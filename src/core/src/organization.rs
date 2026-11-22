@@ -74,6 +74,16 @@ const INVITE_ROLE_REFUSED: &str = "Invitations can grant Admin, Editor, Viewer o
 #[cfg(feature = "cloud")]
 const INVITE_NO_LONGER_VALID: &str = "This invitation is no longer valid";
 
+/// What a cloud login does with a user's orgs once the orgs every gate refuses are dropped.
+#[cfg(any(feature = "cloud", test))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LoginOrgs {
+    UseUsable,
+    AwaitInvites,
+    RefuseBlocked,
+    CreateDefault,
+}
+
 /// Checks if a service account token should be masked
 /// Returns true if:
 /// - The service account has allow_static_token set to false
@@ -502,6 +512,21 @@ pub async fn list_org_users_by_user(
     db::org_users::list_orgs_by_user(user_email).await
 }
 
+/// A user left with no usable org and no invite, but with a blocked one, gets no default org.
+#[cfg(any(feature = "cloud", test))]
+pub fn login_orgs(
+    has_usable_org: bool,
+    has_pending_invites: bool,
+    has_blocked_org: bool,
+) -> LoginOrgs {
+    match (has_usable_org, has_pending_invites, has_blocked_org) {
+        (true, ..) => LoginOrgs::UseUsable,
+        (false, true, _) => LoginOrgs::AwaitInvites,
+        (false, false, true) => LoginOrgs::RefuseBlocked,
+        (false, false, false) => LoginOrgs::CreateDefault,
+    }
+}
+
 /// Always creates a new org. Also, makes the user an admin of the org
 pub async fn create_org(
     org: &mut Organization,
@@ -856,6 +881,9 @@ async fn refuse_deleted_org(org_id: &str) -> Result<(), anyhow::Error> {
             .await
             .is_ok_and(|org| org.status == "deleted")
     };
+    if db::org_status::is_operator_blocked(org_id) {
+        return Err(anyhow::anyhow!("Organization {org_id} is blocked"));
+    }
     if db::org_status::is_blocked(org_id) || tombstoned().await {
         return Err(anyhow::anyhow!("Organization {org_id} is deleted"));
     }
@@ -1888,6 +1916,7 @@ mod tests {
         check_and_create_org_without_ofga(org).await.unwrap();
         refuse_inactive_invite_org(org).await.unwrap();
         for status in [
+            OrgStatus::Blocked,
             OrgStatus::PendingDeletion,
             OrgStatus::Deleting,
             OrgStatus::Deleted,
@@ -1941,6 +1970,51 @@ mod tests {
         for org_id in ["public_dashboards", "Public_Dashboards"] {
             let err = validate_auto_created_org_id(org_id).unwrap_err();
             assert!(err.to_string().contains("reserved"), "{org_id}: {err}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_auto_provisioning_names_an_operator_block_apart_from_a_deletion() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        let mut texts = vec![];
+        for (org, status) in [
+            ("provision-refused-blocked", OrgStatus::Blocked),
+            ("provision-refused-pending", OrgStatus::PendingDeletion),
+        ] {
+            ORG_STATUS_CACHE.insert(org.to_string(), status);
+            let refused = refuse_deleted_org(org).await;
+            ORG_STATUS_CACHE.remove(org);
+            texts.push(refused.unwrap_err().to_string());
+        }
+        assert_eq!(
+            texts,
+            [
+                "Organization provision-refused-blocked is blocked",
+                "Organization provision-refused-pending is deleted",
+            ]
+        );
+    }
+
+    #[test]
+    fn test_login_orgs_refuses_only_a_user_left_with_nothing_but_blocked_orgs() {
+        use LoginOrgs::*;
+        // (usable org left, pending invite, a blocked org) -> outcome
+        let table = [
+            ((true, false, false), UseUsable),
+            ((true, true, false), UseUsable),
+            ((true, false, true), UseUsable),
+            ((true, true, true), UseUsable),
+            ((false, true, false), AwaitInvites),
+            ((false, true, true), AwaitInvites),
+            ((false, false, true), RefuseBlocked),
+            ((false, false, false), CreateDefault),
+        ];
+        for ((usable, invites, blocked), expected) in table {
+            assert_eq!(
+                login_orgs(usable, invites, blocked),
+                expected,
+                "usable={usable} invites={invites} blocked={blocked}"
+            );
         }
     }
 }

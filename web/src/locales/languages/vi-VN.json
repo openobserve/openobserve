@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "Không thể bắt đầu xóa.",
       "organizationResurrected": "Tổ chức đã được phục hồi.",
       "failedToResurrect": "Không thể phục hồi.",
+      "organizationBlocked": "Đã chặn tổ chức.",
+      "failedToBlock": "Chặn thất bại.",
+      "organizationUnblocked": "Đã bỏ chặn tổ chức.",
+      "failedToUnblock": "Bỏ chặn thất bại.",
       "organizationUpdated": "Cập nhật tổ chức thành công.",
       "organizationAdded": "Thêm tổ chức thành công.",
       "requestCompleted": "Yêu cầu hoàn thành thành công.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "Còn {n} ngày",
     "resurrect": "Khôi phục tổ chức",
     "statusActive": "Hoạt động",
-    "statusDeleting": "Đang xóa"
+    "statusDeleting": "Đang xóa",
+    "statusBlocked": "Đã chặn",
+    "block": "Chặn tổ chức",
+    "unblock": "Bỏ chặn tổ chức",
+    "blockConfirmMessage": "Chặn {name}? Tổ chức sẽ không nhận dữ liệu nhập, truy vấn và đăng nhập cho đến khi được bỏ chặn.",
+    "blockConfirmLabel": "Chặn"
   },
   "template": {
     "search": "Tìm kiếm mẫu"

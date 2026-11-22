@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "Verwijdering starten mislukt.",
       "organizationResurrected": "Organisatie hersteld.",
       "failedToResurrect": "Herstellen mislukt.",
+      "organizationBlocked": "Organisatie geblokkeerd.",
+      "failedToBlock": "Blokkeren mislukt.",
+      "organizationUnblocked": "Organisatie gedeblokkeerd.",
+      "failedToUnblock": "Deblokkeren mislukt.",
       "organizationUpdated": "Organisatie succesvol bijgewerkt.",
       "organizationAdded": "Organisatie succesvol toegevoegd.",
       "requestCompleted": "Verzoek succesvol voltooid.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "{n} dagen resterend",
     "resurrect": "Organisatie herstellen",
     "statusActive": "Actief",
-    "statusDeleting": "Wordt verwijderd"
+    "statusDeleting": "Wordt verwijderd",
+    "statusBlocked": "Geblokkeerd",
+    "block": "Organisatie blokkeren",
+    "unblock": "Organisatie deblokkeren",
+    "blockConfirmMessage": "{name} blokkeren? Tot de deblokkering accepteert de organisatie geen ingestie, query's of aanmeldingen meer.",
+    "blockConfirmLabel": "Blokkeren"
   },
   "template": {
     "search": "Sjabloon zoeken"

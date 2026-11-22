@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "Avvio eliminazione fallito.",
       "organizationResurrected": "Organizzazione ripristinata.",
       "failedToResurrect": "Ripristino fallito.",
+      "organizationBlocked": "Organizzazione bloccata.",
+      "failedToBlock": "Blocco non riuscito.",
+      "organizationUnblocked": "Organizzazione sbloccata.",
+      "failedToUnblock": "Sblocco non riuscito.",
       "organizationUpdated": "Organizzazione aggiornata con successo.",
       "organizationAdded": "Organizzazione aggiunta con successo.",
       "requestCompleted": "Richiesta completata con successo.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "{n} giorni rimasti",
     "resurrect": "Resuscita organizzazione",
     "statusActive": "Attivo",
-    "statusDeleting": "In eliminazione"
+    "statusDeleting": "In eliminazione",
+    "statusBlocked": "Bloccata",
+    "block": "Blocca organizzazione",
+    "unblock": "Sblocca organizzazione",
+    "blockConfirmMessage": "Bloccare {name}? Non accetterà più ingestione, query e accessi finché non verrà sbloccata.",
+    "blockConfirmLabel": "Blocca"
   },
   "template": {
     "search": "Cerca template"

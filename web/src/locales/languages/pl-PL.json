@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "Nie udało się zainicjować usuwania.",
       "organizationResurrected": "Organizacja przywrócona.",
       "failedToResurrect": "Nie udało się przywrócić.",
+      "organizationBlocked": "Organizacja zablokowana.",
+      "failedToBlock": "Nie udało się zablokować.",
+      "organizationUnblocked": "Organizacja odblokowana.",
+      "failedToUnblock": "Nie udało się odblokować.",
       "organizationUpdated": "Organizacja zaktualizowana pomyślnie.",
       "organizationAdded": "Organizacja dodana pomyślnie.",
       "requestCompleted": "Żądanie zakończone pomyślnie.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "Pozostałe dni: {n}",
     "resurrect": "Przywróć organizację",
     "statusActive": "Aktywna",
-    "statusDeleting": "Usuwanie"
+    "statusDeleting": "Usuwanie",
+    "statusBlocked": "Zablokowana",
+    "block": "Zablokuj organizację",
+    "unblock": "Odblokuj organizację",
+    "blockConfirmMessage": "Zablokować {name}? Do czasu odblokowania organizacja nie będzie przyjmować danych, zapytań ani logowań.",
+    "blockConfirmLabel": "Zablokuj"
   },
   "template": {
     "search": "Szukaj szablonu"

@@ -144,6 +144,8 @@ pub enum QueueError {
 pub enum IngestionError {
     #[error("Organization [{0}] is deleted")]
     OrgBlocked(String),
+    #[error("Organization [{0}] is blocked")]
+    OrgBlockedByOperator(String),
 }
 
 #[derive(ThisError, Debug)]
@@ -340,7 +342,9 @@ impl Error {
         match self {
             Error::ErrorCode(code) => code.http_status(),
             Error::ResourceError(_) => 503,
-            Error::Ingestion(IngestionError::OrgBlocked(_)) => 403,
+            Error::Ingestion(
+                IngestionError::OrgBlocked(_) | IngestionError::OrgBlockedByOperator(_),
+            ) => 403,
             // A JSON deserialization failure means the client sent a malformed
             // request body, so surface it as 400 rather than a 500 server error.
             _ => 400,
@@ -844,6 +848,13 @@ mod tests {
         let e = Error::from(IngestionError::OrgBlocked("t1".into()));
         assert_eq!(e.http_status(), 403);
         assert_eq!(e.to_string(), "Organization [t1] is deleted");
+    }
+
+    #[test]
+    fn test_an_operator_block_is_forbidden_and_named_blocked() {
+        let e = Error::from(IngestionError::OrgBlockedByOperator("t1".into()));
+        assert_eq!(e.http_status(), 403);
+        assert_eq!(e.to_string(), "Organization [t1] is blocked");
     }
 
     #[derive(Debug)]

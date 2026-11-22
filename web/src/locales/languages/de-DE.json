@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "Löschung konnte nicht eingeleitet werden.",
       "organizationResurrected": "Organisation wiederhergestellt.",
       "failedToResurrect": "Wiederherstellung fehlgeschlagen.",
+      "organizationBlocked": "Organisation gesperrt.",
+      "failedToBlock": "Sperren fehlgeschlagen.",
+      "organizationUnblocked": "Organisation entsperrt.",
+      "failedToUnblock": "Entsperren fehlgeschlagen.",
       "organizationUpdated": "Organisation erfolgreich aktualisiert.",
       "organizationAdded": "Organisation erfolgreich hinzugefügt.",
       "requestCompleted": "Anfrage erfolgreich abgeschlossen.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "{n} Tage verbleibend",
     "resurrect": "Organisation wiederherstellen",
     "statusActive": "Aktiv",
-    "statusDeleting": "Wird gelöscht"
+    "statusDeleting": "Wird gelöscht",
+    "statusBlocked": "Gesperrt",
+    "block": "Organisation sperren",
+    "unblock": "Organisation entsperren",
+    "blockConfirmMessage": "{name} sperren? Bis zur Entsperrung nimmt die Organisation keine Datenaufnahme, Abfragen oder Anmeldungen mehr an.",
+    "blockConfirmLabel": "Sperren"
   },
   "template": {
     "search": "Vorlage suchen"

@@ -46,6 +46,13 @@ pub async fn broadcast_deleted(org_id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
+/// Update local cache + broadcast that an operator blocked an org; the caller wrote the row.
+pub async fn broadcast_blocked(org_id: &str) -> Result<(), errors::Error> {
+    ORG_STATUS_CACHE.insert(org_id.to_string(), OrgStatus::Blocked);
+    coordinator::emit_blocked_event(org_id).await?;
+    Ok(())
+}
+
 /// Evict an org from the status cache on all nodes (called after deletion completes).
 pub async fn evict(org_id: &str) -> Result<(), errors::Error> {
     ORG_STATUS_CACHE.remove(org_id);
@@ -61,17 +68,27 @@ pub async fn set_active(org_id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
-/// True for pending, deleting and tombstoned orgs, which every gate treats as gone.
+/// True for blocked, pending, deleting and tombstoned orgs, which every gate refuses.
 pub fn is_blocked(org_id: &str) -> bool {
     ORG_STATUS_CACHE
         .get(org_id)
         .map(|v| {
             matches!(
                 *v,
-                OrgStatus::Deleting | OrgStatus::PendingDeletion | OrgStatus::Deleted
+                OrgStatus::Blocked
+                    | OrgStatus::Deleting
+                    | OrgStatus::PendingDeletion
+                    | OrgStatus::Deleted
             )
         })
         .unwrap_or(false)
+}
+
+/// True only for an org an operator blocked, which gates name apart from a deletion.
+pub fn is_operator_blocked(org_id: &str) -> bool {
+    ORG_STATUS_CACHE
+        .get(org_id)
+        .is_some_and(|v| *v == OrgStatus::Blocked)
 }
 
 /// True for deleting and tombstoned orgs, the states that run the org-gone hook.
@@ -107,20 +124,7 @@ pub fn set_org_gone_hook(hook: fn(&str)) {
 pub async fn load_from_db() -> Result<(), anyhow::Error> {
     let orgs = organizations::list(organizations::ListFilter::default()).await?;
     for org in orgs {
-        match org.status.as_str() {
-            "deleting" => {
-                ORG_STATUS_CACHE.insert(org.identifier.clone(), OrgStatus::Deleting);
-                run_org_gone_hook(&org.identifier);
-            }
-            "pending_deletion" => {
-                ORG_STATUS_CACHE.insert(org.identifier.clone(), OrgStatus::PendingDeletion);
-            }
-            "deleted" => {
-                ORG_STATUS_CACHE.insert(org.identifier.clone(), OrgStatus::Deleted);
-                run_org_gone_hook(&org.identifier);
-            }
-            _ => {}
-        }
+        cache_refused_status(&org.identifier, &org.status);
     }
     Ok(())
 }
@@ -169,10 +173,6 @@ async fn apply_event(event: db::Event) {
 }
 
 async fn apply_put(org_id: &str, value: Option<&[u8]>) {
-    use infra::coordinator::org_status::{
-        STATUS_ACTIVE, STATUS_DELETED, STATUS_DELETING, STATUS_PENDING_DELETION,
-    };
-
     // The DB is the fallback for a coordinator backend that delivers no inline value.
     let status = match value {
         Some(v) => String::from_utf8_lossy(v).to_string(),
@@ -184,33 +184,33 @@ async fn apply_put(org_id: &str, value: Option<&[u8]>) {
             }
         },
     };
-    match status.as_str() {
-        STATUS_DELETING => {
-            ORG_STATUS_CACHE.insert(org_id.to_string(), OrgStatus::Deleting);
-            log::info!("[org_status] org {org_id} marked deleting in cache");
-            run_org_gone_hook(org_id);
-        }
-        STATUS_PENDING_DELETION => {
-            ORG_STATUS_CACHE.insert(org_id.to_string(), OrgStatus::PendingDeletion);
-            log::info!("[org_status] org {org_id} marked pending_deletion in cache");
-        }
-        STATUS_DELETED => {
-            ORG_STATUS_CACHE.insert(org_id.to_string(), OrgStatus::Deleted);
-            log::info!("[org_status] org {org_id} marked deleted in cache");
-            run_org_gone_hook(org_id);
-        }
-        STATUS_ACTIVE => {
-            ORG_STATUS_CACHE.remove(org_id);
-            log::info!("[org_status] org {org_id} active, cleared from cache");
-        }
-        other => {
-            // Loud, because clearing the entry could unblock an org that is really being deleted.
-            log::warn!(
-                "[org_status] org {org_id} unexpected status={other:?}; clearing from cache"
-            );
-            ORG_STATUS_CACHE.remove(org_id);
-        }
+    if cache_refused_status(org_id, &status) {
+        log::info!("[org_status] org {org_id} marked {status} in cache");
+    } else if status == coordinator::STATUS_ACTIVE {
+        ORG_STATUS_CACHE.remove(org_id);
+        log::info!("[org_status] org {org_id} active, cleared from cache");
+    } else {
+        // Loud, because clearing the entry could unblock an org that is really being deleted.
+        log::warn!("[org_status] org {org_id} unexpected status={status:?}; clearing from cache");
+        ORG_STATUS_CACHE.remove(org_id);
     }
+}
+
+/// Caches a status every gate refuses, running the gone hook for a deletion; false for any other.
+fn cache_refused_status(org_id: &str, status: &str) -> bool {
+    let cached = match status {
+        coordinator::STATUS_BLOCKED => OrgStatus::Blocked,
+        coordinator::STATUS_PENDING_DELETION => OrgStatus::PendingDeletion,
+        coordinator::STATUS_DELETING => OrgStatus::Deleting,
+        coordinator::STATUS_DELETED => OrgStatus::Deleted,
+        _ => return false,
+    };
+    let gone = matches!(cached, OrgStatus::Deleting | OrgStatus::Deleted);
+    ORG_STATUS_CACHE.insert(org_id.to_string(), cached);
+    if gone {
+        run_org_gone_hook(org_id);
+    }
+    true
 }
 
 /// Callers run it after the cache insert, so a writer that re-checks the status misses no removal.
@@ -223,8 +223,8 @@ fn run_org_gone_hook(org_id: &str) {
 #[cfg(test)]
 mod tests {
     use super::{
-        ORG_STATUS_CACHE, OrgStatus, apply_event, coordinator, is_active, is_blocked, is_gone,
-        organizations, read_active, set_org_gone_hook,
+        ORG_STATUS_CACHE, OrgStatus, apply_event, cache_refused_status, coordinator, is_active,
+        is_blocked, is_gone, organizations, read_active, set_org_gone_hook,
     };
 
     /// `(org, blocked when the hook ran)` for each hook call; tests filter by their own org ids.
@@ -266,9 +266,17 @@ mod tests {
     }
 
     #[test]
+    fn test_is_blocked_true_for_an_operator_block() {
+        with_org_status("org-operator-blocked", OrgStatus::Blocked, || {
+            assert!(is_blocked("org-operator-blocked"));
+        });
+    }
+
+    #[test]
     fn test_is_gone_only_for_deleting_and_deleted() {
         for (status, gone) in [
             (OrgStatus::Active, false),
+            (OrgStatus::Blocked, false),
             (OrgStatus::PendingDeletion, false),
             (OrgStatus::Deleting, true),
             (OrgStatus::Deleted, true),
@@ -430,11 +438,41 @@ mod tests {
             ("gone-hook-deleting", "deleting", vec![true]),
             ("gone-hook-deleted", "deleted", vec![true]),
             ("gone-hook-pending", "pending_deletion", vec![]),
+            ("gone-hook-blocked", "blocked", vec![]),
             ("gone-hook-active", "active", vec![]),
         ] {
             apply_event(event(org, status)).await;
             ORG_STATUS_CACHE.remove(org);
             assert_eq!(gone_calls_for(org), calls, "{status}");
         }
+    }
+
+    #[tokio::test]
+    async fn test_a_blocked_put_caches_the_block() {
+        use infra::{
+            coordinator::org_status::{ORG_STATUS_KEY_PREFIX, STATUS_BLOCKED},
+            db::{Event, EventData},
+        };
+        let org = "put-caches-blocked";
+        apply_event(Event::Put(EventData {
+            key: format!("{ORG_STATUS_KEY_PREFIX}{org}"),
+            value: Some(STATUS_BLOCKED.as_bytes().to_vec().into()),
+            start_dt: None,
+        }))
+        .await;
+        let cached = ORG_STATUS_CACHE.get(org).map(|status| status.clone());
+        ORG_STATUS_CACHE.remove(org);
+        assert_eq!(cached, Some(OrgStatus::Blocked));
+    }
+
+    #[test]
+    fn test_startup_load_caches_a_blocked_row_without_the_gone_hook() {
+        set_org_gone_hook(record_gone);
+        let org_id = "load-row-blocked";
+        cache_refused_status(org_id, coordinator::STATUS_BLOCKED);
+        let cached = ORG_STATUS_CACHE.get(org_id).map(|status| status.clone());
+        ORG_STATUS_CACHE.remove(org_id);
+        assert_eq!(cached, Some(OrgStatus::Blocked));
+        assert!(gone_calls_for(org_id).is_empty());
     }
 }

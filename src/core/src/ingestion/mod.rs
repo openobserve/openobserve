@@ -832,6 +832,9 @@ pub async fn check_ingestion_allowed(
     stream_type: StreamType,
     stream_name: Option<&str>,
 ) -> Result<()> {
+    if db::org_status::is_operator_blocked(org_id) {
+        return Err(infra::errors::IngestionError::OrgBlockedByOperator(org_id.to_string()).into());
+    }
     if db::org_status::is_blocked(org_id) {
         return Err(infra::errors::IngestionError::OrgBlocked(org_id.to_string()).into());
     }
@@ -2161,6 +2164,16 @@ mod tests {
         use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
 
         let org = "ingest-blocked-org";
+        ORG_STATUS_CACHE.insert(org.to_string(), OrgStatus::Blocked);
+        let res = check_ingestion_allowed(org, StreamType::Logs, Some("default")).await;
+        ORG_STATUS_CACHE.remove(org);
+        assert!(
+            matches!(
+                res,
+                Err(Error::Ingestion(infra::errors::IngestionError::OrgBlockedByOperator(ref o))) if o == org
+            ),
+            "Blocked: {res:?}"
+        );
         for status in [
             OrgStatus::PendingDeletion,
             OrgStatus::Deleting,

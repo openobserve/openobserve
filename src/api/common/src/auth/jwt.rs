@@ -45,7 +45,7 @@ use {
         get_user_crole_removal_tuples,
     },
     openobserve_core::org_domain_ownership::get_cached_org_for_domain,
-    openobserve_core::organization::list_org_users_by_user,
+    openobserve_core::organization::{LoginOrgs, list_org_users_by_user, login_orgs},
     openobserve_core::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
     openobserve_core::users,
     std::{collections::HashSet, str::FromStr as _},
@@ -1262,31 +1262,42 @@ pub async fn check_and_add_to_org(
         ),
     }
 
-    // Check if the user is part of any organization. Exclude orgs that are
-    // pending_deletion/deleting: they are hidden + blocked everywhere, so if a
-    // user's ONLY org is being deleted we must treat them as having no org and
-    // create a fresh default one — otherwise the org-list API returns empty and
-    // the UI is stuck on a blank screen / login loop.
-    let org_users = list_org_users_by_user(user_email).await;
-    if org_users.is_err() {
-        log::error!("Error fetching orgs for user: {}", user_email);
-    }
-    let org_users = org_users.map(|orgs| {
-        orgs.into_iter()
-            .filter(|o| !db::org_status::is_blocked(&o.org_id))
-            .collect::<Vec<_>>()
-    });
+    // Refused orgs do not count: a user whose only org is being deleted gets a fresh default
+    // org, or the UI is stuck on a blank screen, but one whose org is blocked is refused.
+    let org_users = match list_org_users_by_user(user_email).await {
+        Ok(orgs) => orgs,
+        Err(e) => {
+            log::error!("Error fetching orgs for user: {user_email}: {e}");
+            vec![]
+        }
+    };
+    let has_blocked_org = org_users
+        .iter()
+        .any(|o| org_status::is_operator_blocked(&o.org_id));
+    let usable_orgs: Vec<_> = org_users
+        .into_iter()
+        .filter(|o| !org_status::is_blocked(&o.org_id))
+        .collect();
 
-    let (org_name, role) = match org_users {
-        Ok(existing_orgs) if !existing_orgs.is_empty() => (
-            existing_orgs[0].org_name.to_owned(),
-            existing_orgs[0].role.to_string(),
+    let plan = login_orgs(
+        !usable_orgs.is_empty(),
+        has_pending_invites,
+        has_blocked_org,
+    );
+    let (org_name, role) = match plan {
+        // `UseUsable` is only chosen when `usable_orgs` is not empty.
+        LoginOrgs::UseUsable => (
+            usable_orgs[0].org_name.to_owned(),
+            usable_orgs[0].role.to_string(),
         ),
-        // if there are some pending invites, we do not want to create any orgs for the user
-        _ if has_pending_invites => {
+        LoginOrgs::AwaitInvites => {
             return Ok((is_new_user, has_pending_invites));
         }
-        _ => {
+        LoginOrgs::RefuseBlocked => {
+            log::info!("refusing login of {user_email}: every org of the user is blocked");
+            return Err(anyhow::anyhow!("Organization is blocked"));
+        }
+        LoginOrgs::CreateDefault => {
             // Create a default org for the user
             let org = Organization {
                 // id will be overridden by the service function

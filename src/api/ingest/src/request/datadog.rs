@@ -373,7 +373,9 @@ fn logs_error_status(e: &infra::errors::Error) -> StatusCode {
     match e {
         Error::ResourceError(_) => StatusCode::SERVICE_UNAVAILABLE,
         Error::TrialPeriodExpired => StatusCode::TOO_MANY_REQUESTS,
-        Error::Ingestion(IngestionError::OrgBlocked(_)) => StatusCode::FORBIDDEN,
+        Error::Ingestion(
+            IngestionError::OrgBlocked(_) | IngestionError::OrgBlockedByOperator(_),
+        ) => StatusCode::FORBIDDEN,
         Error::PayloadTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
         Error::IngestionError(msg) if is_retryable_admission(msg) => {
             StatusCode::SERVICE_UNAVAILABLE
@@ -603,6 +605,10 @@ mod tests {
             (Error::TrialPeriodExpired, StatusCode::TOO_MANY_REQUESTS),
             (
                 Error::from(IngestionError::OrgBlocked("acme".to_string())),
+                StatusCode::FORBIDDEN,
+            ),
+            (
+                Error::from(IngestionError::OrgBlockedByOperator("acme".to_string())),
                 StatusCode::FORBIDDEN,
             ),
             (

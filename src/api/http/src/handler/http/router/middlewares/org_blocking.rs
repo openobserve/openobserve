@@ -44,6 +44,17 @@ fn is_own_cleanup_retry(method: &Method, path: &str) -> bool {
         )
 }
 
+/// The 403 text for an org every gate refuses; `None` when the org is open.
+fn refusal(org_id: &str) -> Option<&'static str> {
+    if !db::org_status::is_blocked(org_id) {
+        return None;
+    }
+    if db::org_status::is_operator_blocked(org_id) {
+        return Some("Organization is blocked");
+    }
+    Some("Organization is deleted")
+}
+
 pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
     let path = routed_path(request.uri().path());
 
@@ -53,14 +64,14 @@ pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
 
     if !org_id.is_empty()
         && !SYSTEM_PREFIXES.contains(&org_id)
-        && db::org_status::is_blocked(org_id)
+        && let Some(text) = refusal(org_id)
         && !is_own_cleanup_retry(request.method(), path)
     {
         // "deleted", not "being deleted": this gate also covers the soft-delete
         // (pending_deletion) grace window, during which the org is invisible and
         // inaccessible to the end user — to them it is simply deleted, even though
         // we retain the data for the recovery window.
-        return (StatusCode::FORBIDDEN, "Organization is deleted").into_response();
+        return (StatusCode::FORBIDDEN, text).into_response();
     }
 
     #[cfg(feature = "cloud")]
@@ -100,11 +111,8 @@ pub async fn blocked_org_param(
     request: Request,
     next: Next,
 ) -> Response {
-    if params
-        .get("org_id")
-        .is_some_and(|org_id| db::org_status::is_blocked(org_id))
-    {
-        return (StatusCode::FORBIDDEN, "Organization is deleted").into_response();
+    if let Some(text) = params.get("org_id").and_then(|org_id| refusal(org_id)) {
+        return (StatusCode::FORBIDDEN, text).into_response();
     }
     next.run(request).await
 }
@@ -219,6 +227,47 @@ mod tests {
         ORG_STATUS_CACHE.remove(org);
         let codes: Vec<u16> = statuses.iter().map(|(_, s)| *s).collect();
         assert_eq!(codes, [200, 403, 403, 403], "{statuses:?}");
+    }
+
+    #[tokio::test]
+    async fn test_both_gates_name_an_operator_block_apart_from_a_deletion() {
+        use axum::{Router, body::Body, http::Request, middleware, routing::get};
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        use tower::ServiceExt;
+
+        let api = Router::new()
+            .route("/{org_id}/streams", get(|| async { "ok" }))
+            .layer(middleware::from_fn(super::blocked_orgs_middleware));
+        let param = Router::new().route(
+            "/web/{org_id}/page",
+            get(|| async { "ok" }).layer(middleware::from_fn(super::blocked_org_param)),
+        );
+        let mut seen = vec![];
+        for (org, status) in [
+            ("gate-text-blocked", OrgStatus::Blocked),
+            ("gate-text-pending", OrgStatus::PendingDeletion),
+            ("gate-text-deleting", OrgStatus::Deleting),
+            ("gate-text-deleted", OrgStatus::Deleted),
+        ] {
+            ORG_STATUS_CACHE.insert(org.to_string(), status);
+            for (app, uri) in [
+                (&api, format!("/{org}/streams")),
+                (&param, format!("/web/{org}/page")),
+            ] {
+                let request = Request::get(uri).body(Body::empty()).unwrap();
+                let response = app.clone().oneshot(request).await.unwrap();
+                let code = response.status().as_u16();
+                let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                    .await
+                    .unwrap();
+                seen.push((code, String::from_utf8_lossy(&body).to_string()));
+            }
+            ORG_STATUS_CACHE.remove(org);
+        }
+        let blocked = (403, "Organization is blocked".to_string());
+        let deleted = (403, "Organization is deleted".to_string());
+        assert_eq!(seen[..2], [blocked.clone(), blocked]);
+        assert!(seen[2..].iter().all(|text| *text == deleted), "{seen:?}");
     }
 
     #[test]

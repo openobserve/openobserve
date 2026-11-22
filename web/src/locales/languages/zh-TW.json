@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "啟動刪除失敗。",
       "organizationResurrected": "組織已復原。",
       "failedToResurrect": "復原失敗。",
+      "organizationBlocked": "組織已封鎖。",
+      "failedToBlock": "封鎖失敗。",
+      "organizationUnblocked": "組織已解除封鎖。",
+      "failedToUnblock": "解除封鎖失敗。",
       "organizationUpdated": "組織更新成功。",
       "organizationAdded": "組織新增成功。",
       "requestCompleted": "要求已成功完成。",
@@ -5228,7 +5232,12 @@
     "daysLeft": "剩餘 {n} 天",
     "resurrect": "恢復組織",
     "statusActive": "啟用中",
-    "statusDeleting": "刪除中"
+    "statusDeleting": "刪除中",
+    "statusBlocked": "已封鎖",
+    "block": "封鎖組織",
+    "unblock": "解除封鎖組織",
+    "blockConfirmMessage": "封鎖 {name}？在解除封鎖之前，該組織將不再接受資料擷取、查詢和登入。",
+    "blockConfirmLabel": "封鎖"
   },
   "template": {
     "search": "搜尋範本"
