@@ -615,6 +615,9 @@ fn admission_status(e: &infra::errors::Error) -> HecCollectorStatus {
         // Not an ingester, and a cloud trial that has run out, are both conditions
         // of the receiving side rather than of the batch.
         infra::errors::Error::TrialPeriodExpired => HecCollectorStatus::ServerBusy,
+        infra::errors::Error::ErrorCode(
+            infra::errors::ErrorCodes::ContractUsageLimitExceeded { .. },
+        ) => HecCollectorStatus::ServerBusy,
         // Same answer the auth middleware gives a blocked org, for a block that lands mid-request.
         infra::errors::Error::Ingestion(infra::errors::IngestionError::OrgBlocked(..)) => {
             HecCollectorStatus::TokenDisabled

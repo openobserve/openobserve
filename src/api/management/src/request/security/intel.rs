@@ -89,7 +89,7 @@ pub async fn sweep(
         return MetaHttpResponse::bad_request("Too many indicators or streams in one sweep");
     }
     if let Err(e) = search_service::check_org_search_allowed(&org_id) {
-        return MetaHttpResponse::too_many_requests(e.to_string());
+        return MetaHttpResponse::search_refused(e);
     }
 
     let mut streams = vec![];
@@ -231,7 +231,7 @@ pub async fn sightings(
         ));
     }
     if let Err(e) = search_service::check_org_search_allowed(&org_id) {
-        return MetaHttpResponse::too_many_requests(e.to_string());
+        return MetaHttpResponse::search_refused(e);
     }
     let mut series = Vec::with_capacity(req.sightings.len());
     for target in &req.sightings {

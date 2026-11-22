@@ -1772,7 +1772,7 @@ pub async fn get_pipelines(
     {
         // Fleet routes are outside the gated group, so this PromQL search checks the licence here.
         if let Err(e) = search_service::check_org_search_allowed(&org_id) {
-            return MetaHttpResponse::too_many_requests(e);
+            return MetaHttpResponse::search_refused(e);
         }
         let user_id = &user_email.user_id;
         if !allowed_on(FLEET_MANAGEMENT, &org_id, user_id, "GET").await {

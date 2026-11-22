@@ -14,12 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import store from "../stores";
-import { addLicenseDeniedError } from "@/composables/useLicenseDenials";
+import { addLicenseDeniedError, addUsageLimitError } from "@/composables/useLicenseDenials";
 import { markLicenseDenial, recordDenial } from "@/composables/useFeatureLock";
-import { deniedByContract, licenseDeniedFeatures } from "@/utils/featureGate";
+import { deniedByContract, licenseDeniedFeatures, usageLimitMessage } from "@/utils/featureGate";
 
-/** Sends a license or contract denial to the top bar; true when the error was one. */
+/** Sends a license, contract or usage-limit denial to the top bar; true when the error was one. */
 export const receiveLicenseDenial = (error: unknown, requestStartedAt?: number): boolean => {
+  const usageLimit = usageLimitMessage(error);
+  if (usageLimit !== null) {
+    addUsageLimitError(usageLimit, requestStartedAt);
+    return true;
+  }
   const features = licenseDeniedFeatures(error);
   if (!features) return false;
   markLicenseDenial(error);
@@ -35,12 +40,12 @@ export const installFetchLicenseReceiver = (): void => {
   window.fetch = async (...args) => {
     const startedAt = Date.now();
     const response = await nativeFetch(...args);
-    if (response.status !== 403) return response;
+    if (response.status !== 403 && response.status !== 429) return response;
     try {
       if (response.url.startsWith(new URL(store.state.API_ENDPOINT, window.location.origin).href)) {
         // Awaited so the denial is marked before the caller can toast its message.
         receiveLicenseDenial(
-          { response: { status: 403, data: await response.clone().json() } },
+          { response: { status: response.status, data: await response.clone().json() } },
           startedAt,
         );
       }

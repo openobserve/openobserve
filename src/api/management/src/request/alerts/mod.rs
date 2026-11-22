@@ -115,6 +115,9 @@ const ONCALL_LOCKED_WARNING: &str =
 const ONCALL_UNCONTRACTED_WARNING: &str =
     "This alert will not page its on-call team: On-Call is not included in your contract.";
 
+/// The save warning while the org is over a contract usage limit, which stops every metered feature.
+const USAGE_BLOCKED_WARNING: &str = "This alert will not run while the organization is over a usage limit on its contract.";
+
 /// Stripped on export: re-importing this state would claim a model the destination never trained.
 #[cfg(feature = "enterprise")]
 const ANOMALY_EXPORT_STRIPPED_KEYS: &[&str] = &[
@@ -210,6 +213,7 @@ fn workflows_lock(_org_id: &str) -> Option<&'static str> {
         match org_denial(_org_id, &[config::meta::feature::Feature::Workflows])? {
             Denial::License(_) => Some(WORKFLOWS_LOCKED_WARNING),
             Denial::Contract(_) => Some(WORKFLOWS_UNCONTRACTED_WARNING),
+            Denial::UsageLimit(_) => Some(USAGE_BLOCKED_WARNING),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -224,6 +228,7 @@ fn oncall_lock(_org_id: &str) -> Option<&'static str> {
         match o2_enterprise::enterprise::oncall::denial_for(_org_id)? {
             Denial::License(_) => Some(ONCALL_LOCKED_WARNING),
             Denial::Contract(_) => Some(ONCALL_UNCONTRACTED_WARNING),
+            Denial::UsageLimit(_) => Some(USAGE_BLOCKED_WARNING),
         }
     }
     #[cfg(not(feature = "enterprise"))]

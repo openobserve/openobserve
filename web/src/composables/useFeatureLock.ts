@@ -27,7 +27,7 @@ import {
   type Ref,
 } from "vue";
 import { useStore } from "vuex";
-import { featureState, lockedByContract } from "@/utils/featureGate";
+import { featureState, lockReason, lockedByContract, type LockReason } from "@/utils/featureGate";
 import type { I18nText } from "@/types/i18n";
 
 export interface FeatureLock {
@@ -103,11 +103,19 @@ export const useFeatureNames = () => {
 };
 
 // What refused each key in a denial, so wording follows the latest denial even before the config reloads.
-const denials = reactive(new Map<string, "license" | "contract">());
+const denials = reactive(new Map<string, LockReason>());
 
 /** Records what refused these keys, from the denial's code. */
-export const recordDenial = (keys: readonly string[], byContract: boolean): void => {
-  for (const key of keys) denials.set(key, byContract ? "contract" : "license");
+export const recordDenial = (keys: readonly string[], reason: boolean | LockReason): void => {
+  const lock: LockReason = reason === true ? "contract" : reason === false ? "license" : reason;
+  for (const key of keys) denials.set(key, lock);
+};
+
+/** What locks these keys: the license, the contract or a contract usage limit. */
+export const useLockReason = () => {
+  const store = useStore();
+  return (keys: readonly string[]): LockReason =>
+    lockReason(store?.state.zoConfig?.feature_locks, keys, denials);
 };
 
 /** Whether the org's contract, not the license, locks every one of these keys. */

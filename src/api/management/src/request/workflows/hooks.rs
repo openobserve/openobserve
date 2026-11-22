@@ -663,9 +663,10 @@ fn not_entitled(denial: Denial) -> Response {
     let err = match denial {
         Denial::License(_) => ErrorCodes::LicenseFeatureNotEntitled(feature),
         Denial::Contract(_) => ErrorCodes::ContractFeatureNotEntitled(feature),
+        Denial::UsageLimit(block) => openobserve_core::contract_usage::usage_limit_code(&block),
     };
     (
-        StatusCode::FORBIDDEN,
+        StatusCode::from_u16(err.http_status()).unwrap_or(StatusCode::FORBIDDEN),
         Json(MetaHttpResponse::error_code(err)),
     )
         .into_response()

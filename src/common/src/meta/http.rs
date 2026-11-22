@@ -299,6 +299,19 @@ impl HttpResponse {
     }
 
     /// A TooManyRequests response with a `Retry-After` header of at least one second.
+    /// A search gate's 429: the licence message, or a usage block's `40003` body with its meters.
+    pub fn search_refused(error: errors::Error) -> Response {
+        match &error {
+            errors::Error::ErrorCode(code) => (
+                StatusCode::from_u16(code.http_status()).unwrap_or(StatusCode::TOO_MANY_REQUESTS),
+                [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
+                Json(Self::error_code_with_trace_id(code, None)),
+            )
+                .into_response(),
+            _ => Self::too_many_requests(error),
+        }
+    }
+
     pub fn too_many_requests_retry_after(error: impl ToString, retry_after_secs: i64) -> Response {
         let mut resp = Self::too_many_requests(error);
         resp.headers_mut().insert(

@@ -834,7 +834,7 @@ async fn authorize_read(org_id: &str, user_id: &str, stream: &str) -> Result<(),
         if let Err(e) =
             search_service::check_search_allowed(org_id, Some((stream, StreamType::Traces)))
         {
-            return Err(MetaHttpResponse::too_many_requests(e.to_string()));
+            return Err(MetaHttpResponse::search_refused(e));
         }
         if let Some(denied) = openobserve_core::authz::check_stream_permissions(
             stream,

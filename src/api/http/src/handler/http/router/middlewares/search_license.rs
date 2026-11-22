@@ -24,16 +24,19 @@ use common::meta::http::HttpResponse as MetaHttpResponse;
 #[cfg(any(feature = "enterprise", test))]
 use config::{META_ORG_ID, meta::stream::StreamType};
 
-/// Answers the search handlers' licence 429 before a gated route reads any data.
+/// Answers the search handlers' 429, for the licence or an org's usage block, before a gated
+/// route reads any data.
 pub async fn search_license_middleware(request: Request, next: Next) -> Response {
     #[cfg(feature = "enterprise")]
-    if !o2_enterprise::enterprise::license::search_allowed() {
+    {
+        // a usage block is per org, so every request is checked, not only a closed licence
         let (mut parts, body) = request.into_parts();
         if let Some(refused) = refusal(&mut parts).await {
             return refused;
         }
-        return next.run(Request::from_parts(parts, body)).await;
+        next.run(Request::from_parts(parts, body)).await
     }
+    #[cfg(not(feature = "enterprise"))]
     next.run(request).await
 }
 
@@ -60,9 +63,7 @@ fn refusal_for(
     if org_id == META_ORG_ID {
         return None;
     }
-    gate(org_id, None)
-        .err()
-        .map(MetaHttpResponse::too_many_requests)
+    gate(org_id, None).err().map(MetaHttpResponse::search_refused)
 }
 
 #[cfg(test)]
@@ -89,6 +90,29 @@ mod tests {
             .await
             .unwrap()
             .to_vec()
+    }
+
+    fn usage_blocked(_: &str, _: Option<(&str, StreamType)>) -> Result<(), Error> {
+        Err(Error::ErrorCode(infra::errors::ErrorCodes::ContractUsageLimitExceeded {
+            meters: "ingestion".to_string(),
+            until: 1_793_577_600_000_000,
+        }))
+    }
+
+    #[tokio::test]
+    async fn a_usage_block_answers_429_with_its_40003_body() {
+        let refused = refusal_for("acme", usage_blocked).unwrap();
+        assert_eq!(refused.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(refused.headers().get("X-Error-Message").unwrap(), "40003");
+        let json: serde_json::Value =
+            serde_json::from_slice(&body_bytes(refused).await).unwrap();
+        assert_eq!(json["code"], 40003);
+        assert_eq!(json["error_detail"], "ingestion");
+        assert_eq!(
+            json["message"],
+            "Usage limit exceeded on your contract (ingestion). Metered features are blocked until 2026-11-02 00:00 UTC. Contact your account manager."
+        );
+        assert!(refusal_for("_meta", usage_blocked).is_none());
     }
 
     #[test]

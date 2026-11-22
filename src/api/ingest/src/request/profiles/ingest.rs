@@ -25,8 +25,6 @@ use config::{
     axum::middlewares::{get_process_time, insert_process_time_header},
     meta::otlp::OtlpRequestType,
 };
-#[cfg(feature = "cloud")]
-use infra::errors::Error as InfraError;
 use ingestion_common::IngestUser;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
@@ -96,7 +94,7 @@ pub async fn otlp_profiles_write(
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Profiles, None).await {
         // Prefer the request Content-Type; fall back to protobuf for unknown types.
         let req_type = req_type.unwrap_or(OtlpRequestType::HttpProtobuf);
-        let (status, rpc_code) = if matches!(e, InfraError::TrialPeriodExpired) {
+        let (status, rpc_code) = if e.is_quota_refusal() {
             (StatusCode::TOO_MANY_REQUESTS, 8) // RESOURCE_EXHAUSTED
         } else {
             (StatusCode::SERVICE_UNAVAILABLE, 14) // UNAVAILABLE

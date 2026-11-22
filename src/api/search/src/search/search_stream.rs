@@ -24,8 +24,6 @@ use axum::{
     response::Response,
 };
 #[cfg(feature = "enterprise")]
-use axum::{http::StatusCode, response::IntoResponse};
-#[cfg(feature = "enterprise")]
 use common::utils::http::get_extract_patterns_from_request;
 use config::{
     get_config,
@@ -746,14 +744,7 @@ pub async fn values_http2_stream(
     {
         // the request's SQL or filter may read streams other than the one it names
         if let Err(e) = search_service::check_org_search_allowed(&org_id) {
-            return (
-                StatusCode::TOO_MANY_REQUESTS,
-                axum::Json(MetaHttpResponse::error(
-                    StatusCode::TOO_MANY_REQUESTS,
-                    e.to_string(),
-                )),
-            )
-                .into_response();
+            return MetaHttpResponse::search_refused(e);
         }
     }
 

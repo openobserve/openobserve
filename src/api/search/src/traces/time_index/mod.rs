@@ -1292,7 +1292,7 @@ pub(crate) async fn check_stream_permission(
     if let Err(e) =
         search_service::check_search_allowed(org_id, Some((stream_name, StreamType::Traces)))
     {
-        return Err(MetaHttpResponse::too_many_requests(e.to_string()));
+        return Err(MetaHttpResponse::search_refused(e));
     }
     if let Some(response) = super::check_stream_permissions(org_id, stream_name, user_id).await {
         return Err(response);
@@ -1608,7 +1608,7 @@ pub async fn get_org_trace_time_range(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     if let Err(e) = search_service::check_search_allowed(&org_id, None) {
-        return MetaHttpResponse::too_many_requests(e.to_string());
+        return MetaHttpResponse::search_refused(e);
     }
     let request = match parse_lookup_request(&params) {
         Ok(request) => request,

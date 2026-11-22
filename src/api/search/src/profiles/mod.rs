@@ -135,7 +135,7 @@ pub(crate) async fn check_stream_permission(
     if let Err(e) =
         search_service::check_search_allowed(org_id, Some((stream_name, StreamType::Profiles)))
     {
-        return Err(MetaHttpResponse::too_many_requests(e.to_string()));
+        return Err(MetaHttpResponse::search_refused(e));
     }
     if let Some(response) = check_stream_permissions(org_id, stream_name, user_id).await {
         return Err(response);

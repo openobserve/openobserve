@@ -165,7 +165,7 @@ pub async fn traces_write(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Traces, None).await {
-        let status = if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+        let status = if e.is_quota_refusal() {
             http::StatusCode::TOO_MANY_REQUESTS
         } else {
             http::StatusCode::SERVICE_UNAVAILABLE
@@ -267,7 +267,7 @@ pub async fn get_latest_traces(
     {
         // the request's SQL or filter may read streams other than the one it names
         if let Err(e) = search_service::check_org_search_allowed(&org_id) {
-            return MetaHttpResponse::too_many_requests(e.to_string());
+            return MetaHttpResponse::search_refused(e);
         }
     }
 
@@ -384,7 +384,7 @@ pub async fn get_latest_traces_stream(
     {
         // the request's SQL or filter may read streams other than the one it names
         if let Err(e) = search_service::check_org_search_allowed(&org_id) {
-            return MetaHttpResponse::too_many_requests(e.to_string());
+            return MetaHttpResponse::search_refused(e);
         }
     }
 

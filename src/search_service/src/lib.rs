@@ -1086,6 +1086,7 @@ pub fn check_search_allowed(
         if is_license_exempt_stream(_org_id, _stream) {
             return Ok(());
         }
+        check_usage_block(_org_id)?;
         // this is installation level limit for all orgs combined
         if !o2_enterprise::enterprise::license::search_allowed() {
             Err(Error::Message(search_blocked_message(
@@ -1109,6 +1110,34 @@ pub fn check_org_search_allowed(org_id: &str) -> Result<(), Error> {
         return Ok(());
     }
     check_search_allowed(org_id, None)
+}
+
+/// The `40003` refusal for an org over a contract usage limit, or `None`; outside cloud builds
+/// `usage_block` is always `None`.
+pub fn usage_limit_refusal(_org_id: &str) -> Option<Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::license::usage_block(_org_id)
+            .map(|block| Error::ErrorCode(usage_limit_code(&block)))
+    }
+    #[cfg(not(feature = "enterprise"))]
+    None
+}
+
+/// `Err` with the `40003` refusal while the org is blocked.
+pub fn check_usage_block(org_id: &str) -> Result<(), Error> {
+    usage_limit_refusal(org_id).map_or(Ok(()), Err)
+}
+
+/// The error code a usage block answers with.
+#[cfg(feature = "enterprise")]
+pub fn usage_limit_code(
+    block: &o2_enterprise::enterprise::license::UsageBlock,
+) -> infra::errors::ErrorCodes {
+    infra::errors::ErrorCodes::ContractUsageLimitExceeded {
+        meters: block.meters.join(", "),
+        until: block.until,
+    }
 }
 
 pub fn is_operational_stream(stream: &str) -> bool {

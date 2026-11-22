@@ -30,6 +30,7 @@ pub mod autoobserve;
 pub mod background_access;
 pub mod bootstrap;
 pub mod cache;
+pub mod contract_usage;
 pub mod dashboards;
 pub mod datadog;
 pub mod db_monitoring;

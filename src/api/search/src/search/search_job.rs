@@ -756,10 +756,11 @@ fn check_license(job: &JobModel) -> Option<Response> {
     let err = match org_denial(&job.org_id, &[feature])? {
         Denial::License(_) => ErrorCodes::LicenseFeatureNotEntitled(name),
         Denial::Contract(_) => ErrorCodes::ContractFeatureNotEntitled(name),
+        Denial::UsageLimit(block) => search_service::usage_limit_code(&block),
     };
     Some(
         (
-            StatusCode::FORBIDDEN,
+            StatusCode::from_u16(err.http_status()).unwrap_or(StatusCode::FORBIDDEN),
             Json(MetaHttpResponse::error_code(err)),
         )
             .into_response(),

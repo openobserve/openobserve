@@ -1288,10 +1288,12 @@ fn ai_license_denial(
     let err = match denial? {
         Denial::License(_) => ErrorCodes::LicenseFeatureNotEntitled(feature),
         Denial::Contract(_) => ErrorCodes::ContractFeatureNotEntitled(feature),
+        Denial::UsageLimit(block) => openobserve_core::contract_usage::usage_limit_code(&block),
     };
     Some(
         (
-            axum::http::StatusCode::FORBIDDEN,
+            axum::http::StatusCode::from_u16(err.http_status())
+                .unwrap_or(axum::http::StatusCode::FORBIDDEN),
             Json(MetaHttpResponse::error_code(err)),
         )
             .into_response(),

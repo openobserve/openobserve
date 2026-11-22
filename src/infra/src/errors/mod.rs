@@ -286,6 +286,9 @@ pub enum ErrorCodes {
     LicenseFeatureNotEntitled(String),
     /// The org's contract does not entitle these features; carries the comma-joined keys.
     ContractFeatureNotEntitled(String),
+    /// The org is over a contract usage limit: the comma-joined meters, blocked until `until`
+    /// (epoch microseconds).
+    ContractUsageLimitExceeded { meters: String, until: i64 },
 }
 
 impl From<config::meta::search::QueryOutOfRange> for Error {
@@ -352,6 +355,15 @@ impl Error {
         }
     }
 
+    /// An answer that means "over quota, retry later": an expired trial or a contract usage block.
+    pub fn is_quota_refusal(&self) -> bool {
+        matches!(
+            self,
+            Error::TrialPeriodExpired
+                | Error::ErrorCode(ErrorCodes::ContractUsageLimitExceeded { .. })
+        )
+    }
+
     /// The HTTP status code this error maps to. This is the single source of
     /// truth shared by the HTTP response mapping and audit logging.
     pub fn http_status(&self) -> u16 {
@@ -370,7 +382,9 @@ impl ErrorCodes {
     /// The HTTP status code this error code maps to.
     pub fn http_status(&self) -> u16 {
         match self {
-            ErrorCodes::SearchCancelQuery(_) | ErrorCodes::RatelimitExceeded(_) => 429,
+            ErrorCodes::SearchCancelQuery(_)
+            | ErrorCodes::RatelimitExceeded(_)
+            | ErrorCodes::ContractUsageLimitExceeded { .. } => 429,
             ErrorCodes::SearchTimeout(_) => 408,
             ErrorCodes::AiSessionOwnerUnavailable(_) | ErrorCodes::AiChatSessionBusy(_) => 409,
             ErrorCodes::LicenseFeatureNotEntitled(_)
@@ -412,6 +426,7 @@ impl ErrorCodes {
             ErrorCodes::AiChatSessionBusy(_) => 30002,
             ErrorCodes::LicenseFeatureNotEntitled(_) => 40001,
             ErrorCodes::ContractFeatureNotEntitled(_) => 40002,
+            ErrorCodes::ContractUsageLimitExceeded { .. } => 40003,
         }
     }
 
@@ -464,6 +479,15 @@ impl ErrorCodes {
             ErrorCodes::ContractFeatureNotEntitled(features) => {
                 format!("Features not included in your contract: {features}")
             }
+            ErrorCodes::ContractUsageLimitExceeded { meters, until } => {
+                let until = chrono::DateTime::from_timestamp_micros(*until).map_or_else(
+                    || until.to_string(),
+                    |t| t.format("%Y-%m-%d %H:%M UTC").to_string(),
+                );
+                format!(
+                    "Usage limit exceeded on your contract ({meters}). Metered features are blocked until {until}. Contact your account manager."
+                )
+            }
         }
     }
 
@@ -489,6 +513,8 @@ impl ErrorCodes {
             ErrorCodes::AiChatSessionBusy(session_id) => session_id.to_owned(),
             ErrorCodes::LicenseFeatureNotEntitled(features) => features.to_owned(),
             ErrorCodes::ContractFeatureNotEntitled(features) => features.to_owned(),
+            // `from_json` reads both back; a meter name never holds a `|`
+            ErrorCodes::ContractUsageLimitExceeded { meters, until } => format!("{meters}|{until}"),
         }
     }
 
@@ -514,6 +540,7 @@ impl ErrorCodes {
             ErrorCodes::AiChatSessionBusy(session_id) => session_id.to_owned(),
             ErrorCodes::LicenseFeatureNotEntitled(features) => features.to_owned(),
             ErrorCodes::ContractFeatureNotEntitled(features) => features.to_owned(),
+            ErrorCodes::ContractUsageLimitExceeded { meters, .. } => meters.to_owned(),
         }
     }
 
@@ -572,6 +599,13 @@ impl ErrorCodes {
             30002 => Ok(ErrorCodes::AiChatSessionBusy(message)),
             40001 => Ok(ErrorCodes::LicenseFeatureNotEntitled(message)),
             40002 => Ok(ErrorCodes::ContractFeatureNotEntitled(message)),
+            40003 => {
+                let (meters, until) = message.rsplit_once('|').unwrap_or((&message, "0"));
+                Ok(ErrorCodes::ContractUsageLimitExceeded {
+                    meters: meters.to_string(),
+                    until: until.parse().unwrap_or_default(),
+                })
+            }
             _ => Ok(ErrorCodes::ServerInternalError(json.to_string())),
         }
     }
@@ -672,6 +706,32 @@ mod tests {
             ErrorCodes::ContractFeatureNotEntitled(keys) => assert_eq!(keys, "oncall"),
             other => panic!("round trip lost the variant: {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_contract_usage_limit_exceeded() {
+        let err = ErrorCodes::ContractUsageLimitExceeded {
+            meters: "ingestion, query".into(),
+            until: 1_793_577_600_000_000,
+        };
+        assert_eq!(err.get_code(), 40003);
+        assert_eq!(err.http_status(), 429);
+        assert_eq!(err.get_error_detail(), "ingestion, query");
+        assert_eq!(
+            err.get_message(),
+            "Usage limit exceeded on your contract (ingestion, query). Metered features are blocked until 2026-11-02 00:00 UTC. Contact your account manager."
+        );
+        match ErrorCodes::from_json(&err.to_json()).unwrap() {
+            ErrorCodes::ContractUsageLimitExceeded { meters, until } => {
+                assert_eq!((meters.as_str(), until), ("ingestion, query", 1_793_577_600_000_000))
+            }
+            other => panic!("round trip lost the variant: {other:?}"),
+        }
+        let refusal = Error::ErrorCode(err);
+        assert!(refusal.is_quota_refusal());
+        assert_eq!(refusal.http_status(), 429);
+        assert!(Error::TrialPeriodExpired.is_quota_refusal());
+        assert!(!Error::ErrorCode(ErrorCodes::ContractFeatureNotEntitled("x".into())).is_quota_refusal());
     }
 
     #[test]

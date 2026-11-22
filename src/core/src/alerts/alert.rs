@@ -3427,6 +3427,7 @@ fn is_license_denial(error: &anyhow::Error) -> bool {
         Some(
             infra::errors::ErrorCodes::LicenseFeatureNotEntitled(_)
                 | infra::errors::ErrorCodes::ContractFeatureNotEntitled(_)
+                | infra::errors::ErrorCodes::ContractUsageLimitExceeded { .. }
         )
     )
 }

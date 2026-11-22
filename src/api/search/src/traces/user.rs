@@ -97,7 +97,7 @@ pub async fn get_latest_users(
     {
         // the request's SQL or filter may read streams other than the one it names
         if let Err(e) = search_service::check_org_search_allowed(&org_id) {
-            return MetaHttpResponse::too_many_requests(e.to_string());
+            return MetaHttpResponse::search_refused(e);
         }
     }
 

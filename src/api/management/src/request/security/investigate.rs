@@ -456,7 +456,7 @@ async fn guard(
         ));
     }
     if let Err(e) = SearchService::check_org_search_allowed(org_id) {
-        return Err(MetaHttpResponse::too_many_requests(e.to_string()));
+        return Err(MetaHttpResponse::search_refused(e));
     }
     validate_history_range(start_time, end_time).map_err(MetaHttpResponse::bad_request)?;
     validate_plans(plans).map_err(MetaHttpResponse::bad_request)?;

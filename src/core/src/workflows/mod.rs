@@ -1126,6 +1126,9 @@ pub(crate) fn require_workflows(
         None => Ok(()),
         Some(Denial::License(_)) => Err(ErrorCodes::LicenseFeatureNotEntitled(feature).into()),
         Some(Denial::Contract(_)) => Err(ErrorCodes::ContractFeatureNotEntitled(feature).into()),
+        Some(Denial::UsageLimit(block)) => {
+            Err(crate::contract_usage::usage_limit_code(&block).into())
+        }
     }
 }
 

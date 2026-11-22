@@ -502,14 +502,7 @@ pub async fn around_v1(
     {
         // the request's SQL or filter may read streams other than the one it names
         if let Err(e) = search_service::check_org_search_allowed(&org_id) {
-            return (
-                StatusCode::TOO_MANY_REQUESTS,
-                Json(MetaHttpResponse::error(
-                    StatusCode::TOO_MANY_REQUESTS,
-                    e.to_string(),
-                )),
-            )
-                .into_response();
+            return MetaHttpResponse::search_refused(e);
         }
     }
 
@@ -638,14 +631,7 @@ pub async fn around_v2(
     {
         // the request's SQL or filter may read streams other than the one it names
         if let Err(e) = search_service::check_org_search_allowed(&org_id) {
-            return (
-                StatusCode::TOO_MANY_REQUESTS,
-                Json(MetaHttpResponse::error(
-                    StatusCode::TOO_MANY_REQUESTS,
-                    e.to_string(),
-                )),
-            )
-                .into_response();
+            return MetaHttpResponse::search_refused(e);
         }
     }
 
@@ -756,14 +742,7 @@ pub async fn values(
     {
         // the request's SQL or filter may read streams other than the one it names
         if let Err(e) = search_service::check_org_search_allowed(&org_id) {
-            return (
-                StatusCode::TOO_MANY_REQUESTS,
-                Json(MetaHttpResponse::error(
-                    StatusCode::TOO_MANY_REQUESTS,
-                    e.to_string(),
-                )),
-            )
-                .into_response();
+            return MetaHttpResponse::search_refused(e);
         }
     }
 
@@ -1312,14 +1291,7 @@ fn search_license_refusal(org_id: &str, sql: &str, stream_type: StreamType) -> O
         Err(_) => search_service::check_search_allowed(org_id, None).err(),
     };
     refused.map(|e| {
-        (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(MetaHttpResponse::error(
-                StatusCode::TOO_MANY_REQUESTS,
-                e.to_string(),
-            )),
-        )
-            .into_response()
+        MetaHttpResponse::search_refused(e)
     })
 }
 

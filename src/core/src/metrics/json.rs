@@ -436,7 +436,7 @@ pub async fn ingest(
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
         // we do not want to log trial period expired errors
-        if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+        if e.is_quota_refusal() {
             return Ok(IngestionResponse {
                 code: http::StatusCode::TOO_MANY_REQUESTS.into(),
                 status: vec![],

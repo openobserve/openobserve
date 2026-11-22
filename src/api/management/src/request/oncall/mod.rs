@@ -83,6 +83,10 @@ const VOICE_UNCONTRACTED: &str = "<Response><Say>On-Call is not included in this
      organization's contract. The page was not acknowledged and stays open. No further calls \
      will be made.</Say><Hangup/></Response>";
 
+const VOICE_USAGE_BLOCKED: &str = "<Response><Say>This organization is over a usage limit on \
+     its contract, so On-Call is paused. The page was not acknowledged and stays open. No \
+     further calls will be made.</Say><Hangup/></Response>";
+
 #[cfg(feature = "enterprise")]
 const ACK_UNLICENSED: &str =
     "On-Call is not included in this installation's license. This page was not acknowledged.";
@@ -90,6 +94,9 @@ const ACK_UNLICENSED: &str =
 #[cfg(feature = "enterprise")]
 const ACK_UNCONTRACTED: &str =
     "On-Call is not included in this organization's contract. This page was not acknowledged.";
+
+const ACK_USAGE_BLOCKED: &str = "This organization is over a usage limit on its contract, so \
+     On-Call is paused. This page was not acknowledged.";
 
 /// A second lock behind `route_permissions`, which is first-match-wins and silently shadowable.
 #[cfg(feature = "enterprise")]
@@ -2127,6 +2134,9 @@ fn ack_status_refusal(
         Some(Denial::Contract(_)) => {
             return Some(broken_link(StatusCode::FORBIDDEN, ACK_UNCONTRACTED));
         }
+        Some(Denial::UsageLimit(_)) => {
+            return Some(broken_link(StatusCode::TOO_MANY_REQUESTS, ACK_USAGE_BLOCKED));
+        }
         None => {}
     }
     match active {
@@ -2528,6 +2538,7 @@ fn voice_status_refusal(
     match denial {
         Some(Denial::License(_)) => return Some(VOICE_UNLICENSED),
         Some(Denial::Contract(_)) => return Some(VOICE_UNCONTRACTED),
+        Some(Denial::UsageLimit(_)) => return Some(VOICE_USAGE_BLOCKED),
         None => {}
     }
     match active {

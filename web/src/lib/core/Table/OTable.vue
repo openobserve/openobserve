@@ -17,7 +17,7 @@ import {
   watchEffect,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { useContractLocks, useFeatureNames } from "@/composables/useFeatureLock";
+import { useFeatureNames, useLockReason } from "@/composables/useFeatureLock";
 import { denialCopyKeys } from "@/utils/featureGate";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
@@ -82,7 +82,7 @@ import { LOADER_DELAY_MS, MIN_SKELETON_MS, STALE_DIM_DELAY_MS } from "@/lib/styl
 
 const { t } = useI18nTyped();
 const { featureNames } = useFeatureNames();
-const lockedByContract = useContractLocks();
+const lockReasonOf = useLockReason();
 const props = withDefaults(defineProps<OTableProps<TData>>(), {
   pagination: "client",
   pageSize: 20,
@@ -1429,7 +1429,7 @@ useTableRowShortcuts(scrollContainerRef);
 // knows which, so `forbidden` decides and takes precedence over the empty state.
 const forbiddenState = inject(TABLE_FORBIDDEN_STATE_KEY, null);
 const forbiddenCopy = computed(() =>
-  denialCopyKeys(Array.isArray(props.forbidden) && lockedByContract(props.forbidden)),
+  denialCopyKeys(Array.isArray(props.forbidden) ? lockReasonOf(props.forbidden) : "license"),
 );
 const showForbidden = computed(
   () => !heldLoading.value && !!props.forbidden && displayRows.value.length === 0,

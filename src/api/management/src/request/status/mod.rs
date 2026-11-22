@@ -294,9 +294,18 @@ struct ConfigResponse<'a> {
     #[cfg(feature = "enterprise")]
     feature_revision: u32,
     features: HashMap<Feature, FeatureState>,
-    /// What locks each locked feature: "license" or "contract".
+    /// What locks each locked feature: "license", "usage_limit" or "contract".
     feature_locks: HashMap<Feature, &'static str>,
     feature_names: HashMap<String, String>,
+    /// Set while the org is over a contract usage limit, for the banner.
+    contract_usage_block: Option<ContractUsageBlock>,
+}
+
+/// The meters an org's contract usage limit blocks, until `until` (epoch microseconds).
+#[derive(Serialize, utoipa::ToSchema)]
+struct ContractUsageBlock {
+    meters: Vec<String>,
+    until: i64,
 }
 
 #[cfg(feature = "enterprise")]
@@ -654,6 +663,15 @@ pub async fn zo_config(
     let workflows_enabled =
         o2cfg.common.workflows_enabled && check_org_features(&org_id, &[Feature::Workflows]);
     #[cfg(feature = "enterprise")]
+    let contract_usage_block = o2_enterprise::enterprise::license::usage_block(&org_id).map(|b| {
+        ContractUsageBlock {
+            meters: b.meters,
+            until: b.until,
+        }
+    });
+    #[cfg(not(feature = "enterprise"))]
+    let contract_usage_block: Option<ContractUsageBlock> = None;
+    #[cfg(feature = "enterprise")]
     let workflow_hooks_enabled = openobserve_core::workflows::http_trigger::hooks_enabled();
     #[cfg(not(feature = "enterprise"))]
     let workflow_hooks_enabled = false;
@@ -685,6 +703,7 @@ pub async fn zo_config(
             } else if let Some(denial) = denial {
                 let lock = match denial {
                     Denial::License(_) => "license",
+                    Denial::UsageLimit(_) => "usage_limit",
                     Denial::Contract(_) => "contract",
                 };
                 feature_locks.insert(variant, lock);
@@ -847,6 +866,7 @@ pub async fn zo_config(
         features: featuremap,
         feature_locks,
         feature_names,
+        contract_usage_block,
     })
 }
 
@@ -3148,6 +3168,13 @@ mod tests {
             o2cfg.llm_eval_config.enabled
                 && check_org_features("default", &[Feature::AiObservability])
         );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_has_no_usage_block_for_an_unblocked_org() {
+        let json = zo_config_json().await;
+        assert!(json.get("contract_usage_block").is_some(), "{json}");
+        assert!(json["contract_usage_block"].is_null());
     }
 
     // Without contracts the license is the only thing that can lock a feature.

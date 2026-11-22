@@ -327,9 +327,10 @@ fn denial_response(denial: Denial) -> Response {
     let err = match denial {
         Denial::License(missing) => ErrorCodes::LicenseFeatureNotEntitled(keys(missing)),
         Denial::Contract(missing) => ErrorCodes::ContractFeatureNotEntitled(keys(missing)),
+        Denial::UsageLimit(block) => search_service::usage_limit_code(&block),
     };
     (
-        StatusCode::FORBIDDEN,
+        StatusCode::from_u16(err.http_status()).unwrap_or(StatusCode::FORBIDDEN),
         axum::Json(MetaHttpResponse::error_code(err)),
     )
         .into_response()

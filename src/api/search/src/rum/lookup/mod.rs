@@ -308,7 +308,7 @@ async fn check_search_allowed(org_id: &str) -> Result<(), Response> {
     if let Err(e) =
         search_service::check_search_allowed(org_id, Some((RUM_DATA_STREAM, StreamType::Logs)))
     {
-        return Err(MetaHttpResponse::too_many_requests(e.to_string()));
+        return Err(MetaHttpResponse::search_refused(e));
     }
     #[cfg(not(feature = "enterprise"))]
     let _ = org_id;

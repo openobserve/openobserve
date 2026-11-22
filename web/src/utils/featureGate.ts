@@ -23,9 +23,13 @@ export type FeatureStates = Partial<Record<string, FeatureState>>;
 
 const LICENSE_FEATURE_NOT_ENTITLED = 40001;
 const CONTRACT_FEATURE_NOT_ENTITLED = 40002;
+const CONTRACT_USAGE_LIMIT_EXCEEDED = 40003;
+
+/** What locks a feature: the license, the org's contract, or a contract usage limit the org is over. */
+export type LockReason = "license" | "contract" | "usage_limit";
 
 /** The `feature_locks` map of the org config response: what locks each locked feature. */
-export type FeatureLocks = Partial<Record<string, "license" | "contract">>;
+export type FeatureLocks = Partial<Record<string, LockReason>>;
 
 /** Daily GB the backend applies to an expired license or one without an ingestion limit. */
 export const FREE_LIMIT_GB = 50;
@@ -116,13 +120,39 @@ export const deniedByContract = (error: unknown): boolean => {
 export const lockedByContract = (
   locks: FeatureLocks | undefined,
   keys: readonly string[],
-  denials?: ReadonlyMap<string, "license" | "contract">,
-): boolean =>
-  keys.length > 0 && keys.every((key) => (denials?.get(key) ?? locks?.[key]) === "contract");
+  denials?: ReadonlyMap<string, LockReason>,
+): boolean => lockReason(locks, keys, denials) === "contract";
+
+/** What locks these keys: a usage limit on any of them, the contract on all of them, else the license. */
+export const lockReason = (
+  locks: FeatureLocks | undefined,
+  keys: readonly string[],
+  denials?: ReadonlyMap<string, LockReason>,
+): LockReason => {
+  const reasons = keys.map((key) => denials?.get(key) ?? locks?.[key]);
+  if (reasons.includes("usage_limit")) return "usage_limit";
+  if (keys.length > 0 && reasons.every((reason) => reason === "contract")) return "contract";
+  return "license";
+};
+
+/** A usage-limit refusal (429 + 40003): the server's message, which names the meters and the end. */
+export const usageLimitMessage = (error: unknown): string | null => {
+  const response = (error as RejectedResponse | undefined)?.response;
+  if (response?.status !== 429 || response.data?.code !== CONTRACT_USAGE_LIMIT_EXCEEDED)
+    return null;
+  const message = (response.data as { message?: unknown }).message;
+  return typeof message === "string" ? message : "";
+};
 
 /** Locale keys of a denial's title and message, worded for what refused it. */
-export const denialCopyKeys = (byContract: boolean) =>
-  byContract
+export const denialCopyKeys = (reason: boolean | LockReason) => {
+  if (reason === "usage_limit")
+    return {
+      title: "featureLock.usageLimitToastTitle",
+      message: "featureLock.usageLimitToastMessage",
+      generic: "featureLock.usageLimitToastMessageGeneric",
+    } as const;
+  return reason === true || reason === "contract"
     ? ({
         title: "featureLock.contractToastTitle",
         message: "featureLock.contractToastMessage",
@@ -133,6 +163,7 @@ export const denialCopyKeys = (byContract: boolean) =>
         message: "featureLock.toastMessage",
         generic: "featureLock.toastMessageGeneric",
       } as const);
+};
 
 interface FeatureDefinition {
   display_name?: string;

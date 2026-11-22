@@ -43,6 +43,20 @@ export function addLicenseDeniedError(
   });
 }
 
+/** Tell the user a request was refused because the org is over a contract usage limit; once per page. */
+export function addUsageLimitError(message: string, requestStartedAt = Date.now()): void {
+  if (requestStartedAt < pageChangedAt) return;
+  const key = "usage_limit";
+  if (shown.has(key)) return;
+  shown.add(key);
+  const copy = denialCopyKeys("usage_limit");
+  toast({
+    variant: "warning",
+    title: gt(copy.title),
+    message: message ? raw(message) : gt(copy.generic),
+  });
+}
+
 /** Forget the notices already shown and ignore those of requests the previous page started. */
 export function clearLicenseDenials(): void {
   pageChangedAt = Date.now();

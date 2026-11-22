@@ -841,6 +841,10 @@ pub async fn check_ingestion_allowed(
         return Err(infra::errors::IngestionError::OrgBlocked(org_id.to_string(), kind).into());
     }
 
+    if let Some(refusal) = crate::contract_usage::usage_limit_refusal(org_id) {
+        return Err(refusal);
+    }
+
     if !LOCAL_NODE.is_ingester() {
         return Err(Error::IngestionError("not an ingester".to_string()));
     }

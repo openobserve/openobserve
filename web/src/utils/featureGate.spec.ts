@@ -26,9 +26,11 @@ import {
   licenseKeyLosses,
   licenseRequestUrl,
   lockedByContract,
+  lockReason,
   menuState,
   splitLicenseFeatures,
   streamTypeFeature,
+  usageLimitMessage,
   withLicenseFeature,
 } from "./featureGate";
 
@@ -168,6 +170,39 @@ describe("denialCopyKeys", () => {
   it("words a contract denial for the account manager and a license one for the admin", () => {
     expect(denialCopyKeys(true).title).toBe("featureLock.contractToastTitle");
     expect(denialCopyKeys(false).title).toBe("featureLock.toastTitle");
+    expect(denialCopyKeys("contract").title).toBe("featureLock.contractToastTitle");
+    expect(denialCopyKeys("license").title).toBe("featureLock.toastTitle");
+    expect(denialCopyKeys("usage_limit").title).toBe("featureLock.usageLimitToastTitle");
+  });
+});
+
+describe("lockReason", () => {
+  it("is the usage limit when it locks any key, the contract when it locks all, else the license", () => {
+    const locks = { logs: "usage_limit", oncall: "contract", sso: "license" } as const;
+    expect(lockReason(locks, ["oncall", "logs"])).toBe("usage_limit");
+    expect(lockReason(locks, ["oncall"])).toBe("contract");
+    expect(lockReason(locks, ["oncall", "sso"])).toBe("license");
+    expect(lockReason(locks, [])).toBe("license");
+    expect(lockReason(undefined, ["logs"])).toBe("license");
+    expect(lockReason(locks, ["sso"], new Map([["sso", "usage_limit"]]))).toBe("usage_limit");
+  });
+});
+
+describe("usageLimitMessage", () => {
+  const refused = (status: number, data: Record<string, unknown>) => ({
+    response: { status, data },
+  });
+
+  it("reads the server's message from a 429 with code 40003 only", () => {
+    expect(usageLimitMessage(refused(429, { code: 40003, message: "Usage limit exceeded" }))).toBe(
+      "Usage limit exceeded",
+    );
+    expect(usageLimitMessage(refused(429, { code: 40003 }))).toBe("");
+    expect(
+      usageLimitMessage(refused(429, { code: 429, message: "Search is disabled" })),
+    ).toBeNull();
+    expect(usageLimitMessage(refused(403, { code: 40003 }))).toBeNull();
+    expect(usageLimitMessage(new Error("network"))).toBeNull();
   });
 });
 

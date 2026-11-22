@@ -20,9 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     preset="no-access"
     :title="t(copy.title)"
     :description="
-      features.length
-        ? t(copy.message, { features: raw(featureNames(features)) })
-        : t(copy.generic)
+      features.length ? t(copy.message, { features: raw(featureNames(features)) }) : t(copy.generic)
     "
   >
     <template v-if="$slots.actions" #actions><slot name="actions" /></template>
@@ -33,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { useContractLocks, useFeatureNames } from "@/composables/useFeatureLock";
+import { useFeatureNames, useLockReason } from "@/composables/useFeatureLock";
 import { denialCopyKeys } from "@/utils/featureGate";
 
 /** The missing feature keys of a denial, from `licenseDeniedFeatures()`. */
@@ -41,6 +39,6 @@ const props = defineProps<{ features: readonly string[] }>();
 
 const { t } = useI18nTyped();
 const { featureNames } = useFeatureNames();
-const lockedByContract = useContractLocks();
-const copy = computed(() => denialCopyKeys(lockedByContract(props.features)));
+const lockReasonOf = useLockReason();
+const copy = computed(() => denialCopyKeys(lockReasonOf(props.features)));
 </script>

@@ -210,7 +210,7 @@ async fn query(
     #[cfg(feature = "enterprise")]
     {
         if let Err(e) = search_service::check_search_allowed(org_id, None) {
-            return MetaHttpResponse::too_many_requests(e);
+            return MetaHttpResponse::search_refused(e);
         }
         let ast = match promql::parse(&req.query.clone().unwrap_or_default()) {
             Ok(v) => v,
@@ -540,7 +540,7 @@ async fn query_range(
     #[cfg(feature = "enterprise")]
     {
         if let Err(e) = search_service::check_search_allowed(org_id, None) {
-            return MetaHttpResponse::too_many_requests(e);
+            return MetaHttpResponse::search_refused(e);
         }
 
         let ast = match promql::parse(&req.query.clone().unwrap_or_default()) {
@@ -916,7 +916,7 @@ async fn series(
     #[cfg(feature = "enterprise")]
     {
         if let Err(e) = search_service::check_search_allowed(org_id, None) {
-            return MetaHttpResponse::too_many_requests(e);
+            return MetaHttpResponse::search_refused(e);
         }
     }
 
