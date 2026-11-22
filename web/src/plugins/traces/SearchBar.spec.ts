@@ -3645,7 +3645,6 @@ describe("SearchBar", () => {
     const { isPinned, togglePin } = useToolbarPins("traces");
     const pinnedBtn = () => wrapper.find('[data-test="traces-search-bar-sql-mode-pinned-btn"]');
     const menuItem = () => wrapper.find('[data-test="traces-search-bar-menu-sql-mode-toggle-btn"]');
-    const indicator = () => wrapper.find('[data-test="traces-search-bar-sql-mode-indicator"]');
     const setPinned = (pinned: boolean) => {
       if (isPinned("sqlMode") !== pinned) togglePin("sqlMode");
     };
@@ -3944,20 +3943,15 @@ describe("SearchBar", () => {
       expect(sqlTextsOf(searchObjInstance).sqlTexts.sql).toBe(plain);
     });
 
-    it("shows an SQL indicator on More only while SQL mode is on and unpinned", async () => {
+    it("keeps More a plain label while SQL mode is on and unpinned", async () => {
       setPinned(false);
       wrapper = mountSearchBar();
-      await flushPromises();
-      expect(indicator().exists()).toBe(false);
-
       searchObjInstance.meta.sqlMode = true;
       await flushPromises();
       expect(pinnedBtn().exists()).toBe(false);
-      expect(indicator().exists()).toBe(true);
-
-      setPinned(true);
-      await flushPromises();
-      expect(indicator().exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-search-bar-more-menu-btn"]').text()).toBe(
+        "search.menuMore",
+      );
     });
 
     it("turns SQL on while typing a statement on a real stream, and off when SELECT goes", async () => {

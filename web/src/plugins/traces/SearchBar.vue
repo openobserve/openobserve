@@ -241,15 +241,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="shrink-0 max-lg:ms-auto"
             >
               {{ t("search.menuMore") }}
-              <OBadge
-                v-if="searchObj.meta.sqlMode && !showPinnedSqlMode"
-                variant="primary-soft"
-                size="xs"
-                shape="rounded"
-                data-test="traces-search-bar-sql-mode-indicator"
-              >
-                {{ t("traces.sqlMode.indicator") }}
-              </OBadge>
             </OButton>
           </template>
 
@@ -897,7 +888,6 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import useTraces from "@/composables/useTraces";
@@ -965,7 +955,6 @@ export default defineComponent({
   components: {
     OPageHeaderStatus,
     OSeparator,
-    OBadge,
     DateTime,
     ShareButton,
     OToggleGroup,

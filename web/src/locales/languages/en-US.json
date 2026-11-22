@@ -17367,7 +17367,6 @@
       "chip": "Scope: {scope}"
     },
     "sqlMode": {
-      "indicator": "SQL",
       "actionUnavailable": "Not available in SQL mode yet",
       "drillDownDisabled": "Drill down is not available in SQL mode",
       "putConditionInWhere": "In SQL mode, put the condition in your WHERE clause",
