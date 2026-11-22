@@ -297,10 +297,10 @@
       "importDesc": "Upload a pipeline definition"
     },
     "noQueues": {
-      "title": "Create your first queue",
-      "description": "Queues are stateful review to-do lists — bind Score Configs, a target dataset, and a filter that feeds items in for human review.",
-      "action": "New queue",
-      "actionDesc": "Start an empty queue"
+      "title": "Create your first annotation queue",
+      "description": "Annotation queues are review to-do lists — bind Score Configs, a target dataset, and a filter that feeds items in for human review.",
+      "action": "New annotation queue",
+      "actionDesc": "Start an empty annotation queue"
     },
     "noPrompts": {
       "title": "Create your first prompt",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Nothing Unhealthy Here",
-      "description": "No unhealthy items in this window. Widen the time range, or switch the queue filter to see items you already triaged."
+      "description": "No unhealthy items in this window. Widen the time range, or switch the annotation queue filter to see items you already triaged."
     },
     "noTraces": {
       "title": "No traces found",
@@ -18866,7 +18866,7 @@
       "users": "Users",
       "budgets": "Budgets",
       "discovery": "Discovery",
-      "queues": "Queues",
+      "queues": "Annotation Queues",
       "datasets": "Datasets",
       "experiments": "Experiments",
       "quality": "Quality",
@@ -19151,15 +19151,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "Add To Review Queue",
-        "title": "Add To Review Queue",
-        "hint": "Queue {ref} for human review. It stays where it is — the review state lives in the queue.",
-        "queueLabel": "Queue",
-        "queuePlaceholder": "Select A Queue...",
-        "noQueues": "No queue accepts a {scope} — create one from the Queues page first.",
-        "confirm": "Add To Queue",
+        "button": "Add to annotation queue",
+        "title": "Add to annotation queue",
+        "hint": "Add {ref} for human review. It stays where it is — the annotation queue tracks its review status.",
+        "queueLabel": "Annotation Queue",
+        "queuePlaceholder": "Select an annotation queue...",
+        "noQueues": "No annotation queue accepts a {scope} — create one from the Annotation Queues page first.",
+        "confirm": "Add to annotation queue",
         "success": "Added to {queue}",
-        "error": "Failed to add this item to the queue"
+        "error": "Failed to add this item to the annotation queue"
       },
       "dataset": {
         "button": "Add To Dataset",
@@ -19196,12 +19196,12 @@
         "session": "Sessions"
       },
       "inQueueFilter": {
-        "label": "In Queue",
-        "notEnqueued": "In Queue: Not Enqueued",
-        "enqueued": "In Queue: Any Queue",
-        "pending": "In Queue: Pending",
-        "reviewed": "In Queue: Reviewed",
-        "all": "In Queue: All"
+        "label": "Annotation queue status",
+        "notEnqueued": "Annotation queue: Not enqueued",
+        "enqueued": "Annotation queue: Any",
+        "pending": "Annotation queue: Pending",
+        "reviewed": "Annotation queue: Reviewed",
+        "all": "Annotation queue: All"
       },
       "columns": {
         "timestamp": "Timestamp",
@@ -19217,7 +19217,7 @@
         "service": "Service",
         "input": "Input",
         "quality": "Quality",
-        "inQueue": "In Queue?",
+        "inQueue": "In annotation queue?",
         "actions": "Actions"
       },
       "spanParent": "In {trace}",
@@ -19229,26 +19229,26 @@
       "inQueue": {
         "none": "Not Enqueued",
         "reviewed": "Already Reviewed",
-        "multiple": "In {count} Queues"
+        "multiple": "In {count} annotation queues"
       },
-      "addToQueue": "Add To Queue",
+      "addToQueue": "Add to annotation queue",
       "addToQueueMenu": {
-        "loading": "Loading queues...",
-        "noQueues": "No queues yet — create one from the Queues page first.",
+        "loading": "Loading annotation queues...",
+        "noQueues": "No annotation queues yet — create one from the Annotation Queues page first.",
         "dimensions": "{count} dimension | {count} dimensions",
         "accepts": "Accepts {types} only",
-        "sectionTitle": "Add To Queue",
-        "manageQueues": "Manage Queues"
+        "sectionTitle": "Add to annotation queue",
+        "manageQueues": "Manage annotation queues"
       },
-      "addSuccess": "Added to {queue} — the row stays in Discovery, its state lives in the queue.",
-      "addError": "Failed to add items to the queue",
-      "openQueue": "Open Queue",
-      "queuesError": "Failed to load queues"
+      "addSuccess": "Added to {queue} — the row stays in Discovery, and the annotation queue tracks its review status.",
+      "addError": "Failed to add items to the annotation queue",
+      "openQueue": "Open annotation queue",
+      "queuesError": "Failed to load annotation queues"
     },
     "queues": {
-      "searchPlaceholder": "Search Queues...",
-      "newButton": "New Queue",
-      "loadError": "Failed to load queues",
+      "searchPlaceholder": "Search annotation queues...",
+      "newButton": "New annotation queue",
+      "loadError": "Failed to load annotation queues",
       "optionsLoadError": "Failed to load score configs",
       "review": "Review",
       "cleared": "Cleared",
@@ -19263,7 +19263,7 @@
         "actions": "Actions"
       },
       "create": {
-        "title": "New Queue",
+        "title": "New annotation queue",
         "errors": {
           "name": "Name is required",
           "scoreConfigs": "Bind at least one Score Config"
@@ -19271,9 +19271,9 @@
         "nameLabel": "Name",
         "namePlaceholder": "e.g. hallucination_review",
         "descriptionLabel": "Description",
-        "descriptionPlaceholder": "What this queue is for and who reviews it...",
+        "descriptionPlaceholder": "What this annotation queue is for and who reviews it...",
         "scoreConfigsLabel": "Score Configs",
-        "scoreConfigsHint": "A queue scores items on one or more dimensions. Each Score Config is a single dimension — pick the configs to bind, and pin each to a version.",
+        "scoreConfigsHint": "An annotation queue scores items on one or more dimensions. Each Score Config is a single dimension — pick the configs to bind, and pin each to a version.",
         "scoreConfigsEmpty": "Pick the Score Configs to bind.",
         "addScoreConfig": "Add Score Config",
         "allScoreConfigsAdded": "All score configs are added.",
@@ -19281,10 +19281,10 @@
         "noScoreConfigs": "No score configs yet — create one in Score Configs first.",
         "targetDatasetLabel": "Target Dataset",
         "targetDatasetNone": "None (review-only)",
-        "targetDatasetHint": "Review-only queue — reviewed items won't be distilled to a dataset.",
+        "targetDatasetHint": "Without a target dataset, items in this annotation queue are reviewed only.",
         "autoRoutingLabel": "Auto-routing",
-        "autoRoutingHint": "Automatically enqueue objects whose scores match a condition. Leave empty to feed this queue manually from Discovery.",
-        "autoRoutingEmpty": "No auto-routing — this queue is fed manually.",
+        "autoRoutingHint": "Automatically enqueue objects whose scores match a condition. Leave empty to add items to this annotation queue from Discovery.",
+        "autoRoutingEmpty": "Items are added to this annotation queue manually.",
         "addCondition": "Add Condition",
         "conditionAnd": "AND",
         "operatorIs": "is",
@@ -19293,12 +19293,12 @@
         "conditionValuePlaceholder": "Value",
         "pin": "Pin Version",
         "versionLatest": "v{version} (latest)",
-        "success": "Queue created",
-        "error": "Failed to create queue"
+        "success": "Annotation queue created",
+        "error": "Failed to create annotation queue"
       },
       "detail": {
-        "fallbackTitle": "Queue",
-        "loadError": "Failed to load queue items",
+        "fallbackTitle": "Annotation Queue",
+        "loadError": "Failed to load annotation queue items",
         "startReviewing": "Start Reviewing",
         "scoreConfigs": "Score Configs ({count})",
         "targetDataset": "Target Dataset",
@@ -19308,7 +19308,7 @@
         "inTrace": "In Trace {traceId}",
         "reviewAgain": "Review Again",
         "emptyTitle": "Nothing To Review",
-        "emptyBody": "Add traces, spans or sessions to this queue from Discovery or a trace view.",
+        "emptyBody": "Add traces, spans or sessions to this annotation queue from Discovery or a trace view.",
         "columns": {
           "refType": "Ref",
           "refId": "Reference",
@@ -19379,7 +19379,7 @@
         "true": "True",
         "false": "False",
         "allReviewedTitle": "All items reviewed",
-        "allReviewedBody": "Every item in this queue has a completed review."
+        "allReviewedBody": "Every item in this annotation queue has a completed review."
       }
     },
     "experiments": {
@@ -25529,8 +25529,8 @@
     "sloDetail": "SLO Detail",
     "alertDetail": "Alert Detail",
     "editAlert": "Edit Alert",
-    "aiQueueDetail": "Queue",
-    "aiQueueReview": "Queue Review",
+    "aiQueueDetail": "Annotation Queue",
+    "aiQueueReview": "Annotation Queue Review",
     "aiDatasetDetail": "Dataset",
     "aiPromptCreate": "New Prompt",
     "aiPromptVersionCreate": "New Prompt Version",

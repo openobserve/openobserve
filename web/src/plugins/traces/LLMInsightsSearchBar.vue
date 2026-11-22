@@ -159,12 +159,14 @@ async function bindEnter() {
 
 <style scoped>
 /* keep(lib-override:code-query-editor): the search box draws surface and focus ring. */
-.llm-insights-search-editor :deep(.logs-query-editor) {
+.llm-insights-search-editor :deep(.logs-query-editor),
+.llm-insights-search-editor :deep(.monaco-editor .scroll-decoration) {
   background: transparent;
   box-shadow: none;
 }
 .llm-insights-search-editor :deep(.monaco-editor),
-.llm-insights-search-editor :deep(.monaco-editor-background) {
+.llm-insights-search-editor :deep(.monaco-editor-background),
+.llm-insights-search-editor :deep(.monaco-editor .margin) {
   background-color: transparent;
 }
 /* One line: a vertical scrollbar only shows when the line is taller than the box. */
