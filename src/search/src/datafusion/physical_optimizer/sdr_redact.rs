@@ -94,13 +94,14 @@ pub fn protected_columns(
     }
 }
 
-/// Part of a cache key: results are stored redacted, so a pattern change must miss them.
-/// `None` when no stream read is protected, which keeps the keys of other queries unchanged.
+/// Part of a cache key: results hold redacted or raw values, so a pattern change or a different
+/// `raw_streams` must miss them. `None` when no stream read is protected.
 #[cfg(feature = "vectorscan")]
 pub fn redaction_digest(
     org_id: &str,
     stream_type: config::meta::stream::StreamType,
     streams: &[datafusion::common::TableReference],
+    raw_streams: Option<&config::meta::search::RawStreams>,
 ) -> Option<String> {
     use config::meta::sql::TableReferenceExt;
 
@@ -112,10 +113,17 @@ pub fn redaction_digest(
         .filter_map(|stream| {
             let stype = stream.get_stream_type(stream_type);
             let name = stream.stream_name();
+            let class = if raw_streams.is_some_and(|raw| raw.contains(stype, &name)) {
+                "raw"
+            } else {
+                "redact"
+            };
             match manager.search_protection(org_id, stype, &name) {
-                Ok(Some(protection)) => Some(format!("{stype}/{name}={}", protection.digest)),
+                Ok(Some(protection)) => {
+                    Some(format!("{stype}/{name}={}:{class}", protection.digest))
+                }
                 Ok(None) => None,
-                Err(_) => Some(format!("{stype}/{name}=unbuilt")),
+                Err(_) => Some(format!("{stype}/{name}=unbuilt:{class}")),
             }
         })
         .collect();
@@ -397,12 +405,18 @@ mod tests {
     }
 
     fn redacted_ctx() -> SessionContext {
+        ctx_with(protected())
+    }
+
+    /// What the scanning node builds for a stream in `raw_streams`: no redact function.
+    fn raw_reader_ctx() -> SessionContext {
+        ctx_with(HashMap::new())
+    }
+
+    fn ctx_with(protected: HashMap<String, Arc<ScalarUDF>>) -> SessionContext {
         let ctx = SessionContext::new();
         let inner = MemTable::try_new(test_schema(), vec![vec![test_batch()]]).unwrap();
-        let table = RedactedTable {
-            inner,
-            protected: protected(),
-        };
+        let table = RedactedTable { inner, protected };
         ctx.register_table("t", Arc::new(table)).unwrap();
         ctx
     }
@@ -490,6 +504,36 @@ mod tests {
         )
         .await;
         assert!(none.contains("| 0 "), "{none}");
+    }
+
+    #[tokio::test]
+    async fn test_a_raw_reader_reads_raw_values_but_never_the_raw_copy() {
+        let ctx = raw_reader_ctx();
+        let found = run(&ctx, "SELECT msg FROM t WHERE msg LIKE '%SECRETVAL10000%'").await;
+        assert!(found.contains("SECRETVAL10000"), "{found}");
+        let original = run(&ctx, "SELECT count(_original) AS c FROM t").await;
+        assert!(original.contains("| 0 "), "{original}");
+        let plan = ctx
+            .sql("SELECT msg FROM t")
+            .await
+            .unwrap()
+            .create_physical_plan()
+            .await
+            .unwrap();
+        let plan = displayable(plan.as_ref()).indent(true).to_string();
+        assert!(!plan.contains(SDR_REDACT_UDF_NAME), "{plan}");
+    }
+
+    #[test]
+    fn test_a_raw_reader_keeps_its_filters_in_the_scan() {
+        use datafusion::logical_expr::{col, lit};
+
+        let filters = vec![
+            col("msg").like(lit("%a%")),
+            col(ORIGINAL_DATA_COL_NAME).like(lit("%a%")),
+        ];
+        let redacted = redacted_columns(&HashMap::new());
+        assert_eq!(scan_filters(&filters, &redacted), vec![filters[0].clone()]);
     }
 
     #[test]
@@ -595,5 +639,55 @@ mod tests {
             line_of(&plan, SDR_REDACT_UDF_NAME) > line_of(&plan, "AggregateExec"),
             "{plan}"
         );
+    }
+
+    #[cfg(feature = "vectorscan")]
+    #[test]
+    fn test_digest_separates_raw_and_redacted_readers() {
+        use config::meta::{search::RawStreams, stream::StreamType};
+        use o2_enterprise::enterprise::re_patterns::{PATTERN_MANAGER, PatternManager};
+
+        if PATTERN_MANAGER.get().is_none() {
+            let _ = PATTERN_MANAGER.set(PatternManager::empty());
+        }
+        let mgr = PATTERN_MANAGER.get().unwrap();
+        mgr.insert_pattern(infra::table::re_pattern::PatternEntry {
+            id: "digest_secret".to_string(),
+            org: "sdr_digest".to_string(),
+            name: "digest_secret".to_string(),
+            description: String::new(),
+            created_by: String::new(),
+            created_at: 0,
+            updated_at: 0,
+            pattern: r"SECRETVAL\d+".to_string(),
+        });
+        mgr.update_associations(
+            "sdr_digest",
+            StreamType::Logs,
+            "app",
+            vec![],
+            vec![config::meta::stream::PatternAssociation {
+                field: "msg".to_string(),
+                pattern_id: "digest_secret".to_string(),
+                policy: "Redact".to_string(),
+                apply_at: "AtSearch".to_string(),
+                ..Default::default()
+            }],
+        )
+        .unwrap();
+
+        let streams = [datafusion::common::TableReference::from("app")];
+        let digest = |raw: Option<&RawStreams>| {
+            redaction_digest("sdr_digest", StreamType::Logs, &streams, raw).unwrap()
+        };
+        let mut raw = RawStreams::default();
+        raw.insert(StreamType::Logs, "app");
+        assert_ne!(digest(Some(&raw)), digest(Some(&RawStreams::default())));
+        assert_eq!(digest(None), digest(Some(&RawStreams::default())));
+        assert!(digest(Some(&raw)).ends_with(":raw"));
+
+        let unprotected = [datafusion::common::TableReference::from("plain")];
+        let none = redaction_digest("sdr_digest", StreamType::Logs, &unprotected, Some(&raw));
+        assert_eq!(none, None);
     }
 }

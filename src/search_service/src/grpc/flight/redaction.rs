@@ -31,12 +31,14 @@ pub(super) struct ScanRedaction {
 
 impl ScanRedaction {
     /// Fails closed: a protected stream whose patterns cannot be applied is not scanned at all.
+    /// A `raw` stream keeps its values; only the raw-copy columns are still nulled.
     #[cfg(feature = "vectorscan")]
     pub(super) async fn load(
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
         schema: &Schema,
+        raw: bool,
     ) -> Result<Self, Error> {
         use o2_enterprise::enterprise::re_patterns::{
             get_pattern_manager, search_redact_udf::sdr_redact_udf,
@@ -51,6 +53,12 @@ impl ScanRedaction {
         else {
             return Ok(Self::default());
         };
+        if raw {
+            return Ok(Self {
+                protected: true,
+                udfs: HashMap::new(),
+            });
+        }
         // A field the schema types as non-string carries no text a pattern could match.
         let udfs = protection
             .fields
@@ -82,6 +90,7 @@ impl ScanRedaction {
         _stream_type: StreamType,
         _stream_name: &str,
         _schema: &Schema,
+        _raw: bool,
     ) -> Result<Self, Error> {
         Ok(Self::default())
     }
@@ -101,5 +110,70 @@ impl ScanRedaction {
         } else {
             Default::default()
         }
+    }
+}
+
+#[cfg(all(test, feature = "vectorscan"))]
+mod tests {
+    use arrow_schema::{DataType, Field};
+    use config::meta::stream::PatternAssociation;
+    use infra::table::re_pattern::PatternEntry;
+    use o2_enterprise::enterprise::re_patterns::{PATTERN_MANAGER, PatternManager};
+
+    use super::*;
+
+    const ORG: &str = "sdr_scan_raw";
+
+    fn protect_msg() {
+        if PATTERN_MANAGER.get().is_none() {
+            let _ = PATTERN_MANAGER.set(PatternManager::empty());
+        }
+        let mgr = PATTERN_MANAGER.get().unwrap();
+        mgr.insert_pattern(PatternEntry {
+            id: "scan_raw_secret".to_string(),
+            org: ORG.to_string(),
+            name: "scan_raw_secret".to_string(),
+            description: String::new(),
+            created_by: String::new(),
+            created_at: 0,
+            updated_at: 0,
+            pattern: r"SECRETVAL\d+".to_string(),
+        });
+        mgr.update_associations(
+            ORG,
+            StreamType::Logs,
+            "app",
+            vec![],
+            vec![PatternAssociation {
+                field: "msg".to_string(),
+                pattern_id: "scan_raw_secret".to_string(),
+                policy: "Redact".to_string(),
+                apply_at: "AtSearch".to_string(),
+                ..Default::default()
+            }],
+        )
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_raw_stream_is_scanned_without_redaction_but_without_raw_copies() {
+        protect_msg();
+        let schema = Schema::new(vec![Field::new("msg", DataType::Utf8, true)]);
+
+        let redacted = ScanRedaction::load(ORG, StreamType::Logs, "app", &schema, false)
+            .await
+            .unwrap();
+        assert!(redacted.udfs().contains_key("msg"));
+        assert!(redacted.redacted_columns().contains("msg"));
+
+        let raw = ScanRedaction::load(ORG, StreamType::Logs, "app", &schema, true)
+            .await
+            .unwrap();
+        assert!(raw.is_protected());
+        assert!(raw.udfs().is_empty());
+        let columns = raw.redacted_columns();
+        assert!(!columns.contains("msg"));
+        assert!(columns.contains(config::ORIGINAL_DATA_COL_NAME));
+        assert!(columns.contains(config::ALL_VALUES_COL_NAME));
     }
 }

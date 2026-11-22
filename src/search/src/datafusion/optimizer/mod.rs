@@ -328,11 +328,20 @@ fn stream_index_fields(sql: &Sql) -> HashMap<TableReference, HashSet<String>> {
         #[cfg(feature = "vectorscan")]
         let idx_fields = {
             use config::meta::sql::TableReferenceExt;
-            let protected = crate::datafusion::physical_optimizer::sdr_redact::protected_columns(
-                &sql.org_id,
-                stream_name.get_stream_type(sql.stream_type),
-                &stream_name.stream_name(),
-            );
+            let stream_type = stream_name.get_stream_type(sql.stream_type);
+            let name = stream_name.stream_name();
+            let protected = if sql.raw_streams.contains(stream_type, &name) {
+                crate::datafusion::physical_optimizer::sdr_redact::RAW_COPY_COLUMNS
+                    .iter()
+                    .map(|c| c.to_string())
+                    .collect()
+            } else {
+                crate::datafusion::physical_optimizer::sdr_redact::protected_columns(
+                    &sql.org_id,
+                    stream_type,
+                    &name,
+                )
+            };
             idx_fields
                 .into_iter()
                 .filter(|field| !protected.contains(field))
@@ -436,6 +445,7 @@ mod tests {
             histogram_offset: Some(0),
             sorted_by_time: false,
             sampling_config: None,
+            raw_streams: Default::default(),
         }
     }
 
