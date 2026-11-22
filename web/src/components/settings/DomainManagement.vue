@@ -15,8 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <div v-if="forbidden" class="flex flex-1 items-center justify-center">
+    <OEmptyState size="hero" preset="no-access" data-test="domain-management-forbidden" />
+  </div>
   <!-- The Settings shell owns the header, scroll and gutter; the content just flows. -->
-  <div class="domain_management flex flex-col gap-4">
+  <div v-else class="domain_management flex flex-col gap-4">
     <OFormSection
       variant="plain"
       :title="t('settings.domainManagement.claimParserTitle')"
@@ -438,6 +441,7 @@ import { updateOrgSettingsMutation } from "@/services/organizations.queries";
 import { useMutation } from "@tanstack/vue-query";
 import searchService from "@/services/search";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
@@ -510,6 +514,7 @@ const savedRestrictions = ref<DomainRestrictions>(parseDomainRestrictions(null))
 const saving = ref(false);
 // False until the first load settles, so the bar cannot claim changes over placeholders.
 const loaded = ref(false);
+const forbidden = ref(false);
 const hasBlockPolicy = computed(() => domains.some((d) => isBlockPolicy(d.policy)));
 
 // Schema-driven validation (upstream): pure validators live in the schema file; the component only
@@ -628,6 +633,7 @@ onActivated(() => {
 const loadDomainSettings = async () => {
   try {
     const response = await domainManagement.getDomainRestrictions(store.state.zoConfig.meta_org);
+    forbidden.value = false;
 
     if (response.data) {
       savedRestrictions.value = parseDomainRestrictions(response.data);
@@ -642,6 +648,7 @@ const loadDomainSettings = async () => {
     claimParserFunction.value = storedFunction;
     originalClaimParserFunction.value = storedFunction;
   } catch (error: any) {
+    forbidden.value = error?.response?.status === 403;
     // If the API doesn't exist yet or returns an error, use example data
     console.warn("Domain restrictions API not available, using example data:", error);
 

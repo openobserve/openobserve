@@ -1451,7 +1451,7 @@ pub async fn decline_invitation(
     summary = "List users across all organizations (meta only)",
     description = "Lists every non-root user, newest first, with the organizations each belongs to. Searching and \
                    paging run in the database. Only accessible through the '_meta' organization, and only to the \
-                   root user or a member of '_meta'.",
+                   root user or an administrator of '_meta'.",
     security(
         ("Authorization"= [])
     ),
@@ -1464,7 +1464,7 @@ pub async fn decline_invitation(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = infra::table::users::UserListPage),
-        (status = 403, description = "The caller is neither the root user nor a member of '_meta'", content_type = "application/json", body = Object),
+        (status = 403, description = "The caller is neither the root user nor an administrator of '_meta'", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"})),
@@ -1479,11 +1479,8 @@ pub async fn all_users(
     if org_id != config::META_ORG_ID {
         return MetaHttpResponse::unauthorized("not authorized to access this resource");
     }
-    let allowed = db::user::is_root_user(&user_email.user_id)
-        || users::get_user(Some(config::META_ORG_ID), &user_email.user_id)
-            .await
-            .is_some();
-    if !allowed {
+    // Every `_meta` role holds users:LIST, so the cross-org listing is narrowed to admins here.
+    if !users::is_org_admin(config::META_ORG_ID, &user_email.user_id).await {
         return MetaHttpResponse::forbidden("Not allowed");
     }
 
@@ -1618,18 +1615,30 @@ mod tests {
 
     #[cfg(feature = "cloud")]
     #[tokio::test]
-    async fn only_root_or_a_meta_member_lists_all_users_and_only_through_meta() {
+    async fn only_root_or_a_meta_admin_lists_all_users_and_only_through_meta() {
         let root = "root@all-users-refusal.test";
         let org_admin = "admin@all-users-refusal.test";
         join(config::DEFAULT_ORG, root, UserRole::Root);
         join("all-users-acme", org_admin, UserRole::Admin);
-
-        for (caller, org_id) in [
+        let mut callers = vec![
             (root, "all-users-acme"),
             (root, config::DEFAULT_ORG),
             (org_admin, "all-users-acme"),
             (org_admin, config::META_ORG_ID),
-        ] {
+        ];
+        let meta_members = [
+            ("editor@all-users-refusal.test", UserRole::Editor),
+            ("viewer@all-users-refusal.test", UserRole::Viewer),
+            ("user@all-users-refusal.test", UserRole::User),
+            ("sa@all-users-refusal.test", UserRole::ServiceAccount),
+            ("sre@all-users-refusal.test", UserRole::SreAgent),
+        ];
+        for (email, role) in meta_members {
+            join(config::META_ORG_ID, email, role);
+            callers.push((email, config::META_ORG_ID));
+        }
+
+        for (caller, org_id) in callers {
             let resp = list_all_users(caller, org_id, &[]).await;
             assert_eq!(resp.status(), StatusCode::FORBIDDEN, "{caller} {org_id}");
         }
@@ -1637,7 +1646,7 @@ mod tests {
 
     #[cfg(feature = "cloud")]
     #[tokio::test]
-    async fn a_meta_member_lists_all_users_with_invalid_paging_clamped() {
+    async fn a_meta_admin_lists_all_users_with_invalid_paging_clamped() {
         for key in [
             "O2_STRIPE_SECRET_KEY",
             "O2_STRIPE_WEBHOOK_SECRET",
@@ -1652,11 +1661,11 @@ mod tests {
         infra::db_init().await.unwrap();
         infra::table::migrate().await.unwrap();
         let root = "root@all-users-allowed.test";
-        let meta_viewer = "viewer@all-users-allowed.test";
+        let meta_admin = "admin@all-users-allowed.test";
         join(config::DEFAULT_ORG, root, UserRole::Root);
-        join(config::META_ORG_ID, meta_viewer, UserRole::Viewer);
+        join(config::META_ORG_ID, meta_admin, UserRole::Admin);
 
-        for caller in [root, meta_viewer] {
+        for caller in [root, meta_admin] {
             for query in [
                 vec![],
                 vec![("page", "abc"), ("page_size", "-3")],

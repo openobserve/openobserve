@@ -234,6 +234,31 @@ describe("DomainManagement Component", () => {
       expect(mockDomainManagement.getDomainRestrictions).toHaveBeenCalledWith("test-meta-org");
     });
 
+    it("shows the no-access state instead of the form when the config read is refused", async () => {
+      mockDomainManagement.getDomainRestrictions.mockRejectedValueOnce({
+        response: { status: 403, data: { message: "Not allowed" } },
+      });
+      const refused = mount(DomainManagement, {
+        global: { plugins: [i18n], stubs: { OEmptyState: true } },
+      });
+      await flushPromises();
+
+      expect(refused.findComponent({ name: "OEmptyState" }).exists()).toBe(true);
+      expect(refused.find(".domain_management").exists()).toBe(false);
+      refused.unmount();
+    });
+
+    it("keeps the form when the config read fails for another reason", async () => {
+      mockDomainManagement.getDomainRestrictions.mockRejectedValueOnce({
+        response: { status: 500, data: { message: "boom" } },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="domain-management-forbidden"]').exists()).toBe(false);
+      expect(wrapper.find(".domain_management").exists()).toBe(true);
+    });
+
     it("should redirect if not meta organization", async () => {
       mockStore.state.selectedOrganization.identifier = "different-org";
 
