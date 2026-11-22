@@ -58,6 +58,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </li>
           </ul>
         </div>
+        <div v-if="contractStatus.usage_blocks?.length" data-test="org-management-usage-blocks">
+          <div class="font-semibold">
+            {{ t("settings.organizationManagementPage.usageBlocksTitle") }}
+          </div>
+          <ul>
+            <li
+              v-for="block in contractStatus.usage_blocks"
+              :key="block.org_id"
+              :data-test="`org-management-usage-block-${block.org_id}`"
+            >
+              {{
+                t("settings.organizationManagementPage.usageBlockLine", {
+                  org: block.org_id,
+                  meters: block.meters.join(", "),
+                  until: formatMicrosToDateTime(block.until),
+                })
+              }}
+              <span v-if="!block.applied" class="text-text-secondary">
+                {{ t("settings.organizationManagementPage.usageBlockNotApplied") }}
+              </span>
+            </li>
+          </ul>
+        </div>
       </div>
       <div class="bg-card-glass-bg mt-2.5 min-h-0 flex-1 overflow-hidden">
         <OTable
@@ -686,6 +709,13 @@ interface ContractSyncStatus {
   last_success: number | null;
   last_error: { at: number; message: string } | null;
   blocked: { contract_id: string; org_id: string; ends_at: number; reason: string | null }[];
+  usage_blocks?: {
+    org_id: string;
+    contract_id: string;
+    meters: string[];
+    until: number;
+    applied: boolean;
+  }[];
 }
 
 type ContractSyncOutcome =

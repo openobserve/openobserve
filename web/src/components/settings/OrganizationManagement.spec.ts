@@ -936,6 +936,33 @@ describe("OrganizationManagement.vue", () => {
         expect(dialog.attributes("data-name")).toBe("Test Org");
       });
 
+      it("lists orgs over a contract limit and says which are only reported", async () => {
+        await mounted({
+          ...syncOn,
+          usage_blocks: [
+            {
+              org_id: "acme",
+              contract_id: "c1",
+              meters: ["ingestion", "query"],
+              until: 1,
+              applied: true,
+            },
+            { org_id: "beta", contract_id: "c2", meters: ["ai_credits"], until: 1, applied: false },
+          ],
+        });
+        const applied = wrapper.find('[data-test="org-management-usage-block-acme"]').text();
+        expect(applied).toContain("acme: ingestion, query until");
+        expect(applied).not.toContain("reported only");
+        expect(wrapper.find('[data-test="org-management-usage-block-beta"]').text()).toContain(
+          "(reported only; enforcement is set to notify)",
+        );
+      });
+
+      it("shows no usage blocks section when there are none", async () => {
+        await mounted({ ...syncOn, usage_blocks: [] });
+        expect(wrapper.find('[data-test="org-management-usage-blocks"]').exists()).toBe(false);
+      });
+
       it("keeps the old buttons and no panel while sync is off", async () => {
         await mounted({ sync_active: false, last_success: null, last_error: null, blocked: [] });
         expect(wrapper.find('[data-test="org-management-sync-contract-btn"]').exists()).toBe(false);

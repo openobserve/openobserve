@@ -613,7 +613,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(openobserve_core::org_domain_ownership::watch());
 
         use o2_enterprise::enterprise::cloud::contracts::entitlements;
-        if entitlements::gating_active() {
+        // usage blocks share the watch and reloads, so they run without gating too
+        if entitlements::cache_active() {
             tokio::task::spawn(entitlements::watch());
             entitlements::reload_all().await;
             tokio::task::spawn(entitlements::reload_periodically());
