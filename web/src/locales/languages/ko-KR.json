@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "삭제 시작 실패.",
       "organizationResurrected": "조직이 복원되었습니다.",
       "failedToResurrect": "복원 실패.",
+      "organizationBlocked": "조직이 차단되었습니다.",
+      "failedToBlock": "차단하지 못했습니다.",
+      "organizationUnblocked": "조직 차단이 해제되었습니다.",
+      "failedToUnblock": "차단을 해제하지 못했습니다.",
       "organizationUpdated": "조직이 성공적으로 업데이트되었습니다.",
       "organizationAdded": "조직이 성공적으로 추가되었습니다.",
       "requestCompleted": "요청이 성공적으로 완료되었습니다.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "{n}일 남음",
     "resurrect": "조직 복구",
     "statusActive": "활성",
-    "statusDeleting": "삭제 중"
+    "statusDeleting": "삭제 중",
+    "statusBlocked": "차단됨",
+    "block": "조직 차단",
+    "unblock": "조직 차단 해제",
+    "blockConfirmMessage": "{name}을(를) 차단하시겠습니까? 차단을 해제할 때까지 수집, 쿼리, 로그인을 받지 않습니다.",
+    "blockConfirmLabel": "차단"
   },
   "template": {
     "search": "템플릿 검색"
@@ -14978,6 +14987,12 @@
       "moreGroups": "+{count}",
       "quickMuteTooltip": "알림에서 빠른 음소거",
       "endedLabel": "종료됨"
+    },
+    "lease": {
+      "temporary": "{who}이(가) 생성한 임시 항목, {time}에 종료",
+      "incidentsOn": "{who}이(가) 인시던트 생성을 켬, {time}까지",
+      "incidentsOff": "{who}이(가) 인시던트 생성을 끔, {time}까지",
+      "why": "{label}. 이유: {reason}"
     },
     "ack": {
       "acknowledge": "확인",

@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "Failed to initiate deletion.",
       "organizationResurrected": "Organization resurrected.",
       "failedToResurrect": "Failed to resurrect.",
+      "organizationBlocked": "บล็อกองค์กรแล้ว",
+      "failedToBlock": "บล็อกไม่สำเร็จ",
+      "organizationUnblocked": "เลิกบล็อกองค์กรแล้ว",
+      "failedToUnblock": "เลิกบล็อกไม่สำเร็จ",
       "organizationUpdated": "Organization updated successfully.",
       "organizationAdded": "Organization added successfully.",
       "requestCompleted": "Request completed successfully.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "{n} days left",
     "resurrect": "Resurrect organization",
     "statusActive": "Active",
-    "statusDeleting": "Deleting"
+    "statusDeleting": "Deleting",
+    "statusBlocked": "ถูกบล็อก",
+    "block": "บล็อกองค์กร",
+    "unblock": "เลิกบล็อกองค์กร",
+    "blockConfirmMessage": "บล็อก {name} หรือไม่? องค์กรจะไม่รับการนำเข้าข้อมูล การค้นหา และการลงชื่อเข้าใช้จนกว่าจะเลิกบล็อก",
+    "blockConfirmLabel": "บล็อก"
   },
   "template": {
     "search": "Search Template"
@@ -14976,6 +14985,12 @@
       "moreGroups": "+{count}",
       "quickMuteTooltip": "Quick mute from an alert",
       "endedLabel": "ended"
+    },
+    "lease": {
+      "temporary": "ชั่วคราว สร้างโดย {who} สิ้นสุดเมื่อ {time}",
+      "incidentsOn": "เปิดการสร้างเหตุการณ์ขัดข้องโดย {who} จนถึง {time}",
+      "incidentsOff": "ปิดการสร้างเหตุการณ์ขัดข้องโดย {who} จนถึง {time}",
+      "why": "{label}. เหตุผล: {reason}"
     },
     "ack": {
       "acknowledge": "Acknowledge",

@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "Не удалось запустить удаление.",
       "organizationResurrected": "Организация восстановлена.",
       "failedToResurrect": "Не удалось восстановить.",
+      "organizationBlocked": "Организация заблокирована.",
+      "failedToBlock": "Не удалось заблокировать.",
+      "organizationUnblocked": "Организация разблокирована.",
+      "failedToUnblock": "Не удалось разблокировать.",
       "organizationUpdated": "Организация успешно обновлена.",
       "organizationAdded": "Организация успешно добавлена.",
       "requestCompleted": "Запрос успешно выполнен.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "Осталось {n} дн.",
     "resurrect": "Восстановить организацию",
     "statusActive": "Активна",
-    "statusDeleting": "Удаляется"
+    "statusDeleting": "Удаляется",
+    "statusBlocked": "Заблокирована",
+    "block": "Заблокировать организацию",
+    "unblock": "Разблокировать организацию",
+    "blockConfirmMessage": "Заблокировать {name}? До разблокировки организация не будет принимать данные, запросы и входы.",
+    "blockConfirmLabel": "Заблокировать"
   },
   "template": {
     "search": "Поиск шаблона"
@@ -14978,6 +14987,12 @@
       "moreGroups": "+{count}",
       "quickMuteTooltip": "Быстрое заглушение из оповещения",
       "endedLabel": "завершено"
+    },
+    "lease": {
+      "temporary": "Временный, создан {who}, действует до {time}",
+      "incidentsOn": "Создание инцидентов включено {who} до {time}",
+      "incidentsOff": "Создание инцидентов отключено {who} до {time}",
+      "why": "{label}. Причина: {reason}"
     },
     "ack": {
       "acknowledge": "Принять",

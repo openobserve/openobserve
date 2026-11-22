@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "Falha ao iniciar a eliminação.",
       "organizationResurrected": "Organização restaurada.",
       "failedToResurrect": "Falha ao restaurar.",
+      "organizationBlocked": "Organização bloqueada.",
+      "failedToBlock": "Falha ao bloquear.",
+      "organizationUnblocked": "Organização desbloqueada.",
+      "failedToUnblock": "Falha ao desbloquear.",
       "organizationUpdated": "Organização atualizada com sucesso.",
       "organizationAdded": "Organização adicionada com sucesso.",
       "requestCompleted": "Pedido concluído com sucesso.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "Restam {n} dias",
     "resurrect": "Ressuscitar organização",
     "statusActive": "Ativo",
-    "statusDeleting": "A eliminar"
+    "statusDeleting": "A eliminar",
+    "statusBlocked": "Bloqueada",
+    "block": "Bloquear organização",
+    "unblock": "Desbloquear organização",
+    "blockConfirmMessage": "Bloquear {name}? Deixará de aceitar ingestão, consultas e inícios de sessão até ser desbloqueada.",
+    "blockConfirmLabel": "Bloquear"
   },
   "template": {
     "search": "Pesquisar modelos"
@@ -14978,6 +14987,12 @@
       "moreGroups": "+{count}",
       "quickMuteTooltip": "Silenciamento rápido a partir de um alerta",
       "endedLabel": "terminado"
+    },
+    "lease": {
+      "temporary": "Temporário, criado por {who}, termina às {time}",
+      "incidentsOn": "Criação de incidentes ativada por {who} até {time}",
+      "incidentsOff": "Criação de incidentes desativada por {who} até {time}",
+      "why": "{label}. Motivo: {reason}"
     },
     "ack": {
       "acknowledge": "Reconhecer",

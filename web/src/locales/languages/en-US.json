@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "Failed to initiate deletion.",
       "organizationResurrected": "Organization resurrected.",
       "failedToResurrect": "Failed to resurrect.",
+      "organizationBlocked": "Organization blocked.",
+      "failedToBlock": "Failed to block.",
+      "organizationUnblocked": "Organization unblocked.",
+      "failedToUnblock": "Failed to unblock.",
       "organizationUpdated": "Organization updated successfully.",
       "organizationAdded": "Organization added successfully.",
       "requestCompleted": "Request completed successfully.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "{n} days left",
     "resurrect": "Resurrect organization",
     "statusActive": "Active",
-    "statusDeleting": "Deleting"
+    "statusDeleting": "Deleting",
+    "statusBlocked": "Blocked",
+    "block": "Block organization",
+    "unblock": "Unblock organization",
+    "blockConfirmMessage": "Block {name}? It stops accepting ingestion, queries and sign-ins until it is unblocked.",
+    "blockConfirmLabel": "Block"
   },
   "template": {
     "search": "Search Template"

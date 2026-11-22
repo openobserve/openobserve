@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "Silme başlatılamadı.",
       "organizationResurrected": "Kuruluş geri getirildi.",
       "failedToResurrect": "Geri getirme başarısız oldu.",
+      "organizationBlocked": "Kuruluş engellendi.",
+      "failedToBlock": "Engellenemedi.",
+      "organizationUnblocked": "Kuruluşun engeli kaldırıldı.",
+      "failedToUnblock": "Engel kaldırılamadı.",
       "organizationUpdated": "Kuruluş başarıyla güncellendi.",
       "organizationAdded": "Kuruluş başarıyla eklendi.",
       "requestCompleted": "İstek başarıyla tamamlandı.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "{n} gün kaldı",
     "resurrect": "Kuruluşu canlandır",
     "statusActive": "Etkin",
-    "statusDeleting": "Siliniyor"
+    "statusDeleting": "Siliniyor",
+    "statusBlocked": "Engellendi",
+    "block": "Kuruluşu engelle",
+    "unblock": "Kuruluşun engelini kaldır",
+    "blockConfirmMessage": "{name} engellensin mi? Engeli kaldırılana kadar veri alımı, sorgu ve oturum açma kabul edilmez.",
+    "blockConfirmLabel": "Engelle"
   },
   "template": {
     "search": "Şablon ara"
@@ -14978,6 +14987,12 @@
       "moreGroups": "+{count}",
       "quickMuteTooltip": "Bir uyarıdan hızlı sessize alma",
       "endedLabel": "sona erdi"
+    },
+    "lease": {
+      "temporary": "Geçici, {who} tarafından oluşturuldu, {time} tarihinde sona eriyor",
+      "incidentsOn": "Vaka oluşturma {who} tarafından {time} tarihine kadar açık",
+      "incidentsOff": "Vaka oluşturma {who} tarafından {time} tarihine kadar kapalı",
+      "why": "{label}. Neden: {reason}"
     },
     "ack": {
       "acknowledge": "Üstlen",

@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "启动删除失败。",
       "organizationResurrected": "组织已恢复。",
       "failedToResurrect": "恢复失败。",
+      "organizationBlocked": "组织已封禁。",
+      "failedToBlock": "封禁失败。",
+      "organizationUnblocked": "组织已解除封禁。",
+      "failedToUnblock": "解除封禁失败。",
       "organizationUpdated": "组织更新成功。",
       "organizationAdded": "组织添加成功。",
       "requestCompleted": "请求完成成功。",
@@ -5228,7 +5232,12 @@
     "daysLeft": "剩余 {n} 天",
     "resurrect": "恢复组织",
     "statusActive": "活跃",
-    "statusDeleting": "删除中"
+    "statusDeleting": "删除中",
+    "statusBlocked": "已封禁",
+    "block": "封禁组织",
+    "unblock": "解除封禁组织",
+    "blockConfirmMessage": "封禁 {name}？在解除封禁之前，该组织将不再接受数据摄取、查询和登录。",
+    "blockConfirmLabel": "封禁"
   },
   "template": {
     "search": "搜索模板"
@@ -14978,6 +14987,12 @@
       "moreGroups": "+{count}",
       "quickMuteTooltip": "从告警快速静默",
       "endedLabel": "已结束"
+    },
+    "lease": {
+      "temporary": "临时，由 {who} 创建，于 {time} 结束",
+      "incidentsOn": "事件创建已由 {who} 开启，直到 {time}",
+      "incidentsOff": "事件创建已由 {who} 关闭，直到 {time}",
+      "why": "{label}。原因：{reason}"
     },
     "ack": {
       "acknowledge": "确认",
