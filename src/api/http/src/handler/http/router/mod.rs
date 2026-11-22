@@ -2344,6 +2344,7 @@ fn service_route_table() -> Router {
                 get(organization::org::all_organizations)
                     .delete(organization::org::initiate_org_deletion),
             )
+            .route("/{org_id}/all_users", get(users::all_users))
             .route(
                 "/{org_id}/extend_trial_period",
                 put(organization::org::extend_trial_period),

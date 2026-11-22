@@ -1584,6 +1584,7 @@ struct WorkflowHttpTriggerApiDoc;
     openobserve_api_management::request::organization::org::initiate_org_deletion,
     openobserve_api_management::request::organization::org::revoke_external_contract,
     openobserve_api_management::request::organization::org::set_quota_usage_limit,
+    openobserve_api_management::request::users::all_users,
 ))]
 struct CloudQuotaApiDoc;
 
