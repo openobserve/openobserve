@@ -832,7 +832,7 @@ pub async fn check_ingestion_allowed(
     stream_type: StreamType,
     stream_name: Option<&str>,
 ) -> Result<()> {
-    if db::org_status::is_operator_blocked(org_id) {
+    if db::org_status::is_blocked_status(org_id) {
         return Err(infra::errors::IngestionError::OrgBlockedByOperator(org_id.to_string()).into());
     }
     if db::org_status::is_blocked(org_id) {

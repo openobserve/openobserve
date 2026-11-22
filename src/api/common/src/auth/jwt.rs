@@ -1273,7 +1273,7 @@ pub async fn check_and_add_to_org(
     };
     let has_blocked_org = org_users
         .iter()
-        .any(|o| org_status::is_operator_blocked(&o.org_id));
+        .any(|o| org_status::is_blocked_status(&o.org_id));
     let usable_orgs: Vec<_> = org_users
         .into_iter()
         .filter(|o| !org_status::is_blocked(&o.org_id))

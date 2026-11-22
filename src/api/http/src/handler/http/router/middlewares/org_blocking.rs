@@ -45,11 +45,11 @@ fn is_own_cleanup_retry(method: &Method, path: &str) -> bool {
 }
 
 /// The 403 text for an org every gate refuses; `None` when the org is open.
-fn refusal(org_id: &str) -> Option<&'static str> {
+fn check_blocked(org_id: &str) -> Option<&'static str> {
     if !db::org_status::is_blocked(org_id) {
         return None;
     }
-    if db::org_status::is_operator_blocked(org_id) {
+    if db::org_status::is_blocked_status(org_id) {
         return Some("Organization is blocked");
     }
     Some("Organization is deleted")
@@ -64,7 +64,7 @@ pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
 
     if !org_id.is_empty()
         && !SYSTEM_PREFIXES.contains(&org_id)
-        && let Some(text) = refusal(org_id)
+        && let Some(text) = check_blocked(org_id)
         && !is_own_cleanup_retry(request.method(), path)
     {
         // "deleted", not "being deleted": this gate also covers the soft-delete
@@ -111,7 +111,10 @@ pub async fn blocked_org_param(
     request: Request,
     next: Next,
 ) -> Response {
-    if let Some(text) = params.get("org_id").and_then(|org_id| refusal(org_id)) {
+    if let Some(text) = params
+        .get("org_id")
+        .and_then(|org_id| check_blocked(org_id))
+    {
         return (StatusCode::FORBIDDEN, text).into_response();
     }
     next.run(request).await

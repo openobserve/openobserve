@@ -881,7 +881,7 @@ async fn refuse_deleted_org(org_id: &str) -> Result<(), anyhow::Error> {
             .await
             .is_ok_and(|org| org.status == "deleted")
     };
-    if db::org_status::is_operator_blocked(org_id) {
+    if db::org_status::is_blocked_status(org_id) {
         return Err(anyhow::anyhow!("Organization {org_id} is blocked"));
     }
     if db::org_status::is_blocked(org_id) || tombstoned().await {

@@ -84,8 +84,8 @@ pub fn is_blocked(org_id: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// True only for an org an operator blocked, which gates name apart from a deletion.
-pub fn is_operator_blocked(org_id: &str) -> bool {
+/// True only for the `blocked` status, which gates name apart from a deletion status.
+pub fn is_blocked_status(org_id: &str) -> bool {
     ORG_STATUS_CACHE
         .get(org_id)
         .is_some_and(|v| *v == OrgStatus::Blocked)
