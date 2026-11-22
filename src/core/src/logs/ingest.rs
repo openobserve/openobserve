@@ -2065,6 +2065,37 @@ mod tests {
         assert!(parse_json_body(br#"[{"a":1}"#).is_err());
     }
 
+    // cloud builds reject the unknown test org at the trial check before the columns check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_json_over_the_columns_limit_fails_every_row() {
+        let limit = config::get_config().limit.req_cols_per_record_limit;
+        let wide: json::Map<String, json::Value> = (0..=limit)
+            .map(|i| (format!("f_{i}"), json::json!(i)))
+            .collect();
+        let body = json::json!([{"message": "small"}, wide]).to_string();
+        let resp = ingest(
+            0,
+            "test_org_id",
+            "test_json_columns_limit",
+            IngestionRequest::JSON(body.into()),
+            IngestUser::from_user_email("a@a.com"),
+            None,
+            false,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(resp.code, 200);
+        let status = &resp.status[0].status;
+        assert_eq!((status.successful, status.failed), (0, 2));
+        assert!(
+            status.error.contains("ZO_COLS_PER_RECORD_LIMIT"),
+            "{status:?}"
+        );
+        assert!(resp.write_failed);
+    }
+
     fn gzip_base64(raw: &[u8]) -> String {
         use std::io::Write;
 

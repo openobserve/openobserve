@@ -925,6 +925,48 @@ mod tests {
         );
     }
 
+    // cloud builds reject the unknown test org at the trial check before the columns check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_fails_every_row_of_the_stream_over_the_columns_limit() {
+        let limit = get_config().limit.req_cols_per_record_limit;
+        let wide: json::Map<String, json::Value> = (0..=limit)
+            .map(|i| (format!("f_{i}"), json::json!(i)))
+            .collect();
+        let body = format!(
+            "{{\"index\": {{\"_index\": \"test_bulk_cols_ok\", \"_id\": \"1\"}}}}\n{{\"message\": \"a\"}}\n\
+             {{\"index\": {{\"_index\": \"test_bulk_cols_wide\", \"_id\": \"2\"}}}}\n{{\"message\": \"b\"}}\n\
+             {{\"index\": {{\"_index\": \"test_bulk_cols_wide\", \"_id\": \"3\"}}}}\n{}\n",
+            json::Value::Object(wide)
+        );
+        let resp = ingest(
+            1,
+            "test_org_id",
+            Bytes::from(body),
+            IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+
+        let rejected: Vec<&str> = resp
+            .items
+            .iter()
+            .flat_map(|item| item.values())
+            .filter(|item| {
+                item.error
+                    .as_ref()
+                    .is_some_and(|e| e.err_type == SCHEMA_CONFORMANCE_FAILED)
+            })
+            .map(|item| item._id.as_str())
+            .collect();
+        assert!(resp.errors);
+        assert_eq!(rejected, ["2", "3"]);
+        assert!(infra::schema::exists("test_org_id", StreamType::Logs, "test_bulk_cols_ok").await);
+        assert!(
+            !infra::schema::exists("test_org_id", StreamType::Logs, "test_bulk_cols_wide").await
+        );
+    }
+
     #[test]
     fn test_prepare_bulk_record_reads_a_key_flattened_into_timestamp() {
         let now = now_micros();
