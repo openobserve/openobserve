@@ -12402,9 +12402,6 @@
     "testErrorClientError": "클라이언트 오류 (4xx).자격 증명과 구성을 확인하십시오.",
     "testErrorServerError": "서버 오류(5xx)입니다. 대상 서비스에 문제가 발생했습니다.",
     "viewDetails": "세부 정보 보기",
-    "error": "오류",
-    "httpStatus": "HTTP 상태",
-    "responseBody": "응답 바디",
     "retry": "재시도",
     "suggestCheckUrl": "웹후크 URL이 정확하고 연결할 수 있는지 확인하십시오.",
     "suggestCheckFirewall": "방화벽 설정을 확인하고 대상 서비스에 접근할 수 있는지 확인하세요.",
@@ -14202,7 +14199,6 @@
       "loadFailedTitle": "이 알림을 불러올 수 없습니다"
     },
     "timeLabel": "시간",
-    "unknownHttpStatus": "알 수 없음",
     "previewEvaluation": {
       "realTimeReason": "조건이 일치할 때",
       "matchingGroup": "일치 그룹",
@@ -15623,7 +15619,6 @@
       "hideWebhook": "Slack 웹훅 URL 숨기기",
       "slackAppFallback": "Slack 앱",
       "previewDisclaimer": "Slack은 설치 후 실제 앱 아이콘과 대상 채널을 제공합니다.",
-      "successResponseBody": "Slack 응답",
       "callbackTitle": "Slack 연결 중",
       "callbackWorking": "{product}(으)로 돌아가는 중…",
       "callbackError": "이 Slack 연결을 완료할 수 없습니다. 이 창을 닫고 다시 시도하세요.",
@@ -20202,7 +20197,6 @@
         "latency": "지연 시간",
         "output": "추출된 출력",
         "rawRequest": "보낸 요청",
-        "rawResponse": "받은 응답",
         "idle": "테스트를 실행하면 요청과 응답이 모두 여기에 표시됩니다.",
         "disabledHint": "먼저 이름과 엔드포인트를 입력하세요.",
         "failure": {

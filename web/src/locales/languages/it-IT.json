@@ -12402,9 +12402,6 @@
     "testErrorClientError": "Errore del client (4xx). Controlla le tue credenziali e la tua configurazione.",
     "testErrorServerError": "Errore del server (5xx). Il servizio di destinazione sta riscontrando problemi.",
     "viewDetails": "Visualizza dettagli",
-    "error": "Errore",
-    "httpStatus": "Stato HTTP",
-    "responseBody": "Corpo di risposta",
     "retry": "Riprova",
     "suggestCheckUrl": "Verifica che l'URL del webhook sia corretto e raggiungibile.",
     "suggestCheckFirewall": "Controlla le impostazioni del firewall e assicurati che il servizio di destinazione sia accessibile.",
@@ -14202,7 +14199,6 @@
       "loadFailedTitle": "Impossibile caricare questo avviso"
     },
     "timeLabel": "Tempo",
-    "unknownHttpStatus": "Sconosciuto",
     "previewEvaluation": {
       "realTimeReason": "Quando le condizioni corrispondono",
       "matchingGroup": "gruppo corrispondente",
@@ -15623,7 +15619,6 @@
       "hideWebhook": "Nascondi URL webhook Slack",
       "slackAppFallback": "App Slack",
       "previewDisclaimer": "Slack fornisce l'icona effettiva dell'app e il canale di destinazione dopo l'installazione.",
-      "successResponseBody": "Risposta di Slack",
       "callbackTitle": "Connessione a Slack",
       "callbackWorking": "Ritorno a {product}…",
       "callbackError": "Impossibile completare questa connessione a Slack. Chiudi questa finestra e riprova.",
@@ -20202,7 +20197,6 @@
         "latency": "Latenza",
         "output": "Output estratto",
         "rawRequest": "Richiesta inviata",
-        "rawResponse": "Risposta ricevuta",
         "idle": "La richiesta e la risposta compaiono entrambe qui dopo aver eseguito un test.",
         "disabledHint": "Compila prima il nome e l'endpoint.",
         "failure": {

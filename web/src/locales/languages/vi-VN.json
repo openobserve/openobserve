@@ -12402,9 +12402,6 @@
     "testErrorClientError": "Lỗi máy khách (4xx). Vui lòng kiểm tra thông tin đăng nhập và cấu hình của bạn.",
     "testErrorServerError": "Lỗi máy chủ (5xx). Dịch vụ đích đang gặp sự cố.",
     "viewDetails": "Xem chi tiết",
-    "error": "Lỗi",
-    "httpStatus": "Trạng thái HTTP",
-    "responseBody": "Nội dung phản hồi",
     "retry": "Thử lại",
     "suggestCheckUrl": "Vui lòng xác minh URL webhook là chính xác và có thể truy cập.",
     "suggestCheckFirewall": "Kiểm tra cài đặt tường lửa và đảm bảo dịch vụ đích có thể truy cập được.",
@@ -14202,7 +14199,6 @@
       "loadFailedTitle": "Không thể tải cảnh báo này"
     },
     "timeLabel": "Thời gian",
-    "unknownHttpStatus": "Không xác định",
     "previewEvaluation": {
       "realTimeReason": "Khi các điều kiện khớp",
       "matchingGroup": "nhóm khớp",
@@ -15623,7 +15619,6 @@
       "hideWebhook": "Ẩn URL webhook Slack",
       "slackAppFallback": "Ứng dụng Slack",
       "previewDisclaimer": "Slack cung cấp biểu tượng ứng dụng và kênh đích thực tế sau khi cài đặt.",
-      "successResponseBody": "Phản hồi từ Slack",
       "callbackTitle": "Đang kết nối Slack",
       "callbackWorking": "Đang quay lại {product}…",
       "callbackError": "Không thể hoàn tất kết nối Slack này. Đóng cửa sổ này và thử lại.",
@@ -20202,7 +20197,6 @@
         "latency": "Độ trễ",
         "output": "Đầu ra đã trích xuất",
         "rawRequest": "Yêu cầu đã gửi",
-        "rawResponse": "Phản hồi đã nhận",
         "idle": "Yêu cầu và phản hồi sẽ hiển thị tại đây sau khi bạn chạy thử.",
         "disabledHint": "Vui lòng nhập tên và điểm cuối trước.",
         "failure": {
