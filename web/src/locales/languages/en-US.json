@@ -17382,48 +17382,6 @@
         "subqueryTitle": "The Traces view cannot run a subquery",
         "description": "SQL runs in the Spans view."
       },
-      "examples": "Examples",
-      "gallery": {
-        "title": "Query spans with SQL",
-        "lede": "Your query runs over spans, and the result shows as a table with one column per field. Start from a template or write your own.",
-        "traceQuestions": "Trace questions",
-        "spanSummaries": "Span summaries",
-        "useTemplate": "Use template"
-      },
-      "templates": {
-        "slowTraces": { "name": "Slow traces", "description": "Whole trace longer than 2 s" },
-        "bigTraces": { "name": "Big traces", "description": "More than 200 spans" },
-        "errorsInTwoServices": {
-          "name": "Errors in two services",
-          "description": "{first} fails and {second} is called"
-        },
-        "nPlusOne": {
-          "name": "N+1 database calls",
-          "description": "One row per parent with more than 50 client spans. Columns cover client spans only, so duration_ms is not the trace duration."
-        },
-        "missingSpan": {
-          "name": "Missing span",
-          "description": "Calls {first} but never reaches {second}"
-        },
-        "manyServices": {
-          "name": "Crosses 5+ services",
-          "description": "Five or more services in one trace"
-        },
-        "p95ByVersion": {
-          "name": "p95 by version",
-          "description": "Compare releases by p95 duration"
-        },
-        "p95ByOperation": { "name": "p95 by operation", "description": "Top 10 slow operations" },
-        "spansPerMinute": {
-          "name": "Spans per service per minute",
-          "description": "Span volume over time"
-        },
-        "nullAudit": {
-          "name": "Null and cardinality audit",
-          "description": "Data quality per service"
-        },
-        "tokensByModel": { "name": "Tokens by model", "description": "Input tokens per model" }
-      },
       "noTraceIdHint": "These rows have no trace_id, so they do not open a trace.",
       "addTraceId": "Add trace_id",
       "openTrace": "Open trace",

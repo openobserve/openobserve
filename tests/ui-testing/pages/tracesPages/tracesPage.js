@@ -4066,21 +4066,6 @@ export class TracesPage {
     return this.page.locator('[data-test="traces-metrics-dashboard"]');
   }
 
-  getSqlTemplateGallery() {
-    return this.page.locator('[data-test="traces-sql-template-gallery"]');
-  }
-
-  async useSqlTemplate(name) {
-    await this.getSqlTemplateGallery()
-      .locator('[data-test="traces-sql-template-card"]', { hasText: name })
-      .locator('[data-test="traces-sql-template-use-btn"]')
-      .click();
-  }
-
-  getSqlTemplateGroupTitles() {
-    return this.getSqlTemplateGallery().locator('[data-test="traces-sql-template-group-title"]');
-  }
-
   getSqlResultCap() {
     return this.page.locator('[data-test="traces-sql-result-cap"]');
   }

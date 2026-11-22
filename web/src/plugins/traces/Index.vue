@@ -85,10 +85,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @services-catalog-refresh="servicesCatalogRef?.refresh()"
               @filter-builder-growth="filterBuilderGrowth = $event"
               @drill-down="searchResultRef?.openComparison()"
-              :sql-templates="sqlTemplates"
               @sql-stream-change="onSqlStreamChange"
               @open-spans-sql="onOpenSpansSql"
-              @sql-examples-open="(open: boolean) => (sqlExamplesOpen = open)"
             />
           </div>
         </template>
@@ -178,11 +176,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                       </TracesNoDataState>
                     </FirstDataPanel>
-                    <TracesSqlTemplateGallery
-                      v-else-if="!searchObj.loadingStream && sqlEditorEmpty && isStreamSelected"
-                      :templates="sqlTemplates"
-                      @use="onUseSqlTemplate"
-                    />
                     <div
                       v-else-if="searchObj.data.errorMsg !== '' && !searchObj.loading"
                       data-test="traces-search-error-message"
@@ -443,10 +436,8 @@ import {
   mergesAcrossPartitions,
   sqlPaging,
 } from "@/utils/traces/tracesSql";
-import { useTracesSqlTemplates } from "./composables/useTracesSqlTemplates";
 import { createStreamingHits } from "@/utils/traces/streamingHits";
 import { fieldsStoredInAll } from "@/utils/traces/tracesAllFields";
-import TracesSqlTemplateGallery from "./components/TracesSqlTemplateGallery.vue";
 import TracesSqlAwaitingRun from "./components/TracesSqlAwaitingRun.vue";
 import TracesSqlErrorState from "./components/TracesSqlErrorState.vue";
 import { ONE_HOUR_US } from "@/utils/traces/tracesSqlErrors";
@@ -2478,12 +2469,6 @@ const isStreamSelected = computed(() => {
   return searchObj.data.stream?.selectedStream?.value?.trim()?.length > 0;
 });
 
-// The Examples menu in the search bar is open, so its templates want service names.
-const sqlExamplesOpen = ref(false);
-const { sqlTemplates } = useTracesSqlTemplates(
-  () => (sqlEditorEmpty.value && isStreamSelected.value) || sqlExamplesOpen.value,
-);
-
 // Results shaped by typed SQL do not describe the filter that replaces it.
 watch(
   () => searchObj.meta.sqlMode,
@@ -2914,12 +2899,6 @@ const onSqlUseLastHour = async () => {
   searchObj.data.datetime = { ...searchObj.data.datetime, ...datetime };
   await syncSavedViewDateTime(datetime);
   searchData();
-};
-
-// A template fills the editor only; typed SQL always waits for Run.
-const onUseSqlTemplate = (sql: string) => {
-  searchObj.data.editorValue = sql;
-  searchBarRef.value?.setEditorValue?.(sql);
 };
 
 const syncSavedViewDateTime = async (datetime: TracesSavedView["datetime"]) => {

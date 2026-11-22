@@ -813,46 +813,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="query-editor-placeholder-typewriter">{{ traceEditorPlaceholder }}</span>
         </div>
-        <!-- Clears the editor's floating AI button, which sits at the top-right corner. -->
-        <div
-          v-if="showSqlExamples"
-          class="absolute top-1 z-2"
-          :class="isAiEnabled && !nlpMode ? 'end-9' : 'end-2'"
-          data-test="traces-sql-examples-wrap"
-        >
-          <ODropdown
-            side="bottom"
-            align="end"
-            @update:open="(open: boolean) => $emit('sql-examples-open', open)"
-          >
-            <template #trigger>
-              <OButton
-                variant="outline"
-                size="xs"
-                icon-right="arrow-drop-down"
-                data-test="traces-sql-examples-btn"
-              >
-                {{ t("traces.sqlMode.examples") }}
-              </OButton>
-            </template>
-            <ODropdownGroup
-              v-for="entry in groupedTemplates(sqlTemplates)"
-              :key="entry.group"
-              :label="groupName(entry.group)"
-              data-test="traces-sql-examples-group"
-            >
-              <ODropdownItem
-                v-for="tpl in entry.templates"
-                :key="tpl.id"
-                :description="templateDescription(tpl)"
-                data-test="traces-sql-examples-item"
-                @select="writeEditor(tpl.sql)"
-              >
-                {{ templateName(tpl) }}
-              </ODropdownItem>
-            </ODropdownGroup>
-          </ODropdown>
-        </div>
       </div>
     </div>
     <RecentSearchesDrawer
@@ -910,8 +870,6 @@ import {
 } from "@/utils/traces/tracesSql";
 import { allFieldRef, withAllFieldInserts } from "@/utils/traces/tracesAllFields";
 import { offsetRange, tracesSqlGuards } from "@/utils/traces/tracesSqlErrors";
-import type { TracesSqlTemplate } from "@/utils/traces/tracesSqlTemplates";
-import { useTracesSqlTemplateText } from "@/plugins/traces/composables/useTracesSqlTemplates";
 import { isAuthoredStatement, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
 import { nlSqlToTracesFilter } from "@/plugins/traces/utils/nlSqlToTracesFilter";
 import { chartInterval } from "./metrics/latencyHeatmap";
@@ -1050,7 +1008,6 @@ export default defineComponent({
     "recent-restore",
     "sql-stream-change",
     "open-spans-sql",
-    "sql-examples-open",
   ],
   props: {
     fieldValues: {
@@ -1072,10 +1029,6 @@ export default defineComponent({
     refreshLastRunAt: {
       type: Number as PropType<number | null>,
       default: null,
-    },
-    sqlTemplates: {
-      type: Array as PropType<TracesSqlTemplate[]>,
-      default: () => [],
     },
   },
   methods: {
@@ -1492,15 +1445,6 @@ export default defineComponent({
       searchObj.data.editorValue = text;
       setEditorValue(text);
     };
-
-    const { templateName, templateDescription, groupName, groupedTemplates } =
-      useTracesSqlTemplateText();
-    const showSqlExamples = computed(
-      () =>
-        !!searchObj.meta.sqlMode &&
-        !!String(searchObj.data.editorValue ?? "").trim() &&
-        props.sqlTemplates.length > 0,
-    );
 
     // OSwitch flips its own state on click; in the Traces view SQL never shows on, so the switch remounts.
     const sqlSwitchKey = ref(0);
@@ -2199,11 +2143,6 @@ export default defineComponent({
       sqlSwitchKey,
       showPinnedSavedViews,
       setSqlMode,
-      showSqlExamples,
-      templateName,
-      templateDescription,
-      groupName,
-      groupedTemplates,
       writeEditor,
       insertSqlCondition,
       setSqlFieldValues,

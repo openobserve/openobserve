@@ -3867,74 +3867,10 @@ describe("SearchBar", () => {
       });
     });
 
-    it("offers the templates under Examples once the editor has SQL, and fills it without running", async () => {
-      const templates = [
-        {
-          id: "bigTraces",
-          group: "traceQuestions",
-          sql: `SELECT trace_id FROM "default" GROUP BY trace_id`,
-          services: [],
-        },
-        {
-          id: "p95ByVersion",
-          group: "spanSummaries",
-          sql: `SELECT service_service_version FROM "default"`,
-          services: [],
-        },
-      ];
-      searchObjInstance.meta.sqlMode = true;
-      searchObjInstance.data.editorValue = "";
-      wrapper = mountSearchBar({ sqlTemplates: templates });
-      await flushPromises();
-      expect(wrapper.find('[data-test="traces-sql-examples-btn"]').exists()).toBe(false);
-
-      searchObjInstance.data.editorValue = `SELECT trace_id FROM "default" WHERE a = 1`;
-      await flushPromises();
-      const items = wrapper.findAll('[data-test="traces-sql-examples-item"]');
-      expect(items).toHaveLength(2);
-      const groups = wrapper.findAll('[data-test="traces-sql-examples-group"]');
-      expect(groups.map((g) => g.attributes("label"))).toEqual([
-        "traces.sqlMode.gallery.traceQuestions",
-        "traces.sqlMode.gallery.spanSummaries",
-      ]);
-      expect(groups.map((g) => g.text())).toEqual([
-        "traces.sqlMode.templates.bigTraces.name",
-        "traces.sqlMode.templates.p95ByVersion.name",
-      ]);
-
-      await items[1].trigger("click");
-      expect(searchObjInstance.data.editorValue).toBe(templates[1].sql);
-      expect(searchObjInstance.meta.sqlMode).toBe(true);
-      expect(wrapper.emitted("searchdata")).toBeUndefined();
-    });
-
-    it("moves Examples left of the editor's AI button only while that button shows", async () => {
-      const wrap = () => wrapper.find('[data-test="traces-sql-examples-wrap"]');
+    it("shows no Examples menu in SQL mode", async () => {
       searchObjInstance.meta.sqlMode = true;
       searchObjInstance.data.editorValue = `SELECT trace_id FROM "default"`;
-      store.state.zoConfig.ai_enabled = true;
-      wrapper = mountSearchBar({
-        sqlTemplates: [
-          { id: "bigTraces", group: "traceQuestions", sql: "SELECT trace_id FROM x", services: [] },
-        ],
-      });
-      await flushPromises();
-      expect(wrap().classes()).toContain("end-9");
-
-      store.state.zoConfig.ai_enabled = false;
-      await flushPromises();
-      expect(wrap().classes()).toContain("end-2");
-      delete store.state.zoConfig.ai_enabled;
-    });
-
-    it("shows no Examples outside SQL mode", async () => {
-      searchObjInstance.meta.sqlMode = false;
-      searchObjInstance.data.editorValue = "a = 1";
-      wrapper = mountSearchBar({
-        sqlTemplates: [
-          { id: "bigTraces", group: "traceQuestions", sql: "SELECT trace_id FROM x", services: [] },
-        ],
-      });
+      wrapper = mountSearchBar();
       await flushPromises();
       expect(wrapper.find('[data-test="traces-sql-examples-btn"]').exists()).toBe(false);
     });

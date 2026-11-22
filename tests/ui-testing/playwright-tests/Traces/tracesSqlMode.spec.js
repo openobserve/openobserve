@@ -11,6 +11,11 @@ const PREFILLED = `SELECT * FROM "default" WHERE ${FILTER} ORDER BY start_time D
 const GROUPED = `SELECT service_name, count(*) AS spans FROM "default" GROUP BY service_name`;
 const GROUPED_WHERE = `SELECT service_name, count(*) AS spans FROM "default" WHERE ${FILTER} GROUP BY service_name`;
 const TYPO = `SELECT servce_name, count(*) AS spans FROM "default" GROUP BY servce_name`;
+const PER_TRACE =
+  "SELECT trace_id, min(_timestamp) AS first_seen, count(*) AS spans, " +
+  "sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS errors, " +
+  "(max(end_time) - min(start_time)) / 1000 AS trace_duration " +
+  'FROM "default" GROUP BY trace_id HAVING count(*) > 0 ORDER BY spans DESC LIMIT 100';
 
 test.describe("Traces SQL mode testcases", () => {
   test.describe.configure({ mode: 'serial' });
@@ -230,24 +235,12 @@ test.describe("Traces SQL mode testcases", () => {
     await expect(pm.tracesPage.getSqlResultTable()).toBeVisible({ timeout: 20000 });
   });
 
-  test("P1: A trace question from the gallery shows one row per trace, opens it, and Back re-runs nothing", {
+  test("P1: A per-trace SQL query shows one row per trace, opens it, and Back re-runs nothing", {
     tag: ['@tracesSqlMode', '@traces', '@query', '@P1', '@all']
   }, async ({ page }) => {
     await pm.tracesPage.toggleSqlModeFromToolbar();
     await pm.tracesPage.expectSqlMode(true);
-    await pm.tracesPage.setQueryEditorValue('');
-
-    await expect(pm.tracesPage.getSqlTemplateGroupTitles()).toHaveText(
-      ['Trace questions', 'Span summaries'],
-      { timeout: 10000 },
-    );
-    await pm.tracesPage.useSqlTemplate('Big traces');
-    const template = await pm.tracesPage.getQueryEditorContent();
-    expect(template).toContain('min(_timestamp) AS first_seen');
-    expect(template).toContain('LIMIT 100');
-
-    // The seeded traces are small, so the span threshold comes down to find them.
-    await pm.tracesPage.setQueryEditorValue(template.replace('count(*) > 200', 'count(*) > 0'));
+    await pm.tracesPage.setQueryEditorValue(PER_TRACE);
     await pm.tracesPage.setTimeRange('15m');
     await pm.tracesPage.runSearch();
 

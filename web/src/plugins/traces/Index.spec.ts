@@ -422,26 +422,6 @@ vi.mock("@/services/product_analytics", () => ({
   },
 }));
 
-const { mockSqlTemplates } = vi.hoisted(() => ({
-  mockSqlTemplates: [
-    {
-      id: "bigTraces",
-      group: "traceQuestions",
-      sql: `SELECT trace_id FROM "default"\nGROUP BY trace_id\nHAVING count(*) > 200`,
-      services: [],
-    },
-  ],
-}));
-
-vi.mock("@/plugins/traces/composables/useTracesSqlTemplates", async (importOriginal) => {
-  const actual: any = await importOriginal();
-  const { computed } = await import("vue");
-  return {
-    ...actual,
-    useTracesSqlTemplates: () => ({ sqlTemplates: computed(() => mockSqlTemplates) }),
-  };
-});
-
 // Mock SQL parser
 vi.mock("@/composables/useParser", () => ({
   default: () => ({
@@ -5570,7 +5550,9 @@ describe("Index.vue (Main Traces Page)", () => {
         relativeTimePeriod: "6h",
       });
       try {
-        const { handlers } = await runSql(mockSqlTemplates[0].sql);
+        const { handlers } = await runSql(
+          `SELECT trace_id FROM "default"\nGROUP BY trace_id\nHAVING count(*) > 200`,
+        );
         handlers.error({}, { content: { code: 20008, message: "Resources exhausted" } });
         await flushPromises();
         for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
@@ -6085,7 +6067,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(false);
     });
 
-    it("shows the template gallery for an empty SQL editor, and a template fills it without running", async () => {
+    it("shows the Run prompt, not a template gallery, for an empty SQL editor", async () => {
       await mountSql();
       mockSearchObj.meta.sqlMode = true;
       mockSearchObj.data.editorValue = "";
@@ -6095,16 +6077,8 @@ describe("Index.vue (Main Traces Page)", () => {
       for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
       await nextTick();
 
-      const gallery = wrapper.findComponent({ name: "TracesSqlTemplateGallery" });
-      expect(gallery.props()).not.toHaveProperty("view");
-      expect(gallery.props("templates")).toEqual(mockSqlTemplates);
-
-      gallery.vm.$emit("use", mockSqlTemplates[0].sql);
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toBe(mockSqlTemplates[0].sql);
-      expect(mockSearchObj.meta.sqlMode).toBe(true);
-      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="traces-sql-template-gallery"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(true);
     });
 
     it("adds trace_id to the SQL in the editor, not the SQL that last ran", async () => {
