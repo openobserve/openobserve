@@ -4015,14 +4015,31 @@ export class TracesPage {
     return this.page.locator('[data-test="traces-search-bar-sql-mode-pinned-btn"] [role="switch"]');
   }
 
+  // SQL Mode is unpinned by default, so it is toggled from the More menu unless the user pinned it.
   async toggleSqlModeFromToolbar() {
-    await this.page.locator('[data-test="traces-search-bar-sql-mode-pinned-btn"]').click();
+    const pinned = this.page.locator('[data-test="traces-search-bar-sql-mode-pinned-btn"]');
+    if (await pinned.isVisible()) {
+      await pinned.click();
+      return;
+    }
+    await this.page.locator('[data-test="traces-search-bar-more-menu-btn"]').click();
+    await this.page.locator('[data-test="traces-search-bar-sql-mode-toggle-btn"]').click();
+    await this.page.keyboard.press('Escape');
   }
 
   async expectSqlMode(on) {
-    await expect(this.getSqlModePinnedSwitch()).toHaveAttribute('aria-checked', String(on), {
-      timeout: 10000,
-    });
+    const pinned = this.page.locator('[data-test="traces-search-bar-sql-mode-pinned-btn"]');
+    if (await pinned.isVisible()) {
+      await expect(this.getSqlModePinnedSwitch()).toHaveAttribute('aria-checked', String(on), {
+        timeout: 10000,
+      });
+      return;
+    }
+    await this.page.locator('[data-test="traces-search-bar-more-menu-btn"]').click();
+    await expect(
+      this.page.locator('[data-test="traces-search-bar-sql-mode-toggle-btn"]'),
+    ).toHaveAttribute('aria-checked', String(on), { timeout: 10000 });
+    await this.page.keyboard.press('Escape');
   }
 
   // Monaco auto-closes quotes and brackets on typed input, so SQL is set through its API.
