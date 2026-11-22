@@ -48,13 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @pagination-change="onPageChange"
         >
           <template #toolbar>
-            <OSearchInput
-              v-model="search"
-              :debounce="SEARCH_DEBOUNCE_MS"
-              class="w-72 max-md:w-auto max-md:min-w-40 max-md:flex-1"
-              :placeholder="t('settings.userManagementPage.searchPlaceholder')"
-              data-test="user-management-search-input"
-            />
             <div class="w-60 shrink-0 max-md:w-40">
               <OSelect
                 v-model="orgFilter"
@@ -67,12 +60,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="user-management-org-select"
               />
             </div>
+            <OSearchInput
+              v-model="search"
+              :debounce="SEARCH_DEBOUNCE_MS"
+              class="min-w-0 flex-1 max-md:min-w-40"
+              :placeholder="t('settings.userManagementPage.searchPlaceholder')"
+              data-test="user-management-search-input"
+            />
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
               variant="outline"
+              layout="inline"
               :loading="fetching"
-              :last-run-at="lastUpdatedAt"
               shortcut-id="userManagementRefresh"
               data-test="user-management-refresh-btn"
               @click="refresh"
@@ -226,7 +226,6 @@ const setBlocked = useMutation(() => setUserBlockedMutation(metaOrg.value));
 
 const loading = computed(() => inMetaOrg.value && usersList.isPending.value);
 const fetching = usersList.isFetching;
-const lastUpdatedAt = usersList.dataUpdatedAt;
 const total = computed(() => usersList.data.value?.total ?? 0);
 const forbidden = computed(() =>
   usersList.error.value ? forbiddenState(usersList.error.value) : false,
