@@ -908,11 +908,42 @@ describe("OrganizationManagement.vue", () => {
         );
       });
 
+      it("offers each org's overage invoices while sync is on", async () => {
+        await mounted(syncOn);
+        expect(wrapper.find('[data-test="org-management-contract-invoices-btn"]').exists()).toBe(
+          true,
+        );
+      });
+
+      it("opens the invoices dialog for the row's org", async () => {
+        store.state.zoConfig.meta_org = "default";
+        mockGetAdminOrg.mockResolvedValue(noOpRow);
+        statusService().mockReset();
+        statusService().mockResolvedValue({ data: syncOn });
+        const InvoicesStub = {
+          name: "OrgContractInvoicesDialog",
+          props: ["open", "orgId", "orgName"],
+          template: `<div data-test="invoices-dialog-stub" :data-open="String(open)" :data-org="orgId" :data-name="orgName" />`,
+        };
+        wrapper = createWrapper({}, { OrgContractInvoicesDialog: InvoicesStub });
+        await flushPromises();
+        expect(wrapper.find('[data-test="invoices-dialog-stub"]').exists()).toBe(false);
+        await wrapper.find('[data-test="org-management-contract-invoices-btn"]').trigger("click");
+        await nextTick();
+        const dialog = wrapper.find('[data-test="invoices-dialog-stub"]');
+        expect(dialog.attributes("data-open")).toBe("true");
+        expect(dialog.attributes("data-org")).toBe("test-org");
+        expect(dialog.attributes("data-name")).toBe("Test Org");
+      });
+
       it("keeps the old buttons and no panel while sync is off", async () => {
         await mounted({ sync_active: false, last_success: null, last_error: null, blocked: [] });
         expect(wrapper.find('[data-test="org-management-sync-contract-btn"]').exists()).toBe(false);
         expect(wrapper.find('[data-test="org-management-extend-contract-btn"]').exists()).toBe(
           true,
+        );
+        expect(wrapper.find('[data-test="org-management-contract-invoices-btn"]').exists()).toBe(
+          false,
         );
         expect(wrapper.find('[data-test="org-management-revoke-contract-btn"]').exists()).toBe(
           true,

@@ -36,6 +36,10 @@ ent POST /api/{org_id}/anomaly_detection/{config_id}/train | core anomaly_detect
 cloud GET /api/{org_id}/aws-marketplace/activation-status | o2-enterprise build_activation_status_response returns a serde_json::Value
 all GET /api/{org_id}/cipher_keys | KeyListResponse lives in the enterprise-only cipher module; OSS publishes this op too
 all GET /api/{org_id}/cipher_keys/{key_name} | KeyGetResponse lives in the enterprise-only cipher module; OSS publishes this op too
+cloud GET /api/{org_id}/contracts/status | o2-enterprise ContractSyncStatus derives no schema
+cloud GET /api/{org_id}/contracts/{target_org_id}/invoices | o2-enterprise InvoiceView derives no schema
+cloud POST /api/{org_id}/contracts/{target_org_id}/invoices/{invoice_id}/resend | o2-enterprise InvoiceView derives no schema
+cloud POST /api/{org_id}/contracts/{target_org_id}/sync | o2-enterprise OrgSyncResult derives no schema
 all DELETE /api/{org_id}/dashboards/{dashboard_id}/public_links/{link_id} | the handler answers serde_json::json!({deleted}) built in place
 all GET /api/{org_id}/db_monitoring/activity | the db_monitoring service assembles this body as a serde_json::Value
 all GET /api/{org_id}/db_monitoring/badges | the db_monitoring service assembles this body as a serde_json::Value

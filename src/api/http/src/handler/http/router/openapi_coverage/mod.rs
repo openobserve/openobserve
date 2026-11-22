@@ -388,6 +388,22 @@ const SUCCESS_CONTRACTS: &[ContractRow] = &[
     ),
     (
         "cloud",
+        "GET",
+        "/api/{org_id}/contracts/{target_org_id}/invoices",
+        "200",
+        JSON,
+        "array",
+    ),
+    (
+        "cloud",
+        "POST",
+        "/api/{org_id}/contracts/{target_org_id}/invoices/{invoice_id}/resend",
+        "200",
+        JSON,
+        "object",
+    ),
+    (
+        "cloud",
         "PUT",
         "/api/{org_id}/enable_org_storage",
         "200",
@@ -469,6 +485,11 @@ const BODYLESS_ROUTES: &[(&str, &str, &str)] = &[
         "cloud",
         "POST",
         "/api/{org_id}/contracts/{target_org_id}/sync",
+    ),
+    (
+        "cloud",
+        "POST",
+        "/api/{org_id}/contracts/{target_org_id}/invoices/{invoice_id}/resend",
     ),
     (
         "cloud",

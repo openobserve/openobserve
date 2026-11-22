@@ -177,6 +177,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="t('settings.organizationManagementPage.syncContract')" />
               </OButton>
               <OButton
+                v-if="contractSyncActive"
+                variant="ghost"
+                size="icon-xs-circle"
+                icon-left="receipt-long"
+                class="max-md:hidden"
+                data-test="org-management-contract-invoices-btn"
+                @click.stop="viewContractInvoices(row)"
+              >
+                <OTooltip :content="t('settings.organizationManagementPage.contractInvoices')" />
+              </OButton>
+              <OButton
                 v-if="!contractSyncActive && row.billing_provider === '-'"
                 variant="ghost"
                 size="icon-xs-circle"
@@ -325,6 +336,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @select="syncContract(row)"
                 >
                   <span>{{ t("settings.organizationManagementPage.syncContract") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="contractSyncActive"
+                  icon-left="receipt-long"
+                  class="md:hidden"
+                  data-test="org-management-contract-invoices-btn-menu"
+                  @select="viewContractInvoices(row)"
+                >
+                  <span>{{ t("settings.organizationManagementPage.contractInvoices") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
                   v-if="!contractSyncActive && row.billing_provider === '-'"
@@ -604,6 +624,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :org-name="cleanupTargetOrg.name"
       @update:open="showCleanupDialog = $event"
     />
+
+    <OrgContractInvoicesDialog
+      v-if="invoicesTargetOrg.id"
+      :open="showInvoicesDialog"
+      :org-id="invoicesTargetOrg.id"
+      :org-name="invoicesTargetOrg.name"
+      @update:open="showInvoicesDialog = $event"
+    />
   </div>
 </template>
 <script lang="ts">
@@ -613,6 +641,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OrgCleanupTasksDialog from "@/components/iam/organizations/OrgCleanupTasksDialog.vue";
+import OrgContractInvoicesDialog from "./OrgContractInvoicesDialog.vue";
 import { timestampToTimezoneDate, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -689,6 +718,7 @@ export default defineComponent({
     OBadge,
     OBanner,
     OrgCleanupTasksDialog,
+    OrgContractInvoicesDialog,
     OButton,
     ODialog,
     ODropdown,
@@ -718,6 +748,8 @@ export default defineComponent({
     const filterQuery = ref("");
     const showCleanupDialog = ref(false);
     const cleanupTargetOrg = ref({ id: "", name: "" });
+    const showInvoicesDialog = ref(false);
+    const invoicesTargetOrg = ref({ id: "", name: "" });
 
     // Usage allowance state — one dialog for every quota pool, the active tab
     // naming the pool. Tab names are the backend TrialQuotaPool keys.
@@ -1268,6 +1300,11 @@ export default defineComponent({
       }
     };
 
+    const viewContractInvoices = (row: any) => {
+      invoicesTargetOrg.value = { id: row.identifier, name: row.name };
+      showInvoicesDialog.value = true;
+    };
+
     const syncContract = async (row: any) => {
       const dismiss = toast({
         variant: "loading",
@@ -1593,6 +1630,9 @@ export default defineComponent({
       contractStatus,
       contractSyncActive,
       syncContract,
+      showInvoicesDialog,
+      invoicesTargetOrg,
+      viewContractInvoices,
       formatMicrosToDateTime,
       toggleContractDialog,
       submitContract,

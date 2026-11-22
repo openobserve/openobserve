@@ -2396,6 +2396,14 @@ fn service_route_table() -> Router {
                 get(organization::org::get_contract_sync_status),
             )
             .route(
+                "/{org_id}/contracts/{target_org_id}/invoices",
+                get(organization::org::list_org_contract_invoices),
+            )
+            .route(
+                "/{org_id}/contracts/{target_org_id}/invoices/{invoice_id}/resend",
+                post(organization::org::resend_org_contract_invoice),
+            )
+            .route(
                 "/{org_id}/aws-marketplace/link-subscription",
                 post(cloud::aws_marketplace::link_subscription),
             )
