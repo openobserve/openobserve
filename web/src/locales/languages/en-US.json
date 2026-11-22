@@ -19197,11 +19197,11 @@
       },
       "inQueueFilter": {
         "label": "Annotation queue status",
-        "notEnqueued": "Annotation queue: Not enqueued",
-        "enqueued": "Annotation queue: Any",
-        "pending": "Annotation queue: Pending",
-        "reviewed": "Annotation queue: Reviewed",
-        "all": "Annotation queue: All"
+        "notEnqueued": "Not enqueued",
+        "enqueued": "In an annotation queue",
+        "pending": "Pending review",
+        "reviewed": "Reviewed",
+        "all": "All items"
       },
       "columns": {
         "timestamp": "Timestamp",
