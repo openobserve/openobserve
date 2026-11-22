@@ -319,7 +319,11 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { COPY_CONFIRM_MS } from "@/lib/feedback/Toast/copyConfirm";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { isSafeNavigableUrl } from "@/utils/safeUrl";
+import {
+  matchCrossLinks,
+  openCrossLink as openSafeCrossLink,
+  resolveCrossLinkUrl as resolveCrossLinkTemplate,
+} from "@/utils/crossLinking";
 import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 
 export default {
@@ -491,77 +495,29 @@ export default {
       const crossLinks = searchObj.data.crossLinks;
       if (!crossLinks) return [];
 
-      const { stream_links = [], org_links = [] } = crossLinks;
-
-      // Build alias→original map
-      const aliasToOriginal: Record<string, string> = {};
-      for (const link of [...stream_links, ...org_links]) {
-        for (const f of link.fields || []) {
-          if (f.alias) aliasToOriginal[f.alias] = f.name;
-        }
-      }
-
-      const originalFieldName = aliasToOriginal[fieldName] || fieldName;
+      const { originalFieldName, links } = matchCrossLinks(crossLinks, fieldName);
       const fieldValue = props.value?.[fieldName];
 
-      const streamCoveredFields = new Set<string>();
-      for (const link of stream_links) {
-        for (const f of link.fields || []) {
-          if (f.alias) streamCoveredFields.add(f.name);
-        }
-      }
-
-      const results: Array<{ name: string; resolvedUrl: string }> = [];
-
-      for (const link of stream_links) {
-        if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
-          const resolved = resolveCrossLinkUrl(link.url, originalFieldName, fieldValue);
-          results.push({ name: link.name, resolvedUrl: resolved });
-        }
-      }
-
-      if (!streamCoveredFields.has(originalFieldName)) {
-        for (const link of org_links) {
-          if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
-            const resolved = resolveCrossLinkUrl(link.url, originalFieldName, fieldValue);
-            results.push({ name: link.name, resolvedUrl: resolved });
-          }
-        }
-      }
-
-      return results;
+      return links.map((link) => ({
+        name: link.name,
+        resolvedUrl: resolveCrossLinkUrl(link.url, originalFieldName, fieldValue),
+      }));
     };
 
-    const resolveCrossLinkUrl = (
-      urlTemplate: string,
-      fieldName: string,
-      fieldValue: any,
-    ): string => {
-      const startTime = searchObj.data.datetime?.startTime || 0;
-      const endTime = searchObj.data.datetime?.endTime || 0;
-      const query = crossLinkQueryText(searchObj, store.state.zoConfig);
-
-      return urlTemplate
-        .replace(/\$\{field\.__name\}/g, encodeURIComponent(String(fieldName)))
-        .replace(/\$\{field\.__value\}/g, encodeURIComponent(String(fieldValue ?? "")))
-        .replace(/\$\{start_time\}/g, String(startTime))
-        .replace(/\$\{end_time\}/g, String(endTime))
-        .replace(/\$\{query\}/g, encodeURIComponent(query))
-        .replace(/\$\{query_encoded\}/g, btoa(query));
-    };
+    const resolveCrossLinkUrl = (urlTemplate: string, fieldName: string, fieldValue: any): string =>
+      resolveCrossLinkTemplate(urlTemplate, {
+        fieldName,
+        fieldValue,
+        startTime: searchObj.data.datetime?.startTime || 0,
+        endTime: searchObj.data.datetime?.endTime || 0,
+        query: crossLinkQueryText(searchObj, store.state.zoConfig),
+      });
 
     // Dropdown state for multi-link fields
     const crossLinkDropdownVisible = ref(false);
 
     const openCrossLink = (url: string) => {
-      // Guard the RESOLVED url, not just the saved template: links stored
-      // before save-time validation existed are still in the DB, and a field
-      // VALUE substituted into the template can carry a hostile scheme too.
-      if (!isSafeNavigableUrl(url)) {
-        crossLinkDropdownVisible.value = false;
-        return;
-      }
-      window.open(url, "_blank", "noopener,noreferrer");
+      openSafeCrossLink(url);
       crossLinkDropdownVisible.value = false;
     };
     let multiStreamFields: any = ref([]);

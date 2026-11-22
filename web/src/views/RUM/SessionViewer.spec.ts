@@ -1798,6 +1798,10 @@ describe("SessionViewer.vue — server-clock query windows (Risk 3)", () => {
       startTime: minTs - 60_000_000,
       endTime: maxTs + 60_000_000,
     });
+    expect((wrapper.vm as any).sessionLinkRange()).toEqual({
+      start: minTs - 60_000_000,
+      end: maxTs + 60_000_000,
+    });
     wrapper.unmount();
   });
 
@@ -2935,6 +2939,11 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
       .findAllComponents(OBadge)
       .find((badge) => badge.attributes("data-test") === "session-viewer-live-badge");
     expect(liveBadge?.props("variant")).toBe("success");
+    // A live link ends at the polling bound (now plus the overlap), not at the replay's last row.
+    expect(vm.sessionLinkRange()).toEqual({
+      start: L * 1000 - 60_000_000,
+      end: Date.now() * 1000 + 60_000_000,
+    });
     live.unmount();
 
     const ended = await mountLive(NOW - ACTIVE_WINDOW_MS - 1);
@@ -3189,6 +3198,19 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     expect(views).toHaveLength(1);
     expect(views[0].name).toBe("initial_load : /b");
     expect(vm.segmentEvents.filter((event: any) => event.id === "a1")).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it("ends a session link no earlier than the latest loaded event plus the tail", async () => {
+    const eventTs = maxTs + 55_000_000;
+    server.rum = [
+      { type: "action", action_id: "a1", action_type: "click", date: L + 20, _timestamp: eventTs },
+    ];
+    const wrapper = await mountLive(NOW - ACTIVE_WINDOW_MS - 1);
+    const vm = wrapper.vm as any;
+    expect(vm.segmentEvents).toHaveLength(1);
+    expect(vm.isLive).toBe(false);
+    expect(vm.sessionLinkRange().end).toBe(eventTs + 60_000_000);
     wrapper.unmount();
   });
 

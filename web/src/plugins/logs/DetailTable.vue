@@ -714,7 +714,11 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import { isSafeNavigableUrl } from "@/utils/safeUrl";
+import {
+  matchCrossLinks,
+  openCrossLink,
+  resolveCrossLinkUrl as resolveCrossLinkTemplate,
+} from "@/utils/crossLinking";
 import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 import { scopeHighlightQuery } from "@/composables/useTextHighlighter";
 const SEVERITY_BORDER_CLASSES: Record<KnownLogSeverityLevel, string> = {
@@ -1352,69 +1356,23 @@ export default defineComponent({
       const crossLinks = searchObj.data.crossLinks;
       if (!crossLinks) return [];
 
-      const { stream_links = [], org_links = [] } = crossLinks;
-
-      const aliasToOriginal: Record<string, string> = {};
-      for (const link of [...stream_links, ...org_links]) {
-        for (const f of link.fields || []) {
-          if (f.alias) aliasToOriginal[f.alias] = f.name;
-        }
-      }
-
-      const originalFieldName = aliasToOriginal[fieldName] || fieldName;
+      const { originalFieldName, links } = matchCrossLinks(crossLinks, fieldName);
       const fieldValue = rowData.value?.[fieldName];
 
-      const streamCoveredFields = new Set<string>();
-      for (const link of stream_links) {
-        for (const f of link.fields || []) {
-          if (f.alias) streamCoveredFields.add(f.name);
-        }
-      }
-
-      const results: Array<{ name: string; resolvedUrl: string }> = [];
-
-      for (const link of stream_links) {
-        if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
-          const resolved = resolveCrossLinkUrl(link.url, originalFieldName, fieldValue);
-          results.push({ name: link.name, resolvedUrl: resolved });
-        }
-      }
-
-      if (!streamCoveredFields.has(originalFieldName)) {
-        for (const link of org_links) {
-          if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
-            const resolved = resolveCrossLinkUrl(link.url, originalFieldName, fieldValue);
-            results.push({ name: link.name, resolvedUrl: resolved });
-          }
-        }
-      }
-
-      return results;
+      return links.map((link) => ({
+        name: link.name,
+        resolvedUrl: resolveCrossLinkUrl(link.url, originalFieldName, fieldValue),
+      }));
     };
 
-    const resolveCrossLinkUrl = (
-      urlTemplate: string,
-      fieldName: string,
-      fieldValue: any,
-    ): string => {
-      const startTime = searchObj.data.datetime?.startTime || 0;
-      const endTime = searchObj.data.datetime?.endTime || 0;
-      const query = crossLinkQueryText(searchObj, store.state.zoConfig);
-
-      return urlTemplate
-        .replace(/\$\{field\.__name\}/g, encodeURIComponent(String(fieldName)))
-        .replace(/\$\{field\.__value\}/g, encodeURIComponent(String(fieldValue ?? "")))
-        .replace(/\$\{start_time\}/g, String(startTime))
-        .replace(/\$\{end_time\}/g, String(endTime))
-        .replace(/\$\{query\}/g, encodeURIComponent(query))
-        .replace(/\$\{query_encoded\}/g, btoa(query));
-    };
-
-    const openCrossLink = (url: string) => {
-      // Guard the RESOLVED url — see JsonPreview.vue's twin for the reasoning.
-      if (!isSafeNavigableUrl(url)) return;
-      window.open(url, "_blank", "noopener,noreferrer");
-    };
+    const resolveCrossLinkUrl = (urlTemplate: string, fieldName: string, fieldValue: any): string =>
+      resolveCrossLinkTemplate(urlTemplate, {
+        fieldName,
+        fieldValue,
+        startTime: searchObj.data.datetime?.startTime || 0,
+        endTime: searchObj.data.datetime?.endTime || 0,
+        query: crossLinkQueryText(searchObj, store.state.zoConfig),
+      });
 
     const viewTrace = () => {
       emit("view-trace");

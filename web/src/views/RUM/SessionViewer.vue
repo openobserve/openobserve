@@ -98,6 +98,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-if="!sessionNotFound" #actions>
+      <SessionCrossLinks
+        field-name="session_id"
+        :field-value="sessionId"
+        :range="sessionLinkRange"
+      />
       <OButton
         variant="outline"
         size="sm"
@@ -323,6 +328,7 @@ import useStreams from "@/composables/useStreams";
 import { sessionEventsProbeSql, type StepKind } from "@/utils/rum/productAnalyticsQueries";
 import { MAX_KEY_LENGTH } from "@/utils/rum/productAnalyticsModel";
 import ShareButton from "@/components/common/ShareButton.vue";
+import SessionCrossLinks from "@/components/rum/SessionCrossLinks.vue";
 import useRum from "@/composables/rum/useRum";
 import useSessionHeatmap from "@/composables/rum/useSessionHeatmap";
 import analytics from "@/services/product_analytics";
@@ -959,6 +965,14 @@ const serverWindowUs = (headUs: number, tailUs: number) => {
   const minTs = Number(sessionState.data.selectedSession?.min_ts);
   if (minTs > 0 && upperTs > 0) return { start: minTs - headUs, end: upperTs + tailUs };
   return routeRangeUs();
+};
+
+// Never ends before the latest event or log the player has loaded (0 until one is) plus the tail.
+const sessionLinkRange = () => {
+  const { start, end } = isLive.value
+    ? liveWindowUs(0, EVENTS_TAIL_US)
+    : serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US);
+  return { start, end: Math.max(end, lastEventsTs + EVENTS_TAIL_US, lastLogsTs + EVENTS_TAIL_US) };
 };
 
 const retryOptions = () => ({
