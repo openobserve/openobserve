@@ -677,7 +677,7 @@ describe("StarterPackDrawer", () => {
       "Kubernetes · you can see this pack but not set it up",
     );
     expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
-      "You can't create alerts in this org",
+      "You can't set up packs in this org. Ask an admin to set it up.",
     );
   });
 

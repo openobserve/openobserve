@@ -15268,7 +15268,7 @@
     "scope": "Alert scope: {value}",
     "scopeAll": "All clusters",
     "scopeSeen": "All clusters · {count} seen so far: {clusters}",
-    "noPermission": "You can't create alerts in this org",
+    "noPermission": "You can't set up packs in this org. Ask an admin to set it up.",
     "askAdmin": "Ask an admin to set this up",
     "card": {
       "dashboards": "{count} dashboard | {count} dashboards"
