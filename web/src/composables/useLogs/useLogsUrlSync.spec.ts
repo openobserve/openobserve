@@ -30,7 +30,9 @@ import {
   resetLogsUrlForTests,
   sharedPage,
   sharedPageNotice,
+  shownSearch,
 } from "@/composables/useLogs/useLogsUrl";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 import {
   activePermalink,
   mintInitOrigin,
@@ -164,6 +166,53 @@ describe("useLogsUrlSync (4c C7b URL timing)", () => {
     await flushPromises();
     expect(nav.router.currentRoute.value.query).toEqual(before);
     expect(nav.router.currentRoute.value.query.stream).toBe("app");
+  });
+
+  it("a Visualize toggle before the first hits publishes the new query once its chart load completes (o2-enterprise#3701)", async () => {
+    engine().recordChunk(dispatch());
+    await flushPromises();
+    expect(nav.router.currentRoute.value.query.query).toBe(b64EncodeUnicode("level = 'error'"));
+    searchObj.data.query = "level = 'warn'";
+    dispatch();
+    engine().cancelGeneration(null, { cause: "reset" });
+    searchObj.meta.logsVisualizeToggle = "visualize";
+    await flushPromises();
+    expect(nav.router.currentRoute.value.query.query).toBe(b64EncodeUnicode("level = 'error'"));
+
+    const autoRun = useLogsAutoRun();
+    autoRun.setPanelConfigReader(() => ({ type: "bar" }));
+    const panel = autoRun.openPanelRun();
+    autoRun.markPanelDispatched(panel);
+    autoRun.panelLoadingChanged(true, false);
+    autoRun.panelLoadingChanged(false, false);
+    await flushPromises();
+
+    expect(autoRun.hasPanelRun(panel)).toBe(false);
+    expect(shownSearch.visualize?.generation).toBe(panel);
+    expect(shownSearch.visualize?.inputs.query).toBe("level = 'warn'");
+    expect(nav.router.currentRoute.value.query.query).toBe(b64EncodeUnicode("level = 'warn'"));
+    expect(nav.router.currentRoute.value.query.logs_visualize_toggle).toBe("visualize");
+  });
+
+  it("hits that arrived before a Visualize toggle keep the new query in the URL with no panel run open", async () => {
+    searchObj.data.query = "level = 'warn'";
+    const id = dispatch();
+    engine().recordChunk(id);
+    await flushPromises();
+    engine().cancelGeneration(null, { cause: "reset" });
+    searchObj.meta.logsVisualizeToggle = "visualize";
+
+    const autoRun = useLogsAutoRun();
+    autoRun.setPanelConfigReader(() => ({ type: "bar" }));
+    autoRun.panelLoadingChanged(true, false);
+    autoRun.panelLoadingChanged(false, false);
+    await flushPromises();
+
+    expect(engine().currentGeneration("grid")?.id).toBe(id);
+    expect(autoRun.hasPanelRun(id)).toBe(false);
+    expect(shownSearch.visualize).toBeNull();
+    expect(shownSearch.logs?.inputs.query).toBe("level = 'warn'");
+    expect(nav.router.currentRoute.value.query.query).toBe(b64EncodeUnicode("level = 'warn'"));
   });
 
   it("a page of the same query replaces, so Back does not step through pages", async () => {
