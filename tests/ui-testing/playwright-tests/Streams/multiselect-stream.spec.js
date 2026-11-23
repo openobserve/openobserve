@@ -405,21 +405,10 @@ async function multistreamselect(page) {
     await pageManager.logsPage.clickSaveViewButton();
     await pageManager.logsPage.fillSavedViewName(randomSavedViewName);
     await pageManager.logsPage.clickSavedViewDialogSave();
-    
-    // Wait for success message with timeout constant
-    try {
-      await pageManager.logsPage.getSuccessToastLocator().waitFor({
-        state: 'visible',
-        timeout: MULTISTREAM_CONFIG.TIMEOUTS.DATA_INDEXING
-      });
-      testLogger.info('Success toast validated: Multistream view created successfully');
-    } catch (error) {
-      testLogger.info('View creation toast may have appeared and disappeared quickly - continuing with test');
-    }
-    
-    // Wait for saved view creation to complete using constant
-    await page.waitForTimeout(MULTISTREAM_CONFIG.TIMEOUTS.NAVIGATION);
-    
+
+    // The success toast can vanish before it is seen; the saved view existing server-side is the real signal.
+    await pageManager.logsPage.waitForSavedViewViaApi(process.env["ORGNAME"], randomSavedViewName);
+
     // Navigate away and back to verify saved view persistence
     await pageManager.logsPage.clickStreamsMenuItem();
     await pageManager.logsPage.clickSearchStreamInput();
@@ -446,12 +435,8 @@ async function multistreamselect(page) {
     // Verify query results are displayed
     await pageManager.logsPage.expectLogsTableVisible();
     testLogger.info('Verified: Query results are displayed after loading saved view');
-    
-    await pageManager.logsPage.clickSavedViewsExpand();
-    await pageManager.logsPage.clickSavedViewSearchInput();
-    await pageManager.logsPage.fillSavedViewSearchInput(randomSavedViewName);
-    await page.waitForTimeout(MULTISTREAM_CONFIG.TIMEOUTS.UI_INTERACTION);
 
+    // The helper opens the menu and filters by name itself; opening it here first left the menu half-closed.
     await pageManager.logsPage.clickDeleteSavedViewButton(randomSavedViewName);
     await page.waitForTimeout(MULTISTREAM_CONFIG.TIMEOUTS.TOAST_WAIT);
     await pageManager.logsPage.clickConfirmButton();
