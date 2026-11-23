@@ -78,23 +78,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
           </OToggleGroup>
 
-          <span v-if="showDrillDown" class="inline-flex" data-test="insights-button-wrap">
+          <span v-if="drillDownSlot" class="inline-flex" data-test="insights-button-wrap">
             <!-- First child, so the tooltip binds to the wrapper: the disabled button takes no pointer events. -->
-            <OTooltip
-              v-if="searchObj.meta.sqlMode"
-              :content="t('traces.sqlMode.drillDownDisabled')"
-            />
+            <OTooltip v-if="drillDownBlockedReason" :content="drillDownBlockedReason" />
             <OButton
               data-test="insights-button"
               variant="outline"
               size="sm-toolbar"
               :disabled="
+                !!drillDownBlockedReason ||
                 searchObj.loading ||
-                !!searchObj.meta.sqlMode ||
                 !(searchObj.data.queryResults?.total || searchObj.data.queryResults?.hits?.length)
               "
-              :class="{ 'pointer-events-none': searchObj.meta.sqlMode }"
-              :focusable-unavailable="!searchObj.meta.sqlMode"
+              :class="{ 'pointer-events-none': drillDownBlockedReason }"
+              :focusable-unavailable="!drillDownBlockedReason"
               @click="$emit('drill-down')"
             >
               <template #icon-left>
@@ -102,23 +99,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
               <OTooltip
-                v-if="!searchObj.meta.sqlMode"
+                v-if="!drillDownBlockedReason"
                 :content="t('volumeInsights.analyzeTooltipTraces')"
               />
-            </OButton>
-          </span>
-          <span
-            v-else-if="drillDownSlot"
-            class="invisible inline-flex"
-            aria-hidden="true"
-            inert
-            data-test="insights-button-placeholder"
-          >
-            <OButton variant="outline" size="sm-toolbar" tabindex="-1">
-              <template #icon-left>
-                <OIcon name="timeline" size="sm" class="shrink-0" />
-              </template>
-              <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
             </OButton>
           </span>
 
@@ -1998,6 +1981,11 @@ export default defineComponent({
         isSearchMode.value &&
         (searchObj.loadingStream || searchObj.data.stream.streamLists.length > 0),
     );
+    const drillDownBlockedReason = computed(() => {
+      if (searchObj.meta.sqlMode) return t("traces.sqlMode.drillDownDisabled");
+      if (!showDrillDown.value) return t("search.drillDownRunTitle");
+      return "";
+    });
     const serviceGraphAccess = useLockedAffordance("enterprise");
     const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
@@ -2130,6 +2118,7 @@ export default defineComponent({
       toolbarMoveResetToMenu,
       showDrillDown,
       drillDownSlot,
+      drillDownBlockedReason,
       isSearchMode,
       isPinned,
       togglePin,

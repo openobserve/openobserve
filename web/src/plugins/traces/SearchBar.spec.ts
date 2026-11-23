@@ -1150,29 +1150,32 @@ describe("SearchBar", () => {
       },
     );
 
-    it("should be hidden before a search is applied", async () => {
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
-    });
-
-    it("should be hidden when the search errored", async () => {
+    it.each([
+      ["no search is applied yet", () => (searchObjInstance.searchApplied = false)],
+      ["the search errored", () => (searchObjInstance.data.errorMsg = "boom")],
+      ["streams are loading", () => (searchObjInstance.loadingStream = true)],
+      [
+        "no stream is selected",
+        () => (searchObjInstance.data.stream.selectedStream = { label: "", value: "" }),
+      ],
+    ])("shows disabled, in place, with a run-a-query reason when %s", async (_, set) => {
       applySearch();
-      searchObjInstance.data.errorMsg = "boom";
+      set();
       wrapper = mountSearchBar();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
-    });
-
-    it("should be hidden while streams are loading", async () => {
-      applySearch();
-      searchObjInstance.loadingStream = true;
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
+      const btn = wrapper.find('[data-test="insights-button"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.attributes("disabled")).toBeDefined();
+      await btn.trigger("click");
+      expect(wrapper.emitted("drill-down")).toBeUndefined();
+      const wrap = wrapper.find('[data-test="insights-button-wrap"]');
+      expect(wrap.findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "search.drillDownRunTitle",
+      );
+      expect(wrap.element.firstElementChild).not.toBe(btn.element);
+      const toggleGroup = wrapper.find(".o-toggle-group-stub").element;
+      expect(toggleGroup.nextElementSibling).toBe(wrap.element);
     });
 
     it("stays in place, aria-disabled and inert to clicks, while a search is loading", async () => {
@@ -1187,7 +1190,6 @@ describe("SearchBar", () => {
       expect(btn.attributes("disabled")).toBeUndefined();
       await btn.trigger("click");
       expect(wrapper.emitted("drill-down")).toBeUndefined();
-      expect(wrapper.find('[data-test="insights-button-placeholder"]').exists()).toBe(false);
 
       searchObjInstance.loading = false;
       await flushPromises();
@@ -1234,15 +1236,6 @@ describe("SearchBar", () => {
       expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
     });
 
-    it("should be hidden when no stream is selected", async () => {
-      applySearch();
-      searchObjInstance.data.stream.selectedStream = { label: "", value: "" };
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
-    });
-
     it("shows disabled in SQL mode, with the reason on its wrapper", async () => {
       applySearch();
       searchObjInstance.meta.sqlMode = true;
@@ -1254,7 +1247,6 @@ describe("SearchBar", () => {
       expect(btn.attributes("disabled")).toBeDefined();
       await btn.trigger("click");
       expect(wrapper.emitted("drill-down")).toBeUndefined();
-      expect(wrapper.find('[data-test="insights-button-placeholder"]').exists()).toBe(false);
       const wrap = wrapper.find('[data-test="insights-button-wrap"]');
       const tooltip = wrap.findComponent({ name: "OTooltip" });
       expect(tooltip.props("content")).toBe("traces.sqlMode.drillDownDisabled");
@@ -1271,44 +1263,18 @@ describe("SearchBar", () => {
       expect(wrapper.emitted("drill-down")).toHaveLength(1);
     });
 
-    describe("reserved slot while results load (200% zoom shift)", () => {
-      const placeholder = () => wrapper.find('[data-test="insights-button-placeholder"]');
-
-      it.each([
-        ["streams are loading", () => (searchObjInstance.loadingStream = true)],
-        ["the search errored", () => (searchObjInstance.data.errorMsg = "boom")],
-      ])("holds an invisible, inert placeholder in the button's place while %s", async (_, set) => {
-        applySearch();
-        set();
-        wrapper = mountSearchBar();
-        await flushPromises();
-
-        expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
-        expect(placeholder().exists()).toBe(true);
-        expect(placeholder().classes()).toContain("invisible");
-        expect(placeholder().attributes("aria-hidden")).toBe("true");
-        expect(placeholder().attributes("inert")).toBeDefined();
-        const toggleGroup = wrapper.find(".o-toggle-group-stub").element;
-        expect(toggleGroup.nextElementSibling).toBe(placeholder().element);
-      });
-
-      it("reserves nothing when the button shows, or when the org has no trace streams", async () => {
-        applySearch();
-        wrapper = mountSearchBar();
-        await flushPromises();
-        expect(placeholder().exists()).toBe(false);
-        wrapper.unmount();
-
+    describe("steady slot while results load (200% zoom shift)", () => {
+      it("is not rendered when the org has no trace streams", async () => {
         applySearch();
         searchObjInstance.data.stream.streamLists = [];
         wrapper = mountSearchBar();
         await flushPromises();
-        expect(placeholder().exists()).toBe(false);
+        expect(wrapper.find('[data-test="insights-button-wrap"]').exists()).toBe(false);
         expect((wrapper.vm as any).drillDownSlot).toBe(false);
       });
 
       it.each(["service-graph", "services-catalog"] as const)(
-        "reserves nothing in %s mode",
+        "is not rendered in %s mode",
         async (mode) => {
           searchObjInstance.meta.searchMode = mode;
           applySearch();
@@ -1316,11 +1282,11 @@ describe("SearchBar", () => {
           wrapper = mountSearchBar();
           await flushPromises();
 
-          expect(placeholder().exists()).toBe(false);
+          expect(wrapper.find('[data-test="insights-button-wrap"]').exists()).toBe(false);
         },
       );
 
-      it("budgets the toolbar the same while loading as once the button shows", async () => {
+      it("budgets the toolbar the same while loading as once the button is enabled", async () => {
         const widthSpy = mockToolbarWidth(714);
         try {
           applySearch();
@@ -1335,7 +1301,9 @@ describe("SearchBar", () => {
           await flushPromises();
 
           expect((wrapper.vm as any).shouldHideToolbarButtonText).toBe(shown);
-          expect(placeholder().text().includes("traces.drillDown")).toBe(!shown);
+          expect(
+            wrapper.find('[data-test="insights-button"]').text().includes("traces.drillDown"),
+          ).toBe(!shown);
         } finally {
           widthSpy.mockRestore();
         }
