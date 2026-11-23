@@ -109,6 +109,7 @@ jsonschema = { version = "0.38", default-features = false }
 opentelemetry-proto.workspace = true
 openobserve-core = { workspace = true, features = ["test-utils"] }
 openobserve-synthetics.workspace = true
+prometheus.workspace = true
 prost.workspace = true
 rcgen = "0.14"
 sea-orm.workspace = true

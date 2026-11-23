@@ -16,11 +16,12 @@
 //! The health state of the domain listener and the port that reports it to a load balancer.
 
 use std::sync::{
-    Arc,
+    Arc, Mutex, PoisonError,
     atomic::{AtomicBool, Ordering},
 };
 
 use axum::{Router, http::StatusCode};
+use config::metrics::status_page_domains::{METRICS, Metrics};
 use o2_enterprise::enterprise::status_pages::cert_store::Readiness;
 
 use super::Directory;
@@ -64,22 +65,49 @@ impl HealthState {
             Self::NotListening => "not listening",
         }
     }
+
+    /// The `reason` label of `status_page_domain_listener_ready`.
+    pub fn reason(self) -> &'static str {
+        match self {
+            Self::Ready | Self::Store(Readiness::Ready) => "ready",
+            Self::Store(Readiness::Loading) => "loading",
+            Self::Store(Readiness::NoKey) => "no_key",
+            Self::Store(Readiness::KeyMismatch) => "key_mismatch",
+            Self::Store(Readiness::EpochMismatch) => "epoch_mismatch",
+            Self::Store(Readiness::Draining) | Self::Draining => "draining",
+            Self::NotListening => "not_listening",
+        }
+    }
 }
 
 /// What the listener itself knows: whether its ports are up, and whether it is shutting down.
-#[derive(Default)]
+/// Every change of either republishes the health state as `status_page_domain_listener_ready`.
 pub(super) struct Flags {
     listening: AtomicBool,
     draining: AtomicBool,
+    /// The store's readiness as of the last publish, for changes that carry none of their own.
+    readiness: Mutex<Readiness>,
+    metrics: Arc<Metrics>,
 }
 
 impl Flags {
+    pub(super) fn with_metrics(metrics: Arc<Metrics>) -> Self {
+        Self {
+            listening: AtomicBool::new(false),
+            draining: AtomicBool::new(false),
+            readiness: Mutex::new(Readiness::Loading),
+            metrics,
+        }
+    }
+
     pub(super) fn set_listening(&self, listening: bool) {
         self.listening.store(listening, Ordering::Relaxed);
+        self.republish();
     }
 
     pub(super) fn begin_drain(&self) {
         self.draining.store(true, Ordering::Relaxed);
+        self.republish();
     }
 
     pub(super) fn state(&self, readiness: Readiness) -> HealthState {
@@ -88,6 +116,34 @@ impl Flags {
             self.draining.load(Ordering::Relaxed),
             self.listening.load(Ordering::Relaxed),
         )
+    }
+
+    /// Sets the gauge from the store's readiness as the caller just read it.
+    pub(super) fn publish(&self, readiness: Readiness) {
+        self.publish_state(Some(readiness));
+    }
+
+    fn republish(&self) {
+        self.publish_state(None);
+    }
+
+    /// The flags are stored before this runs and the state is derived under the lock that the
+    /// write holds, so the last writer always publishes the latest state.
+    fn publish_state(&self, readiness: Option<Readiness>) {
+        let mut seen = self
+            .readiness
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if let Some(readiness) = readiness {
+            *seen = readiness;
+        }
+        self.metrics.set_listener_ready(self.state(*seen).reason());
+    }
+}
+
+impl Default for Flags {
+    fn default() -> Self {
+        Self::with_metrics(METRICS.clone())
     }
 }
 

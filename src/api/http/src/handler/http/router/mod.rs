@@ -2240,6 +2240,22 @@ fn service_route_table() -> Router {
             .route(
                 "/{org_id}/status_pages/domains/release_shadowed",
                 post(status_pages::admin::release_shadowed),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/installation",
+                get(status_pages::admin::installation_status),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/installation/check",
+                post(status_pages::admin::installation_check),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/installation/reset_key_check",
+                post(status_pages::admin::installation_reset_key_check),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/installation/recheck_epoch",
+                post(status_pages::admin::installation_recheck_epoch),
             );
 
         // The private-VPC-agent path, and the only part of synthetics that
@@ -3568,6 +3584,10 @@ mod tests {
             ("POST", "/api/default/status_pages/notices/n1/mark_false_positive", 403, "require an enterprise license"),
             ("POST", "/api/default/status_pages/s1/domains", 403, "require an enterprise license"),
             ("POST", "/api/default/status_pages/domains/release_shadowed", 403, "require an enterprise license"),
+            ("GET", "/api/default/status_pages/domains/installation", 403, "require an enterprise license"),
+            ("POST", "/api/default/status_pages/domains/installation/check", 403, "require an enterprise license"),
+            ("POST", "/api/default/status_pages/domains/installation/reset_key_check", 403, "require an enterprise license"),
+            ("POST", "/api/default/status_pages/domains/installation/recheck_epoch", 403, "require an enterprise license"),
             ("POST", "/api/v2/default/alerts/incidents", 403, "Service incidents require the enterprise build"),
             ("PUT", "/api/default/service_identity/overrides", 403, "Service versions require the enterprise build"),
             ("POST", "/api/default/service_identity/aliases", 403, "Service versions require the enterprise build"),

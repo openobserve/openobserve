@@ -557,6 +557,68 @@ pub struct ReleaseShadowedResponse {
     pub released: u64,
 }
 
+/// Whether this node's domain key fits the check value stored in the manager row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum InstallationKeyCheck {
+    Ok,
+    Missing,
+    Mismatch,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+pub struct InstallationEpoch {
+    pub configured: i64,
+    pub stored: i64,
+}
+
+/// A listener node that is reporting.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+pub struct InstallationListener {
+    pub node: String,
+    pub address: String,
+    pub last_seen_at: i64,
+    pub certs_loaded: i32,
+    pub last_sync_at: i64,
+    pub private_peers_only: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+pub struct InstallationLease {
+    pub owner: Option<String>,
+    pub expires_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+pub struct InstallationCaError {
+    pub at: i64,
+    pub message: String,
+}
+
+/// The installation status root users read. Every key is always present: only `enabled` and `tls`
+/// are filled unless built-in TLS is on, and `listeners` is then empty.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+pub struct DomainInstallationView {
+    /// Custom domains are on, in either mode.
+    pub enabled: bool,
+    /// The configured certificate mode, `built_in` or `proxy`.
+    pub tls: String,
+    pub target: Option<String>,
+    pub not_ready_reason: Option<String>,
+    pub target_resolves: Option<bool>,
+    pub wildcard_resolves: Option<bool>,
+    pub target_certificate_expires_at: Option<i64>,
+    pub key_check: Option<InstallationKeyCheck>,
+    pub epoch: Option<InstallationEpoch>,
+    pub listeners: Vec<InstallationListener>,
+    pub lease: Option<InstallationLease>,
+    pub last_validation_at: Option<i64>,
+    pub last_ca_error: Option<InstallationCaError>,
+    pub visitor_addresses_visible: Option<bool>,
+    pub probe_mode: Option<String>,
+    pub next_check_at: Option<i64>,
+}
+
 fn default_snooze_hours() -> i64 {
     6
 }
@@ -1382,5 +1444,41 @@ mod tests {
         let json = serde_json::to_string(&view).unwrap();
         assert!(!json.contains("password_hash"), "{json}");
         assert!(json.contains("\"password_set\":true"), "{json}");
+    }
+
+    #[test]
+    fn the_installation_view_serializes_every_key_with_nulls_for_what_is_not_filled() {
+        let view = DomainInstallationView {
+            enabled: true,
+            tls: "proxy".to_string(),
+            target: None,
+            not_ready_reason: None,
+            target_resolves: None,
+            wildcard_resolves: None,
+            target_certificate_expires_at: None,
+            key_check: None,
+            epoch: None,
+            listeners: Vec::new(),
+            lease: None,
+            last_validation_at: None,
+            last_ca_error: None,
+            visitor_addresses_visible: None,
+            probe_mode: None,
+            next_check_at: None,
+        };
+
+        let json = serde_json::to_value(&view).unwrap();
+
+        let object = json.as_object().unwrap();
+        assert_eq!(object.len(), 16, "{json}");
+        for (key, value) in object {
+            let filled = ["enabled", "tls"].contains(&key.as_str());
+            assert_eq!(
+                value.is_null(),
+                !filled && key != "listeners",
+                "{key}: {json}"
+            );
+        }
+        assert_eq!(json["listeners"], serde_json::json!([]));
     }
 }

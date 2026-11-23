@@ -531,6 +531,58 @@ pub async fn release_shadowed_domains() -> Result<u64, anyhow::Error> {
     enterprise_required()
 }
 
+/// The installation status root users read: one body in every state. Licensed.
+#[cfg(feature = "enterprise")]
+pub async fn installation_status()
+-> Result<config::meta::status_pages::DomainInstallationView, anyhow::Error> {
+    o2_enterprise::enterprise::status_pages::installation::status().await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn installation_status()
+-> Result<config::meta::status_pages::DomainInstallationView, anyhow::Error> {
+    enterprise_required()
+}
+
+/// Asks for the installation check of the domain target now; refused outside built-in TLS.
+#[cfg(feature = "enterprise")]
+pub async fn installation_check()
+-> Result<config::meta::status_pages::DomainInstallationView, anyhow::Error> {
+    o2_enterprise::enterprise::status_pages::installation::check_again().await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn installation_check()
+-> Result<config::meta::status_pages::DomainInstallationView, anyhow::Error> {
+    enterprise_required()
+}
+
+/// Forgets the stored key check value after the key was replaced; refused outside built-in TLS.
+#[cfg(feature = "enterprise")]
+pub async fn installation_reset_key_check()
+-> Result<config::meta::status_pages::DomainInstallationView, anyhow::Error> {
+    o2_enterprise::enterprise::status_pages::installation::reset_key_check().await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn installation_reset_key_check()
+-> Result<config::meta::status_pages::DomainInstallationView, anyhow::Error> {
+    enterprise_required()
+}
+
+/// Re-checks every holder after a restore and writes the epoch; refused outside built-in TLS.
+#[cfg(feature = "enterprise")]
+pub async fn installation_recheck_epoch()
+-> Result<config::meta::status_pages::DomainInstallationView, anyhow::Error> {
+    o2_enterprise::enterprise::status_pages::installation::recheck_epoch().await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn installation_recheck_epoch()
+-> Result<config::meta::status_pages::DomainInstallationView, anyhow::Error> {
+    enterprise_required()
+}
+
 // ── Super-cluster emit (enterprise, gated on super_cluster.enabled) ──────────
 // Follows the synthetics idiom: cfg(enterprise) + super_cluster.enabled (NO
 // !local_mode — synthetics does not gate on it). Best-effort: a publish failure

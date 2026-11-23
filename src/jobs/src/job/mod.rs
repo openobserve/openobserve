@@ -90,6 +90,8 @@ mod session_cleanup;
 pub mod slack_hooks;
 mod slo_maintenance;
 mod stats;
+#[cfg(feature = "enterprise")]
+mod status_page_mail;
 
 use enrichment_data::enrichment_table::geoip::wait_for_initialization;
 use openobserve_core::org_cleanup::{DrainPass, StreamDataCleanup};
@@ -698,6 +700,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // Routers serve the inbound /api/slack/* routes, whose audit and lookups need the hooks.
     #[cfg(feature = "enterprise")]
     slack_hooks::register();
+
+    // Every node that checks a holder can start a clock, so each one can send its notice.
+    #[cfg(feature = "enterprise")]
+    status_page_mail::register();
 
     // Routers serve the hook routes, so the hook node tasks start before the router return.
     #[cfg(feature = "enterprise")]
@@ -1932,6 +1938,26 @@ mod tests {
         assert!(
             router_return < boot,
             "Slack tasks start only on the roles that ran them before"
+        );
+    }
+
+    #[test]
+    fn the_proof_loss_mail_is_registered_before_the_router_return() {
+        let source = include_str!("mod.rs");
+        let init = source
+            .split("pub async fn init()")
+            .nth(1)
+            .and_then(|rest| rest.split("mod tests {").next())
+            .expect("init() body");
+        let register = init
+            .find("status_page_mail::register();")
+            .expect("init() must register the proof-loss mail");
+        let router_return = init
+            .find("if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role()")
+            .expect("router return in init()");
+        assert!(
+            register < router_return,
+            "routers serve Verify now and the epoch re-check, which check holders too"
         );
     }
 

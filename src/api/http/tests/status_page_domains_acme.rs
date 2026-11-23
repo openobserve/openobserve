@@ -480,6 +480,7 @@ async fn claim_with_cname(db: &DatabaseConnection, env: &Env, id: &str) {
         displacement_allowed: true,
         holder_clock: true,
         lapse_allowed: false,
+        stored_epoch: None,
     };
     wait_for("a claim to become the holder", || async {
         let row = claim(db, id).await;

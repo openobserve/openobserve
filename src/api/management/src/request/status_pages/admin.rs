@@ -878,6 +878,178 @@ pub async fn release_shadowed(Path(org_id): Path<String>, headers: HeaderMap) ->
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/{org_id}/status_pages/domains/installation",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "GetStatusPageDomainInstallation",
+    summary = "Read the custom domain installation status",
+    description = "Root only. Every key is always present: with built-in TLS the status is filled, in proxy mode only `enabled` and `tls` are, and while custom domains are off only `tls` says which mode is configured.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::DomainInstallationView),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn installation_status(Path(org_id): Path<String>, headers: HeaderMap) -> Response {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, headers);
+        licensed_only("installation_status")
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        let call = openobserve_core::status_pages::installation_status();
+        root_installation(&org_id, &headers, ("installation_status", None), call).await
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/status_pages/domains/installation/check",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "CheckStatusPageDomainInstallation",
+    summary = "Check the custom domain installation again",
+    description = "Root only, with built-in TLS. Asks the domain manager for the installation check of the domain target now, while the target's validation attempts for the hour have room. In proxy mode and while custom domains are off it is refused.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::DomainInstallationView),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn installation_check(Path(org_id): Path<String>, headers: HeaderMap) -> Response {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, headers);
+        licensed_only("installation_check")
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        let call = openobserve_core::status_pages::installation_check();
+        let ctx = ("installation_check", Some("installation_check"));
+        root_installation(&org_id, &headers, ctx, call).await
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/status_pages/domains/installation/reset_key_check",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "ResetStatusPageDomainKeyCheck",
+    summary = "Reset the custom domain key check value",
+    description = "Root only, with built-in TLS. Run after the domain key was replaced: the next node with a key stores its own check value, and every certificate is then issued again. In proxy mode and while custom domains are off it is refused.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::DomainInstallationView),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn installation_reset_key_check(
+    Path(org_id): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, headers);
+        licensed_only("installation_reset_key_check")
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        let call = openobserve_core::status_pages::installation_reset_key_check();
+        let ctx = ("installation_reset_key_check", Some("reset_key_check"));
+        root_installation(&org_id, &headers, ctx, call).await
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/status_pages/domains/installation/recheck_epoch",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "RecheckStatusPageDomainEpoch",
+    summary = "Re-check every custom domain after a restore",
+    description = "Root only, with built-in TLS. When the stored epoch differs from the configured one, asks every holder for its proof, starts the 72 hours of those whose proof is gone and lapses none, then writes the configured epoch. With equal epochs it only returns the status. In proxy mode and while custom domains are off it is refused.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::DomainInstallationView),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn installation_recheck_epoch(
+    Path(org_id): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, headers);
+        licensed_only("installation_recheck_epoch")
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        let call = openobserve_core::status_pages::installation_recheck_epoch();
+        let ctx = ("installation_recheck_epoch", Some("recheck_epoch"));
+        root_installation(&org_id, &headers, ctx, call).await
+    }
+}
+
+/// The root check is in the handler, as `release_shadowed` does it; a refused action is the
+/// error every refused write uses. An action is audited once it answered.
+#[cfg(feature = "enterprise")]
+async fn root_installation(
+    org_id: &str,
+    headers: &HeaderMap,
+    (ctx, audited): (&str, Option<&str>),
+    call: impl Future<
+        Output = Result<config::meta::status_pages::DomainInstallationView, anyhow::Error>,
+    >,
+) -> Response {
+    let refusal = "only a root user may read or repair the installation";
+    let user_id = match root_caller(headers, refusal) {
+        Ok(user_id) => user_id,
+        Err(refused) => return refused,
+    };
+    match call.await {
+        Ok(view) => {
+            if let Some(action) = audited {
+                audit(org_id, user_id, action, None).await;
+            }
+            MetaHttpResponse::json(view)
+        }
+        Err(e) => map_err(ctx, e),
+    }
+}
+
 /// R-1 composition: resolve the check's folder, then OpenFGA-check read on it.
 /// Enterprise-only — the OSS build has no OpenFGA (and its stub returns false),
 /// so the gate is compiled only where it can be enforced.
@@ -934,7 +1106,13 @@ fn root_caller<'a>(headers: &'a HeaderMap, refusal: &str) -> Result<&'a str, Res
 
 #[cfg(test)]
 mod tests {
-    use axum::http::{HeaderValue, Request};
+    use axum::{
+        Router,
+        body::{Body, to_bytes},
+        http::{HeaderValue, Method, Request},
+        routing::{get, post},
+    };
+    use tower::ServiceExt;
 
     use super::*;
 
@@ -978,6 +1156,183 @@ mod tests {
         ] {
             let parts = parts_with_user_id(user_id);
             assert_eq!(user_id_of(&parts.headers), Some(user_id));
+        }
+    }
+
+    fn user(user_id: &str) -> Option<HeaderValue> {
+        Some(HeaderValue::from_str(user_id).unwrap())
+    }
+
+    // The routes of this slice that check for root, as the production router mounts them.
+    fn app() -> Router {
+        let base = "/{org_id}/status_pages/domains";
+        Router::new()
+            .route(&format!("{base}/installation"), get(installation_status))
+            .route(
+                &format!("{base}/installation/check"),
+                post(installation_check),
+            )
+            .route(
+                &format!("{base}/installation/reset_key_check"),
+                post(installation_reset_key_check),
+            )
+            .route(
+                &format!("{base}/installation/recheck_epoch"),
+                post(installation_recheck_epoch),
+            )
+            .route(&format!("{base}/release_shadowed"), post(release_shadowed))
+    }
+
+    async fn send(method: Method, tail: &str, who: Option<HeaderValue>) -> Response {
+        let mut request = Request::builder()
+            .method(method)
+            .uri(format!("/default/status_pages/domains/{tail}"));
+        if let Some(who) = who {
+            request = request.header("user_id", who);
+        }
+        let request = request.body(Body::empty()).unwrap();
+        app().oneshot(request).await.unwrap()
+    }
+
+    /// The four installation routes. `release_shadowed` is not among them: it mutates for root.
+    async fn answers_for(who: Option<HeaderValue>) -> Vec<(&'static str, Response)> {
+        let routes = [
+            ("GET installation", Method::GET, "installation"),
+            ("POST check", Method::POST, "installation/check"),
+            (
+                "POST reset_key_check",
+                Method::POST,
+                "installation/reset_key_check",
+            ),
+            (
+                "POST recheck_epoch",
+                Method::POST,
+                "installation/recheck_epoch",
+            ),
+        ];
+        let mut answers = Vec::new();
+        for (route, method, tail) in routes {
+            answers.push((route, send(method, tail, who.clone()).await));
+        }
+        answers
+    }
+
+    async fn answers(user_id: &str) -> Vec<(&'static str, Response)> {
+        answers_for(user(user_id)).await
+    }
+
+    async fn json_of(response: Response) -> serde_json::Value {
+        let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_caller_that_is_not_root_gets_403_on_all_four_installation_routes() {
+        for (route, response) in answers("member@example.com").await {
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{route}");
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn the_oss_twin_answers_with_the_enterprise_required_error() {
+        for (route, response) in answers("member@example.com").await {
+            let body = json_of(response).await.to_string();
+            assert!(body.contains("enterprise"), "{route}: {body}");
+        }
+    }
+
+    /// The identities that look like the root user to a trimming or lossy reader, and are not.
+    #[cfg(feature = "enterprise")]
+    fn lookalikes() -> Vec<Option<HeaderValue>> {
+        vec![
+            user("root@example.com "),
+            user(" root@example.com"),
+            user("\u{a0}root@example.com"),
+            user("root@example.com\u{a0}"),
+            Some(HeaderValue::from_bytes(b"root@example.com\xff").unwrap()),
+            None,
+        ]
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn insert_root() {
+        common::infra::config::ORG_USERS.insert(
+            format!("{}/root@example.com", config::DEFAULT_ORG),
+            infra::table::org_users::OrgUserRecord {
+                email: "root@example.com".to_string(),
+                org_id: config::DEFAULT_ORG.to_string(),
+                role: config::meta::user::UserRole::Root,
+                token: String::new(),
+                rum_token: None,
+                created_at: 0,
+                allow_static_token: false,
+            },
+        );
+    }
+
+    // Through the router, so the identity is extracted as a request has it: a lookalike or no
+    // identity is a 403 on every installation route, never a 400 and never root.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_identity_that_only_looks_like_root_is_refused_on_the_installation_routes() {
+        insert_root();
+        for who in lookalikes() {
+            for (route, response) in answers_for(who.clone()).await {
+                assert_eq!(response.status(), StatusCode::FORBIDDEN, "{route} {who:?}");
+            }
+        }
+    }
+
+    // Only rejected identities reach `release_shadowed` here: root's call would run the cleanup.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_identity_that_only_looks_like_root_is_refused_on_release_shadowed() {
+        insert_root();
+        for who in lookalikes() {
+            let response = send(Method::POST, "release_shadowed", who.clone()).await;
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{who:?}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_exact_root_identity_passes_the_root_check_on_the_installation_status() {
+        insert_root();
+        let status = send(Method::GET, "installation", user("root@example.com")).await;
+        assert_eq!(status.status(), StatusCode::OK);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_refused_action_has_the_status_and_error_shape_of_a_refused_create_domain() {
+        insert_root();
+        let refused = map_err(
+            "create_domain",
+            anyhow::anyhow!("validation: custom domains are not enabled on this installation"),
+        );
+        let reference = (refused.status(), json_of(refused).await);
+        let mut got = answers("root@example.com").await;
+
+        let status = got.remove(0).1;
+        assert_eq!(status.status(), StatusCode::OK);
+        let body = json_of(status).await;
+        assert_eq!(
+            (body["enabled"].clone(), body.as_object().unwrap().len()),
+            (false.into(), 16)
+        );
+        for (route, response) in got {
+            assert_eq!(response.status(), reference.0, "{route}");
+            let body = json_of(response).await;
+            let keys = |value: &serde_json::Value| -> Vec<String> {
+                value.as_object().unwrap().keys().cloned().collect()
+            };
+            assert_eq!(keys(&body), keys(&reference.1), "{route}");
+            let message = body["message"].as_str().unwrap();
+            assert_eq!(
+                message, "validation: this action needs built-in TLS",
+                "{route}"
+            );
         }
     }
 }

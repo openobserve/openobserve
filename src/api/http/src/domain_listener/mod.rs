@@ -56,6 +56,8 @@ use tokio_rustls::rustls::sign::CertifiedKey;
 const MAX_STREAMS: u32 = 32;
 /// How long the health port keeps answering 503 after the other ports are drained.
 const HEALTH_GRACE: Duration = Duration::from_secs(1);
+/// How often the listener reads the store's readiness for `status_page_domain_listener_ready`.
+const PUBLISH_EVERY: Duration = Duration::from_secs(1);
 
 static FLAGS: LazyLock<Arc<Flags>> = LazyLock::new(|| Arc::new(Flags::default()));
 
@@ -269,6 +271,7 @@ impl Running {
             Ok(async move { server.serve(app.into_make_service()).await })
         });
         if let Some(https) = &self.https {
+            self.flags.publish(self.directory.readiness());
             self.flags.set_listening(true);
             self.directory.set_listening(https.addr);
         }
@@ -329,6 +332,7 @@ impl Running {
             .inspect_err(|e| {
                 log::error!("[status_pages] the domain {port} port could not be bound: {e}");
                 if port != "health" {
+                    self.flags.publish(self.directory.readiness());
                     self.flags.set_listening(false);
                 }
             })
@@ -337,6 +341,7 @@ impl Running {
 
     /// Reports not ready first, stops accepting, lets connections finish, then closes health.
     async fn drain(self) {
+        self.flags.publish(self.directory.readiness());
         self.flags.begin_drain();
         self.directory.begin_drain();
         self.stop.signal();
@@ -379,6 +384,7 @@ pub fn spawn() -> Option<JoinHandle<()>> {
         serves_domains(&config::cluster::LOCAL_NODE),
         &settings,
     )?;
+    cert_store::export_listener_metrics();
     let stop = crate::server::shutdown_started();
     Some(tokio::spawn(run(
         plan,
@@ -413,6 +419,7 @@ async fn run(
     if let Some(notice) = plan.start_notice() {
         log::error!("{notice}");
     }
+    let publisher = tokio::spawn(publish_readiness(flags.clone(), directory.clone()));
     let mut running = Running::new(plan, directory, flags, pages);
     running.bind_health();
     tokio::pin!(stop);
@@ -421,6 +428,16 @@ async fn run(
         () = running.bind_domain_ports() => stop.await,
     }
     running.drain().await;
+    publisher.abort();
+}
+
+/// The store's readiness changes without the listener noticing, so the gauge follows it here.
+async fn publish_readiness(flags: Arc<Flags>, directory: Arc<dyn Directory>) {
+    let mut ticks = tokio::time::interval(PUBLISH_EVERY);
+    loop {
+        ticks.tick().await;
+        flags.publish(directory.readiness());
+    }
 }
 
 fn bind(port: &str, addr: SocketAddr) -> io::Result<(std::net::TcpListener, SocketAddr)> {
@@ -678,6 +695,106 @@ mod tests {
         flags.set_listening(true);
         finish("TLS", flags.clone(), async { Ok(()) }).await;
         assert_eq!(flags.state(Readiness::Ready), HealthState::Ready);
+    }
+
+    const READY_GAUGE: &str = "zo_status_page_domain_listener_ready";
+
+    fn own_metrics() -> (
+        Arc<config::metrics::status_page_domains::Metrics>,
+        prometheus::Registry,
+    ) {
+        let metrics = Arc::new(config::metrics::status_page_domains::Metrics::new());
+        let registry = prometheus::Registry::new();
+        metrics.register(&registry);
+        (metrics, registry)
+    }
+
+    /// Every `reason` series of the gauge with its value.
+    fn ready_series(registry: &prometheus::Registry) -> Vec<(String, i64)> {
+        let mut series = Vec::new();
+        for family in registry.gather() {
+            if family.name() != READY_GAUGE {
+                continue;
+            }
+            for metric in family.get_metric() {
+                let label = metric.get_label().iter().find(|l| l.name() == "reason");
+                let reason = label.map(|l| l.value().to_string()).unwrap_or_default();
+                series.push((reason, metric.get_gauge().value() as i64));
+            }
+        }
+        series.sort();
+        series
+    }
+
+    /// Seven series, and only `reason` at 1.
+    fn only_at_one(registry: &prometheus::Registry, reason: &str) {
+        let series = ready_series(registry);
+        let ones: Vec<&str> = series
+            .iter()
+            .filter(|(_, value)| *value == 1)
+            .map(|(name, _)| name.as_str())
+            .collect();
+        assert_eq!(series.len(), 7, "{series:?}");
+        assert_eq!(ones, [reason], "{series:?}");
+    }
+
+    #[test]
+    fn listener_ready_has_one_series_at_one_for_each_health_state() {
+        use Readiness::{EpochMismatch, KeyMismatch, Loading, NoKey, Ready};
+        let cases: [(Readiness, bool, bool, &str); 8] = [
+            (Loading, false, false, "loading"),
+            (NoKey, false, false, "no_key"),
+            (KeyMismatch, false, true, "key_mismatch"),
+            (EpochMismatch, false, true, "epoch_mismatch"),
+            (Ready, false, false, "not_listening"),
+            (Ready, false, true, "ready"),
+            (Ready, true, true, "draining"),
+            (Readiness::Draining, false, true, "draining"),
+        ];
+        for (readiness, draining, listening, reason) in cases {
+            let (metrics, registry) = own_metrics();
+            let flags = Flags::with_metrics(metrics);
+            flags.publish(readiness);
+            flags.set_listening(listening);
+            if draining {
+                flags.begin_drain();
+            }
+
+            only_at_one(&registry, reason);
+        }
+    }
+
+    #[tokio::test]
+    async fn listener_ready_says_not_listening_after_a_failed_tls_bind_and_draining_after_stop() {
+        let fake = Fake::new();
+        let (metrics, registry) = own_metrics();
+        let flags = Arc::new(Flags::with_metrics(metrics));
+        let taken = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let mut plan = local_plan(Proxy::Off);
+        plan.https = taken.local_addr().unwrap();
+        let (stop, stopped) = oneshot::channel::<()>();
+        let run = tokio::spawn(run(plan, fake.clone(), flags, Pages::live(), async move {
+            let _ = stopped.await;
+        }));
+        let mut shown = false;
+        for _ in 0..100 {
+            let series = ready_series(&registry);
+            shown = series.contains(&("not_listening".to_string(), 1));
+            if shown {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert!(shown, "{:?}", ready_series(&registry));
+        only_at_one(&registry, "not_listening");
+
+        stop.send(()).unwrap();
+        tokio::time::timeout(Duration::from_secs(10), run)
+            .await
+            .unwrap()
+            .unwrap();
+
+        only_at_one(&registry, "draining");
     }
 
     #[tokio::test]

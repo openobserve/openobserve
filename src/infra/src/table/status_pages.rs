@@ -75,6 +75,8 @@ pub const CLAIM_TTL_MICROS: i64 = 7 * 24 * MICROS_PER_HOUR;
 pub const HOLDER_RECHECK_MICROS: i64 = 6 * MICROS_PER_HOUR;
 /// A holder lapses at a negative answer this long after its first one.
 pub const PROOF_LAPSE_AFTER_MICROS: i64 = 72 * MICROS_PER_HOUR;
+/// The proof-loss e-mail waits until a clock has run this long, so a flapping record sends none.
+pub const PROOF_NOTIFY_AFTER_MICROS: i64 = MICROS_PER_HOUR;
 /// A holder whose own proof was found more recently than this is not displaced.
 pub const DISPLACEMENT_HOLD_DOWN_MICROS: i64 = MICROS_PER_HOUR;
 /// A claim that lost its hostname cannot displace a holder until this long after its proof failed.
@@ -1474,9 +1476,23 @@ pub async fn record_holder_proof_failure<C: ConnectionTrait>(
     now: i64,
     lapse_allowed: bool,
 ) -> Result<HolderProofFailure, errors::Error> {
+    record_holder_proof_failure_at_epoch(conn, id, reason, now, lapse_allowed, None).await
+}
+
+/// The same writes, each also guarded on the manager row still holding `epoch`: a check that read
+/// readiness before a restore's epoch change writes nothing (`Contended`) and the next one decides.
+pub async fn record_holder_proof_failure_at_epoch<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    reason: i32,
+    now: i64,
+    lapse_allowed: bool,
+    epoch: Option<i64>,
+) -> Result<HolderProofFailure, errors::Error> {
     use status_page_custom_domains::Column;
     for _ in 0..3 {
-        if let Some(outcome) = holder_failure_once(conn, id, reason, now, lapse_allowed).await? {
+        let once = holder_failure_once(conn, id, reason, now, lapse_allowed, epoch).await?;
+        if let Some(outcome) = once {
             return Ok(outcome);
         }
     }
@@ -1502,11 +1518,16 @@ async fn holder_failure_once<C: ConnectionTrait>(
     reason: i32,
     now: i64,
     lapse_allowed: bool,
+    epoch: Option<i64>,
 ) -> Result<Option<HolderProofFailure>, errors::Error> {
     use status_page_custom_domains::Column;
     let proof = FailureProof::of(reason)
         .ok_or_else(|| errors::Error::Message(format!("{reason} is not a proof failure reason")))?;
-    let holder = || live_claim_update(id).filter(Column::HeldDomain.is_not_null());
+    let backend = conn.get_database_backend();
+    let holder = || {
+        let held = live_claim_update(id).filter(Column::HeldDomain.is_not_null());
+        at_epoch(held, epoch, backend)
+    };
     if lapse_allowed {
         let lapse = lapsed_holder(
             holder()
@@ -1559,6 +1580,27 @@ async fn holder_failure_once<C: ConnectionTrait>(
         .then_some(HolderProofFailure::Running))
 }
 
+/// Narrows a write to the manager row still holding `epoch`. PostgreSQL shares the row's lock, so
+/// the write waits for an epoch change in flight and then reads the new epoch, not the snapshot.
+fn at_epoch(
+    update: UpdateMany<status_page_custom_domains::Entity>,
+    epoch: Option<i64>,
+    backend: DatabaseBackend,
+) -> UpdateMany<status_page_custom_domains::Entity> {
+    let Some(epoch) = epoch else {
+        return update;
+    };
+    let (marker, lock) = if backend == DatabaseBackend::Postgres {
+        ("$1", " FOR SHARE")
+    } else {
+        ("?", "")
+    };
+    let held = format!(
+        "EXISTS (SELECT 1 FROM status_page_domain_manager WHERE id = 1 AND epoch = {marker}{lock})"
+    );
+    update.filter(Expr::cust_with_values(held, [epoch]))
+}
+
 /// Clears the clock and the reason of every unreleased holder: custom domains are off.
 pub async fn clear_holder_proof_failures<C: ConnectionTrait>(
     conn: &C,
@@ -1590,6 +1632,54 @@ pub async fn clear_holder_proof_failure<C: ConnectionTrait>(
             updated_at: Set(now),
             ..cleared_clock()
         });
+    run_claim_update(conn, update).await
+}
+
+/// True once per clock: a holder whose clock of either proof has run for an hour and was not
+/// yet notified for it. One guarded statement, so two concurrent checks cannot both get true.
+pub async fn mark_proof_loss_notified<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    mark_notified(conn, id, None, now).await
+}
+
+/// The same statement for the clock that started at `since`: it marks nothing when that clock
+/// ended or restarted meanwhile, so the notice built from `since` is for the clock it marked.
+pub async fn mark_proof_loss_notified_for_clock<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    since: i64,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    mark_notified(conn, id, Some(since), now).await
+}
+
+async fn mark_notified<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    since: Option<i64>,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    use status_page_custom_domains::Column;
+    let reasons = FailureProof::Txt
+        .reasons()
+        .iter()
+        .chain(FailureProof::Cname.reasons())
+        .copied();
+    let mut update = held_update(id)
+        .filter(Column::VerificationFailureReason.is_in(reasons))
+        .filter(Column::ProofFailedSince.lte(now - PROOF_NOTIFY_AFTER_MICROS))
+        .filter(
+            Condition::any()
+                .add(Column::ProofNotifiedAt.is_null())
+                .add(Expr::col(Column::ProofNotifiedAt).lt(Expr::col(Column::ProofFailedSince))),
+        )
+        .col_expr(Column::ProofNotifiedAt, Expr::value(now));
+    if let Some(since) = since {
+        update = update.filter(Column::ProofFailedSince.eq(since));
+    }
     run_claim_update(conn, update).await
 }
 
@@ -3966,6 +4056,184 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn the_proof_loss_mark_is_true_once_for_a_clock_of_either_proof_an_hour_old() {
+        for reason in [
+            FAILURE_RECORD_MISSING,
+            FAILURE_VALUE_MISMATCH,
+            FAILURE_POINTS_AT_APP_HOST,
+            FAILURE_NO_CNAME,
+            FAILURE_CNAME_ELSEWHERE,
+        ] {
+            let db = claims_db().await;
+            holder_with_clock(&db, Some(reason), Some(T0)).await;
+            let hour = PROOF_NOTIFY_AFTER_MICROS;
+
+            let early = mark_proof_loss_notified(&db, "a", T0 + hour - 1).await;
+            assert!(!early.unwrap(), "reason {reason}: a younger clock");
+            assert!(mark_proof_loss_notified(&db, "a", T0 + hour).await.unwrap());
+            let again = mark_proof_loss_notified(&db, "a", T0 + hour + 5).await;
+            assert!(!again.unwrap(), "reason {reason}: the same clock twice");
+
+            assert_eq!(row(&db, "a").await.proof_notified_at, Some(T0 + hour));
+        }
+    }
+
+    #[tokio::test]
+    async fn the_proof_loss_mark_is_false_without_a_clock_or_a_reason_of_either_proof() {
+        let hour = PROOF_NOTIFY_AFTER_MICROS;
+        for (reason, since) in [
+            (None, Some(T0)),
+            (Some(FAILURE_NO_CNAME), None),
+            (Some(FAILURE_DNS_LOOKUP), Some(T0)),
+            (Some(FAILURE_HELD_BY_ANOTHER_ORG), Some(T0)),
+            (Some(FAILURE_PROOF_LOST), Some(T0)),
+        ] {
+            let db = claims_db().await;
+            holder_with_clock(&db, reason, since).await;
+
+            let marked = mark_proof_loss_notified(&db, "a", T0 + 2 * hour).await;
+
+            assert!(!marked.unwrap(), "reason {reason:?}, clock {since:?}");
+            assert_eq!(row(&db, "a").await.proof_notified_at, None);
+        }
+    }
+
+    #[tokio::test]
+    async fn the_proof_loss_mark_is_false_for_a_non_holder_and_for_a_released_holder() {
+        let hour = PROOF_NOTIFY_AFTER_MICROS;
+        let db = claims_db().await;
+        add(&db, "pending", "org-a", "pa", "pending.example.com").await;
+        fail_domain(&db, "pending", FAILURE_NO_CNAME, T0)
+            .await
+            .unwrap();
+        let marked = mark_proof_loss_notified(&db, "pending", T0 + 2 * hour).await;
+        assert!(!marked.unwrap(), "a claim that holds nothing");
+
+        holder_with_clock(&db, Some(FAILURE_NO_CNAME), Some(T0)).await;
+        release_domain(&db, "org-a", "a", T0 + 1, RELEASED_BY_ORG)
+            .await
+            .unwrap();
+        let released = mark_proof_loss_notified(&db, "a", T0 + 2 * hour).await;
+        assert!(!released.unwrap(), "a released row");
+
+        assert_eq!(row(&db, "pending").await.proof_notified_at, None);
+        assert_eq!(row(&db, "a").await.proof_notified_at, None);
+    }
+
+    #[tokio::test]
+    async fn the_proof_loss_mark_is_true_again_for_a_restarted_clock_once_it_is_an_hour_old() {
+        let hour = PROOF_NOTIFY_AFTER_MICROS;
+        let db = claims_db().await;
+        holder_with_clock(&db, Some(FAILURE_NO_CNAME), Some(T0)).await;
+        assert!(mark_proof_loss_notified(&db, "a", T0 + hour).await.unwrap());
+
+        assert!(grant_domain(&db, "a", T0 + 2 * hour).await.unwrap());
+        let restarted = T0 + 3 * hour;
+        let outcome = failure(&db, FAILURE_NO_CNAME, restarted, true).await;
+        assert_eq!(outcome, HolderProofFailure::Started);
+
+        let young = mark_proof_loss_notified(&db, "a", restarted + hour - 1).await;
+        assert!(!young.unwrap(), "the new clock is not an hour old yet");
+        assert!(
+            mark_proof_loss_notified(&db, "a", restarted + hour)
+                .await
+                .unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn the_proof_loss_mark_follows_a_clock_the_other_proof_restarted() {
+        let hour = PROOF_NOTIFY_AFTER_MICROS;
+        let db = claims_db().await;
+        holder_with_clock(&db, Some(FAILURE_NO_CNAME), Some(T0)).await;
+        assert!(mark_proof_loss_notified(&db, "a", T0 + hour).await.unwrap());
+
+        let changed = T0 + 2 * hour;
+        let outcome = failure(&db, FAILURE_RECORD_MISSING, changed, true).await;
+        assert_eq!(outcome, HolderProofFailure::Started);
+
+        let young = mark_proof_loss_notified(&db, "a", changed + hour - 1).await;
+        assert!(!young.unwrap(), "the other proof's clock is new");
+        assert!(
+            mark_proof_loss_notified(&db, "a", changed + hour)
+                .await
+                .unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn two_concurrent_proof_loss_marks_of_one_clock_give_one_true() {
+        let hour = PROOF_NOTIFY_AFTER_MICROS;
+        let db = claims_db().await;
+        holder_with_clock(&db, Some(FAILURE_NO_CNAME), Some(T0)).await;
+
+        let (first, second) = tokio::join!(
+            mark_proof_loss_notified(&db, "a", T0 + hour),
+            mark_proof_loss_notified(&db, "a", T0 + hour + 1),
+        );
+
+        let answers = [first.unwrap(), second.unwrap()];
+        assert_eq!(
+            answers.iter().filter(|sent| **sent).count(),
+            1,
+            "{answers:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_clock_bound_proof_loss_mark_refuses_a_clock_that_ended_and_restarted() {
+        let hour = PROOF_NOTIFY_AFTER_MICROS;
+        let db = claims_db().await;
+        holder_with_clock(&db, Some(FAILURE_NO_CNAME), Some(T0 + hour)).await;
+        let now = T0 + 3 * hour;
+
+        let read_before_a_restart = mark_proof_loss_notified_for_clock(&db, "a", T0, now).await;
+        assert!(!read_before_a_restart.unwrap(), "the clock it read is gone");
+        assert_eq!(row(&db, "a").await.proof_notified_at, None);
+
+        let own = mark_proof_loss_notified_for_clock(&db, "a", T0 + hour, now).await;
+        assert!(own.unwrap());
+        let again = mark_proof_loss_notified_for_clock(&db, "a", T0 + hour, now + 1).await;
+        assert!(!again.unwrap(), "once per clock");
+    }
+
+    #[tokio::test]
+    async fn a_clock_write_guarded_on_the_epoch_writes_nothing_once_the_epoch_moved() {
+        let db = claims_db().await;
+        let aged = T0 - 80 * MICROS_PER_HOUR;
+        holder_with_clock(&db, Some(FAILURE_NO_CNAME), Some(aged)).await;
+        let moved = super::super::status_page_domains::set_epoch(&db, 1, 2, T0).await;
+        assert!(moved.unwrap());
+
+        let stale =
+            record_holder_proof_failure_at_epoch(&db, "a", FAILURE_NO_CNAME, T0, true, Some(1))
+                .await
+                .unwrap();
+
+        assert_eq!(
+            stale,
+            HolderProofFailure::Contended,
+            "a pass that read the old epoch"
+        );
+        let kept = row(&db, "a").await;
+        assert!(kept.held_domain.is_some());
+        assert_eq!(
+            kept.proof_failed_since,
+            Some(aged),
+            "the 80-hour clock is untouched"
+        );
+        let current =
+            record_holder_proof_failure_at_epoch(&db, "a", FAILURE_NO_CNAME, T0, true, Some(2))
+                .await
+                .unwrap();
+        assert_eq!(
+            current,
+            HolderProofFailure::Lapsed,
+            "the guard is the epoch and nothing else"
+        );
+    }
+
+    #[tokio::test]
     async fn grant_leaves_the_reason_and_the_clock_null() {
         let db = claims_db().await;
         add(&db, "a", "org-a", "pa", HOST).await;
@@ -4243,6 +4511,36 @@ mod tests {
             .unwrap();
         txn.commit().await.unwrap();
         assert_eq!(competing.await.unwrap(), ClaimInsert::HostnameTaken);
+        pg.drop_schema().await;
+    }
+
+    #[tokio::test]
+    async fn postgres_a_guarded_clock_write_waits_for_an_epoch_change_and_then_sees_it() {
+        let Some(pg) = postgres().await else {
+            return;
+        };
+        insert_org_page(&pg.db, "org-a", "pa").await;
+        let aged = T0 - 80 * MICROS_PER_HOUR;
+        holder_with_clock(&pg.db, Some(FAILURE_NO_CNAME), Some(aged)).await;
+        // The epoch change has updated the manager row and has not committed.
+        let txn = pg.db.begin().await.unwrap();
+        let moved = super::super::status_page_domains::set_epoch(&txn, 1, 2, T0).await;
+        assert!(moved.unwrap());
+        let pid = backend_pid(&txn).await;
+
+        let write =
+            record_holder_proof_failure_at_epoch(&pg.db, "a", FAILURE_NO_CNAME, T0, true, Some(1));
+        tokio::pin!(write);
+        tokio::select! {
+            done = &mut write => panic!("the write finished beside an epoch change: {done:?}"),
+            () = pg.wait_until_blocked_by(pid) => {}
+        }
+        txn.commit().await.unwrap();
+
+        assert_eq!(write.await.unwrap(), HolderProofFailure::Contended);
+        let kept = row(&pg.db, "a").await;
+        assert!(kept.held_domain.is_some());
+        assert_eq!(kept.proof_failed_since, Some(aged));
         pg.drop_schema().await;
     }
 

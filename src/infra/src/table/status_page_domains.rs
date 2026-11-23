@@ -29,7 +29,7 @@ use sea_orm::{
     FromQueryResult, IntoActiveModel, JoinType, PaginatorTrait, QueryFilter, QueryOrder,
     QueryResult, QuerySelect, Select, TransactionTrait, TryInsertResult,
     prelude::Expr,
-    sea_query::{Alias, OnConflict},
+    sea_query::{Alias, OnConflict, Query},
 };
 
 use super::entity::{
@@ -245,6 +245,21 @@ pub async fn delete_cert<C: ConnectionTrait>(
 ) -> Result<bool, errors::Error> {
     let deleted = certs::Entity::delete_many()
         .filter(certs::Column::Hostname.eq(hostname))
+        .exec(conn)
+        .await?;
+    Ok(deleted.rows_affected > 0)
+}
+
+/// Deletes a hostname's row only while it still holds `private_key`, the ciphertext the caller
+/// inspected: a certificate issued meanwhile stays. False when nothing went.
+pub async fn delete_cert_sealed_as<C: ConnectionTrait>(
+    conn: &C,
+    hostname: &str,
+    private_key: &str,
+) -> Result<bool, errors::Error> {
+    let deleted = certs::Entity::delete_many()
+        .filter(certs::Column::Hostname.eq(hostname))
+        .filter(certs::Column::PrivateKey.eq(private_key))
         .exec(conn)
         .await?;
     Ok(deleted.rows_affected > 0)
@@ -826,6 +841,27 @@ pub async fn insert_account<C: ConnectionTrait>(
     Ok(matches!(inserted, TryInsertResult::Inserted(rows) if rows > 0))
 }
 
+pub async fn list_accounts<C: ConnectionTrait>(
+    conn: &C,
+) -> Result<Vec<accounts::Model>, errors::Error> {
+    Ok(accounts::Entity::find().all(conn).await?)
+}
+
+/// Removes a directory's account only while it still holds `credentials`, the ciphertext the
+/// caller inspected: an account another node registered meanwhile stays. False when nothing went.
+pub async fn delete_account_sealed_as<C: ConnectionTrait>(
+    conn: &C,
+    ca_directory: &str,
+    credentials: &str,
+) -> Result<bool, errors::Error> {
+    let gone = accounts::Entity::delete_many()
+        .filter(accounts::Column::CaDirectory.eq(ca_directory))
+        .filter(accounts::Column::Credentials.eq(credentials))
+        .exec(conn)
+        .await?;
+    Ok(gone.rows_affected > 0)
+}
+
 /// The final certificate write. The claim is touched first, so a release that committed before
 /// it, or one that waits on it, decides: `false` means the claim no longer holds the hostname and
 /// nothing was written.
@@ -846,6 +882,102 @@ pub async fn write_certificate<C: ConnectionTrait>(
         .filter(|old| *old != row.fingerprint);
     upsert_cert(conn, &row).await?;
     Ok(true)
+}
+
+/// Holders by the serving state the manager stored; `None` is a holder it has not judged yet.
+pub async fn count_holders_by_state<C: ConnectionTrait>(
+    conn: &C,
+) -> Result<Vec<(Option<String>, i64)>, errors::Error> {
+    Ok(claims::Entity::find()
+        .select_only()
+        .column(claims::Column::ServingState)
+        .column_as(claims::Column::Id.count(), "holders")
+        .filter(claims::Column::HeldDomain.is_not_null())
+        .filter(claims::Column::ReleasedAt.is_null())
+        .filter(claims::Column::ReleaseSeal.is_null())
+        .group_by(claims::Column::ServingState)
+        .into_tuple()
+        .all(conn)
+        .await?)
+}
+
+/// When the proof of the holder that has waited longest for a certificate was first found: the
+/// oldest `dns_ok_since` of a holder with no certificate row, its proof found and no
+/// proof-failure clock running (a clock means a later check found the proof missing).
+pub async fn oldest_stuck_since<C: ConnectionTrait>(
+    conn: &C,
+) -> Result<Option<i64>, errors::Error> {
+    let certified = Query::select()
+        .column(certs::Column::Hostname)
+        .from(certs::Entity)
+        .to_owned();
+    let since: Option<Option<i64>> = claims::Entity::find()
+        .select_only()
+        .column_as(claims::Column::DnsOkSince.min(), "since")
+        .filter(claims::Column::HeldDomain.is_not_null())
+        .filter(claims::Column::ReleasedAt.is_null())
+        .filter(claims::Column::ReleaseSeal.is_null())
+        .filter(claims::Column::DnsOkSince.is_not_null())
+        .filter(claims::Column::ProofFailedSince.is_null())
+        .filter(claims::Column::HeldDomain.not_in_subquery(certified))
+        .into_tuple()
+        .one(conn)
+        .await?;
+    Ok(since.flatten())
+}
+
+/// Clears the stored key check value, so the next node with a key writes its own; false when no
+/// value was stored.
+pub async fn clear_key_check<C: ConnectionTrait>(
+    conn: &C,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    let cleared = manager::Entity::update_many()
+        .col_expr(manager::Column::KeyCheck, Expr::cust("NULL"))
+        .col_expr(manager::Column::UpdatedAt, Expr::value(now))
+        .filter(manager::Column::Id.eq(MANAGER_ID))
+        .filter(manager::Column::KeyCheck.is_not_null())
+        .exec(conn)
+        .await?;
+    Ok(cleared.rows_affected > 0)
+}
+
+/// Writes the epoch only while the row still holds `from`, so a concurrent change is not undone.
+/// In the same statement it drops the installation status: what a restore brought back says
+/// nothing about the new epoch, so readiness starts again from the next manager publication.
+pub async fn set_epoch<C: ConnectionTrait>(
+    conn: &C,
+    from: i64,
+    to: i64,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    let set = manager::Entity::update_many()
+        .col_expr(manager::Column::Epoch, Expr::value(to))
+        .col_expr(manager::Column::UpdatedAt, Expr::value(now))
+        .col_expr(manager::Column::InstallationStatus, Expr::cust("NULL"))
+        .filter(manager::Column::Id.eq(MANAGER_ID))
+        .filter(manager::Column::Epoch.eq(from))
+        .exec(conn)
+        .await?;
+    Ok(set.rows_affected > 0)
+}
+
+/// Replaces the installation status text only while it is still `from`, so a status the manager
+/// wrote meanwhile is not lost.
+pub async fn swap_installation_status<C: ConnectionTrait>(
+    conn: &C,
+    from: &str,
+    to: &str,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    let swapped = manager::Entity::update_many()
+        .col_expr(manager::Column::InstallationStatus, Expr::value(to))
+        .col_expr(manager::Column::UpdatedAt, Expr::value(now))
+        .filter(manager::Column::Id.eq(MANAGER_ID))
+        .filter(manager::Column::InstallationStatus.eq(from))
+        .exec(conn)
+        .await?;
+    Ok(swapped.rows_affected > 0)
 }
 
 /// Database time as a SQL expression, so a lease is judged by one clock whatever the node says.
@@ -1754,5 +1886,189 @@ mod tests {
                 .credentials,
             "sealed"
         );
+    }
+
+    /// A holder claim of `domain`; a test changes the columns it needs before the insert.
+    fn holder_of(id: &str, domain: &str) -> claims::Model {
+        claims::Model {
+            id: id.to_string(),
+            org_id: "org-a".to_string(),
+            status_page_id: "pa".to_string(),
+            domain: domain.to_string(),
+            verification_token: format!("o2v_{id}"),
+            verification_state: 1,
+            held_domain: Some(domain.to_string()),
+            cname_label: Some(format!("label{id}")),
+            created_at: T0,
+            updated_at: T0,
+            ..Default::default()
+        }
+    }
+
+    async fn put_claim(db: &DatabaseConnection, model: claims::Model) {
+        model.into_active_model().insert(db).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn holders_are_counted_by_stored_state_and_never_a_released_or_non_holder_claim() {
+        let db = db().await;
+        for (id, state) in [("a", Some("serving")), ("b", Some("serving")), ("c", None)] {
+            let mut claim = holder_of(id, &format!("{id}.example.com"));
+            claim.serving_state = state.map(str::to_string);
+            put_claim(&db, claim).await;
+        }
+        let mut released = holder_of("d", "d.example.com");
+        released.release_seal = Some(T0);
+        released.serving_state = Some("serving".to_string());
+        put_claim(&db, released).await;
+        let mut pending = holder_of("e", "e.example.com");
+        pending.held_domain = None;
+        pending.serving_state = Some("serving".to_string());
+        put_claim(&db, pending).await;
+
+        let mut counts = count_holders_by_state(&db).await.unwrap();
+
+        counts.sort();
+        assert_eq!(counts, [(None, 1), (Some("serving".to_string()), 2)]);
+    }
+
+    #[tokio::test]
+    async fn the_oldest_stuck_holder_has_its_proof_found_and_no_certificate() {
+        let db = db().await;
+        assert_eq!(oldest_stuck_since(&db).await.unwrap(), None);
+        let rows = [
+            ("a", Some(T0 + 10), false, false),
+            ("with-cert", Some(T0 + 1), true, false),
+            ("no-proof", None, false, false),
+            ("late", Some(T0 + 20), false, false),
+            ("released", Some(T0 + 2), false, true),
+        ];
+        for (id, found_since, certified, released) in rows {
+            let domain = format!("{id}.example.com");
+            let mut claim = holder_of(id, &domain);
+            claim.dns_ok_since = found_since;
+            claim.release_seal = released.then_some(T0);
+            put_claim(&db, claim).await;
+            if certified {
+                upsert_cert(&db, &cert(&domain, Some(id))).await.unwrap();
+            }
+        }
+        let mut failing = holder_of("failing", "failing.example.com");
+        failing.dns_ok_since = Some(T0 + 3);
+        failing.proof_failed_since = Some(T0 + 4);
+        put_claim(&db, failing).await;
+
+        assert_eq!(oldest_stuck_since(&db).await.unwrap(), Some(T0 + 10));
+    }
+
+    #[tokio::test]
+    async fn the_key_check_is_cleared_once_and_the_next_node_with_a_key_writes_its_own() {
+        let db = db().await;
+        assert!(!clear_key_check(&db, T0).await.unwrap(), "nothing stored");
+        assert!(set_key_check_if_unset(&db, "old", 1, T0).await.unwrap());
+
+        assert!(clear_key_check(&db, T0 + 1).await.unwrap());
+        assert!(!clear_key_check(&db, T0 + 2).await.unwrap());
+
+        assert_eq!(get_manager(&db).await.unwrap().unwrap().key_check, None);
+        assert!(set_key_check_if_unset(&db, "new", 1, T0 + 3).await.unwrap());
+        let stored = get_manager(&db).await.unwrap().unwrap().key_check;
+        assert_eq!(stored.as_deref(), Some("new"));
+    }
+
+    #[tokio::test]
+    async fn the_epoch_is_written_only_while_the_row_still_holds_the_epoch_that_was_read() {
+        let db = db().await;
+        write_installation_status(&db, "ready for two days", T0)
+            .await
+            .unwrap();
+        assert!(!set_epoch(&db, 5, 7, T0).await.unwrap(), "another epoch");
+        assert_eq!(get_manager(&db).await.unwrap().unwrap().epoch, 1);
+        assert!(set_epoch(&db, 1, 7, T0 + 1).await.unwrap());
+        assert!(
+            !set_epoch(&db, 1, 9, T0 + 2).await.unwrap(),
+            "already moved"
+        );
+
+        let row = get_manager(&db).await.unwrap().unwrap();
+        assert_eq!((row.epoch, row.updated_at), (7, T0 + 1));
+        assert_eq!(
+            row.installation_status, None,
+            "the readiness of the old epoch is gone"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_installation_status_is_swapped_only_while_it_is_the_text_that_was_read() {
+        let db = db().await;
+        write_installation_status(&db, "one", T0).await.unwrap();
+
+        assert!(
+            !swap_installation_status(&db, "other", "two", T0 + 1)
+                .await
+                .unwrap()
+        );
+        assert!(
+            swap_installation_status(&db, "one", "two", T0 + 2)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !swap_installation_status(&db, "one", "three", T0 + 3)
+                .await
+                .unwrap()
+        );
+
+        let status = get_manager(&db).await.unwrap().unwrap().installation_status;
+        assert_eq!(status.as_deref(), Some("two"));
+    }
+
+    #[tokio::test]
+    async fn a_certificate_is_deleted_only_while_it_holds_the_ciphertext_that_was_inspected() {
+        let db = db().await;
+        let mut old = cert(HOST, Some("a"));
+        old.private_key = "sealed-old".to_string();
+        upsert_cert(&db, &old).await.unwrap();
+        let mut replacement = old.clone();
+        replacement.private_key = "sealed-new".to_string();
+        upsert_cert(&db, &replacement).await.unwrap();
+
+        let stale = delete_cert_sealed_as(&db, HOST, "sealed-old")
+            .await
+            .unwrap();
+
+        assert!(!stale, "the row was replaced after it was read");
+        assert!(get_cert(&db, HOST).await.unwrap().is_some());
+        assert!(
+            delete_cert_sealed_as(&db, HOST, "sealed-new")
+                .await
+                .unwrap()
+        );
+        assert!(get_cert(&db, HOST).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn an_account_is_deleted_only_while_it_holds_the_ciphertext_that_was_inspected() {
+        let db = db().await;
+        let account = |credentials: &str| accounts::Model {
+            ca_directory: "https://ca.test/dir".to_string(),
+            credentials: credentials.to_string(),
+            created_at: T0,
+        };
+        assert!(insert_account(&db, &account("old")).await.unwrap());
+        assert!(
+            delete_account_sealed_as(&db, "https://ca.test/dir", "old")
+                .await
+                .unwrap()
+        );
+        assert!(insert_account(&db, &account("new")).await.unwrap());
+
+        let stale = delete_account_sealed_as(&db, "https://ca.test/dir", "old").await;
+
+        assert!(
+            !stale.unwrap(),
+            "the account was registered again after it was read"
+        );
+        assert_eq!(list_accounts(&db).await.unwrap().len(), 1);
     }
 }
