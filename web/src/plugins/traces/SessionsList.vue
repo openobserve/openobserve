@@ -26,6 +26,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
     </div>
 
+    <SqlFilterBuilder
+      v-else
+      v-model:query="searchFilter"
+      :fields="filterFields"
+      :fields-loading="filterFieldsLoading"
+      :load-values="loadFilterValues"
+      :free-text="false"
+      appearance="field"
+      class="px-page-edge shrink-0 pt-2"
+      data-test="sessions-list-filter"
+      @submit="refresh()"
+    />
+
     <AiScopeBar
       v-if="!(streamsLoaded && availableStreams.length === 0)"
       :filter-mode="filterMode"
@@ -60,21 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:selected-agent-stream="selectedAgentStream = $event"
       @agent-pick="modeExplicit = true"
       @stream-change="onStreamChange"
-    >
-      <template #trailing>
-        <SqlFilterBuilder
-          v-model:query="searchFilter"
-          :fields="filterFields"
-          :fields-loading="filterFieldsLoading"
-          :load-values="loadFilterValues"
-          :free-text="false"
-          appearance="field"
-          class="grow basis-64"
-          data-test="sessions-list-filter"
-          @submit="refresh()"
-        />
-      </template>
-    </AiScopeBar>
+    />
 
     <!-- Stream mode because these LLM spans carry no agent identity. -->
     <AiNoAgentIdentityBanner v-if="noAgentIdentity" data-test="sessions-list" class="pb-2" />

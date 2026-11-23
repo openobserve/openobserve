@@ -1008,9 +1008,11 @@ describe("SessionsList — filters", () => {
     return wrapper;
   }
 
-  it("uses the shared builder without a separate keyword search box", async () => {
+  it("puts the only filter above the Stream/Agent controls, like Insights", async () => {
     const wrapper = await mountInStreamMode();
-    expect(wrapper.find(FILTER_INPUT).exists()).toBe(true);
+    const filter = wrapper.get(FILTER_INPUT).element;
+    const scope = wrapper.get("[data-test='sessions-list-filter-mode']").element;
+    expect(filter.compareDocumentPosition(scope) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(wrapper.find("[data-test='sessions-list-search-field']").exists()).toBe(false);
   });
 
