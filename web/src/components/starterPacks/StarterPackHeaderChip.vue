@@ -103,7 +103,10 @@ const listSubtitle = computed(() => {
 const primaryLabel = computed(() => {
   const row = selected.value;
   if (row?.setUp) return t("starterPacks.popup.viewPack");
-  if (row?.stopped) return t("starterPacks.progress.finish");
+  if (row?.stopped && row.entry.flow.interruptedBy.value === null) {
+    return t("starterPacks.progress.finish");
+  }
+  if (row?.stopped) return t("starterPacks.popup.viewPack");
   return t("starterPacks.popup.reviewSetUp");
 });
 

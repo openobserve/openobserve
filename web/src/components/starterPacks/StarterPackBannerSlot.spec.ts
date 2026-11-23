@@ -196,6 +196,18 @@ describe("StarterPackBannerSlot", () => {
     expect(useStarterPackPopup("org").open.value).toBe(true);
   });
 
+  it("names who started a stopped setup in the Home banner and offers them no Finish", async () => {
+    fake.flow.interrupted.value = true;
+    fake.flow.interruptedBy = ref("other@example.com");
+    const wrapper = await render();
+    expect(has(wrapper, "first-event-status-pack-interrupted-btn")).toBe(false);
+    const banner = () => wrapper.get('[data-test="first-event-status-pack-interrupted"]').text();
+    expect(banner()).toBe("other@example.com started setting up Kubernetes.");
+    fake.flow.interruptedBy.value = "";
+    await nextTick();
+    expect(banner()).toBe("Someone else started setting up Kubernetes.");
+  });
+
   it("offers nothing when no pack matches", async () => {
     fake.matcher.state.value = "none";
     const wrapper = await render();

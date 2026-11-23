@@ -543,6 +543,13 @@ const note = computed<{ icon?: IconName; spin?: boolean; text: I18nText }>(() =>
 const footerNote = computed<{ icon?: IconName; error?: boolean; text: I18nText } | null>(() => {
   if (step.value === "setup") {
     if (flow.running.value) return { text: t("starterPacks.popup.keepsGoing") };
+    const by = flow.interruptedBy.value;
+    if (by !== null) {
+      const text = by
+        ? t("starterPacks.startedBy", { who: raw(by) })
+        : t("starterPacks.startedBySomeone");
+      return { icon: "person", text };
+    }
     if (flow.installFailed.value) {
       return { icon: "error", error: true, text: t("starterPacks.progress.installError") };
     }
@@ -1138,7 +1145,12 @@ const confirmDone = () => {
           {{ t("starterPacks.stepper.settingUp") }}
         </OButton>
         <OButton
-          v-else-if="(step === 'setup' || step === 'ready') && failedCount && !flow.forbidden.value"
+          v-else-if="
+            (step === 'setup' || step === 'ready') &&
+            failedCount &&
+            !flow.forbidden.value &&
+            flow.interruptedBy.value === null
+          "
           variant="primary"
           size="sm-action"
           class="min-w-35"
@@ -1149,7 +1161,7 @@ const confirmDone = () => {
           {{ t("starterPacks.progress.retry", { count: failedCount }, failedCount) }}
         </OButton>
         <OButton
-          v-else-if="step === 'setup' && !failedCount"
+          v-else-if="step === 'setup' && !failedCount && flow.interruptedBy.value === null"
           variant="primary"
           size="sm-action"
           class="min-w-35"

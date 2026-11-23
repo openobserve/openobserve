@@ -106,6 +106,9 @@ const busyLine = ({ flow }: HomePack): I18nText =>
     ? t("starterPacks.busyBy", { who: raw(flow.busyBy.value) })
     : t("starterPacks.busySomeone");
 
+const startedByLine = (by: string): I18nText =>
+  by ? t("starterPacks.startedBy", { who: raw(by) }) : t("starterPacks.startedBySomeone");
+
 const setUpLabel = (count: number | null): I18nText =>
   count === null
     ? t("starterPacks.drawer.setUp")
@@ -162,6 +165,11 @@ const setUpLabel = (count: number | null): I18nText =>
             <span v-else-if="state.kind === 'ready'" class="truncate">{{
               t("starterPacks.ready.title", { title: item.title })
             }}</span>
+            <span
+              v-else-if="state.kind === 'failed' && item.flow.interruptedBy.value !== null"
+              class="truncate"
+              >{{ startedByLine(item.flow.interruptedBy.value) }}</span
+            >
             <span v-else-if="state.kind === 'failed'" class="truncate">{{
               t("starterPacks.progress.interrupted", {
                 made: item.flow.made.value.length,
@@ -223,7 +231,7 @@ const setUpLabel = (count: number | null): I18nText =>
             </OButton>
           </template>
           <OButton
-            v-else-if="state.kind === 'failed'"
+            v-else-if="state.kind === 'failed' && item.flow.interruptedBy.value === null"
             variant="primary"
             size="sm-action"
             icon-left="refresh"

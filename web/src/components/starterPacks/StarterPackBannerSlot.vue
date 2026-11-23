@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { packById, packTitle } from "@/composables/starterPacks/usePackCatalog";
 import type { HomePackRowItem, HomePackView } from "@/composables/starterPacks/useHomePacks";
 import { usePackGate } from "@/composables/starterPacks/usePackGate";
@@ -86,6 +86,17 @@ const view = computed<HomePackView>(() => {
   if (pending.value) return "loading";
   return "offer";
 });
+const interruptedLine = computed(() => {
+  const by = flow.interruptedBy.value;
+  const title = packTitle(pack);
+  if (by === null) {
+    const counts = { made: flow.made.value.length, total: flow.toCreate.value.length };
+    return t("starterPacks.home.interrupted", { title, ...counts });
+  }
+  return by
+    ? t("starterPacks.home.startedBy", { who: raw(by), title })
+    : t("starterPacks.home.startedBySomeone", { title });
+});
 const row: HomePackRowItem = {
   pack,
   title: packTitle(pack),
@@ -116,14 +127,8 @@ const row: HomePackRowItem = {
     inline-actions
     data-test="first-event-status-pack-interrupted"
   >
-    {{
-      t("starterPacks.home.interrupted", {
-        title: row.title,
-        made: flow.made.value.length,
-        total: flow.toCreate.value.length,
-      })
-    }}
-    <template #actions>
+    {{ interruptedLine }}
+    <template v-if="flow.interruptedBy.value === null" #actions>
       <OButton
         variant="primary"
         size="sm-action"
