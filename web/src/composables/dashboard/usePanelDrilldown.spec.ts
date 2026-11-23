@@ -546,6 +546,33 @@ describe("usePanelDrilldown", () => {
     expect(url.searchParams.get("v")).toBe("88");
   });
 
+  it("a funnel stage standing in for a missing name drills down with the blank, not (null)", async () => {
+    const deps = makeDeps();
+    deps.panelSchema.value.type = "funnel";
+    deps.panelSchema.value.config.drilldown = [
+      {
+        name: "Stage",
+        type: "byUrl",
+        data: { url: "https://example.com/?stage=${series.__name}&value=${series.__value}" },
+      },
+    ];
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    const api = usePanelDrilldown(deps as any);
+    await api.onChartClick({
+      componentType: "series",
+      event: { offsetX: 1, offsetY: 1 },
+      seriesName: "series",
+      name: "(null)",
+      value: 14746,
+      data: { name: "(null)", rawName: null, value: 14746 },
+    });
+    await api.openDrilldown(0);
+    const url = new URL(String(openSpy.mock.calls[0]?.[0]));
+    openSpy.mockRestore();
+    expect(url.searchParams.get("stage")).toBe("");
+    expect(url.searchParams.get("value")).toBe("14746");
+  });
+
   describe("heatmap drilldown", () => {
     const heatmapDeps = (options: any, extras: any = {}) => {
       const deps = makeDeps();
