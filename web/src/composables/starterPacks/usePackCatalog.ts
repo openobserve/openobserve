@@ -94,6 +94,7 @@ const failure = (result: { status: string; message?: string }) =>
 
 // The setup card imports the same dashboard, so both go through its one importer (R22).
 const HOST_METRICS_IMPORT: PackSharedDashboard = {
+  folderId: "default",
   find: async (org) => {
     const result = await findHostMetricsDashboard(org);
     if (result.status === "error") throw failure(result);
