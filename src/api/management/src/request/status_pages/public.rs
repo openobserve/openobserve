@@ -39,6 +39,9 @@ use infra::{
     db::get_orm_client_ro,
     table::{entity, status_pages as table},
 };
+use tokio::sync::{Semaphore, SemaphorePermit};
+
+use crate::request::public_rate_limit::{ShardedCounters, ip_key};
 
 /// The visitor UI: one self-contained page that fetches the snapshot JSON.
 const PAGE_HTML: &str = include_str!("status_page.html");
@@ -57,6 +60,10 @@ const UNLOCK_COOKIE_NAME: &str = "o2_sp_unlock";
 #[cfg(feature = "enterprise")]
 const AUTH_BODY_LIMIT: usize = 4096;
 const AUTH_MAX_ATTEMPTS: u32 = 5;
+/// Per page across all addresses, so many addresses cannot multiply the per-address limit.
+const AUTH_PAGE_MAX_ATTEMPTS: u32 = 50;
+/// Concurrent Argon2 checks per node; each takes a blocking thread and about 19 MiB.
+const AUTH_VERIFY_SLOTS: usize = 4;
 const AUTH_WINDOW: Duration = Duration::from_secs(60);
 const READ_WINDOW: Duration = Duration::from_secs(60);
 /// The limiter key when no `RealIp` was resolved: one bucket still bounds Argon2 CPU per slug
@@ -68,12 +75,14 @@ static CACHE: LazyLock<Vec<Shard>> = LazyLock::new(|| {
         .map(|_| RwLock::new(Default::default()))
         .collect()
 });
-/// Per-IP read-route counters.
-static READ_RPM: LazyLock<Counters> = LazyLock::new(|| RwLock::new(Default::default()));
+/// Per-address read-route counters.
+static READ_RPM: LazyLock<ShardedCounters> = LazyLock::new(Default::default);
 /// Password attempts, keyed by "{ip}|{slug}".
-static AUTH_ATTEMPTS: LazyLock<Counters> = LazyLock::new(|| RwLock::new(Default::default()));
+static AUTH_ATTEMPTS: LazyLock<ShardedCounters> = LazyLock::new(Default::default);
+/// Password attempts per page, keyed by the slug alone.
+static AUTH_PAGE_ATTEMPTS: LazyLock<ShardedCounters> = LazyLock::new(Default::default);
+static VERIFY_SLOTS: Semaphore = Semaphore::const_new(AUTH_VERIFY_SLOTS);
 
-type Counters = RwLock<HashMap<String, (u32, Instant)>>;
 type Shard = RwLock<HashMap<String, CacheEntry>>;
 
 /// What the cache knows about a slug; a password page's payload is never cached (R-7).
@@ -213,10 +222,9 @@ pub async fn auth(
     ip: Option<Extension<RealIp>>,
     Json(body): Json<AuthBody>,
 ) -> Response {
-    // R-5: the per-IP+slug limit is checked before any Argon2 work so hashes can't be driven
-    // unbounded.
+    // R-5: the address's budget is spent before any lookup, the page's before any Argon2 work.
     let ip = client_ip(ip.map(|e| e.0));
-    if !attempt_allowed(&ip, &slug) {
+    if !address_allowed(&ip, &slug) {
         return too_many();
     }
     if !config::get_config().synthetics.enabled {
@@ -229,32 +237,10 @@ pub async fn auth(
         Ok(None) => return unauthorized(),
         Err(()) => return unavailable(),
     };
-    let (Some(hash), true) = (page.password_hash.as_deref(), page.visibility == 2) else {
+    let (Some(hash), 2) = (page.password_hash, page.visibility) else {
         return unauthorized();
     };
-    match openobserve_core::status_pages::verify_password(hash, &body.password) {
-        Ok(true) => {
-            let pwv = openobserve_core::status_pages::pw_version(hash);
-            let Some(cookie) = openobserve_core::status_pages::issue_unlock_cookie(
-                &slug,
-                &pwv,
-                UNLOCK_COOKIE_TTL_SECS,
-            )
-            .await
-            else {
-                return unauthorized();
-            };
-            Response::builder()
-                .status(StatusCode::OK)
-                .header(header::CACHE_CONTROL, "no-store, private")
-                .header(header::SET_COOKIE, unlock_set_cookie(&cookie))
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from("{\"ok\":true}"))
-                .unwrap_or_else(|_| unauthorized())
-        }
-        // The shell already conceded the page exists, so a plain "wrong password" is safe here.
-        _ => unauthorized(),
-    }
+    unlock_response(&VERIFY_SLOTS, &slug, hash, body.password).await
 }
 
 // Badges are scoped to a PUBLISHED page's overall state only — never a raw check/monitor id (Uptime
@@ -741,44 +727,83 @@ fn json_ok(body: &str, noindex: bool) -> Response {
         .unwrap_or_else(|_| not_found())
 }
 
-/// The limiter key: the ingress-resolved `RealIp`, or one shared bucket when that layer isn't
-/// installed.
+/// The limiter key: the ingress-resolved `RealIp` by /64 for IPv6, or one shared bucket when that
+/// layer isn't installed.
 fn client_ip(ip: Option<RealIp>) -> String {
-    ip.map_or_else(|| SHARED_IP.to_owned(), |ip| ip.0.to_string())
+    ip.map_or_else(|| SHARED_IP.to_owned(), |ip| ip_key(ip.0))
 }
 
 /// True if this IP is over its per-minute read budget; 0 rpm disables the limiter.
 fn read_rate_limited(ip: Option<RealIp>) -> bool {
     let rpm = config::get_config().synthetics.status_page_public_rpm;
-    rpm != 0 && over_budget(&READ_RPM, client_ip(ip), READ_WINDOW, rpm)
+    rpm != 0 && READ_RPM.over_budget(&client_ip(ip), READ_WINDOW, rpm)
 }
 
-fn attempt_allowed(ip: &str, slug: &str) -> bool {
-    !over_budget(
-        &AUTH_ATTEMPTS,
-        format!("{ip}|{slug}"),
-        AUTH_WINDOW,
-        AUTH_MAX_ATTEMPTS,
-    )
+/// Spends one attempt of this address's budget for the page.
+fn address_allowed(ip: &str, slug: &str) -> bool {
+    !AUTH_ATTEMPTS.over_budget(&format!("{ip}|{slug}"), AUTH_WINDOW, AUTH_MAX_ATTEMPTS)
 }
 
-/// Counts one hit for `key` and reports whether the window's budget is exceeded; fails open on a
-/// poisoned lock.
-fn over_budget(counters: &Counters, key: String, window: Duration, max: u32) -> bool {
-    let Ok(mut guard) = counters.write() else {
-        return false;
+/// Spends one attempt of the page's budget across all addresses; only a confirmed password page
+/// is charged, so a slug spray cannot fill its table.
+fn page_allowed(slug: &str) -> bool {
+    !AUTH_PAGE_ATTEMPTS.over_budget(slug, AUTH_WINDOW, AUTH_PAGE_MAX_ATTEMPTS)
+}
+
+/// The unlock cookie for a right password. The page budget and then the slot are spent only now,
+/// with a password page confirmed; a wrong password or an unsignable cookie is the same 401.
+async fn unlock_response(
+    slots: &'static Semaphore,
+    slug: &str,
+    hash: String,
+    password: String,
+) -> Response {
+    if !page_allowed(slug) {
+        return too_many();
+    }
+    let Ok(slot) = slots.try_acquire() else {
+        return busy();
     };
-    let now = Instant::now();
-    // Opportunistic cleanup keeps the map bounded.
-    if guard.len() > 8192 {
-        guard.retain(|_, (_, at)| now.duration_since(*at) < window);
-    }
-    let e = guard.entry(key).or_insert((0, now));
-    if now.duration_since(e.1) >= window {
-        *e = (0, now);
-    }
-    e.0 = e.0.saturating_add(1);
-    e.0 > max
+    let Some(pwv) = verify_blocking(slot, hash, password).await else {
+        // The shell already conceded the page exists, so a plain "wrong password" is safe here.
+        return unauthorized();
+    };
+    let Some(cookie) =
+        openobserve_core::status_pages::issue_unlock_cookie(slug, &pwv, UNLOCK_COOKIE_TTL_SECS)
+            .await
+    else {
+        return unauthorized();
+    };
+    unlocked_response(&cookie)
+}
+
+fn unlocked_response(cookie: &str) -> Response {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CACHE_CONTROL, "no-store, private")
+        .header(header::SET_COOKIE, unlock_set_cookie(cookie))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from("{\"ok\":true}"))
+        .unwrap_or_else(|_| unauthorized())
+}
+
+/// Argon2 on the blocking pool; the cookie version of a right password. The slot moves into the
+/// task, so it frees when the hash is done, not when the request is dropped.
+async fn verify_blocking(
+    slot: SemaphorePermit<'static>,
+    hash: String,
+    password: String,
+) -> Option<String> {
+    let checked = tokio::task::spawn_blocking(move || {
+        let _slot = slot;
+        let verified = openobserve_core::status_pages::verify_password(&hash, &password);
+        matches!(verified, Ok(true)).then(|| openobserve_core::status_pages::pw_version(&hash))
+    })
+    .await;
+    checked.unwrap_or_else(|e| {
+        log::error!("[status_pages] the password check task failed: {e}");
+        None
+    })
 }
 
 fn xml_escape(s: &str) -> String {
@@ -830,6 +855,16 @@ fn too_many() -> Response {
         .header(header::CACHE_CONTROL, "no-store")
         .header(header::RETRY_AFTER, "60")
         .body(Body::from("Too many attempts. Try again in a minute."))
+        .unwrap_or_default()
+}
+
+/// Every verify slot is taken; a hash ends within a second, so the retry is short.
+fn busy() -> Response {
+    Response::builder()
+        .status(StatusCode::TOO_MANY_REQUESTS)
+        .header(header::CACHE_CONTROL, "no-store")
+        .header(header::RETRY_AFTER, "1")
+        .body(Body::from("Too many attempts. Try again in a moment."))
         .unwrap_or_default()
 }
 
@@ -915,6 +950,34 @@ fn domain_not_connected() -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // The PHC hash of "open sesame" at argon2's default cost.
+    const SESAME_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$L9rKncp0tg7B1aX0NS8EXg$TmmEKmF0oLtQ2rKnVMk5qDM1zyPSsf/SkWVA/Zj6kvI";
+
+    // A directory this test created itself (`create_dir` fails on an existing path), removed on
+    // drop, also when an assertion fails.
+    struct OwnDir(std::path::PathBuf);
+
+    impl OwnDir {
+        fn create(tag: &str) -> Self {
+            let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH);
+            let path = std::env::temp_dir().join(format!(
+                "{tag}-{}-{}",
+                std::process::id(),
+                now.unwrap().as_nanos()
+            ));
+            std::fs::create_dir(&path).unwrap();
+            Self(path)
+        }
+    }
+
+    impl Drop for OwnDir {
+        fn drop(&mut self) {
+            if let Err(e) = std::fs::remove_dir_all(&self.0) {
+                eprintln!("cannot remove {}: {e}", self.0.display());
+            }
+        }
+    }
 
     fn cache_control(resp: &Response) -> Option<&str> {
         resp.headers()
@@ -1224,12 +1287,223 @@ mod tests {
 
     #[test]
     fn over_budget_allows_exactly_max_hits_per_window() {
-        let counters: Counters = RwLock::new(HashMap::new());
+        let counters = ShardedCounters::default();
         for _ in 0..3 {
-            assert!(!over_budget(&counters, "k".into(), AUTH_WINDOW, 3));
+            assert!(!counters.over_budget("k", AUTH_WINDOW, 3));
         }
-        assert!(over_budget(&counters, "k".into(), AUTH_WINDOW, 3));
-        assert!(!over_budget(&counters, "other".into(), AUTH_WINDOW, 3));
+        assert!(counters.over_budget("k", AUTH_WINDOW, 3));
+        assert!(!counters.over_budget("other", AUTH_WINDOW, 3));
+    }
+
+    fn real_ip(addr: &str) -> Option<RealIp> {
+        Some(RealIp(addr.parse().unwrap()))
+    }
+
+    async fn call_auth(ip: &str, slug: &str, password: &str) -> Response {
+        let body = AuthBody {
+            password: password.to_owned(),
+        };
+        auth(Path(slug.into()), real_ip(ip).map(Extension), Json(body)).await
+    }
+
+    #[test]
+    fn addresses_of_one_slash_64_share_the_read_budget() {
+        let (a, b) = (real_ip("2001:db8:a1::1"), real_ip("2001:db8:a1:0:ffff::2"));
+        assert_eq!(client_ip(a), client_ip(b));
+        assert!(!READ_RPM.over_budget(&client_ip(a), READ_WINDOW, 2));
+        assert!(!READ_RPM.over_budget(&client_ip(b), READ_WINDOW, 2));
+        assert!(READ_RPM.over_budget(&client_ip(a), READ_WINDOW, 2));
+        let other = real_ip("2001:db8:a2::1");
+        assert!(!READ_RPM.over_budget(&client_ip(other), READ_WINDOW, 2));
+    }
+
+    #[test]
+    fn addresses_of_one_slash_64_share_the_password_budget() {
+        let slug = "t-v6-password";
+        let a = client_ip(real_ip("2001:db8:b1::1"));
+        let b = client_ip(real_ip("2001:db8:b1:0:1:2:3:4"));
+        for i in 0..AUTH_MAX_ATTEMPTS {
+            let ip = if i % 2 == 0 { &a } else { &b };
+            assert!(address_allowed(ip, slug), "attempt {i}");
+        }
+        assert!(!address_allowed(&a, slug));
+        assert!(!address_allowed(&b, slug));
+        assert!(address_allowed(&client_ip(real_ip("2001:db8:b2::1")), slug));
+    }
+
+    // Every address stays inside its own limit, so the page's budget is what refuses, and it
+    // refuses ahead of the slot (the gate here has none).
+    #[tokio::test]
+    async fn the_page_budget_trips_across_addresses_each_within_its_own() {
+        static NO_SLOTS: Semaphore = Semaphore::const_new(0);
+        let slug = "t-page-budget";
+        for host in 0..AUTH_PAGE_MAX_ATTEMPTS.div_ceil(AUTH_MAX_ATTEMPTS) {
+            for _ in 0..AUTH_MAX_ATTEMPTS {
+                assert!(address_allowed(&format!("198.51.100.{host}"), slug));
+                assert!(page_allowed(slug));
+            }
+        }
+        assert!(address_allowed("198.51.100.200", slug));
+        let resp = unlock_response(&NO_SLOTS, slug, SESAME_HASH.into(), "open sesame".into()).await;
+        assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(resp.headers(), too_many().headers());
+        assert_eq!(
+            body_text(resp).await,
+            body_text(too_many()).await,
+            "the existing too_many() answer"
+        );
+        assert!(page_allowed("t-page-budget-other"));
+    }
+
+    // The slug is unprimed and unknown: the sixth attempt is the 429 it always was, before any
+    // lookup, and it leaves the page's budget whole.
+    #[tokio::test]
+    async fn the_address_budget_refuses_any_slug_before_any_lookup() {
+        let (ip, slug) = ("198.51.100.222", "t-address-budget");
+        for _ in 0..AUTH_MAX_ATTEMPTS {
+            assert!(address_allowed(ip, slug));
+        }
+        let resp = call_auth(ip, slug, "guess").await;
+        assert_eq!(resp.headers(), too_many().headers());
+        for _ in 0..AUTH_PAGE_MAX_ATTEMPTS {
+            assert!(page_allowed(slug));
+        }
+    }
+
+    // The right password, so only the full gate keeps it from verification.
+    #[tokio::test]
+    async fn a_full_verify_gate_answers_429_to_a_request_that_would_verify() {
+        static NO_SLOTS: Semaphore = Semaphore::const_new(0);
+        let resp = unlock_response(
+            &NO_SLOTS,
+            "t-busy",
+            SESAME_HASH.into(),
+            "open sesame".into(),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(resp.headers().get(header::RETRY_AFTER).unwrap(), "1");
+        assert!(resp.headers().get(header::SET_COOKIE).is_none());
+    }
+
+    #[tokio::test]
+    async fn a_wrong_password_is_the_uniform_401_through_the_blocking_path() {
+        static SLOTS: Semaphore = Semaphore::const_new(1);
+        let resp =
+            unlock_response(&SLOTS, "t-wrong", SESAME_HASH.into(), "open sesamE".into()).await;
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        assert!(resp.headers().get(header::SET_COOKIE).is_none());
+        assert_eq!(body_text(resp).await, "Wrong password.");
+        assert_eq!(SLOTS.available_permits(), 1, "the slot is released");
+    }
+
+    #[tokio::test]
+    async fn a_correct_password_passes_the_blocking_check_with_its_cookie_version() {
+        static SLOTS: Semaphore = Semaphore::const_new(1);
+        let check = |password: &str| {
+            verify_blocking(
+                SLOTS.try_acquire().unwrap(),
+                SESAME_HASH.into(),
+                password.into(),
+            )
+        };
+        let pwv = openobserve_core::status_pages::pw_version(SESAME_HASH);
+        assert_eq!(check("open sesame").await, Some(pwv));
+        assert_eq!(check("open sesamE").await, None);
+        assert_eq!(SLOTS.available_permits(), 1, "the slot is released");
+    }
+
+    #[tokio::test]
+    async fn an_unlocked_answer_sets_the_host_only_cookie() {
+        let resp = unlocked_response("tok");
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(cache_control(&resp), Some("no-store, private"));
+        assert_eq!(resp.headers()[header::SET_COOKIE], unlock_set_cookie("tok"));
+        assert_eq!(body_text(resp).await, "{\"ok\":true}");
+    }
+
+    // The signing key is process-wide state, so the unlock runs in a child process whose config
+    // file is its own, which keeps a developer `.env` from replacing the key.
+    #[test]
+    fn a_correct_password_unlocks_with_a_cookie_the_signer_verifies() {
+        const KEY: &str = "t-status-page-unlock-key";
+        let test = "request::status_pages::public::tests::a_correct_password_unlocks_with_a_cookie_the_signer_verifies";
+        if std::env::var_os("O2_SP_UNLOCK_CHILD").is_none() {
+            let out = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", test, "--nocapture"])
+                .env("O2_SP_UNLOCK_CHILD", "1")
+                .env(
+                    "ZO_ALERT_CHART_SIGNING_KEY",
+                    "a-key-the-config-file-overrides",
+                )
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            assert!(
+                out.status.success() && stdout.contains("1 passed"),
+                "the child failed:\n{stdout}\n{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            return;
+        }
+        let dir = OwnDir::create("o2-sp-unlock");
+        let env_file = dir.0.join("test.env");
+        std::fs::write(&env_file, format!("ZO_ALERT_CHART_SIGNING_KEY=\"{KEY}\"\n")).unwrap();
+        config::config_path_manager::set_config_file_path(env_file).unwrap();
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                static SLOTS: Semaphore = Semaphore::const_new(1);
+                assert_eq!(config::get_config().auth.alert_chart_signing_key, KEY);
+                let (slug, password) = ("t-right", "open sesame");
+                let resp = unlock_response(&SLOTS, slug, SESAME_HASH.into(), password.into()).await;
+                assert_eq!(resp.status(), StatusCode::OK);
+                let set = resp.headers()[header::SET_COOKIE].to_str().unwrap();
+                let cookie = set.split(';').next().unwrap();
+                let cookie = cookie.strip_prefix("o2_sp_unlock=").unwrap();
+                let pwv = openobserve_core::status_pages::pw_version(SESAME_HASH);
+                let verify = openobserve_core::status_pages::verify_unlock_cookie;
+                assert!(verify(cookie, slug, &pwv).await, "the issued cookie");
+                assert!(!verify(cookie, "t-other", &pwv).await, "bound to its slug");
+            });
+    }
+
+    // One blocking thread, parked: the hash job is queued behind it, owned by the pool, while the
+    // request that submitted it is dropped.
+    #[test]
+    fn the_slot_outlives_a_dropped_request_until_the_hash_is_done() {
+        static SLOTS: Semaphore = Semaphore::const_new(1);
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .max_blocking_threads(1)
+            .enable_time()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let (release, parked) = std::sync::mpsc::channel::<()>();
+            let (entered_tx, entered) = tokio::sync::oneshot::channel();
+            let _gate = tokio::task::spawn_blocking(move || {
+                entered_tx.send(()).unwrap();
+                parked.recv().unwrap();
+            });
+            entered.await.unwrap();
+            let slot = SLOTS.try_acquire().unwrap();
+            let mut request = Box::pin(verify_blocking(slot, SESAME_HASH.into(), "nope".into()));
+            assert!(
+                futures::poll!(request.as_mut()).is_pending(),
+                "not submitted"
+            );
+            drop(request);
+            assert_eq!(
+                SLOTS.available_permits(),
+                0,
+                "freed with the dropped request"
+            );
+            release.send(()).unwrap();
+            let freed = tokio::time::timeout(Duration::from_secs(30), SLOTS.acquire()).await;
+            assert!(freed.is_ok(), "the slot never came back");
+        });
     }
 
     // A custom domain gets the same Set-Cookie as the slug host, so it must carry no Domain= or the

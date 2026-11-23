@@ -15,11 +15,7 @@
 
 //! Per-node limiters of the workflow hook routes; `Counters` lives in this crate, not in core.
 
-use std::{
-    net::{IpAddr, Ipv6Addr},
-    sync::LazyLock,
-    time::Duration,
-};
+use std::{sync::LazyLock, time::Duration};
 
 use tokio::sync::{Semaphore, SemaphorePermit};
 
@@ -56,20 +52,6 @@ impl HookLimiters {
     }
 }
 
-/// IPv6 callers own a whole /64, so one host cannot spread over 2^64 keys.
-pub fn ip_key(ip: IpAddr) -> String {
-    match ip {
-        IpAddr::V4(v4) => v4.to_string(),
-        IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
-            Some(v4) => v4.to_string(),
-            None => {
-                let s = v6.segments();
-                format!("{}/64", Ipv6Addr::new(s[0], s[1], s[2], s[3], 0, 0, 0, 0))
-            }
-        },
-    }
-}
-
 /// The trigger's own budget never exceeds the org's.
 pub fn trigger_budget(rate_limit_per_minute: i32, org_rpm: u32) -> u32 {
     u32::try_from(rate_limit_per_minute)
@@ -88,33 +70,7 @@ pub fn enter(gate: &Semaphore) -> Option<SemaphorePermit<'_>> {
 
 #[cfg(test)]
 mod tests {
-    use std::net::Ipv4Addr;
-
     use super::*;
-
-    #[test]
-    fn ipv6_addresses_share_a_slash_64_key() {
-        let a: IpAddr = "2001:db8:1:2:aaaa::1".parse().unwrap();
-        let b: IpAddr = "2001:db8:1:2:bbbb:cccc:dddd:eeee".parse().unwrap();
-        let other: IpAddr = "2001:db8:1:3::1".parse().unwrap();
-        assert_eq!(ip_key(a), ip_key(b));
-        assert_ne!(ip_key(a), ip_key(other));
-        assert_eq!(ip_key(a), "2001:db8:1:2::/64");
-    }
-
-    #[test]
-    fn ipv4_addresses_are_keyed_per_host() {
-        let a = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 7));
-        let b = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 8));
-        assert_ne!(ip_key(a), ip_key(b));
-        assert_eq!(ip_key(a), "203.0.113.7");
-        let mapped = IpAddr::V6(Ipv4Addr::new(203, 0, 113, 7).to_ipv6_mapped());
-        assert_eq!(
-            ip_key(mapped),
-            "203.0.113.7",
-            "a v4-mapped address keys as v4"
-        );
-    }
 
     #[test]
     fn the_trigger_budget_is_capped_by_the_org() {
