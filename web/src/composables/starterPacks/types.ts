@@ -26,6 +26,8 @@ export type PackItemStatus = "pending" | "created" | "existing" | "failed" | "sk
 
 export type PackInstallStatus = "installing" | "complete" | "incomplete" | "removed";
 
+export type PackEmailFailure = "email" | "forbidden";
+
 export type PackKeptReason = "changed" | "not_empty" | "delete_failed" | "unrecorded";
 
 export interface PackDashboard {
@@ -204,6 +206,8 @@ export interface PackInstallRecord {
   /** The setup's alert choice, so Retry after a reload creates the rest the same way. */
   enableAlerts?: boolean;
   destination?: string;
+  /** Why Email me could not be set up, so the note survives Retry and reopen. */
+  emailFailure?: PackEmailFailure;
 }
 
 export interface PackKeptItem {
@@ -285,6 +289,7 @@ export interface PackInstallOptions {
   enableAlerts?: boolean;
   /** Alert destination every created alert routes to, on or off. */
   destination?: string;
+  emailFailure?: PackEmailFailure;
   repairs?: PackRepair[];
   bindings?: PackBinding[];
   flavours?: Record<string, string>;
