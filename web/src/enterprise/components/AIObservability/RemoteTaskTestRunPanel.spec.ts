@@ -39,7 +39,6 @@ function row(overrides: Record<string, unknown> = {}) {
     status: "ok",
     parsedOutput: "there",
     rawRequest: "{}",
-    rawResponse: "{}",
     httpStatus: 200,
     latencyMs: 120,
     attempts: 1,

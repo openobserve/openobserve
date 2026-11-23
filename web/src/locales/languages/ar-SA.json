@@ -11371,9 +11371,6 @@
     "testErrorClientError": "خطأ في العميل (4xx). يرجى التحقق من بيانات الاعتماد والإعدادات الخاصة بك.",
     "testErrorServerError": "خطأ في الخادم (5xx). خدمة الوجهة تواجه مشاكل.",
     "viewDetails": "عرض التفاصيل",
-    "error": "خطأ",
-    "httpStatus": "حالة HTTP",
-    "responseBody": "جسم الاستجابة",
     "retry": "إعادة المحاولة",
     "suggestCheckUrl": "يرجى التأكد من صحة رابط webhook وإمكانية الوصول إليه.",
     "suggestCheckFirewall": "تحقق من إعدادات جدار الحماية وتأكد من أن خدمة الوجهة متاحة.",
@@ -12800,7 +12797,6 @@
       "notFoundDescription": "هذا التنبيه لم يعد موجودا، أو لم يعد بإمكانك الوصول إليه. قد يكون حذف."
     },
     "timeLabel": "الوقت",
-    "unknownHttpStatus": "غير معروف",
     "previewEvaluation": {
       "realTimeReason": "عندما تتطابق الظروف",
       "matchingGroup": "مجموعة المطابقة",
@@ -14089,7 +14085,6 @@
       "hideWebhook": "إخفاء عنوان webhook الخاص بـ Slack",
       "slackAppFallback": "تطبيق Slack",
       "previewDisclaimer": "يوفّر Slack أيقونة التطبيق الفعلية وقناة الوجهة بعد التثبيت.",
-      "successResponseBody": "استجابة Slack",
       "callbackTitle": "جارٍ ربط Slack",
       "callbackWorking": "جارٍ الرجوع إلى {product}…",
       "callbackError": "لا يمكن إكمال ربط Slack هذا. أغلق هذه النافذة ثم أعد المحاولة.",
@@ -18555,7 +18550,6 @@
         "latency": "زمن الاستجابة",
         "output": "المخرجات المستخرجة",
         "rawRequest": "تم إرسال الطلب",
-        "rawResponse": "الرد الموصول",
         "idle": "الطلب والرد يظهران هنا بعد إجراء اختبار.",
         "disabledHint": "املأ الاسم ونقطة النهاية أولا.",
         "failure": {

@@ -11371,9 +11371,6 @@
     "testErrorClientError": "Błąd klienta (4xx). Sprawdź swoje dane uwierzytelniające i konfigurację.",
     "testErrorServerError": "Błąd serwera (5xx). Usługa miejsca docelowego napotyka problemy.",
     "viewDetails": "Wyświetl szczegóły",
-    "error": "Błąd",
-    "httpStatus": "Status HTTP",
-    "responseBody": "Treść odpowiedzi",
     "retry": "Ponów",
     "suggestCheckUrl": "Sprawdź, czy URL webhooka jest poprawny i osiągalny.",
     "suggestCheckFirewall": "Sprawdź ustawienia zapory sieciowej i upewnij się, że usługa miejsca docelowego jest dostępna.",
@@ -12800,7 +12797,6 @@
       "notFoundDescription": "Ten alert już nie istnieje lub nie masz do niego dostępu. Mógł zostać usunięty."
     },
     "timeLabel": "Czas",
-    "unknownHttpStatus": "Nieznany",
     "previewEvaluation": {
       "realTimeReason": "Gdy warunki są spełnione",
       "matchingGroup": "pasująca grupa",
@@ -14089,7 +14085,6 @@
       "hideWebhook": "Ukryj adres URL webhooka Slacka",
       "slackAppFallback": "Aplikacja Slack",
       "previewDisclaimer": "Slack udostępnia rzeczywistą ikonę aplikacji i kanał docelowy po instalacji.",
-      "successResponseBody": "Odpowiedź Slacka",
       "callbackTitle": "Łączenie ze Slackiem",
       "callbackWorking": "Powrót do {product}…",
       "callbackError": "To połączenie ze Slackiem nie może zostać ukończone. Zamknij to okno i spróbuj ponownie.",
@@ -18555,7 +18550,6 @@
         "latency": "Opóźnienie",
         "output": "Wyodrębnione dane wyjściowe",
         "rawRequest": "Wysłane żądanie",
-        "rawResponse": "Otrzymana odpowiedź",
         "idle": "Żądanie i odpowiedź pojawią się tutaj po uruchomieniu testu.",
         "disabledHint": "Najpierw podaj nazwę i punkt końcowy.",
         "failure": {

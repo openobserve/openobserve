@@ -868,6 +868,7 @@ pub async fn test_workflow(
             from_node,
             WorkflowRunOptions {
                 suppress_destinations,
+                status_only_http_errors: true,
                 ..Default::default()
             },
         )
