@@ -415,6 +415,16 @@ describe("useStarterPackFlow", () => {
     expect(flow.nameOf("lib/cpu")).toBe("Host high CPU usage");
   });
 
+  it("names a Use all copy by its alert and stream, before and after the preview", async () => {
+    const pack = { ...PACK, alerts: ["lib/cpu"] } as unknown as StarterPack;
+    const manifest = { alerts: [{ id: "lib/cpu", title: "High CPU" }] };
+    const flow = setup({ alertLibrary: { manifest } }, pack);
+    expect(flow.nameOf("lib/cpu@edge")).toBe("High CPU · edge");
+    fake.previewPack.mockResolvedValueOnce({ items: [], names: {}, notIncluded: [] });
+    await flow.loadPreview();
+    expect(flow.nameOf("lib/cpu@edge")).toBe("High CPU · edge");
+  });
+
   const refused = Object.assign(new Error("http"), { response: { status: 403 } });
 
   it("calls a refused preview forbidden, not a load error to retry", async () => {

@@ -53,6 +53,8 @@ import { getUUID } from "@/utils/uuid";
 import {
   StarterPackBusyError,
   StarterPackPermissionError,
+  copyItemId,
+  copyName,
   type PackFolderType,
   type PackDashboard,
   type PackInstallOptions,
@@ -154,8 +156,6 @@ const folderIdOf = (items: PackRecordItem[], type: PackFolderType): string | und
   items.find((item) => item.kind === "folder" && item.itemId === type)?.id;
 
 const NO_ADAPTATION: PackAdaptation = { repairs: [], bindings: [] };
-
-const copyItemId = (copyOf: string, stream: string) => `${copyOf}@${stream}`;
 
 const flavourAlert = (pack: StarterPack, flavourId: string | undefined, alertId: string) =>
   pack.flavours?.find(({ id }) => id === flavourId)?.alerts[alertId];
@@ -638,7 +638,7 @@ export function useStarterPacks(org: string) {
     }
     const copies = alertCopies(alerts, repairs);
     for (const { copyOf, stream } of copies) {
-      names[copyItemId(copyOf, stream)] = `${names[copyOf]} (${stream})`;
+      names[copyItemId(copyOf, stream)] = copyName(names[copyOf], stream);
     }
 
     const panels = { kept: 0, dropped: 0 };

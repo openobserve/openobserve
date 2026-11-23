@@ -232,6 +232,16 @@ export interface PackNotIncludedItem {
 export const leftOutIds = (preview: Pick<PackPreview, "notIncluded">): string[] =>
   preview.notIncluded.filter(({ reason }) => reason !== "already_have").map(({ itemId }) => itemId);
 
+export const copyItemId = (copyOf: string, stream: string) => `${copyOf}@${stream}`;
+
+/** A Use all copy's alert id and stream, or null for any other item id. */
+export const copyParts = (itemId: string): { copyOf: string; stream: string } | null => {
+  const at = itemId.indexOf("@");
+  return at > 0 ? { copyOf: itemId.slice(0, at), stream: itemId.slice(at + 1) } : null;
+};
+
+export const copyName = (base: string, stream: string) => `${base} · ${stream}`;
+
 export interface PackCandidate {
   stream: string;
   matched: number;
