@@ -276,7 +276,7 @@ describe("DbmSectionTabs", () => {
         props: { databaseCount: 2, queryCount: 34, activityCount: 5791 },
         global: { plugins: [i18n] },
       });
-      expect(wrapper.text()).toContain("5791");
+      expect(wrapper.text()).toContain("5.79k");
     });
 
     // The samples badge is the finished-call population, not the capped
@@ -286,7 +286,7 @@ describe("DbmSectionTabs", () => {
         props: { databaseCount: 2, queryCount: 34, sampleCallsCount: 12483 },
         global: { plugins: [i18n] },
       });
-      expect(wrapper.text()).toContain("12483");
+      expect(wrapper.text()).toContain("12.5k");
     });
   });
 
@@ -324,7 +324,7 @@ describe("DbmSectionTabs", () => {
     /** STATE 1 — the trace rollup (`/badges → databases[].calls`). */
     it("marks nothing on the badge when the trace rollup counted it", () => {
       const wrapper = mountWith({ count: 141984, complete: true, vantage: "client" });
-      expect(wrapper.text()).toContain("141984");
+      expect(wrapper.text()).toContain("142k");
       expect(wrapper.text()).not.toMatch(/client-observed/i);
       expect(vantageOf(wrapper).exists()).toBe(false);
       expect(wrapper.find("[data-test='dbm-app-source-marker']").exists()).toBe(false);

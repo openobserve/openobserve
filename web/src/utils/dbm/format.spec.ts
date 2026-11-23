@@ -334,7 +334,7 @@ describe("badgeCount — a tab badge may not show a cap as a total", () => {
   it("marks a floor at any cap, not just the default 100", () => {
     // Pins the rule rather than one fixture: a hard-coded `count === 100` check
     // would pass the case above and fail here.
-    expect(badgeCount({ count: 1000, complete: false })).toBe("1000+");
+    expect(badgeCount({ count: 1000, complete: false })).toBe("1k+");
     expect(badgeCount({ count: 7, complete: false })).toBe("7+");
   });
 

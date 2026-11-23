@@ -331,8 +331,8 @@ export const claimedCount = (value: DbmCountClaim | number | null | undefined): 
  */
 export const badgeCount = (value: DbmCountClaim | number | null | undefined): string | null => {
   if (value == null) return null;
-  if (typeof value === "number") return String(value);
-  return value.complete ? String(value.count) : `${value.count}+`;
+  if (typeof value === "number") return formatCompact(value);
+  return value.complete ? formatCompact(value.count) : `${formatCompact(value.count)}+`;
 };
 
 /**
