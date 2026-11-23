@@ -1,6 +1,11 @@
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
-const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../../playwright-tests/utils/cloud-auth.js');
+
+// Root reads search-time protected streams unredacted, so self-hosted runs verify as this user.
+const READER_EMAIL = 'sdr_e2e_reader@example.com';
+const READER_PASSWORD = 'SdrE2eReaderPass#123';
+let readerHeaders = null;
 
 /**
  * SDR (Sensitive Data Redaction) verification.
@@ -49,6 +54,39 @@ export class SDRVerificationPage {
   }
 
   /**
+   * Headers of a non-root admin without the `logs_unredacted` grant, created once per worker.
+   * A cloud run already searches as a regular user, so it keeps its own credentials.
+   */
+  async readerHeaders() {
+    if (isCloudEnvironment()) {
+      return getAuthHeaders();
+    }
+    if (readerHeaders) {
+      return readerHeaders;
+    }
+    const baseUrl = process.env['ZO_BASE_URL'];
+    const orgName = getOrgIdentifier();
+    const response = await this.page.request.post(`${baseUrl}/api/${orgName}/users`, {
+      headers: getAuthHeaders(),
+      data: {
+        email: READER_EMAIL,
+        password: READER_PASSWORD,
+        first_name: 'sdr',
+        last_name: 'reader',
+        role: 'admin',
+      },
+    });
+    if (!response.ok()) {
+      const body = await response.text().catch(() => '');
+      // Another worker or an earlier run may have created it; the search below proves the login.
+      testLogger.info(`SDR reader create returned HTTP ${response.status()} — ${body.slice(0, 200)}`);
+    }
+    const token = Buffer.from(`${READER_EMAIL}:${READER_PASSWORD}`).toString('base64');
+    readerHeaders = { Authorization: `Basic ${token}`, 'Content-Type': 'application/json' };
+    return readerHeaders;
+  }
+
+  /**
    * Poll the Search API for records tagged with `marker` until at least `minCount`
    * are searchable. Records are returned newest-first. The poll only waits out async
    * ingestion indexing for THIS batch — once `minCount` records appear, any SDR
@@ -62,7 +100,7 @@ export class SDRVerificationPage {
   async fetchRecordsByMarker(streamName, marker, minCount = 1, streamType = 'logs') {
     expect(marker, 'SDR verification requires an ingest marker — pass the value returned by ingestMultipleFields/ingestSingleLog').toBeTruthy();
 
-    const headers = getAuthHeaders();
+    const headers = await this.readerHeaders();
     const baseUrl = process.env['ZO_BASE_URL'];
     const orgName = getOrgIdentifier();
     const sql = `SELECT * FROM "${streamName}" WHERE sdr_test_id = '${marker}' ORDER BY _timestamp DESC`;

@@ -186,6 +186,10 @@ pub async fn search(
         }
     };
     request.set_raw_streams(raw_streams);
+    partition::aggregate::check_streaming_owner(
+        request.streaming_id.as_deref(),
+        user_id.as_deref(),
+    )?;
     // Before the query is planned again in spawned tasks (cluster::http).
     request.mark_protected_reader();
     let meta = Sql::new_from_req(&request, &query).await?;
@@ -663,6 +667,9 @@ pub async fn search_partition(
 
     let (streaming_aggs, streaming_id, cache_strategy) =
         prepare_streaming_aggregate(trace_id, req, &ctx, &raw_streams, use_cache).await?;
+    if let Some(id) = streaming_id.as_deref() {
+        streaming_aggs_exec::registry::set_owner(id, user_id.map(str::to_string));
+    }
     resp.streaming_output = streaming_aggs;
     resp.streaming_aggs = streaming_aggs;
     resp.streaming_id = streaming_id;

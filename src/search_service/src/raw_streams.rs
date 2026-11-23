@@ -142,6 +142,35 @@ pub async fn resolve(
     search::RawStreams::default()
 }
 
+/// Whether `user_id` may read every protected stream `sql` reads unredacted. Stored results such
+/// as a search job's may hold raw values; protection that cannot be determined denies.
+#[cfg(all(feature = "enterprise", feature = "vectorscan"))]
+pub async fn may_read_unredacted(
+    org_id: &str,
+    stream_type: StreamType,
+    sql: &str,
+    user_id: &str,
+) -> bool {
+    let Some(protected) = protected_streams_checked(org_id, stream_type, sql) else {
+        return false;
+    };
+    if protected.is_empty() {
+        return true;
+    }
+    let access = OpenFgaAccess::load(org_id, user_id).await;
+    covers(&raw_for(&protected, &access).await, &protected)
+}
+
+#[cfg(not(all(feature = "enterprise", feature = "vectorscan")))]
+pub async fn may_read_unredacted(
+    _org_id: &str,
+    _stream_type: StreamType,
+    _sql: &str,
+    _user_id: &str,
+) -> bool {
+    true
+}
+
 /// Streams `sql` reads that carry search-time patterns, including ones whose patterns fail
 /// to build; none when the pattern manager is not ready, which redacts everything.
 #[cfg(all(feature = "enterprise", feature = "vectorscan"))]
@@ -150,21 +179,28 @@ fn protected_streams(
     stream_type: StreamType,
     sql: &str,
 ) -> Vec<(StreamType, String)> {
+    protected_streams_checked(org_id, stream_type, sql).unwrap_or_default()
+}
+
+/// [`protected_streams`], but `None` when the pattern manager is not ready or `sql` does not parse.
+#[cfg(all(feature = "enterprise", feature = "vectorscan"))]
+fn protected_streams_checked(
+    org_id: &str,
+    stream_type: StreamType,
+    sql: &str,
+) -> Option<Vec<(StreamType, String)>> {
     use config::meta::sql::{TableReferenceExt, resolve_stream_names_with_type};
 
-    let Some(manager) = o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER.get() else {
-        return Vec::new();
-    };
-    let Ok(streams) = resolve_stream_names_with_type(sql) else {
-        return Vec::new();
-    };
-    streams
+    let manager = o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER.get()?;
+    let streams = resolve_stream_names_with_type(sql).ok()?;
+    let protected = streams
         .iter()
         .map(|stream| (stream.get_stream_type(stream_type), stream.stream_name()))
         .filter(|(stype, name)| {
             !matches!(manager.search_protection(org_id, *stype, name), Ok(None))
         })
-        .collect()
+        .collect();
+    Some(protected)
 }
 
 /// Root reads every protected stream raw; anyone else only logs streams OpenFGA grants.
@@ -189,6 +225,13 @@ async fn raw_for(
         }
     }
     raw
+}
+
+#[cfg(any(all(feature = "enterprise", feature = "vectorscan"), test))]
+fn covers(raw: &search::RawStreams, protected: &[(StreamType, String)]) -> bool {
+    protected
+        .iter()
+        .all(|(stype, name)| raw.contains(*stype, name))
 }
 
 /// Records each stream read unredacted; detached so the query never waits on the audit.
@@ -330,6 +373,23 @@ mod tests {
         let mut admin = user(&["app", "billing"]);
         admin.rbac = false;
         assert!(raw_for(&protected(), &admin).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn stored_results_need_raw_access_to_every_protected_stream() {
+        let partial = raw_for(&protected(), &user(&["app", "billing"])).await;
+        assert!(!covers(&partial, &protected()));
+        let root = Fake {
+            root: true,
+            rbac: true,
+            granted: HashSet::new(),
+        };
+        assert!(covers(&raw_for(&protected(), &root).await, &protected()));
+        let logs_only = &protected()[..2];
+        assert!(covers(
+            &raw_for(logs_only, &user(&["app", "billing"])).await,
+            logs_only
+        ));
     }
 
     #[tokio::test]

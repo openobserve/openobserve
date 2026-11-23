@@ -72,6 +72,23 @@ pub fn is_ranked_histogram(sql: &Sql, ts_column: Option<&str>) -> bool {
     sql.histogram_interval.is_some() && is_ranked_by_non_ts_column(sql, ts_column)
 }
 
+/// A streaming id reads and writes the cache its partition registered without checking the SQL,
+/// so only the user who registered it may search with it.
+pub fn check_streaming_owner(
+    streaming_id: Option<&str>,
+    user_id: Option<&str>,
+) -> Result<(), Error> {
+    let Some(Some(owner)) = streaming_id.and_then(registry::get_owner) else {
+        return Ok(());
+    };
+    if user_id == Some(owner.as_str()) {
+        return Ok(());
+    }
+    Err(Error::Message(
+        "the streaming id belongs to another user".to_string(),
+    ))
+}
+
 /// Fails a streaming search whose redaction differs from the one its streaming id was cached
 /// with, since its results would land under the other class's key; a retry re-partitions.
 #[cfg(feature = "vectorscan")]
@@ -315,6 +332,19 @@ mod tests {
         registry::set_redaction_digest("sdr-class-check", Some("sdr=logs/app=stale".to_string()));
         assert!(check(Some("sdr-class-check")).is_err());
         registry::remove_cache("sdr-class-check");
+    }
+
+    #[test]
+    fn only_the_registering_user_may_search_with_a_streaming_id() {
+        assert!(check_streaming_owner(None, Some("bob@x")).is_ok());
+        assert!(check_streaming_owner(Some("sdr-owner-unknown"), Some("bob@x")).is_ok());
+
+        registry::init_cache("sdr-owner-check", 0, 1, "sdr-owner-check", 60);
+        registry::set_owner("sdr-owner-check", Some("alice@x".to_string()));
+        assert!(check_streaming_owner(Some("sdr-owner-check"), Some("alice@x")).is_ok());
+        assert!(check_streaming_owner(Some("sdr-owner-check"), Some("bob@x")).is_err());
+        assert!(check_streaming_owner(Some("sdr-owner-check"), None).is_err());
+        registry::remove_cache("sdr-owner-check");
     }
 
     #[test]
