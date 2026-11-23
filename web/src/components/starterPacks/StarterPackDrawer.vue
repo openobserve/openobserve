@@ -647,6 +647,7 @@ const storedOutcome = (): ReadyAlerts => {
     sendTo: !!name,
     destination: label ?? (name ? raw(name) : undefined),
     name,
+    failure: record?.emailFailure,
   };
 };
 
@@ -723,6 +724,7 @@ const startSetup = async () => {
     exclude: excludedIds.value,
     enableAlerts: alerts.turnOn && !alerts.failure,
     destination: name,
+    emailFailure: alerts.failure,
   });
   if (!done) return;
   useBrowserMatches(flow.org).markInstalled(pack.id, pack.id);
