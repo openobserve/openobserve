@@ -93,9 +93,18 @@ describe("groupFindMore", () => {
       groupFindMore(inputs({ packs })).sources.map(({ id }) => id);
     expect(ids([{ ...row, match: viewOnly }])).toEqual([]);
     expect(ids([unseen])).toEqual([]);
-    expect(ids([{ ...unseen, pack: { ...PACK, detector: "kubernetes" } as StarterPack }])).toEqual([
-      "kubernetes",
-    ]);
+  });
+
+  it("offers Kubernetes only on a Kubernetes stream, never on a ready match alone", () => {
+    const [row] = inputs().packs;
+    const kubernetes = { ...PACK, detector: "kubernetes" } as StarterPack;
+    const ids = (fits: string[]) =>
+      groupFindMore(inputs({ packs: [{ ...row, pack: kubernetes, fits }] })).sources.map(
+        ({ id }) => id,
+      );
+    expect(ids([])).toEqual([]);
+    expect(ids(["kube_pod_status_phase"])).toEqual(["kubernetes"]);
+    expect(ids(["k8s_events"])).toEqual(["kubernetes"]);
   });
 
   it("leaves out items an install record already holds", () => {

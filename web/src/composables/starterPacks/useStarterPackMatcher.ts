@@ -209,8 +209,12 @@ export function useStarterPackMatcher(
     const types = Object.fromEntries(
       found.map((name) => [name, metrics.includes(name) ? "metrics" : "logs"]),
     );
+    // Only a Kubernetes stream earns the offer; a dashboard panel on `default` must not.
     const matched =
-      library && orgStreams ? (await matchPack(org, pack, orgStreams, library)).ready : anchor >= 0;
+      found.length > 0 &&
+      (library && orgStreams
+        ? (await matchPack(org, pack, orgStreams, library)).ready
+        : anchor >= 0);
     if (matched) {
       if (anchor < 0) return { next: "matched", seen: [], found, types };
       const column = CLUSTER_COLUMNS.find((name) => columns[anchor].includes(name));

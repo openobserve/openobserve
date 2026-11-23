@@ -89,7 +89,7 @@ const KUBERNETES_PACK = packById("kubernetes")!;
 const entry = {
   id: "k8s/one",
   stream_type: "metrics",
-  required_streams: ["kube_pod"],
+  required_streams: ["kube_pod_status_phase"],
 } as AlertLibraryEntry;
 
 const library = {
@@ -126,7 +126,10 @@ const libraryReady = async () => {
   return verdicts.get(entry.id);
 };
 
-const metric = (doc: number | undefined) => ({ name: "kube_pod", stats: { doc_time_max: doc } });
+const metric = (doc: number | undefined) => ({
+  name: "kube_pod_status_phase",
+  stats: { doc_time_max: doc },
+});
 
 describe("one matcher", () => {
   beforeEach(() => {
@@ -143,17 +146,27 @@ describe("one matcher", () => {
   });
 
   it.each([
-    ["fits", () => [metric(recent())], ["k8s_cluster", "phase"], "sum by (phase) (kube_pod)"],
-    ["alias", () => [metric(recent())], ["k8s_cluster_name"], "sum by (k8s_cluster) (kube_pod)"],
-    ["case", () => [metric(recent())], ["phase"], "sum by (PHASE) (KUBE_POD)"],
-    ["missing label", () => [metric(recent())], ["phase"], "sum by (verb) (kube_pod)"],
-    ["extra metric", () => [metric(recent())], ["phase"], "kube_pod / kube_other"],
-    ["stale", () => [metric(recent() - 90_000_000_000)], ["phase"], "kube_pod"],
-    ["never ingested", () => [metric(undefined)], ["phase"], "kube_pod"],
-    ["no stream", () => [], [], "kube_pod"],
+    [
+      "fits",
+      () => [metric(recent())],
+      ["k8s_cluster", "phase"],
+      "sum by (phase) (kube_pod_status_phase)",
+    ],
+    [
+      "alias",
+      () => [metric(recent())],
+      ["k8s_cluster_name"],
+      "sum by (k8s_cluster) (kube_pod_status_phase)",
+    ],
+    ["case", () => [metric(recent())], ["phase"], "sum by (PHASE) (KUBE_POD_STATUS_PHASE)"],
+    ["missing label", () => [metric(recent())], ["phase"], "sum by (verb) (kube_pod_status_phase)"],
+    ["extra metric", () => [metric(recent())], ["phase"], "kube_pod_status_phase / kube_other"],
+    ["stale", () => [metric(recent() - 90_000_000_000)], ["phase"], "kube_pod_status_phase"],
+    ["never ingested", () => [metric(undefined)], ["phase"], "kube_pod_status_phase"],
+    ["no stream", () => [], [], "kube_pod_status_phase"],
   ])("Library and banner agree: %s", async (_name, rows, columns, promql) => {
     fake.streams = { metrics: rows() };
-    fake.columns = { kube_pod: columns };
+    fake.columns = { kube_pod_status_phase: columns };
     fake.files = { "k8s/one": query(promql) };
     const ready = await libraryReady();
     const banner = await bannerState();
@@ -174,16 +187,18 @@ describe("one matcher", () => {
       ],
     };
     const streams = await readOrgStreams("org");
-    expect([...(streams.metrics?.keys() ?? [])]).toEqual(["kube_pod"]);
+    expect([...(streams.metrics?.keys() ?? [])]).toEqual(["kube_pod_status_phase"]);
     expect([...(streams.logs?.keys() ?? [])]).toEqual(["app"]);
   });
 
   it("counts a stream with no flushed data yet from its creation", async () => {
     fake.streams = {
-      metrics: [{ name: "kube_pod", stats: { doc_time_max: 0, created_at: recent() } }],
+      metrics: [
+        { name: "kube_pod_status_phase", stats: { doc_time_max: 0, created_at: recent() } },
+      ],
     };
-    fake.columns = { kube_pod: ["phase"] };
-    fake.files = { "k8s/one": query("kube_pod") };
+    fake.columns = { kube_pod_status_phase: ["phase"] };
+    fake.files = { "k8s/one": query("kube_pod_status_phase") };
     expect(await libraryReady()).toBe(true);
   });
 
@@ -200,11 +215,11 @@ describe("one matcher", () => {
     beforeEach(() => {
       KUBERNETES_PACK.alerts = [];
       fake.streams = { metrics: [metric(recent())] };
-      fake.columns = { kube_pod: ["phase"] };
+      fake.columns = { kube_pod_status_phase: ["phase"] };
     });
 
     it.each([
-      ["fits", panel("sum by (phase) (kube_pod)"), true],
+      ["fits", panel("sum by (phase) (kube_pod_status_phase)"), true],
       ["lacks data", panel("kube_other"), false],
       ["text only", { queries: [{ query: "" }] }, false],
     ])("%s", async (_name, item, expected) => {
@@ -221,15 +236,15 @@ describe("one matcher", () => {
 
     it("re-reads a cached schema once when a pack fails on a field", async () => {
       vi.spyOn(Date, "now").mockReturnValue(clock.next());
-      KUBERNETES_PACK.dashboards = [dashboard([panel("sum by (late) (kube_pod)")])];
+      KUBERNETES_PACK.dashboards = [dashboard([panel("sum by (late) (kube_pod_status_phase)")])];
       const result = await match();
       expect(result.ready).toBe(false);
-      expect(fake.schemaReads).toContainEqual({ name: "kube_pod", force: true });
+      expect(fake.schemaReads).toContainEqual({ name: "kube_pod_status_phase", force: true });
     });
 
     it("does not force the same schema again on the next poll", async () => {
       vi.spyOn(Date, "now").mockReturnValue(clock.next());
-      KUBERNETES_PACK.dashboards = [dashboard([panel("sum by (late) (kube_pod)")])];
+      KUBERNETES_PACK.dashboards = [dashboard([panel("sum by (late) (kube_pod_status_phase)")])];
       await match();
       fake.schemaReads = [];
       await match();
@@ -238,40 +253,40 @@ describe("one matcher", () => {
 
     it("retries a forced read that failed on the next match", async () => {
       vi.spyOn(Date, "now").mockReturnValue(clock.next());
-      KUBERNETES_PACK.dashboards = [dashboard([panel("sum by (late) (kube_pod)")])];
+      KUBERNETES_PACK.dashboards = [dashboard([panel("sum by (late) (kube_pod_status_phase)")])];
       fake.failForced = true;
       await match();
       fake.failForced = false;
       fake.schemaReads = [];
       await match();
-      expect(fake.schemaReads).toContainEqual({ name: "kube_pod", force: true });
+      expect(fake.schemaReads).toContainEqual({ name: "kube_pod_status_phase", force: true });
     });
 
     it("counts a strict rename as ready, since the installer fixes it", async () => {
       KUBERNETES_PACK.alerts = ["k8s/one"];
-      entry.required_streams = ["KUBE_POD"];
-      fake.files = { "k8s/one": query("KUBE_POD") };
+      entry.required_streams = ["KUBE_POD_STATUS_PHASE"];
+      fake.files = { "k8s/one": query("KUBE_POD_STATUS_PHASE") };
       KUBERNETES_PACK.dashboards = [];
       const result = await match();
-      entry.required_streams = ["kube_pod"];
+      entry.required_streams = ["kube_pod_status_phase"];
       expect(result.ready).toBe(true);
     });
 
     it("reads each schema once and never forces it", async () => {
       KUBERNETES_PACK.alerts = ["k8s/one"];
-      fake.files = { "k8s/one": query("kube_pod") };
-      KUBERNETES_PACK.dashboards = [dashboard([panel("kube_pod")])];
+      fake.files = { "k8s/one": query("kube_pod_status_phase") };
+      KUBERNETES_PACK.dashboards = [dashboard([panel("kube_pod_status_phase")])];
       await match();
-      expect(fake.schemaReads).toEqual([{ name: "kube_pod", force: false }]);
+      expect(fake.schemaReads).toEqual([{ name: "kube_pod_status_phase", force: false }]);
     });
 
     it("keeps alert verdicts when a dashboard fails, and retries the load", async () => {
       KUBERNETES_PACK.alerts = ["k8s/one"];
-      fake.files = { "k8s/one": query("kube_pod") };
+      fake.files = { "k8s/one": query("kube_pod_status_phase") };
       const load = vi
         .fn()
         .mockRejectedValueOnce(new Error("chunk"))
-        .mockResolvedValue({ tabs: [{ panels: [panel("kube_pod")] }] });
+        .mockResolvedValue({ tabs: [{ panels: [panel("kube_pod_status_phase")] }] });
       KUBERNETES_PACK.dashboards = [dashboard([], load)];
       const first = await match();
       expect(first.alerts.get("k8s/one")).toBe(true);
@@ -293,8 +308,8 @@ describe("one matcher", () => {
 
   it("uses only pack aliases on OSS, without calling semantic groups", async () => {
     fake.streams = { metrics: [metric(recent())] };
-    fake.columns = { kube_pod: ["k8s_cluster_name"] };
-    fake.files = { "k8s/one": query("sum by (k8s_cluster) (kube_pod)") };
+    fake.columns = { kube_pod_status_phase: ["k8s_cluster_name"] };
+    fake.files = { "k8s/one": query("sum by (k8s_cluster) (kube_pod_status_phase)") };
     expect(await libraryReady()).toBe(true);
     expect(fake.groups).not.toHaveBeenCalled();
   });
@@ -303,8 +318,8 @@ describe("one matcher", () => {
     fake.isEnterprise = "true";
     fake.groups.mockResolvedValue([{ fields: ["verb", "http_verb"] }]);
     fake.streams = { metrics: [metric(recent())] };
-    fake.columns = { kube_pod: ["http_verb"] };
-    fake.files = { "k8s/one": query("sum by (verb) (kube_pod)") };
+    fake.columns = { kube_pod_status_phase: ["http_verb"] };
+    fake.files = { "k8s/one": query("sum by (verb) (kube_pod_status_phase)") };
     expect(await libraryReady()).toBe(true);
     expect(fake.groups).toHaveBeenCalledWith("org");
   });
@@ -317,10 +332,10 @@ describe("one matcher", () => {
   it("falls back to the bundled file when the Library is out of reach", async () => {
     library.loadAlertFile.mockRejectedValueOnce(new Error("down"));
     fake.streams = { metrics: [metric(recent())] };
-    fake.columns = { kube_pod: ["phase"] };
+    fake.columns = { kube_pod_status_phase: ["phase"] };
     const pack = {
       ...KUBERNETES_PACK,
-      bundledAlerts: [{ entry, file: query("sum by (verb) (kube_pod)") }],
+      bundledAlerts: [{ entry, file: query("sum by (verb) (kube_pod_status_phase)") }],
     };
     const match = await matchPack("org", pack, await readOrgStreams("org"), library as any);
     expect(match.ready).toBe(false);
@@ -412,8 +427,8 @@ describe("one matcher", () => {
       );
 
     beforeEach(() => {
-      fake.columns = { kube_pod: ["phase"] };
-      fake.files = { "k8s/one": query("kube_pod") };
+      fake.columns = { kube_pod_status_phase: ["phase"] };
+      fake.files = { "k8s/one": query("kube_pod_status_phase") };
     });
 
     it("counts a view whose logs stream has data", async () => {
@@ -436,7 +451,7 @@ describe("one matcher", () => {
 
     it("looks the stream up under the view's own stream type", async () => {
       fake.streams = { metrics: [metric(recent())] };
-      const result = await match([view(["kube_pod"], "metrics")]);
+      const result = await match([view(["kube_pod_status_phase"], "metrics")]);
       expect(result.views.get("events-view")).toBe(true);
     });
 

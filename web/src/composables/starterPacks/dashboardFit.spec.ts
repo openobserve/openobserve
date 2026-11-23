@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import bundled from "@/assets/dashboards/kubernetes_overview.dashboard.json";
 
-import { dashboardStreams, fitDashboard, type StreamFields } from "./dashboardFit";
+import {
+  dashboardPanelNeeds,
+  dashboardStreams,
+  fitDashboard,
+  type StreamFields,
+} from "./dashboardFit";
 
 const sql = (title: string, query: string, y = 0) => ({
   title,
@@ -88,6 +93,34 @@ describe("fitDashboard", () => {
     );
     expect(fit.doc.tabs[0].panels[0].layout.y).toBe(0);
     expect(fitDashboard(doc(sql("gone", "SELECT a FROM gone")), schemas({})).doc.tabs).toEqual([]);
+  });
+});
+
+describe("dashboardPanelNeeds", () => {
+  const typed = (query: string, ...types: Array<string | undefined>) => ({
+    queryType: "sql",
+    queries: types.map((stream_type) => ({ query, fields: { stream_type } })),
+  });
+
+  it("carries each panel's single declared stream type with its needs", () => {
+    const needs = dashboardPanelNeeds({
+      tabs: [
+        { panels: [typed("SELECT a FROM s", "logs")] },
+        { panels: [{}, typed("SELECT b FROM t", "metrics", "metrics")] },
+      ],
+    });
+    expect(needs.map(({ streamType }) => streamType)).toEqual(["logs", undefined, "metrics"]);
+    expect([...needs[2].streams]).toEqual(["t"]);
+  });
+
+  it("reads any type for untyped, mixed and PromQL panels", () => {
+    const needs = dashboardPanelNeeds(
+      doc(typed("SELECT a FROM s", undefined), typed("SELECT a FROM s", "logs", "traces"), {
+        ...typed("up", "logs"),
+        queryType: "promql",
+      }),
+    );
+    expect(needs.map(({ streamType }) => streamType)).toEqual([undefined, undefined, undefined]);
   });
 });
 

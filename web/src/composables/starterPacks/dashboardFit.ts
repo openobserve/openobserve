@@ -148,9 +148,24 @@ const compact = (panels: Array<Record<string, any>>) => {
   });
 };
 
-/** What each panel reads, for the readiness check. */
-export const dashboardPanelNeeds = (doc: Record<string, any>): PanelNeeds[] =>
-  (doc.tabs ?? []).flatMap((tab: Record<string, any>) => (tab.panels ?? []).map(panelNeeds));
+// PromQL always reads metrics, and saved PromQL panels can carry a stale `logs` type.
+const panelStreamType = (panel: Record<string, any>): string | undefined => {
+  if (panel.queryType === "promql") return undefined;
+  const types = new Set((panel.queries ?? []).map((query: any) => query.fields?.stream_type));
+  const [type] = types;
+  return types.size === 1 && typeof type === "string" && type ? type : undefined;
+};
+
+/** What each panel reads, for the readiness check. No `streamType` means any type. */
+export const dashboardPanelNeeds = (
+  doc: Record<string, any>,
+): Array<PanelNeeds & { streamType?: string }> =>
+  (doc.tabs ?? []).flatMap((tab: Record<string, any>) =>
+    (tab.panels ?? []).map((panel: Record<string, any>) => ({
+      ...panelNeeds(panel),
+      streamType: panelStreamType(panel),
+    })),
+  );
 
 /** Every stream a dashboard could read, so a caller fetches each schema once. */
 export const dashboardStreams = (doc: Record<string, any>): string[] => {

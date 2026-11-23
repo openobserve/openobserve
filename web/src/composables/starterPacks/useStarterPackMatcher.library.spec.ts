@@ -19,6 +19,8 @@ import { defineComponent } from "vue";
 
 const fake = vi.hoisted(() => ({
   metrics: [] as string[],
+  logs: [] as string[],
+  traces: [] as string[],
   lastIngested: 1,
   columns: [] as string[],
   requests: [] as any[],
@@ -42,6 +44,8 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 vi.mock("./packMatchData", () => ({
   readOrgStreams: async () => ({
     metrics: new Map(fake.metrics.map((name) => [name, fake.lastIngested])),
+    logs: new Map(fake.logs.map((name) => [name, fake.lastIngested])),
+    traces: new Map(fake.traces.map((name) => [name, fake.lastIngested])),
   }),
   readSchemaColumns: async () => fake.columns,
   matchPack: (...args: unknown[]) => {
@@ -75,7 +79,15 @@ const check = async (pack = HOSTS_PACK) => {
 
 describe("useStarterPackMatcher with the Library on, Hosts pack", () => {
   beforeEach(() => {
-    Object.assign(fake, { metrics: [], lastIngested: 1, columns: [], requests: [], ready: false });
+    Object.assign(fake, {
+      metrics: [],
+      logs: [],
+      traces: [],
+      lastIngested: 1,
+      columns: [],
+      requests: [],
+      ready: false,
+    });
     fake.matchPack.mockClear();
   });
 
@@ -104,6 +116,63 @@ describe("useStarterPackMatcher with the Library on, Hosts pack", () => {
 });
 
 describe("useStarterPackMatcher with the Library on, Kubernetes pack", () => {
+  beforeEach(() => {
+    Object.assign(fake, {
+      metrics: [],
+      logs: [],
+      traces: [],
+      lastIngested: 1,
+      columns: [],
+      requests: [],
+      ready: true,
+    });
+    fake.matchPack.mockClear();
+  });
+
+  const setupKubernetes = async () => {
+    let api!: ReturnType<typeof useStarterPackMatcher>;
+    mount(
+      defineComponent({
+        setup() {
+          api = useStarterPackMatcher("org", { pack: KUBERNETES_PACK });
+          return () => null;
+        },
+      }),
+    );
+    await api.check();
+    return api;
+  };
+
+  it.each(["logs", "traces"] as const)(
+    "does not offer Kubernetes on a %s stream named default",
+    async (type) => {
+      fake[type] = ["default"];
+      const api = await setupKubernetes();
+      expect(api.state.value).toBe("none");
+      expect(api.streams.value).toEqual([]);
+      expect(fake.matchPack).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    [["k8s_cluster"], 1],
+    [["value"], 0],
+  ])("offers Kubernetes on its metrics with columns %j", async (columns, clusterReads) => {
+    fake.metrics = ["kube_pod_status_phase"];
+    fake.columns = columns;
+    const api = await setupKubernetes();
+    expect(api.state.value).toBe("matched");
+    expect(api.streams.value).toEqual(["kube_pod_status_phase"]);
+    expect(fake.requests).toHaveLength(clusterReads);
+  });
+
+  it("offers Kubernetes on k8s_events alone, with no clusters seen", async () => {
+    fake.logs = ["k8s_events"];
+    const api = await setupKubernetes();
+    expect(api.state.value).toBe("matched");
+    expect([api.streams.value, api.clusters.value]).toEqual([["k8s_events"], []]);
+  });
+
   it("reads clusters in the day before a stale stream's last data", async () => {
     const lastIngested = Date.now() * 1000 - 3 * 24 * 60 * 60 * 1_000_000;
     Object.assign(fake, {
