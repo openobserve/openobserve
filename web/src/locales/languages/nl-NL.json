@@ -12402,9 +12402,6 @@
     "testErrorClientError": "Klantfout (4xx). Controleer uw inloggegevens en configuratie.",
     "testErrorServerError": "Serverfout (5xx). De bestemmingsservice ondervindt problemen.",
     "viewDetails": "Details bekijken",
-    "error": "Fout",
-    "httpStatus": "HTTP-status",
-    "responseBody": "Reactielichaam",
     "retry": "Probeer het opnieuw",
     "suggestCheckUrl": "Controleer of de webhook-URL correct en bereikbaar is.",
     "suggestCheckFirewall": "Controleer je firewallinstellingen en zorg ervoor dat de bestemmingsservice toegankelijk is.",
@@ -14202,7 +14199,6 @@
       "loadFailedTitle": "Deze waarschuwing kon niet worden geladen"
     },
     "timeLabel": "Tijd",
-    "unknownHttpStatus": "Onbekend",
     "previewEvaluation": {
       "realTimeReason": "Wanneer voorwaarden overeenkomen",
       "matchingGroup": "overeenkomende groep",
@@ -15623,7 +15619,6 @@
       "hideWebhook": "Slack-webhook-URL verbergen",
       "slackAppFallback": "Slack-app",
       "previewDisclaimer": "Slack levert het daadwerkelijke app-pictogram en het bestemmingskanaal na installatie.",
-      "successResponseBody": "Slack-antwoord",
       "callbackTitle": "Slack verbinden",
       "callbackWorking": "Terugkeren naar {product}…",
       "callbackError": "Deze Slack-verbinding kan niet worden voltooid. Sluit dit venster en probeer het opnieuw.",
@@ -20202,7 +20197,6 @@
         "latency": "Latentie",
         "output": "Geëxtraheerde uitvoer",
         "rawRequest": "Verzonden verzoek",
-        "rawResponse": "Ontvangen antwoord",
         "idle": "Het verzoek en het antwoord verschijnen hier beide wanneer je een test uitvoert.",
         "disabledHint": "Vul eerst de naam en het eindpunt in.",
         "failure": {
