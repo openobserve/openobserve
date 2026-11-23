@@ -9144,24 +9144,28 @@ export class LogsPage {
      * This opens the utilities menu (replaces old dropdown arrow)
      */
     async clickSavedViewsDropdownArrow() {
-        // Saved views list is now opened via the utilities ("More") dropdown menu.
-        // Ensure any previously open dropdown is closed before opening fresh.
+        const utilitiesBtn = this.page.locator(this.utilitiesMenuButton);
         const listMenuItem = this.page.locator(this.menuListSavedViewsBtn);
-        await this.page.keyboard.press('Escape').catch(() => {});
-        await listMenuItem.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
-        // After navigation the Vue component may need an extra render cycle before its
-        // click handler responds. Retry the open sequence up to 3 times: force-click the
-        // trigger, wait up to 5 s for the menu item to appear, then reset and try again.
+        await this.page.keyboard.press('Escape');
+        // Escape closes one menu level at a time; clicking the trigger while the root menu is still open toggles it shut.
+        for (let i = 0; i < 3 && (await utilitiesBtn.getAttribute('aria-expanded')) === 'true'; i++) {
+            await this.page.keyboard.press('Escape');
+            await expect(utilitiesBtn).not.toHaveAttribute('aria-expanded', 'true', { timeout: 1000 }).catch(() => {});
+        }
+        await expect(utilitiesBtn).not.toHaveAttribute('aria-expanded', 'true', { timeout: 2000 });
+        await expect(listMenuItem).toBeHidden({ timeout: 3000 });
+        // After navigation the click handler may not be bound yet, so retry the open up to 3 times.
         let opened = false;
         for (let attempt = 0; attempt < 3; attempt++) {
-            await this.page.locator(this.utilitiesMenuButton).click({ force: true });
-            opened = await listMenuItem.waitFor({ state: 'visible', timeout: 5000 })
+            await utilitiesBtn.click({ force: true });
+            opened = await expect(utilitiesBtn).toHaveAttribute('aria-expanded', 'true', { timeout: 5000 })
                 .then(() => true).catch(() => false);
             if (opened) break;
             await this.page.keyboard.press('Escape').catch(() => {});
             await listMenuItem.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {});
         }
         if (!opened) throw new Error('Could not open saved views menu after 3 attempts');
+        await listMenuItem.waitFor({ state: 'visible', timeout: 5000 });
         await this.openSavedViewsSubmenu(this.savedViewSearchInput);
         testLogger.info('Clicked saved views dropdown arrow');
     }
