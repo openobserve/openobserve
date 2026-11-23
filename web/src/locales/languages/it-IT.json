@@ -8192,6 +8192,7 @@
     "deleteDashboardsConfirmMsg": "Sei sicuro di voler eliminare {count} dashboard? | Sei sicuro di voler eliminare {count} dashboard?",
     "deleteDashboardsConfirmMsgPublicLinks": "Sei sicuro di voler eliminare {count} dashboard? I suoi link pubblici smetteranno di funzionare e verranno eliminati. | Sei sicuro di voler eliminare {count} dashboard? I loro link pubblici smetteranno di funzionare e verranno eliminati.",
     "deleteDashboardReportsWarning": "L'eliminazione elimina anche questo report: {names} | L'eliminazione elimina anche questi {count} report: {names}",
+    "deleteDashboardReportsWarningMore": "L'eliminazione elimina anche questi {count} report: {names} e altri {more}",
     "edit": "Modifica dashboard",
     "duplicate": "Duplica dashboard",
     "move_to_another_folder": "Sposta in un'altra cartella",

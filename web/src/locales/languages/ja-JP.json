@@ -8192,6 +8192,7 @@
     "deleteDashboardsConfirmMsg": "{count} 件のダッシュボードを削除してもよろしいですか？ | {count} 件のダッシュボードを削除してもよろしいですか？",
     "deleteDashboardsConfirmMsgPublicLinks": "{count} 件のダッシュボードを削除してもよろしいですか？その公開リンクは機能しなくなり、削除されます。 | {count} 件のダッシュボードを削除してもよろしいですか？それらの公開リンクは機能しなくなり、削除されます。",
     "deleteDashboardReportsWarning": "削除すると、このレポートも削除されます: {names} | 削除すると、これら {count} 件のレポートも削除されます: {names}",
+    "deleteDashboardReportsWarningMore": "削除すると、これら {count} 件のレポートも削除されます: {names} ほか {more} 件",
     "edit": "ダッシュボードを編集",
     "duplicate": "ダッシュボードを複製",
     "move_to_another_folder": "別のフォルダに移動",

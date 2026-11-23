@@ -8192,6 +8192,7 @@
     "deleteDashboardsConfirmMsg": "Bạn có chắc chắn muốn xóa {count} bảng điều khiển? | Bạn có chắc chắn muốn xóa {count} bảng điều khiển?",
     "deleteDashboardsConfirmMsgPublicLinks": "Bạn có chắc chắn muốn xóa {count} bảng điều khiển không? Các liên kết công khai của nó sẽ ngừng hoạt động và bị xóa. | Bạn có chắc chắn muốn xóa {count} bảng điều khiển không? Các liên kết công khai của chúng sẽ ngừng hoạt động và bị xóa.",
     "deleteDashboardReportsWarning": "Thao tác xóa cũng sẽ xóa báo cáo này: {names} | Thao tác xóa cũng sẽ xóa {count} báo cáo này: {names}",
+    "deleteDashboardReportsWarningMore": "Thao tác xóa cũng sẽ xóa {count} báo cáo này: {names} và {more} báo cáo khác",
     "edit": "Chỉnh sửa bảng điều khiển",
     "duplicate": "Sao chép Bảng điều khiển",
     "move_to_another_folder": "Di chuyển đến Thư mục khác",

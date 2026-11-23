@@ -220,6 +220,8 @@ const createMockI18n = () => {
           save: "Save",
           deleteDashboardReportsWarning:
             "Deleting also deletes this report: {names} | Deleting also deletes these {count} reports: {names}",
+          deleteDashboardReportsWarningMore:
+            "Deleting also deletes these {count} reports: {names} and {more} more",
         },
       },
     },
@@ -933,6 +935,19 @@ describe("Dashboards.vue", () => {
           })),
         ),
       });
+
+    it("names only the first five reports when a dashboard feeds many", async () => {
+      reportsUsing(...Array.from({ length: 80 }, () => ["d1"]));
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      await wrapper.vm.showDeleteDialogFn({ row: { id: "d1", name: "cpu-overview" } });
+      await flushPromises();
+
+      expect(findDialog("dashboard-confirm-dialog").props("warningMessage")).toBe(
+        "Deleting also deletes these 80 reports: report-0, report-1, report-10, report-11, report-12 and 75 more",
+      );
+    });
 
     it("lists only the reports left with no dashboard, not those that cover another one", async () => {
       reportsUsing(["d1", "d2"], ["d2"], ["d1"]);

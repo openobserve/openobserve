@@ -8192,6 +8192,7 @@
     "deleteDashboardsConfirmMsg": "Weet je zeker dat je {count} dashboard wilt verwijderen? | Weet je zeker dat je {count} dashboards wilt verwijderen?",
     "deleteDashboardsConfirmMsgPublicLinks": "Weet je zeker dat je {count} dashboard wilt verwijderen? De openbare links ervan werken niet meer en worden verwijderd. | Weet je zeker dat je {count} dashboards wilt verwijderen? De openbare links ervan werken niet meer en worden verwijderd.",
     "deleteDashboardReportsWarning": "Verwijderen verwijdert ook dit rapport: {names} | Verwijderen verwijdert ook deze {count} rapporten: {names}",
+    "deleteDashboardReportsWarningMore": "Verwijderen verwijdert ook deze {count} rapporten: {names} en nog {more}",
     "edit": "Dashboard bewerken",
     "duplicate": "Dashboard dupliceren",
     "move_to_another_folder": "Naar een andere map verplaatsen",

@@ -1829,6 +1829,9 @@ export default defineComponent({
       }
     };
 
+    // A dashboard can feed dozens of reports; naming them all would push the dialog buttons off screen.
+    const REPORT_NAMES_SHOWN = 5;
+
     const deleteReportsWarning = (dashboardIds: string[]): I18nText | undefined => {
       const reports = new Map<string, { name: string; dashboards: string[] }>();
       for (const report of reportsForDelete.value) {
@@ -1839,11 +1842,21 @@ export default defineComponent({
       // The server deletes a report only when every dashboard it covers is deleted; others just lose the link.
       const names = [...reports.values()]
         .filter((r) => r.dashboards.length && r.dashboards.every((d) => dashboardIds.includes(d)))
-        .map((r) => r.name);
+        .map((r) => r.name)
+        .sort((a, b) => a.localeCompare(b));
       if (!names.length) return undefined;
+      const shown = names.slice(0, REPORT_NAMES_SHOWN).join(", ");
+      const more = names.length - REPORT_NAMES_SHOWN;
+      if (more > 0) {
+        return t("dashboard.deleteDashboardReportsWarningMore", {
+          count: names.length,
+          names: shown,
+          more,
+        });
+      }
       return t(
         "dashboard.deleteDashboardReportsWarning",
-        { count: names.length, names: names.join(", ") },
+        { count: names.length, names: shown },
         names.length,
       );
     };
