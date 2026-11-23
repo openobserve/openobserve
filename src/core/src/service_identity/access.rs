@@ -19,7 +19,7 @@ use config::meta::{service_identity::WhereSummaryRecord, stream::StreamType};
 
 use crate::{
     auth::check_permissions,
-    authz::{QuerySource, active_checker, authorize_query_sources, readable_streams},
+    authz::{StreamReadMemo, active_checker, readable_streams},
 };
 
 pub struct ReadableStreams {
@@ -90,6 +90,7 @@ pub async fn evidence(
     streams: &[String],
     overflow: bool,
     org_wide_read: bool,
+    memo: &StreamReadMemo,
 ) -> bool {
     if overflow && !org_wide_read {
         return false;
@@ -104,7 +105,12 @@ pub async fn evidence(
             "metrics" => StreamType::Metrics,
             _ => return false,
         };
-        if name.is_empty() || (!org_wide_read && !readable(org, user, name, kind).await) {
+        if name.is_empty()
+            || (!org_wide_read
+                && !memo
+                    .can_read(active_checker().as_ref(), user, org, kind, name)
+                    .await)
+        {
             return false;
         }
     }
@@ -121,19 +127,6 @@ pub async fn org_wide_read(org: &str, user: &str) -> bool {
                 config::meta::user::UserRole::Root | config::meta::user::UserRole::Admin
             )
         })
-}
-
-async fn readable(org: &str, user: &str, name: &str, stream_type: StreamType) -> bool {
-    authorize_query_sources(
-        user,
-        &[QuerySource::Stream {
-            org_id: org.to_string(),
-            stream_type,
-            name: name.to_string(),
-        }],
-    )
-    .await
-    .is_ok()
 }
 
 #[cfg(all(test, feature = "test-utils"))]
@@ -246,11 +239,22 @@ mod tests {
                 user,
                 &["metrics/kube_pod_container_info".into()],
                 false,
-                false
+                false,
+                &StreamReadMemo::default()
             )
             .await
         );
-        assert!(!evidence(org, user, &["allowed".into()], false, true).await);
+        assert!(
+            !evidence(
+                org,
+                user,
+                &["allowed".into()],
+                false,
+                true,
+                &StreamReadMemo::default()
+            )
+            .await
+        );
     }
 
     fn row(org: &str, signal: &str, stream: &str) -> WhereSummaryRecord {

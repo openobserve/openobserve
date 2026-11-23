@@ -1268,10 +1268,24 @@ async fn attach_not_serving_pods(
         Ok(table) => {
             use crate::service_identity::access;
             let admin = access::org_wide_read(&ctx.org, &ctx.user).await;
-            let pods_ok =
-                access::evidence(&ctx.org, &ctx.user, &table.source_streams, false, admin).await;
-            let status_ok =
-                access::evidence(&ctx.org, &ctx.user, &table.status_streams, false, admin).await;
+            let pods_ok = access::evidence(
+                &ctx.org,
+                &ctx.user,
+                &table.source_streams,
+                false,
+                admin,
+                &ctx.evidence,
+            )
+            .await;
+            let status_ok = access::evidence(
+                &ctx.org,
+                &ctx.user,
+                &table.status_streams,
+                false,
+                admin,
+                &ctx.evidence,
+            )
+            .await;
             table.attach(summary, pods_ok, status_ok);
         }
         Err(error) => log::warn!("[ServiceVersions] not_serving pods unavailable: {error}"),
@@ -2356,6 +2370,7 @@ mod tests {
                 traces: std::collections::HashSet::from(["t".into()]),
                 rum: false,
             },
+            evidence: Default::default(),
             identity: Default::default(),
             aliases: Default::default(),
         };
@@ -2713,6 +2728,7 @@ mod tests {
                 traces: std::collections::HashSet::from(["t".into()]),
                 rum: false,
             },
+            evidence: Default::default(),
             identity: Default::default(),
             aliases: Default::default(),
         };

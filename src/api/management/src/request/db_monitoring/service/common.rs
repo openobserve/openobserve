@@ -1096,25 +1096,64 @@ pub(super) async fn involved_streams(
         }
     }
 
-    // One RBAC check per stream, CONCURRENTLY — on enterprise each is a
-    // network OFGA round trip, and the serial form summed them.
     let streams: Vec<String> = set.into_iter().collect();
-    let verdicts = join_all(streams.iter().map(|stream| {
-        can_read_stream(
+    Some(
+        readable_among(
             org_id,
             user_id,
-            stream,
+            streams,
             required_stream_for(DbmVantage::Client),
         )
-    }))
-    .await;
-    Some(
+        .await,
+    )
+}
+
+/// [`can_read_stream`] over many streams: the module grant is asked once, then the
+/// streams it does not cover go through one org-wide question and bounded Checks.
+async fn readable_among(
+    org_id: &str,
+    user_id: &str,
+    streams: Vec<String>,
+    stream_type: StreamType,
+) -> Vec<String> {
+    #[cfg(feature = "enterprise")]
+    {
+        if !get_openfga_config().enabled || module_grant(org_id, user_id).await {
+            return streams;
+        }
+        let wanted = streams.iter().map(|s| (stream_type, s.clone())).collect();
+        let Some(readable) =
+            openobserve_core::authz::readable_org_streams(user_id, org_id, wanted).await
+        else {
+            return streams;
+        };
         streams
             .into_iter()
-            .zip(verdicts)
-            .filter_map(|(stream, ok)| ok.then_some(stream))
-            .collect(),
+            .filter(|s| readable.contains(&(stream_type, s.clone())))
+            .collect()
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, user_id, stream_type);
+        streams
+    }
+}
+
+/// `db_monitoring:_all_{org}`, the module toggle of the role editor.
+#[cfg(feature = "enterprise")]
+async fn module_grant(org_id: &str, user_id: &str) -> bool {
+    check_permissions(
+        org_id,
+        org_id,
+        user_id,
+        "db_monitoring",
+        "GET",
+        None,
+        true,
+        false,
+        false,
     )
+    .await
 }
 
 /// Freshness block carried by every rollup-backed response (D4).

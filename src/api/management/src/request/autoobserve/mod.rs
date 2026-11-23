@@ -881,42 +881,27 @@ async fn readable_subjects(org_id: &str, user_id: &str, subjects: Vec<EntityRef>
     readable_mask(&LiveAuthority { org_id, user_id }, &subjects).await
 }
 
-/// Each stream needs the read right a search of it needs; one org-wide check per type comes first.
+/// Each stream needs the read right a search of it needs; one org-wide check per type comes first,
+/// then the streams left are checked 16 at a time.
 async fn readable_streams(org_id: &str, user_id: &str, ids: Vec<(String, String)>) -> Vec<bool> {
-    if !rbac_enforced().await {
-        return vec![true; ids.len()];
+    use config::meta::stream::StreamType;
+
+    // An unknown type name is refused, never read as the default type.
+    let typed: Vec<Option<(StreamType, String)>> = ids
+        .into_iter()
+        .map(|(stream_type, name)| {
+            let parsed = StreamType::from(stream_type.as_str());
+            (parsed.as_str() == stream_type).then_some((parsed, name))
+        })
+        .collect();
+    let wanted = typed.iter().flatten().cloned().collect();
+    match openobserve_core::authz::readable_org_streams(user_id, org_id, wanted).await {
+        None => vec![true; typed.len()],
+        Some(readable) => typed
+            .iter()
+            .map(|stream| stream.as_ref().is_some_and(|s| readable.contains(s)))
+            .collect(),
     }
-    let mut org_wide: HashMap<&str, bool> = HashMap::new();
-    let mut out = Vec::with_capacity(ids.len());
-    for (stream_type, name) in &ids {
-        let wide = match org_wide.get(stream_type.as_str()) {
-            Some(wide) => *wide,
-            None => {
-                let wide = org_wide_allows(org_id, user_id, stream_type, "GET").await;
-                org_wide.insert(stream_type, wide);
-                wide
-            }
-        };
-        if wide {
-            out.push(true);
-            continue;
-        }
-        out.push(
-            check_permissions(
-                &config::utils::str::into_ofga_supported_format(name),
-                org_id,
-                user_id,
-                stream_type,
-                "GET",
-                None,
-                false,
-                true,
-                false,
-            )
-            .await,
-        );
-    }
-    out
 }
 
 /// One org-wide check per resource, then one grant listing and one folder read for the alerts left.
@@ -1046,6 +1031,42 @@ mod tests {
 
     use super::*;
     use crate::request::alert_grants::tests::CountingAuthority;
+
+    // o2-enterprise#3642: an org-wide grant costs one question; single grants check each stream.
+    #[tokio::test]
+    async fn readable_streams_asks_org_wide_once_and_refuses_unknown_types() {
+        use config::meta::stream::StreamType;
+        use openobserve_core::authz::{TypedStream, fake_checker};
+
+        let checker = fake_checker();
+        let org = format!("ao_{}", config::ider::uuid());
+        let wide = format!("wide_{}", config::ider::uuid());
+        checker.grant_read_all(&wide, &org, StreamType::Logs);
+        let ids: Vec<(String, String)> = (0..20)
+            .map(|i| ("logs".to_string(), format!("s{i}")))
+            .chain([("nonsense".to_string(), "s0".to_string())])
+            .collect();
+        let mut expected = vec![true; 20];
+        expected.push(false);
+        assert_eq!(readable_streams(&org, &wide, ids.clone()).await, expected);
+        let calls = checker.calls(&wide);
+        assert_eq!(calls.streams, 0);
+        assert_eq!(calls.org_wide, vec![vec![StreamType::Logs]]);
+
+        let single = format!("single_{}", config::ider::uuid());
+        checker.grant_read(
+            &single,
+            &TypedStream {
+                org_id: org.clone(),
+                stream_type: StreamType::Logs,
+                name: "s3".to_string(),
+            },
+        );
+        let got = readable_streams(&org, &single, ids).await;
+        assert_eq!(got.iter().filter(|r| **r).count(), 1);
+        assert!(got[3]);
+        assert_eq!(checker.calls(&single).streams, 20);
+    }
 
     thread_local! {
         /// The deployment switch as this test's thread sees it; None reads the config.

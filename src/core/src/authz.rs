@@ -491,6 +491,76 @@ impl StreamAccessChecker for OpenFgaStreamChecker {
     }
 }
 
+/// One request's stream reads for one user and org, so a stream named on many rows is checked once.
+#[cfg(feature = "enterprise")]
+#[derive(Default)]
+pub struct StreamReadMemo {
+    unrestricted: tokio::sync::OnceCell<bool>,
+    org_wide: std::sync::Mutex<HashMap<StreamType, bool>>,
+    streams: std::sync::Mutex<HashMap<(StreamType, String), bool>>,
+}
+
+#[cfg(feature = "enterprise")]
+impl StreamReadMemo {
+    /// Answers as [`readable_streams`] does for one stream.
+    pub async fn can_read(
+        &self,
+        checker: &dyn StreamAccessChecker,
+        user_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        name: &str,
+    ) -> bool {
+        let unrestricted = *self
+            .unrestricted
+            .get_or_init(|| async {
+                !checker.enforces_rbac().await
+                    || checker.is_root(user_id).await
+                    || checker.is_root_or_admin(org_id, user_id).await
+            })
+            .await;
+        if unrestricted {
+            return true;
+        }
+        let key = (stream_type, name.to_string());
+        if let Some(hit) = lock(&self.streams).get(&key) {
+            return *hit;
+        }
+        let allowed = (org_wide_grant_covers(name)
+            && self.org_wide(checker, user_id, org_id, stream_type).await)
+            || checker
+                .can_read_stream(
+                    user_id,
+                    &TypedStream {
+                        org_id: org_id.to_string(),
+                        stream_type,
+                        name: name.to_string(),
+                    },
+                )
+                .await;
+        lock(&self.streams).insert(key, allowed);
+        allowed
+    }
+
+    async fn org_wide(
+        &self,
+        checker: &dyn StreamAccessChecker,
+        user_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+    ) -> bool {
+        if let Some(hit) = lock(&self.org_wide).get(&stream_type) {
+            return *hit;
+        }
+        let wide = checker
+            .org_wide_readable(user_id, org_id, &[stream_type])
+            .await
+            .contains(&stream_type);
+        lock(&self.org_wide).insert(stream_type, wide);
+        wide
+    }
+}
+
 /// Checks stream permissions, returning `Some(forbidden response)` when the
 /// user is not permitted and `None` when access is allowed.
 #[cfg(feature = "enterprise")]
@@ -1028,6 +1098,17 @@ pub fn stream_access_forbidden(request_org: &str, denied: &StreamAccessDenied) -
     (StatusCode::FORBIDDEN, Json(body)).into_response()
 }
 
+/// [`readable_streams`] with the live checker, for callers outside this crate.
+#[cfg(feature = "enterprise")]
+pub async fn readable_org_streams(
+    user_id: &str,
+    org_id: &str,
+    streams: HashSet<(StreamType, String)>,
+) -> Option<HashSet<(StreamType, String)>> {
+    let checker = active_checker();
+    readable_streams(checker.as_ref(), user_id, org_id, streams).await
+}
+
 /// The streams of `org_id` the user can read, or `None` when RBAC lets them read every stream.
 #[cfg(any(feature = "enterprise", test))]
 pub(crate) async fn readable_streams(
@@ -1094,6 +1175,11 @@ fn effective_role(org_id: &str, user_id: &str, role: String) -> String {
         Some(user) => user.role.to_string(),
         None => role,
     }
+}
+
+#[cfg(feature = "enterprise")]
+fn lock<T>(mutex: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 #[cfg(feature = "enterprise")]
@@ -1814,6 +1900,55 @@ mod tests {
                 (r.service_name.clone(), streams)
             })
             .collect()
+    }
+
+    // o2-enterprise#3642: a stream named on many rows costs one Check, an org-wide type one
+    // question.
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn stream_read_memo_checks_each_stream_and_type_once() {
+        let checker = FakeStreamChecker::default();
+        let stream = |name: &str| TypedStream {
+            org_id: "o1".to_string(),
+            stream_type: StreamType::Traces,
+            name: name.to_string(),
+        };
+        checker.grant_read("u1", &stream("a"));
+        let memo = StreamReadMemo::default();
+        for _ in 0..10 {
+            assert!(
+                memo.can_read(&checker, "u1", "o1", StreamType::Traces, "a")
+                    .await
+            );
+            assert!(
+                !memo
+                    .can_read(&checker, "u1", "o1", StreamType::Traces, "b")
+                    .await
+            );
+        }
+        let calls = checker.calls("u1");
+        assert_eq!(calls.streams, 2);
+        assert_eq!(calls.org_wide, vec![vec![StreamType::Traces]]);
+
+        checker.grant_read_all("u2", "o1", StreamType::Logs);
+        let memo = StreamReadMemo::default();
+        for name in ["x", "y", "z"] {
+            assert!(
+                memo.can_read(&checker, "u2", "o1", StreamType::Logs, name)
+                    .await
+            );
+        }
+        let calls = checker.calls("u2");
+        assert_eq!(calls.streams, 0);
+        assert_eq!(calls.org_wide.len(), 1);
+
+        checker.grant_admin("o1", "u3");
+        let memo = StreamReadMemo::default();
+        assert!(
+            memo.can_read(&checker, "u3", "o1", StreamType::Logs, "x")
+                .await
+        );
+        assert_eq!(checker.calls("u3"), CheckCalls::default());
     }
 
     #[tokio::test]
