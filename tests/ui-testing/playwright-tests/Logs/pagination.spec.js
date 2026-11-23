@@ -232,6 +232,7 @@ sessionTest.describe("Pagination for SQL that sets its own row count", () => {
         await sessionFixtures.navigateToBase(page);
         pageManager = new PageManager(page);
         await pageManager.logsPage.selectStream(streamA);
+        await pageManager.logsPage.waitForPickedStreamSettled(streamA);
     });
 
     sessionTest.afterAll(async ({ browser }) => {
@@ -246,16 +247,11 @@ sessionTest.describe("Pagination for SQL that sets its own row count", () => {
         }
     });
 
-    sessionTest("UNION ALL with an outer LIMIT 100 requests 100 rows and shows them on one page", { tag: ['@pagination', '@functional', '@P1'] }, async ({ page }) => {
-        const sizes = [];
-        page.on('request', (req) => {
-            const url = new URL(req.url());
-            if (/\/_search(_stream)?$/.test(url.pathname) && url.searchParams.get('search_type') === 'ui' && !url.searchParams.has('is_ui_histogram')) {
-                sizes.push(req.postDataJSON()?.query?.size);
-            }
-        });
-        await pageManager.logsPage.clearAndFillQueryEditor(`SELECT seq, msg FROM "${streamA}" UNION ALL SELECT seq, msg FROM "${streamB}" ORDER BY seq LIMIT 100`);
-        await pageManager.logsPage.clickRefreshButton();
+    sessionTest("UNION ALL with an outer LIMIT 100 requests 100 rows and shows them on one page", { tag: ['@pagination', '@functional', '@P1'] }, async () => {
+        // Only this query names streamB, so an auto-run of the picked streamA is never counted.
+        const sizes = pageManager.logsPage.recordRequestedSizes(streamB);
+        await pageManager.logsPage.fillSqlQueryAndWaitForSqlMode(`SELECT seq, msg FROM "${streamA}" UNION ALL SELECT seq, msg FROM "${streamB}" ORDER BY seq LIMIT 100`);
+        await pageManager.logsPage.runQueryAndWaitForSearchEnd(streamB);
         await pageManager.logsPage.expectResultsGridSettledWithRows();
 
         await expect.poll(() => pageManager.logsPage.getVisibleResultTitleText(), { timeout: 30000 }).toMatch(/^1 to 100 out of 100 events/);
@@ -265,8 +261,8 @@ sessionTest.describe("Pagination for SQL that sets its own row count", () => {
     });
 
     sessionTest("approx_distinct without GROUP BY is one aggregate row with the exact value", { tag: ['@pagination', '@functional', '@P1'] }, async () => {
-        await pageManager.logsPage.clearAndFillQueryEditor(`SELECT approx_distinct(msg) AS d FROM "${streamA}"`);
-        await pageManager.logsPage.clickRefreshButton();
+        await pageManager.logsPage.fillSqlQueryAndWaitForSqlMode(`SELECT approx_distinct(msg) AS d FROM "${streamA}"`);
+        await pageManager.logsPage.runQueryAndWaitForSearchEnd(streamA);
         await pageManager.logsPage.expectResultsGridSettledWithRows();
 
         await expect.poll(() => pageManager.logsPage.getVisibleResultTitleText(), { timeout: 30000 }).toMatch(/^1 to 1 out of 1 events/);

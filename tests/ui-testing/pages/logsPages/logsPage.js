@@ -523,6 +523,7 @@ export class LogsPage {
         this.searchSettledStates = `${this.logsSearchResultTableRows}, ${this.noResultsFoundText}, [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"], [data-test="logs-search-cancelled-state"], [data-test="logs-auto-run-guard"]`;
         this.resultsProgressBar = '[data-test="logs-results-progress"]';
         this.queryPlanDialog = '[data-test="query-plan-dialog"]';
+        this.queryPlanCloseBtn = `${this.queryPlanDialog} [data-test="o-dialog-close-btn"]`;
         this.queryPlanView = `${this.queryPlanDialog} [data-test="query-plan-view"]`;
         this.queryPlanTileOperators = `${this.queryPlanDialog} [data-test="query-plan-tile-operators"]`;
         this.queryPlanOperatorCards = `${this.queryPlanDialog} [data-profile-card]`;
@@ -11537,6 +11538,16 @@ export class LogsPage {
         testLogger.info('Query plan dialog is hidden');
     }
 
+    /** Close the query execution plan dialog with its close button. */
+    async closeQueryPlanDialog() {
+        // The closing More options menu holds focus, and its refocused trigger opens a tooltip over the dialog.
+        await expect(this.page.locator(this.explainQueryMenuBtn)).toBeHidden({ timeout: 10000 });
+        const closeBtn = this.page.locator(this.queryPlanCloseBtn);
+        await closeBtn.focus();
+        await closeBtn.click();
+        testLogger.info('Closed the query plan dialog with its close button');
+    }
+
     /** Click Run and wait for the hits request of `stream`, skipping the histogram call. */
     async runQueryAndWaitForStreamSearch(stream) {
         const searched = this.page.waitForResponse(
@@ -11548,6 +11559,53 @@ export class LogsPage {
         );
         await this.clickRunQueryButton();
         return await searched;
+    }
+
+    /** Wait until a picked stream's fields are loaded and the auto-run the pick may start has ended. */
+    async waitForPickedStreamSettled(stream, timeout = 60000) {
+        await expect.poll(() => this._mutateSearchObj((searchObj, skeleton) => ({
+            streams: [...searchObj.data.stream.selectedStream],
+            fieldsLoaded: searchObj.data.stream.selectedStreamFields.length > 0,
+            loadingStream: searchObj.loadingStream,
+            running: searchObj.loading || searchObj.loadingHistogram,
+            // loadingStream clears before the auto-run starts; the skeleton goes only after it has.
+            switching: document.querySelector(skeleton) !== null,
+        }), this.logsQueryPage.streamSwitchSkeleton), { timeout }).toEqual({
+            streams: [stream],
+            fieldsLoaded: true,
+            loadingStream: false,
+            running: false,
+            switching: false,
+        });
+        testLogger.info(`Stream ${stream} is loaded and no search is running`);
+    }
+
+    /** Set the editor to a SQL query and wait until the app holds it in SQL mode with the streams it names loaded. */
+    async fillSqlQueryAndWaitForSqlMode(sql) {
+        await this.clearAndFillQueryEditor(sql);
+        await this.waitForSearchQueryCommitted(sql);
+        await expect.poll(() => this._isSqlModeEnabledViaVue(), { timeout: 15000 }).toBe(true);
+        // SQL that names another stream reloads the schemas, which cancels a run started meanwhile.
+        await expect.poll(() => this._mutateSearchObj((searchObj) => searchObj.loadingStream), { timeout: 30000 }).toBe(false);
+    }
+
+    /** Run the query and wait for the hits request of `stream` to be answered and its results applied. */
+    async runQueryAndWaitForSearchEnd(stream) {
+        const response = await this.runQueryAndWaitForStreamSearch(stream);
+        expect(response.status()).toBe(200);
+        await expect.poll(() => this._mutateSearchObj((searchObj) => searchObj.loading), { timeout: 60000 }).toBe(false);
+    }
+
+    /** Record the size of every Logs UI hits request whose SQL contains `sqlPart`, from this call on. */
+    recordRequestedSizes(sqlPart) {
+        const sizes = [];
+        this.page.on('request', (req) => {
+            const url = new URL(req.url());
+            if (!/\/_search(_stream)?$/.test(url.pathname) || url.searchParams.get('search_type') !== 'ui' || url.searchParams.has('is_ui_histogram')) return;
+            const query = req.postDataJSON()?.query;
+            if (query?.sql?.includes(sqlPart)) sizes.push(query.size);
+        });
+        return sizes;
     }
 
     /** Open the Explain query dialog from the More options menu. */
