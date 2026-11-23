@@ -5914,7 +5914,6 @@ dependencies = [
  "chrono",
  "collapse",
  "config",
- "criterion",
  "dashmap",
  "datafusion",
  "futures",
