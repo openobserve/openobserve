@@ -326,6 +326,17 @@ describe("useStarterPackFlow", () => {
     expect(retry.destination).toBe("oncall");
   });
 
+  it("retries with the Email me failure stored on the record", async () => {
+    fake.installs = [record({ status: "incomplete", emailFailure: "forbidden" })];
+    fake.installPack.mockResolvedValue(record());
+    const flow = setup();
+    await flow.load();
+    await flow.retry();
+    expect(fake.installPack.mock.calls[0][1].emailFailure).toBe("forbidden");
+    await flow.install(undefined, { emailFailure: "email" });
+    expect(fake.installPack.mock.calls[1][1].emailFailure).toBe("email");
+  });
+
   it("retries a record without a stored choice with alerts off", async () => {
     fake.installs = [record({ status: "incomplete" })];
     fake.installPack.mockResolvedValue(record());

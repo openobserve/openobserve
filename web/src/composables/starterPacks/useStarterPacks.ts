@@ -794,6 +794,7 @@ export function useStarterPacks(org: string) {
       folderName,
       enableAlerts = false,
       destination,
+      emailFailure,
     }: PackInstallOptions,
   ): Promise<PackInstallRecord> => {
     const { entries } = await loadEntries(sourcePack);
@@ -814,12 +815,14 @@ export function useStarterPacks(org: string) {
     const choice = {
       ...(enableAlerts ? { enableAlerts } : {}),
       ...(destination ? { destination } : {}),
+      ...(emailFailure ? { emailFailure } : {}),
     };
     const record: PackInstallRecord = interrupted
       ? {
           ...interrupted,
           enableAlerts: undefined,
           destination: undefined,
+          emailFailure: undefined,
           ...choice,
           status: "installing",
           items: interrupted.items.filter(kept),

@@ -28,6 +28,7 @@ import {
   StarterPackPermissionError,
   leftOutIds,
   type PackChoices,
+  type PackEmailFailure,
   type PackInstallRecord,
   type PackPreview,
   type PackRecordItem,
@@ -52,6 +53,7 @@ export interface PackInstallChoice {
   enableAlerts?: boolean;
   /** Alert destination the created alerts route to, whether they start on or off. */
   destination?: string;
+  emailFailure?: PackEmailFailure;
 }
 
 const isForbidden = (error: any): boolean => error?.response?.status === 403;
@@ -301,7 +303,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
 
   const install = async (folderName?: string, choice: PackInstallChoice = {}): Promise<boolean> => {
     if (running.value) return false;
-    const { exclude: unticked = [], enableAlerts = false, destination } = choice;
+    const { exclude: unticked = [], enableAlerts = false, destination, emailFailure } = choice;
     running.value = true;
     installFailed.value = false;
     forbidden.value = false;
@@ -321,6 +323,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
         folderName,
         enableAlerts,
         destination,
+        emailFailure,
         onProgress: (next) => {
           record.value = { ...next, items: [...next.items] };
           if (enableAlerts) trackEnabled(next);
@@ -348,8 +351,8 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
 
   /** Finishes an interrupted install the way it was asked for, even after a reload. */
   const retry = () => {
-    const { enableAlerts, destination } = record.value ?? {};
-    return install(undefined, { enableAlerts, destination });
+    const { enableAlerts, destination, emailFailure } = record.value ?? {};
+    return install(undefined, { enableAlerts, destination, emailFailure });
   };
 
   const applyRemoval = async (work: () => Promise<PackRemovalResult>) => {

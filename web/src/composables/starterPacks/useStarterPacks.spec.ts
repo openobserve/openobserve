@@ -444,6 +444,17 @@ describe("useStarterPacks", () => {
       expect(JSON.parse(value)).toMatchObject({ enableAlerts: true, destination: "oncall" });
     });
 
+    it("stores why Email me failed on the record, and a resume replaces it", async () => {
+      fake.state.faults.push({ method: "post", url: /\/api\/v2\/org\/alerts/ });
+      const api = packs();
+      await api.installPack(PACK, { emailFailure: "forbidden" });
+      expect(JSON.parse([...fake.state.kv.values()][0])).toMatchObject({
+        emailFailure: "forbidden",
+      });
+      const resumed = await api.installPack(PACK, { emailFailure: "email" });
+      expect(resumed.emailFailure).toBe("email");
+    });
+
     it("sets the destination on alerts created off", async () => {
       await packs().installPack(PACK, { destination: "oncall" });
       for (const alert of fake.state.alerts) {
