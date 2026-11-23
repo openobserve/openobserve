@@ -681,7 +681,12 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), DashboardError> {
         &broadcast,
         |(dashboard_id, folder_id): (String, String)| async move {
             forget_dashboard(org_id, &dashboard_id, &folder_id).await?;
-            table::dashboards::delete_from_folder(org_id, &folder_id, &dashboard_id).await?;
+            let orphaned =
+                table::dashboards::delete_from_folder(org_id, &folder_id, &dashboard_id).await?;
+            // Deleted before the reports step lists rows, so their tuples go here.
+            for (report_id, report_folder_id) in orphaned {
+                reports::forget_deleted(org_id, &report_id, &report_folder_id).await;
+            }
             Ok(())
         },
     )

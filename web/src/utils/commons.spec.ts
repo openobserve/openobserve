@@ -614,7 +614,7 @@ describe("Commons Utility Functions", () => {
       expect(mockStore.dispatch).not.toHaveBeenCalled();
     });
 
-    it("drops the cached report lists, since the server deletes the reports of a deleted dashboard", () => {
+    it("drops the cached report lists, since a deleted dashboard deletes or changes the reports that include it", () => {
       mockStore.state.organizationData.allDashboardList = {};
       const invalidate = vi.spyOn(queryClient, "invalidateQueries");
 
@@ -1720,7 +1720,7 @@ describe("Commons Utility Functions", () => {
       expect(mockStore.dispatch).toHaveBeenCalledWith("setDashboardData", {});
     });
 
-    it("drops the cached report lists, since the server deletes the reports of a deleted dashboard", async () => {
+    it("drops the cached report lists, since a deleted dashboard deletes or changes the reports that include it", async () => {
       mockStore.state.organizationData.allDashboardList = {};
       mockStore.state.organizationData.allDashboardData = {};
       vi.mocked(dashboardService.delete).mockResolvedValue({} as AxiosResponse);

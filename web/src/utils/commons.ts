@@ -868,7 +868,7 @@ const pruneDashboardQueryCache = (store: any, folderId: string, ids: string[]) =
   }
 };
 
-// The server deletes every report that includes a deleted dashboard.
+// A deleted dashboard deletes or changes the reports that include it.
 const invalidateReportsOfDeletedDashboards = (store: {
   state: { selectedOrganization?: { identifier?: string } };
 }) => {
