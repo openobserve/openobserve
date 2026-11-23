@@ -53,6 +53,7 @@ import { getUUID } from "@/utils/uuid";
 import {
   StarterPackBusyError,
   StarterPackPermissionError,
+  StarterPackStaleError,
   copyItemId,
   copyName,
   type PackFolderType,
@@ -89,7 +90,7 @@ import {
   readSchemaColumns,
 } from "./packMatchData";
 import { MAX_STREAM_COPIES } from "./streamCandidates";
-import { contentHash, useInstallRecords } from "./useInstallRecords";
+import { contentHash, isRunning, useInstallRecords } from "./useInstallRecords";
 import { catalogVersion } from "./usePackCatalog";
 import { StreamRewriteError } from "./streamRewriter";
 import { useRewriteChecks } from "./useRewriteChecks";
@@ -762,9 +763,15 @@ export function useStarterPacks(org: string) {
     }
   };
 
+  // Other tabs read a quiet `installing` record as stopped, so every write of a run is stamped.
+  const writeRun = (record: PackInstallRecord) => {
+    record.updatedAt = Date.now() * 1000;
+    return records.write(record);
+  };
+
   const writeFirstRecord = async (record: PackInstallRecord) => {
     try {
-      await records.write(record);
+      await writeRun(record);
     } catch (error: any) {
       if (error?.response?.status === 403) throw new StarterPackPermissionError();
       throw error;
@@ -785,10 +792,19 @@ export function useStarterPacks(org: string) {
     throw new StarterPackBusyError(earlier.installedBy ?? "");
   };
 
+  // Two users can continue one stopped setup; the last claim written keeps going, the other stops.
+  const stopIfClaimLost = async (record: PackInstallRecord) => {
+    const stored = await records.read(record.packId, record.installId);
+    // A record gone mid-run was undone or removed, so the caller must re-read, not wait on it.
+    if (!stored) throw new StarterPackStaleError();
+    if (stored.runId !== record.runId) throw new StarterPackBusyError(record.installedBy ?? "");
+  };
+
   const runInstall = async (
     sourcePack: StarterPack,
     {
       exclude = [],
+      resumeOf,
       onProgress,
       repairs = [],
       bindings = [],
@@ -806,10 +822,13 @@ export function useStarterPacks(org: string) {
     const unfinished = (await records.list(sourcePack.id)).filter(
       ({ status }) => status === "installing" || status === "incomplete",
     );
-    // Only whoever started a setup may finish it, so another's unfinished one blocks this run.
-    const interrupted = unfinished.find(({ installedBy }) => (installedBy ?? "") === me);
-    const theirs = unfinished[0];
-    if (!interrupted && theirs) throw new StarterPackBusyError(theirs.installedBy ?? "");
+    // A live run blocks everyone, its starter's other tabs too; a stopped one is anyone's to finish.
+    const live = unfinished.find((row) => isRunning(row, Date.now() * 1000));
+    if (live) throw new StarterPackBusyError(live.installedBy ?? "");
+    const interrupted = resumeOf
+      ? unfinished.find(({ installId }) => installId === resumeOf)
+      : (unfinished.find(({ installedBy }) => (installedBy ?? "") === me) ?? unfinished[0]);
+    if (resumeOf && !interrupted) throw new StarterPackStaleError();
     const pack = withFolder(sourcePack, interrupted?.folderName ?? folderName);
     // A resumed record still lists items the current plan leaves out; only made ones stay.
     const excluded = (item: PackRecordItem) =>
@@ -828,11 +847,13 @@ export function useStarterPacks(org: string) {
           emailFailure: undefined,
           ...choice,
           status: "installing",
+          runId: getUUID(),
           items: interrupted.items.filter(kept),
         }
       : {
           packId: pack.id,
           installId: getUUID(),
+          runId: getUUID(),
           status: "installing",
           installedBy: me,
           version: pack.version,
@@ -845,12 +866,24 @@ export function useStarterPacks(org: string) {
           items: (await planItems(pack, entries, copies)).filter((item) => !excluded(item)),
         };
     // Stamped after planning, so the order the race check reads is the order of the writes.
+    // A resume restamps it too, since the Undo window counts from the run that made the items.
     record.installedAt = Date.now() * 1000;
     await writeFirstRecord(record);
-    // A resumed record was already the pack's active one, so only a fresh one can lose the race.
-    if (!interrupted) await stopIfNotFirst(record);
+    // A fresh record races other starters; a resumed one races other continuers.
+    if (interrupted) await stopIfClaimLost(record);
+    else await stopIfNotFirst(record);
     onProgress?.(record);
-    return settleRecord(pack, record, entries, onProgress, enableAlerts, destination, !interrupted);
+    const fresh = !interrupted;
+    return settleRecord(pack, record, entries, onProgress, enableAlerts, destination, fresh).catch(
+      async (error) => {
+        // Marked stopped at once, so a Finish need not wait out the quiet window; best effort.
+        const stored = await records.read(record.packId, record.installId).catch(() => null);
+        if (stored?.runId === record.runId) {
+          await records.write({ ...record, status: "incomplete" }).catch(() => {});
+        }
+        throw error;
+      },
+    );
   };
 
   const settleRecord = async (
@@ -875,7 +908,8 @@ export function useStarterPacks(org: string) {
         destination,
         fresh,
       );
-      await records.write(record);
+      await stopIfClaimLost(record);
+      await writeRun(record);
       onProgress?.(record);
       // Everything after a folder needs its id.
       if (item.kind === "folder" && record.items[index].status === "failed") break;
@@ -885,7 +919,8 @@ export function useStarterPacks(org: string) {
       ["created", "existing", "skipped"].includes(status),
     );
     record.status = settled ? "complete" : "incomplete";
-    await records.write(record);
+    await stopIfClaimLost(record);
+    await writeRun(record);
     return record;
   };
 
@@ -996,6 +1031,10 @@ export function useStarterPacks(org: string) {
   const undoPack = async (pack: StarterPack, installId: string): Promise<PackRemovalResult> => {
     await installSettled(pack);
     const record = await records.read(pack.id, installId);
+    // Another tab or user is still making items, which a removal would race.
+    if (record && isRunning(record, Date.now() * 1000)) {
+      throw new StarterPackBusyError(record.installedBy ?? "");
+    }
     return record ? removeInstall(pack, record) : { removed: [], kept: [] };
   };
 

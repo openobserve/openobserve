@@ -23,8 +23,14 @@ import store from "@/test/unit/helpers/store";
 import { HOST_METRICS_DASHBOARD_TITLE } from "@/composables/useHostMetricsDashboard";
 
 import type { PackStreamRole, StarterPack } from "./types";
-import { leftOutIds, StarterPackBusyError, StarterPackPermissionError } from "./types";
+import {
+  leftOutIds,
+  StarterPackBusyError,
+  StarterPackPermissionError,
+  StarterPackStaleError,
+} from "./types";
 import { catalogVersion, packById } from "./usePackCatalog";
+import { UNDO_WINDOW_US } from "./useStarterPackFlow";
 import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
 
 const library = vi.hoisted(() => ({
@@ -267,6 +273,7 @@ const counts = () => ({
 });
 const FULL = { alertFolders: 1, dashboardFolders: 1, dashboards: 1, alerts: 2, views: 1 };
 const EMPTY = { alertFolders: 0, dashboardFolders: 0, dashboards: 0, alerts: 0, views: 0 };
+const MINUTE_US = 60_000_000;
 
 describe("useStarterPacks", () => {
   beforeEach(() => {
@@ -762,12 +769,13 @@ describe("useStarterPacks", () => {
         expect(counts()).toEqual(EMPTY);
       });
 
-      it("never resumes an unfinished setup someone else started", async () => {
+      it("never resumes a setup someone else is still running", async () => {
         const theirs = {
           packId: "kubernetes",
           installId: "other",
-          status: "incomplete",
-          installedAt: Number.MAX_SAFE_INTEGER,
+          status: "installing",
+          installedAt: Date.now() * 1000 - MINUTE_US * 20,
+          updatedAt: Date.now() * 1000 - 5_000_000,
           installedBy: "first@example.com",
           items: [],
         };
@@ -784,12 +792,212 @@ describe("useStarterPacks", () => {
         expect(counts()).toEqual(EMPTY);
       });
 
+      it("never resumes this user's own setup still running in another tab", async () => {
+        const mine = {
+          packId: "kubernetes",
+          installId: "other",
+          status: "installing",
+          installedAt: Date.now() * 1000 - 5_000_000,
+          installedBy: store.state.userInfo?.email ?? "",
+          items: [],
+        };
+        fake.state.kv.set(otherKey, JSON.stringify(mine));
+
+        const error = await packs()
+          .installPack(PACK)
+          .catch((caught) => caught);
+
+        expect(error).toBeInstanceOf(StarterPackBusyError);
+        expect(JSON.parse(fake.state.kv.get(otherKey)!)).toEqual(mine);
+        expect(counts()).toEqual(EMPTY);
+      });
+
       it("carries on when the other started later", async () => {
         seedOther(Number.MAX_SAFE_INTEGER);
         const record = await packs().installPack(PACK);
         expect(record.status).toBe("complete");
         expect(counts()).toEqual(FULL);
       });
+    });
+
+    describe("a setup that stopped partway", () => {
+      const ago = (us: number) => Date.now() * 1000 - us;
+      // An install that failed one alert, then handed to another user and left quiet.
+      const stopIt = async (patch: Record<string, unknown> = {}) => {
+        const api = packs();
+        fake.state.faults.push({ method: "post", url: /\/api\/v2\/org\/alerts/ });
+        const first = await api.installPack(PACK);
+        const key = [...fake.state.kv.keys()][0];
+        const stored = JSON.parse(fake.state.kv.get(key)!);
+        const aged = {
+          ...stored,
+          installedBy: "first@example.com",
+          updatedAt: ago(MINUTE_US * 10),
+          ...patch,
+        };
+        fake.state.kv.set(key, JSON.stringify(aged));
+        return { api, first, key };
+      };
+
+      it("lets another user finish it, keeping its starter", async () => {
+        const { api, first, key } = await stopIt();
+
+        const record = await api.installPack(PACK);
+
+        expect(record.installId).toBe(first.installId);
+        expect(record.status).toBe("complete");
+        expect(record.installedBy).toBe("first@example.com");
+        expect(JSON.parse(fake.state.kv.get(key)!).installedBy).toBe("first@example.com");
+        expect([...fake.state.kv.keys()]).toEqual([key]);
+        expect(counts()).toEqual(FULL);
+      });
+
+      it("finishes an older record with no updatedAt once its start is old", async () => {
+        const { api, first } = await stopIt({
+          status: "installing",
+          updatedAt: undefined,
+          installedAt: ago(MINUTE_US * 10),
+        });
+
+        const record = await api.installPack(PACK);
+
+        expect(record.installId).toBe(first.installId);
+        expect(record.status).toBe("complete");
+      });
+
+      it("stops a second continuer whose claim was overwritten, creating nothing", async () => {
+        const { api, key } = await stopIt();
+        const before = counts();
+        // The other continuer's claim lands right after this one's write commits.
+        fake.state.onRequest = (method, url, body) => {
+          if (method !== "post" || !url.includes("/kv/")) return;
+          fake.state.onRequest = null;
+          const claim = { ...JSON.parse(body as string), runId: "someone-else" };
+          queueMicrotask(() => fake.state.kv.set(key, JSON.stringify(claim)));
+        };
+
+        const error = await api.installPack(PACK).catch((caught) => caught);
+
+        expect(error).toBeInstanceOf(StarterPackBusyError);
+        expect(error.installedBy).toBe("first@example.com");
+        expect(counts()).toEqual(before);
+        expect(JSON.parse(fake.state.kv.get(key)!).runId).toBe("someone-else");
+      });
+
+      it("restarts the Undo window when a setup stopped days ago is finished", async () => {
+        const startedAt = ago(MINUTE_US * 60 * 24 * 4);
+        const { api, key } = await stopIt({ installedAt: startedAt });
+        const before = Date.now() * 1000;
+
+        const record = await api.installPack(PACK);
+
+        expect(record.status).toBe("complete");
+        expect(record.installedAt).toBeGreaterThanOrEqual(before);
+        expect(JSON.parse(fake.state.kv.get(key)!).installedAt).toBe(record.installedAt);
+        expect(record.installedAt! + UNDO_WINDOW_US).toBeGreaterThan(Date.now() * 1000);
+      });
+
+      it("reads a setup removed mid-claim as gone, not as busy", async () => {
+        const { api, key } = await stopIt();
+        // An admin's Undo deletes the record right after this continuer's claim commits.
+        fake.state.onRequest = (method, url) => {
+          if (method !== "post" || !url.includes("/kv/")) return;
+          fake.state.onRequest = null;
+          queueMicrotask(() => fake.state.kv.delete(key));
+        };
+
+        const error = await api.installPack(PACK).catch((caught) => caught);
+
+        expect(error).toBeInstanceOf(StarterPackStaleError);
+        expect(fake.state.kv.has(key)).toBe(false);
+      });
+
+      it("refuses to Undo a setup that is still running", async () => {
+        const { api, first, key } = await stopIt({ status: "installing", updatedAt: ago(5e6) });
+        const before = counts();
+
+        const error = await api.undoPack(PACK, first.installId).catch((caught) => caught);
+
+        expect(error).toBeInstanceOf(StarterPackBusyError);
+        expect(counts()).toEqual(before);
+        expect(fake.state.kv.has(key)).toBe(true);
+      });
+
+      it("never starts a fresh setup when the one to finish is gone", async () => {
+        const { api, first, key } = await stopIt();
+        fake.state.kv.set(
+          key,
+          JSON.stringify({ ...JSON.parse(fake.state.kv.get(key)!), status: "complete" }),
+        );
+        const before = counts();
+
+        const error = await api
+          .installPack(PACK, { resumeOf: first.installId })
+          .catch((caught) => caught);
+
+        expect(error).toBeInstanceOf(StarterPackStaleError);
+        expect(counts()).toEqual(before);
+        expect([...fake.state.kv.keys()]).toEqual([key]);
+      });
+
+      it("stops creating once another continuer claims the record mid-run", async () => {
+        const { api, key } = await stopIt();
+        // Three items left to make: both alerts and the view.
+        const stored = JSON.parse(fake.state.kv.get(key)!);
+        const reset = (item: { kind: string }) =>
+          item.kind === "alert" || item.kind === "savedView"
+            ? { kind: item.kind, itemId: (item as { itemId: string }).itemId, status: "pending" }
+            : item;
+        fake.state.kv.set(key, JSON.stringify({ ...stored, items: stored.items.map(reset) }));
+        fake.state.alerts = [];
+        fake.state.views = [];
+        let writes = 0;
+        // The other continuer's claim lands right after this run's first item write.
+        fake.state.onRequest = (method, url, body) => {
+          if (method !== "post" || !url.includes("/kv/") || (writes += 1) !== 2) return;
+          const claim = { ...JSON.parse(body as string), runId: "someone-else" };
+          queueMicrotask(() => fake.state.kv.set(key, JSON.stringify(claim)));
+        };
+
+        const error = await api.installPack(PACK).catch((caught) => caught);
+
+        expect(error).toBeInstanceOf(StarterPackBusyError);
+        expect(fake.state.alerts.length + fake.state.views.length).toBe(2);
+        const after = JSON.parse(fake.state.kv.get(key)!);
+        expect(after.runId).toBe("someone-else");
+        expect(after.status).toBe("installing");
+      });
+
+      it("lets Undo remove what another user's stopped setup created, and its record", async () => {
+        const { api, first } = await stopIt({ status: "incomplete" });
+        expect(counts()).not.toEqual(EMPTY);
+
+        const result = await api.undoPack(PACK, first.installId);
+
+        expect(result.kept).toEqual([]);
+        expect(counts()).toEqual(EMPTY);
+        expect(fake.state.kv.size).toBe(0);
+      });
+    });
+
+    it("advances updatedAt on every record write of a run", async () => {
+      let now = 1_000_000;
+      vi.spyOn(Date, "now").mockImplementation(() => (now += 1));
+      const stamps: number[] = [];
+      fake.state.onRequest = (method, url, body) => {
+        if (method === "post" && url.includes("/kv/")) {
+          stamps.push(JSON.parse(body as string).updatedAt);
+        }
+      };
+
+      await packs().installPack(PACK);
+      vi.restoreAllMocks();
+
+      expect(stamps.length).toBeGreaterThan(2);
+      for (let index = 1; index < stamps.length; index += 1) {
+        expect(stamps[index]).toBeGreaterThan(stamps[index - 1]);
+      }
+      expect(stamps.every((stamp) => typeof stamp === "number")).toBe(true);
     });
 
     it("joins a concurrent install of the same pack", async () => {

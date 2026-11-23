@@ -408,14 +408,34 @@ describe("StarterPackHomeSection", () => {
     expect(useStarterPackPopup("org").packId.value).toBe("kubernetes");
   });
 
-  it("names who started an interrupted install on Home and offers them no Finish", async () => {
+  it("names who started an interrupted install on Home and still offers Finish", async () => {
     fake.flows.kubernetes.interrupted.value = true;
     fake.flows.kubernetes.interruptedBy = ref("other@example.com");
     fake.flows.kubernetes.record = shallowRef({ status: "incomplete" });
     const wrapper = await render();
+    expect(has(wrapper, "home-pack-interrupted-btn")).toBe(true);
+    expect(wrapper.get('[data-test="home-pack-interrupted-line"]').text()).toBe(
+      "other@example.com started setting up Kubernetes.",
+    );
+  });
+
+  it("offers no Finish on Home where it would ask for an admin instead of Set up", async () => {
+    fake.flows.kubernetes.interrupted.value = true;
+    fake.flows.kubernetes.record = shallowRef({ status: "incomplete" });
+    fake.flows.hosts.forbidden.value = true;
+    const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
+    expect(homeOf(wrapper).askAdmin.value).toBe(true);
+    expect(has(wrapper, "home-pack-interrupted")).toBe(true);
+    expect(has(wrapper, "home-pack-interrupted-btn")).toBe(false);
+  });
+
+  it("says who is running a setup elsewhere on Home, with no Finish", async () => {
+    fake.flows.kubernetes.runningBy.value = "other@example.com";
+    fake.flows.kubernetes.record = shallowRef({ status: "installing" });
+    const wrapper = await render();
     expect(has(wrapper, "home-pack-interrupted-btn")).toBe(false);
     expect(wrapper.get('[data-test="home-pack-interrupted"]').text()).toBe(
-      "other@example.com started setting up Kubernetes.",
+      "other@example.com is setting up Kubernetes right now.",
     );
   });
 

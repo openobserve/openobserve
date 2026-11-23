@@ -15175,6 +15175,7 @@
     "askAdmin": "Ask an admin to set this up",
     "busyBy": "{who} is setting this pack up right now. Check back in a minute.",
     "busySomeone": "Someone else is setting this pack up right now. Check back in a minute.",
+    "busyYou": "You are setting this pack up in another tab. Check back in a minute.",
     "startedBy": "{who} started setting up this pack.",
     "startedBySomeone": "Someone else started setting up this pack.",
     "card": {
@@ -15205,6 +15206,9 @@
       "interrupted": "{title} setup stopped partway · {made} of {total} done",
       "startedBy": "{who} started setting up {title}.",
       "startedBySomeone": "Someone else started setting up {title}.",
+      "busyBy": "{who} is setting up {title} right now.",
+      "busySomeone": "Someone else is setting up {title} right now.",
+      "busyYou": "You are setting up {title} in another tab.",
       "askAdminLine": "Starter packs fit your data. Ask an admin to add them.",
       "heroTitle": "Data is live. Set up ready-made dashboards and alerts in about a minute",
       "heroLead": "from {count} pack that fits your data | from {count} packs that fit your data",

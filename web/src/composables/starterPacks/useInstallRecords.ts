@@ -20,6 +20,9 @@ import { deleteKvMutation, kvKeysQuery, kvValueQuery, setKvMutation } from "@/se
 
 import type { PackInstallRecord } from "./types";
 
+/** A run rewrites its record after every item, so one quiet this long has lost its tab. */
+export const RUN_STALE_US = 5 * 60 * 1_000_000;
+
 const keyPrefix = (packId: string) => `starter_pack.${packId}.`;
 
 const recordKey = (packId: string, installId: string) => `${keyPrefix(packId)}${installId}`;
@@ -49,6 +52,11 @@ export const contentHash = (value: unknown): string => {
   const text = JSON.stringify(sortKeys(value));
   return `${text.length.toString(16)}-${fnv1a(text)}`;
 };
+
+// Only a run writes `installing`; its last write says `complete` or `incomplete`.
+export const isRunning = (record: PackInstallRecord, nowUs: number): boolean =>
+  record.status === "installing" &&
+  nowUs - (record.updatedAt ?? record.installedAt ?? 0) < RUN_STALE_US;
 
 // The KV store is shared and user-writable, so a stored value is not trusted to be a record.
 const parseRecord = (value: string): PackInstallRecord | null => {

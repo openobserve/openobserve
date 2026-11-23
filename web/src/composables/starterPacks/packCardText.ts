@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { I18nText, useI18nTyped } from "@/types/i18n";
+import { raw, type I18nText, type useI18nTyped } from "@/types/i18n";
 
 type Translate = ReturnType<typeof useI18nTyped>["t"];
 export type HasKey = (key: string, locale?: string) => boolean;
@@ -83,4 +83,21 @@ export const packCardText = (
     if (!text.includes(MISSING)) return text;
   }
   return null;
+};
+
+/** Who is running a pack's setup right now; a title names the pack where several are listed. */
+export const packBusyText = (
+  t: Translate,
+  who: string,
+  mine: boolean,
+  title?: I18nText,
+): I18nText => {
+  if (title !== undefined) {
+    if (!who) return t("starterPacks.home.busySomeone", { title });
+    return mine
+      ? t("starterPacks.home.busyYou", { title })
+      : t("starterPacks.home.busyBy", { who: raw(who), title });
+  }
+  if (!who) return t("starterPacks.busySomeone");
+  return mine ? t("starterPacks.busyYou") : t("starterPacks.busyBy", { who: raw(who) });
 };

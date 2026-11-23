@@ -926,7 +926,7 @@ describe("StarterPackDrawer", () => {
     expect(flow.land).not.toHaveBeenCalled();
   });
 
-  it("shows an interrupted setup as step 2 with Retry and Back, and no Undo", async () => {
+  it("shows an interrupted setup as step 2 with Retry, Undo and Back", async () => {
     const failedItem = { kind: "alert", itemId: "a2", status: "failed" };
     const flow = fakeFlow({
       interrupted: ref(true),
@@ -950,6 +950,7 @@ describe("StarterPackDrawer", () => {
       "Failed · name-a2",
     );
     expect(has(wrapper, "starter-pack-progress-undo-btn")).toBe(false);
+    expect(has(wrapper, "starter-pack-setup-undo-btn")).toBe(true);
     expect(has(wrapper, "starter-pack-drawer-back-btn")).toBe(true);
     expect(wrapper.get('[data-test="starter-pack-progress-retry-btn"]').text()).toBe(
       "Retry 1 item",
@@ -1014,29 +1015,121 @@ describe("StarterPackDrawer", () => {
     );
   });
 
-  it("offers no Finish or Retry on a setup someone else started, and names them", async () => {
+  it("offers Finish on a stopped setup someone else started, and names them", async () => {
     const failedItem = { kind: "alert", itemId: "a2", status: "failed" };
     const flow = fakeFlow({
       interrupted: ref(true),
       interruptedBy: ref("other@example.com"),
+      canManage: ref(false),
       failed: ref([failedItem]),
       toCreate: ref([{ kind: "alert", itemId: "a1", status: "created" }, failedItem]),
       made: ref([{ kind: "alert", itemId: "a1", status: "created" }]),
     });
     const wrapper = render(flow);
     await flushPromises();
-    expect(has(wrapper, "starter-pack-progress-retry-btn")).toBe(false);
-    expect(has(wrapper, "starter-pack-progress-finish-btn")).toBe(false);
+    expect(has(wrapper, "starter-pack-progress-retry-btn")).toBe(true);
+    expect(has(wrapper, "starter-pack-setup-undo-btn")).toBe(false);
     expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
       "other@example.com started setting up this pack.",
     );
     flow.failed.value = [];
     flow.interruptedBy.value = "";
     await nextTick();
-    expect(has(wrapper, "starter-pack-progress-finish-btn")).toBe(false);
+    expect(has(wrapper, "starter-pack-progress-finish-btn")).toBe(true);
+    await wrapper.get('[data-test="starter-pack-progress-finish-btn"]').trigger("click");
+    expect(flow.retry).toHaveBeenCalled();
     expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
       "Someone else started setting up this pack.",
     );
+  });
+
+  it("offers an admin Finish and Undo on another user's stopped setup", async () => {
+    const flow = fakeFlow({
+      interrupted: ref(true),
+      interruptedBy: ref("other@example.com"),
+      canManage: ref(true),
+      toCreate: ref([
+        { kind: "alert", itemId: "a0", status: "created" },
+        { kind: "alert", itemId: "a1", status: "pending" },
+      ]),
+      made: ref([{ kind: "alert", itemId: "a0", status: "created" }]),
+    });
+    const wrapper = render(flow);
+    await flushPromises();
+    expect(has(wrapper, "starter-pack-progress-finish-btn")).toBe(true);
+    await wrapper.get('[data-test="starter-pack-setup-undo-btn"]').trigger("click");
+    await wrapper.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
+    await flushPromises();
+    expect(flow.undo).toHaveBeenCalled();
+  });
+
+  it("closes an open Undo confirm when the install record changes under it", async () => {
+    const flow = fakeFlow({
+      interrupted: ref(true),
+      record: shallowRef({ installId: "i1", status: "incomplete", runId: "r1" }),
+      toCreate: ref([
+        { kind: "alert", itemId: "a0", status: "created" },
+        { kind: "alert", itemId: "a1", status: "pending" },
+      ]),
+      made: ref([{ kind: "alert", itemId: "a0", status: "created" }]),
+    });
+    const wrapper = render(flow);
+    await flushPromises();
+    await wrapper.get('[data-test="starter-pack-setup-undo-btn"]').trigger("click");
+    expect(has(wrapper, "starter-pack-drawer-confirm")).toBe(true);
+    flow.record.value = { installId: "i1", status: "incomplete", runId: "r1" } as never;
+    await flushPromises();
+    expect(has(wrapper, "starter-pack-drawer-confirm")).toBe(true);
+    flow.record.value = { installId: "i1", status: "complete", runId: "r2" } as never;
+    await flushPromises();
+    expect(has(wrapper, "starter-pack-drawer-confirm")).toBe(false);
+  });
+
+  it("offers no Finish when the stopped setup is one this user may not set up, and says so", () => {
+    const wrapper = render(
+      fakeFlow({
+        interrupted: ref(true),
+        interruptedBy: ref("other@example.com"),
+        forbidden: ref(true),
+        canManage: ref(false),
+      }),
+    );
+    expect(has(wrapper, "starter-pack-progress-finish-btn")).toBe(false);
+    expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
+      "You can't set up this pack in this org. Ask an admin.",
+    );
+  });
+
+  it("shows a setup running elsewhere with no Set up, Finish or Undo", async () => {
+    const flow = fakeFlow({
+      preview: shallowRef(PREVIEW),
+      runningBy: ref("other@example.com"),
+      canManage: ref(true),
+      toCreate: ref([{ kind: "alert", itemId: "a1", status: "pending" }]),
+    });
+    const wrapper = render(flow);
+    await flushPromises();
+    for (const id of [
+      "starter-pack-drawer-submit-btn",
+      "starter-pack-progress-finish-btn",
+      "starter-pack-progress-retry-btn",
+      "starter-pack-setup-undo-btn",
+      "starter-pack-progress-running-btn",
+    ]) {
+      expect(has(wrapper, id)).toBe(false);
+    }
+    expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
+      "other@example.com is setting this pack up right now. Check back in a minute.",
+    );
+    flow.runningBy.value = "user@example.com";
+    await nextTick();
+    expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
+      "You are setting this pack up in another tab. Check back in a minute.",
+    );
+    flow.runningBy.value = null;
+    flow.interrupted.value = true;
+    await nextTick();
+    expect(has(wrapper, "starter-pack-progress-finish-btn")).toBe(true);
   });
 
   it("offers Finish on an interrupted install without failures", () => {
