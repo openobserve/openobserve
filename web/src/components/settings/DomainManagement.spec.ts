@@ -234,6 +234,33 @@ describe("DomainManagement Component", () => {
       expect(mockDomainManagement.getDomainRestrictions).toHaveBeenCalledWith("test-meta-org");
     });
 
+    it("shows the no-access state instead of the form when the config read is refused", async () => {
+      mockDomainManagement.getDomainRestrictions.mockRejectedValueOnce({
+        response: { status: 403, data: { message: "Not allowed" } },
+      });
+      const refused = mount(DomainManagement, {
+        global: { plugins: [i18n], stubs: { OEmptyState: true } },
+      });
+      await flushPromises();
+
+      expect(refused.findComponent({ name: "OEmptyState" }).exists()).toBe(true);
+      expect(refused.find('[data-test="domain-management-claim-parser-title"]').exists()).toBe(
+        false,
+      );
+      refused.unmount();
+    });
+
+    it("keeps the form when the config read fails for another reason", async () => {
+      mockDomainManagement.getDomainRestrictions.mockRejectedValueOnce({
+        response: { status: 500, data: { message: "boom" } },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="domain-management-forbidden"]').exists()).toBe(false);
+      expect(wrapper.find(".domain_management").exists()).toBe(true);
+    });
+
     it("should redirect if not meta organization", async () => {
       mockStore.state.selectedOrganization.identifier = "different-org";
 
@@ -595,6 +622,90 @@ describe("DomainManagement Component", () => {
     beforeEach(async () => {
       wrapper = createWrapper();
       await flushPromises();
+    });
+
+    it("keeps the allow rule of a domain that also has blocked users", async () => {
+      mockDomainManagement.getDomainRestrictions.mockResolvedValue({
+        data: {
+          enabled: true,
+          domains: [
+            { domain: "acme.com", allow_all_users: true, allowed_emails: [], enabled: true },
+            { domain: "other.com", allow_all_users: true, allowed_emails: [], enabled: true },
+          ],
+          blocked_emails: ["alice@acme.com"],
+          blocked_domains: [],
+        },
+      });
+      wrapper.unmount();
+      wrapper = createWrapper();
+      await flushPromises();
+
+      wrapper.vm.domains.push({
+        name: "new.example",
+        policy: "allow_all",
+        allowedEmails: [],
+        blockedEmails: [],
+      });
+      await wrapper.vm.saveChanges();
+
+      const [, sent] = mockDomainManagement.updateDomainRestrictions.mock.calls[0];
+      expect(sent.domains.map((d: { domain: string }) => d.domain)).toEqual([
+        "acme.com",
+        "other.com",
+        "new.example",
+      ]);
+      expect(sent.blocked_emails).toEqual(["alice@acme.com"]);
+    });
+
+    const loadMixed = async () => {
+      mockDomainManagement.getDomainRestrictions.mockResolvedValue({
+        data: {
+          enabled: true,
+          domains: [
+            { domain: "acme.com", allow_all_users: true, allowed_emails: [], enabled: true },
+            { domain: "other.com", allow_all_users: true, allowed_emails: [], enabled: true },
+          ],
+          blocked_emails: ["alice@acme.com"],
+          blocked_domains: [],
+        },
+      });
+      wrapper.unmount();
+      wrapper = createWrapper();
+      await flushPromises();
+    };
+    const sentDomains = (call: number) =>
+      mockDomainManagement.updateDomainRestrictions.mock.calls[call][1].domains.map(
+        (d: { domain: string }) => d.domain,
+      );
+
+    it("unblocks by removing the card and keeps the domain's allow rule", async () => {
+      await loadMixed();
+      const vm = wrapper.vm;
+      vm.removeDomain(vm.domains.findIndex((d: { name: string }) => d.name === "acme.com"));
+      vm.doRemoveDomain();
+      await vm.saveChanges();
+
+      expect(sentDomains(0)).toEqual(["acme.com", "other.com"]);
+      expect(mockDomainManagement.updateDomainRestrictions.mock.calls[0][1].blocked_emails).toEqual(
+        [],
+      );
+      expect(vm.domains.map((d: { name: string; policy: string }) => [d.name, d.policy])).toEqual([
+        ["acme.com", "allow_all"],
+        ["other.com", "allow_all"],
+      ]);
+    });
+
+    it("writes what the server last saved, whatever the order of policy edits", async () => {
+      await loadMixed();
+      const vm = wrapper.vm;
+      const acme = vm.domains.find((d: { name: string }) => d.name === "acme.com");
+      acme.policy = "block_all";
+      await vm.saveChanges();
+      acme.policy = "block_specific";
+      await vm.saveChanges();
+
+      expect(sentDomains(0)).toEqual(["acme.com", "other.com"]);
+      expect(sentDomains(1)).toEqual(["acme.com", "other.com"]);
     });
 
     it("sends the domains Save was clicked on and keeps a later edit unsaved", async () => {

@@ -95,7 +95,7 @@ number.
 | 5 min | `MEDIUM_STALE_TIME` | logs & streams (name list, stream page, schema), saved views, traces (DAG, service graph), service correlation (semantic groups, identity config, discovered services, dimension analytics), org summary counts, AI observability (agents, experiments, remote tasks, datasets, queues), online evals, on-call **derived** (reachability, config risks, team load, resolved schedule, overrides, unavailability, ownership stats), DB monitoring instances |
 | 1 h | `NORMAL_STALE_TIME` | dashboards (+ annotations), pipelines (+ history), functions, query functions, workflows (folder lists, search, run history), reports, folders, nodes, IAM (users, roles, groups, resources, service accounts), ingestion/RUM tokens, org passcode, cipher keys, org settings, settings KV, alert destinations + templates, regex patterns, model pricing, AI toolsets, synthetics agent tokens, on-call **config** (teams, members, schedule, policy, presets, routing config, ownership rules, response history + prior causes), DB monitoring tab counts on an absolute range |
 | ∞ | `SESSION_STALE_TIME` | the two `/config` reads |
-| 0 | `staleTime: 0` | license, org cleanup-task poll (`refetchInterval` while its dialog is open) |
+| 0 | `staleTime: 0` | license, org cleanup-task poll (`refetchInterval` while its dialog is open), SSO domain-management config (the SSO page writes it without a mutation) |
 
 - A new query joins its module's row. A new module: pick the row whose data
   changes at the same speed, and name it in the table above.

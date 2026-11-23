@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "Verwijdering starten mislukt.",
       "organizationResurrected": "Organisatie hersteld.",
       "failedToResurrect": "Herstellen mislukt.",
+      "organizationBlocked": "Organisatie geblokkeerd.",
+      "failedToBlock": "Blokkeren mislukt.",
+      "organizationUnblocked": "Organisatie gedeblokkeerd.",
+      "failedToUnblock": "Deblokkeren mislukt.",
       "organizationUpdated": "Organisatie succesvol bijgewerkt.",
       "organizationAdded": "Organisatie succesvol toegevoegd.",
       "requestCompleted": "Verzoek succesvol voltooid.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "{n} dagen resterend",
     "resurrect": "Organisatie herstellen",
     "statusActive": "Actief",
-    "statusDeleting": "Wordt verwijderd"
+    "statusDeleting": "Wordt verwijderd",
+    "statusBlocked": "Geblokkeerd",
+    "block": "Organisatie blokkeren",
+    "unblock": "Organisatie deblokkeren",
+    "blockConfirmMessage": "{name} blokkeren? Tot de deblokkering accepteert de organisatie geen ingestie, query's of aanmeldingen meer.",
+    "blockConfirmLabel": "Blokkeren"
   },
   "template": {
     "search": "Sjabloon zoeken"
@@ -14979,6 +14988,12 @@
       "quickMuteTooltip": "Snel dempen vanuit een alarm",
       "endedLabel": "beëindigd"
     },
+    "lease": {
+      "temporary": "Tijdelijk, aangemaakt door {who}, eindigt om {time}",
+      "incidentsOn": "Aanmaken van incidenten ingeschakeld door {who} tot {time}",
+      "incidentsOff": "Aanmaken van incidenten uitgeschakeld door {who} tot {time}",
+      "why": "{label}. Waarom: {reason}"
+    },
     "ack": {
       "acknowledge": "Bevestigen",
       "acknowledgeGroups": "Alle {count} groep die afgaat | Alle {count} groepen die afgaan",
@@ -16217,6 +16232,36 @@
     "nodesDesc": "Clusternodes en hun status",
     "licenseDesc": "Details van enterprise-licentie",
     "organizationManagementDesc": "Organisaties aanmaken en beheren",
+    "userManagement": "Gebruikersbeheer",
+    "userManagementDesc": "Gebruikers in elke organisatie vinden en blokkeren",
+    "userManagementPage": {
+      "subtitle": "Gebruikers van elke organisatie en hun SSO-blokkeerstatus",
+      "searchPlaceholder": "Zoeken op e-mail of gebruikers-ID",
+      "allOrganizations": "Alle organisaties",
+      "filterByOrganization": "Filteren op organisatie",
+      "email": "E-mail",
+      "organizations": "Organisaties",
+      "blockState": "Blokkeerstatus",
+      "orgCount": "{count} organisatie | {count} organisaties",
+      "notBlocked": "Niet geblokkeerd",
+      "blockedByEmail": "Geblokkeerd op e-mail",
+      "blockedByDomain": "Geblokkeerd op domein",
+      "block": "Blokkeren",
+      "unblock": "Deblokkeren",
+      "blockConfirmTitle": "Deze gebruiker blokkeren?",
+      "blockConfirmMessage": "{email} wordt toegevoegd aan de SSO-blokkeerlijst en de domeinbeperkingen worden ingeschakeld.",
+      "blocked": "{email} is geblokkeerd",
+      "unblocked": "{email} is gedeblokkeerd",
+      "updateFailed": "De SSO-blokkeerlijst kon niet worden bijgewerkt",
+      "dormantRules": "Domeinbeperkingen staan uit, en ze inschakelen zou ook de regels toepassen die ze bevatten. Blokkeer deze gebruiker via {page}.",
+      "detailsTitle": "Gebruikersgegevens",
+      "userId": "Gebruikers-ID",
+      "orgId": "Organisatie-ID",
+      "orgName": "Organisatie",
+      "role": "Rol",
+      "noOrganizations": "Geen lid van een organisatie",
+      "ssoOnlyHint": "Geldt wanneer dit e-mailadres zich via SSO aanmeldt"
+    },
     "queryManagement": "Beheer van zoekopdrachten",
     "scrapintervalLabel": "Scrape-interval (in seconden) *",
     "logoLabel": "Afbeelding met Drag & Drop-logo",
@@ -16471,7 +16516,8 @@
       "noEmails": "Nog geen e-mailadressen vermeld.",
       "removeDomain": "{domain} verwijderen",
       "removeEmail": "{email} verwijderen",
-      "saved": "SSO-instellingen opgeslagen"
+      "saved": "SSO-instellingen opgeslagen",
+      "blocksRemovedKeepsAllowRule": "Blokkades verwijderd. {domain} behoudt zijn toestaanregel."
     },
     "general": {
       "close": "Sluiten",
@@ -23833,6 +23879,7 @@
       "llmProviders": "LLM-aanbieders",
       "aiToolsets": "AI-toolsets",
       "orgManagement": "Beheer van de organisatie",
+      "userManagement": "Gebruikersbeheer",
       "rumErrors": "RUM — Foutopsporing",
       "rumSessions": "{product} — Sessies",
       "sourceMaps": "RUM — Bronkaarten",
@@ -23950,6 +23997,7 @@
       "llmProvidersRefresh": "Lijst verversen",
       "aiToolsetsRefresh": "Lijst verversen",
       "orgManagementRefresh": "Lijst verversen",
+      "userManagementRefresh": "Lijst verversen",
       "rumErrorsRefresh": "Lijst verversen",
       "rumErrorsCopyUrl": "Kopieer deel-URL voor foutopsporing",
       "rumSessionsRefresh": "Lijst verversen",
