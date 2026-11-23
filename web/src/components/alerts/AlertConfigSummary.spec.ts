@@ -537,6 +537,8 @@ describe("AlertConfigSummary — layout", () => {
     const block = field(wrapper, key).findComponent(OCodeBlock);
     expect(block.exists(), `${key} is not a code block`).toBe(true);
     expect(block.props("lang")).toBe(lang);
+    // A long query wraps instead of scrolling under an overlay scrollbar.
+    expect(block.props("wrap")).toBe(true);
     expect(text(wrapper, key).exists()).toBe(false);
     expect(field(wrapper, key).classes()).toContain("col-span-full");
     // After the short fields, so it never splits a row of them.
@@ -627,6 +629,24 @@ describe("AlertConfigSummary — layout", () => {
     );
     expectShortText(threshold, "condition");
     expect(value(threshold, "warning")).toBe("> 0.5");
+  });
+
+  it("shows a PromQL threshold alert's expression as its own query row", () => {
+    const threshold = mountSummary(
+      generic({
+        type: "promql",
+        promql: "avg(x) by (region)",
+        promql_condition: { operator: ">", value: 50 },
+      }),
+    );
+    expectQueryRow(threshold, "query", "promql");
+    expect(value(threshold, "query")).toBe("avg(x) by (region)");
+    expectShortText(threshold, "condition");
+
+    const rule = mountSummary(
+      generic({ type: "promql", promql_rule_mode: true, promql: "sum(rate(errors[5m])) > 1" }),
+    );
+    expect(field(rule, "query").exists()).toBe(false);
   });
 
   it("renders an anomaly config's custom SQL and its filters as full-row code blocks", () => {

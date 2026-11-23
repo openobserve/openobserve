@@ -932,6 +932,57 @@ function countWhereLeaves(node: any): number {
   return 1;
 }
 
+const COMPARISON_OPERATORS = ["=", "!=", "<>", "<", ">", "<=", ">="];
+const STRING_TYPES = ["string", "single_quote_string"];
+const FIELD_FUNCTIONS = ["str_match", "str_match_ignore_case", "re_match", "re_not_match"];
+
+const isColumnRef = (node: any) => node?.type === "column_ref" && !!node.column;
+const isStringLiteral = (node: any) => STRING_TYPES.includes(node?.type);
+const isValueLiteral = (node: any) => isStringLiteral(node) || node?.type === "number";
+
+// LIKE only round-trips as starts-with, ends-with or a wildcard-free contains.
+function isChartableLike(pattern: any): boolean {
+  if (typeof pattern !== "string") return false;
+  const [lead, trail] = [pattern.startsWith("%"), pattern.endsWith("%")];
+  const inner = pattern.replace(/^%/, "").replace(/%$/, "");
+  if (!inner || inner.includes("%")) return false;
+  return lead && trail ? !inner.includes("_") : lead !== trail;
+}
+
+// Whether buildCondition re-emits the leaf with the same meaning (parseCondition drops the rest).
+function isChartableLeaf(node: any): boolean {
+  if (!node) return true;
+  if (node.type === "binary_expr" && (node.operator === "AND" || node.operator === "OR")) {
+    return isChartableLeaf(node.left) && isChartableLeaf(node.right);
+  }
+  if (node.type === "function") {
+    const name = node.name?.name?.[0]?.value?.toLowerCase();
+    const args = node.args?.value ?? [];
+    if (name === "match_all") return args.length === 1 && isStringLiteral(args[0]);
+    return (
+      FIELD_FUNCTIONS.includes(name) &&
+      args.length === 2 &&
+      isColumnRef(args[0]) &&
+      isStringLiteral(args[1])
+    );
+  }
+  if (node.type !== "binary_expr" || !isColumnRef(node.left)) return false;
+  const { operator, right } = node;
+  if (COMPARISON_OPERATORS.includes(operator))
+    return isValueLiteral(right) || right?.type === "bool";
+  if (operator === "IS" || operator === "IS NOT") return right?.type === "null";
+  if (operator === "IN" || operator === "NOT IN") {
+    return (
+      right?.type === "expr_list" && right.value?.length > 0 && right.value.every(isValueLiteral)
+    );
+  }
+  if (operator === "LIKE") return isStringLiteral(right) && isChartableLike(right.value);
+  if (operator === "NOT LIKE") {
+    return isStringLiteral(right) && isChartableLike(right.value) && /^%.+%$/.test(right.value);
+  }
+  return false;
+}
+
 function countFilterConditions(filter: any): number {
   if (!filter) return 0;
   if (filter.filterType === "condition") return 1;
@@ -1515,7 +1566,12 @@ export const parseWhereClauseToFilterChecked = async (
   const filter = await parseWhereClauseToFilter(whereClauseText);
   try {
     const ast: any = parser.astify(`SELECT * FROM "dummy" WHERE ${whereClauseText}`);
-    return { filter, complete: countWhereLeaves(ast?.where) === countFilterConditions(filter) };
+    return {
+      filter,
+      complete:
+        isChartableLeaf(ast?.where) &&
+        countWhereLeaves(ast?.where) === countFilterConditions(filter),
+    };
   } catch {
     return { filter, complete: false };
   }

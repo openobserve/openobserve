@@ -120,8 +120,8 @@ export class ReportsFormValidationPage {
 
     // ── Step 1 actions ────────────────────────────────────────────────────────
 
-    async fillReportName(name) {
-        await this.page.locator(this.reportNameInput).waitFor({ state: 'visible', timeout: 8000 });
+    async fillReportName(name, timeout = 8000) {
+        await this.page.locator(this.reportNameInput).waitFor({ state: 'visible', timeout });
         await this.page.locator(this.reportNameInput).fill(name);
     }
 
@@ -305,6 +305,7 @@ export class ReportsFormValidationPage {
 
     // ── Locator getters for assertions ────────────────────────────────────────
 
+    getReportNameInputLocator()     { return this.page.locator(this.reportNameInput); }
     getReportNameErrorLocator()     { return this.page.locator(this.reportNameError); }
     getDashboardFolderErrorLocator() { return this.page.locator(this.dashboardFolderError); }
     getDashboardNameErrorLocator()  { return this.page.locator(this.dashboardNameError); }

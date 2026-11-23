@@ -1795,10 +1795,18 @@ mod tests {
         use config::meta::{
             alerts::alert_calibration::DIGEST_STREAM, self_reporting::redaction::is_platform_write,
         };
-        for job in [SystemJobType::AlertCalibration, SystemJobType::AutoObserve] {
+        for job in [
+            SystemJobType::AlertCalibration,
+            SystemJobType::AutoObserve,
+            SystemJobType::SessionReplay,
+        ] {
             let writer = IngestUser::SystemJob(job);
             assert!(is_internal_writer(&writer, false), "{job:?}");
-            for stream in [DIGEST_STREAM, "_o2_autoobserve_health"] {
+            for stream in [
+                DIGEST_STREAM,
+                "_o2_autoobserve_health",
+                "_o2_sessionreplay_resources",
+            ] {
                 assert!(!is_blocked_internal_rollup_write(stream, &writer, false));
                 assert!(is_platform_write(false, true, stream, stream), "{stream}");
             }

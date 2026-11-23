@@ -262,6 +262,90 @@ def test_sdr_02_redaction_applies_to_rows_ingested_after_association(
 
 
 # ---------------------------------------------------------------------------
+# SDR-12..14 — o2-enterprise#3610: redaction runs at the scan, so no query shape bypasses it
+# ---------------------------------------------------------------------------
+
+# Every shape #3610 found returning the raw value while redaction ran on the response.
+BYPASS_QUERIES = [
+    "SELECT lower(body) AS v FROM {s}",
+    "SELECT upper(body) AS v FROM {s}",
+    "SELECT reverse(body) AS v FROM {s}",
+    "SELECT replace(body, 'charged card ', '') AS v FROM {s}",
+    "SELECT regexp_replace(body, '^charged card ', '') AS v FROM {s}",
+    "SELECT substr(body, 14, 16) AS v FROM {s}",
+    "SELECT concat(substr(body, 1, 20), substr(body, 21)) AS v FROM {s}",
+    "SELECT CAST(body AS VARCHAR) AS v FROM {s}",
+    "SELECT array_agg(body) AS v FROM {s}",
+    "SELECT body AS v, count(*) AS c FROM {s} GROUP BY body",
+    "SELECT DISTINCT body AS v FROM {s}",
+    "SELECT v FROM (SELECT lower(body) AS v FROM {s}) sub",
+    "WITH c AS (SELECT body FROM {s}) SELECT reverse(body) AS v FROM c",
+]
+
+
+def _leaks(payload):
+    text = str(payload)
+    return CARD in text or CARD[::-1] in text
+
+
+@pytest.mark.parametrize("sql", BYPASS_QUERIES)
+def test_sdr_12_no_query_shape_returns_the_raw_value(create_session, base_url, redacted_stream, sql):
+    resp = _search(create_session, base_url, sql.format(s=f'"{redacted_stream["stream"]}"'))
+    assert resp.status_code == 200, f"{sql}: {resp.status_code} {resp.text}"
+    hits = resp.json().get("hits", [])
+    assert hits, f"{sql} returned no rows; the fixture row should be searchable"
+    assert not _leaks(hits), f"{sql} leaked the raw value: {hits}"
+
+
+def test_sdr_13_filters_and_encodings_see_only_redacted_values(
+    create_session, base_url, redacted_stream
+):
+    stream = f'"{redacted_stream["stream"]}"'
+    resp = _search(create_session, base_url, f"SELECT encode(body, 'base64') AS v FROM {stream}")
+    assert resp.status_code == 200, resp.text
+    # DataFusion's base64 omits the padding
+    decoded = [base64.b64decode(h["v"] + "=" * (-len(h["v"]) % 4)).decode() for h in resp.json()["hits"]]
+    assert decoded, "no rows came back"
+    assert not _leaks(decoded), f"base64 carried the raw value: {decoded}"
+
+    # A predicate that is true for the redacted value must not select rows by the raw one.
+    oracle = _search(
+        create_session,
+        base_url,
+        f"SELECT count(*) AS c FROM {stream} WHERE body LIKE '%{CARD[:6]}%'",
+    )
+    assert oracle.status_code == 200, oracle.text
+    assert oracle.json()["hits"][0]["c"] == 0, f"a filter matched the raw value: {oracle.text}"
+
+
+def test_sdr_14_query_function_and_streaming_see_only_redacted_values(
+    create_session, base_url, redacted_stream
+):
+    now = int(time.time() * 1_000_000)
+    query = {
+        "sql": f'SELECT * FROM "{redacted_stream["stream"]}"',
+        "start_time": now - 60 * 60 * 1_000_000,
+        "end_time": now,
+        "from": 0,
+        "size": 50,
+        # A query function copying the field ran before the old response-level redaction.
+        "query_fn": base64.b64encode(b".leak = .body\n.").decode(),
+    }
+    resp = create_session.post(f"{base_url}api/{ORG_ID}/_search?type=logs", json={"query": query})
+    assert resp.status_code == 200, resp.text
+    hits = resp.json().get("hits", [])
+    assert any("[REDACTED]" in h.get("leak", "") for h in hits), f"no copied field: {hits}"
+    assert not _leaks(hits), f"the query function copy leaked the raw value: {hits}"
+
+    stream = create_session.post(
+        f"{base_url}api/{ORG_ID}/_search_stream?type=logs", json={"query": query}
+    )
+    assert stream.status_code == 200, stream.text
+    assert "[REDACTED]" in stream.text, f"streaming returned no redacted row: {stream.text[:300]}"
+    assert not _leaks(stream.text), "the streaming search leaked the raw value"
+
+
+# ---------------------------------------------------------------------------
 # SDR-03..06 — the admission guards that keep an association buildable
 # ---------------------------------------------------------------------------
 

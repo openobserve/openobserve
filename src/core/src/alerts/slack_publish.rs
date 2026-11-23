@@ -23,13 +23,14 @@ use bytes::Bytes;
 use config::meta::{
     alerts::{
         level::AlertLevel,
+        notification_kind::NotificationKind,
         recovery::RecoveryEvent,
         state::{AlertState, ROLLUP_GROUP_KEY},
     },
     destinations::{DestinationType, Module, SlackAppTarget, Template, TemplateKind},
     slack::{
-        ALERT_SLACK_EVENT_VERSION, AlertSlackEvent, AlertSlackEventKind, RenderedWire,
-        SLACK_OUTBOUND_TOPIC, SlackAlertMessageKey,
+        ALERT_SLACK_EVENT_VERSION, ANOMALY_GROUP_KEY, AlertSlackEvent, AlertSlackEventKind,
+        RenderedWire, SLACK_OUTBOUND_TOPIC, SlackAlertMessageKey,
     },
 };
 use dashmap::DashMap;
@@ -52,6 +53,18 @@ pub const MAX_CHART_PNG_BYTES: usize = 512 * 1024;
 pub const MAX_CONTENT_BYTES: usize = 16 * 1024;
 /// A predicted single-row firing start older than this belongs to a run that never persisted.
 const PENDING_START_TTL_MICROS: i64 = 60 * 60 * 1_000_000;
+
+/// Slack codes whose failed-test detail is our hint plus the code, as enterprise maps them.
+#[cfg(any(feature = "enterprise", test))]
+const HINTED_SLACK_CODES: [&str; 7] = [
+    "not_in_channel",
+    "channel_not_found",
+    "is_archived",
+    "invalid_auth",
+    "token_revoked",
+    "account_inactive",
+    "not_authed",
+];
 
 /// Single-row firing starts handed to a send before the run's state commit writes them.
 static PENDING_STARTS: LazyLock<DashMap<String, i64>> = LazyLock::new(DashMap::new);
@@ -188,6 +201,7 @@ pub fn build_event(
             .and_then(|png| chart_b64(t.alert_id, png)),
         level,
         at,
+        anomaly: None,
     }
 }
 
@@ -277,14 +291,38 @@ fn templated_post_event(
     now: i64,
 ) -> anyhow::Result<AlertSlackEvent> {
     let rendered = render_wire(template, ctx)?;
-    let target = post_target(org_id, destination_id, "", now.max(0) as u64);
-    Ok(build_event(
-        &target,
-        level_of(ctx),
-        rendered,
-        chart(ctx),
-        now,
-    ))
+    let thread = anomaly_thread(ctx);
+    let mut target = post_target(org_id, destination_id, "", now.max(0) as u64);
+    if let Some((anomaly_id, hint)) = thread {
+        // The leader finds the thread by detector, and each fire's data time keys its root row.
+        target.alert_id = anomaly_id;
+        target.group_key = ANOMALY_GROUP_KEY;
+        target.firing_started_at = hint.data_us;
+    }
+    let mut event = build_event(&target, level_of(ctx), rendered, chart(ctx), now);
+    event.anomaly = thread.map(|(_, hint)| hint.clone());
+    Ok(event)
+}
+
+/// The detector id and thread hint of an anomaly send; any other kind posts one-off.
+fn anomaly_thread(
+    ctx: &NotificationContext,
+) -> Option<(
+    &str,
+    &crate::alerts::notifications::context::SlackThreadHint,
+)> {
+    let hint = ctx
+        .slack_thread
+        .as_ref()
+        .filter(|_| ctx.kind == NotificationKind::Anomaly)?;
+    let anomaly_id = ctx
+        .context_attributes
+        .iter()
+        .find(|(key, _)| key == "anomaly_id")
+        .map(|(_, id)| id.as_str())
+        .or(ctx.episode_id.as_deref())
+        .filter(|id| !id.is_empty())?;
+    Some((anomaly_id, hint))
 }
 
 /// The short thread reply of a recovery a downtime did not mute; the green edit is the clear's.
@@ -636,10 +674,16 @@ async fn test_outcome(
             .await
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     if outcome.posted {
-        Ok(outcome.detail)
-    } else {
-        Err(anyhow::anyhow!(outcome.detail))
+        return Ok(outcome.detail);
     }
+    log::warn!(
+        "[SLACK] test post for org {org_id} failed: {}",
+        outcome.detail
+    );
+    Err(anyhow::anyhow!(failed_post_message(
+        outcome.error.as_deref(),
+        outcome.detail
+    )))
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -649,6 +693,16 @@ async fn test_outcome(
     _wire: RenderedWire,
 ) -> anyhow::Result<String> {
     Err(anyhow::anyhow!("Slack app needs Enterprise"))
+}
+
+/// Keeps the detail only for a hinted Slack code; other details can carry raw transport text.
+#[cfg(any(feature = "enterprise", test))]
+fn failed_post_message(slack_code: Option<&str>, detail: String) -> String {
+    if slack_code.is_some_and(|code| HINTED_SLACK_CODES.contains(&code)) {
+        detail
+    } else {
+        "Couldn't post the test message to Slack".to_string()
+    }
 }
 
 fn post_target<'a>(
@@ -1538,6 +1592,54 @@ mod tests {
         );
     }
 
+    #[test]
+    fn an_anomaly_post_is_keyed_by_the_detector_and_its_data_time() {
+        use config::meta::slack::AnomalyThreadInfo;
+        let template = Template {
+            body: "{alert_name}".to_string(),
+            ..Default::default()
+        };
+        let hint = AnomalyThreadInfo {
+            first_anomaly_us: Some(10),
+            data_us: 900,
+            bucket_end_us: 800,
+            gap_us: 3_600_000_000,
+            closes: false,
+            thread_headline: Some("checkout rose 50.0% above expected".into()),
+            model_version: Some(7),
+            recovered_at_us: None,
+        };
+        let anomaly = NotificationContext {
+            kind: NotificationKind::Anomaly,
+            episode_id: Some("2Kanomaly".into()),
+            context_attributes: vec![("anomaly_id".into(), "2Kanomaly".into())],
+            slack_thread: Some(hint.clone()),
+            ..ctx()
+        };
+        let event = templated_post_event("acme", "dest-1", &template, &anomaly, 5).unwrap();
+        assert_eq!(event.kind, AlertSlackEventKind::Post);
+        assert_eq!(event.alert_id, "2Kanomaly");
+        assert_eq!(event.group_key, ANOMALY_GROUP_KEY);
+        assert_eq!(event.firing_started_at, 900);
+        assert_eq!(event.anomaly, Some(hint.clone()));
+
+        let other = NotificationContext {
+            slack_thread: Some(hint),
+            ..ctx()
+        };
+        let event = templated_post_event("acme", "dest-1", &template, &other, 5).unwrap();
+        assert_eq!(event.alert_id, "");
+        assert_eq!(event.group_key, "");
+        assert_eq!(event.firing_started_at, 0);
+        assert_eq!(event.anomaly, None, "other kinds post one-off as before");
+        let plain = NotificationContext {
+            kind: NotificationKind::Anomaly,
+            ..ctx()
+        };
+        let event = templated_post_event("acme", "dest-1", &template, &plain, 5).unwrap();
+        assert_eq!(event.anomaly, None, "an anomaly with no hint posts one-off");
+    }
+
     #[tokio::test]
     async fn a_failed_publish_is_a_failed_send_and_a_good_one_is_keyed() {
         let down = Recorder {
@@ -1564,5 +1666,24 @@ mod tests {
             "{err}"
         );
         assert!(rec.sent.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_failed_test_post_keeps_only_a_hinted_slack_detail() {
+        let detail = "not_in_channel: invite the OpenObserve app to #ops";
+        for (code, want) in [
+            (Some("not_in_channel"), detail),
+            (
+                Some("transport: error sending request"),
+                "Couldn't post the test message to Slack",
+            ),
+            (None, "Couldn't post the test message to Slack"),
+        ] {
+            assert_eq!(
+                failed_post_message(code, detail.to_string()),
+                want,
+                "{code:?}"
+            );
+        }
     }
 }

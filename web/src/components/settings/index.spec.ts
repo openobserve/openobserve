@@ -249,12 +249,14 @@ describe("SettingsIndex", () => {
         (i: any) => i.dataTest === "organization-management-tab",
       );
       const syntheticsItem = items.find((i: any) => i.key === "synthetics_locations");
+      const userManagementItem = items.find((i: any) => i.dataTest === "user-management-tab");
 
       expect(queryItem?.visible).toBe(true);
       expect(nodesItem?.visible).toBe(true);
       expect(domainItem?.visible).toBe(true);
       expect(orgManagementItem?.visible).toBe(true);
       expect(syntheticsItem?.visible).toBe(true);
+      expect(userManagementItem?.visible).toBe(true);
     });
 
     describe("license-gated items", () => {
@@ -441,17 +443,14 @@ describe("SettingsIndex", () => {
       const wrapper = createWrapper();
       const items = getAllItems(wrapper);
       const cipherItem = items.find((i: any) => i.dataTest === "management-cipher-key-tab");
-      const nodesItem = items.find((i: any) => i.dataTest === "nodes-tab");
       const pipelineItem = items.find((i: any) => i.dataTest === "pipeline-destinations-tab");
       const regexItem = items.find((i: any) => i.dataTest === "regex-patterns-tab");
 
       // Present but locked — not hidden — in OSS, so the feature stays discoverable.
       expect(cipherItem?.visible).not.toBe(false);
-      expect(nodesItem?.visible).not.toBe(false);
       expect(pipelineItem?.visible).not.toBe(false);
       expect(regexItem?.visible).not.toBe(false);
       expect(cipherItem?.locked).toBe(true);
-      expect(nodesItem?.locked).toBe(true);
       expect(pipelineItem?.locked).toBe(true);
       expect(regexItem?.locked).toBe(true);
     });
@@ -552,6 +551,8 @@ describe("SettingsIndex", () => {
         (i: any) => i.dataTest === "organization-management-tab",
       );
       expect(orgManagementItem?.visible).toBe(false);
+      const userManagementItem = items.find((i: any) => i.dataTest === "user-management-tab");
+      expect(userManagementItem?.visible).toBe(false);
     });
   });
 

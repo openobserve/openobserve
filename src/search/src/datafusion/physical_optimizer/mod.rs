@@ -22,6 +22,7 @@ pub mod enrichment;
 pub mod index_optimizer;
 pub mod join_reorder;
 pub mod remote_scan;
+pub mod sdr_redact;
 pub mod shared_subplan;
 pub mod stream_aggregate;
 pub mod utils;

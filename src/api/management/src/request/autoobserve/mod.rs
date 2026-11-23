@@ -16,6 +16,7 @@
 //! AutoObserve engine routes: coverage, suggestions, and the marks the alert gate reads.
 
 pub mod decisions;
+pub mod fix_ports;
 pub mod incidents;
 pub mod paging;
 pub mod review;
@@ -982,7 +983,7 @@ async fn folder_writes<W: FolderWrites>(
         .await)
 }
 
-/// A mark whose alert is gone has no per-alert grant left, so it needs alerts PUT org-wide.
+/// A mark whose alert is gone has no per-alert grant left, so it needs a grant over every alert.
 async fn may_change_mark(org_id: &str, user_id: &str, entity_type: &str, entity_id: &str) -> bool {
     #[cfg(test)]
     if let Some(allowed) = tests::MAY_CHANGE.with(std::cell::Cell::get) {
@@ -996,7 +997,17 @@ async fn may_change_mark(org_id: &str, user_id: &str, entity_type: &str, entity_
     {
         return allowed;
     }
-    org_wide_allows(org_id, user_id, "alerts", "PUT").await
+    changes_every_mark(|resource, method| org_wide_allows(org_id, user_id, resource, method)).await
+}
+
+/// Alerts PUT org-wide, or PUT on every alert folder: `alert:_all_{org}` has no folder parent,
+/// so a role granting all folders reaches every alert only through the folder check.
+async fn changes_every_mark<F, Fut>(allows: F) -> bool
+where
+    F: Fn(&'static str, &'static str) -> Fut,
+    Fut: Future<Output = bool>,
+{
+    allows("alerts", "PUT").await || allows("alert_folders", "PUT").await
 }
 
 /// The per-alert check the alert handlers make; `None` when no alert has this id.
@@ -1367,6 +1378,36 @@ mod tests {
         assert_eq!(readable_mask(&org_reader, &[subject]).await, [true]);
     }
 
+    #[tokio::test]
+    async fn a_grant_on_every_alert_folder_changes_every_mark() {
+        let every = &[
+            ("alerts", "GET"),
+            ("alerts", "PUT"),
+            ("alert_folders", "GET"),
+            ("alert_folders", "PUT"),
+        ][..];
+        let folder_admin = &[("alert_folders", "GET"), ("alert_folders", "PUT")][..];
+        for (who, grants, want) in [
+            ("root", every, true),
+            ("base-role admin", every, true),
+            (
+                "custom-role admin with All on every folder",
+                folder_admin,
+                true,
+            ),
+            (
+                "reader of every folder",
+                &[("alert_folders", "GET")][..],
+                false,
+            ),
+            ("plain user", &[][..], false),
+        ] {
+            let allows =
+                |resource, method| std::future::ready(grants.contains(&(resource, method)));
+            assert_eq!(changes_every_mark(allows).await, want, "{who}");
+        }
+    }
+
     /// Answers the create check per folder from `allowed`; `None` stands for RBAC switched off.
     struct Writes {
         every_folder: bool,
@@ -1518,6 +1559,8 @@ mod tests {
     #[tokio::test]
     async fn without_the_engine_a_valid_request_is_a_503_and_a_bad_one_a_400() {
         ENGINE_ON.with(|on| on.set(Some(true)));
+        // RBAC is on for the whole process once any test installs the fake checker.
+        MAY_CHANGE.with(|may| may.set(Some(true)));
         let mark = "/v2/o/autoobserve/marks/protected/alert/a1";
         for (method, uri, body) in [
             ("GET", "/v2/o/autoobserve/coverage", ""),

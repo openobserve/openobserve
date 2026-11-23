@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mx-2.5 mt-2.5 shrink-0"
       @dismiss="firstDataArrival = null"
     />
+    <AnomalyOriginBanner class="mx-2.5 mt-2.5 shrink-0" data-test="logs-anomaly-origin-banner" />
     <div id="secondLevel" class="h-full max-h-full min-h-0 flex-1 overflow-hidden">
       <OSplitter
         class="h-full max-h-full overflow-hidden"
@@ -116,9 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="bg-card-glass-bg relative-position h-full w-full">
                     <div
                       v-if="
-                        !searchObj.loadingStream &&
-                        searchObj.data.stream.streamLists.length == 0 &&
-                        searchObj.loading == false
+                        !searchObj.loadingStream && noUserStreamsInOrg && searchObj.loading == false
                       "
                       class="h-full max-lg:overflow-y-auto"
                     >
@@ -166,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     -->
                     <div
                       v-else-if="
-                        searchObj.data.stream.streamLists.length > 0 &&
+                        !noUserStreamsInOrg &&
                         searchObj.data.stream.selectedStream.length == 0 &&
                         searchObj.data.filterErrMsg === ''
                       "
@@ -497,6 +496,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :model-value="searchObj.data.stream.selectedStream[0] ?? null"
                 @update:model-value="onDrillDownStreamChange"
               />
+              <span
+                class="text-text-heading ms-3 shrink-0 text-sm font-semibold"
+                data-test="logs-drill-down-stream-row-title"
+              >
+                {{ t("volumeInsights.title") }}
+              </span>
             </div>
             <div class="min-h-0 flex-1">
               <!-- Same no-stream / error / no-events states as the results pane. -->
@@ -508,9 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <LogsNoDataState
                 v-else-if="
-                  !searchObj.loadingStream &&
-                  searchObj.data.stream.streamLists.length == 0 &&
-                  searchObj.loading == false
+                  !searchObj.loadingStream && noUserStreamsInOrg && searchObj.loading == false
                 "
                 :ai-enabled="isAiEnabled"
                 data-test="logs-drill-down-no-streams-in-org-text"
@@ -518,7 +521,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <LogsNoStreamState
                 v-else-if="
-                  searchObj.data.stream.streamLists.length > 0 &&
+                  !noUserStreamsInOrg &&
                   searchObj.data.stream.selectedStream.length == 0 &&
                   searchObj.data.filterErrMsg === ''
                 "
@@ -573,7 +576,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else-if="drillDownShowsDashboard"
                 embedded
                 :streamName="searchObj.data.stream.selectedStream[0]"
-                streamType="logs"
+                :streamType="searchObj.data.stream.streamType || 'logs'"
                 :timeRange="drillDownTimeRange"
                 :rateFilter="drillDownRateFilter"
                 :baseFilter="drillDownBaseFilter"
@@ -614,6 +617,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 preset="no-query-applied"
                 size="hero"
+                :title="t('search.drillDownRunTitle')"
+                :description="t('search.drillDownRunDescription')"
                 data-test="logs-drill-down-apply-search-text"
                 @action="() => searchBarRef?.handleRunQueryFn?.()"
               />
@@ -628,6 +633,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="buildQueryPageRef"
               :searchQuery="searchObj.meta.sqlMode ? searchObj.data.query : ''"
               :selectedStream="searchObj.data.stream.selectedStream[0] || ''"
+              :selectedStreamType="searchObj.data.stream.streamType || 'logs'"
               :selectedDateTime="selectedDateTime"
               :isFirstToggle="isFirstBuildToggle"
               :isSqlMode="searchObj.meta.sqlMode"
@@ -697,8 +703,16 @@ import { raw, useI18nTyped } from "@/types/i18n";
 
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
+import {
+  cachedSearchMatchesRoute,
+  lastRunSearch,
+  lastRunSurface,
+} from "@/composables/useLogs/logsRouteCache";
+import { resolveUrlViewToggle } from "@/composables/useLogs/logsViewToggle";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { featureState, streamTypeFeature } from "@/utils/featureGate";
 import { inheritedRetentionDays } from "@/utils/dataRetention";
+import { isUserDataStream } from "@/utils/internalStreams";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { verifyOrganizationStatus, deepCopy, addSpacesToOperators } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
@@ -717,6 +731,7 @@ import {
 import { buildColumnIdentifierAst, quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { replaceSelectFieldList } from "@/utils/query/quickModeFieldList";
 import { hasLineComment } from "@/utils/query/sqlComments";
+import { quoteIdent } from "@/utils/security/sql";
 import useNotifications from "@/composables/useNotifications";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
@@ -750,10 +765,12 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
-import { logsReapplyRequest } from "@/utils/queryHistory/logs";
+import { logsReapplyRequest, requestLogsReapply } from "@/utils/queryHistory/logs";
+import { useLogsHistoryRestore } from "@/composables/useLogs/useLogsHistoryRestore";
 import { takeRecentLanding } from "@/utils/queryHistory/routes";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
+import AnomalyOriginBanner from "@/components/alerts/AnomalyOriginBanner.vue";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import LogsNoStreamState from "@/plugins/logs/LogsNoStreamState.vue";
 import LogsErrorState from "@/plugins/logs/LogsErrorState.vue";
@@ -783,7 +800,9 @@ import {
 import {
   endLogsArrival,
   parseSharedPage,
+  replaceNextLogsWrite,
   resetShownSearch,
+  shownEntryFor,
   sharedPage,
   sharedPageNotice,
 } from "@/composables/useLogs/useLogsUrl";
@@ -854,6 +873,7 @@ export default defineComponent({
     LogsNoEventsState,
     LogsNoDataState,
     FirstDataPanel,
+    AnomalyOriginBanner,
     LogsNoStreamState,
     LogsDrillDownStreamSelect,
     LogsErrorState,
@@ -1217,7 +1237,14 @@ export default defineComponent({
     };
 
     // Logs is not in MainLayout's keep-alive include list, so onActivated alone would never run.
-    onMounted(registerBeforeAppReload);
+    let stopHistoryRestore: (() => void) | undefined;
+    onMounted(() => {
+      registerBeforeAppReload();
+      stopHistoryRestore = useLogsHistoryRestore(router, () => {
+        replaceNextLogsWrite();
+        requestLogsReapply(true, "url");
+      });
+    });
 
     onActivated(() => {
       registerBeforeAppReload();
@@ -1225,7 +1252,10 @@ export default defineComponent({
     });
 
     onDeactivated(unregisterBeforeAppReload);
-    onBeforeUnmount(unregisterBeforeAppReload);
+    onBeforeUnmount(() => {
+      unregisterBeforeAppReload();
+      stopHistoryRestore?.();
+    });
 
     /**
      * As we are redirecting stream explorer to logs page, we need to check if the user has changed the stream type from stream explorer to logs.
@@ -1291,7 +1321,10 @@ export default defineComponent({
           await extractFields();
           refreshData();
           // A newer restore started meanwhile; it carries its own run decision.
-          if (runRequested && logsReapplyRequest.value.seq === seq) runQueryFn();
+          if (runRequested && logsReapplyRequest.value.seq === seq) {
+            const result = await runQueryFn(logsReapplyRequest.value.reason);
+            if (result !== "scheduled" && result !== "dispatched") endLogsArrival();
+          }
         }
       },
     );
@@ -1318,13 +1351,13 @@ export default defineComponent({
       },
     );
 
-    const runQueryFn = async () => {
+    const runQueryFn = async (reason: "run" | "url" = "run") => {
       searchObj.runQuery = false;
       if (!searchObj.data.stream.selectedStream.length) {
         searchObj.loading = false;
-        return;
+        return "skipped";
       }
-      autoRun.engine.requestRun("run");
+      return autoRun.engine.requestRun(reason === "url" ? "url" : "run");
     };
 
     const showRanFilter = (generationId: number, ranQuery: string) => {
@@ -1491,7 +1524,11 @@ export default defineComponent({
     // Main method for handling before mount logic
     async function handleBeforeMount() {
       if (Object.hasOwn(router.currentRoute.value?.query, "logs_visualize_toggle")) {
-        const urlToggle = router.currentRoute.value.query.logs_visualize_toggle;
+        const urlToggle = resolveUrlViewToggle(
+          router.currentRoute.value.query.logs_visualize_toggle,
+          checkFeatureAccess("logPatterns", buildFeatureGateContext(store.state.zoConfig)).allowed,
+          router.currentRoute.value.query.stream_type,
+        );
         // Restoring directly onto the Timechart tab: setupLogsTab() will run the
         // visualization once fields are ready, so tell the toggle watcher to skip
         // the page-load fire it is about to receive from the assignment below.
@@ -1539,11 +1576,24 @@ export default defineComponent({
         store.state.logs.logs.data != undefined &&
         Object.hasOwn(store.state.logs.logs.data, "stream") &&
         Object.hasOwn(store.state.logs.logs, "organizationIdentifier") &&
-        (!store.state.logs.logs.data.stream.selectedStream.includes(
-          router.currentRoute.value.query.stream,
-        ) ||
-          router.currentRoute.value.query.org_identifier !==
-            store.state.logs.logs.organizationIdentifier)
+        !cachedSearchMatchesRoute(
+          router.currentRoute.value.query,
+          lastRunSearch(
+            {
+              streams: store.state.logs.logs.data.stream.selectedStream,
+              org: store.state.logs.logs.organizationIdentifier,
+              streamType: store.state.logs.logs.data.stream.streamType,
+              query: store.state.logs.logs.data.query,
+              sqlMode: store.state.logs.logs.meta?.sqlMode,
+              timeType: store.state.logs.logs.data.datetime?.type,
+              period: store.state.logs.logs.data.datetime?.relativeTimePeriod,
+              startTime: store.state.logs.logs.data.datetime?.startTime,
+              endTime: store.state.logs.logs.data.datetime?.endTime,
+              toggle: store.state.logs.logs.meta?.logsVisualizeToggle,
+            },
+            shownEntryFor(lastRunSurface(store.state.logs.logs.meta?.logsVisualizeToggle)),
+          ),
+        )
       ) {
         store.dispatch("logs/setIsInitialized", false);
       }
@@ -2019,6 +2069,16 @@ export default defineComponent({
       return !!searchObj.data.stream.streamLists.length;
     });
 
+    // A picked internal stream still shows its results; "logs" keeps enrichment-table lists counted as user data.
+    const noUserStreamsInOrg = computed(() => {
+      const stream = searchObj.data.stream;
+      return !stream.streamLists.some(
+        (row: { value: string; internal?: boolean }) =>
+          stream.selectedStream.includes(row.value) ||
+          isUserDataStream({ name: row.value, is_internal: row.internal === true }, "logs"),
+      );
+    });
+
     const toggleExpandLog = (index: number) => {
       if (expandedLogs.value.includes(index))
         expandedLogs.value = expandedLogs.value.filter((item) => item != index);
@@ -2102,8 +2162,8 @@ export default defineComponent({
     // Mirrors the drill-down template's state chain, so the stream select sits in the dashboard header only while it is mounted.
     const drillDownShowsDashboard = computed(() => {
       const stream = searchObj.data.stream;
-      const noStreamsInOrg = !searchObj.loadingStream && stream.streamLists.length == 0;
-      const noStreamSelected = stream.streamLists.length > 0 && stream.selectedStream.length == 0;
+      const noStreamsInOrg = !searchObj.loadingStream && noUserStreamsInOrg.value;
+      const noStreamSelected = !noUserStreamsInOrg.value && stream.selectedStream.length == 0;
       return (
         !searchObj.meta.sqlMode &&
         !searchObj.loading &&
@@ -3422,7 +3482,12 @@ export default defineComponent({
       searchObj.meta.logsVisualizeToggle = "logs";
     };
 
+    const isBuildFilterHeld = () =>
+      !!(buildQueryPageRef.value as { freeTextNotice?: boolean } | null)?.freeTextNotice;
+
     const onBuildQueryGenerated = async (query: string) => {
+      // While the notice shows the builder has no SQL for the filter; "" would erase Search.
+      if (isBuildFilterHeld()) return;
       if (searchObj.meta.sqlMode) {
         // SQL mode ON: sync the full generated SQL to the search bar
         searchObj.data.query = query;
@@ -3440,6 +3505,24 @@ export default defineComponent({
       // Disable query editor in build mode when customQuery is false (builder mode)
       // In builder mode, query is auto-generated from fields - user shouldn't edit directly
       searchObj.meta.buildModeQueryEditorDisabled = !isCustomMode;
+      if (isCustomMode) seedCustomQueryFromHeldFilter();
+    };
+
+    // Builder -> Custom with a filter the builder could not chart: hand the user that filter as SQL.
+    const seedCustomQueryFromHeldFilter = () => {
+      const page = buildQueryPageRef.value as { incompleteFilterNotice?: boolean } | null;
+      const panelQuery = buildDashboardPanelData.data.queries[0];
+      const streams = searchObj.data.stream.selectedStream;
+      if (!page?.incompleteFilterNotice || !panelQuery) return;
+      if (searchObj.meta.sqlMode) {
+        panelQuery.query = searchObj.data.query;
+      } else if (streams.length === 1) {
+        // The WHERE sits on its own line so a trailing `-- comment` cannot swallow GROUP BY.
+        panelQuery.query =
+          `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 ` +
+          `FROM ${quoteIdent(streams[0])} WHERE ${searchObj.data.query}\n` +
+          `GROUP BY x_axis_1 ORDER BY x_axis_1`;
+      }
     };
 
     // Handle build mode toggle from SearchBar (updates panel schema's customQuery)
@@ -3450,6 +3533,7 @@ export default defineComponent({
 
         // Builder → Custom: show the generated SQL in the editor for editing
         if (isCustomMode) {
+          if (isBuildFilterHeld()) return;
           const generatedQuery = buildDashboardPanelData.data.queries[0]?.query || "";
           if (searchObj.meta.sqlMode) {
             searchObj.data.query = generatedQuery;
@@ -3582,7 +3666,8 @@ export default defineComponent({
         dashboardPanelData.data.queries[currentQueryIndex].fields.stream = streamName;
         // stream_type should already be set, but ensure it's preserved
         if (!dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type) {
-          dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type = "logs";
+          dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type =
+            searchObj.data.stream.streamType || "logs";
         }
       }
 
@@ -4273,6 +4358,7 @@ export default defineComponent({
       verifyOrganizationStatus,
       collapseFieldList,
       areStreamsPresent,
+      noUserStreamsInOrg,
       toggleExpandLog,
       expandedLogs,
       fieldValues,

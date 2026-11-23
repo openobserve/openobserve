@@ -4,7 +4,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
-const { ingestTestData, waitForStreamData } = require('../utils/data-ingestion.js');
+const { ingestTestData, ingestCustomData, waitForStreamData } = require('../utils/data-ingestion.js');
 const { FilterBuilderDriver } = require('../../pages/generalPages/filterBuilderPage.js');
 const { EDITOR_HOSTS, seedEditor, editorText } = require('../utils/suggest-menu-helpers.js');
 
@@ -107,5 +107,69 @@ test.describe('Logs filter builder', () => {
         await expect(banner).toBeHidden();
         await expect(builder.barInput).toBeVisible();
         await expect.poll(() => editorText(page, HOST)).toBe('');
+    });
+});
+
+test.describe('Logs filter builder: mixed AND/OR', () => {
+    test.describe.configure({ mode: 'serial' });
+    const stream = `e2e_fb_mixed_${Date.now()}`;
+    const mix = { 'error|alpha': 3, 'warn|alpha': 2, 'error|beta': 4, 'warn|beta': 5, 'info|alpha': 1 };
+    const rows = Object.entries(mix).flatMap(([key, n]) => {
+        const [level, svc_name] = key.split('|');
+        return Array.from({ length: n }, (_, i) => ({ level, svc_name, seq: i }));
+    });
+    let pm;
+    let builder;
+
+    test.beforeAll(async ({ browser }) => {
+        const page = await browser.newPage();
+        try {
+            expect((await ingestCustomData(page, stream, rows)).status, 'Precondition: rows must ingest').toBe(200);
+        } finally {
+            await page.close();
+        }
+    });
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await page.addInitScript(() => {
+            try { localStorage.setItem('o2.logs.queryInput', 'builder'); } catch (_) {}
+        });
+        await navigateToBase(page);
+        pm = new PageManager(page);
+        expect(await waitForStreamData(page, stream, rows.length, 60000), 'Precondition: rows searchable').toBe(true);
+        await pm.logsPage.selectStream(stream);
+        await pm.logsPage.disableSqlModeIfNeeded();
+        builder = new FilterBuilderDriver(page, `${PREFIX}-bar`);
+        await expect(builder.barInput).toBeVisible({ timeout: 15000 });
+    });
+
+    test.afterAll(async ({ browser }) => {
+        const page = await browser.newPage();
+        try {
+            await new PageManager(page).streamsPage.deleteStreamViaAPI(stream);
+        } catch (e) {
+            testLogger.warn(`Cleanup of ${stream} failed: ${e.message}`);
+        } finally {
+            await page.close();
+        }
+    });
+
+    test('adding an AND after an OR keeps the OR together, as the chips read', {
+        tag: ['@all', '@logs', '@filterBuilder', '@bug-16941', '@P1'],
+    }, async ({ page }) => {
+        await builder.addCondition('level', '=', 'error');
+        await builder.addCondition('level', '=', 'warn');
+        await builder.close();
+        // The Logs bar has no "-root" wrapper, so the connector is found page-wide rather than via toggleConnector().
+        await builder.connectors.first().click();
+        await expect(builder.connectors.first()).toHaveText('OR');
+        await builder.addCondition('svc_name', '=', 'alpha');
+
+        await expect.poll(() => editorText(page, HOST))
+            .toBe("(level = 'error' OR level = 'warn') AND svc_name = 'alpha'");
+
+        await pm.logsPage.runQueryAndWaitForResults();
+        expect(await pm.logsPage.getResultHitsCount()).toBe(mix['error|alpha'] + mix['warn|alpha']);
     });
 });

@@ -1,7 +1,7 @@
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
-const { ingestTestData } = require('../../utils/data-ingestion.js');
+const { ingestTestData, ingestCustomData, waitForStreamData } = require('../../utils/data-ingestion.js');
 
 const STREAM = 'e2e_automate';
 
@@ -61,4 +61,67 @@ test.describe("Logs Field Actions Regression", () => {
     expect(afterAdd.toLowerCase(), 'menu should offer to remove an already-added field')
       .toContain('remove');
   });
+});
+
+test.describe("Include on an empty or \"null\" text value", () => {
+  test.describe.configure({ mode: 'serial' });
+  const stream = `e2e_empty_vals_${Date.now()}`;
+  const ROWS = [
+    { tag: 'row_empty', k: '' },
+    { tag: 'row_missing' },
+    { tag: 'row_nulltext', k: 'null' },
+    { tag: 'row_value', k: 'v' },
+  ];
+  let pm;
+
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    await navigateToBase(page);
+    pm = new PageManager(page);
+    expect(await waitForStreamData(page, stream, ROWS.length, 60000), 'Precondition: rows searchable').toBe(true);
+    await pm.logsPage.openLogsWithSqlQuery(stream, `SELECT * FROM "${stream}"`);
+    await pm.logsPage.runQueryAndWaitForResults();
+    await pm.logsPage.expectResultsGridSettledWithRows();
+  });
+
+  test.beforeAll(async ({ browser }) => {
+    const page = await browser.newPage();
+    try {
+      expect((await ingestCustomData(page, stream, ROWS)).status, 'Precondition: rows must ingest').toBe(200);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test.afterAll(async ({ browser }) => {
+    const page = await browser.newPage();
+    try {
+      await new PageManager(page).streamsPage.deleteStreamViaAPI(stream);
+    } catch (e) {
+      testLogger.warn(`Cleanup of ${stream} failed: ${e.message}`);
+    } finally {
+      await page.close();
+    }
+  });
+
+  for (const { title, tag, literal } of [
+    { title: 'Include on an empty value returns only the clicked row', tag: 'row_empty', literal: "k = ''" },
+    { title: 'Include on the text "null" returns only the clicked row', tag: 'row_nulltext', literal: "k = 'null'" },
+  ]) {
+    test(title, { tag: ['@bug-16941', '@P1', '@regression', '@logsRegression'] }, async () => {
+      await pm.logsPage.openLogDetailForRowContaining(tag);
+      await pm.logsPage.includeLogDetailJsonFieldValue('k');
+      await pm.logsPage.closeLogDetailIfOpen();
+
+      const query = await pm.logsPage.getQueryEditorText();
+      testLogger.info(`Query after Include: ${query}`);
+      expect(query).toContain(literal);
+      expect(query.toLowerCase()).not.toContain('is null');
+
+      await pm.logsPage.runQueryAndWaitForResults();
+      expect(await pm.logsPage.getResultHitsCount()).toBe(1);
+      const rows = await pm.logsPage.getResultRowTexts();
+      expect(rows.join('\n')).toContain(tag);
+    });
+  }
 });

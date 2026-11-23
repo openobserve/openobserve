@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod agent_format;
 pub mod agent_signals;
 pub mod ai;
 pub mod alerts;
+pub mod anomaly_detection;
 pub mod autoobserve;
 pub mod cluster;
 pub mod correlation;
@@ -41,7 +43,6 @@ pub mod organization;
 pub mod otlp;
 pub mod pipeline;
 pub mod plan;
-pub mod projections;
 pub mod promql;
 pub mod public_dashboards;
 pub mod queue_store;
@@ -58,6 +59,7 @@ pub mod slo;
 pub mod sql;
 pub mod status_pages;
 pub mod stream;
+pub mod stream_fold;
 pub mod synthetics;
 pub mod synthetics_composition;
 pub mod synthetics_variables;

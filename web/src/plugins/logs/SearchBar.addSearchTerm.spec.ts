@@ -191,6 +191,71 @@ describe("SearchBar — adding a filter term to the query", () => {
     });
   });
 
+  describe("SQL mode outer WHERE handling", () => {
+    beforeEach(() => {
+      wrapper.vm.searchObj.meta.sqlMode = true;
+    });
+
+    const run = async (query: string, filter: string) => {
+      wrapper.vm.searchObj.data.query = query;
+      return addFilterTerm(filter);
+    };
+
+    it("keeps UNION ALL on its own line after a branch ending in a line comment", async () => {
+      const query = [
+        "SELECT id FROM t WHERE a = 1 -- first branch",
+        "UNION ALL",
+        "SELECT id FROM t WHERE b = 2",
+      ].join("\n");
+
+      expect(await run(query, "c = 2")).toBe(
+        [
+          "SELECT id FROM t WHERE a = 1 AND c = 2 -- first branch",
+          " UNION ALL ",
+          "SELECT id FROM t WHERE b = 2 AND c = 2",
+        ].join("\n"),
+      );
+    });
+
+    it("does not replace a field that only occurs in a subquery", async () => {
+      const query =
+        "SELECT id FROM t\nWHERE level = 'error'\n   OR id IN (SELECT id FROM t WHERE svc_name = 'beta')";
+
+      expect(await run(query, "svc_name = 'alpha'")).toBe(
+        "SELECT id FROM t\nWHERE (level = 'error'\n   OR id IN (SELECT id FROM t WHERE svc_name = 'beta')) AND svc_name = 'alpha'",
+      );
+    });
+
+    it("replaces only the outer condition when the field is also in a subquery", async () => {
+      const query =
+        "SELECT id FROM t WHERE svc_name = 'x' AND id IN (SELECT id FROM t WHERE svc_name = 'beta')";
+
+      expect(await run(query, "svc_name = 'alpha'")).toBe(
+        "SELECT id FROM t WHERE svc_name = 'alpha' AND id IN (SELECT id FROM t WHERE svc_name = 'beta')",
+      );
+    });
+
+    it("still replaces a multi-value group in the outer WHERE", async () => {
+      expect(
+        await run(
+          "SELECT id FROM t WHERE (svc_name = 'x' OR svc_name = 'y') ORDER BY id",
+          "svc_name = 'alpha'",
+        ),
+      ).toBe("SELECT id FROM t WHERE svc_name = 'alpha' ORDER BY id");
+    });
+
+    it("ignores a where inside a string literal and handles each UNION branch alone", async () => {
+      expect(
+        await run(
+          "SELECT id FROM t WHERE svc_name = 'x' UNION SELECT id FROM u WHERE msg = 'where svc_name = ''z'''",
+          "svc_name = 'alpha'",
+        ),
+      ).toBe(
+        "SELECT id FROM t WHERE svc_name = 'alpha'  UNION  SELECT id FROM u WHERE msg = 'where svc_name = ''z''' AND svc_name = 'alpha'",
+      );
+    });
+  });
+
   describe("free text (item 1 AC6.9)", () => {
     const stream = (name: string, fts: boolean) => ({
       name,

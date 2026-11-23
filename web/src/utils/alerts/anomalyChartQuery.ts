@@ -37,6 +37,7 @@ export const ANOMALY_EXPECTED_ALIAS = "expected_value";
 export const ANOMALY_LOWER_ALIAS = "expected_lower";
 export const ANOMALY_UPPER_ALIAS = "expected_upper";
 export const ANOMALY_EVENT_ALIAS = "event_value";
+export const ANOMALY_MODEL_ALIAS = "model_version";
 
 /** Opt-in per-kind columns: referencing one the stream never saw fails the whole query, and its absence proves no such record exists. */
 export interface AnomalyKindColumns {
@@ -44,6 +45,7 @@ export interface AnomalyKindColumns {
   isPartialDrop: boolean;
   expectedValue: boolean;
   expectedBounds: boolean;
+  judgedEnd: boolean;
 }
 
 export const NO_KIND_COLUMNS: AnomalyKindColumns = {
@@ -51,6 +53,7 @@ export const NO_KIND_COLUMNS: AnomalyKindColumns = {
   isPartialDrop: false,
   expectedValue: false,
   expectedBounds: false,
+  judgedEnd: false,
 };
 
 /** `histogram()`'s interval grammar, as the config stores it ("5m", "1h"). */
@@ -95,7 +98,9 @@ function scoredRowPicker(kinds: AnomalyKindColumns) {
   const scoredRank = kindFlags.length
     ? `CASE WHEN ${kindFlags.map((flag) => `${flag} IS NOT TRUE`).join(" AND ")} THEN 1 ELSE 0 END`
     : null;
-  const order = scoredRank ? `ORDER BY ${scoredRank}, created_at` : "ORDER BY created_at";
+  // A run can outlive its lease, so the judged query end ranks before completion time; NULL is a pre-field row.
+  const judged = kinds.judgedEnd ? "judged_end_us ASC NULLS FIRST, " : "";
+  const order = `ORDER BY ${scoredRank ? `${scoredRank}, ` : ""}${judged}created_at`;
   const latest = (column: string) => `last_value(${column} ${order})`;
   // An event-only bucket has no scored row, and its latest row must not stand in for one.
   const scored = (expr: string) =>
@@ -130,7 +135,8 @@ export function buildAnomalyMetricQuery(
     interval,
     `${scored(latest("actual_value"))} AS ${ANOMALY_VALUE_ALIAS}, ` +
       `CASE WHEN ${verdict} THEN ${latest("actual_value")} END AS ${ANOMALY_FLAGGED_ALIAS}, ` +
-      `${scored(latest("threshold_value"))} AS ${ANOMALY_THRESHOLD_ALIAS}` +
+      `${scored(latest("threshold_value"))} AS ${ANOMALY_THRESHOLD_ALIAS}, ` +
+      `${latest("model_version")} AS ${ANOMALY_MODEL_ALIAS}` +
       expected +
       bounds +
       event,

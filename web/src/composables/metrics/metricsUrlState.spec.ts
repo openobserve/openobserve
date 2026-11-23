@@ -411,6 +411,36 @@ describe("metricsUrlState · legacyLinkToVisualizeQuery", () => {
     expect(data.queries[0].customQuery).toBe(true);
   });
 
+  it("keeps the anomaly banner parameters of an anomaly link through the translation", () => {
+    const out = legacyLinkToVisualizeQuery({
+      org_identifier: "o",
+      stream_name: "cpu_usage",
+      query_type: "sql",
+      query: b64EncodeUnicode("SELECT 1"),
+      from_anomaly: "a1",
+      anomaly_filter_applied: "0",
+      anomaly_start: "1000",
+      anomaly_end: "2000",
+      anomaly_kind: "value",
+      anomaly_measure: "avg(value) per 15 min",
+      anomaly_actual: "91.2",
+      anomaly_lower: "40.1",
+      anomaly_upper: "62.3",
+    });
+    expect(out).toMatchObject({
+      from_anomaly: "a1",
+      anomaly_filter_applied: "0",
+      anomaly_start: "1000",
+      anomaly_end: "2000",
+      anomaly_kind: "value",
+      anomaly_measure: "avg(value) per 15 min",
+      anomaly_actual: "91.2",
+      anomaly_lower: "40.1",
+      anomaly_upper: "62.3",
+      mode: "visualize",
+    });
+  });
+
   it("maps the legacy `stream` alias and indexed queries onto their own slots", () => {
     const data = blobOf({
       stream: "cpu",
