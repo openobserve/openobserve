@@ -289,14 +289,11 @@ export function useTracesTableColumns() {
     if (!selectedFields.find((col) => col === timestampCol))
       cols.unshift({
         id: timestampCol,
-        // The timezone lives in the tooltip so the fixed header never truncates.
-        header: t("traces.timestamp"),
+        header: t("search.timestampWithTimezone", { timezone: store.state.timezone }),
         size: 216,
         meta: {
           sortable: true,
-          headerClass: "capitalize!",
           mono: true,
-          headerTooltip: raw(`${t("traces.timestamp")} (${store.state.timezone})`),
         },
         accessorFn: (row: any) =>
           timestampToTimezoneDate(

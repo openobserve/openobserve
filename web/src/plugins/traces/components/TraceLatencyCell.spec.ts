@@ -140,10 +140,10 @@ describe("TraceLatencyCell", () => {
       expect(segment.attributes("style")).toContain("background-color: rgb(255, 0, 0)");
     });
 
-    it("falls back to #9e9e9e for unknown service colors", () => {
+    it("falls back to #9e9e9e for an empty service name", () => {
       wrapper = mount(TraceLatencyCell, {
         props: {
-          item: { services: { "unknown-svc": { duration: 100 } } },
+          item: { services: { "": { duration: 100 } } },
         },
       });
       const segment = wrapper.find('[data-test="trace-row-latency-segment"]');

@@ -651,7 +651,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-row-action="row.enabled ? 'pause' : 'resume'"
                     :data-test="`alert-list-${row.name}-pause-start-alert`"
                     class="ms-1 max-md:hidden"
-                    :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
+                    :variant="row.enabled ? 'ghost' : 'ghost-success'"
                     size="icon-xs-sq"
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                     :loading="!!alertStateLoadingMap[row.uuid]"
@@ -2426,6 +2426,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 170,
+          minSize: 120,
           meta: { align: "left" },
         },
         // "oncall_team" — which team this alert would page. Only present on a
@@ -2442,6 +2443,7 @@ export default defineComponent({
                 resizable: true,
                 hideable: true,
                 size: 200,
+                minSize: 160,
                 meta: { align: "left" },
               } as OTableColumnDef,
             ]
@@ -2457,6 +2459,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 200,
+          minSize: 120,
           meta: { align: "left" },
         },
         {

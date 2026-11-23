@@ -36,6 +36,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-text-heading": "#262626",
   "--color-text-body": "#404040",
   "--color-text-secondary": "#5f5f5f",
+  "--color-chart-axis-text": "#5f5f5f",
   "--color-text-inverse": "#ffffff",
   "--color-border-default": "#d4d4d4",
   "--color-border-strong": "#a3a3a3",
@@ -201,7 +202,7 @@ export function chartNumber(token: `--${string}`, fallback: number): number {
 
 // Convenience getters used by the dashboard/trace chart converters.
 export const chartTextColor = (): string => chartColor("--color-text-secondary");
-export const chartAxisTextColor = (): string => chartColor("--color-text-secondary");
+export const chartAxisTextColor = (): string => chartColor("--color-chart-axis-text");
 export const chartAxisLine = (): string => chartColor("--color-border-default");
 export const chartBg = (): string => chartColor("--color-surface-base");
 export const chartGridLine = (): string => chartColor("--color-border-subtle");

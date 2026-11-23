@@ -586,7 +586,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           // Sortable's `filter` selector — this header can't start a drag, so it
           // must not advertise the move cursor the draggable <tr> sets either.
           header.id === pinnedFirstColumn ? 'o2-table-th-pinned-first cursor-default' : '',
-          headerPin(header) ? 'bg-table-header-bg' : '',
+          headerPin(header) ? 'bg-table-header-bg [--pin-bg:var(--color-table-header-bg)]' : '',
+          headerPin(header) === 'right' ? 'o2-pinned-right' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
@@ -623,6 +624,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 right: `${header.column.getAfter?.('right') ?? 0}px`,
                 zIndex: 20,
                 boxShadow: 'var(--shadow-sticky-right)',
+                borderLeft: '0.0625rem solid var(--color-border-default)',
               }
             : {}),
           // Sticky pivot total column in single-level pivots (last, so it wins).
@@ -1037,7 +1039,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           `${headerPaddingClass(header)} text-table-header-text relative text-left text-xs font-medium select-none`,
           compact ? 'group h-6' : dense ? 'group h-8' : 'group h-9',
           'border-table-header-border border-b',
-          headerPin(header) ? 'bg-table-header-bg' : '',
+          headerPin(header) ? 'bg-table-header-bg [--pin-bg:var(--color-table-header-bg)]' : '',
+          headerPin(header) === 'right' ? 'o2-pinned-right' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
@@ -1074,6 +1077,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 right: `${header.column.getAfter?.('right') ?? 0}px`,
                 zIndex: 20,
                 boxShadow: 'var(--shadow-sticky-right)',
+                borderLeft: '0.0625rem solid var(--color-border-default)',
               }
             : {}),
           // Sticky pivot total column in single-level pivots (last, so it wins).
@@ -1174,7 +1178,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   v-else
                   name="unfold-more"
                   size="sm"
-                  class="shrink-0 text-table-sort-icon-inactive"
+                  class="text-table-sort-icon-inactive shrink-0"
                   data-test="o2-table-sort-icon-inactive"
                   data-test-sort-direction="none"
                 />
@@ -1235,7 +1239,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   v-else
                   name="unfold-more"
                   size="sm"
-                  class="shrink-0 text-table-sort-icon-inactive"
+                  class="text-table-sort-icon-inactive shrink-0"
                   data-test="o2-table-sort-icon-inactive"
                   data-test-sort-direction="none"
                 />

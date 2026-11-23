@@ -211,7 +211,7 @@ describe("FieldValuesPanel.vue", () => {
       expect(wrapper.text()).toContain("Custom Label");
     });
 
-    it("renders multiline value with whitespace-pre-wrap and break-words classes to preserve newlines", () => {
+    it("renders multiline value as a single truncated line with the full value in the title", () => {
       wrapper = createWrapper({
         fieldValues: {
           isLoading: false,
@@ -220,8 +220,9 @@ describe("FieldValuesPanel.vue", () => {
       });
       const el = wrapper.find(".text-field-list-label-text");
       expect(el.exists()).toBe(true);
-      expect(el.classes()).toContain("whitespace-pre-wrap");
-      expect(el.classes()).toContain("break-words");
+      expect(el.classes()).toContain("truncate");
+      expect(el.classes()).toContain("min-w-0");
+      expect(el.attributes("title")).toBe("k1\nwith\nnewlines");
       expect(el.text()).toContain("k1\nwith\nnewlines");
     });
   });

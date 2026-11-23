@@ -1295,6 +1295,8 @@ export const useStreamFields = () => {
             name: "source",
             id: "source",
             accessorFn: (row: any) => JSON.stringify(row),
+            // The timestamp has its own column, so the source preview shows it last.
+            previewLastKey: store.state.zoConfig.timestamp_column || "_timestamp",
             cell: (info: any) => info.getValue(),
             // "source" here, "_source" in the CorrelatedLogsTable variant — the two
             // columns are named differently on purpose; do not unify them.

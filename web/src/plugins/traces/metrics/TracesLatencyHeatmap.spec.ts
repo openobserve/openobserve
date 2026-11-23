@@ -579,7 +579,7 @@ describe("TracesLatencyHeatmap", () => {
       wrapper = await mountHeatmap();
       expect(chartColor).toHaveBeenCalledWith("--color-latency-p95");
       expect(options(wrapper).visualMap.inRange.color).toEqual(["#0a4ce8"]);
-      expect(options(wrapper).visualMap.inRange.colorAlpha).toEqual([0.2, 1]);
+      expect(options(wrapper).visualMap.inRange.colorAlpha).toEqual([0.35, 1]);
     });
 
     it("rebuilds the option when the theme flips", async () => {
@@ -649,7 +649,7 @@ describe("TracesLatencyHeatmap", () => {
       expect(o.series).toHaveLength(1);
       expect(o.visualMap.dimension).toBe(2);
       expect(o.visualMap.seriesIndex).toBeUndefined();
-      expect(o.visualMap.inRange).toEqual({ color: ["#0a4ce8"], colorAlpha: [0.2, 1] });
+      expect(o.visualMap.inRange).toEqual({ color: ["#0a4ce8"], colorAlpha: [0.35, 1] });
       expect(o.series[0].data).toHaveLength(2);
     });
 
@@ -667,7 +667,7 @@ describe("TracesLatencyHeatmap", () => {
       expect(errorsMap.dimension).toBe(4);
       expect(errorsMap.min).toBe(0);
       expect(errorsMap.max).toBe(1);
-      expect(errorsMap.inRange).toEqual({ color: ["#cc3645"], colorAlpha: [0.2, 1] });
+      expect(errorsMap.inRange).toEqual({ color: ["#cc3645"], colorAlpha: [0.35, 1] });
       expect(chartColor).toHaveBeenCalledWith("--color-status-error-text");
       expect(bandMap.show).toBe(false);
       expect(bandMap.seriesIndex).toBe(1);

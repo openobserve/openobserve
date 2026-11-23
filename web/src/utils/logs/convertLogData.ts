@@ -10,6 +10,7 @@ import {
   chartAxisLine,
   chartCrosshairLabel,
   chartGridLine,
+  chartColor,
   chartTextColor,
   chartTooltipStyle,
   dataZoomBrushStyle,
@@ -158,8 +159,8 @@ const SEMANTIC_COLORS_LIGHT: Record<string, string> = {
   alert: "#ea580c",
   critical: "#F4511E",
   error: "#D64541",
-  warn: "#B8650A",
-  warning: "#B8650A",
+  warn: "#D97706",
+  warning: "#D97706",
   notice: "#16a34a",
   // Info is most of the volume, so it is the softest hue; warn and error stay strong enough to stand out against it.
   info: "#5E95DE",
@@ -180,8 +181,8 @@ export const SEMANTIC_COLORS_DARK: Record<string, string> = {
   alert: "#ea580c",
   critical: "#DC6030",
   error: "#D95C5C",
-  warn: "#D4944A",
-  warning: "#D4944A",
+  warn: "#F59E0B",
+  warning: "#F59E0B",
   notice: "#16a34a",
   info: "#5B8FD0",
   debug: "#3DAAB8",
@@ -222,7 +223,7 @@ const MODERN_BAR_STYLE = { borderRadius: [2, 2, 0, 0] };
 const MODERN_BAR_LAYOUT = { barCategoryGap: "15%", barMinWidth: 2 };
 
 // Canvas cannot read CSS, so the axis colors follow the tokens resolved at call time.
-const modernAxisLabel = () => ({ color: chartTextColor(), fontSize: 11 });
+const modernAxisLabel = () => ({ color: chartTextColor(), fontSize: 12 });
 const modernSplitLine = () => ({
   show: true,
   lineStyle: { color: chartGridLine(), type: "dashed", width: 1 },
@@ -263,9 +264,22 @@ export const convertStackedLogData = (
 
   // ECharts stacks the first series at the bottom: severities stack error, warn, info, debug, so errors form the baseline.
   const SEVERITY_RANK: Record<string, number> = {
-    fatal: 0, critical: 0, error: 1, err: 1, warn: 2, warning: 2, info: 3, debug: 4, trace: 5,
+    fatal: 0,
+    critical: 0,
+    error: 1,
+    err: 1,
+    warn: 2,
+    warning: 2,
+    info: 3,
+    debug: 4,
+    trace: 5,
   };
-  const rank = (c: unknown) => SEVERITY_RANK[String(c ?? "").trim().toLowerCase()] ?? 9;
+  const rank = (c: unknown) =>
+    SEVERITY_RANK[
+      String(c ?? "")
+        .trim()
+        .toLowerCase()
+    ] ?? 9;
   const entries = [...breakdownSeries.entries()];
   const ordered = entries.some(([c]) => rank(c) < 9)
     ? [...entries].sort(([a], [b]) => rank(a) - rank(b))
@@ -366,19 +380,20 @@ export const convertStackedLogData = (
         padding: [0, 5],
         // Small square swatches and quiet axis-coloured labels, so the key reads as a caption, not a row of bars.
         icon: "roundRect",
-        itemWidth: 8,
-        itemHeight: 8,
-        itemGap: 14,
+        itemWidth: 10,
+        itemHeight: 10,
+        itemGap: 16,
         type: "scroll",
         // An all-caps level (DEBUG, INFO) shows as a word; other breakdown values keep their case.
         formatter: (name: string) =>
           /^[A-Z]{2,}$/.test(name) ? name.charAt(0) + name.slice(1).toLowerCase() : name,
         // ECharts measures legend text on canvas, so the width is a pixel number.
         textStyle: {
-          fontSize: 11,
+          fontSize: 12,
+          fontWeight: 500,
           width: 120,
           overflow: "truncate",
-          ...(modern ? { color: modernAxisLabel().color } : {}),
+          ...(modern ? { color: chartColor("--color-text-body") } : {}),
         },
         tooltip: { show: true },
       },

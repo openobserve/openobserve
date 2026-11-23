@@ -288,3 +288,15 @@
     vertical-align: top;
   }
 }
+
+/* Fades text scrolling under a right-pinned column instead of cutting it mid-letter. */
+.o2-pinned-right::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 100%;
+  width: 1.5rem;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--pin-bg));
+}

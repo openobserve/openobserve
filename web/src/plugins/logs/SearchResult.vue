@@ -180,7 +180,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="results-bar-quiet flex flex-none items-center justify-end gap-1.5 pe-2 max-md:ms-auto">
+        <div
+          class="results-bar-quiet flex flex-none items-center justify-end gap-1.5 pe-2 max-md:ms-auto"
+        >
           <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
           <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
@@ -260,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.stop
                 />
                 <OIcon name="wrap-text" size="sm" class="shrink-0" />
-                <OTooltip :content="t('search.messageWrapContent')" />
+                <OTooltip :content="t('search.messageWrapContent')" side="bottom" />
               </OButton>
             </div>
           </template>
@@ -633,35 +635,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="col.id"
                     #[`cell-${col.id}`]="{ row, value }"
                   >
-                    <LogCellWrap
-                      :wrap="searchObj.meta.toggleSourceWrap"
-                      :expanded="expandedWrappedRows.has(row)"
-                      @update:expanded="setWrappedRowExpanded(row, $event)"
+                    <span
+                      v-if="value === undefined || value === null || value === ''"
+                      class="text-text-secondary select-none"
+                      data-test="log-row-empty-cell"
+                      >—</span
                     >
-                      <span
-                        v-if="value === undefined || value === null || value === ''"
-                        class="text-text-secondary select-none"
-                        data-test="log-row-empty-cell"
-                        >—</span
-                      >
-                      <span
-                        v-else-if="logsCellHtml(col.id, row)"
-                        class="log-cell-html"
-                        :class="severityFieldTextClass(col.id, value)"
-                        :data-test="
-                          col.id === logsTimestampCol ? 'log-row-timestamp-value' : undefined
-                        "
-                        v-html="logsCellHtml(col.id, row)"
-                      />
-                      <span
-                        v-else
-                        :class="severityFieldTextClass(col.id, value)"
-                        :data-test="
-                          col.id === logsTimestampCol ? 'log-row-timestamp-value' : undefined
-                        "
-                        >{{ value }}</span
-                      >
-                    </LogCellWrap>
+                    <span
+                      v-else-if="logsCellHtml(col.id, row)"
+                      class="log-cell-html"
+                      :class="severityFieldTextClass(col.id, value)"
+                      :data-test="
+                        col.id === logsTimestampCol ? 'log-row-timestamp-value' : undefined
+                      "
+                      v-html="logsCellHtml(col.id, row)"
+                    />
+                    <span
+                      v-else
+                      :class="severityFieldTextClass(col.id, value)"
+                      :data-test="
+                        col.id === logsTimestampCol ? 'log-row-timestamp-value' : undefined
+                      "
+                      >{{ value }}</span
+                    >
                     <span
                       v-if="col.id === logsTimestampCol"
                       class="sr-only select-none"
@@ -973,7 +969,6 @@ import {
   computed,
   defineComponent,
   ref,
-  reactive,
   onMounted,
   onUpdated,
   onBeforeUnmount,
@@ -1074,7 +1069,6 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LogsTableSkeleton from "@/plugins/logs/LogsTableSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
-import LogCellWrap from "@/plugins/logs/data-table/LogCellWrap.vue";
 import {
   noFtsRecoveryStreams,
   noFtsRecoveryTerm as recoveryTerm,
@@ -1124,7 +1118,6 @@ export default defineComponent({
     SanitizedHtmlRenderer,
     OTable: defineAsyncComponent(() => import("@/lib/core/Table/OTable.vue")),
     CellActions,
-    LogCellWrap,
     LogsMissingStreamBanner,
     LogsTableSkeleton,
     O2AIContextAddBtn,
@@ -3116,11 +3109,6 @@ export default defineComponent({
       return m;
     });
     const logsRowIndex = (row: any): number => logsHitIndexMap.value.get(row) ?? -1;
-    const expandedWrappedRows = reactive(new WeakSet<object>());
-    const setWrappedRowExpanded = (row: object, expanded: boolean) => {
-      if (expanded) expandedWrappedRows.add(row);
-      else expandedWrappedRows.delete(row);
-    };
     const logsCellHtml = (columnId: string, row: any): string | null => {
       // The highlight cache is keyed by row position in the current hits, which stale rows no longer match.
       if (showStaleRows.value) return null;
@@ -3236,7 +3224,28 @@ export default defineComponent({
           }
       if (toggled == null) return;
       const idx = Number(toggled);
-      if (Number.isInteger(idx) && idx >= 0) expandLog(idx);
+      if (Number.isInteger(idx) && idx >= 0) {
+        expandLog(idx);
+        if (!prev.has(toggled)) nextTick(revealExpandedRowUnderHeader);
+      }
+    };
+
+    // An expanded row can sit under the sticky header; scroll it just below the header.
+    const revealExpandedRowUnderHeader = () => {
+      const table = document.querySelector('[data-test="logs-search-result-logs-table"]');
+      const header = table?.querySelector("thead");
+      if (!table || !header) return;
+      const headerBottom = header.getBoundingClientRect().bottom;
+      for (const panel of table.querySelectorAll("tr[data-row-expansion]")) {
+        const row = panel.previousElementSibling;
+        const gap = row ? headerBottom - row.getBoundingClientRect().top : 0;
+        if (gap <= 0) continue;
+        let scroller = panel.parentElement;
+        while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY))
+          scroller = scroller.parentElement;
+        if (scroller) scroller.scrollTop -= gap;
+        return;
+      }
     };
 
     const openLogDetailsByRow = (row: any) => openLogDetails(row, logsRowIndex(row));
@@ -3307,8 +3316,6 @@ export default defineComponent({
       showLogCellActions,
       logsCellHtml,
       logsRowIndex,
-      expandedWrappedRows,
-      setWrappedRowExpanded,
       logsRowKey,
       getLogRowStatusColor,
       splitUnit,
@@ -3501,6 +3508,15 @@ export default defineComponent({
 }
 .logs-results-otable--wrap :deep(td[data-test^="o2-table-cell-"] > div) {
   align-items: flex-start;
+}
+/* Break at spaces and commas first; split a token only when it cannot fit. */
+.logs-results-otable--wrap :deep(td[data-test^="o2-table-cell-"] *) {
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+/* JSON has no spaces, so give each comma a break point; it is not copied with the text. */
+.logs-results-otable--wrap :deep(.log-comma)::after {
+  content: "\200B";
 }
 
 /* Plain text, no box or colour: the strip is background info, not a focus point. */

@@ -1212,9 +1212,7 @@ describe("SearchResult Component", () => {
       expect(row.classes()).toEqual(
         expect.arrayContaining(["o2-log-level-error", "o2-log-level-src-message"]),
       );
-      expect(row.attributes("data-row-status-color")).toBe(
-        "var(--color-log-severity-error-indicator)",
-      );
+      expect(row.attributes("data-row-status-color")).toBe("var(--color-status-negative)");
       const cell = row.find('[data-test="otable-stub-cell-_timestamp"]');
       expect(cell.find('[data-test="log-row-timestamp-value"]').text()).toBe("2026-10-06 12:00:01");
       const sr = cell.find('[data-test="log-row-severity-sr"]');
@@ -1242,9 +1240,7 @@ describe("SearchResult Component", () => {
       );
       expect(levels).toEqual(["o2-log-level-error", "o2-log-level-warning", "o2-log-level-ok"]);
       rows.forEach((r: any) => expect(r.classes()).toContain("o2-log-level-src-http"));
-      expect(rows[0].attributes("data-row-status-color")).toBe(
-        "var(--color-log-severity-error-indicator)",
-      );
+      expect(rows[0].attributes("data-row-status-color")).toBe("var(--color-status-negative)");
       expect(rows[0].find('[data-test="log-row-severity-sr"]').text()).toBe("Severity error");
     });
 

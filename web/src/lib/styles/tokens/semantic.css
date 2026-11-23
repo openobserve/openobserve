@@ -454,7 +454,7 @@
   /* Directional / inset roles — not points on the elevation scale, so they
      cannot be expressed as one. */
   --shadow-sticky-left-geom: 2px 0 4px -2px;
-  --shadow-sticky-right-geom: -2px 0 4px -2px;
+  --shadow-sticky-right-geom: -0.5rem 0 0.5rem -0.5rem;
   --shadow-sticky-footer-geom: 0 -0.25rem 0.4375rem 0;
   --shadow-rail-geom: inset 0.25rem 0 0 0;
   --shadow-rail-thin-geom: inset 0.125rem 0 0 0;
@@ -464,7 +464,9 @@
   --shadow-pivot-edge-geom: inset 0.25rem 0 0.375rem -0.125rem;
   --shadow-pivot-cast-geom: 0.25rem 0 0.5rem;
   --shadow-sticky-left: var(--shadow-sticky-left-geom) var(--color-border-default);
-  --shadow-sticky-right: var(--shadow-sticky-right-geom) var(--color-border-default);
+  --shadow-sticky-right-c: color-mix(in srgb, black 22%, transparent);
+  --shadow-sticky-right: var(--shadow-sticky-right-geom) var(--shadow-sticky-right-c);
+  --color-chart-axis-text: var(--color-text-secondary);
   --shadow-sticky-footer: var(--shadow-sticky-footer-geom) var(--color-border-subtle);
   --shadow-rail: var(--shadow-rail-geom) var(--color-border-default);
   --shadow-ring-hairline: var(--shadow-ring-hairline-geom) var(--color-border-default);

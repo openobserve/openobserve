@@ -42,6 +42,8 @@ const props = withDefaults(
     expanded?: boolean;
     /** The row opens a flyout, which stands in for the collapsed-rail tooltip. */
     flyout?: boolean;
+    /** Larger label for rows inside the flyout panel. */
+    large?: boolean;
   }>(),
   {
     icon: undefined,
@@ -56,6 +58,7 @@ const props = withDefaults(
     beta: false,
     expanded: undefined,
     flyout: false,
+    large: false,
   },
 );
 
@@ -69,7 +72,11 @@ const isToggle = computed(
   () => !props.locked && (!props.to || (props.expanded !== undefined && !props.collapsed)),
 );
 const iconClass = computed(() =>
-  props.active || props.childActive ? "text-selected-fg" : "text-text-secondary",
+  props.active || props.childActive
+    ? "text-selected-fg"
+    : props.large
+      ? "text-[var(--color-sidebar-flyout-icon)]"
+      : "text-text-secondary",
 );
 
 const rootAttrs = computed<Record<string, unknown>>(() => {
@@ -86,12 +93,13 @@ const rootAttrs = computed<Record<string, unknown>>(() => {
 
 // `!` on the text colour: the global link colour rule is unlayered and would otherwise tint <a> rows.
 const rowClass = computed(() => [
-  "group/nav flex min-w-9 w-full items-center gap-2.5 overflow-hidden rounded-default text-xs [text-decoration:none]! transition-colors duration-150 motion-reduce:transition-none cursor-pointer border-0 text-start [font-family:inherit]",
+  "group/nav flex min-w-9 w-full items-center gap-2.5 overflow-hidden rounded-default [text-decoration:none]! transition-colors duration-150 motion-reduce:transition-none cursor-pointer border-0 text-start [font-family:inherit]",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent",
+  props.large ? "text-compact" : "text-xs",
   props.sub ? "h-8 ps-8.5 pe-2" : "h-8 px-2",
   // Calm selection: a soft accent tint, no ring and no bold; the accent icon carries the state cue.
   props.active
-    ? "bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)] text-text-body! font-normal"
+    ? "bg-[var(--selected-tint)] text-text-body! font-normal"
     : props.childActive
       ? "bg-transparent hover:bg-surface-hover font-normal text-text-heading!"
       : "bg-transparent hover:bg-surface-hover hover:text-text-body! font-normal text-text-body!",
@@ -135,7 +143,7 @@ function onKeydown(event: KeyboardEvent) {
       <BetaBadge
         v-if="beta"
         size="xs"
-        class="-ms-1 shrink-0 px-1! py-px! text-[0.5625rem]! leading-none! font-medium! tracking-normal! normal-case!"
+        class="-ms-1 shrink-0 px-1! py-px! text-[0.625rem]! leading-none! font-semibold! tracking-normal! normal-case!"
       />
       <span class="-ms-2.5 flex-1" aria-hidden="true" />
       <OIcon

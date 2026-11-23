@@ -386,6 +386,7 @@ import { isStreamPick } from "@/components/commandPalette/resourceRoutes";
 import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
+import { clearServiceColorRegistry } from "@/utils/traces/serviceColorRegistry";
 import { contextRegistry, createTracesContextProvider } from "@/composables/contextProviders";
 
 import TransformService from "@/services/jstransform";
@@ -573,6 +574,16 @@ const activeHealthView = computed(() =>
 );
 // 85 = 47px toolbar + 1px pad + a 36px filter bar with its rule, the same height as Logs.
 const splitterModel = ref(85);
+// Span colors come from theme tokens, so cached service colors must re-resolve on a theme switch.
+watch(
+  () => store.state.theme,
+  () => {
+    clearServiceColorRegistry();
+    searchObj.meta.serviceColors = {};
+    setServiceColors(searchObj.data.queryResults?.hits ?? []);
+  },
+  { flush: "post" },
+);
 const fieldValues = ref({});
 
 const { isMobile, isTablet } = useBreakpoint();

@@ -26,16 +26,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
   <span
     v-else
     data-test="span-row-status-pill"
-    class="text-text-secondary text-compact uppercase"
-    >{{ status || "UNSET" }}</span
+    class="text-text-body text-compact inline-flex items-center gap-1.5 font-medium"
   >
+    <span aria-hidden="true" class="bg-status-positive size-2 rounded-full"></span>
+    {{ label }}
+  </span>
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { raw } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
 
-defineProps<{
+const props = defineProps<{
   status?: string;
 }>();
+
+const label = computed(() => {
+  const s = (props.status || "UNSET").toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+});
 </script>

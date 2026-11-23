@@ -24,11 +24,11 @@ describe("serviceColorRegistry", () => {
     expect(a).not.toBe(b);
   });
 
-  it("should assign colors sequentially (first service = index 0, second = index 1)", () => {
-    const first = getOrSetServiceColor("svc-a");
-    const second = getOrSetServiceColor("svc-b");
-    // the first two trace-span colors must differ
-    expect(first).not.toBe(second);
+  it("should give a service the same color regardless of first-seen order", () => {
+    const alone = getOrSetServiceColor("svc-b");
+    clearServiceColorRegistry();
+    getOrSetServiceColor("svc-a");
+    expect(getOrSetServiceColor("svc-b")).toBe(alone);
   });
 
   it("should return a fallback color for empty string", () => {
@@ -36,11 +36,9 @@ describe("serviceColorRegistry", () => {
     expect(color).toMatch(/^#[0-9a-fA-F]{6}$/);
   });
 
-  it("clearServiceColorRegistry should reset all assignments", () => {
+  it("clearServiceColorRegistry should keep colors deterministic", () => {
     const before = getOrSetServiceColor("svc-a");
     clearServiceColorRegistry();
-    // after reset, svc-b gets index 0 — same as svc-a had before
-    const after = getOrSetServiceColor("svc-b");
-    expect(before).toBe(after);
+    expect(getOrSetServiceColor("svc-a")).toBe(before);
   });
 });

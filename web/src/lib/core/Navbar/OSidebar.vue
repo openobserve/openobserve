@@ -473,7 +473,7 @@ const selfLogoSrc = computed(() =>
             aria-hidden="true"
           >
             <div
-              class="text-text-secondary overflow-hidden px-2 pt-3 pb-1 text-xs font-medium whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none"
+              class="overflow-hidden px-2 pt-3 pb-1 text-xs font-semibold tracking-wide whitespace-nowrap text-[var(--color-sidebar-section-label)] transition-opacity duration-150 motion-reduce:transition-none"
               :class="collapsed ? 'opacity-0' : 'opacity-100'"
             >
               {{ sectionTitle(section) }}
@@ -501,8 +501,7 @@ const selfLogoSrc = computed(() =>
                 :label="row.entry.item.title"
                 :icon="iconFor(row.entry.item)"
                 :to="linkTo(row.group.tileLink)"
-                :active="collapsed && row.group.activeKey !== null"
-                :child-active="!collapsed && row.group.activeKey !== null"
+                :active="row.group.activeKey !== null"
                 :collapsed="collapsed"
                 :expanded="collapsible ? undefined : expanded.has(row.entry.item.name)"
                 :aria-controls="collapsible ? undefined : `sidebar-children-${row.entry.item.name}`"
@@ -550,7 +549,7 @@ const selfLogoSrc = computed(() =>
                       <BetaBadge
                         v-if="childSection.beta"
                         size="xs"
-                        class="px-1! py-px! text-[0.5625rem]! leading-none! font-medium! tracking-normal! normal-case!"
+                        class="px-1! py-px! text-[0.625rem]! leading-none! font-semibold! tracking-normal! normal-case!"
                       />
                     </div>
                     <OSidebarItem
@@ -619,7 +618,7 @@ const selfLogoSrc = computed(() =>
         ref="flyoutRef"
         role="menu"
         :aria-label="flyoutRow.entry.item.title"
-        class="bg-dropdown-bg border-border-subtle shadow-overlay rounded-default fixed flex max-w-150 min-w-52 flex-col gap-0.5 overflow-y-auto overscroll-contain border p-1"
+        class="shadow-overlay rounded-default fixed flex max-w-150 min-w-52 flex-col gap-0.5 overflow-y-auto overscroll-contain border border-[var(--color-sidebar-flyout-border)] bg-[var(--color-sidebar-flyout-bg)] p-1"
         :style="flyoutStyle"
         :data-test="`sidebar-flyout-${flyoutRow.entry.item.name}`"
         @mouseenter="clearFlyoutTimers"
@@ -653,20 +652,21 @@ const selfLogoSrc = computed(() =>
               v-if="childSection.titleKey"
               :id="headingId('flyout', flyoutRow.entry.item.name, childSection)"
               role="presentation"
-              class="text-text-secondary text-2xs flex items-center gap-1.5 overflow-hidden px-2 pt-1 pb-0.5 font-medium whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none"
+              class="flex items-center gap-1.5 overflow-hidden px-2 pt-1 pb-0.5 text-xs font-semibold tracking-wide whitespace-nowrap text-[var(--color-sidebar-section-label)] transition-opacity duration-150 motion-reduce:transition-none"
               :data-test="`sidebar-flyout-section-label-${childSection.key}`"
             >
               {{ t(childSection.titleKey) }}
               <BetaBadge
                 v-if="childSection.beta"
                 size="xs"
-                class="px-1! py-px! text-[0.5625rem]! leading-none! font-medium! tracking-normal! normal-case!"
+                class="px-1! py-px! text-[0.625rem]! leading-none! font-semibold! tracking-normal! normal-case!"
               />
             </div>
             <OSidebarItem
               v-for="child in childSection.children"
               :key="childKey(child)"
               role="menuitem"
+              large
               :label="childLabel(child)"
               :icon="sidebarIcon(child.icon)"
               :to="childLocation(child, route, orgIdentifier)"

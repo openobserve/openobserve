@@ -203,16 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </router-view>
                 </FeatureLockBoundary>
               </div>
-              <div
-                v-else
-                data-test="main-content-pending"
-                aria-busy="true"
-                class="flex h-full flex-1 flex-col gap-3 overflow-hidden p-4"
-              >
-                <OSkeleton type="text" class="h-6 w-48" />
-                <OSkeleton class="h-8 w-full" />
-                <OSkeleton v-for="n in 8" :key="n" class="h-9 w-full" />
-              </div>
+              <PageLoader v-else data-test="main-content-pending" />
             </div>
           </main>
 
@@ -366,7 +357,7 @@ import EditorDraftSignOutDialog from "@/components/common/drafts/EditorDraftSign
 import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import PageLoader from "@/components/common/PageLoader.vue";
 import { confirmLeave, releaseLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
 import { switchOrganization, toOrganizationOption } from "@/utils/organizationSwitch";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -446,7 +437,7 @@ export default defineComponent({
     SampleDataProgressDock,
     ODrawer,
     OButton,
-    OSkeleton,
+    PageLoader,
     FirstDataNotice,
     EditorDraftSignOutDialog,
     FeatureLockBoundary,

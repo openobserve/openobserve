@@ -1033,8 +1033,12 @@ export default {
   font-size: 0.8125rem;
   line-height: 1.5;
 }
+/* keep(complex-state): values use the heading tone so they read brighter than the keys, also in dark. */
+.log_json_content {
+  --log-syntax-value: var(--color-text-heading);
+}
 /* keep(complex-state): keys take the same accent as keys in the results table, so a field reads the same in both places. */
 .log_json_content :deep(.log-key) {
-  color: var(--color-selected-fg);
+  color: var(--color-log-key);
 }
 </style>

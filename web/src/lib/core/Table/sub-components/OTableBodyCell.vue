@@ -111,10 +111,13 @@ const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
 
 // A sticky cell paints its own opaque background over the row's, so it must repeat every row state.
 const pinnedBgClass = computed(() => {
-  if (props.rowSelected || props.rowActive) return "bg-table-row-selected-bg";
+  if (props.rowSelected || props.rowActive)
+    return "bg-table-row-selected-bg [--pin-bg:var(--color-table-row-selected-bg)]";
   return [
-    props.rowStriped ? "bg-table-row-striped-bg" : "bg-table-cell-bg",
-    "group-hover/row:bg-table-row-hover-bg",
+    props.rowStriped
+      ? "bg-table-row-striped-bg [--pin-bg:var(--color-table-row-striped-bg)]"
+      : "bg-table-cell-bg [--pin-bg:var(--color-table-cell-bg)]",
+    "group-hover/row:bg-table-row-hover-bg group-hover/row:[--pin-bg:var(--color-table-row-hover-bg)]",
     props.rowFocusable ? "group-focus-visible/row:bg-table-row-hover-bg" : "",
   ];
 });
@@ -248,6 +251,7 @@ const cellStyle = computed(() => {
     base.right = `${pinOffset.value}px`;
     base.zIndex = 1;
     base.boxShadow = "var(--shadow-sticky-right)";
+    base.borderLeft = "0.0625rem solid var(--color-border-default)";
   }
   const extra = props.getCellStyle?.({
     columnId: props.cell.column.id,
@@ -480,6 +484,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
       alignClass,
       isAction ? 'w-0 whitespace-nowrap' : '',
       isPinned ? pinnedBgClass : '',
+      isPinned === 'right' ? 'o2-pinned-right' : '',
       wrap
         ? 'wrap-anywhere whitespace-normal'
         : horizontalScroll?.value

@@ -84,10 +84,11 @@ describe("SpanStatusPill", () => {
       wrapper = mount(SpanStatusPill, { props: { status: "OK" } });
     });
 
-    it("should apply the success class", () => {
-      expect(wrapper.find('[data-test="span-row-status-pill"]').classes()).toContain(
-        "bg-badge-success-soft-bg",
-      );
+    it("should render a plain label with a status dot instead of a filled chip", () => {
+      const pill = wrapper.find('[data-test="span-row-status-pill"]');
+      expect(pill.classes()).toContain("text-text-body");
+      expect(pill.classes()).not.toContain("bg-badge-success-soft-bg");
+      expect(pill.find(".bg-status-positive").exists()).toBe(true);
     });
 
     it("should not apply the error class", () => {
@@ -97,7 +98,7 @@ describe("SpanStatusPill", () => {
     });
 
     it("should display the OK label", () => {
-      expect(wrapper.find('[data-test="span-row-status-pill"]').text()).toContain("OK");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').text()).toContain("Ok");
     });
   });
 
@@ -106,10 +107,11 @@ describe("SpanStatusPill", () => {
       wrapper = mount(SpanStatusPill);
     });
 
-    it("should apply the unset class", () => {
-      expect(wrapper.find('[data-test="span-row-status-pill"]').classes()).toContain(
-        "bg-badge-default-soft-bg",
-      );
+    it("should render a plain label with a status dot instead of a filled chip", () => {
+      const pill = wrapper.find('[data-test="span-row-status-pill"]');
+      expect(pill.classes()).toContain("text-text-body");
+      expect(pill.classes()).not.toContain("bg-badge-default-soft-bg");
+      expect(pill.find(".bg-status-positive").exists()).toBe(true);
     });
 
     it("should not apply the error class", () => {
@@ -119,19 +121,19 @@ describe("SpanStatusPill", () => {
     });
 
     it("should display UNSET as the label", () => {
-      expect(wrapper.find('[data-test="span-row-status-pill"]').text()).toContain("UNSET");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').text()).toContain("Unset");
     });
   });
 
   describe("label text", () => {
     it("should display the exact status string passed via prop", () => {
       wrapper = mount(SpanStatusPill, { props: { status: "CUSTOM_STATUS" } });
-      expect(wrapper.find('[data-test="span-row-status-pill"]').text()).toContain("CUSTOM_STATUS");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').text()).toContain("Custom_status");
     });
 
     it("should display UNSET when an empty string is passed", () => {
       wrapper = mount(SpanStatusPill, { props: { status: "" } });
-      expect(wrapper.find('[data-test="span-row-status-pill"]').text()).toContain("UNSET");
+      expect(wrapper.find('[data-test="span-row-status-pill"]').text()).toContain("Unset");
     });
   });
 });

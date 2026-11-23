@@ -114,10 +114,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span data-test="span-count-text">
                     {{ formatLargeNumber(effectiveSpanList.length) }}
-                    {{ t("traces.spansLabel") }}
+                    {{ t("traces.spansLabel", effectiveSpanList.length) }}
                   </span>
                 </OTag>
-                <OTooltip :content="raw(effectiveSpanList.length + ' ' + t('traces.spansLabel'))" />
+                <OTooltip
+                  :content="
+                    raw(
+                      effectiveSpanList.length +
+                        ' ' +
+                        t('traces.spansLabel', effectiveSpanList.length),
+                    )
+                  "
+                />
               </span>
 
               <template v-if="errorSpans.length">
@@ -161,6 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="canManualEvaluate"
               data-test="trace-details-evaluate-trace-btn"
+              class="toolbar-btn-rest"
               variant="outline"
               size="icon-xs"
               :aria-label="t('onlineEvals.manualEvaluation.titles.trace')"
@@ -189,6 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-xs"
                 :aria-label="t('aiObservability.traceActions.annotate.button')"
                 data-test="trace-details-annotate-trace-btn"
+                class="toolbar-btn-rest"
                 @click="openUpgradeDialog"
               >
                 <OIcon name="fact-check" size="sm" />
@@ -199,6 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="canAnnotateContext"
               data-test="trace-details-dataset-trace-btn"
+              class="toolbar-btn-rest"
               variant="outline"
               size="icon-xs"
               :aria-label="t('aiObservability.traceActions.dataset.button')"
@@ -219,6 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ShareButton
               v-if="showShareButton"
               data-test="trace-details-share-link-btn"
+              class="toolbar-btn-rest"
               :url="traceDetailsShareURL"
               variant="outline"
               size="icon-xs"
@@ -228,6 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="showCloseButton"
               data-test="trace-details-close-btn"
+              class="toolbar-btn-rest"
               variant="outline"
               size="icon-xs"
               @click="handleBackOrClose"
@@ -350,10 +363,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTag type="logsResultChip" value="neutral" data-test="trace-details-spans-count">
                   <span data-test="span-count-text">
                     {{ formatLargeNumber(effectiveSpanList.length) }}
-                    {{ t("traces.spansLabel") }}
+                    {{ t("traces.spansLabel", effectiveSpanList.length) }}
                   </span>
                 </OTag>
-                <OTooltip :content="raw(effectiveSpanList.length + ' ' + t('traces.spansLabel'))" />
+                <OTooltip
+                  :content="
+                    raw(
+                      effectiveSpanList.length +
+                        ' ' +
+                        t('traces.spansLabel', effectiveSpanList.length),
+                    )
+                  "
+                />
               </span>
 
               <template v-if="errorSpans.length">
@@ -1159,7 +1180,6 @@ import {
   filterTraceServiceGraph,
   filterTraceTree,
 } from "@/utils/traces/traceServiceGraph";
-import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
 import {
   buildFilterTerm,
@@ -1825,9 +1845,6 @@ export default defineComponent({
       const sidebarWidthPx = Math.max(remainingWidth * 0.84, 300); // Minimum 300px
       return `${sidebarWidthPx}px`;
     });
-
-    const serviceColorIndex = ref(0);
-    const colors = ref(getAllSpanColors());
 
     const spanList: any = computed(() => {
       return searchObj.data.traceDetails.spanList;
@@ -2898,12 +2915,9 @@ export default defineComponent({
       const selected = searchObj.data.traceDetails.selectedTrace!;
       selected.service_name!.forEach((service) => {
         if (!searchObj.meta.serviceColors[service.service_name]) {
-          if (serviceColorIndex.value >= colors.value.length) generateNewColor();
-
-          searchObj.meta.serviceColors[service.service_name] =
-            colors.value[serviceColorIndex.value];
-
-          serviceColorIndex.value++;
+          searchObj.meta.serviceColors[service.service_name] = getOrSetServiceColor(
+            service.service_name,
+          );
         }
         selected.services![service.service_name] = service.count;
       });
@@ -2932,15 +2946,6 @@ export default defineComponent({
       });
       return;
     };
-
-    function generateNewColor() {
-      // Generate a color in HSL format
-      const hue = (colors.value.length * 137.508) % 360; // Using golden angle approximation
-      const saturation = 70 + (colors.value.length % 2) * 15;
-      const lightness = 50;
-      colors.value.push(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
-      return colors;
-    }
 
     const calculateTracePosition = () => {
       const tics: { value: number; label: I18nText; left: string }[] = [];

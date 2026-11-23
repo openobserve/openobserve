@@ -1819,7 +1819,8 @@ export default defineComponent({
       // A span of an hour or less keeps its seconds, so a tight window still reads exactly.
       const keepSeconds =
         !!abs && stamp(abs[4], abs[5], abs[6]) - stamp(abs[1], abs[2], abs[3]) <= 3_600_000;
-      const trim = (time: string) => (keepSeconds ? time : time.replace(/^(\d{2}:\d{2}):\d{2}$/, "$1"));
+      const trim = (time: string) =>
+        keepSeconds ? time : time.replace(/^(\d{2}:\d{2}):\d{2}$/, "$1");
       // The year is only dropped when both ends share it, or a cross-year range would read as same-day.
       if (!abs || abs[1] !== abs[4] || (onlyYear && abs[1] !== onlyYear))
         return keepSeconds ? label : label.replace(/\b(\d{2}:\d{2}):\d{2}\b/g, "$1");

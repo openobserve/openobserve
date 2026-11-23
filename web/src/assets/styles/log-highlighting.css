@@ -11,10 +11,13 @@
 /* Calm syntax palette: keys secondary, values body, one muted accent for numbers.
    :root.dark selectors match refresh.css specificity; this file loads later, so it wins. */
 :root {
-  --log-syntax-key: var(--color-text-secondary);
+  --log-syntax-key: var(--color-log-key);
   --log-syntax-value: var(--color-text-body);
   --log-syntax-accent: color-mix(in srgb, var(--color-accent-text) 70%, var(--color-text-body));
   --log-syntax-muted: var(--color-text-secondary);
+}
+:root.dark {
+  --log-syntax-key: var(--color-log-key);
 }
 
 :root .log-key,
@@ -121,6 +124,12 @@
   color: inherit;
 }
 
-:root .log-cell-html :is(.log-key, .log-embedded-key) {
-  color: var(--color-selected-fg);
+:root .log-cell-html .log-key {
+  color: var(--color-log-key);
+}
+
+/* Keys inside free-text messages stay quiet so they do not read as links. */
+:root .log-cell-html .log-embedded-key {
+  color: color-mix(in srgb, var(--color-text-secondary) 45%, var(--color-text-body));
+  font-weight: 400;
 }

@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="
             isOn
               ? 'border-live-border! bg-live-soft! text-live! shadow-none!'
-              : 'border-transparent! text-text-secondary!'
+              : 'text-text-secondary! border-transparent!'
           "
           :aria-label="triggerAriaLabel"
         >
@@ -61,13 +61,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="
             isOn
               ? 'border-live-border! bg-live-soft! text-live! shadow-none!'
-              : 'border-transparent! text-text-secondary!'
+              : 'text-text-secondary! border-transparent!'
           "
           size="sm-toolbar"
           :aria-label="triggerAriaLabel"
         >
           <div class="flex flex-nowrap items-center">
             <OIcon name="update" size="sm" class="me-1" :class="isOn ? 'text-live!' : ''" />
+            <span v-if="!isOn" class="text-text-secondary text-xs">{{ t("common.off") }}</span>
             <OIcon
               name="arrow-drop-down"
               size="sm"

@@ -59,6 +59,7 @@ import { useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useTraces from "@/composables/useTraces";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
+import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 
 // TODO(design-tokens): the "unknown service" grey has no semantic token. It is the
 // shared fallback for a service the colour allocator never assigned (also in
@@ -94,7 +95,9 @@ function segmentPercent(svc: any): number {
 }
 
 function serviceColor(service: string): string {
-  return serviceColors.value[service] || UNKNOWN_SERVICE_COLOR;
+  if (!service) return UNKNOWN_SERVICE_COLOR;
+  // Reading serviceColors keeps the cell reactive to the theme-change reset.
+  return serviceColors.value[service] || getOrSetServiceColor(service);
 }
 
 /** Legend dot — per-service colour, so it can only be a runtime binding. */

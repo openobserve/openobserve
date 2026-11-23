@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="valueSearchTerm"
           clearable
           size="sm"
-          :placeholder="t('common.searchValuesIn', { field: fieldName })"
+          :placeholder="t('common.searchValuesShort')"
           @clear="valueSearchTerm = ''"
         />
       </div>
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ selectedValues.length }} {{ t("search.selectedLabel") }}
         </span>
-        <span v-else class="selection-hint text-3! text-3xs text-text-secondary">{{
+        <span v-else class="selection-hint text-text-secondary text-xs font-medium">{{
           t("search.selectToFilter")
         }}</span>
         <OButton
@@ -158,20 +158,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <div
-              class="flex min-w-0 flex-row flex-wrap justify-between ps-1"
+              class="flex min-w-0 flex-row flex-nowrap items-center justify-between ps-1"
               :class="showMultiSelect ? 'w-[calc(100%-1.5rem)]' : 'w-full'"
             >
               <div
-                :title="value.key"
-                class="text-field-list-label-text text-3! w-[calc(100%-3.125rem)] pe-1 break-words whitespace-pre-wrap"
+                :title="value.label ?? value.key"
+                class="text-field-list-label-text text-3! min-w-0 flex-1 truncate pe-1"
               >
                 {{ value.label ?? value.key }}
               </div>
               <div
                 v-if="value.count != null"
                 :title="String(value.count)"
-                class="text-3! contents truncate pe-0 text-right"
-                :class="showMultiSelect ? 'w-[3.125rem]' : ''"
+                class="text-3! w-[3.125rem] shrink-0 truncate pe-0 text-right tabular-nums"
               >
                 {{ formatLargeNumber(value.count) }}
               </div>

@@ -2019,6 +2019,7 @@ defineExpose({
                         right: `${header.column.getAfter?.('right') ?? 0}px`,
                         zIndex: 20,
                         boxShadow: 'var(--shadow-sticky-right)',
+                        borderLeft: '0.0625rem solid var(--color-border-default)',
                       }
                     : {}),
                 }"

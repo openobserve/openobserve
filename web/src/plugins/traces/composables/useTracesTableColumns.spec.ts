@@ -460,10 +460,9 @@ describe("useTracesTableColumns", () => {
   // ── timestamp column ──────────────────────────────────────────────────────
 
   describe("timestamp column — auto-prepended when absent from selectedFields", () => {
-    it("should have header containing the i18n key and timezone when auto-prepended", () => {
-      // With the mock: t("traces.timestamp") returns "traces.timestamp", timezone is "UTC"
+    it("should use the timezone header key when auto-prepended", () => {
       const col = buildCols(false, "spans", []).find((c) => c.id === "_timestamp");
-      expect(col?.header).toBe("traces.timestamp (UTC)");
+      expect(col?.header).toBe("search.timestampWithTimezone");
     });
 
     it("should have size 210 when auto-prepended", () => {
@@ -474,12 +473,6 @@ describe("useTracesTableColumns", () => {
     it("should have accessorFn defined when auto-prepended", () => {
       const col = buildCols(false, "spans", []).find((c) => c.id === "_timestamp");
       expect(typeof (col as any)?.accessorFn).toBe("function");
-    });
-
-    it("should have meta.headerClass set to 'capitalize!' when auto-prepended", () => {
-      const col = buildCols(false, "spans", []).find((c) => c.id === "_timestamp");
-      const meta = col?.meta as Record<string, unknown>;
-      expect(meta?.headerClass).toBe("capitalize!");
     });
 
     it("should have meta.sortable=true on timestamp column", () => {

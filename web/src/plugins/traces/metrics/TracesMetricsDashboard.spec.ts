@@ -428,7 +428,7 @@ describe("TracesMetricsDashboard", () => {
       );
       const options = result.options;
       const yAxis = Array.isArray(options.yAxis) ? options.yAxis[0] : options.yAxis;
-      expect(yAxis.axisLabel.formatter(10)).toBe("10.00");
+      expect(yAxis.axisLabel.formatter(10)).toBe("10");
       expect(options.tooltip.axisPointer.label.formatter({ axisDimension: "y", value: 10 })).toBe(
         "10.00",
       );

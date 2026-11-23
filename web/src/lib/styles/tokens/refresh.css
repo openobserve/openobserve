@@ -39,6 +39,10 @@
   --color-text-secondary: #545866;
   --color-text-disabled: #9a9da8;
 
+  /* Loading bars at 1.4:1 on the card, so they read as content-to-come, not a faint wash. */
+  --color-skeleton-base: var(--color-grey-300);
+  --color-skeleton-highlight: var(--color-grey-200);
+
   /* Structure hairline < button edge < control edge (3:1) < hover edge. */
   /* Neutral selected-item fill, 1.3:1 on the panel so it never matches a header or hover. */
   --color-surface-selected-neutral: #d5d8df;
@@ -51,6 +55,20 @@
   --color-accent-text: color-mix(in srgb, var(--color-accent) 78%, var(--color-black));
   --color-selected-bg: color-mix(in srgb, var(--color-accent) 26%, transparent);
   --color-selected-fg: color-mix(in srgb, var(--color-accent) 65%, var(--color-black));
+  --color-sidebar-section-label: color-mix(
+    in srgb,
+    var(--color-text-secondary) 60%,
+    var(--color-text-heading)
+  );
+  --color-sidebar-flyout-icon: color-mix(
+    in srgb,
+    var(--color-text-secondary) 60%,
+    var(--color-text-body)
+  );
+  --color-sidebar-flyout-bg: var(--color-dropdown-bg);
+  --color-sidebar-flyout-border: var(--color-border-subtle);
+  --selected-tint: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --color-log-key: #2f5fb8;
   --color-selected-border: var(--color-accent-text);
   /* Opaque twin of the selected fill, so sticky table cells stay solid. */
   --color-table-row-selected-bg: color-mix(
@@ -92,6 +110,26 @@
 
 /* ── Dark ────────────────────────────────────────────────── */
 :root.dark {
+  --shadow-sticky-right-c: color-mix(in srgb, black 60%, transparent);
+  --color-chart-axis-text: color-mix(
+    in srgb,
+    var(--color-text-secondary) 60%,
+    var(--color-text-body)
+  );
+  --color-sidebar-section-label: color-mix(
+    in srgb,
+    var(--color-text-secondary) 45%,
+    var(--color-text-heading)
+  );
+  --color-sidebar-flyout-icon: color-mix(
+    in srgb,
+    var(--color-text-secondary) 40%,
+    var(--color-text-body)
+  );
+  --color-sidebar-flyout-bg: color-mix(in srgb, white 5%, var(--color-surface-overlay));
+  --color-sidebar-flyout-border: color-mix(in srgb, white 10%, transparent);
+  --selected-tint: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  --color-log-key: #8ab4f8;
   /* dark.css builds its surfaces and borders from these. */
   --d-chrome: #0f1013;
   /* One step further from the shell so the card reads as its own surface. */
@@ -252,7 +290,7 @@
   --color-toggle-item-text: var(--color-text-body);
   --color-toggle-item-hover-bg: var(--color-surface-subtle-hover);
   /* Calm selection, same as the sidebar: soft accent tint, no ring, body text; the accent glyph carries the state. */
-  --color-toggle-item-active-bg: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --color-toggle-item-active-bg: var(--selected-tint);
   --color-toggle-item-active-border: transparent;
   --color-toggle-item-active-text: var(--color-text-body);
   --color-toggle-item-disabled: var(--color-text-disabled);
@@ -260,7 +298,7 @@
   /* Pager: the current page takes the selected recipe, never a solid fill. */
   --color-pagination-item-text: var(--color-text-secondary);
   --color-pagination-item-hover-bg: var(--color-surface-hover);
-  --color-pagination-item-active-bg: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --color-pagination-item-active-bg: var(--selected-tint);
   --color-pagination-item-active-text: var(--color-selected-fg);
   --color-pagination-item-disabled-text: var(--color-text-disabled);
   --color-pagination-nav-text: var(--color-text-secondary);
@@ -330,7 +368,7 @@
   --color-field-list-row-hover-bg: var(--color-surface-hover);
   /* In-table field rows: neutral fill, no accent; weight and the eye icon also carry the state. */
   /* Calm selection, same as the sidebar and tabs: soft accent tint, body text; the accent eye carries "in the table". */
-  --color-field-list-row-selected-bg: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --color-field-list-row-selected-bg: var(--selected-tint);
   --color-field-list-row-selected-text: var(--color-text-body);
   --color-field-list-expansion-bg: var(--color-surface-band);
   /* The field-row action strip takes the row's own fill, so it never reads as a second box. */
@@ -611,10 +649,16 @@
 }
 
 /* Toolbar and header secondary buttons: a raised fill plus a 1px control edge, so they read as outlined buttons, not floating text; hover and open keep the ghost fills. */
-:root :is(.toolbar-btn-rest, .header-utility-icons button:not(.ai-btn-active)):not(:hover):not([aria-expanded="true"]):not([data-state="open"]):not([aria-pressed="true"]) {
+:root
+  :is(.toolbar-btn-rest, .header-utility-icons button:not(.ai-btn-active)):not(:hover):not(
+    [aria-expanded="true"]
+  ):not([data-state="open"]):not([aria-pressed="true"]) {
   background-color: var(--toolbar-btn-rest-bg);
 }
-:root :is(.toolbar-btn-rest, .header-utility-icons button:not(.ai-btn-active)):not(:focus-visible):not([aria-pressed="true"]) {
+:root
+  :is(.toolbar-btn-rest, .header-utility-icons button:not(.ai-btn-active)):not(:focus-visible):not(
+    [aria-pressed="true"]
+  ) {
   box-shadow: inset 0 0 0 1px var(--toolbar-btn-rest-edge);
 }
 :root:not(.dark) {
@@ -624,10 +668,22 @@
 /* Raised, never sunken: the fill sits a step above the near-black bar and the edge is near the control border. */
 :root.dark {
   --toolbar-btn-rest-bg: var(--color-surface-raised);
-  --toolbar-btn-rest-edge: color-mix(in srgb, var(--color-border-button) 75%, var(--color-border-control));
+  --toolbar-btn-rest-edge: color-mix(
+    in srgb,
+    var(--color-border-button) 75%,
+    var(--color-border-control)
+  );
 }
 /* Their icons stay secondary grey (as in the reference apps) but get a thin currentColor stroke, lifting the 300-weight outlines to about the 400 weight (≈1.3px at 16px). */
-:root :is(.toolbar-btn-rest, .header-utility-icons button:not([data-test="menu-link-slack-item"]), #date-time-button) svg path[fill="currentColor"] {
+:root
+  :is(
+    .toolbar-btn-rest,
+    .row-actions button,
+    .header-utility-icons button:not([data-test="menu-link-slack-item"]),
+    #date-time-button
+  )
+  svg
+  path[fill="currentColor"] {
   stroke: currentColor;
   stroke-width: 0.75px;
   stroke-linejoin: round;
@@ -642,8 +698,18 @@
   color: var(--color-text-secondary) !important;
 }
 /* Light mode: resting toolbar and header icons sit one step below the secondary text, so the heavier strokes do not read as black. */
-:root:not(.dark) :is(.toolbar-btn-rest, .header-utility-icons button:not([data-test="menu-link-slack-item"]), #date-time-button):not(:hover):not([aria-expanded="true"]) :is(span.inline-flex.shrink-0.align-middle, svg.text-text-secondary) {
-  color: color-mix(in srgb, var(--color-text-secondary) 85%, var(--color-surface-raised)) !important;
+:root:not(.dark)
+  :is(
+    .toolbar-btn-rest,
+    .header-utility-icons button:not([data-test="menu-link-slack-item"]),
+    #date-time-button
+  ):not(:hover):not([aria-expanded="true"])
+  :is(span.inline-flex.shrink-0.align-middle, svg.text-text-secondary) {
+  color: color-mix(
+    in srgb,
+    var(--color-text-secondary) 85%,
+    var(--color-surface-raised)
+  ) !important;
 }
 :root [data-otoggle-value][data-state="on"] span.inline-flex.shrink-0.align-middle {
   color: var(--color-selected-fg);

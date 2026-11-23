@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTruncatedText :tooltip="false" class="min-w-0">{{ item.label }}</OTruncatedText>
             <span
               v-if="item.hint"
-              class="shrink-0 text-xs font-normal italic"
+              class="shrink-0 text-xs font-normal"
               :class="item.selected ? '' : 'text-text-secondary'"
               :data-test="`date-time-rail-calendar-${item.id}-hint`"
               >{{ item.hint }}</span
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="recent.length > 0 || hasCalendar"
-      class="text-text-secondary mt-auto px-3 pt-3 pb-2 text-xs italic max-sm:hidden"
+      class="text-text-secondary mt-auto px-3 pt-3 pb-2 text-xs max-sm:hidden"
       data-test="date-time-rail-keys-hint"
     >
       {{ t("common.timeRangeRailKeysHint") }}

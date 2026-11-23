@@ -223,17 +223,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              the widest thing on a row, and clipping it hides the part that
              distinguishes one trace or span from the next. -->
         <OButton
+          as="div"
           variant="ghost"
           size="sm-toolbar"
-          :class="searchObj.meta.resultGrid.wrapCells ? '' : 'border! border-transparent!'"
-          :active="searchObj.meta.resultGrid.wrapCells"
-          :aria-pressed="searchObj.meta.resultGrid.wrapCells ? 'true' : 'false'"
-          @click.stop="toggleWrapCells"
+          class="toolbar-btn-rest"
           data-test="traces-search-result-wrap-btn"
+          @click="toggleWrapCells"
         >
-          <OIcon name="wrap-text" size="sm" />
-          <span class="whitespace-nowrap @max-[58rem]/results:hidden">{{ t("common.wrap") }}</span>
-          <OTooltip :content="t('search.messageWrapContent')" />
+          <OSwitch
+            class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
+            :model-value="searchObj.meta.resultGrid.wrapCells"
+            :aria-label="t('search.messageWrapContent')"
+            size="sm"
+            @click.stop
+            @update:model-value="toggleWrapCells"
+          />
+          <OIcon name="wrap-text" size="sm" class="shrink-0" />
+          <OTooltip :content="t('search.messageWrapContent')" side="bottom" />
         </OButton>
         <div
           v-if="pagerShown && !groupsShown"
@@ -447,6 +453,7 @@ import { formatLargeNumber } from "../../utils/zincutils";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { useLocalWrapTracesContent } from "@/utils/storage";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -473,6 +480,7 @@ export default defineComponent({
   components: {
     ORefreshButton,
     OButton,
+    OSwitch,
     OTooltip,
     OSelect,
     OPagination,

@@ -1,12 +1,12 @@
 // Copyright 2026 OpenObserve Inc.
-import { getSpanColorHex } from "@/utils/traces/traceColors";
+import { getServiceColorHex } from "@/utils/traces/traceColors";
 
 const registry = new Map<string, string>();
 
 export function getOrSetServiceColor(name: string): string {
-  if (!name) return getSpanColorHex(0);
+  if (!name) return getServiceColorHex("");
   if (!registry.has(name)) {
-    registry.set(name, getSpanColorHex(registry.size));
+    registry.set(name, getServiceColorHex(name));
   }
   return registry.get(name)!;
 }

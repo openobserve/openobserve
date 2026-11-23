@@ -1145,6 +1145,7 @@
     "pickColor": "Pick color",
     "pickColorFor": "{label} — pick color",
     "searchValuesIn": "Search {field} values…",
+    "searchValuesShort": "Search Values",
     "panelColor": "Panel color: {color}",
     "queryNumber": "Query {index}",
     "itemLogo": "{name} logo",
@@ -1154,6 +1155,8 @@
     "dropFilesHint": "Drop files here or click to choose",
     "chooseFiles": "Choose files",
     "chooseAFile": "Choose a file",
+    "loadingWorkspace": "Loading your workspace",
+    "stillLoadingWorkspace": "Still loading your workspace",
     "loadingEllipsis": "Loading...",
     "field": "Field",
     "enterValueOrVariable": "Enter value or $variable",
@@ -1457,7 +1460,7 @@
     "searchField": "Search for a field",
     "searchDimension": "Search Dimensions",
     "maxRecords": "Max records to return",
-    "timestampWithTimezone": "timestamp ({timezone})",
+    "timestampWithTimezone": "Timestamp ({timezone})",
     "noResult": "No results found.",
     "noData": "No data available",
     "fieldValuesEmpty": "No values found.",
@@ -17461,6 +17464,12 @@
         "spans": "Spans",
         "errors": "Errors"
       },
+      "legend": {
+        "spans": "Color scale: fewer to more spans",
+        "errors": "Color scale: fewer to more errors",
+        "fewer": "Fewer",
+        "more": "More"
+      },
       "noData": "No data",
       "loadFailed": "Failed to load the latency heatmap",
       "selection": {
@@ -17663,7 +17672,7 @@
     "clearErrorFilter": "Clear error filter",
     "error": "ERROR",
     "errorCount": "{n} ERROR | {n} ERRORS",
-    "success": "SUCCESS",
+    "success": "Success",
     "applyPendingFilters": "Apply pending filters and Search Traces",
     "backToTraces": "Back to Traces",
     "loadingTrace": "Loading...",
@@ -17671,7 +17680,7 @@
     "copyTraceId": "Copy Trace ID",
     "viewFilters": "View filters",
     "reviewAndApplyFilters": "Review and apply filters to Traces",
-    "spansLabel": "spans",
+    "spansLabel": "span | spans",
     "errorsLabel": "errors",
     "errorStrip": {
       "spanLabel": "{service} · {operation}",

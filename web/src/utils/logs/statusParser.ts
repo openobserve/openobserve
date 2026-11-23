@@ -501,6 +501,14 @@ const SEVERITY_TEXT_CLASSES: Readonly<Record<KnownLogSeverityLevel, string>> = {
   ok: "text-text-body",
 };
 
+const SEVERITY_BOLD_LEVELS: ReadonlySet<string> = new Set([
+  "emergency",
+  "alert",
+  "critical",
+  "error",
+  "warning",
+]);
+
 const GUARDED_FIELDS: readonly string[] = [
   ...new Set<string>([...SEVERITY_TIER1_FIELDS, ...SEVERITY_TIER2_FIELDS, ...SEVERITY_HTTP_FIELDS]),
 ];
@@ -601,10 +609,8 @@ export function severityStripColor(severity: LogSeverity): string {
     case "notice":
     case "info":
     case "ok":
-      return "color-mix(in srgb, var(--color-info) 55%, var(--color-text-secondary))";
     case "debug":
     case "trace":
-      return "var(--color-status-neutral-text)";
     case "unknown":
       return "transparent";
   }
@@ -618,7 +624,8 @@ export function severityRowClass(severity: LogSeverity): string {
 export function severityFieldTextClass(field: string, value: unknown): string {
   const resolved = resolveSeverityFieldValue(field, value);
   if (!resolved || resolved.source !== "field") return "";
-  return `font-normal ${SEVERITY_TEXT_CLASSES[resolved.level]}`;
+  const weight = SEVERITY_BOLD_LEVELS.has(resolved.level) ? "font-semibold" : "font-normal";
+  return `${weight} ${SEVERITY_TEXT_CLASSES[resolved.level]}`;
 }
 
 export function severityStringValues(levels: readonly LogSeverityLevel[]): string[] {

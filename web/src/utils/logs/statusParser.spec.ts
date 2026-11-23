@@ -33,6 +33,7 @@ import {
   resolveSeverityFieldValue,
   setSeverityInferenceEnabled,
   severityFieldTextClass,
+  severityStripColor,
   severityIndicatorColor,
   severityRowClass,
   severityStringValues,
@@ -1049,19 +1050,26 @@ describe("indicator colours and row classes (A7)", () => {
     expect(severityRowClass(sev({ status: 503 }))).toBe("o2-log-level-error o2-log-level-src-http");
   });
 
+  it("rails only error and warn rows", () => {
+    expect(severityStripColor(sev({ level: "error" }))).toBe("var(--color-status-negative)");
+    expect(severityStripColor(sev({ level: "warn" }))).toBe(
+      "var(--color-log-severity-warning-indicator)",
+    );
+    for (const level of ["info", "debug", "trace"]) {
+      expect(severityStripColor(sev({ level }))).toBe("transparent");
+    }
+    expect(severityStripColor(sev({}))).toBe("transparent");
+  });
+
   it("colours only a severity field's own cell by its level", () => {
     expect(severityFieldTextClass("level", "ERROR")).toBe(
-      "font-mono font-medium text-log-severity-error-text",
+      "font-semibold text-log-severity-error-text",
     );
     expect(severityFieldTextClass("level", "warn")).toBe(
-      "font-mono font-medium text-log-severity-warning-text",
+      "font-semibold text-log-severity-warning-text",
     );
-    expect(severityFieldTextClass("severity", "debug")).toBe(
-      "font-mono font-medium text-log-severity-debug-text",
-    );
-    expect(severityFieldTextClass("level", "info")).toBe(
-      "font-mono font-medium text-log-severity-info-text",
-    );
+    expect(severityFieldTextClass("severity", "debug")).toBe("font-normal text-text-body");
+    expect(severityFieldTextClass("level", "info")).toBe("font-normal text-text-body");
     expect(severityFieldTextClass("message", "ERROR")).toBe("");
     expect(severityFieldTextClass("status", 503)).toBe("");
   });

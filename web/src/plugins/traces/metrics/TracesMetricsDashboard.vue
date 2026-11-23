@@ -401,6 +401,7 @@ const loadDashboard = async () => {
           panel.config.axis_width = TRACES_CHART_GRID.left;
           panel.config.custom_chart_options = {
             tooltip: { appendToBody: true, confine: false },
+            yAxis: { axisLabel: { formatter: (v: number) => String(Number(v.toFixed(2))) } },
             grid: { ...TRACES_CHART_GRID, containLabel: false },
           };
           panel.config.color = {

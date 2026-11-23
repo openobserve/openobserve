@@ -31,6 +31,12 @@ import { escapeHtml } from "@/utils/html";
 import { ref, watch, onBeforeUnmount, getCurrentInstance } from "vue";
 import { useTheme } from "@/composables/useTheme";
 
+const moveKeyLast = (hit: any, key?: string) => {
+  if (!key || !hit || typeof hit !== "object" || !(key in hit)) return hit;
+  const { [key]: value, ...rest } = hit;
+  return { ...rest, [key]: value };
+};
+
 export function useLogsHighlighter(t: TranslateFn) {
   const processedResults = ref<Record<string, string>>({});
 
@@ -140,7 +146,7 @@ export function useLogsHighlighter(t: TranslateFn) {
           const processedHtml = colorizedJson({
             data:
               columns[columnIndex].id === "source"
-                ? hit
+                ? moveKeyLast(hit, columns[columnIndex].previewLastKey)
                 : columns[columnIndex].accessorFn
                   ? columns[columnIndex].accessorFn(hit)
                   : hit[columns[columnIndex].id],
@@ -663,7 +669,7 @@ export function useLogsHighlighter(t: TranslateFn) {
 
       // Add comma separator (except for last item): ","
       if (index < entries.length - 1) {
-        parts.push('<span class="log-separator">,</span>');
+        parts.push('<span class="log-separator log-comma">,</span>');
       }
     });
 

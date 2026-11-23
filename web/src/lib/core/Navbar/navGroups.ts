@@ -523,6 +523,7 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
       tab: "spans",
       feature: "traces",
       defaultForRoute: true,
+      activeOnRoutes: ["traceDetails"],
     },
     {
       titleKey: "menu.traces",

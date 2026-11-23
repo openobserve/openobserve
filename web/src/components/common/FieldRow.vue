@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OFieldRow
     v-if="(field.ftsKey && !showFtsFieldValues) || !field.isSchemaField || !field.showValues"
     :data-test="`logs-field-list-item-${field.name}`"
-    class="group/field ps-6"
+    class="group/field ps-5"
     :highlight="isFieldSelected && field.name !== timestampColumn && !grouped"
     :class="{ 'bg-accent/10!': grouped }"
   >
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
       v-if="showQuickMode && isInterestingCandidate && field.name !== timestampColumn"
       variant="ghost-neutral"
-      class="me-1 gap-0!"
+      class="bg-field-list-actions-bg absolute end-0 top-0 gap-0!"
       :class="
         field.isInterestingField
           ? 'text-selected-fg! opacity-100'
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         aria-pressed="false"
         @click.stop="$emit('toggle-field', field)"
       >
-        <OIcon name="visibility" size="sm" />
+        <OIcon name="visibility" size="sm" class="text-text-secondary!" />
       </OButton>
       <OButton
         :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         aria-pressed="true"
         @click.stop="$emit('toggle-field', field)"
       >
-        <OIcon name="visibility-off" size="sm" />
+        <OIcon name="visibility-off" size="sm" class="text-selected-fg!" />
       </OButton>
       <OButton
         v-if="showGroupBy && field.isSchemaField"

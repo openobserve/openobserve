@@ -281,8 +281,8 @@ describe("convertLogData.ts", () => {
       const { options } = convertLogData([1640995200000], [10], { ...base, modern: true });
       expect(options.series[0].barCategoryGap).toBe("30%");
       expect(options.series[0].itemStyle.borderRadius).toEqual([3, 3, 0, 0]);
-      expect(options.yAxis.axisLabel.fontSize).toBe(11);
-      expect(options.xAxis.axisLabel.fontSize).toBe(11);
+      expect(options.yAxis.axisLabel.fontSize).toBe(12);
+      expect(options.xAxis.axisLabel.fontSize).toBe(12);
     });
 
     it("leaves the flat histogram untouched when not modern", () => {

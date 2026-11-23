@@ -22,9 +22,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     value="error"
     :label="label"
   />
-  <span v-else data-test="trace-row-status-pill" class="text-text-secondary text-compact">{{
-    label
-  }}</span>
+  <span
+    v-else
+    data-test="trace-row-status-pill"
+    class="text-text-body text-compact inline-flex items-center gap-1.5 font-medium"
+  >
+    <span aria-hidden="true" class="bg-status-positive size-2 rounded-full"></span>
+    {{ label }}
+  </span>
 </template>
 
 <script setup lang="ts">
