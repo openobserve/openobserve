@@ -1131,7 +1131,7 @@ describe("StarterPackDrawer", () => {
       );
     });
 
-    const failEmailMe = async (failure: string) => {
+    const failEmailMe = async (failure: string, made = ITEMS) => {
       mocks.destinations = [];
       mocks.ensure.mockResolvedValue({ failure });
       const flow = ready({ items: ref(ITEMS) });
@@ -1140,7 +1140,7 @@ describe("StarterPackDrawer", () => {
       flow.install = vi.fn(async () => {
         flow.running.value = true;
         await nextTick();
-        flow.made.value = ITEMS as never;
+        flow.made.value = made as never;
         flow.toCreate.value = ITEMS as never;
         flow.installed.value = true;
         flow.running.value = false;
@@ -1163,6 +1163,14 @@ describe("StarterPackDrawer", () => {
       expect(wrapper.get('[data-test="starter-pack-ready-email-failed"]').text()).toBe(
         "You can't add alert destinations in this org, so your email destination was not created and the alerts were added turned off.",
       );
+    });
+
+    it("says nothing of off alerts when Email me failed and no alert was created", async () => {
+      const wrapper = await failEmailMe(
+        "email",
+        ITEMS.filter(({ kind }) => kind !== "alert"),
+      );
+      expect(has(wrapper, "starter-pack-ready-email-failed")).toBe(false);
     });
 
     it("shows no Email me warning when the alerts were set up as asked", async () => {

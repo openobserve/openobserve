@@ -229,7 +229,7 @@ const toggleAll = (group: ViewGroup) => {
 const failedCount = computed(() => flow.failed.value.length);
 const emailFailedNote = computed<I18nText | undefined>(() => {
   const failure = props.alerts?.failure;
-  if (!failure) return undefined;
+  if (!failure || !flow.made.value.some(({ kind }) => kind === "alert")) return undefined;
   return failure === "forbidden"
     ? t("starterPacks.ready.emailForbidden")
     : t("starterPacks.ready.emailFailed");
