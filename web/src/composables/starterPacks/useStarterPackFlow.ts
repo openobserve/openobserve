@@ -17,10 +17,10 @@ import { computed, onScopeDispose, ref, shallowRef } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
 
+import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
 import { readQuery } from "@/composables/query/readQuery";
 import { refreshOrgResources } from "@/composables/useOrgResources";
 import { alertsByTagsQuery } from "@/services/alerts.queries";
-import type { AlertLibraryManifest } from "@/types/alertLibrary";
 import { featureState } from "@/utils/featureGate";
 
 import {
@@ -87,6 +87,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const store = useStore();
   const router = useRouter();
   const { installPack, previewPack, undoPack, removePack, listInstalls } = useStarterPacks(org);
+  const { manifest: libraryManifest } = useAlertLibrary();
 
   const myEmail = (): string => store.state.userInfo?.email ?? "";
   const record = shallowRef<PackInstallRecord | null>(null);
@@ -230,9 +231,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   ]);
   // The preview fills the Library cache first, so its titles show before the rest of the plan.
   const libraryTitle = (itemId: string): string | undefined =>
-    (store.state.alertLibrary?.manifest as AlertLibraryManifest | null | undefined)?.alerts?.find(
-      ({ id }) => id === itemId,
-    )?.title;
+    libraryManifest.value?.alerts.find(({ id }) => id === itemId)?.title;
   const nameOf = (itemId: string): string => {
     const known = preview.value?.names[itemId] ?? packNames[itemId] ?? libraryTitle(itemId);
     const copy = copyParts(itemId);
