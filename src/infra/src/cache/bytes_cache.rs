@@ -14,20 +14,23 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::VecDeque,
     sync::atomic::{AtomicI64, Ordering},
     time::Instant,
 };
 
 use bytes::Bytes;
 use config::{RwHashMap, metrics};
+use dashmap::mapref::entry::Entry;
+
+use super::recency::{EvictedKeys, Recency, now_secs};
 
 // NOTE: for this cache, if you insert a key that already exists,
 // it will drop the second key and value
 pub struct BytesCache {
     tag: String,
-    readers: RwHashMap<String, Bytes>,
-    cacher: parking_lot::Mutex<VecDeque<String>>,
+    readers: RwHashMap<String, CachedBytes>,
+    evicting: parking_lot::Mutex<()>,
+    evicted: EvictedKeys,
     max_bytes: usize,
     current_memory: AtomicI64,
 }
@@ -37,40 +40,51 @@ impl BytesCache {
         Self {
             tag,
             readers: RwHashMap::default(),
-            cacher: parking_lot::Mutex::new(VecDeque::new()),
+            evicting: parking_lot::Mutex::new(()),
+            evicted: EvictedKeys::new(),
             max_bytes,
             current_memory: AtomicI64::new(0),
         }
     }
 
     pub fn get(&self, key: &str) -> Option<Bytes> {
-        match self.readers.get(key) {
-            Some(r) => {
-                metrics::BYTES_CACHE_HITS_TOTAL
-                    .with_label_values(&[&self.tag])
-                    .inc();
-                Some(r.clone())
-            }
-            None => {
-                metrics::BYTES_CACHE_MISS_TOTAL
-                    .with_label_values(&[&self.tag])
-                    .inc();
-                None
-            }
-        }
+        self.lookup(key, now_secs())
     }
 
     pub fn put(&self, key: String, value: Bytes) {
-        let value_len = (value.len() + key.len() * 2) as i64;
+        self.insert(key, value, now_secs());
+    }
 
-        {
-            let mut w = self.cacher.lock();
+    fn lookup(&self, key: &str, now: u32) -> Option<Bytes> {
+        if let Some(entry) = self.readers.get(key) {
+            entry.recency.touch(now);
+            metrics::BYTES_CACHE_HITS_TOTAL
+                .with_label_values(&[&self.tag])
+                .inc();
+            return Some(entry.bytes.clone());
+        }
+        metrics::BYTES_CACHE_MISS_TOTAL
+            .with_label_values(&[&self.tag])
+            .inc();
+        if self.evicted.take(key) {
+            metrics::BYTES_CACHE_REREAD_MISS_TOTAL
+                .with_label_values(&[&self.tag])
+                .inc();
+        }
+        None
+    }
+
+    fn insert(&self, key: String, value: Bytes, now: u32) {
+        let value_len = entry_size(&key, &value);
+        match self.readers.entry(key) {
             // NOTE: if key already exists, drop the second key and value
-            if self.readers.contains_key(&key) {
-                return;
+            Entry::Occupied(_) => return,
+            Entry::Vacant(slot) => {
+                slot.insert(CachedBytes {
+                    bytes: value,
+                    recency: Recency::new(now),
+                });
             }
-            w.push_back(key.clone());
-            self.readers.insert(key, value);
         }
 
         self.current_memory.fetch_add(value_len, Ordering::Relaxed);
@@ -81,7 +95,6 @@ impl BytesCache {
             .with_label_values(&[&self.tag])
             .add(value_len);
 
-        // GC: evict oldest entries if over memory limit
         if self.current_memory.load(Ordering::Relaxed) > self.max_bytes as i64 {
             self.evict();
         }
@@ -89,23 +102,9 @@ impl BytesCache {
 
     fn evict(&self) {
         let start = Instant::now();
-        let mut w = self.cacher.lock();
-        loop {
-            if self.current_memory.load(Ordering::Relaxed) <= self.max_bytes as i64 || w.is_empty()
-            {
-                break;
-            }
-            let batch = (w.len() / 20).max(1);
-            let mut removed_total = 0i64;
-            let mut removed_count = 0i64;
-            for k in w.drain(0..batch) {
-                if let Some((_, removed)) = self.readers.remove(&k) {
-                    removed_total += (removed.len() + k.len() * 2) as i64;
-                    removed_count += 1;
-                }
-            }
-            self.current_memory
-                .fetch_sub(removed_total, Ordering::Relaxed);
+        let _evicting = self.evicting.lock();
+        if self.current_memory.load(Ordering::Relaxed) > self.max_bytes as i64 {
+            let (removed_total, removed_count) = self.drop_coldest();
             metrics::BYTES_CACHE_MEMORY_SIZE
                 .with_label_values(&[&self.tag])
                 .sub(removed_total);
@@ -121,6 +120,48 @@ impl BytesCache {
             .with_label_values(&[&self.tag])
             .observe(elapsed);
     }
+
+    /// Drops the least recently read entries, 5% of them per round, until under `max_bytes`.
+    /// Returns the bytes and entries removed.
+    fn drop_coldest(&self) -> (i64, i64) {
+        let mut coldest = self
+            .readers
+            .iter()
+            .map(|entry| (entry.recency.rank(), entry.key().clone()))
+            .collect::<Vec<_>>();
+        coldest.sort_unstable();
+        let batch = (coldest.len() / 20).max(1);
+        let (mut removed_total, mut removed_count) = (0, 0);
+        for (i, (rank, key)) in coldest.into_iter().enumerate() {
+            if i % batch == 0
+                && self.current_memory.load(Ordering::Relaxed) <= self.max_bytes as i64
+            {
+                break;
+            }
+            // An entry read after the snapshot has a new rank and stays.
+            let Some((key, entry)) = self
+                .readers
+                .remove_if(&key, |_, entry| entry.recency.rank() == rank)
+            else {
+                continue;
+            };
+            let size = entry_size(&key, &entry.bytes);
+            self.current_memory.fetch_sub(size, Ordering::Relaxed);
+            self.evicted.record(&key);
+            removed_total += size;
+            removed_count += 1;
+        }
+        (removed_total, removed_count)
+    }
+}
+
+struct CachedBytes {
+    bytes: Bytes,
+    recency: Recency,
+}
+
+fn entry_size(key: &str, value: &Bytes) -> i64 {
+    (value.len() + key.len() * 2) as i64
 }
 
 #[cfg(test)]
@@ -195,6 +236,25 @@ mod tests {
 
         // The newest entries should still be present
         assert!(cache.get("k9").is_some(), "newest entry should survive");
+    }
+
+    #[test]
+    fn test_evict_keeps_recently_read_entry_over_newer_unread_ones() {
+        // Each entry takes 90 + 5 * 2 = 100 bytes.
+        let cache = BytesCache::new(1000, "test".to_string());
+        cache.insert("hot-0".to_string(), Bytes::from(vec![0u8; 90]), 1);
+        for i in 0..9 {
+            cache.insert(format!("old-{i}"), Bytes::from(vec![0u8; 90]), 2 * i + 2);
+            assert!(cache.lookup("hot-0", 2 * i + 3).is_some());
+        }
+        cache.insert("new-0".to_string(), Bytes::from(vec![0u8; 90]), 30);
+
+        assert!(cache.lookup("hot-0", 31).is_some(), "hot entry was evicted");
+        assert!(cache.lookup("old-0", 31).is_none());
+        assert!(!cache.evicted.take("old-0"), "re-read counted twice");
+        assert!(cache.lookup("old-1", 31).is_some());
+        assert!(cache.lookup("new-0", 31).is_some());
+        assert!(!cache.evicted.take("never-cached"));
     }
 
     #[test]

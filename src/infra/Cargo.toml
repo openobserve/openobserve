@@ -20,6 +20,7 @@ base64.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 config.workspace = true
+dashmap.workspace = true
 datafusion.workspace = true
 futures.workspace = true
 futures-util.workspace = true
@@ -58,6 +59,11 @@ proto.workspace = true
 
 [dev-dependencies]
 collapse.workspace = true
+criterion = { version = "0.5", default-features = false, features = ["rayon"] }
 sea-orm = { workspace = true, features = ["mock"] }
 tempfile.workspace = true
 tracing-subscriber.workspace = true
+
+[[bench]]
+name = "bytes_cache"
+harness = false

@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::VecDeque,
     sync::{
         Arc, LazyLock as Lazy,
         atomic::{AtomicI64, Ordering},
@@ -35,6 +34,7 @@ use datafusion::{
     },
     physical_expr::{LexOrdering, PhysicalExpr, PhysicalSortExpr, expressions::Column},
 };
+use infra::cache::recency::{EvictedKeys, Recency, now_secs};
 use object_store::path::Path;
 
 use super::TRACE_ID_SEPARATOR;
@@ -45,8 +45,9 @@ pub static GLOBAL_CACHE: Lazy<Arc<FileStatisticsCache>> =
 /// Collected statistics for files
 /// Cache is invalided when file size or last modification has changed
 pub struct FileStatisticsCache {
-    statistics: DashMap<String, (CachedFileMetadata, usize)>,
-    cacher: parking_lot::Mutex<VecDeque<String>>,
+    statistics: DashMap<String, StatEntry>,
+    evicting: parking_lot::Mutex<()>,
+    evicted: EvictedKeys,
     // Equal fingerprints are shared across entries and charged once; the value counts users.
     fingerprints: DashMap<Arc<SchemaFingerprint>, usize>,
     current_memory: AtomicI64,
@@ -56,7 +57,8 @@ impl FileStatisticsCache {
     pub fn new() -> Self {
         Self {
             statistics: DashMap::new(),
-            cacher: parking_lot::Mutex::new(VecDeque::new()),
+            evicting: parking_lot::Mutex::new(()),
+            evicted: EvictedKeys::new(),
             fingerprints: DashMap::new(),
             current_memory: AtomicI64::new(0),
         }
@@ -75,9 +77,9 @@ impl FileStatisticsCache {
     }
 
     fn estimate_entry_size(key: &str, value: &CachedFileMetadata) -> usize {
-        // Count both key copies and inline storage, rounding heap blocks to allocator size classes.
+        // The key is charged twice because eviction clones every key into its sort buffer.
         (std::mem::size_of::<String>() + alloc_size(key.len())) * 2
-            + std::mem::size_of::<(CachedFileMetadata, usize)>()
+            + std::mem::size_of::<StatEntry>()
             + value_heap_size(value)
             + Self::estimate_ordering_size(value.ordering.as_ref())
             + 64
@@ -102,39 +104,103 @@ impl FileStatisticsCache {
         })
     }
 
+    fn lookup(&self, key: &str, now: u32) -> Option<CachedFileMetadata> {
+        if let Some(entry) = self.statistics.get(key) {
+            entry.recency.touch(now);
+            metrics::QUERY_PARQUET_METADATA_CACHE_HITS_TOTAL
+                .with_label_values::<&str>(&[])
+                .inc();
+            return Some(entry.value.clone());
+        }
+        metrics::QUERY_PARQUET_METADATA_CACHE_MISS_TOTAL
+            .with_label_values::<&str>(&[])
+            .inc();
+        if self.evicted.take(key) {
+            metrics::QUERY_PARQUET_METADATA_CACHE_REREAD_MISS_TOTAL
+                .with_label_values::<&str>(&[])
+                .inc();
+        }
+        None
+    }
+
+    fn insert(
+        &self,
+        key: String,
+        value: CachedFileMetadata,
+        now: u32,
+    ) -> Option<CachedFileMetadata> {
+        let value = CachedFileMetadata {
+            schema_fingerprint: self.intern_fingerprint(&value.schema_fingerprint),
+            ..value
+        };
+        let size = Self::estimate_entry_size(&key, &value);
+        let entry = StatEntry {
+            value,
+            size,
+            recency: Recency::new(now),
+        };
+        let old = self.statistics.insert(key, entry);
+        let old_size = old.as_ref().map_or(0, |old| old.size);
+        self.current_memory
+            .fetch_add(size as i64 - old_size as i64, Ordering::Relaxed);
+        if let Some(old) = &old {
+            self.release_fingerprint(&old.value.schema_fingerprint);
+        }
+
+        let max_bytes = config::get_config()
+            .limit
+            .datafusion_file_stat_cache_max_size;
+        if self.current_memory.load(Ordering::Relaxed) > max_bytes as i64 {
+            self.evict(max_bytes);
+        }
+        old.map(|old| old.value)
+    }
+
+    /// Drops the least recently read entries, 5% of them per round, until under `max_bytes`.
     fn evict(&self, max_bytes: usize) {
         let start = Instant::now();
-        let mut warned = false;
-        let mut w = self.cacher.lock();
-        while self.current_memory.load(Ordering::Relaxed) > max_bytes as i64 && !w.is_empty() {
-            if !warned {
-                log::warn!(
-                    "FileStatisticsCache is full ({} bytes > {} bytes), evicting oldest entries",
-                    self.current_memory.load(Ordering::Relaxed),
-                    max_bytes,
-                );
-                warned = true;
-            }
-            let batch = (w.len() / 20).max(1).min(w.len());
-            let mut removed_total = 0i64;
-            for k in w.drain(0..batch) {
-                if let Some((_, (value, size))) = self.statistics.remove(&k) {
-                    removed_total += size as i64;
-                    self.release_fingerprint(&value.schema_fingerprint);
+        let _evicting = self.evicting.lock();
+        if self.current_memory.load(Ordering::Relaxed) > max_bytes as i64 {
+            log::warn!(
+                "FileStatisticsCache is full ({} bytes > {} bytes), evicting least recently read entries",
+                self.current_memory.load(Ordering::Relaxed),
+                max_bytes,
+            );
+            let mut coldest = self
+                .statistics
+                .iter()
+                .map(|entry| (entry.recency.rank(), entry.key().clone()))
+                .collect::<Vec<_>>();
+            coldest.sort_unstable();
+            let batch = (coldest.len() / 20).max(1);
+            for (i, (rank, key)) in coldest.into_iter().enumerate() {
+                if i % batch == 0 && self.current_memory.load(Ordering::Relaxed) <= max_bytes as i64
+                {
+                    break;
                 }
-            }
-            if removed_total > 0 {
-                self.current_memory
-                    .fetch_sub(removed_total, Ordering::Relaxed);
+                self.remove_unless_read(&key, rank);
             }
         }
-        drop(w);
         metrics::QUERY_PARQUET_METADATA_CACHE_GC_COUNT
             .with_label_values::<&str>(&[])
             .inc();
         metrics::QUERY_PARQUET_METADATA_CACHE_GC_TIME
             .with_label_values::<&str>(&[])
             .observe(start.elapsed().as_millis() as f64);
+    }
+
+    // An entry read or replaced after the eviction snapshot has a new rank and stays.
+    fn remove_unless_read(&self, key: &str, rank: (u32, u64)) {
+        let Some((key, entry)) = self
+            .statistics
+            .remove_if(key, |_, entry| entry.recency.rank() == rank)
+        else {
+            return;
+        };
+        self.current_memory
+            .fetch_sub(entry.size as i64, Ordering::Relaxed);
+        self.release_fingerprint(&entry.value.schema_fingerprint);
+        self.evicted.record(&key);
     }
 
     // DataFusion builds a fingerprint per table and O2 a table per query, so equal copies pile up.
@@ -185,63 +251,21 @@ impl Default for FileStatisticsCache {
 impl Cache<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
     /// Get cached metadata for file location.
     fn get(&self, k: &TableScopedPath) -> Option<CachedFileMetadata> {
-        let k = self.format_key(&k.path);
-        match self.statistics.get(&k) {
-            Some(s) => {
-                metrics::QUERY_PARQUET_METADATA_CACHE_HITS_TOTAL
-                    .with_label_values::<&str>(&[])
-                    .inc();
-                Some(s.value().0.clone())
-            }
-            None => {
-                metrics::QUERY_PARQUET_METADATA_CACHE_MISS_TOTAL
-                    .with_label_values::<&str>(&[])
-                    .inc();
-                None
-            }
-        }
+        self.lookup(&self.format_key(&k.path), now_secs())
     }
 
     /// Save collected file statistics
     fn put(&self, k: &TableScopedPath, value: CachedFileMetadata) -> Option<CachedFileMetadata> {
-        let k = self.format_key(&k.path);
-        let value = CachedFileMetadata {
-            schema_fingerprint: self.intern_fingerprint(&value.schema_fingerprint),
-            ..value
-        };
-        let entry_size = Self::estimate_entry_size(&k, &value);
-
-        let old = self.statistics.insert(k.clone(), (value, entry_size));
-        let old_size = old.as_ref().map(|(_, s)| *s).unwrap_or(0);
-        let delta = entry_size as i64 - old_size as i64;
-        self.current_memory.fetch_add(delta, Ordering::Relaxed);
-
-        // Only queue the key for eviction when it's a fresh insertion.
-        // When `old.is_some()` the key is already present in `cacher`
-        // (it hasn't been drained yet, otherwise stats wouldn't hold it),
-        // so pushing again would create a duplicate tombstone.
-        match &old {
-            Some((old_value, _)) => self.release_fingerprint(&old_value.schema_fingerprint),
-            None => self.cacher.lock().push_back(k),
-        }
-
-        let max_bytes = config::get_config()
-            .limit
-            .datafusion_file_stat_cache_max_size;
-        if self.current_memory.load(Ordering::Relaxed) > max_bytes as i64 {
-            self.evict(max_bytes);
-        }
-
-        old.map(|(value, _)| value)
+        self.insert(self.format_key(&k.path), value, now_secs())
     }
 
     fn remove(&self, k: &TableScopedPath) -> Option<CachedFileMetadata> {
         let k = self.format_key(&k.path);
-        self.statistics.remove(&k).map(|(_, (value, size))| {
+        self.statistics.remove(&k).map(|(_, entry)| {
             self.current_memory
-                .fetch_sub(size as i64, Ordering::Relaxed);
-            self.release_fingerprint(&value.schema_fingerprint);
-            value
+                .fetch_sub(entry.size as i64, Ordering::Relaxed);
+            self.release_fingerprint(&entry.value.schema_fingerprint);
+            entry.value
         })
     }
 
@@ -257,7 +281,6 @@ impl Cache<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
     fn clear(&self) {
         self.statistics.clear();
         self.fingerprints.clear();
-        self.cacher.lock().clear();
         self.current_memory.store(0, Ordering::Relaxed);
     }
 
@@ -292,12 +315,11 @@ impl Cache<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
                     table: None,
                     path: Path::from(entry.key().as_str()),
                 };
-                let (value, size) = entry.value();
                 (
                     path,
                     CacheEntryInfo {
-                        value: value.clone(),
-                        size_bytes: *size,
+                        value: entry.value.clone(),
+                        size_bytes: entry.size,
                         hits: 0,
                         expires: None,
                     },
@@ -309,6 +331,12 @@ impl Cache<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
     fn drop_table_entries(&self, _table_ref: &TableReference) -> datafusion::error::Result<()> {
         Ok(())
     }
+}
+
+struct StatEntry {
+    value: CachedFileMetadata,
+    size: usize,
+    recency: Recency,
 }
 
 fn fingerprint_size(fingerprint: &Arc<SchemaFingerprint>) -> usize {
@@ -722,8 +750,50 @@ mod tests {
         assert!(cache.is_empty());
         assert_eq!(cache.memory_size(), 0);
         assert!(cache.statistics.is_empty());
-        assert!(cache.cacher.lock().is_empty());
         assert!(cache.fingerprints.is_empty());
+    }
+
+    #[test]
+    fn test_evict_keeps_recently_read_entry_over_newer_unread_ones() {
+        let cache = FileStatisticsCache::new();
+        let stats = unknown_stats(vec![Field::new("col", DataType::Int64, false)]);
+        let value = |name: &str| {
+            CachedFileMetadata::new(
+                object_meta(name, 64),
+                Arc::new(
+                    datafusion::execution::cache::SchemaFingerprint::from_schema(&Schema::empty()),
+                ),
+                stats.clone(),
+                None,
+            )
+        };
+        cache.insert("hot".to_string(), value("hot"), 1);
+        for i in 0..10 {
+            cache.insert(format!("cold_{i}"), value("cold"), 2 * i + 2);
+            assert!(cache.lookup("hot", 2 * i + 3).is_some());
+        }
+        let one_entry = cache.memory_size() / cache.len();
+        cache.evict(one_entry * 5);
+
+        assert!(cache.lookup("hot", 30).is_some(), "hot entry was evicted");
+        for i in 0..5 {
+            assert!(cache.lookup(&format!("cold_{i}"), 30).is_none());
+            assert!(
+                !cache.evicted.take(&format!("cold_{i}")),
+                "re-read counted twice"
+            );
+        }
+        assert!(cache.lookup("cold_9", 30).is_some());
+    }
+
+    #[test]
+    fn test_reread_miss_counts_only_evicted_keys() {
+        let cache = FileStatisticsCache::new();
+        put(&cache, object_meta("a", 64), unknown_stats(vec![]));
+        cache.evict(0);
+        assert!(cache.lookup("never_cached", 1).is_none());
+        assert!(!cache.evicted.take("never_cached"));
+        assert!(cache.evicted.take("a"));
     }
 
     #[test]
