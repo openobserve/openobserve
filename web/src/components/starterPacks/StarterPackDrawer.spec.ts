@@ -435,6 +435,15 @@ describe("StarterPackDrawer", () => {
       );
     });
 
+    it("promises no email destination while Turn on is unticked", async () => {
+      mocks.destinations = [];
+      const wrapper = await shown();
+      await box(wrapper, "send-to").trigger("click");
+      expect(has(wrapper, "starter-pack-alert-setup-email-note")).toBe(true);
+      await box(wrapper, "turn-on-check").trigger("click");
+      expect(has(wrapper, "starter-pack-alert-setup-email-note")).toBe(false);
+    });
+
     it("disables Send to with a note and keeps Turn on ticked when there is nothing to send to", async () => {
       mocks.destinations = [];
       mocks.state.zoConfig = { smtp_enabled: false };

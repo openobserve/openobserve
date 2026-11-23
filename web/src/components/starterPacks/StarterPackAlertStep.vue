@@ -151,7 +151,7 @@ const pickDestination = (value: unknown) => {
         }}</OText
       >
       <OText
-        v-else-if="mode === 'email' && sendTo"
+        v-else-if="mode === 'email' && sendTo && turnOn"
         variant="meta"
         class="ps-7"
         data-test="starter-pack-alert-setup-email-note"
