@@ -563,32 +563,14 @@ pub async fn write_partial_results_to_cache(
     }
 }
 
-/// Usage timing for a search served from the result cache.
-///
-/// `took_ms` is the cache read time in milliseconds. `RequestStats.response_time`
-/// is in seconds, like every other search path. The queue wait is 0 because a
-/// cache hit does not wait in the search queue. The `took_detail.wait_in_queue`
-/// of the cached response belongs to the query that filled the cache.
+/// Usage timing for a cache hit: `took_ms` in seconds, and 0 queue wait because the
+/// cached `wait_in_queue` belongs to the query that filled the cache.
 fn cache_hit_usage_timing(took_ms: usize) -> (f64, Option<usize>) {
     (took_ms as f64 / 1000.0, Some(0))
 }
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn test_cache_hit_usage_timing_reports_seconds_and_no_queue_wait() {
-        use super::cache_hit_usage_timing;
-
-        let (response_time, took_wait_in_queue) = cache_hit_usage_timing(40);
-        assert!((response_time - 0.04).abs() < f64::EPSILON);
-        assert_eq!(took_wait_in_queue, Some(0));
-
-        let (response_time, _) = cache_hit_usage_timing(5185);
-        assert!((response_time - 5.185).abs() < 1e-9);
-
-        assert_eq!(cache_hit_usage_timing(0), (0.0, Some(0)));
-    }
-
     use config::{
         meta::search::{Request, Response},
         utils::json,
@@ -842,5 +824,19 @@ mod tests {
         .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(hits, 3);
+    }
+
+    #[test]
+    fn test_cache_hit_usage_timing_reports_seconds_and_no_queue_wait() {
+        use super::cache_hit_usage_timing;
+
+        let (response_time, took_wait_in_queue) = cache_hit_usage_timing(40);
+        assert!((response_time - 0.04).abs() < f64::EPSILON);
+        assert_eq!(took_wait_in_queue, Some(0));
+
+        let (response_time, _) = cache_hit_usage_timing(5185);
+        assert!((response_time - 5.185).abs() < 1e-9);
+
+        assert_eq!(cache_hit_usage_timing(0), (0.0, Some(0)));
     }
 }
