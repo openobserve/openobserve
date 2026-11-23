@@ -34,6 +34,7 @@ import {
 } from "./types";
 import { adaptSavedView } from "./packAdapt";
 import { RESERVED_FIELD } from "./packBinding";
+import { useBrowserMatches } from "./useBrowserMatches";
 import { useStarterPacks } from "./useStarterPacks";
 
 export const UNDO_WINDOW_US = 24 * 60 * 60 * 1_000_000;
@@ -303,6 +304,9 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       removal.value = result;
       removalFailed.value = result.kept.some(({ reason }) => reason === "delete_failed");
       await load();
+      if (!installed.value) useBrowserMatches(org).markRemoved(pack.id);
+      // A plan read before the removal still counts the removed items as existing.
+      if (previewState.value !== "idle") await loadPreview();
       return !removalFailed.value;
     } catch {
       removalFailed.value = true;

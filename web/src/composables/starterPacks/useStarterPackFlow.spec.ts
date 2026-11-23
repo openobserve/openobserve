@@ -14,6 +14,7 @@ const fake = vi.hoisted(() => ({
   undoPack: vi.fn(),
   removePack: vi.fn(),
   refreshResources: vi.fn(),
+  markRemoved: vi.fn(),
   push: vi.fn(async () => undefined),
   alerts: [] as Array<{ enabled: boolean }>,
 }));
@@ -30,6 +31,9 @@ vi.mock("./useStarterPacks", () => ({
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: fake.push }) }));
 vi.mock("@/composables/query/readQuery", () => ({ readQuery: async () => fake.alerts }));
 vi.mock("@/composables/useOrgResources", () => ({ refreshOrgResources: fake.refreshResources }));
+vi.mock("./useBrowserMatches", () => ({
+  useBrowserMatches: () => ({ markRemoved: fake.markRemoved }),
+}));
 
 const PACK = {
   id: "kubernetes",
@@ -419,6 +423,66 @@ describe("useStarterPackFlow", () => {
     fake.undoPack.mockResolvedValueOnce({ removed: [{}], kept: [] });
     expect(await flow.undo()).toBe(true);
     expect(flow.record.value).toBeNull();
+  });
+
+  it("reads the plan again after an Undo that kept an edited item", async () => {
+    fake.installs = [record()];
+    fake.previewPack.mockResolvedValueOnce({
+      items: [
+        { kind: "dashboard", itemId: "overview", status: "existing", id: "d1" },
+        { kind: "alert", itemId: "a1", status: "existing", id: "al1" },
+      ],
+      names: {},
+      notIncluded: [],
+    });
+    const flow = setup();
+    await flow.load();
+    await flow.loadPreview();
+    fake.undoPack.mockResolvedValueOnce({
+      removed: [{ kind: "alert", itemId: "a1" }],
+      kept: [{ kind: "dashboard", itemId: "overview", reason: "changed" }],
+    });
+    const after = {
+      items: [
+        { kind: "dashboard", itemId: "overview", status: "existing", id: "d1" },
+        { kind: "alert", itemId: "a1", status: "pending" },
+      ],
+      names: {},
+      notIncluded: [],
+    };
+    fake.previewPack.mockResolvedValueOnce(after);
+    fake.installs = [];
+    expect(await flow.undo()).toBe(true);
+    expect(flow.preview.value).toEqual(after);
+    expect(flow.previewState.value).toBe("ready");
+    expect(flow.alertCount.value).toBe(1);
+  });
+
+  it("gives the header chip the pack back only once Undo cleared the install", async () => {
+    fake.markRemoved.mockClear();
+    fake.installs = [record()];
+    const flow = setup();
+    await flow.load();
+    fake.undoPack.mockResolvedValueOnce({
+      removed: [],
+      kept: [{ kind: "alert", itemId: "a1", reason: "delete_failed" }],
+    });
+    await flow.undo();
+    expect(fake.markRemoved).not.toHaveBeenCalled();
+
+    fake.installs = [];
+    fake.undoPack.mockResolvedValueOnce({ removed: [{}], kept: [] });
+    await flow.undo();
+    expect(fake.markRemoved).toHaveBeenCalledWith("kubernetes");
+  });
+
+  it("asks for no plan after an Undo on a surface that never showed one", async () => {
+    fake.installs = [record()];
+    const flow = setup();
+    await flow.load();
+    fake.undoPack.mockResolvedValueOnce({ removed: [{}], kept: [] });
+    await flow.undo();
+    expect(fake.previewPack).not.toHaveBeenCalled();
   });
 
   it("refreshes the org's resources check after every install, undo and remove", async () => {
