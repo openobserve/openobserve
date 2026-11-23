@@ -1,20 +1,23 @@
 <template>
   <OForm class="bg-card-bg flex min-h-0 flex-1 flex-col" :form="form" v-slot="{ isSubmitting }">
     <OPageLayout
-      :about="t('onlineEvals.provider.subtitle')"
+      :subtitle="t('onlineEvals.provider.subtitle')"
       :back="{
-        label: t('llmProviders.title'),
+        label: t('onlineEvals.provider.backTo'),
         onClick: () => $emit('cancel'),
         dataTest: 'provider-form-back-btn',
       }"
-      :title="
-        mode === 'create'
-          ? t('onlineEvals.provider.createTitle')
-          : t('onlineEvals.provider.editTitle')
-      "
-      title-data-test="provider-form-title"
       scroll
     >
+      <template #title>
+        <span data-test="provider-form-title">
+          {{
+            mode === "create"
+              ? t("onlineEvals.provider.createTitle")
+              : t("onlineEvals.provider.editTitle")
+          }}
+        </span>
+      </template>
       <div class="provider-form__main flex min-h-0 flex-col gap-2 p-2">
         <!-- Provider details -->
         <section

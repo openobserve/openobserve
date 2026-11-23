@@ -327,7 +327,8 @@ describe("AIObservabilityShell — tabs of a rail item", () => {
     const wrapper = await mountShell();
     expect((wrapper.vm as any).$.setupState.activeItemHeader).toEqual({
       title: "aiObservability.nav.costUsage",
-      about: "aiObservability.itemSubtitle.costUsage",
+      subtitle: "aiObservability.itemSubtitle.costUsage",
+      icon: "paid",
     });
   });
 

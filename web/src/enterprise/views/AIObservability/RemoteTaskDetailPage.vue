@@ -16,24 +16,27 @@
   <OPageLayout
     data-test="ai-remote-task-detail-page"
     :back="{
-      label: t('aiObservability.nav.experiments'),
-      to: aiRemoteTasksRoute(orgId),
+      label: t('aiObservability.remoteTasks.detail.backTo'),
+      onClick: goBack,
       dataTest: 'ai-remote-task-detail-back-btn',
     }"
-    :title="title"
-    title-data-test="ai-remote-task-detail-title"
     bleed
     :scroll="false"
   >
-    <template v-if="task" #status>
-      <OTag v-if="versionLabel(task)" tone="neutral">
-        {{ versionLabel(task) }}
-      </OTag>
-      <OTag type="remoteTaskAuth" :value="task.auth.type" />
-      <OTag v-if="task.signing.enabled" tone="ok" icon="lock">
-        {{ t("aiObservability.remoteTasks.signingOn") }}
-      </OTag>
-      <OTag type="remoteTaskStatus" :value="state" data-test="ai-remote-task-detail-state" />
+    <template #title>
+      <span class="flex flex-wrap items-center gap-2">
+        <span class="font-mono" data-test="ai-remote-task-detail-title">{{ title }}</span>
+        <template v-if="task">
+          <OTag v-if="versionLabel(task)" tone="neutral">
+            {{ versionLabel(task) }}
+          </OTag>
+          <OTag type="remoteTaskAuth" :value="task.auth.type" />
+          <OTag v-if="task.signing.enabled" tone="ok" icon="lock">
+            {{ t("aiObservability.remoteTasks.signingOn") }}
+          </OTag>
+          <OTag type="remoteTaskStatus" :value="state" data-test="ai-remote-task-detail-state" />
+        </template>
+      </span>
     </template>
 
     <template #actions>
@@ -389,6 +392,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -631,6 +635,9 @@ const versionColumns = computed<OTableColumnDef[]>(() => [
     meta: { align: "left" },
   },
 ]);
+
+// Real browser back when there's history to pop.
+const { goBack } = useSmartBack(() => aiRemoteTasksRoute(orgId.value));
 
 function openEdit() {
   if (!canEdit.value) return;

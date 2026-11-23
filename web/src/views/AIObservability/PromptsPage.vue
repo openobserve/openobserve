@@ -3,7 +3,8 @@
   <OPageLayout
     bleed
     :title="t('aiObservability.nav.prompts')"
-    :about="t('aiObservability.promptManagement.subtitle')"
+    icon="edit"
+    :subtitle="t('aiObservability.promptManagement.subtitle')"
     data-test="prompts-page"
   >
     <template #actions>

@@ -16,9 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <OPageLayout :title="raw(headerBasedOnRoute())" bleed>
-    <template v-if="isUsageRoute" #status>
-      <BetaBadge />
+  <OPageLayout :title="raw(headerBasedOnRoute())" icon="paid" bleed>
+    <template v-if="isUsageRoute" #title>
+      <span class="inline-flex items-center gap-2">
+        {{ raw(headerBasedOnRoute()) }}
+        <BetaBadge />
+      </span>
     </template>
     <template #actions>
       <div v-if="isOrgGroupRoute" class="flex items-center gap-2">

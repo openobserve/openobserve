@@ -5,7 +5,7 @@
     <OPageLayout
       :back="{
         label: t('aiObservability.nav.prompts'),
-        to: promptsListRoute,
+        onClick: goBack,
         dataTest: 'prompt-editor-back-btn',
       }"
       :title="

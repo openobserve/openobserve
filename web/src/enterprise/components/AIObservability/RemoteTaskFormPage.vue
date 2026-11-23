@@ -16,14 +16,17 @@
   <OForm :form="form" class="h-full w-full" v-slot="{ isSubmitting }">
     <OPageLayout
       :back="{
-        label: t('aiObservability.nav.experiments'),
+        label: t('aiObservability.remoteTasks.form.backTo'),
         onClick: cancel,
         dataTest: 'ai-remote-task-form-back-btn',
       }"
-      :title="pageTitle"
-      title-data-test="ai-remote-task-form-title"
+      title-overflow="visible"
       bleed
     >
+      <template #title>
+        <span data-test="ai-remote-task-form-title">{{ pageTitle }}</span>
+      </template>
+
       <div
         class="grid min-h-0 flex-1 grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.9fr)] gap-0 overflow-hidden max-[68.75rem]:grid-cols-1"
       >
@@ -494,7 +497,6 @@ import remoteTasksService, {
 import RemoteTaskTestPanel from "./RemoteTaskTestPanel.vue";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import { useEditorDraft, useEditorDraftIds } from "@/composables/useEditorDraft";
-import useSmartBack from "@/composables/useSmartBack";
 import {
   ATTEMPTS_MAX,
   ATTEMPTS_MIN,
@@ -729,10 +731,8 @@ function goBack() {
   void router.push(aiRemoteTasksRoute(orgId.value));
 }
 
-const { goBack: leaveForm } = useSmartBack(() => aiRemoteTasksRoute(orgId.value));
-
 async function cancel() {
-  if (await taskDraft.confirmLeave()) leaveForm();
+  if (await taskDraft.confirmLeave()) goBack();
 }
 
 /**

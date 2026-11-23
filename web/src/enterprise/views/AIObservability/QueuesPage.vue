@@ -23,7 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     data-test="ai-queues-page"
     :title="t('aiObservability.nav.queues')"
-    :about="t('aiObservability.subtitle.queues')"
+    :subtitle="t('aiObservability.subtitle.queues')"
+    icon="fact-check"
     bleed
     :scroll="false"
   >

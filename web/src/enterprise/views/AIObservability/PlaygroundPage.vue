@@ -14,9 +14,11 @@
   <OPageLayout
     data-test="ai-playground-page"
     :title="t('aiObservability.nav.playground')"
-    :about="t('aiObservability.subtitle.playground')"
+    :subtitle="t('aiObservability.subtitle.playground')"
+    icon="play-circle"
     title-data-test="ai-playground-title"
     bleed
+    overflow-first
   >
     <template #actions-overflow>
       <ODropdown v-if="recentDrafts.length" align="end">
@@ -120,10 +122,11 @@
       </OButton>
     </template>
 
-    <template v-if="(!loadingProviders && !providers.length) || sharedSnapshot" #banner>
+    <div class="flex h-full min-h-0 flex-col">
       <OBanner
         v-if="!loadingProviders && !providers.length"
         tone="info"
+        class="mx-4 mt-3 shrink-0"
         data-test="ai-playground-no-provider"
       >
         <div class="flex flex-col gap-0.5">
@@ -147,6 +150,7 @@
         v-if="sharedSnapshot"
         tone="info"
         icon="visibility"
+        class="mx-4 mt-3 shrink-0"
         data-test="ai-playground-shared-banner"
       >
         <div class="flex flex-col gap-0.5">
@@ -169,9 +173,7 @@
           </OButton>
         </template>
       </OBanner>
-    </template>
 
-    <div class="flex h-full min-h-0 flex-col">
       <PlaygroundVariableBar
         ref="variableBarRef"
         class="shrink-0"

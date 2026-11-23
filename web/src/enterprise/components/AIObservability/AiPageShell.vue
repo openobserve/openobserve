@@ -18,9 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     :data-test="`${dataTest}-page`"
     :title="header?.title ?? title"
-    :about="header?.about ?? about"
+    :subtitle="header?.subtitle ?? subtitle"
+    :icon="header?.icon ?? icon"
     bleed
     :scroll="false"
+    :tabs-below="hasTabs"
   >
     <template v-if="hasTabs" #header-tabs><AiSectionTabs /></template>
     <template #actions>
@@ -82,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { ref } from "vue";
 import type { AiDateState } from "@/enterprise/composables/useAiDateRange";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import AiSectionTabs from "./AiSectionTabs.vue";
@@ -98,8 +101,12 @@ defineProps<{
       `${dataTest}-date-time`, `${dataTest}-refresh-btn` from it, reproducing
       each page's existing data-test values unchanged. */
   dataTest: string;
+  /** Resolved page title (each page passes its own t(...) value). */
   title: I18nText;
-  about: I18nText;
+  /** Resolved page subtitle. */
+  subtitle: I18nText;
+  /** OPageHeader icon name. */
+  icon: IconName;
   /** Shared AI date-range state (useAiDateRange().state) bound to the picker. */
   dateState: AiDateState;
   /** Epoch-ms of the last refresh, shown on the refresh control (or null). */

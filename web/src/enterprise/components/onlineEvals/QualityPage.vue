@@ -19,21 +19,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- With a config open the page header is the detail header, as on the other detail pages. -->
     <OPageHeader
       :title="!configId && sectionHeader ? sectionHeader.title : header.title"
-      :about="!configId && sectionHeader ? sectionHeader.about : header.about"
+      :subtitle="!configId && sectionHeader ? sectionHeader.subtitle : header.subtitle"
+      :icon="configId ? undefined : (sectionHeader?.icon ?? 'star-rate')"
       :back="
         configId
           ? {
-              label: sectionHeader?.title ?? t('aiObservability.nav.quality'),
+              label: t('onlineEvals.quality.detail.back'),
               onClick: closeConfig,
               dataTest: 'quality-detail-back',
             }
           : undefined
       "
       title-data-test="quality-page-title"
+      :tabs-below="hasTabs && !configId"
+      overflow-first
     >
-      <!-- The config list's peer tabs; a config's detail has its back link instead. -->
+      <!-- The config list's peer tabs; a config's detail has its back button instead. -->
       <template v-if="hasTabs && !configId" #tabs><AiSectionTabs /></template>
-      <template v-if="configId" #status>
+      <template v-if="configId" #title-trail>
         <div class="flex shrink-0 items-center gap-1.5" data-test="quality-detail-tags">
           <OTag v-if="header.dataType" type="evalDataType" :value="header.dataType" />
           <OTag v-if="header.version != null" tone="neutral" :label="raw(`v${header.version}`)" />
@@ -151,7 +154,6 @@ import { computed, ref, toRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query/useOrgId";
-import useSmartBack from "@/composables/useSmartBack";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import AiSectionTabs from "@/enterprise/components/AIObservability/AiSectionTabs.vue";
 import { useAiSectionTabs } from "@/enterprise/components/AIObservability/aiSectionTabs";
@@ -274,17 +276,16 @@ const header = computed(() => {
   if (!configId.value) {
     return {
       title: t("aiObservability.nav.quality"),
-      about: t("aiObservability.subtitle.quality"),
+      subtitle: t("aiObservability.subtitle.quality"),
       dataType: null,
       version: null,
     };
   }
   const row = selectedRow.value;
   const config = selectedConfig.value;
-  const description = row?.description || config?.description;
   return {
     title: raw(row?.name ?? config?.name ?? configId.value),
-    about: description ? raw(description) : undefined,
+    subtitle: raw(row?.description || config?.description || ""),
     dataType: row?.dataType ?? (config ? dataTypeOf(config) : null),
     version: row?.version ?? config?.version ?? null,
   };
@@ -386,14 +387,9 @@ function previousIsList() {
   );
 }
 
-const { goBack: backToList } = useSmartBack(() => ({
-  name: route.name as string,
-  query: { tab: route.query.tab },
-}));
-
 function closeConfig() {
   if (previousIsList()) {
-    backToList();
+    router.back();
     return;
   }
   updateQuery({

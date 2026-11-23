@@ -4,15 +4,14 @@
   <OPageLayout
     data-test="ai-experiment-detail-page"
     :title="raw(detail?.experiment.name ?? '')"
+    icon="science"
     :back="backTarget"
     bleed
   >
-    <template v-if="detail" #status>
-      <OTag size="sm" :tone="statusVariant(detail.experiment.status, 'eval').variant">
+    <template #actions>
+      <OTag v-if="detail" size="sm" :tone="statusVariant(detail.experiment.status, 'eval').variant">
         {{ statusVariant(detail.experiment.status, "eval").label }}
       </OTag>
-    </template>
-    <template #actions>
       <OButton
         v-if="detail?.experiment.executionStatus === 'running'"
         variant="secondary"
@@ -63,46 +62,6 @@
       >
         {{ t("aiObservability.experiments.clone") }}
       </OButton>
-    </template>
-
-    <template v-if="failureBanner" #banner>
-      <OBanner tone="err" data-test="ai-experiment-detail-failure-banner">
-        <div class="flex min-w-0 flex-col gap-0.5">
-          <span class="font-semibold" data-test="ai-experiment-detail-failure-title">
-            {{
-              t("aiObservability.experiments.detail.failureBanner.title", {
-                failed: failureBanner.failed,
-                total: failureBanner.total,
-                cause: failureBanner.kindLabel,
-              })
-            }}
-          </span>
-          <span class="text-xs break-words" data-test="ai-experiment-detail-failure-cause">
-            {{
-              t("aiObservability.experiments.detail.failureBanner.cause", {
-                count: failureBanner.count,
-                message: failureBanner.message,
-              })
-            }}
-            <template v-if="failureBanner.moreCauses > 0">
-              {{
-                t("aiObservability.experiments.detail.failureBanner.moreCauses", {
-                  count: failureBanner.moreCauses,
-                })
-              }}
-            </template>
-          </span>
-        </div>
-        <template v-if="failureBanner.providerTask" #actions>
-          <OButton
-            variant="secondary"
-            data-test="ai-experiment-detail-failure-open-providers"
-            @click="router.push({ name: 'llmProviders' })"
-          >
-            {{ t("aiObservability.experiments.detail.failureBanner.openProviders") }}
-          </OButton>
-        </template>
-      </OBanner>
     </template>
 
     <template v-if="detail" #subnav>
@@ -157,6 +116,48 @@
     </template>
 
     <div class="flex h-full min-h-0 flex-col">
+      <OBanner
+        v-if="failureBanner"
+        tone="err"
+        class="mx-page-edge mt-2.5 shrink-0"
+        data-test="ai-experiment-detail-failure-banner"
+      >
+        <div class="flex min-w-0 flex-col gap-0.5">
+          <span class="font-semibold" data-test="ai-experiment-detail-failure-title">
+            {{
+              t("aiObservability.experiments.detail.failureBanner.title", {
+                failed: failureBanner.failed,
+                total: failureBanner.total,
+                cause: failureBanner.kindLabel,
+              })
+            }}
+          </span>
+          <span class="text-xs break-words" data-test="ai-experiment-detail-failure-cause">
+            {{
+              t("aiObservability.experiments.detail.failureBanner.cause", {
+                count: failureBanner.count,
+                message: failureBanner.message,
+              })
+            }}
+            <template v-if="failureBanner.moreCauses > 0">
+              {{
+                t("aiObservability.experiments.detail.failureBanner.moreCauses", {
+                  count: failureBanner.moreCauses,
+                })
+              }}
+            </template>
+          </span>
+        </div>
+        <template v-if="failureBanner.providerTask" #actions>
+          <OButton
+            variant="secondary"
+            data-test="ai-experiment-detail-failure-open-providers"
+            @click="router.push({ name: 'llmProviders' })"
+          >
+            {{ t("aiObservability.experiments.detail.failureBanner.openProviders") }}
+          </OButton>
+        </template>
+      </OBanner>
       <KpiCardRow v-if="metricCards.length" class="px-page-edge shrink-0 py-2.5">
         <KpiCard
           v-for="card in metricCards"
@@ -375,6 +376,7 @@ import { computed, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { gt, raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -471,9 +473,11 @@ const SLOT_RETRY_POLL_INTERVAL_MS = 2_000;
 let slotRetryPollTimer: ReturnType<typeof setTimeout> | null = null;
 let slotRetryPollGeneration = 0;
 
+// Real browser back when there's history to pop, so the list keeps the filter the user came through.
+const { goBack: backToExperiments } = useSmartBack(() => aiExperimentsRoute(orgId.value));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.experiments"),
-  to: aiExperimentsRoute(orgId.value),
+  onClick: backToExperiments,
 }));
 const isMultiTrial = computed(() => (detail.value?.experiment.trialCount ?? 1) > 1);
 

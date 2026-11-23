@@ -6,14 +6,19 @@
   >
     <OPageLayout
       :back="{
-        label: t('aiObservability.nav.evaluations'),
+        label: t('onlineEvals.job.backTo'),
         onClick: cancel,
         dataTest: 'job-form-back-btn',
       }"
-      :title="mode === 'create' ? t('onlineEvals.job.createTitle') : t('onlineEvals.job.editTitle')"
-      title-data-test="job-form-title"
       bleed
     >
+      <template #title>
+        <span data-test="job-form-title">
+          {{
+            mode === "create" ? t("onlineEvals.job.createTitle") : t("onlineEvals.job.editTitle")
+          }}
+        </span>
+      </template>
       <div class="flex min-h-0 flex-1 gap-0 overflow-hidden max-[68.75rem]:flex-col">
         <div
           class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 max-[68.75rem]:flex-[1_1_auto] [&_textarea]:max-h-50 [&_textarea]:overflow-y-auto"

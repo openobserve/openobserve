@@ -26,7 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     data-test="ai-queue-workbench-page"
     :title="queue?.name ? raw(queue.name) : t('aiObservability.queues.detail.fallbackTitle')"
-    :back="backRoute"
+    :subtitle="
+      t('aiObservability.queues.workbench.subtitle', {
+        reviewed: reviewedCount,
+        total: items.length,
+      })
+    "
+    :back="backTarget"
     bleed
     :scroll="false"
   >
@@ -691,6 +697,7 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -774,6 +781,14 @@ const backRoute = computed(() =>
         },
       },
 );
+// Real browser back when there's history to pop; the fallback above only
+// fires with no history to pop (direct link / reload).
+const { goBack: backToParent } = useSmartBack(() => backRoute.value.to);
+const backTarget = computed(() => ({
+  label: backRoute.value.label,
+  to: backRoute.value.to,
+  onClick: backToParent,
+}));
 const items = ref<LlmQueueItem[]>([]);
 const configOptions = ref<LlmScoreConfigOption[]>([]);
 const currentDetail = ref<LlmQueueItemDetail | null>(null);

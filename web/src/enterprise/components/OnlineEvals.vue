@@ -71,7 +71,10 @@ the Free Software Foundation, either version 3 of the License, or
       <OPageHeader
         v-if="hideTabBar && embeddedHeader && activeTab !== 'quality'"
         :title="sectionHeader?.title ?? raw(embeddedHeader.title)"
-        :about="sectionHeader?.about ?? raw(embeddedHeader.about)"
+        :subtitle="sectionHeader?.subtitle ?? raw(embeddedHeader.subtitle)"
+        :icon="sectionHeader?.icon ?? embeddedHeader.icon"
+        :tabs-below="hasTabs"
+        class="border-border-default shrink-0 border-b"
       >
         <template v-if="hasTabs" #tabs><AiSectionTabs /></template>
         <template v-if="activeTab === 'scorers' || activeTab === 'scoreConfigs'" #actions>
@@ -471,6 +474,7 @@ import AiSectionTabs from "@/enterprise/components/AIObservability/AiSectionTabs
 import { useAiSectionTabs } from "@/enterprise/components/AIObservability/aiSectionTabs";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AiLastRefreshed from "@/enterprise/components/AIObservability/AiLastRefreshed.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -655,20 +659,36 @@ const tabs = computed<Array<{ value: ActiveTab; label: I18nText; badge?: string 
 ]);
 
 // The header when embedded in the AI Observability shell; a tabbed rail item's own header wins.
-const EMBEDDED_HEADER_META: Record<ActiveTab, { i18nKey: I18nKey; aboutKey: I18nKey }> = {
-  quality: { i18nKey: "aiObservability.nav.quality", aboutKey: "aiObservability.subtitle.quality" },
-  jobs: { i18nKey: "aiObservability.nav.evalJobs", aboutKey: "aiObservability.subtitle.evalJobs" },
-  scorers: { i18nKey: "aiObservability.nav.scorers", aboutKey: "aiObservability.subtitle.scorers" },
+const EMBEDDED_HEADER_META: Record<
+  ActiveTab,
+  { i18nKey: I18nKey; subtitleKey: I18nKey; icon: IconName }
+> = {
+  quality: {
+    i18nKey: "aiObservability.nav.quality",
+    subtitleKey: "aiObservability.subtitle.quality",
+    icon: "star-rate",
+  },
+  jobs: {
+    i18nKey: "aiObservability.nav.evalJobs",
+    subtitleKey: "aiObservability.subtitle.evalJobs",
+    icon: "event",
+  },
+  scorers: {
+    i18nKey: "aiObservability.nav.scorers",
+    subtitleKey: "aiObservability.subtitle.scorers",
+    icon: "rule",
+  },
   scoreConfigs: {
     i18nKey: "aiObservability.nav.scoreConfigs",
-    aboutKey: "aiObservability.subtitle.scoreConfigs",
+    subtitleKey: "aiObservability.subtitle.scoreConfigs",
+    icon: "tune",
   },
 };
 
-const embeddedHeader = computed<{ title: string; about: string } | null>(() => {
+const embeddedHeader = computed<{ title: string; subtitle: string; icon: IconName } | null>(() => {
   const meta = EMBEDDED_HEADER_META[activeTab.value];
   if (!meta) return null;
-  return { title: t(meta.i18nKey), about: t(meta.aboutKey) };
+  return { title: t(meta.i18nKey), subtitle: t(meta.subtitleKey), icon: meta.icon };
 });
 
 // Per-tab "create" button label for the embedded OPageHeader. Quality has

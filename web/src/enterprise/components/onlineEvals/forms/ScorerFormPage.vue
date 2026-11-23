@@ -7,14 +7,15 @@
     <!-- No scorer type badge: the title already says it ("New LLM Judge Scorer"). -->
     <OPageLayout
       :back="{
-        label: t('aiObservability.nav.scorers'),
+        label: t('onlineEvals.scorer.backTo'),
         onClick: cancel,
         dataTest: 'scorer-form-back-btn',
       }"
-      :title="titleText"
-      title-data-test="scorer-form-title"
       bleed
     >
+      <template #title>
+        <span data-test="scorer-form-title">{{ titleText }}</span>
+      </template>
       <div
         class="grid min-h-0 flex-1 grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.9fr)] gap-0 overflow-hidden max-[68.75rem]:grid-cols-1"
       >

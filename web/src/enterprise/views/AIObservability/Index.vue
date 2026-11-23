@@ -319,7 +319,7 @@ function openTab(key: string | number) {
   );
 }
 
-const ITEM_ABOUT: Record<AiObservabilityTabbedItemKey, I18nKey> = {
+const ITEM_SUBTITLES: Record<AiObservabilityTabbedItemKey, I18nKey> = {
   agents: "aiObservability.itemSubtitle.agents",
   costUsage: "aiObservability.itemSubtitle.costUsage",
   evaluations: "aiObservability.itemSubtitle.evaluations",
@@ -329,7 +329,8 @@ const ITEM_ABOUT: Record<AiObservabilityTabbedItemKey, I18nKey> = {
 const activeItemHeader = computed(() => {
   const key = TAB_OF_SECTION.get(activeTab.value);
   if (!key) return null;
-  return { title: t(AI_OBSERVABILITY_TABBED_ITEMS[key].labelKey), about: t(ITEM_ABOUT[key]) };
+  const item = AI_OBSERVABILITY_TABBED_ITEMS[key];
+  return { title: t(item.labelKey), subtitle: t(ITEM_SUBTITLES[key]), icon: item.icon };
 });
 provide(AI_SECTION_TABS, {
   tabs: activeTabs,

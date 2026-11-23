@@ -75,6 +75,7 @@ vi.mock("@/lib/core/PageLayout/OPageLayout.vue", () => ({
     name: "OPageLayout",
     props: ["back"],
     template: `<div class="o-page-layout">
+      <button v-if="back" data-test="app-page-header-back" @click="back.onClick?.()" />
       <slot name="actions" /><slot />
     </div>`,
   },
@@ -163,14 +164,16 @@ beforeEach(() => {
 });
 
 describe("DatasetDetailPage navigation", () => {
-  // The header's back link does the smart back; the page names the parent it falls back to.
-  it("links back to the Datasets list of this org", async () => {
+  it("uses real browser back when there's history to pop, instead of the bare Datasets list", async () => {
+    window.history.pushState({ back: "/previous" }, "", "/previous-fake-url");
     const wrapper = await mountPage();
+    mockRouterPush.mockClear();
 
-    expect(wrapper.findComponent({ name: "OPageLayout" }).props("back")).toEqual({
-      label: "aiObservability.nav.datasets",
-      to: { name: "aiDatasets", query: { org_identifier: "test-org" } },
-    });
+    await wrapper.get('[data-test="app-page-header-back"]').trigger("click");
+
+    expect(mockRouterBack).toHaveBeenCalledTimes(1);
+    expect(mockRouterPush).not.toHaveBeenCalled();
+    window.history.replaceState(null, "");
   });
 });
 

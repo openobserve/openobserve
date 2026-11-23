@@ -25,7 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     data-test="ai-datasets-page"
     :title="t('aiObservability.nav.datasets')"
-    :about="t('aiObservability.subtitle.datasets')"
+    :subtitle="t('aiObservability.subtitle.datasets')"
+    icon="table-chart"
     bleed
     :scroll="false"
   >

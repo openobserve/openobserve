@@ -26,12 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="ai-dataset-detail-page"
     :back="backTarget"
     :title="raw(dataset?.name) || t('aiObservability.datasets.detail.fallbackTitle')"
+    :subtitle="metaSubtitle"
+    icon="table-chart"
     bleed
     :scroll="false"
   >
-    <template v-if="dataset" #status>
-      <OTag tone="neutral" size="sm" :label="meta" data-test="ai-dataset-detail-meta" />
-    </template>
     <template #actions>
       <OButton
         v-if="activeTab === 'experiments'"
@@ -395,6 +394,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { formatDistanceToNowStrict } from "date-fns";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -470,12 +470,16 @@ const pageSizeOptions = [20, 50, DATASET_ITEMS_MAX_PAGE_SIZE];
  *  item detail drawer. */
 const versionLabel = (version: number) => raw(`v${version}`);
 
+const { goBack: backToDatasets } = useSmartBack(() => ({
+  name: "aiDatasets",
+  query: { org_identifier: orgId.value },
+}));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.datasets"),
-  to: { name: "aiDatasets", query: { org_identifier: orgId.value } },
+  onClick: backToDatasets,
 }));
 
-const meta = computed(() => {
+const metaSubtitle = computed(() => {
   if (!dataset.value) return raw("");
   const updated = dataset.value.updatedAt
     ? formatDistanceToNowStrict(new Date(dataset.value.updatedAt), { addSuffix: true })

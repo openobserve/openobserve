@@ -17,17 +17,22 @@
     <OPageLayout
       :back="{
         label: t('aiObservability.nav.experiments'),
-        to: aiExperimentsRoute(orgId),
+        onClick: goBack,
         dataTest: 'ai-experiment-form-back-btn',
       }"
-      :title="
-        cloning
-          ? t('aiObservability.experiments.form.cloneTitle')
-          : t('aiObservability.experiments.form.pageTitle')
-      "
-      title-data-test="ai-experiment-form-title"
+      title-overflow="visible"
       bleed
     >
+      <template #title>
+        <span data-test="ai-experiment-form-title">
+          {{
+            cloning
+              ? t("aiObservability.experiments.form.cloneTitle")
+              : t("aiObservability.experiments.form.pageTitle")
+          }}
+        </span>
+      </template>
+
       <div class="flex min-h-0 flex-1 gap-0 overflow-hidden max-[68.75rem]:flex-col">
         <div
           class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 max-[68.75rem]:flex-[1_1_auto]"
