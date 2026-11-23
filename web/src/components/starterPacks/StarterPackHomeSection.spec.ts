@@ -408,6 +408,17 @@ describe("StarterPackHomeSection", () => {
     expect(useStarterPackPopup("org").packId.value).toBe("kubernetes");
   });
 
+  it("names who started an interrupted install on Home and offers them no Finish", async () => {
+    fake.flows.kubernetes.interrupted.value = true;
+    fake.flows.kubernetes.interruptedBy = ref("other@example.com");
+    fake.flows.kubernetes.record = shallowRef({ status: "incomplete" });
+    const wrapper = await render();
+    expect(has(wrapper, "home-pack-interrupted-btn")).toBe(false);
+    expect(wrapper.get('[data-test="home-pack-interrupted"]').text()).toBe(
+      "other@example.com started setting up Kubernetes.",
+    );
+  });
+
   it("shows nothing and hands Home no pack state for an org past onboarding (D10)", async () => {
     fake.gate = false;
     const wrapper = await render();

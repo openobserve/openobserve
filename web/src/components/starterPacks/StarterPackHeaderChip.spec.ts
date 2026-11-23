@@ -15,7 +15,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
-import { ref } from "vue";
+import { nextTick, ref } from "vue";
 import { createStore } from "vuex";
 
 import i18n from "@/locales";
@@ -94,6 +94,9 @@ vi.mock("@/composables/starterPacks/useStarterPackFlow", async () => {
         installed: computed(() => record.value?.status === "complete"),
         interrupted: computed(
           () => !running.value && !!record.value && record.value.status !== "complete",
+        ),
+        interruptedBy: computed(() =>
+          flow.interrupted.value && record.value?.installedBy ? record.value.installedBy : null,
         ),
         items: computed(() => record.value?.items ?? []),
         made: ref([]),
@@ -403,6 +406,18 @@ describe("StarterPackHeaderChip", () => {
     expect(find(wrapper, "starter-pack-list-primary-btn").text()).toBe("View Pack");
     await find(wrapper, "starter-pack-list-primary-btn").trigger("click");
     expect(find(wrapper, "pane-kubernetes").exists()).toBe(true);
+  });
+
+  it("offers Finish on a stopped setup only to the person who started it", async () => {
+    save([HOSTS]);
+    fake.records.hosts = { status: "incomplete", items: [] };
+    const wrapper = render();
+    await open(wrapper);
+    await flushPromises();
+    expect(find(wrapper, "starter-pack-list-primary-btn").text()).toBe("Finish");
+    fake.flows.hosts.record.value = { status: "incomplete", items: [], installedBy: "o@x" };
+    await nextTick();
+    expect(find(wrapper, "starter-pack-list-primary-btn").text()).toBe("View Pack");
   });
 
   it("opens on a pack's review when another surface asks for it", async () => {

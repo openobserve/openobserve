@@ -134,6 +134,16 @@ const busy = computed(
     !!selected.value &&
     (selected.value.flow.running.value || opening.value === selected.value.pack.id),
 );
+const interruptedLine = ({ flow, title }: HomePack) => {
+  const by = flow.interruptedBy.value;
+  if (by === null) {
+    const counts = { made: flow.made.value.length, total: flow.toCreate.value.length };
+    return t("starterPacks.home.interrupted", { title, ...counts });
+  }
+  return by
+    ? t("starterPacks.home.startedBy", { who: raw(by), title })
+    : t("starterPacks.home.startedBySomeone", { title });
+};
 </script>
 
 <template>
@@ -281,14 +291,8 @@ const busy = computed(
         inline-actions
         :data-test="item.testId('home-pack-interrupted')"
       >
-        {{
-          t("starterPacks.home.interrupted", {
-            title: item.title,
-            made: item.flow.made.value.length,
-            total: item.flow.toCreate.value.length,
-          })
-        }}
-        <template #actions>
+        {{ interruptedLine(item) }}
+        <template v-if="item.flow.interruptedBy.value === null" #actions>
           <OButton
             variant="primary"
             size="sm-action"

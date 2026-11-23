@@ -205,6 +205,20 @@ describe("StarterPackChatRows", () => {
     expect(wrapper.get('[data-test="starter-pack-chat-retry-hosts"]').text()).toBe("Retry 2 items");
   });
 
+  it("offers no Retry on a partial set up someone else started, and names them", async () => {
+    fake.flows.hosts.record.value = { status: "incomplete", items: [] };
+    fake.flows.hosts.interrupted.value = true;
+    fake.flows.hosts.interruptedBy = ref("other@example.com");
+    fake.flows.hosts.failed.value = [{}, {}];
+    const wrapper = await render();
+    expect(has(wrapper, "starter-pack-chat-retry-hosts")).toBe(false);
+    const note = () => wrapper.get('[data-test="starter-pack-chat-note-hosts"]').text();
+    expect(note()).toBe("other@example.com started setting up this pack.");
+    fake.flows.hosts.interruptedBy.value = "";
+    await nextTick();
+    expect(note()).toBe("Someone else started setting up this pack.");
+  });
+
   it("asks for an admin instead of offering the button", async () => {
     fake.flows.kubernetes.forbidden.value = true;
     const wrapper = await render(["kubernetes"]);

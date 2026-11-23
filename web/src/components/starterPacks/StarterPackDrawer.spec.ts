@@ -987,6 +987,31 @@ describe("StarterPackDrawer", () => {
     );
   });
 
+  it("offers no Finish or Retry on a setup someone else started, and names them", async () => {
+    const failedItem = { kind: "alert", itemId: "a2", status: "failed" };
+    const flow = fakeFlow({
+      interrupted: ref(true),
+      interruptedBy: ref("other@example.com"),
+      failed: ref([failedItem]),
+      toCreate: ref([{ kind: "alert", itemId: "a1", status: "created" }, failedItem]),
+      made: ref([{ kind: "alert", itemId: "a1", status: "created" }]),
+    });
+    const wrapper = render(flow);
+    await flushPromises();
+    expect(has(wrapper, "starter-pack-progress-retry-btn")).toBe(false);
+    expect(has(wrapper, "starter-pack-progress-finish-btn")).toBe(false);
+    expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
+      "other@example.com started setting up this pack.",
+    );
+    flow.failed.value = [];
+    flow.interruptedBy.value = "";
+    await nextTick();
+    expect(has(wrapper, "starter-pack-progress-finish-btn")).toBe(false);
+    expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
+      "Someone else started setting up this pack.",
+    );
+  });
+
   it("offers Finish on an interrupted install without failures", () => {
     const wrapper = render(
       fakeFlow({
