@@ -224,6 +224,31 @@ describe("useStarterPackFlow", () => {
     });
   });
 
+  it("counts the plan the user saw before the install record is first written", async () => {
+    fake.previewPack.mockResolvedValue({
+      items: [
+        { kind: "folder", itemId: "alerts", status: "pending" },
+        { kind: "dashboard", itemId: "overview", status: "pending" },
+        { kind: "alert", itemId: "a1", status: "pending" },
+        { kind: "alert", itemId: "a2", status: "pending" },
+        { kind: "savedView", itemId: "v1", status: "existing" },
+      ],
+      names: {},
+      notIncluded: [],
+    });
+    let finish!: (value: PackInstallRecord) => void;
+    fake.installPack.mockImplementationOnce(() => new Promise((done) => (finish = done)));
+    const flow = setup();
+    await flow.loadPreview();
+    const running = flow.install(undefined, { exclude: ["a2"] });
+    await flushPromises();
+    expect(flow.toCreate.value.map(({ itemId }) => itemId)).toEqual(["overview", "a1"]);
+    expect(flow.made.value).toEqual([]);
+    finish(record());
+    await running;
+    expect(flow.toCreate.value.map(({ itemId }) => itemId)).toEqual(["overview", "a1"]);
+  });
+
   it("adds the ids the user unticked to the ones the preview left out", async () => {
     fake.previewPack.mockResolvedValue({
       items: [],

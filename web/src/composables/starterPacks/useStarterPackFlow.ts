@@ -90,6 +90,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   /** Who started the setup that is already running, or "" when its record names no one. */
   const busyBy = ref<string | null>(null);
   const preview = shallowRef<PackPreview | null>(null);
+  const startPlan = shallowRef<PackRecordItem[]>([]);
   const previewState = ref<PackPreviewState>("idle");
   const removal = shallowRef<PackRemovalResult | null>(null);
   const removalFailed = ref(false);
@@ -109,7 +110,9 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
 
   // A failed folder stops the run, so what it left pending failed with it and Retry redoes both.
   const items = computed(() => {
-    const all = record.value?.items ?? [];
+    // A fresh record has no items until its first write, so the run counts the plan it started from.
+    const fresh = running.value && !record.value?.items.length;
+    const all = fresh ? startPlan.value : (record.value?.items ?? []);
     const blocked =
       !running.value && all.some((item) => !countsAsItem(item) && item.status === "failed");
     return all
@@ -290,6 +293,9 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     try {
       const plan = preview.value ?? (await previewPack(pack, choices.value));
       const exclude = [...new Set([...leftOutIds(plan), ...unticked])];
+      startPlan.value = plan.items.filter(
+        (item) => !exclude.includes(item.itemId) && !exclude.includes(item.copyOf ?? item.itemId),
+      );
       const done = await installPack(pack, {
         exclude,
         repairs: plan.repairs,
