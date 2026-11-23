@@ -30,6 +30,7 @@ import {
   applyPieDonutChartAlignment,
   applyPieDonutCenterAdjustment,
   applyLegendConfiguration,
+  applyPieDonutLegendLayout,
   createPieSlicePercent,
 } from "./legendConfiguration";
 import { calculateWidthText } from "./chartDimensionUtils";
@@ -2126,5 +2127,49 @@ describe("pie right legend floors", () => {
   it("leaves the page height of a legend chosen as scroll to ECharts", () => {
     const options = run({}, many(18), 1200, 93);
     expect(options.legend.height).toBeUndefined();
+  });
+  it("never squeezes the text below its minimum when capping a Legend Width in a narrow panel", () => {
+    const options = run(
+      { legend_values: ["value", "percent"], legend_width: { value: 450, unit: "px" } },
+      slices(services),
+      150,
+    );
+    expect(options.legend.textStyle.width).toBeGreaterThanOrEqual(60);
+  });
+
+  it("centres the pie in the room a capped legend leaves", () => {
+    const options = run(
+      { legend_values: ["value", "percent"], legend_width: { value: 450, unit: "px" } },
+      slices(services),
+      600,
+    );
+    const centerX = (parseFloat(options.series[0].center[0]) / 100) * 600;
+    expect(centerX).toBeCloseTo(options.legend.left / 2, 0);
+  });
+
+  it("sizes a legend without values by the renamed names it shows", () => {
+    const short = ["api-", "auth", "noti"];
+    const renamed = {
+      override_config: [
+        {
+          field: { matchBy: "series", value: "api-" },
+          config: [{ type: "display_name", value: "renamed-api-gateway-production" }],
+        },
+      ],
+    };
+    const plain = run({}, slices(short), 800);
+    const withRename = run(renamed, slices(short), 800);
+    expect(800 - withRename.legend.left).toBeGreaterThan(800 - plain.legend.left);
+  });
+
+  it("re-sizes a switched legend as one column when merged multi-query slices are laid out again", () => {
+    const config = { legends_type: "plain", legend_values: ["value", "percent"] };
+    const options = run(config, many(18), 1200, 150);
+    expect(options.legend.type).toBe("scroll");
+    options.series[0].data = many(22);
+    applyPieDonutLegendLayout(schema(config), options, panel(1200, 150));
+    const fresh = run(config, many(22), 1200, 150);
+    expect(options.legend.type).toBe("scroll");
+    expect(options.legend.left).toBe(fresh.legend.left);
   });
 });

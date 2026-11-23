@@ -738,7 +738,15 @@ const pieLegendSizingData = (
   data?: PieSlice[] | null,
 ): PieSlice[] => {
   const keys = pieLegendValueKeys(panelSchema);
-  if (!keys.length || !Array.isArray(data)) return data ?? [];
+  if (!Array.isArray(data)) return data ?? [];
+  if (!keys.length) {
+    // The legend prints display names, so a renamed slice is sized by its new name.
+    const lookup = createSeriesOverrideLookup(panelSchema?.config);
+    const shownName = (item: PieSlice) => String(lookup.displayName(String(item?.name ?? "")));
+    return data.some((item) => shownName(item) !== String(item?.name ?? ""))
+      ? data.map((item) => ({ ...item, name: shownName(item) }))
+      : data;
+  }
   return [...getPieLegendEntries(panelSchema, data, keys).values()].map((entry) => ({
     name: entry.name ? `${entry.name}  ${entry.valueText}` : entry.valueText,
   }));
@@ -1454,7 +1462,10 @@ const plainLegendColumnsOverflow = (
 const pieLegendTextNeeds = (panelSchema: PieLegendPanelSchema, data: PieSlice[]) => {
   const keys = pieLegendValueKeys(panelSchema);
   if (!keys.length) {
-    const names = [...new Set(data.map((item) => String(item?.name ?? "")))];
+    const lookup = createSeriesOverrideLookup(panelSchema?.config);
+    const names = [
+      ...new Set(data.map((item) => String(lookup.displayName(String(item?.name ?? ""))))),
+    ];
     const floor = Math.max(0, ...names.map((name) => nameWidthOf(legendNameFloor(name))));
     return { whole: 0, floor };
   }
@@ -1493,11 +1504,28 @@ const fitPieLegendWidth = (
   }
   if (hasValues && floorWidth > width) width = Math.min(floorWidth, Math.max(width, pieLimit));
   width = Math.min(width, Math.max(shareLimit, Math.min(floorWidth, pieLimit)));
+  // Capping never squeezes the text below its minimum; past that the names and values vanish.
+  width = Math.max(width, Math.min(legendWidth, chrome + Math.min(shown, LEGEND_MIN_TEXT_WIDTH)));
   if (width === legendWidth) return width;
   const text = Math.max(shown + width - legendWidth, 0);
   legend.textStyle = { ...legend.textStyle, width: text };
   if (text > LEGEND_VALUES_TEXT_WIDTH) widenedPieLegends.add(legend);
   return width;
+};
+
+// Plain legends this layout turned into scroll ones, with the height they had before.
+const scrolledPlainLegends = new WeakMap<object, { height: unknown }>();
+
+// A pie centred beside its legend stays centred in the room left when the legend width changes.
+const centerPieInRoom = (
+  panelSchema: PieLegendPanelSchema,
+  series: any,
+  room: number,
+  chartWidth: number,
+) => {
+  if (panelSchema.config?.chart_align === "left" || room <= 0) return;
+  const center: PieLength[] = Array.isArray(series.center) ? series.center : ["50%", "50%"];
+  series.center = [`${Number(((room / 2 / chartWidth) * 100).toFixed(2))}%`, center[1] ?? "50%"];
 };
 
 // A plain legend that would wrap past the panel edge scrolls, its width follows fitPieLegendWidth,
@@ -1512,12 +1540,20 @@ const fitPieBesideRightLegend = (
   const legend = options.legend;
   if (!chartWidth || series?.type !== "pie" || !legend?.show) return;
   if (typeof legend.left !== "number" || panelSchema.config?.legends_position !== "right") return;
+  // A second pass (merged multi-query slices) re-sizes the legend as plain, so it decides again.
+  const scrolled = scrolledPlainLegends.get(legend);
+  if (scrolled) {
+    legend.type = "plain";
+    legend.height = scrolled.height;
+    scrolledPlainLegends.delete(legend);
+  }
   const placedWidth = chartWidth - legend.left;
   if (placedWidth <= 0) return;
   let legendWidth = placedWidth;
   const data: PieSlice[] = Array.isArray(series.data) ? series.data : [];
   const entryCount = new Set(data.map((item) => String(item?.name ?? ""))).size;
   if (plainLegendColumnsOverflow(legend, entryCount, legendWidth, chartHeight)) {
+    scrolledPlainLegends.set(legend, { height: legend.height });
     legend.type = "scroll";
     const textWidth = Number(legend.textStyle?.width) || 0;
     legendWidth = Math.min(legendWidth, LEGEND_PAD_X + LEGEND_ICON_AND_GAP + textWidth);
@@ -1531,6 +1567,7 @@ const fitPieBesideRightLegend = (
   if (legendWidth !== placedWidth) {
     legend.left = chartWidth - legendWidth;
     legend.right = 0;
+    centerPieInRoom(panelSchema, series, chartWidth - legendWidth, chartWidth);
   }
   shrinkPieBesideLegend(series, chartWidth, chartHeight, legendWidth);
 };
