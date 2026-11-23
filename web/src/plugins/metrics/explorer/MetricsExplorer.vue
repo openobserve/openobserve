@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex h-full min-h-0 w-full flex-col" data-test="metrics-explorer">
+    <h1 class="sr-only">{{ t("menu.metrics") }}</h1>
     <AnomalyOriginBanner class="mx-1.5 mt-1.5 shrink-0" data-test="metrics-anomaly-origin-banner" />
     <!-- No page title: Metrics is an EXPLORE surface like Logs and Traces, so the
          first row is the toolbar — scope on the left, time on the right, like the

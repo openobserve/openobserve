@@ -130,16 +130,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ]"
         >
           <div class="flex min-w-0 items-center gap-1.5">
-            <h1
+            <component
+              :is="headingTag"
               v-if="titleOverflow === 'visible'"
               class="text-text-heading min-h-6 min-w-0 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
               :data-test="titleDataTest"
             >
               <slot name="title">{{ title }}</slot>
-            </h1>
+            </component>
             <OTruncatedText
               v-else
-              as="h1"
+              :as="headingTag"
               class="text-text-heading min-h-6 min-w-0 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
               :data-test="titleDataTest"
             >
@@ -256,6 +257,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useFeatureLock, useFeatureNames } from "@/composables/useFeatureLock";
 import { PAGE_LAYOUT_SIDEBAR_KEY } from "@/lib/core/PageLayout/pageLayoutSidebar";
+import { PAGE_HEADING_OWNED_KEY } from "@/lib/core/PageHeader/pageHeading";
 import { usePageHeaderStatusHost } from "@/lib/core/PageHeader/pageHeaderStatus";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -295,6 +297,8 @@ const props = withDefaults(
     titleMinWidth?: boolean;
     /** Ends the title row at this reading-column width (ConstrainedPage's scale); the border still spans the header. */
     contentSize?: "sm" | "md" | "lg" | "xl";
+    /** Set by OPageLayout for its own header; otherwise a header inside another page's body is an h2. */
+    headingTag?: "h1" | "h2";
   }>(),
   {
     title: raw(""),
@@ -333,6 +337,9 @@ const lockedLabel = computed(() =>
     ),
   }),
 );
+
+const headingOwned = inject(PAGE_HEADING_OWNED_KEY, null);
+const headingTag = computed(() => props.headingTag ?? (headingOwned?.value ? "h2" : "h1"));
 
 // The first header inside a sidebar layout carries its phone trigger, saving the layout a row.
 const layoutSidebar = inject(PAGE_LAYOUT_SIDEBAR_KEY, null);

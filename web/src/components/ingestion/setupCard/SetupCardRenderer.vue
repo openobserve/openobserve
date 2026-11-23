@@ -47,6 +47,7 @@ import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { CodeBlockCopyPayload } from "@/lib/core/Code/OCodeBlock.types";
 import { OPEN_TOKEN_PICKER } from "@/composables/useCredentialSnippet";
+import { PAGE_HEADING_OWNED_KEY } from "@/lib/core/PageHeader/pageHeading";
 import type {
   FirstEventResult,
   FirstEventState,
@@ -94,6 +95,10 @@ const props = withDefaults(
   }>(),
   { tokenState: "ready" },
 );
+
+// The provider name is the page title in the onboarding guide, but a section title inside a page that has one.
+const pageHeadingOwned = inject(PAGE_HEADING_OWNED_KEY, null);
+const headingTag = computed(() => (pageHeadingOwned?.value ? "h2" : "h1"));
 
 const emit = defineEmits<{
   /** A step's action button was clicked; carries RichCardStepAction.id. */
@@ -635,7 +640,7 @@ function fireConfetti() {
             />
             <template v-else>{{ content.provider.name.charAt(0) }}</template>
           </span>
-          <h1 class="c-h1">{{ content.provider.name }}</h1>
+          <component :is="headingTag" class="c-h1">{{ content.provider.name }}</component>
         </div>
         <!-- Optional control on its own row directly under the title, ahead of the
              tagline and meta chips (e.g. RUM's Browser / React Native / Android /

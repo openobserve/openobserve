@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="logPage"
     data-test="logs-page-container"
   >
+    <h1 class="sr-only">{{ t("menu.search") }}</h1>
     <FirstDataPanel
       v-if="firstDataArrival"
       signal="logs"

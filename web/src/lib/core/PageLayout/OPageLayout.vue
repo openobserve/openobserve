@@ -72,6 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title-overflow="titleOverflow"
           :overflow-first="overflowFirst"
           :title-min-width="titleMinWidth"
+          :heading-tag="ownHeadingTag"
         >
           <template v-if="!!slots.title" #title><slot name="title" /></template>
           <template v-if="!!slots['title-prefix']" #title-prefix
@@ -222,6 +223,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useFeatureLock } from "@/composables/useFeatureLock";
 import { PAGE_LAYOUT_SIDEBAR_KEY } from "./pageLayoutSidebar";
+import { PAGE_HEADING_OWNED_KEY } from "@/lib/core/PageHeader/pageHeading";
 import { PAGE_ENTRANCE_KEY } from "./pageEntrance";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
@@ -309,6 +311,14 @@ watch(
   () => router?.currentRoute?.value?.fullPath,
   () => (mobileSidebarOpen.value = false),
 );
+// A custom #header may not hold a page title, so only a built-in header claims the h1 for this subtree.
+const parentHeadingOwned = inject(PAGE_HEADING_OWNED_KEY, null);
+const ownHeadingTag = computed(() => (parentHeadingOwned?.value ? "h2" : "h1"));
+provide(
+  PAGE_HEADING_OWNED_KEY,
+  computed(() => !!parentHeadingOwned?.value || (hasHeader.value && !slots.header)),
+);
+
 // Only a sidebar host provides, so a nested sidebar-less layout doesn't shadow its parent's trigger.
 const sidebarTriggerOwner = ref<symbol | null>(null);
 if (slots.sidebar) {
