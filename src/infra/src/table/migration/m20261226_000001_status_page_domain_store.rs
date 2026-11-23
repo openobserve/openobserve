@@ -340,6 +340,7 @@ mod tests {
         migration::{
             m20260825_000001_create_status_page_custom_domains as create_domains,
             m20261225_000001_status_page_domain_holders as holders,
+            m20261227_000001_status_page_domain_manager as manager_migration,
         },
     };
 
@@ -351,6 +352,8 @@ mod tests {
         let schema = SchemaManager::new(&db);
         create_domains::Migration.up(&schema).await.unwrap();
         holders::Migration.up(&schema).await.unwrap();
+        // The current entity reads the columns the manager migration adds, so the schema must too.
+        manager_migration::Migration.up(&schema).await.unwrap();
         db
     }
 

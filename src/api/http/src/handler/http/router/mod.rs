@@ -2234,6 +2234,10 @@ fn service_route_table() -> Router {
                 post(status_pages::admin::verify_domain),
             )
             .route(
+                "/{org_id}/status_pages/domains/{did}/check",
+                post(status_pages::admin::check_domain),
+            )
+            .route(
                 "/{org_id}/status_pages/domains/release_shadowed",
                 post(status_pages::admin::release_shadowed),
             );

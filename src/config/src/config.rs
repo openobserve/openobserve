@@ -163,7 +163,10 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 161: create status_page_domain_certs, status_page_domain_challenges,
 //      status_page_domain_manager and status_page_domain_listeners, and add cname_label to
 //      status_page_custom_domains with a unique index.
-pub const DB_SCHEMA_VERSION: u64 = 161;
+// 162: create status_page_domain_orders, status_page_domain_revocations and
+//      status_page_domain_acme_accounts, and add proof_notified_at and the serving columns to
+//      status_page_custom_domains.
+pub const DB_SCHEMA_VERSION: u64 = 162;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1261,6 +1264,36 @@ pub struct StatusPageDomain {
         help = "Raised by the operator after a database restore. A node whose epoch differs from the stored one loads no certificate."
     )]
     pub epoch: i64,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_ORDERS_PER_HOUR",
+        default = 30,
+        help = "Certificate orders the domain manager starts per hour for the whole installation."
+    )]
+    pub orders_per_hour: u32,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_ORDERS_PER_ORG_PER_DAY",
+        default = 10,
+        help = "Certificate orders the domain manager starts per organization per day."
+    )]
+    pub orders_per_org_per_day: u32,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_CERTS_PER_REGISTERED_DOMAIN_PER_WEEK",
+        default = 20,
+        help = "Certificates ordered per registered domain per week across the installation, whichever organization orders; keeps room under the CA's own limit."
+    )]
+    pub certs_per_registered_domain_per_week: u32,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_CERTS_PER_HOSTNAME_PER_WEEK",
+        default = 3,
+        help = "Certificates ordered per hostname per week. The domain target is exempt."
+    )]
+    pub certs_per_hostname_per_week: u32,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_VALIDATION_ATTEMPTS_PER_HOUR",
+        default = 3,
+        help = "Validation attempts per hostname per hour: automatic tries, the connection-error retry and \"Check again\"."
+    )]
+    pub validation_attempts_per_hour: u32,
 }
 
 impl std::fmt::Debug for StatusPageDomain {
@@ -1281,6 +1314,11 @@ impl std::fmt::Debug for StatusPageDomain {
             allow_orgs,
             deny_orgs,
             epoch,
+            orders_per_hour,
+            orders_per_org_per_day,
+            certs_per_registered_domain_per_week,
+            certs_per_hostname_per_week,
+            validation_attempts_per_hour,
             encryption_key: _,
         } = self;
         f.debug_struct("StatusPageDomain")
@@ -1299,6 +1337,14 @@ impl std::fmt::Debug for StatusPageDomain {
             .field("allow_orgs", allow_orgs)
             .field("deny_orgs", deny_orgs)
             .field("epoch", epoch)
+            .field("orders_per_hour", orders_per_hour)
+            .field("orders_per_org_per_day", orders_per_org_per_day)
+            .field(
+                "certs_per_registered_domain_per_week",
+                certs_per_registered_domain_per_week,
+            )
+            .field("certs_per_hostname_per_week", certs_per_hostname_per_week)
+            .field("validation_attempts_per_hour", validation_attempts_per_hour)
             .finish_non_exhaustive()
     }
 }

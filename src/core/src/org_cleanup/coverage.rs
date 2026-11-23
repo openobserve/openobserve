@@ -220,6 +220,21 @@ pub const COVERAGE: &[Coverage] = &[
     ),
     exempt(
         Kind::Table,
+        "status_page_domain_orders",
+        "kept 30 days for the CA's rate accounting and purged by the domain manager, which has no org to ask",
+    ),
+    exempt(
+        Kind::Table,
+        "status_page_domain_revocations",
+        "hold a certificate waiting for revocation and no org data; the domain manager purges them",
+    ),
+    exempt(
+        Kind::Table,
+        "status_page_domain_acme_accounts",
+        "CA accounts of the installation, keyed by directory, no org data",
+    ),
+    exempt(
+        Kind::Table,
         "status_page_domain_listeners",
         "one heartbeat row per node of the installation, no org data",
     ),
@@ -514,13 +529,15 @@ mod tests {
         "users",
     ];
     /// Entity tables that hold no org data at all.
-    const GLOBAL_TABLES: [&str; 7] = [
+    const GLOBAL_TABLES: [&str; 9] = [
         "oncall_phone_verifications",
         "sessions",
         "slack_installations",
         "slack_link_requests",
+        "status_page_domain_acme_accounts",
         "status_page_domain_listeners",
         "status_page_domain_manager",
+        "status_page_domain_revocations",
         "system_prompts",
     ];
 

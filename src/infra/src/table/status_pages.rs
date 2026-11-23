@@ -884,13 +884,15 @@ pub async fn delete_by_org_in<C: ConnectionTrait + TransactionTrait>(
     let mut hostnames: Vec<String> = Vec::new();
     if super::status_page_domains::certs_enabled() {
         // The page and claim locks above keep any claim, grant or import for this org out.
-        hostnames = status_page_domain_certs::Entity::find()
-            .select_only()
-            .column(status_page_domain_certs::Column::Hostname)
+        let rows = status_page_domain_certs::Entity::find()
             .filter(status_page_domain_certs::Column::OrgId.eq(org_id))
-            .into_tuple()
             .all(&txn)
             .await?;
+        let now = config::utils::time::now_micros();
+        for row in &rows {
+            super::status_page_domains::queue_revocation_of(&txn, row, now).await?;
+        }
+        hostnames = rows.into_iter().map(|row| row.hostname).collect();
         status_page_domain_certs::Entity::delete_many()
             .filter(status_page_domain_certs::Column::OrgId.eq(org_id))
             .exec(&txn)
@@ -1600,6 +1602,141 @@ pub async fn record_resolver_error<C: ConnectionTrait>(
     run_claim_update(conn, live_claim_update(id).set(checked_at(now))).await
 }
 
+/// What the domain manager decided for a holder, and when.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ServingVerdict<'a> {
+    pub state: &'a str,
+    pub reason: Option<&'a str>,
+    pub warning: Option<&'a str>,
+    pub warning_at: Option<i64>,
+    pub next_action_at: Option<i64>,
+    pub computed_at: i64,
+}
+
+/// Stores the verdict on a holder; false when the claim stopped being one.
+pub async fn write_serving_verdict<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    verdict: &ServingVerdict<'_>,
+) -> Result<bool, errors::Error> {
+    let update = held_update(id).set(status_page_custom_domains::ActiveModel {
+        serving_state: Set(Some(verdict.state.to_string())),
+        serving_reason: Set(verdict.reason.map(str::to_string)),
+        serving_warning: Set(verdict.warning.map(str::to_string)),
+        warning_at: Set(verdict.warning_at),
+        next_action_at: Set(verdict.next_action_at),
+        state_computed_at: Set(Some(verdict.computed_at)),
+        ..Default::default()
+    });
+    run_claim_update(conn, update).await
+}
+
+/// The ownership proof of a holder was looked up: a found answer starts or keeps the run that
+/// `dns_ok_since` dates, a negative one ends it.
+pub async fn record_dns_check<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    found: bool,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    use status_page_custom_domains::Column;
+    let since = if found {
+        first_set(Column::DnsOkSince, now)
+    } else {
+        Expr::cust("NULL")
+    };
+    let update = held_update(id)
+        .col_expr(Column::DnsCheckedAt, Expr::value(now))
+        .col_expr(Column::DnsOkSince, since);
+    run_claim_update(conn, update).await
+}
+
+/// A probe round: success moves the evidence time and clears the failures, a failure counts.
+pub async fn record_probe<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    ok: bool,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    use status_page_custom_domains::Column;
+    let update = if ok {
+        held_update(id)
+            .col_expr(Column::ProbeOkAt, Expr::value(now))
+            .col_expr(Column::ProbeFailures, Expr::value(0))
+    } else {
+        held_update(id).col_expr(
+            Column::ProbeFailures,
+            Expr::col(Column::ProbeFailures).add(1),
+        )
+    };
+    run_claim_update(conn, update).await
+}
+
+/// A probe saw `fingerprint` served. Written only while the hostname's certificate row still has
+/// that fingerprint, so a leaf replaced during the probe is never confirmed.
+pub async fn confirm_probed_fingerprint<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    (hostname, fingerprint): (&str, &str),
+) -> Result<bool, errors::Error> {
+    use status_page_custom_domains::Column;
+    use status_page_domain_certs as certs;
+    let still_current = Query::select()
+        .expr(Expr::val(1))
+        .from(certs::Entity)
+        .and_where(certs::Column::Hostname.eq(hostname))
+        .and_where(certs::Column::Fingerprint.eq(fingerprint))
+        .to_owned();
+    let update = held_update(id)
+        .filter(Column::HeldDomain.eq(hostname))
+        .filter(Expr::exists(still_current))
+        .col_expr(Column::ProbeConfirmedFingerprint, Expr::value(fingerprint));
+    run_claim_update(conn, update).await
+}
+
+/// The CA validated the hostname just now.
+pub async fn record_ca_validated<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    let update = held_update(id).set(status_page_custom_domains::ActiveModel {
+        ca_validated_at: Set(Some(now)),
+        ..Default::default()
+    });
+    run_claim_update(conn, update).await
+}
+
+/// "Check again" on a holder: the flag is set once and stays until a manager cycle takes it.
+pub async fn request_domain_check<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    let update = held_update(id)
+        .filter(status_page_custom_domains::Column::CheckRequestedAt.is_null())
+        .set(status_page_custom_domains::ActiveModel {
+            check_requested_at: Set(Some(now)),
+            ..Default::default()
+        });
+    run_claim_update(conn, update).await
+}
+
+/// The manager took the request; it clears the flag only if it still carries the time it read.
+pub async fn consume_domain_check<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    requested_at: i64,
+) -> Result<bool, errors::Error> {
+    let update = live_claim_update(id)
+        .filter(status_page_custom_domains::Column::CheckRequestedAt.eq(requested_at))
+        .set(status_page_custom_domains::ActiveModel {
+            check_requested_at: Set(None),
+            ..Default::default()
+        });
+    run_claim_update(conn, update).await
+}
+
 /// "Verify now" on a non-holder moves its expiry to 7 days from `now`; the loop never does.
 pub async fn extend_claim_expiry<C: ConnectionTrait>(
     conn: &C,
@@ -1793,6 +1930,11 @@ fn live_claim_update(id: &str) -> UpdateMany<status_page_custom_domains::Entity>
         .filter(unreleased())
 }
 
+/// A live write that reaches a holder only.
+fn held_update(id: &str) -> UpdateMany<status_page_custom_domains::Entity> {
+    live_claim_update(id).filter(status_page_custom_domains::Column::HeldDomain.is_not_null())
+}
+
 /// `column = COALESCE(column, now)`: the first value stays.
 fn first_set(column: status_page_custom_domains::Column, now: i64) -> SimpleExpr {
     Func::coalesce([
@@ -1836,7 +1978,7 @@ fn lapsed_holder(
             held_domain: Set(None),
             expires_at: Set(Some(now + CLAIM_TTL_MICROS)),
             updated_at: Set(now),
-            ..Default::default()
+            ..cleared_serving()
         })
         .col_expr(
             Column::ProofFailedSince,
@@ -1848,6 +1990,26 @@ fn cleared_clock() -> status_page_custom_domains::ActiveModel {
     status_page_custom_domains::ActiveModel {
         proof_failed_since: Set(None),
         verification_failure_reason: Set(None),
+        ..Default::default()
+    }
+}
+
+/// A claim that is not a served holder has no verdict, evidence or pending check.
+fn cleared_serving() -> status_page_custom_domains::ActiveModel {
+    status_page_custom_domains::ActiveModel {
+        serving_state: Set(None),
+        serving_reason: Set(None),
+        serving_warning: Set(None),
+        warning_at: Set(None),
+        next_action_at: Set(None),
+        state_computed_at: Set(None),
+        dns_checked_at: Set(None),
+        dns_ok_since: Set(None),
+        probe_ok_at: Set(None),
+        probe_confirmed_fingerprint: Set(None),
+        ca_validated_at: Set(None),
+        check_requested_at: Set(None),
+        probe_failures: Set(0),
         ..Default::default()
     }
 }
@@ -1882,7 +2044,7 @@ fn release_update(at: i64, reason: i32) -> UpdateMany<status_page_custom_domains
         release_reason: Set(Some(reason)),
         held_domain: Set(None),
         updated_at: Set(at),
-        ..Default::default()
+        ..cleared_serving()
     })
 }
 
@@ -1945,11 +2107,19 @@ async fn release_claim<C: ConnectionTrait>(
         return Ok(None);
     };
     if super::status_page_domains::certs_enabled() {
-        status_page_domain_certs::Entity::delete_many()
+        let held = status_page_domain_certs::Entity::find()
             .filter(status_page_domain_certs::Column::Hostname.eq(hostname))
             .filter(status_page_domain_certs::Column::ClaimId.eq(&claim.id))
-            .exec(txn)
+            .one(txn)
             .await?;
+        if let Some(cert) = held {
+            super::status_page_domains::queue_revocation_of(txn, &cert, at).await?;
+            status_page_domain_certs::Entity::delete_many()
+                .filter(status_page_domain_certs::Column::Hostname.eq(hostname))
+                .filter(status_page_domain_certs::Column::ClaimId.eq(&claim.id))
+                .exec(txn)
+                .await?;
+        }
     }
     Ok(Some(hostname.clone()))
 }
@@ -4190,5 +4360,165 @@ mod tests {
         let after = row(&pg.db, &id).await;
         assert!(after.release_seal.is_some() && after.held_domain.is_none());
         pg.drop_schema().await;
+    }
+
+    /// A claim with a certificate, a verdict and its serving evidence, so a release has something
+    /// to clear.
+    async fn holder_with_cert(db: DatabaseConnection, id: &str) -> DatabaseConnection {
+        create_domains_table_for_tests(&db).await.unwrap();
+        // The certificate gate decides the release path; without it nothing is queued.
+        super::super::status_page_domains::force_certs_for_tests(true);
+        claims::ActiveModel {
+            id: ActiveValue::Set(id.to_string()),
+            org_id: ActiveValue::Set("org-a".to_string()),
+            status_page_id: ActiveValue::Set("pa".to_string()),
+            domain: ActiveValue::Set(HOST.to_string()),
+            verification_token: ActiveValue::Set(format!("o2v_{id}")),
+            verification_state: ActiveValue::Set(1),
+            held_domain: ActiveValue::Set(Some(HOST.to_string())),
+            cname_label: ActiveValue::Set(Some("labelhere".to_string())),
+            serving_state: ActiveValue::Set(Some("serving".to_string())),
+            serving_reason: ActiveValue::Set(None),
+            probe_ok_at: ActiveValue::Set(Some(T0)),
+            state_computed_at: ActiveValue::Set(Some(T0)),
+            probe_failures: ActiveValue::Set(2),
+            check_requested_at: ActiveValue::Set(Some(T0)),
+            created_at: ActiveValue::Set(T0),
+            updated_at: ActiveValue::Set(T0),
+            ..Default::default()
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+        let cert = super::super::entity::status_page_domain_certs::Model {
+            hostname: HOST.to_string(),
+            claim_id: Some(id.to_string()),
+            org_id: Some("org-a".to_string()),
+            ca_directory: "https://ca.test/dir".to_string(),
+            cert_chain: "chain".to_string(),
+            private_key: "key".to_string(),
+            fingerprint: "fp".to_string(),
+            previous_fingerprint: None,
+            not_before: T0,
+            not_after: T0 + 1,
+            renew_at: None,
+            source: "acme".to_string(),
+            created_at: T0,
+            updated_at: T0,
+        };
+        super::super::entity::status_page_domain_certs::Entity::insert(cert.into_active_model())
+            .exec(&db)
+            .await
+            .unwrap();
+        db
+    }
+
+    #[tokio::test]
+    async fn a_release_queues_the_revocation_and_clears_every_serving_column() {
+        let db = holder_with_cert(db().await, "c1").await;
+        assert!(
+            confirm_probed_fingerprint(&db, "c1", (HOST, "fp"))
+                .await
+                .unwrap()
+        );
+
+        let hostname = release_domain(&db, "org-a", "c1", T0 + 5, RELEASED_BY_ORG)
+            .await
+            .unwrap();
+
+        assert_eq!(hostname, Some(Some(HOST.to_string())));
+        let claim = claims::Entity::find_by_id("c1")
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(claim.released_at.is_some() && claim.release_seal.is_some());
+        assert!(claim.held_domain.is_none());
+        assert_eq!(claim.serving_state, None);
+        assert_eq!(claim.serving_reason, None);
+        assert_eq!(claim.probe_ok_at, None);
+        assert_eq!(claim.probe_confirmed_fingerprint, None);
+        assert_eq!(claim.state_computed_at, None);
+        assert_eq!(claim.check_requested_at, None);
+        assert_eq!(claim.probe_failures, 0);
+        let waiting = super::super::status_page_domains::list_waiting_revocations(&db, 10)
+            .await
+            .unwrap();
+        assert_eq!(
+            waiting.len(),
+            1,
+            "the certificate was queued in the same transaction"
+        );
+        assert_eq!(waiting[0].hostname, HOST);
+    }
+
+    #[tokio::test]
+    async fn a_lapse_clears_the_serving_columns_and_frees_the_hostname() {
+        let db = holder_with_cert(db().await, "c1").await;
+        assert!(
+            confirm_probed_fingerprint(&db, "c1", (HOST, "fp"))
+                .await
+                .unwrap()
+        );
+        claims::Entity::update_many()
+            .col_expr(
+                claims::Column::ProofFailedSince,
+                Expr::value(T0 - 72 * 3_600 * 1_000_000),
+            )
+            .col_expr(
+                claims::Column::VerificationFailureReason,
+                Expr::value(FAILURE_NO_CNAME),
+            )
+            .filter(claims::Column::Id.eq("c1"))
+            .exec(&db)
+            .await
+            .unwrap();
+
+        let outcome = record_holder_proof_failure(&db, "c1", FAILURE_NO_CNAME, T0, true)
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, HolderProofFailure::Lapsed);
+        let claim = claims::Entity::find_by_id("c1")
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(claim.serving_state, None);
+        assert_eq!(claim.serving_reason, None);
+        assert_eq!(claim.check_requested_at, None);
+        assert_eq!(claim.probe_failures, 0);
+        assert_eq!(claim.probe_confirmed_fingerprint, None);
+        assert!(claim.held_domain.is_none(), "a lapse frees the hostname");
+    }
+
+    #[tokio::test]
+    async fn a_probe_confirms_only_the_fingerprint_the_certificate_row_still_has() {
+        let db = holder_with_cert(db().await, "c1").await;
+        let confirmed = async |db: &DatabaseConnection| {
+            let claim = claims::Entity::find_by_id("c1").one(db).await.unwrap();
+            claim.unwrap().probe_confirmed_fingerprint
+        };
+
+        let replaced = confirm_probed_fingerprint(&db, "c1", (HOST, "replaced")).await;
+        assert!(!replaced.unwrap(), "the row holds another fingerprint");
+        assert_eq!(confirmed(&db).await, None);
+
+        let current = confirm_probed_fingerprint(&db, "c1", (HOST, "fp")).await;
+        assert!(current.unwrap());
+        assert_eq!(confirmed(&db).await.as_deref(), Some("fp"));
+
+        assert!(record_probe(&db, "c1", false, T0 + 1).await.unwrap());
+        assert!(record_probe(&db, "c1", true, T0 + 2).await.unwrap());
+        assert_eq!(
+            confirmed(&db).await.as_deref(),
+            Some("fp"),
+            "neither a failed round nor an evidence-only success moves the confirmation"
+        );
+        let other_host = confirm_probed_fingerprint(&db, "c1", ("other.example.com", "fp")).await;
+        assert!(
+            !other_host.unwrap(),
+            "the claim does not hold that hostname"
+        );
     }
 }

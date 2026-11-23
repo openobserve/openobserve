@@ -43,6 +43,26 @@ pub struct Model {
     /// The claim's CNAME label: 16 characters of `a-z2-7`, unique across all claims, kept on
     /// release. NULL only on a row an older build inserted, until repair fills it.
     pub cname_label: Option<String>,
+    /// When the proof-loss e-mail of the current clock was sent; written by `domain-ops`.
+    pub proof_notified_at: Option<i64>,
+    /// The domain manager's verdict on a holder (built-in TLS only): state, reason and warning
+    /// codes, and the time each was computed. Cleared on release.
+    pub serving_state: Option<String>,
+    pub serving_reason: Option<String>,
+    pub serving_warning: Option<String>,
+    pub warning_at: Option<i64>,
+    pub next_action_at: Option<i64>,
+    pub state_computed_at: Option<i64>,
+    /// The last found DNS check, and when the unbroken run of found checks began.
+    pub dns_checked_at: Option<i64>,
+    pub dns_ok_since: Option<i64>,
+    pub probe_ok_at: Option<i64>,
+    /// The certificate fingerprint a probe saw served; counts only while it is the current one.
+    pub probe_confirmed_fingerprint: Option<String>,
+    pub ca_validated_at: Option<i64>,
+    /// Set by "Check again"; the next manager cycle consumes it.
+    pub check_requested_at: Option<i64>,
+    pub probe_failures: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

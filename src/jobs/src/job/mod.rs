@@ -716,6 +716,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
+    // Every scheduler node runs the loop; `run` returns unless built-in TLS is on, and only the
+    // holder of the database lease works.
+    #[cfg(feature = "enterprise")]
+    if LOCAL_NODE.is_scheduler() {
+        tokio::spawn(o2_enterprise::enterprise::status_pages::domain_manager::run());
+    }
+
     // telemetry run
     if cfg.common.telemetry_enabled && LOCAL_NODE.is_querier() {
         spawn_pausable_job!(
@@ -1986,6 +1993,27 @@ mod tests {
             store < router_return,
             "single-role routers serve custom domains and need the store"
         );
+    }
+
+    #[test]
+    fn the_domain_manager_is_spawned_on_scheduler_nodes_after_the_router_return() {
+        let source = include_str!("mod.rs");
+        let init = source
+            .split("pub async fn init()")
+            .nth(1)
+            .and_then(|rest| rest.split("mod tests {").next())
+            .expect("init() body");
+        let manager = init
+            .find("status_pages::domain_manager::run()")
+            .expect("init() must spawn domain_manager::run()");
+        let router_return = init
+            .find("if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role()")
+            .expect("router return in init()");
+        assert!(router_return < manager, "routers do not run the manager");
+        let guard = init[..manager]
+            .rfind("if LOCAL_NODE.is_scheduler()")
+            .expect("a scheduler guard before the spawn");
+        assert!(manager - guard < 200, "the spawn sits under the guard");
     }
 
     #[test]

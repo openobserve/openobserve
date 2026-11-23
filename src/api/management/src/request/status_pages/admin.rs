@@ -806,6 +806,34 @@ pub async fn verify_domain(
 
 #[utoipa::path(
     post,
+    path = "/{org_id}/status_pages/domains/{did}/check",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "CheckStatusPageDomainAgain",
+    summary = "Check a custom domain again",
+    description = "Returns the computed state of the domain. With built-in TLS it also asks the domain manager to look at the domain again, while the hostname's validation attempts for the hour have room. In proxy mode and while custom domains are off it only reads.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("did" = String, Path, description = "Custom domain id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::DomainAdminView),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn check_domain(Path((org_id, did)): Path<(String, String)>) -> Response {
+    match openobserve_core::status_pages::check_domain_again(&org_id, &did).await {
+        Ok(domain) => MetaHttpResponse::json(domain),
+        Err(e) => map_err("check_domain", e),
+    }
+}
+
+#[utoipa::path(
+    post,
     path = "/{org_id}/status_pages/domains/release_shadowed",
     context_path = "/api",
     tag = "Status Pages",

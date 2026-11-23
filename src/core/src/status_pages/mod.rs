@@ -500,6 +500,25 @@ pub async fn verify_domain_now(
     enterprise_required()
 }
 
+/// "Check again": the computed view of a claim, as the list gives it. With built-in TLS it also
+/// asks the next manager cycle to look at the claim; in proxy mode and while off it writes
+/// nothing. Licensed.
+#[cfg(feature = "enterprise")]
+pub async fn check_domain_again(
+    org_id: &str,
+    id: &str,
+) -> Result<config::meta::status_pages::DomainAdminView, anyhow::Error> {
+    o2_enterprise::enterprise::status_pages::domains::check_domain_again(org_id, id).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn check_domain_again(
+    _org_id: &str,
+    _id: &str,
+) -> Result<config::meta::status_pages::DomainAdminView, anyhow::Error> {
+    enterprise_required()
+}
+
 /// Releases every claim that is not the holder of a hostname another claim holds, so a rollback
 /// to a release that reads claims by hostname alone serves the holder. Licensed.
 #[cfg(feature = "enterprise")]
