@@ -93,10 +93,13 @@ describe("locale packs", () => {
     }
   });
 
-  it("keeps generated tables equal to a fresh generator run on the same ICU", async () => {
+  it("keeps generated tables equal to a fresh generator run on the same ICU", async (ctx) => {
     const { committedIcu } = await import(pathToFileURL(generator).href);
     const icu = committedIcu(readFileSync(join(__dirname, "../packs/generated/de.ts"), "utf8"));
-    if (icu !== process.versions.icu) return;
+    if (icu !== process.versions.icu) {
+      console.warn(`packs generated with ICU ${icu}, runner has ${process.versions.icu}; skipped`);
+      ctx.skip();
+    }
     const run = spawnSync("node", [generator, "--check"], { cwd: web, encoding: "utf8" });
     expect(run.status, run.stderr).toBe(0);
   });

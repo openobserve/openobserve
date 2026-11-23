@@ -45,8 +45,10 @@ A reading has `startUs`/`endUs` (end exclusive), its `kind` (`rolling`, `calenda
 - `formatTimeRangeInput(range, { zone })` writes a range as text that parses back to the same range
   in every pack and zone: rolling as `now-15m` (units `s m h d w M`), calendar as its token
   (`calendar:day:0`), absolute as `<ISO start> - <ISO end>` with the zone offset at each end and
-  microseconds when not zero. It returns `null` for an unknown zone or an unsafe instant. It lives
-  in its own module, so a caller that only parses does not bundle it.
+  microseconds when not zero. Rolling and calendar output ignore the zone. For an absolute range it
+  returns `null` on an unknown zone, an unsafe instant or a year out of range. An
+  offset the parser cannot read (outside -12:00..+14:00, or minutes other than 00, 30 or 45) is
+  written in UTC. It lives in its own module, so a caller that only parses does not bundle it.
 - `checkTimeRange({ startUs, endUs, nowUs, maxSpanHours?, retentionDays?, allowFuture? })` is the
   validity gate the parser's policy step uses. It returns `{ ok: true, endUs }` or
   `{ ok: false, reason, fix? }` with the parser's reasons and fixes. Like the parser it treats an
@@ -63,6 +65,12 @@ A reading has `startUs`/`endUs` (end exclusive), its `kind` (`rolling`, `calenda
 `en-us` is bundled. The other 16 load lazily, each in its own chunk:
 `const pack = await loadTimeRangeLocale("de")`. The promise rejects if the chunk cannot load; there
 is no English fallback inside an unloaded pack, so keep the last loaded pack until it resolves.
+The keys are `ar`, `zh-cn`, `tr-turk`, `de`, `es`, `fr`, `it`, `ja`, `ko`, `nl`, `pt`, `zh-tw`,
+`ru`, `pl`, `vi` and `th` (`TimeRangeLocale` in `types.ts`).
+
+The Intl tables in `packs/generated/` come from `npm run gen:time-range-intl`. Add `-- --check` to
+fail on drift; a file generated on another ICU version (the committed one is 79.1) is skipped with
+a warning.
 
 ## Example
 
