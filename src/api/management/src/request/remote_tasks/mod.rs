@@ -39,7 +39,7 @@ use crate::{
         ReplaceRemoteTaskSecretRequestBody, RotateRemoteTaskSecretRequestBody,
         TestConnectionRequestBody, TestRemoteTaskRequestBody, TestRemoteTaskResponseBody,
         TestRemoteTaskSecretCandidateResponseBody, TestRunRequestBody, TestRunResponseBody,
-        VerificationReportBody, WrittenRemoteTaskSecretResponseBody,
+        TestRunRowResultBody, VerificationReportBody, WrittenRemoteTaskSecretResponseBody,
     },
     service::llm_evaluations::remote_tasks::{self, RemoteTaskError, stats::RemoteTaskStatsError},
 };
@@ -122,6 +122,25 @@ fn sample_context(body: TestConnectionRequestBody) -> RenderContext {
             "trial_index": 0,
         }),
     }
+}
+
+/// The verdict, error and report a test connection returns, without the endpoint's body.
+fn test_verdict(outcome: VerificationOutcome) -> (bool, Option<String>, VerificationReportBody) {
+    match outcome {
+        VerificationOutcome::Passed(report) => (true, None, report.into()),
+        VerificationOutcome::Failed { error, report } => (false, Some(error), report.into()),
+    }
+}
+
+/// One test-run row; like a test connection, it leaves out the endpoint's body.
+fn test_run_row(result: bench::BenchRowResult) -> TestRunRowResultBody {
+    // A skipped row's reason is the endpoint's own text.
+    let skipped = matches!(result.status, bench::BenchStatus::Skipped);
+    let mut row = TestRunRowResultBody::from(result);
+    if skipped {
+        row.error = None;
+    }
+    row
 }
 
 async fn configured_auth_secret_ref(org_id: &str, entity_id: &str) -> Result<String, Response> {
@@ -486,11 +505,8 @@ pub async fn test_remote_task_signing_candidate(
         Err(response) => return response,
     };
 
-    let outcome = verify_candidate(&task, &sample_context(body)).await;
-    let (verified, error, report) = match outcome {
-        VerificationOutcome::Passed(report) => (true, None, report),
-        VerificationOutcome::Failed { error, report } => (false, Some(error), report),
-    };
+    let (verified, error, report) =
+        test_verdict(verify_candidate(&task, &sample_context(body)).await);
     let secret = if verified {
         match secrets::mark_candidate_verified(
             &org_id,
@@ -510,7 +526,7 @@ pub async fn test_remote_task_signing_candidate(
         verified,
         error,
         secret,
-        report: VerificationReportBody::from(report),
+        report,
     })
 }
 
@@ -781,18 +797,12 @@ pub async fn test_remote_task(
     };
     let sample = sample_context(TestConnectionRequestBody { input, metadata });
     match remote_tasks::test_registration(&org_id, registration, &sample).await {
-        Ok(VerificationOutcome::Passed(report)) => {
+        Ok(outcome) => {
+            let (verified, error, report) = test_verdict(outcome);
             MetaHttpResponse::json(TestRemoteTaskResponseBody {
-                verified: true,
-                error: None,
-                report: report.into(),
-            })
-        }
-        Ok(VerificationOutcome::Failed { error, report }) => {
-            MetaHttpResponse::json(TestRemoteTaskResponseBody {
-                verified: false,
-                error: Some(error),
-                report: report.into(),
+                verified,
+                error,
+                report,
             })
         }
         Err(error) => remote_task_error_response(error),
@@ -1157,7 +1167,7 @@ pub async fn test_run_remote_task(
     match remote_tasks::bench::run(&org_id, &entity_id, samples).await {
         Ok(results) => {
             let body = TestRunResponseBody {
-                results: results.into_iter().map(Into::into).collect(),
+                results: results.into_iter().map(test_run_row).collect(),
             };
             MetaHttpResponse::json(body)
         }
@@ -1184,6 +1194,47 @@ mod tests {
         });
         assert_eq!(ctx.input, serde_json::json!({"q": "2 + 2"}));
         assert_eq!(ctx.metadata["lang"], serde_json::json!("en"));
+    }
+
+    #[test]
+    fn a_test_connection_returns_no_endpoint_body() {
+        use openobserve_core::llm_evaluations::remote_tasks::verify::VerificationReport;
+        let report = VerificationReport {
+            raw_response: "endpoint-body".to_string(),
+            status_code: Some(200),
+            ..Default::default()
+        };
+        for outcome in [
+            VerificationOutcome::Passed(report.clone()),
+            VerificationOutcome::Failed {
+                error: "HTTP 500".to_string(),
+                report,
+            },
+        ] {
+            let (_, _, report) = test_verdict(outcome);
+            let json = serde_json::to_string(&report).unwrap();
+            assert!(!json.contains("endpoint-body"), "{json}");
+        }
+        for (status, want) in [
+            (bench::BenchStatus::Error, Some("endpoint-reason")),
+            (bench::BenchStatus::Skipped, None),
+        ] {
+            let row = test_run_row(bench::BenchRowResult {
+                row_id: "sample-0".to_string(),
+                input: serde_json::json!("hi"),
+                status,
+                parsed_output: None,
+                raw_request: String::new(),
+                raw_response: "endpoint-body".to_string(),
+                http_status: Some(200),
+                latency_ms: 1,
+                attempts: 1,
+                error: Some("endpoint-reason".to_string()),
+            });
+            assert_eq!(row.error.as_deref(), want);
+            let json = serde_json::to_string(&row).unwrap();
+            assert!(!json.contains("endpoint-body"), "{json}");
+        }
     }
 
     #[test]

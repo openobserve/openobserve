@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "Échec de l'initiation de la suppression.",
       "organizationResurrected": "Organisation ressuscitée.",
       "failedToResurrect": "Échec de la résurrection.",
+      "organizationBlocked": "Organisation bloquée.",
+      "failedToBlock": "Échec du blocage.",
+      "organizationUnblocked": "Organisation débloquée.",
+      "failedToUnblock": "Échec du déblocage.",
       "organizationUpdated": "Organisation mise à jour avec succès.",
       "organizationAdded": "Organisation ajoutée avec succès.",
       "requestCompleted": "Requête terminée avec succès.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "{n} jours restants",
     "resurrect": "Restaurer l'organisation",
     "statusActive": "Actif",
-    "statusDeleting": "Suppression en cours"
+    "statusDeleting": "Suppression en cours",
+    "statusBlocked": "Bloquée",
+    "block": "Bloquer l'organisation",
+    "unblock": "Débloquer l'organisation",
+    "blockConfirmMessage": "Bloquer {name} ? Elle n'accepte plus l'ingestion, les requêtes ni les connexions jusqu'à son déblocage.",
+    "blockConfirmLabel": "Bloquer"
   },
   "template": {
     "search": "Rechercher un modèle"
@@ -12393,9 +12402,6 @@
     "testErrorClientError": "Erreur du client (4xx). Vérifiez vos informations d'identification et votre configuration.",
     "testErrorServerError": "Erreur serveur (5xx). Le service de destination rencontre des problèmes.",
     "viewDetails": "Afficher les détails",
-    "error": "Erreur",
-    "httpStatus": "État HTTP",
-    "responseBody": "Organisme de réponse",
     "retry": "Réessayez",
     "suggestCheckUrl": "Vérifiez que l'URL du webhook est correcte et accessible.",
     "suggestCheckFirewall": "Vérifiez vos paramètres de pare-feu et assurez-vous que le service de destination est accessible.",
@@ -14193,7 +14199,6 @@
       "loadFailedTitle": "Impossible de charger cette alerte"
     },
     "timeLabel": "Heure",
-    "unknownHttpStatus": "Inconnu",
     "previewEvaluation": {
       "realTimeReason": "Quand les conditions correspondent",
       "matchingGroup": "groupe correspondant",
@@ -14979,6 +14984,12 @@
       "quickMuteTooltip": "Mise en sourdine rapide depuis une alerte",
       "endedLabel": "terminé"
     },
+    "lease": {
+      "temporary": "Temporaire, créé par {who}, se termine à {time}",
+      "incidentsOn": "Création d'incidents activée par {who} jusqu'à {time}",
+      "incidentsOff": "Création d'incidents désactivée par {who} jusqu'à {time}",
+      "why": "{label}. Raison : {reason}"
+    },
     "ack": {
       "acknowledge": "Prendre en charge",
       "acknowledgeGroups": "Tous les {count} groupe en alerte | Tous les {count} groupes en alerte",
@@ -15608,7 +15619,6 @@
       "hideWebhook": "Masquer l’URL du webhook Slack",
       "slackAppFallback": "Application Slack",
       "previewDisclaimer": "Slack fournit l’icône réelle de l’application et le canal de destination après l’installation.",
-      "successResponseBody": "Réponse de Slack",
       "callbackTitle": "Connexion à Slack",
       "callbackWorking": "Retour à {product}…",
       "callbackError": "Cette connexion à Slack ne peut pas être effectuée. Fermez cette fenêtre et réessayez.",
@@ -16217,6 +16227,36 @@
     "nodesDesc": "Nœuds du cluster et leur état de santé",
     "licenseDesc": "Détails de la licence Enterprise",
     "organizationManagementDesc": "Créer et gérer les organisations",
+    "userManagement": "Gestion des utilisateurs",
+    "userManagementDesc": "Trouver les utilisateurs de toutes les organisations et les bloquer",
+    "userManagementPage": {
+      "subtitle": "Les utilisateurs de toutes les organisations et leur état de blocage SSO",
+      "searchPlaceholder": "Rechercher par e-mail ou ID utilisateur",
+      "allOrganizations": "Toutes les organisations",
+      "filterByOrganization": "Filtrer par organisation",
+      "email": "E-mail",
+      "organizations": "Organisations",
+      "blockState": "État de blocage",
+      "orgCount": "{count} organisation | {count} organisations",
+      "notBlocked": "Non bloqué",
+      "blockedByEmail": "Bloqué par e-mail",
+      "blockedByDomain": "Bloqué par domaine",
+      "block": "Bloquer",
+      "unblock": "Débloquer",
+      "blockConfirmTitle": "Bloquer cet utilisateur ?",
+      "blockConfirmMessage": "{email} est ajouté à la liste de blocage SSO, et les restrictions de domaine sont activées.",
+      "blocked": "{email} est bloqué",
+      "unblocked": "{email} est débloqué",
+      "updateFailed": "Impossible de mettre à jour la liste de blocage SSO",
+      "dormantRules": "Les restrictions de domaine sont désactivées, et les activer appliquerait aussi les règles qu'elles contiennent. Bloquez cet utilisateur depuis {page}.",
+      "detailsTitle": "Détails de l'utilisateur",
+      "userId": "ID utilisateur",
+      "orgId": "ID de l'organisation",
+      "orgName": "Organisation",
+      "role": "Rôle",
+      "noOrganizations": "Membre d'aucune organisation",
+      "ssoOnlyHint": "S'applique lorsque cet e-mail se connecte via SSO"
+    },
     "queryManagement": "Gestion des requêtes",
     "scrapintervalLabel": "Intervalle de grattage (en secondes) *",
     "logoLabel": "Image du logo par glisser-déposer",
@@ -16471,7 +16511,8 @@
       "noEmails": "Aucune adresse e-mail listée pour l'instant.",
       "removeDomain": "Supprimer {domain}",
       "removeEmail": "Supprimer {email}",
-      "saved": "Réglages SSO enregistrés"
+      "saved": "Réglages SSO enregistrés",
+      "blocksRemovedKeepsAllowRule": "Blocages supprimés. {domain} conserve sa règle d'autorisation."
     },
     "general": {
       "close": "Fermer",
@@ -20156,7 +20197,6 @@
         "latency": "Latence",
         "output": "Sortie extraite",
         "rawRequest": "Requête envoyée",
-        "rawResponse": "Réponse reçue",
         "idle": "La requête et la réponse apparaissent ici une fois que vous exécutez un test.",
         "disabledHint": "Saisissez d'abord le nom et le point de terminaison.",
         "failure": {
@@ -23833,6 +23873,7 @@
       "llmProviders": "Fournisseurs de LLM",
       "aiToolsets": "Ensembles d'outils d'IA",
       "orgManagement": "Gestion de l'organisation",
+      "userManagement": "Gestion des utilisateurs",
       "rumErrors": "RUM — Suivi des erreurs",
       "rumSessions": "{product} — Sessions",
       "sourceMaps": "RUM — Cartes des sources",
@@ -23950,6 +23991,7 @@
       "llmProvidersRefresh": "Actualiser la liste",
       "aiToolsetsRefresh": "Actualiser la liste",
       "orgManagementRefresh": "Actualiser la liste",
+      "userManagementRefresh": "Actualiser la liste",
       "rumErrorsRefresh": "Actualiser la liste",
       "rumErrorsCopyUrl": "Copier l'URL de partage du suivi des erreurs",
       "rumSessionsRefresh": "Actualiser la liste",

@@ -138,13 +138,18 @@ class MonacoEditorHelper {
             if (act === 'select-all') {
                 editor.focus();
                 editor.setSelection(editor.getModel().getFullModelRange());
+                return editor.hasTextFocus();
             }
             return editor.getValue();
         }, action);
         // The keyboard select-all can miss the editor's input, so the selection goes through the editor; the text is still typed.
         await expect.poll(async () => {
             if ((await editorCall('read')) === content) return true;
-            await editorCall('select-all');
+            if (!(await editorCall('select-all'))) {
+                // Keys typed outside the editor hit page shortcuts (bare "s" opens Save View on logs).
+                await this.focus(container);
+                if (!(await editorCall('select-all'))) return false;
+            }
             await this.page.keyboard.press('Backspace');
             await this.page.keyboard.type(content);
             return (await editorCall('read')) === content;

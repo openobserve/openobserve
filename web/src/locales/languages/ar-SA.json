@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "فشل في بدء الحذف.",
       "organizationResurrected": "المؤسسة أعيد إحياؤها.",
       "failedToResurrect": "فشلت في الإحياء.",
+      "organizationBlocked": "تم حظر المؤسسة.",
+      "failedToBlock": "فشل الحظر.",
+      "organizationUnblocked": "تم إلغاء حظر المؤسسة.",
+      "failedToUnblock": "فشل إلغاء الحظر.",
       "organizationUpdated": "تم تحديث المؤسسة بنجاح.",
       "organizationAdded": "أضاف المؤسسة بنجاح.",
       "requestCompleted": "تم الانتهاء من الطلب بنجاح.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "الأيام المتبقية: {n}",
     "resurrect": "مؤسسة الإحياء",
     "statusActive": "نشط",
-    "statusDeleting": "جارٍ الحذف"
+    "statusDeleting": "جارٍ الحذف",
+    "statusBlocked": "محظورة",
+    "block": "حظر المؤسسة",
+    "unblock": "إلغاء حظر المؤسسة",
+    "blockConfirmMessage": "حظر {name}؟ لن تقبل المؤسسة استيعاب البيانات أو الاستعلامات أو تسجيلات الدخول حتى يُلغى حظرها.",
+    "blockConfirmLabel": "حظر"
   },
   "template": {
     "search": "البحث في القوالب"
@@ -12393,9 +12402,6 @@
     "testErrorClientError": "خطأ في العميل (4xx). يرجى التحقق من بيانات الاعتماد والإعدادات الخاصة بك.",
     "testErrorServerError": "خطأ في الخادم (5xx). خدمة الوجهة تواجه مشاكل.",
     "viewDetails": "عرض التفاصيل",
-    "error": "خطأ",
-    "httpStatus": "حالة HTTP",
-    "responseBody": "جسم الاستجابة",
     "retry": "إعادة المحاولة",
     "suggestCheckUrl": "يرجى التأكد من صحة رابط webhook وإمكانية الوصول إليه.",
     "suggestCheckFirewall": "تحقق من إعدادات جدار الحماية وتأكد من أن خدمة الوجهة متاحة.",
@@ -14193,7 +14199,6 @@
       "loadFailedTitle": "تعذر تحميل هذا التنبيه"
     },
     "timeLabel": "الوقت",
-    "unknownHttpStatus": "غير معروف",
     "previewEvaluation": {
       "realTimeReason": "عندما تتطابق الظروف",
       "matchingGroup": "مجموعة المطابقة",
@@ -14979,6 +14984,12 @@
       "quickMuteTooltip": "كتم سريع من التنبيه",
       "endedLabel": "انتهى"
     },
+    "lease": {
+      "temporary": "مؤقت، أنشأه {who}، ينتهي في {time}",
+      "incidentsOn": "تم تشغيل إنشاء الحوادث بواسطة {who} حتى {time}",
+      "incidentsOff": "تم إيقاف إنشاء الحوادث بواسطة {who} حتى {time}",
+      "why": "{label}. السبب: {reason}"
+    },
     "ack": {
       "acknowledge": "تأكيد الاستلام",
       "acknowledgeGroups": "كل {count} مجموعة قيد الإطلاق | كل {count} مجموعات قيد الإطلاق",
@@ -15608,7 +15619,6 @@
       "hideWebhook": "إخفاء عنوان webhook الخاص بـ Slack",
       "slackAppFallback": "تطبيق Slack",
       "previewDisclaimer": "يوفّر Slack أيقونة التطبيق الفعلية وقناة الوجهة بعد التثبيت.",
-      "successResponseBody": "استجابة Slack",
       "callbackTitle": "جارٍ ربط Slack",
       "callbackWorking": "جارٍ الرجوع إلى {product}…",
       "callbackError": "لا يمكن إكمال ربط Slack هذا. أغلق هذه النافذة ثم أعد المحاولة.",
@@ -16217,6 +16227,36 @@
     "nodesDesc": "عقد العنقود وصحتها",
     "licenseDesc": "تفاصيل ترخيص المؤسسات",
     "organizationManagementDesc": "إنشاء وإدارة المؤسسات",
+    "userManagement": "إدارة المستخدمين",
+    "userManagementDesc": "ابحث عن المستخدمين في كل المؤسسات واحظرهم",
+    "userManagementPage": {
+      "subtitle": "مستخدمو كل المؤسسات وحالة حظر SSO الخاصة بهم",
+      "searchPlaceholder": "البحث بالبريد الإلكتروني أو معرّف المستخدم",
+      "allOrganizations": "كل المؤسسات",
+      "filterByOrganization": "التصفية حسب المؤسسة",
+      "email": "البريد الإلكتروني",
+      "organizations": "المؤسسات",
+      "blockState": "حالة الحظر",
+      "orgCount": "{count} مؤسسة | {count} مؤسسات",
+      "notBlocked": "غير محظور",
+      "blockedByEmail": "محظور بالبريد الإلكتروني",
+      "blockedByDomain": "محظور بالنطاق",
+      "block": "حظر",
+      "unblock": "إلغاء الحظر",
+      "blockConfirmTitle": "هل تريد حظر هذا المستخدم؟",
+      "blockConfirmMessage": "ستتم إضافة {email} إلى قائمة حظر SSO، وسيتم تشغيل قيود النطاقات.",
+      "blocked": "تم حظر {email}",
+      "unblocked": "تم إلغاء حظر {email}",
+      "updateFailed": "تعذّر تحديث قائمة حظر SSO",
+      "dormantRules": "قيود النطاقات متوقفة، وتشغيلها سيطبّق أيضًا القواعد المحفوظة فيها. احظر هذا المستخدم من {page}.",
+      "detailsTitle": "تفاصيل المستخدم",
+      "userId": "معرّف المستخدم",
+      "orgId": "معرّف المؤسسة",
+      "orgName": "المؤسسة",
+      "role": "الدور",
+      "noOrganizations": "ليس عضوًا في أي مؤسسة",
+      "ssoOnlyHint": "يُطبَّق عند تسجيل دخول هذا البريد الإلكتروني عبر SSO"
+    },
     "queryManagement": "إدارة الاستعلامات",
     "scrapintervalLabel": "فترة الخدش (بثوان) *",
     "logoLabel": "اسحب صورة الشعار وأفلتها",
@@ -16471,7 +16511,8 @@
       "noEmails": "لا توجد عناوين بريد إلكتروني مدرجة بعد.",
       "removeDomain": "إزالة {domain}",
       "removeEmail": "إزالة {email}",
-      "saved": "تم حفظ إعدادات SSO"
+      "saved": "تم حفظ إعدادات SSO",
+      "blocksRemovedKeepsAllowRule": "تمت إزالة الحظر. يحتفظ {domain} بقاعدة السماح الخاصة به."
     },
     "general": {
       "close": "إغلاق",
@@ -20156,7 +20197,6 @@
         "latency": "زمن الاستجابة",
         "output": "المخرجات المستخرجة",
         "rawRequest": "تم إرسال الطلب",
-        "rawResponse": "الرد الموصول",
         "idle": "الطلب والرد يظهران هنا بعد إجراء اختبار.",
         "disabledHint": "املأ الاسم ونقطة النهاية أولا.",
         "failure": {
@@ -23833,6 +23873,7 @@
       "llmProviders": "مزودو LLM",
       "aiToolsets": "مجموعات أدوات الذكاء الاصطناعي",
       "orgManagement": "إدارة المؤسسة",
+      "userManagement": "إدارة المستخدمين",
       "rumErrors": "RUM — تتبع الأخطاء",
       "rumSessions": "{product} — الجلسات",
       "sourceMaps": "RUM — خرائط المصدر",
@@ -23950,6 +23991,7 @@
       "llmProvidersRefresh": "تحديث القائمة",
       "aiToolsetsRefresh": "تحديث القائمة",
       "orgManagementRefresh": "تحديث القائمة",
+      "userManagementRefresh": "تحديث القائمة",
       "rumErrorsRefresh": "تحديث القائمة",
       "rumErrorsCopyUrl": "نسخ رابط مشاركة تتبع الأخطاء",
       "rumSessionsRefresh": "تحديث القائمة",
