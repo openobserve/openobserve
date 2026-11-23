@@ -16,10 +16,8 @@ const {
   SERVICE_GRAPH_READY_FLOOR_MS,
 } = require('../utils/service-graph-ingestion.js');
 const { ingestOtlpTraces, deleteStream, stringAttr } = require('../utils/traces-api.js');
-const { isCloudEnvironment } = require('../utils/cloud-auth.js');
 
-// The shared Cloud daemon can lag far past the floor; the PR gate cannot wait that long within its globalTimeout.
-const SERVICE_GRAPH_WAIT_MS = isCloudEnvironment() ? 25 * 60 * 1000 : SERVICE_GRAPH_READY_FLOOR_MS + 120000;
+const SERVICE_GRAPH_WAIT_MS = SERVICE_GRAPH_READY_FLOOR_MS + 120000;
 
 // Same scale as the node border, catalog row and side panel: Healthy < 1%, Degraded 1-5%, Warning >5-10%, Critical > 10%.
 const expectedHealth = (errorRate) => {
