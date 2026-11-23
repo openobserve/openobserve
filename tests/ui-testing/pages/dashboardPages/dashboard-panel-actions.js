@@ -1224,6 +1224,64 @@ export default class DashboardactionPage {
     return stage;
   }
 
+  // A box plot is canvas-painted: read its categories, five-number boxes and outlier points off the live
+  // instance. Each box's page position is its median, which always lies inside the drawn box.
+  async getBoxplotState(scopeSelector = this.chartRendererSelector) {
+    return this._withLiveCharts(scopeSelector, (findCharts, { scopeSel }) => {
+      const found = findCharts(scopeSel)
+        .map(({ chart }) => chart)
+        .find((chart) => {
+          try {
+            return (chart.getOption()?.series ?? []).some((s) => s.type === "boxplot");
+          } catch {
+            return false; // A disposed instance throws.
+          }
+        });
+      if (!found) return null;
+
+      const option = found.getOption();
+      const boxSeries = option.series.find((s) => s.type === "boxplot");
+      const boxSeriesIndex = option.series.indexOf(boxSeries);
+      const outlierSeries = option.series.find((s) => s.type === "scatter");
+      const categories = (option.xAxis?.[0]?.data ?? []).map((c) => String(c?.value ?? c));
+      const rect = found.getDom().getBoundingClientRect();
+      const boxes = (boxSeries.data ?? []).map((item, i) => {
+        const [low, q1, median, q3, high] = (item?.value ?? item).map(Number);
+        const [px, py] = found.convertToPixel({ seriesIndex: boxSeriesIndex }, [i, median]) ?? [NaN, NaN];
+        return { name: categories[i], low, q1, median, q3, high, x: rect.left + px, y: rect.top + py };
+      });
+      return {
+        seriesName: boxSeries.name ?? null,
+        categories,
+        boxes,
+        outliers: (outlierSeries?.data ?? []).map((d) => (d?.value ?? d).map(Number)),
+        legendShown: Boolean(option.legend?.[0]?.show),
+      };
+    });
+  }
+
+  /** Poll until a box plot draws at least `minBoxes` boxes, and return its state. */
+  async waitForBoxplot(minBoxes = 1, timeout = 20000) {
+    let state = null;
+    await expect
+      .poll(async () => {
+        state = await this.getBoxplotState();
+        return state?.boxes?.length ?? 0;
+      }, { timeout, message: `box plot never drew ${minBoxes} box(es)` })
+      .toBeGreaterThanOrEqual(minBoxes);
+    return state;
+  }
+
+  /** Click the box of the given category (the first box when omitted) and return it. */
+  async clickBoxplotBox(name) {
+    const state = await this.waitForBoxplot();
+    const box = name ? state.boxes.find((b) => b.name === name) : state.boxes[0];
+    if (!box) throw new Error(`No box named "${name}" in ${JSON.stringify(state.categories)}`);
+    await this.page.mouse.move(box.x, box.y);
+    await this.page.mouse.click(box.x, box.y);
+    return box;
+  }
+
   async getGaugeLayoutProblems(expected = {}, scopeSelector = this.chartRendererSelector) {
     const charts = await this.getChartOptionSnapshots(scopeSelector);
     if (charts.length !== 1) return [`expected one rendered chart, found ${charts.length}`];
