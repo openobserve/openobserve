@@ -2282,9 +2282,8 @@ async function waitForServiceGraphData(page, {
   const baseUrl = getBaseUrl();
   const orgId = getOrgId();
   const startTime = Date.now();
-  let lastEdgeCount = 0;
-  let lastMeta = null;
-  let lastStatus = null;
+  let lastReply = 'no topology reply parsed';
+  let lastPoll = 'none';
 
   while (Date.now() - startTime < maxWaitMs) {
     try {
@@ -2293,12 +2292,15 @@ async function waitForServiceGraphData(page, {
         { headers }
       );
 
-      lastStatus = response.status();
-      if (lastStatus === 200) {
+      lastPoll = `HTTP ${response.status()}`;
+      if (response.status() === 200) {
         const data = await response.json().catch(() => null);
         const edges = data?.edges || data?.data?.edges || [];
-        lastEdgeCount = edges.length;
-        lastMeta = data?.meta || data?.data?.meta || null;
+        if (data) {
+          lastReply = `last parsed reply had ${edges.length} of ${expectedMinEdges} edges, meta ${JSON.stringify(data.meta ?? data.data?.meta)}`;
+        } else {
+          lastPoll += ' with an unparseable body';
+        }
 
         if (edges.length >= expectedMinEdges) {
           testLogger.info('Service graph data available', {
@@ -2314,13 +2316,14 @@ async function waitForServiceGraphData(page, {
         });
       }
     } catch (e) {
+      lastPoll = `error ${e.message}`;
       testLogger.debug('Service graph poll error', { error: e.message });
     }
 
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }
 
-  const reason = `${lastEdgeCount} of ${expectedMinEdges} edges ${Math.round((Date.now() - startTime) / 1000)} s after ingest (last HTTP ${lastStatus}, last meta ${JSON.stringify(lastMeta)})`;
+  const reason = `waited ${Math.round((Date.now() - startTime) / 1000)} s; ${lastReply}; last poll: ${lastPoll}`;
   testLogger.warn('Service graph poll timed out', { maxWaitMs, reason });
   return { success: false, edges: [], waitedMs: maxWaitMs, reason };
 }
@@ -2422,7 +2425,7 @@ async function getTopology(page) {
 async function countTopologyNodes(page) {
   const topoResult = await getTopology(page);
   const topoData = topoResult.data?.nodes ? topoResult.data : topoResult.data?.data;
-  testLogger.info(`Topology available: ${topoData?.nodes?.length || 0} nodes, ${topoData?.edges?.length || 0} edges`);
+  testLogger.info(`Topology check (HTTP ${topoResult.status}): ${topoData?.nodes?.length || 0} nodes, ${topoData?.edges?.length || 0} edges`);
   return topoData?.nodes?.length || 0;
 }
 

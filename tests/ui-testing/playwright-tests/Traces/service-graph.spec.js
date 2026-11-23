@@ -13,11 +13,13 @@ const {
   ingestTraces,
   waitForServiceGraphData,
   countTopologyNodes,
+  SERVICE_GRAPH_READY_FLOOR_MS,
 } = require('../utils/service-graph-ingestion.js');
 const { ingestOtlpTraces, deleteStream, stringAttr } = require('../utils/traces-api.js');
+const { isCloudEnvironment } = require('../utils/cloud-auth.js');
 
-// Alpha shows edges 12-15 min after ingest on good nights; a slow night had none at 12.6 min and all of them by 23 min.
-const SERVICE_GRAPH_WAIT_MS = 25 * 60 * 1000;
+// The shared Cloud daemon can lag far past the floor; the PR gate cannot wait that long within its globalTimeout.
+const SERVICE_GRAPH_WAIT_MS = isCloudEnvironment() ? 25 * 60 * 1000 : SERVICE_GRAPH_READY_FLOOR_MS + 120000;
 
 // Same scale as the node border, catalog row and side panel: Healthy < 1%, Degraded 1-5%, Warning >5-10%, Critical > 10%.
 const expectedHealth = (errorRate) => {
@@ -32,7 +34,7 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
 
   let pm;
   let topologyEmpty = false;
-  let topologyEmptyReason = 'the node count was 0 after the edge wait succeeded';
+  let topologyEmptyReason = 'the edge wait succeeded but the node check returned 0 (an API error also reads as 0)';
 
   test.beforeAll(async ({ browser }, testInfo) => {
     test.setTimeout(SERVICE_GRAPH_WAIT_MS + 180000);
@@ -47,7 +49,7 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
       if (fs.existsSync(emptyTopologyMarker)) {
         testLogger.info('=== SERVICE GRAPH SETUP: an earlier wait timed out; checking once ===');
         topologyEmpty = (await countTopologyNodes(page)) === 0;
-        topologyEmptyReason = `an earlier wait ended with ${fs.readFileSync(emptyTopologyMarker, 'utf8')}, and one more check found 0 nodes`;
+        topologyEmptyReason = `an earlier wait timed out: ${fs.readFileSync(emptyTopologyMarker, 'utf8')}; one more node check returned 0 (an API error also reads as 0)`;
         return;
       }
 

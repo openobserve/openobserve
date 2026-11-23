@@ -6,14 +6,9 @@ const { waitForDashboardPage, deleteDashboard } = require('../Dashboards/utils/d
 const { settlePanelLeave } = require('../../pages/dashboardPages/panel-leave-dialog.js');
 
 
-/**
- * A metric ensureMetricsIngested() seeds, so it always has points in the last
- * 15 minutes and label values to filter on. The tests that assert the chart
- * renders DATA pin themselves to it: the metric the page auto-selects is
- * whichever stream sorts first in the org, which is routinely one another suite
- * left behind — present in the schema, empty in the window.
- */
+// The metric the page auto-selects is whichever sorts first in the org, which is routinely empty in the window.
 const SEEDED_METRIC = 'cpu_usage';
+const SEEDED_LABELS = ['instance', 'node', 'region'];
 
 test.describe("Metrics PromQL Builder Mode testcases", () => {
   test.beforeAll(async () => {
@@ -42,6 +37,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       // Picking a metric re-seeds its default operations.
       expect(await pm.metricsBuilderPage.clearOperations()).toBe(0);
       expect(await pm.metricsBuilderPage.getStreamSelectedValue()).toBe(metric);
+      await pm.metricsBuilderPage.waitForLabelsListed(SEEDED_LABELS);
     }
 
     testLogger.info('Test setup completed - navigated to metrics page');
@@ -181,43 +177,39 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await builder.clickAddLabelFilter();
     expect(await builder.getLabelFilterCount()).toBe(initialCount);
     const firstLabel = await builder.firstOptionKey();
+    expect(firstLabel, `no labels listed for metric ${SEEDED_METRIC}`).not.toBe('');
     testLogger.info(`First label: ${firstLabel}`);
 
-    if (firstLabel) {
-      // 3. Picking a label lists PromQL's matchers, plus IN / NOT IN written as an alternation
-      await builder.getLabelFilterOption(firstLabel).click();
-      for (const id of ['eq', 'neq', 'regex', 'not_regex', 'in', 'not_in']) {
-        await expect(builder.getLabelFilterOption(id)).toBeVisible({ timeout: 5000 });
-      }
-      testLogger.info('Operators verified: =, !=, =~, !~, IN, NOT IN');
-
-      // 4. "=" then the first loaded value completes the chip
-      await builder.selectOperator('=');
-      const firstValue = await builder.selectFirstLabelValue(firstLabel);
-      await builder.labelBuilder.close();
-      expect(await builder.getLabelFilterCount()).toBe(initialCount + 1);
-      const chipText = await builder.getLabelFilterText(0);
-      expect(chipText).toContain(firstLabel);
-      if (firstValue) expect(chipText).toContain(firstValue);
-      testLogger.info(`Chip text: "${chipText}"`);
-
-      // 5. A regex value is typed, not picked
-      await builder.addCompleteLabelFilter(firstLabel, '=~', '.+');
-      await builder.addCompleteLabelFilter(firstLabel, '!~', 'zz.*');
-      expect(await builder.getLabelFilterCount()).toBe(initialCount + 3);
-      expect(await builder.getLabelFilterText(1)).toContain('.+');
-      testLogger.info('Added 2 typed regex matchers, total: ' + (initialCount + 3));
-
-      // 6. Remove all filters
-      await builder.removeLabelFilter(2);
-      await builder.removeLabelFilter(1);
-      await builder.removeLabelFilter(0);
-      expect(await builder.getLabelFilterCount()).toBe(0);
-      testLogger.info('All filters removed');
-    } else {
-      await builder.labelBuilder.close();
-      testLogger.warn('No labels available');
+    // 3. Picking a label lists PromQL's matchers, plus IN / NOT IN written as an alternation
+    await builder.getLabelFilterOption(firstLabel).click();
+    for (const id of ['eq', 'neq', 'regex', 'not_regex', 'in', 'not_in']) {
+      await expect(builder.getLabelFilterOption(id)).toBeVisible({ timeout: 5000 });
     }
+    testLogger.info('Operators verified: =, !=, =~, !~, IN, NOT IN');
+
+    // 4. "=" then the first loaded value completes the chip
+    await builder.selectOperator('=');
+    const firstValue = await builder.selectFirstLabelValue(firstLabel);
+    await builder.labelBuilder.close();
+    expect(await builder.getLabelFilterCount()).toBe(initialCount + 1);
+    const chipText = await builder.getLabelFilterText(0);
+    expect(chipText).toContain(firstLabel);
+    expect(chipText).toContain(firstValue);
+    testLogger.info(`Chip text: "${chipText}"`);
+
+    // 5. A regex value is typed, not picked
+    await builder.addCompleteLabelFilter(firstLabel, '=~', '.+');
+    await builder.addCompleteLabelFilter(firstLabel, '!~', 'zz.*');
+    expect(await builder.getLabelFilterCount()).toBe(initialCount + 3);
+    expect(await builder.getLabelFilterText(1)).toContain('.+');
+    testLogger.info('Added 2 typed regex matchers, total: ' + (initialCount + 3));
+
+    // 6. Remove all filters
+    await builder.removeLabelFilter(2);
+    await builder.removeLabelFilter(1);
+    await builder.removeLabelFilter(0);
+    expect(await builder.getLabelFilterCount()).toBe(0);
+    testLogger.info('All filters removed');
   });
 
   // =========================================================================
@@ -464,10 +456,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const pm = await setupTest(page, testInfo, { metric: SEEDED_METRIC });
     const builder = pm.metricsBuilderPage;
 
-    // 1. Verify builder mode + metric pre-selected
+    // 1. Verify builder mode + seeded metric
     expect(await builder.isModeSelected('builder')).toBe(true);
-    expect((await builder.getStreamSelectedValue()).length).toBeGreaterThan(0);
-    testLogger.info('Builder mode active, metric pre-selected');
+    expect(await builder.getStreamSelectedValue()).toBe(SEEDED_METRIC);
+    testLogger.info('Builder mode active, seeded metric selected');
 
     // 2. Set time range
     await pm.metricsPage.openDatePicker();
@@ -730,15 +722,11 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
   test("P1: E2E - build complete query (label filter + Sum + options), verify builder state and table chart", {
     tag: ['@metrics', '@builder', '@e2e', '@P1', '@all']
   }, async ({ page }, testInfo) => {
-    const pm = await setupTest(page, testInfo);
+    const pm = await setupTest(page, testInfo, { metric: SEEDED_METRIC });
     const builder = pm.metricsBuilderPage;
 
-    // 1. Verify builder mode, then pin to the seeded metric — see SEEDED_METRIC.
+    // 1. Verify builder mode + seeded metric
     expect(await builder.isModeSelected('builder')).toBe(true);
-    expect(await builder.selectMetric(SEEDED_METRIC)).toBe(true);
-    // Picking a metric re-seeds its default operations; start from an empty list
-    // again, exactly as setupTest does.
-    expect(await builder.clearOperations()).toBe(0);
     const metricName = await builder.getStreamSelectedValue();
     expect(metricName).toBe(SEEDED_METRIC);
     testLogger.info(`Metric: ${metricName}`);
@@ -752,17 +740,11 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const added = await builder.addFirstLabelFilter();
     const selectedLabel = added.label;
     const selectedValue = added.value;
-    if (selectedLabel) {
-      expect(await builder.getLabelFilterCount()).toBe(1);
-      const chipText = await builder.getLabelFilterText(0);
-      expect(chipText).toContain(selectedLabel);
-      if (selectedValue) {
-        expect(chipText).toContain(selectedValue);
-      }
-      testLogger.info(`Filter chip: "${chipText}"`);
-    } else {
-      testLogger.info('No labels available, continuing without label filter config');
-    }
+    expect(await builder.getLabelFilterCount()).toBe(1);
+    const chipText = await builder.getLabelFilterText(0);
+    expect(chipText).toContain(selectedLabel);
+    expect(chipText).toContain(selectedValue);
+    testLogger.info(`Filter chip: "${chipText}"`);
 
     // 4. Add Sum operation (aggregation)
     expect(await builder.addOperation('Sum')).toBe(true);
@@ -770,32 +752,30 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Sum operation added');
 
     // 5. Configure Sum operation's label parameter (select the same label for "by" clause)
-    if (selectedLabel) {
-      // OperationsList chip menu = ODropdown post-migration
-      const opBtn = builder.getOperationButton(0);
-      await opBtn.click();
-      await builder.getOperationMenu(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    // OperationsList chip menu = ODropdown post-migration
+    const opBtn = builder.getOperationButton(0);
+    await opBtn.click();
+    await builder.getOperationMenu(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
-      // Find the multi-select param for labels (type="select" in the operation menu)
-      // Inside the chip menu the param is OSelect (Reka Listbox)
-      const labelParam = builder.getOperationParam(0);
-      if (await labelParam.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await labelParam.click();
-        await builder.getOperationParamPopover(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    // Find the multi-select param for labels (type="select" in the operation menu)
+    // Inside the chip menu the param is OSelect (Reka Listbox)
+    const labelParam = builder.getOperationParam(0);
+    if (await labelParam.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await labelParam.click();
+      await builder.getOperationParamPopover(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
-        // Select the label from the dropdown
-        const paramOption = builder.getOperationParamOptionByValue(0, selectedLabel);
-        if (await paramOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await paramOption.click();
-          await builder.getOperationParamPopover(0).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-          testLogger.info(`Sum operation: selected label "${selectedLabel}" for by clause`);
-        }
+      // Select the label from the dropdown
+      const paramOption = builder.getOperationParamOptionByValue(0, selectedLabel);
+      if (await paramOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await paramOption.click();
+        await builder.getOperationParamPopover(0).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        testLogger.info(`Sum operation: selected label "${selectedLabel}" for by clause`);
       }
-
-      // Close the operation menu
-      await page.keyboard.press('Escape');
-      await builder.getOperationMenu(0).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
+
+    // Close the operation menu
+    await page.keyboard.press('Escape');
+    await builder.getOperationMenu(0).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
 
     // 6. Set options: legend and step
     await builder.setLegend('{__hash__}');
@@ -809,19 +789,15 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     expect(builderState.metric.toLowerCase()).toContain(metricName.toLowerCase());
 
     // Assert label filter chip shows selected label
-    if (selectedLabel) {
-      expect(builderState.labelFilters.length).toBe(1);
-      expect(builderState.labelFilters[0]).toContain(selectedLabel);
-    }
+    expect(builderState.labelFilters.length).toBe(1);
+    expect(builderState.labelFilters[0]).toContain(selectedLabel);
 
     // Assert operation chip shows Sum (possibly with label param like "Sum(environment)")
     expect(builderState.operations.length).toBe(1);
     expect(builderState.operations[0].toLowerCase()).toContain('sum');
-    if (selectedLabel) {
-      // Operation chip should show the label param, e.g. "Sum(environment)"
-      expect(builderState.operations[0]).toContain(selectedLabel);
-      testLogger.info(`Operation chip: "${builderState.operations[0]}"`);
-    }
+    // Operation chip should show the label param, e.g. "Sum(environment)"
+    expect(builderState.operations[0]).toContain(selectedLabel);
+    testLogger.info(`Operation chip: "${builderState.operations[0]}"`);
 
     // Assert legend option
     expect(builderState.legend).toBe('{__hash__}');
@@ -838,17 +814,13 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     // Assert the API query contains expected components
     expect(capturedQuery.toLowerCase()).toContain(metricName.toLowerCase());
     expect(capturedQuery.toLowerCase()).toContain('sum');
-    if (selectedLabel && selectedValue) {
-      // Query should have label filter syntax: {label="value"}
-      expect(capturedQuery).toContain(selectedLabel);
-      expect(capturedQuery).toContain(selectedValue);
-      testLogger.info(`API query contains: ${selectedLabel}="${selectedValue}"`);
-    }
-    if (selectedLabel) {
-      // Query should have "by (label)" for Sum aggregation
-      expect(capturedQuery.toLowerCase()).toContain('by');
-      testLogger.info('API query contains "by" clause for Sum aggregation');
-    }
+    // Query should have label filter syntax: {label="value"}
+    expect(capturedQuery).toContain(selectedLabel);
+    expect(capturedQuery).toContain(selectedValue);
+    testLogger.info(`API query contains: ${selectedLabel}="${selectedValue}"`);
+    // Query should have "by (label)" for Sum aggregation
+    expect(capturedQuery.toLowerCase()).toContain('by');
+    testLogger.info('API query contains "by" clause for Sum aggregation');
 
     // 10. Verify still in Builder mode (no mode switch happened)
     expect(await builder.isModeSelected('builder')).toBe(true);
@@ -893,15 +865,11 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
   test("P2: E2E - label filter + Sum with by-label, verify query built correctly and table renders data", {
     tag: ['@metrics', '@builder', '@e2e', '@P2', '@all']
   }, async ({ page }, testInfo) => {
-    const pm = await setupTest(page, testInfo);
+    const pm = await setupTest(page, testInfo, { metric: SEEDED_METRIC });
     const builder = pm.metricsBuilderPage;
 
-    // 1. Verify builder mode, then pin to the seeded metric — see SEEDED_METRIC.
+    // 1. Verify builder mode + seeded metric
     expect(await builder.isModeSelected('builder')).toBe(true);
-    expect(await builder.selectMetric(SEEDED_METRIC)).toBe(true);
-    // Picking a metric re-seeds its default operations; start from an empty list
-    // again, exactly as setupTest does.
-    expect(await builder.clearOperations()).toBe(0);
     const metricName = await builder.getStreamSelectedValue();
     expect(metricName).toBe(SEEDED_METRIC);
     testLogger.info(`Metric: ${metricName}`);
@@ -914,17 +882,11 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const added = await builder.addFirstLabelFilter();
     const selectedLabel = added.label;
     const selectedValue = added.value;
-    if (selectedLabel) {
-      expect(await builder.getLabelFilterCount()).toBe(1);
-      const chipText = await builder.getLabelFilterText(0);
-      expect(chipText).toContain(selectedLabel);
-      if (selectedValue) {
-        expect(chipText).toContain(selectedValue);
-      }
-      testLogger.info(`Filter chip: "${chipText}"`);
-    } else {
-      testLogger.info('No labels available, continuing without label filter config');
-    }
+    expect(await builder.getLabelFilterCount()).toBe(1);
+    const chipText = await builder.getLabelFilterText(0);
+    expect(chipText).toContain(selectedLabel);
+    expect(chipText).toContain(selectedValue);
+    testLogger.info(`Filter chip: "${chipText}"`);
 
     // 4. Add Sum operation
     expect(await builder.addOperation('Sum')).toBe(true);
@@ -932,28 +894,26 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Sum operation added');
 
     // 5. Configure Sum's "by" label parameter
-    if (selectedLabel) {
-      // OperationsList chip menu = ODropdown post-migration
-      const opBtn = builder.getOperationButton(0);
-      await opBtn.click();
-      await builder.getOperationMenu(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    // OperationsList chip menu = ODropdown post-migration
+    const opBtn = builder.getOperationButton(0);
+    await opBtn.click();
+    await builder.getOperationMenu(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
-      const labelParam = builder.getOperationParam(0);
-      if (await labelParam.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await labelParam.click();
-        // Inside the chip menu the param is an OSelect (Reka Listbox)
-        await builder.getOperationParamPopover(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    const labelParam = builder.getOperationParam(0);
+    if (await labelParam.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await labelParam.click();
+      // Inside the chip menu the param is an OSelect (Reka Listbox)
+      await builder.getOperationParamPopover(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
-        const paramOption = builder.getOperationParamOptionByValue(0, selectedLabel);
-        if (await paramOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await paramOption.click();
-          await builder.getOperationParamPopover(0).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-          testLogger.info(`Sum by: ${selectedLabel}`);
-        }
+      const paramOption = builder.getOperationParamOptionByValue(0, selectedLabel);
+      if (await paramOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await paramOption.click();
+        await builder.getOperationParamPopover(0).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        testLogger.info(`Sum by: ${selectedLabel}`);
       }
-      await page.keyboard.press('Escape');
-      await builder.getOperationMenu(0).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
+    await page.keyboard.press('Escape');
+    await builder.getOperationMenu(0).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
 
     // 6. Verify builder state — all assertions in Builder mode
     const builderState = await builder.verifyBuilderState();
@@ -963,18 +923,14 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     expect(builderState.metric.toLowerCase()).toContain(metricName.toLowerCase());
 
     // Label filter chip present with label name
-    if (selectedLabel) {
-      expect(builderState.labelFilters.length).toBe(1);
-      expect(builderState.labelFilters[0]).toContain(selectedLabel);
-    }
+    expect(builderState.labelFilters.length).toBe(1);
+    expect(builderState.labelFilters[0]).toContain(selectedLabel);
 
     // Operation chip shows "Sum(label)" with the by-label
     expect(builderState.operations.length).toBe(1);
     expect(builderState.operations[0].toLowerCase()).toContain('sum');
-    if (selectedLabel) {
-      expect(builderState.operations[0]).toContain(selectedLabel);
-      testLogger.info(`Operation chip: "${builderState.operations[0]}"`);
-    }
+    expect(builderState.operations[0]).toContain(selectedLabel);
+    testLogger.info(`Operation chip: "${builderState.operations[0]}"`);
     testLogger.info('Builder state verified');
 
     // 7. Switch to table chart
@@ -988,13 +944,9 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     // Assert query structure: sum by (label) (metric{label="value"})
     expect(capturedQuery.toLowerCase()).toContain(metricName.toLowerCase());
     expect(capturedQuery.toLowerCase()).toContain('sum');
-    if (selectedLabel) {
-      expect(capturedQuery).toContain(selectedLabel);
-      expect(capturedQuery.toLowerCase()).toContain('by');
-    }
-    if (selectedValue) {
-      expect(capturedQuery).toContain(selectedValue);
-    }
+    expect(capturedQuery).toContain(selectedLabel);
+    expect(capturedQuery.toLowerCase()).toContain('by');
+    expect(capturedQuery).toContain(selectedValue);
     testLogger.info('API query verified: correct structure');
 
     // 9. Verify still in Builder mode
@@ -1046,10 +998,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const builder = pm.metricsBuilderPage;
     const panelTitle = `test_panel_${Date.now()}`;
 
-    // 1. Verify builder mode and pre-selected metric
+    // 1. Verify builder mode + seeded metric
     expect(await builder.isModeSelected('builder')).toBe(true);
     const metricName = await builder.getStreamSelectedValue();
-    expect(metricName.length).toBeGreaterThan(0);
+    expect(metricName).toBe(SEEDED_METRIC);
     testLogger.info(`Metric: ${metricName}`);
 
     // 2. Set time range
@@ -1060,17 +1012,11 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const added = await builder.addFirstLabelFilter();
     const selectedLabel = added.label;
     const selectedValue = added.value;
-    if (selectedLabel) {
-      expect(await builder.getLabelFilterCount()).toBe(1);
-      const chipText = await builder.getLabelFilterText(0);
-      expect(chipText).toContain(selectedLabel);
-      if (selectedValue) {
-        expect(chipText).toContain(selectedValue);
-      }
-      testLogger.info(`Filter chip: "${chipText}"`);
-    } else {
-      testLogger.info('No labels available, continuing without label filter config');
-    }
+    expect(await builder.getLabelFilterCount()).toBe(1);
+    const chipText = await builder.getLabelFilterText(0);
+    expect(chipText).toContain(selectedLabel);
+    expect(chipText).toContain(selectedValue);
+    testLogger.info(`Filter chip: "${chipText}"`);
 
     // 4. Add Sum operation
     expect(await builder.addOperation('Sum')).toBe(true);
@@ -1078,26 +1024,24 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Sum operation added');
 
     // 5. Configure Sum's "by" label parameter
-    if (selectedLabel) {
-      // OperationsList chip menu = ODropdown post-migration
-      const opBtn = builder.getOperationButton(0);
-      await opBtn.click();
-      await builder.getOperationMenu(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-      const labelParam = builder.getOperationParam(0);
-      if (await labelParam.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await labelParam.click();
-        // Param OSelect (Reka Listbox)
-        await builder.getOperationParamPopover(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        const paramOption = builder.getOperationParamOptionByValue(0, selectedLabel);
-        if (await paramOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await paramOption.click();
-          await builder.getOperationParamPopover(0).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-          testLogger.info(`Sum by: ${selectedLabel}`);
-        }
+    // OperationsList chip menu = ODropdown post-migration
+    const opBtn = builder.getOperationButton(0);
+    await opBtn.click();
+    await builder.getOperationMenu(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    const labelParam = builder.getOperationParam(0);
+    if (await labelParam.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await labelParam.click();
+      // Param OSelect (Reka Listbox)
+      await builder.getOperationParamPopover(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+      const paramOption = builder.getOperationParamOptionByValue(0, selectedLabel);
+      if (await paramOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await paramOption.click();
+        await builder.getOperationParamPopover(0).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        testLogger.info(`Sum by: ${selectedLabel}`);
       }
-      await page.keyboard.press('Escape');
-      await builder.getOperationMenu(0).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
+    await page.keyboard.press('Escape');
+    await builder.getOperationMenu(0).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
 
     // 6. Set options
     await builder.setLegend('{__hash__}');
@@ -1188,15 +1132,11 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     // 12. Verify label filter persisted
     const editFilterCount = await builder.getLabelFilterCount();
     testLogger.info(`Panel editor label filters: ${editFilterCount}`);
-    if (selectedLabel) {
-      expect(editFilterCount).toBeGreaterThanOrEqual(1);
-      const filterText = await builder.getLabelFilterText(0);
-      expect(filterText).toContain(selectedLabel);
-      if (selectedValue) {
-        expect(filterText).toContain(selectedValue);
-      }
-      testLogger.info(`Panel editor filter chip: "${filterText}"`);
-    }
+    expect(editFilterCount).toBeGreaterThanOrEqual(1);
+    const filterText = await builder.getLabelFilterText(0);
+    expect(filterText).toContain(selectedLabel);
+    expect(filterText).toContain(selectedValue);
+    testLogger.info(`Panel editor filter chip: "${filterText}"`);
 
     // 13. Verify operation persisted
     await expect.poll(async () => await builder.getOperationCount(), { timeout: 10000 })
@@ -1206,9 +1146,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     expect(editOpCount).toBe(1);
     const opText = await builder.getOperationText(0);
     expect(opText.toLowerCase()).toContain('sum');
-    if (selectedLabel) {
-      expect(opText).toContain(selectedLabel);
-    }
+    expect(opText).toContain(selectedLabel);
     testLogger.info(`Panel editor operation: "${opText}"`);
 
     // 14. Verify options persisted (legend)

@@ -554,16 +554,24 @@ export class MetricsBuilderPage {
         return value;
     }
 
+    // The picker keeps offering the previous metric's labels until the new metric's schema arrives.
+    async waitForLabelsListed(labels) {
+        await this.clickAddLabelFilter();
+        for (const label of labels) {
+            await expect(this.getLabelFilterOption(label)).toBeVisible({ timeout: 15000 });
+        }
+        await this.labelBuilder.close();
+    }
+
     /**
-     * Add `<first label> <operator> <first value>`; returns the label and value picked (both '' when the metric lists no labels)
+     * Add `<first label> <operator> <first value>`; returns the label and value picked, throws when none are listed
      * @param {string} operator
      */
     async addFirstLabelFilter(operator = '=') {
         await this.clickAddLabelFilter();
         const label = await this.firstOptionKey();
         if (!label) {
-            await this.labelBuilder.close();
-            return { label: '', value: '' };
+            throw new Error(`no labels listed for metric "${await this.getStreamSelectedValue()}"`);
         }
         await this.getLabelFilterOption(label).click();
         await this.selectOperator(operator);
