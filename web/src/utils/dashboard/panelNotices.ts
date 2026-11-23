@@ -19,12 +19,14 @@ import { addCommasToNumber } from "@/utils/formatters";
 import type { RegionJoinInfo } from "./convertMapsData";
 import type { SankeyNotice } from "./convertSankeyData";
 import type { TreemapNotice } from "./convertTreemapData";
+import type { FunnelNotice } from "./convertFunnelData";
 import type { PanelDiagnostics, SeriesLimitInfo } from "./panelDiagnostics";
 
 export type PanelNoticeId =
   | "function-error"
   | "series-cap"
   | "unmatched-regions"
+  | "ignored-queries"
   | "return-links"
   | "skipped-rows"
   | "partial"
@@ -52,6 +54,7 @@ export interface PanelNoticeInput {
   seriesTotalBound?: SeriesTotalBound;
   sankeyNotice?: SankeyNotice | null;
   treemapNotice?: TreemapNotice | null;
+  funnelNotice?: FunnelNotice | null;
   serverPartial?: boolean;
   partialReasons?: string[];
   interrupted?: boolean;
@@ -215,6 +218,21 @@ export const buildPanelNotices = (input: PanelNoticeInput, t: TranslateFn): Pane
 
   if (input.regionJoin) notices.push(unmatchedRegionsNotice(input.regionJoin, t));
 
+  const ignoredQueries =
+    (input.funnelNotice?.ignoredQueries ?? 0) + (input.treemapNotice?.ignoredQueries ?? 0);
+  if (ignoredQueries) {
+    const count = addCommasToNumber(ignoredQueries);
+    notices.push({
+      id: "ignored-queries",
+      tone: "warning",
+      icon: "code-off",
+      chipLabel: t("dashboard.panelErrorButtons.ignoredQueriesChip", { count }, ignoredQueries),
+      title: t("dashboard.panelErrorButtons.ignoredQueriesTitle"),
+      body: t("dashboard.panelErrorButtons.ignoredQueriesBody", { count }, ignoredQueries),
+      details: [],
+    });
+  }
+
   const returnLinks = input.sankeyNotice?.returnLinks ?? 0;
   if (returnLinks) {
     notices.push({
@@ -251,6 +269,18 @@ export const buildPanelNotices = (input: PanelNoticeInput, t: TranslateFn): Pane
       skippedRowsNotice(
         skippedTiles,
         t("dashboard.panelErrorButtons.treemapSkippedRowsBody", { count }, skippedTiles),
+        t,
+      ),
+    );
+  }
+
+  const funnelSkippedRows = input.funnelNotice?.skippedRows ?? 0;
+  if (funnelSkippedRows) {
+    const count = addCommasToNumber(funnelSkippedRows);
+    notices.push(
+      skippedRowsNotice(
+        funnelSkippedRows,
+        t("dashboard.panelErrorButtons.funnelSkippedRowsBody", { count }, funnelSkippedRows),
         t,
       ),
     );
