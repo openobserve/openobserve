@@ -367,6 +367,45 @@ describe("TemplatePreviewPanel", () => {
     expect(note.text()).toBe("1 link is not shown as a button: D");
   });
 
+  it("reads the buttons of a Slack body sent as colored attachments", async () => {
+    const links = ["A", "B", "C", "D"].map((l) => ({ label: l, url: `https://x/${l}` }));
+    vi.spyOn(templateService, "preview").mockResolvedValue(
+      makePreviewResponse({
+        payload: {
+          attachments: [
+            { color: "#E01E5A", blocks: [{ type: "section" }] },
+            {
+              color: "#E01E5A",
+              blocks: [
+                {
+                  type: "actions",
+                  elements: ["A", "B", "C"].map((l) => ({ type: "button", url: `https://x/${l}` })),
+                },
+              ],
+            },
+          ],
+        },
+        preview_model: {
+          title: "Alert fired",
+          body_html: "",
+          fields: [],
+          links,
+          color: "#E01E5A",
+          severity: null,
+          footer: "",
+          footer_label: "",
+          detail: null,
+          chart_placeholder: false,
+        },
+      }) as any,
+    );
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    const note = w.find('[data-test="template-preview-panel-slack-hidden-links"]');
+    expect(note.text()).toBe("1 link is not shown as a button: D");
+  });
+
   it("names an overflow link that repeats the data button URL", async () => {
     const links = ["A", "B", "C"].map((l) => ({ label: l, url: `https://x/${l}` }));
     links.push({ label: "Mine", url: "https://o2.example/short/abc" });

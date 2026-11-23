@@ -201,4 +201,48 @@ test.describe('IAM · Edit Role · scale and layout', { tag: '@enterprise' }, ()
         }
         await page.setViewportSize({ width: 1280, height: 800 });
     });
+
+    test('SC-04 · a stream past the first loaded page is found by the pane search (ENT#386)', {
+        tag: ['@iam', '@iamRolesScale', '@regression', '@P1', '@all']
+    }, async ({ page }) => {
+        test.setTimeout(240000);
+        // the old pane searched only the first 50 rows it had loaded, so the target must sort after them
+        const seed = `${NS}_s386_${uniq()}`;
+        const fillers = Array.from({ length: 60 }, (_, i) => `${seed}_${String(i).padStart(2, '0')}`);
+        const target = `zz_${seed}_probe`;
+        const streams = [...fillers, target];
+        try {
+            for (const stream of streams) {
+                const { status } = await req(page, 'POST', `/${stream}/_json`, [{ message: 'ent386 seed', level: 'info' }]);
+                expect(status, `ingest into ${stream}`).toBeLessThan(400);
+            }
+            await expect
+                .poll(async () => {
+                    const list = (await req(page, 'GET', '/streams?type=logs')).body?.list || [];
+                    return list.filter((s) => streams.includes(s.name)).length;
+                }, { timeout: 60000 })
+                .toBe(streams.length);
+            const allLogs = (await req(page, 'GET', '/streams?type=logs')).body?.list || [];
+            expect(allLogs.length, 'the org needs more than one loaded batch of log streams').toBeGreaterThan(50);
+
+            const name = await freshRole(page, 'search386');
+            await pm.rolesPage.gotoRoles();
+            await pm.rolesPage.openRole(name);
+            await pm.rolesPage.waitForGrantsSettled(0);
+            await pm.rolesPage.openModule('stream');
+            await pm.rolesPage.openEntity('logs').click();
+            await expect(pm.rolesPage.paneSearch).toBeVisible({ timeout: 30000 });
+            await expect(pm.rolesPage.panePaginationInfo).toBeVisible({ timeout: 30000 });
+            await expect(pm.rolesPage.entityActionCell(target, 'AllowGet')).toHaveCount(0);
+
+            await pm.rolesPage.paneSearch.fill(target);
+            await expect(pm.rolesPage.entityRowCells(target).first()).toBeVisible({ timeout: 30000 });
+            await expect(pm.rolesPage.panePaginationInfo).toContainText(/1\s*-\s*1\s+of\s+1\b/, { timeout: 15000 });
+            await expect(pm.rolesPage.paneNoMatch).toHaveCount(0);
+        } finally {
+            for (const stream of streams) {
+                await req(page, 'DELETE', `/streams/${stream}?type=logs`).catch(() => {});
+            }
+        }
+    });
 });

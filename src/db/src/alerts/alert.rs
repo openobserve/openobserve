@@ -188,7 +188,19 @@ pub async fn create<C: TransactionTrait>(
     alert: Alert,
     overwrite: bool,
 ) -> Result<Alert, infra::errors::Error> {
-    let alert = table::create(conn, org_id, folder_id, alert, overwrite).await?;
+    create_stamped(conn, org_id, folder_id, alert, overwrite, None).await
+}
+
+/// [`create`] stamped as `table::CreateStamp` says.
+pub async fn create_stamped<C: TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: &str,
+    alert: Alert,
+    use_given_id: bool,
+    stamp: Option<table::CreateStamp>,
+) -> Result<Alert, infra::errors::Error> {
+    let alert = table::create_stamped(conn, org_id, folder_id, alert, use_given_id, stamp).await?;
     let schedule_key = scheduler_key(alert.id);
 
     infra::coordinator::alerts::emit_put_event(org_id, &alert, Some(folder_id.to_string())).await?;
@@ -274,10 +286,28 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<(), infra::errors::Error> {
+    delete_by_id_where(conn, org_id, alert_id, None)
+        .await
+        .map(|_| ())
+}
+
+/// With `written_us`, deletes only while the alert's `updated_at` holds it; false when it did not.
+pub async fn delete_by_id_where<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+    written_us: Option<i64>,
+) -> Result<bool, infra::errors::Error> {
     let Some((_folder, _alert)) = table::get_by_id(conn, org_id, alert_id).await? else {
-        return Ok(());
+        return Ok(false);
     };
     let alert_id_str = alert_id.to_string();
+    // The guarded row goes first, so a refused delete leaves its workflow links in place.
+    if let Some(us) = written_us
+        && !table::delete_by_id_where(conn, org_id, alert_id, us).await?
+    {
+        return Ok(false);
+    }
 
     #[cfg(feature = "enterprise")]
     db::workflows::delete_workflow_association(AssociationDeleteEvent::Entity {
@@ -286,7 +316,9 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     })
     .await?;
 
-    table::delete_by_id(conn, org_id, alert_id).await?;
+    if written_us.is_none() {
+        table::delete_by_id(conn, org_id, alert_id).await?;
+    }
     infra::coordinator::alerts::emit_delete_event(org_id, &alert_id_str).await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_delete_event(
@@ -302,8 +334,25 @@ pub async fn delete_by_id<C: ConnectionTrait>(
         db::scheduler::delete(org_id, db::scheduler::TriggerModule::Alert, &alert_id_str).await
     {
         log::error!("Failed to delete trigger: org_id: {org_id}, error: {e}");
+        // A guarded caller retries by id through `forget_deleted`, so it must hear of the miss.
+        if written_us.is_some() {
+            return Err(e);
+        }
     };
-    Ok(())
+    Ok(true)
+}
+
+/// The by-id effects of a delete, for a row already gone: a retry after a crash finishes them.
+pub async fn forget_deleted(org_id: &str, alert_id: Ksuid) -> Result<(), infra::errors::Error> {
+    let alert_id_str = alert_id.to_string();
+    #[cfg(feature = "enterprise")]
+    db::workflows::delete_workflow_association(AssociationDeleteEvent::Entity {
+        org_id: org_id.to_string(),
+        entity_id: alert_id_str.clone(),
+    })
+    .await?;
+    infra::coordinator::alerts::emit_delete_event(org_id, &alert_id_str).await?;
+    db::scheduler::delete(org_id, db::scheduler::TriggerModule::Alert, &alert_id_str).await
 }
 
 pub async fn list(

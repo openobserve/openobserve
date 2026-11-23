@@ -1,13 +1,9 @@
 /**
- * Logs Patterns Multi-Stream Guard (OSS).
+ * Logs Patterns Multi-Stream Guard.
  *
- * The Patterns extraction runs on a dedicated single-stream API. This spec verifies the
- * client-side guard in Index.vue's extractPatternsForCurrentQuery(): when more than one
- * stream is selected in non-SQL mode it cancels the in-flight extraction, clears stale
- * patterns and surfaces an error toast BEFORE any API call. The Patterns toggle button is
- * enterprise-gated, so in OSS we enter patterns mode via the URL query param
- * (logs_visualize_toggle=patterns). No ingestion/FTS/patterns-config setup is required —
- * the guard fires on selectedStream.length alone.
+ * Patterns is enterprise-gated. Where it is allowed, a multi-stream link hits the guard in
+ * Index.vue's extractPatternsForCurrentQuery() and shows an error toast; on OSS the link opens
+ * Logs instead. Either way no patterns extraction request may be made.
  */
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
@@ -41,12 +37,11 @@ test.describe("Logs Patterns Multi-Stream Guard testcases", () => {
         testLogger.testEnd(testInfo.title, testInfo.status);
     });
 
-    test("should show an error toast and refuse patterns when multiple streams are selected @P0 @smoke", {
+    test("should refuse patterns for a multi-stream link: toast on enterprise, Logs fallback on OSS @P0 @smoke", {
         tag: ['@logs-patterns-multi-stream-guard', '@all', '@smoke', '@logs']
     }, async ({ page }) => {
-        testLogger.info('Test: multi-stream patterns guard fires an error toast');
+        testLogger.info('Test: multi-stream Patterns link is refused without an extraction request');
 
-        // The guard fires before any network call, so the streams only need to exist.
         const streamA = makeStreamName('a');
         const streamB = makeStreamName('b');
         await pm.streamsPage.createStream(streamA, 'logs');
@@ -54,23 +49,28 @@ test.describe("Logs Patterns Multi-Stream Guard testcases", () => {
         await waitForStreamListed(page, streamA, 'logs');
         await waitForStreamListed(page, streamB, 'logs');
 
-        // The guard's whole point is that it returns before the request is built, so record
-        // every extraction call and assert none was made — a toast alone would still pass if
-        // the guard ran after the API had already been hit.
         const extractCalls = [];
         page.on('request', (req) => {
             if (PATTERNS_EXTRACT_URL.test(req.url())) extractCalls.push(req.url());
         });
 
-        // Enter patterns mode via URL (the toggle is enterprise-gated in OSS). restoreUrlQueryParams
-        // splits `stream` on ',' into [a, b], so the guard condition is true on mount and the toast fires.
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${getOrgIdentifier()}`;
         await pm.logsPage.startToastRecorder();
         await page.goto(`${logsUrl}&stream_type=logs&stream=${streamA},${streamB}&logs_visualize_toggle=patterns`, { waitUntil: 'domcontentloaded' });
 
-        await pm.logsPage.expectMultiStreamPatternsToast();
+        // The Patterns toggle is always rendered (locked on OSS), so the build is told apart by
+        // whether the link opened the Patterns tab: a locked build falls back to Logs.
+        const patternsToggle = page.locator('[data-test="logs-patterns-toggle"]');
+        await expect(patternsToggle).toBeVisible({ timeout: 30000 });
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        const patternsAllowed = (await patternsToggle.getAttribute('data-state')) === 'on';
+        if (patternsAllowed) {
+            await pm.logsPage.expectMultiStreamPatternsToast();
+        } else {
+            await pm.logsPage.expectNoMultiStreamPatternsToast();
+        }
         expect(extractCalls, `patterns/extract must not be called for a multi-stream selection, got: ${extractCalls.join(', ')}`).toHaveLength(0);
-        testLogger.info('PASSED: multi-stream guard error toast shown, no extraction request issued');
+        testLogger.info(`PASSED: multi-stream Patterns link refused (patternsAllowed=${patternsAllowed}), no extraction request`);
     });
 
     test("should not show the multi-stream patterns toast for a single stream @P1", {

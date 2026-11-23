@@ -52,23 +52,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <div v-if="indexData.schema">
-      <div class="m-0 p-0">
-        <div @submit.prevent="onSubmit">
+    <div v-if="indexData.schema" class="h-full">
+      <div class="m-0 h-full p-0">
+        <div class="h-full" @submit.prevent="onSubmit">
           <!-- we will show loading state here -->
-          <div
-            v-if="loadingState"
-            class="flex h-full w-full items-center justify-center"
-            style="min-height: calc(100vh - 3.75rem)"
-          >
+          <div v-if="loadingState" class="flex h-full w-full items-center justify-center">
             <OSpinner size="md" />
           </div>
           <!-- if we have data and no loading then we will show the data otherwise we will show the loading state -->
-          <div
-            v-else
-            class="indexDetailsContainer flex min-h-0 w-full flex-col"
-            style="height: calc(100vh - 3.75rem)"
-          >
+          <div v-else class="indexDetailsContainer flex h-full min-h-0 w-full flex-col">
             <!-- this the grid section the tiles section -->
             <div class="stats-grid mb-2 grid grid-cols-4 gap-2 max-md:grid-cols-2">
               <!-- Docs Count Tile -->
@@ -434,9 +426,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <template
                             v-if="
                               !(row.name == store.state.zoConfig.timestamp_column) &&
-                              (row.type == 'Utf8' || row.type == 'utf8')
+                              (isStringFieldType(row.type) || patternAssociations[row.name]?.length)
                             "
                           >
+                            <span
+                              v-if="sdrConflict(row)"
+                              class="me-1 inline-flex items-center"
+                              :data-test="`schema-field-${row.name}-pattern-warning`"
+                            >
+                              <OIcon name="warning" size="xs" class="text-status-warning-text" />
+                              <OTooltip side="right" :content="sdrConflict(row)" />
+                            </span>
                             <span
                               class="text-brand-indigo cursor-pointer"
                               :data-test="`schema-field-${row.name}-pattern-action`"
@@ -2408,6 +2408,24 @@ export default defineComponent({
       return Object.values(grouped).flat();
     };
 
+    const isStringFieldType = (type?: string) =>
+      ["utf8", "largeutf8", "utf8view"].includes((type ?? "").toLowerCase());
+
+    const isPartitionIndexType = (value: string) =>
+      value === "keyPartition" || value === "prefixPartition" || value.startsWith("hashPartition");
+
+    // The scan only redacts strings, and a partition key holds its raw value in the file path.
+    const sdrConflict = (row: SchemaField) => {
+      const rewritesAtSearch = (patternAssociations.value[row.name] ?? []).some(
+        (p: PatternAssociation) =>
+          (p.apply_at === "AtSearch" || p.apply_at === "Both") && p.policy !== "Detect",
+      );
+      if (!rewritesAtSearch) return undefined;
+      if (row.index_type?.some(isPartitionIndexType)) return t("logStream.sdrPartitionKeyWarning");
+      if (!isStringFieldType(row.type)) return t("logStream.sdrNonStringFieldWarning");
+      return undefined;
+    };
+
     const openPatternAssociationDialog = (field: string) => {
       if (!sdrAccess.value.allowed) {
         openUpgradeDialog();
@@ -2662,6 +2680,8 @@ export default defineComponent({
       patternAssociationDialog,
       assocPatternsRef,
       openPatternAssociationDialog,
+      isStringFieldType,
+      sdrConflict,
       handleAddPattern,
       handleRemovePattern,
       handleUpdateAppliedPattern,

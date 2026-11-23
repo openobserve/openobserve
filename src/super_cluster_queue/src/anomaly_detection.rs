@@ -95,7 +95,7 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
             log::debug!(
                 "[SUPER_CLUSTER:anomaly_detection] ConfigDelete org={org_id} id={config_id}"
             );
-            table::delete(db, &org_id, &config_id)
+            table::delete_with_slack_rows(db, &org_id, &config_id)
                 .await
                 .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
             // Clear any locally cached model entry on non-primary regions.

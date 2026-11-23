@@ -1120,7 +1120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -1265,6 +1265,7 @@ const retriesEnabled = computed(() => props.retries > 0);
 
 // ── Synthetic results composable ──────────────────────────────────────────
 const synthetics = useSyntheticResults(t);
+onBeforeUnmount(() => synthetics.cancelAll());
 const kpiLoading = computed(() => synthetics.kpiLoading.value);
 const histogramLoading = computed(() => synthetics.histogramLoading.value);
 const runsLoading = computed(() => synthetics.runsLoading.value);

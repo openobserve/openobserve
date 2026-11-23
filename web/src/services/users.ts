@@ -15,6 +15,14 @@
 
 import http from "./http";
 import analytics from "./product_analytics";
+import type { UserListPage } from "@/ts/interfaces";
+
+export interface AllUsersParams {
+  search?: string;
+  org?: string;
+  page: number;
+  page_size: number;
+}
 
 const users = {
   list: (page_num: number, page_size: number, sort_by: string, desc: boolean, name: string) => {
@@ -102,6 +110,10 @@ const users = {
   },
   rejectInvite: (inviteId: string) => {
     return http().post(`/api/invites/${inviteId}/reject`);
+  },
+  /** Every non-root user of every organization, one page at a time; served by the meta org only. */
+  listAllUsers: (metaOrg: string, params: AllUsersParams) => {
+    return http().get<UserListPage>(`/api/${metaOrg}/all_users`, { params });
   },
 };
 

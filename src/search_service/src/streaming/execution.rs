@@ -290,18 +290,6 @@ pub async fn do_partitioned_search(
             let duration = instant.elapsed();
             log::debug!("Top k values for partition {idx} took {duration:?}");
         }
-        #[cfg(feature = "vectorscan")]
-        crate::cache::apply_regex_to_response(
-            &req,
-            org_id,
-            stream_name,
-            stream_type,
-            &mut search_res,
-            &trace_id,
-            "partitioned_search",
-        )
-        .await?;
-
         if is_result_array_skip_vrl {
             search_res.hits = crate::cache::apply_vrl_to_response(
                 backup_query_fn.clone(),
@@ -787,18 +775,6 @@ pub async fn process_delta(
             search_res.total = hit_count as usize;
             search_res.hits = top_k_values;
         }
-        #[cfg(feature = "vectorscan")]
-        crate::cache::apply_regex_to_response(
-            &req,
-            org_id,
-            stream_name,
-            stream_type,
-            &mut search_res,
-            &trace_id,
-            "process_delta",
-        )
-        .await?;
-
         if is_result_array_skip_vrl {
             search_res.hits = crate::cache::apply_vrl_to_response(
                 backup_query_fn.clone(),
@@ -855,7 +831,6 @@ pub async fn process_delta(
                 org_id,
                 stream_name,
                 stream_type,
-                &req,
             )
             .await;
             break;
@@ -931,7 +906,6 @@ async fn send_partial_search_resp(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    _req: &config::meta::search::Request,
 ) -> Result<(), infra::errors::Error> {
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
@@ -948,17 +922,6 @@ async fn send_partial_search_resp(
         trace_id: trace_id.to_string(),
         ..Default::default()
     };
-    #[cfg(feature = "vectorscan")]
-    crate::cache::apply_regex_to_response(
-        _req,
-        org_id,
-        stream_name,
-        stream_type,
-        &mut s_resp,
-        trace_id,
-        "partial_search_resp",
-    )
-    .await?;
     if is_result_array_skip_vrl {
         s_resp.hits = crate::cache::apply_vrl_to_response(
             backup_query_fn.clone(),
@@ -1159,7 +1122,6 @@ mod tests {
             "test-org",
             "test-stream",
             StreamType::Logs,
-            &config::meta::search::Request::default(),
         )
         .await;
 
@@ -1198,7 +1160,6 @@ mod tests {
             "test-org",
             "test-stream",
             StreamType::Logs,
-            &config::meta::search::Request::default(),
         )
         .await;
 
@@ -1236,7 +1197,6 @@ mod tests {
             "test-org",
             "test-stream",
             StreamType::Logs,
-            &config::meta::search::Request::default(),
         )
         .await;
 

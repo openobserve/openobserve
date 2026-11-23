@@ -401,6 +401,26 @@ describe("useTraces", () => {
   // getUrlQueryParams
   // -------------------------------------------------------------------------
   describe("getUrlQueryParams", () => {
+    it("keeps the anomaly banner parameters of the current URL", () => {
+      const saved = mockCurrentRoute.value.query;
+      mockCurrentRoute.value.query = {
+        ...saved,
+        from_anomaly: "a1",
+        anomaly_filter_applied: "0",
+        anomaly_measure: "count(*) per 15 min",
+      };
+      try {
+        const { getUrlQueryParams, resetSearchObj } = useTraces();
+        resetSearchObj();
+        const params = getUrlQueryParams(false);
+        expect(params.from_anomaly).toBe("a1");
+        expect(params.anomaly_filter_applied).toBe("0");
+        expect(params.anomaly_measure).toBe("count(*) per 15 min");
+      } finally {
+        mockCurrentRoute.value.query = saved;
+      }
+    });
+
     it("includes stream from selectedStream.value", () => {
       const { searchObj, getUrlQueryParams, resetSearchObj } = useTraces();
       resetSearchObj();

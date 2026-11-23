@@ -866,6 +866,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="showPatternDetails"
         :selectedPattern="selectedPattern"
         :totalPatterns="patternNavTotal"
+        :filterBlockedReason="
+          showPatternDetails ? filterBlockedReason(selectedPattern?.pattern) : null
+        "
         @navigate="navigatePatternDetail"
         @filter-value="addWildcardValueToSearch"
         @add-to-search="addPatternToSearch"
@@ -933,7 +936,10 @@ import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
 import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
 import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
-import { extractConstantsFromPattern } from "@/plugins/logs/patterns/patternUtils";
+import {
+  extractConstantsFromPattern,
+  FILTER_BLOCKED_MESSAGE,
+} from "@/plugins/logs/patterns/patternUtils";
 import {
   convertLogData,
   convertStackedLogData,
@@ -1392,6 +1398,7 @@ export default defineComponent({
       navigatePatternDetail,
       navTotal: patternNavTotal,
       addPatternToSearch,
+      filterBlockedReason,
       addWildcardValueToSearch,
       buildSinglePatternAlertPrefill,
     } = usePatternActions();
@@ -1405,11 +1412,14 @@ export default defineComponent({
      * surface.
      */
     const createAlertFromPattern = (pattern: any) => {
-      const launched = openAlertCreation(buildSinglePatternAlertPrefill(pattern));
+      const blocked = filterBlockedReason(pattern);
+      const launched = !blocked && openAlertCreation(buildSinglePatternAlertPrefill(pattern));
       if (!launched) {
         toast({
           variant: "warning",
-          message: t("logs.patternList.alertBroadMatch"),
+          message: t(
+            blocked ? FILTER_BLOCKED_MESSAGE[blocked] : "logs.patternList.alertBroadMatch",
+          ),
         });
       }
     };
@@ -1428,6 +1438,7 @@ export default defineComponent({
         streamName: searchObj.data.stream.selectedStream[0],
         window: props.queryWindowUs as { start: number; end: number } | undefined,
         lastQuery: patternsState.value?.lastQuery,
+        allTemplates: (patternsState.value?.patterns?.patterns ?? []).map((p: any) => p.template),
       });
     });
 
@@ -3280,6 +3291,7 @@ export default defineComponent({
       patternVolumeContext,
       patternWindowTotal,
       addPatternToSearch,
+      filterBlockedReason,
       addWildcardValueToSearch,
       createAlertFromPattern,
       extractConstantsFromPattern,

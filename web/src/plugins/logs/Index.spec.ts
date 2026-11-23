@@ -1669,8 +1669,10 @@ describe("Logs Index", async () => {
       selectedStream = ["app_logs"],
       errorMsg = "",
       filterErrMsg = "",
+      streamType = "logs",
     } = {}) => {
       const { searchObj } = wrapper.vm;
+      searchObj.data.stream.streamType = streamType;
       searchObj.loadingStream = false;
       searchObj.data.stream.streamLists = [{ label: "app_logs", value: "app_logs" }];
       searchObj.data.stream.selectedStream = selectedStream;
@@ -1702,6 +1704,21 @@ describe("Logs Index", async () => {
         logSamples: hits,
         analysisType: "volume",
       });
+    });
+
+    it.each(["traces", "metrics"])(
+      "passes the %s stream type to the dashboard instead of logs",
+      async (streamType) => {
+        await enterDrillDown({ streamType });
+
+        expect(dashboard().props("streamType")).toBe(streamType);
+      },
+    );
+
+    it("falls back to logs when the stream type is empty", async () => {
+      await enterDrillDown({ streamType: "" });
+
+      expect(dashboard().props("streamType")).toBe("logs");
     });
 
     it("hides the search results section while active", async () => {
@@ -1791,6 +1808,22 @@ describe("Logs Index", async () => {
           .exists(),
       ).toBe(true);
       expect(streamSelect().attributes("data-test-selected-value")).toBe("");
+    });
+
+    it("shows the Insights title beside the stream select when there is no dashboard", async () => {
+      await enterDrillDown({ withHits: false, searchApplied: true });
+
+      const row = wrapper.find('[data-test="logs-drill-down-stream-row"]');
+      expect(row.find('[data-test="logs-drilldown-stream-select-trigger"]').exists()).toBe(true);
+      expect(row.text()).toContain("Insights");
+    });
+
+    it("says what Drill down needs when no query has run yet", async () => {
+      await enterDrillDown({ withHits: false, searchApplied: false });
+
+      const empty = wrapper.find('[data-test="logs-drill-down-apply-search-text"]');
+      expect(empty.text()).toContain("Run a query to start Drill down");
+      expect(empty.text()).toContain("Drill down compares dimension values");
     });
 
     it("routes a stream picked in drill down through the stream-change path", async () => {
@@ -1901,5 +1934,28 @@ describe("Logs Index", async () => {
 
       await router.replace({ path: router.currentRoute.value.path, query: {} });
     });
+
+    it.each(["bogus", "patterns"])(
+      "opens Search for a %s tab the build cannot show",
+      async (toggle) => {
+        wrapper.unmount();
+        (store.state as any).logs.isInitialized = false;
+        await router.replace({
+          path: router.currentRoute.value.path,
+          query: { stream: "app_logs", logs_visualize_toggle: toggle },
+        });
+        loaderCalls.length = 0;
+
+        wrapper = mount(Index, {
+          attachTo: "#app",
+          global: { provide: { store }, plugins: [i18n, router] },
+        });
+        await flushPromises();
+
+        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("logs");
+
+        await router.replace({ path: router.currentRoute.value.path, query: {} });
+      },
+    );
   });
 });

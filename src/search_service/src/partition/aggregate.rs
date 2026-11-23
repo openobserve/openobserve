@@ -117,8 +117,20 @@ pub async fn prepare_streaming_aggregate(
         let cache_interval_mins = cache_interval.get_duration_minutes();
         if cache_interval_mins > 0 {
             let streaming_id = ider::uuid();
-            let hashed_query =
-                get_aggregation_cache_key_from_request(req, ctx.sql.histogram_interval);
+            #[cfg(feature = "vectorscan")]
+            let redaction_digest =
+                crate::datafusion::physical_optimizer::sdr_redact::redaction_digest(
+                    org_id,
+                    stream_type,
+                    &ctx.sql.stream_names,
+                );
+            #[cfg(not(feature = "vectorscan"))]
+            let redaction_digest: Option<String> = None;
+            let hashed_query = get_aggregation_cache_key_from_request(
+                req,
+                ctx.sql.histogram_interval,
+                redaction_digest.as_deref(),
+            );
             let cache_file_path = create_aggregation_cache_file_path(
                 org_id,
                 &stream_type.to_string(),

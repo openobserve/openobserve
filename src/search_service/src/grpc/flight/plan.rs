@@ -36,13 +36,19 @@ use datafusion::{
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use infra::errors::{Error, ErrorCodes};
 
-use super::scan::{PrecomputedAggregates, collect_stats};
+use super::{
+    redaction::ScanRedaction,
+    scan::{PrecomputedAggregates, collect_stats},
+};
 use crate::{
     datafusion::{
         datasource::{enrich_table::EnrichTable, uniontable::NewUnionTable},
         distributed::codec::get_physical_extension_codec,
         exec::{DataFusionContextBuilder, register_udf},
-        physical_optimizer::index_optimizer::index_aggregate_rewrite::aggregate_optimize_rewrite,
+        physical_optimizer::{
+            index_optimizer::index_aggregate_rewrite::aggregate_optimize_rewrite,
+            sdr_redact::{LiftRedaction, scan_filters, wrap_with_redaction},
+        },
         physical_plan::empty_exec::{NewEmptyExecVisitor, ReplaceTableScanExec},
         sort_order::FileSortOrder,
     },
@@ -129,6 +135,7 @@ pub(super) async fn replace_table_scan(
     ctx: &SessionContext,
     physical_plan: Arc<dyn ExecutionPlan>,
     mut tables: Vec<Arc<dyn TableProvider>>,
+    redaction: &ScanRedaction,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
     let trace_id = query.trace_id.as_str();
 
@@ -168,14 +175,22 @@ pub(super) async fn replace_table_scan(
     );
 
     let scan_start = std::time::Instant::now();
+    let filters = scan_filters(empty_exec.filters(), &redaction.redacted_columns());
     let union_exec = union_table
         .scan(
             &ctx.state(),
             empty_exec.projection(),
-            empty_exec.filters(),
+            &filters,
             empty_exec.limit(),
         )
         .await?;
+    // Every operator above, query functions on the leader included, sees only redacted values.
+    let union_exec = if redaction.is_protected() {
+        let options = Arc::new(ctx.state().config_options().as_ref().clone());
+        wrap_with_redaction(union_exec, redaction.udfs(), options)?
+    } else {
+        union_exec
+    };
     log::info!(
         "{}",
         search_inspector_fields(
@@ -192,7 +207,11 @@ pub(super) async fn replace_table_scan(
 
     let rewrite_start = std::time::Instant::now();
     let mut rewriter = ReplaceTableScanExec::new(union_exec);
-    let physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+    let mut physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+    // Before the pushdown rules: ProjectionPushdown folds the projection into the scan.
+    if redaction.is_protected() {
+        physical_plan = LiftRedaction.optimize(physical_plan, ctx.state().config_options())?;
+    }
     log::info!(
         "{}",
         search_inspector_fields(
