@@ -199,7 +199,13 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     return loadPreview();
   };
 
-  const nameOf = (itemId: string) => preview.value?.names[itemId] ?? itemId;
+  // The preview may still be loading or have failed, so the pack's own names come before the id.
+  const packNames: Record<string, string> = Object.fromEntries([
+    ...(pack.bundledAlerts ?? []).map(({ entry }) => [entry.id, entry.title]),
+    ...pack.savedViews.map(({ id, name }) => [id, name]),
+    ...pack.dashboards.map(({ id, title }) => [id, title]),
+  ]);
+  const nameOf = (itemId: string) => preview.value?.names[itemId] ?? packNames[itemId] ?? itemId;
 
   const planned = (kind: PackRecordItem["kind"]) =>
     (preview.value?.items ?? []).filter((item) => item.kind === kind && item.status !== "existing");
