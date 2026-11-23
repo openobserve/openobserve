@@ -22,6 +22,7 @@ use axum::{
     response::Response,
 };
 use config::meta::{alerts::content_spec::ContentSpec, destinations::Module};
+use db::alerts::destinations::DestinationError;
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
@@ -71,7 +72,6 @@ pub struct TestDestinationRequest {
 pub struct TestDestinationResponse {
     pub success: bool,
     pub status_code: Option<u16>,
-    pub response_body: Option<String>,
     pub error: Option<String>,
 }
 
@@ -109,12 +109,11 @@ pub async fn test_destination(
 ) -> Response {
     match test_req.destination_type {
         DestinationType::Email => test_email_destination(&org_id, &test_req).await,
-        DestinationType::Http => test_http_destination(&test_req).await,
+        DestinationType::Http => test_http_destination(&org_id, &test_req).await,
         DestinationType::SlackApp => test_slack_app_destination(&org_id, &test_req).await,
         other => MetaHttpResponse::json(TestDestinationResponse {
             success: false,
             status_code: None,
-            response_body: None,
             error: Some(format!("Unsupported destination type for testing: {other}")),
         }),
     }
@@ -127,35 +126,42 @@ async fn test_email_destination(org_id: &str, test_req: &TestDestinationRequest)
             return MetaHttpResponse::json(TestDestinationResponse {
                 success: false,
                 status_code: None,
-                response_body: None,
                 error: Some("Email destination requires at least one recipient".to_string()),
             });
         }
     };
 
-    match destinations::test_email(org_id, &recipients, test_req.body.as_deref()).await {
-        Ok(msg) => MetaHttpResponse::json(TestDestinationResponse {
-            success: true,
-            status_code: None,
-            response_body: Some(msg),
-            error: None,
-        }),
-        Err(e) => MetaHttpResponse::json(TestDestinationResponse {
-            success: false,
-            status_code: None,
-            response_body: None,
-            error: Some(e.to_string()),
-        }),
-    }
+    let error = match destinations::test_email(org_id, &recipients, test_req.body.as_deref()).await
+    {
+        Ok(_) => None,
+        Err(
+            e @ (DestinationError::SMTPUnavailable
+            | DestinationError::EmptyEmail
+            | DestinationError::UserNotPermitted(_)),
+        ) => Some(e.to_string()),
+        Err(e @ DestinationError::InfraError(_)) => {
+            log::warn!("[{org_id}] destination test recipient lookup failed: {e}");
+            Some("Couldn't check the recipients. Try again.".to_string())
+        }
+        Err(e) => {
+            log::warn!("[{org_id}] destination test email failed: {e}");
+            Some("Couldn't send the test email. Check the SMTP settings.".to_string())
+        }
+    };
+    MetaHttpResponse::json(TestDestinationResponse {
+        success: error.is_none(),
+        status_code: None,
+        error,
+    })
 }
 
-/// Posts now through the bot, so the form shows Slack's own answer, never a queued "ok".
+/// Posts now through the bot, so a pass means Slack took the message, never a queued "ok".
+/// `send_form_test` errors are our own text, so they pass through.
 async fn test_slack_app_destination(org_id: &str, test_req: &TestDestinationRequest) -> Response {
     let Some(fields) = test_req.slack_app.clone() else {
         return MetaHttpResponse::json(TestDestinationResponse {
             success: false,
             status_code: None,
-            response_body: None,
             error: Some("A Slack app test needs the slackApp target".to_string()),
         });
     };
@@ -166,23 +172,15 @@ async fn test_slack_app_destination(org_id: &str, test_req: &TestDestinationRequ
         test_req.template.as_deref(),
     )
     .await;
-    MetaHttpResponse::json(match sent {
-        Ok(detail) => TestDestinationResponse {
-            success: true,
-            status_code: None,
-            response_body: Some(detail),
-            error: None,
-        },
-        Err(e) => TestDestinationResponse {
-            success: false,
-            status_code: None,
-            response_body: None,
-            error: Some(e.to_string()),
-        },
+    let error = sent.err().map(|e| e.to_string());
+    MetaHttpResponse::json(TestDestinationResponse {
+        success: error.is_none(),
+        status_code: None,
+        error,
     })
 }
 
-async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
+async fn test_http_destination(org_id: &str, test_req: &TestDestinationRequest) -> Response {
     let method = test_req
         .method
         .clone()
@@ -197,17 +195,15 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
         return MetaHttpResponse::json(TestDestinationResponse {
             success: false,
             status_code: None,
-            response_body: None,
             error: Some("HTTP destination must have a url".to_string()),
         });
     }
 
-    // The policy real sends use; an allowlist-only target gets no body back.
+    // The policy real sends use.
     if let Err(error_msg) = SsrfGuard::validate_destination_url_with_config_async(url).await {
         return MetaHttpResponse::json(TestDestinationResponse {
             success: false,
             status_code: None,
-            response_body: None,
             error: Some(error_msg),
         });
     }
@@ -226,7 +222,6 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
             return MetaHttpResponse::json(TestDestinationResponse {
                 success: false,
                 status_code: None,
-                response_body: None,
                 error: Some(format!("Failed to build HTTP client: {}", e)),
             });
         }
@@ -243,7 +238,6 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
             return MetaHttpResponse::json(TestDestinationResponse {
                 success: false,
                 status_code: None,
-                response_body: None,
                 error: Some(format!("Unsupported HTTP method: {}", method)),
             });
         }
@@ -259,41 +253,35 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
         request_builder = request_builder.body(body);
     }
 
-    // Send request
+    // The body is never read: the form gets the status only.
     match request_builder.send().await {
         Ok(response) => {
-            let status_code = response.status().as_u16();
-            let success = response.status().is_success();
-            if config::utils::ssrf_guard::admitted_only_by_allowlist(&response) {
-                return MetaHttpResponse::json(TestDestinationResponse {
-                    success,
-                    status_code: Some(status_code),
-                    response_body: None,
-                    error: None,
-                });
-            }
-
-            match response.text().await {
-                Ok(response_body) => MetaHttpResponse::json(TestDestinationResponse {
-                    success,
-                    status_code: Some(status_code),
-                    response_body: Some(response_body),
-                    error: None,
-                }),
-                Err(e) => MetaHttpResponse::json(TestDestinationResponse {
-                    success: false,
-                    status_code: Some(status_code),
-                    response_body: None,
-                    error: Some(format!("Failed to read response body: {}", e)),
-                }),
-            }
+            let status = response.status();
+            MetaHttpResponse::json(TestDestinationResponse {
+                success: status.is_success(),
+                status_code: Some(status.as_u16()),
+                error: (!status.is_success())
+                    .then(|| format!("The destination answered with HTTP {}", status.as_u16())),
+            })
         }
-        Err(e) => MetaHttpResponse::json(TestDestinationResponse {
-            success: false,
-            status_code: None,
-            response_body: None,
-            error: Some(format!("HTTP request failed: {}", e)),
-        }),
+        Err(e) => {
+            let error = if e.is_timeout() {
+                "The destination did not respond in time"
+            } else if e.is_connect() {
+                "Couldn't connect to the destination"
+            } else {
+                "Couldn't complete the request to the destination"
+            };
+            log::warn!(
+                "[{org_id}] destination test request failed: {}",
+                e.without_url()
+            );
+            MetaHttpResponse::json(TestDestinationResponse {
+                success: false,
+                status_code: None,
+                error: Some(error.to_string()),
+            })
+        }
     }
 }
 
@@ -1002,10 +990,11 @@ mod tests {
         destination_error_response(err).status()
     }
 
-    /// Runs the test at `path` in a child process, as the SSRF allowlist is read once per process.
+    /// Runs the test at `path` once per env set, each in a child process, as the URL policy is
+    /// read once per process.
     fn isolated<F: Future<Output = ()>>(
         path: &str,
-        envs: &[(&str, &str)],
+        env_sets: &[&[(&str, &str)]],
         task: impl FnOnce() -> F,
     ) {
         let test = path.split_once("::").map_or(path, |(_, test)| test);
@@ -1017,36 +1006,38 @@ mod tests {
                 .block_on(task());
             return;
         }
-        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
-        for (name, _) in std::env::vars().filter(|(name, _)| name.contains("SSRF")) {
-            command.env_remove(name);
+        for envs in env_sets {
+            let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+            for (name, _) in std::env::vars().filter(|(name, _)| name.contains("SSRF")) {
+                command.env_remove(name);
+            }
+            let output = command
+                .args(["--exact", test, "--nocapture"])
+                .env("O2_SSRF_ISOLATED_TEST", test)
+                .envs(envs.iter().copied())
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(
+                output.status.success() && stdout.contains("1 passed"),
+                "{test} failed in its child process with {envs:?}:\n{stdout}\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
         }
-        let output = command
-            .args(["--exact", test, "--nocapture"])
-            .env("O2_SSRF_ISOLATED_TEST", test)
-            .envs(envs.iter().copied())
-            .output()
-            .unwrap();
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        assert!(
-            output.status.success() && stdout.contains("1 passed"),
-            "{test} failed in its child process:\n{stdout}\n{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
     }
 
-    /// The JSON the destination test returns for a GET to a local server that answers `secret`.
-    async fn tested_secret_server() -> serde_json::Value {
+    /// The JSON the destination test returns for a GET to a local server that answers
+    /// `status_line` with the body `secret`.
+    async fn tested_secret_server(status_line: &str) -> serde_json::Value {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
+        let reply = format!("HTTP/1.1 {status_line}\r\nContent-Length: 6\r\n\r\nsecret");
         tokio::spawn(async move {
             while let Ok((mut sock, _)) = listener.accept().await {
                 let mut buf = [0u8; 4096];
                 let _ = sock.read(&mut buf).await;
-                let _ = sock
-                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nsecret")
-                    .await;
+                let _ = sock.write_all(reply.as_bytes()).await;
             }
         });
         let req = TestDestinationRequest {
@@ -1068,37 +1059,26 @@ mod tests {
     }
 
     #[test]
-    fn test_destination_test_accepts_an_allowlisted_target_and_shows_its_status_only() {
+    fn test_destination_test_returns_status_only() {
         isolated(
             concat!(
                 module_path!(),
-                "::test_destination_test_accepts_an_allowlisted_target_and_shows_its_status_only"
-            ),
-            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
-            || async {
-                let res = tested_secret_server().await;
-                assert_eq!(res["success"], true, "{res}");
-                assert_eq!(res["statusCode"], 200, "{res}");
-                assert!(res["responseBody"].is_null(), "{res}");
-            },
-        );
-    }
-
-    #[test]
-    fn test_destination_test_shows_the_body_of_a_target_the_strict_policy_admits() {
-        isolated(
-            concat!(
-                module_path!(),
-                "::test_destination_test_shows_the_body_of_a_target_the_strict_policy_admits"
+                "::test_destination_test_returns_status_only"
             ),
             &[
-                ("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32"),
-                ("ZO_SSRF_ALLOW_LOOPBACK", "true"),
+                &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+                &[("ZO_SKIP_SSRF_CHECKS", "true")],
             ],
             || async {
-                let res = tested_secret_server().await;
-                assert_eq!(res["statusCode"], 200, "{res}");
-                assert_eq!(res["responseBody"], "secret", "{res}");
+                for (status_line, code) in [("200 OK", 200), ("503 Service Unavailable", 503)] {
+                    let res = tested_secret_server(status_line).await;
+                    assert!(!res.to_string().contains("secret"), "{res}");
+                    assert_eq!(res["statusCode"], code, "{res}");
+                    assert_eq!(res["success"], code == 200, "{res}");
+                    let error = res["error"].as_str();
+                    assert_eq!(error.is_none(), code == 200, "{res}");
+                    assert!(error.is_none_or(|e| e.contains("503")), "{res}");
+                }
             },
         );
     }

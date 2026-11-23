@@ -11371,9 +11371,6 @@
     "testErrorClientError": "Erro do cliente (4xx). Verifique as suas credenciais e configuração.",
     "testErrorServerError": "Erro do servidor (5xx). O serviço de destino está a enfrentar problemas.",
     "viewDetails": "Ver detalhes",
-    "error": "Erro",
-    "httpStatus": "Estado HTTP",
-    "responseBody": "Corpo de resposta",
     "retry": "Tente novamente",
     "suggestCheckUrl": "Verifique se o URL do webhook está correto e acessível.",
     "suggestCheckFirewall": "Verifique as definições do firewall e garanta que o serviço de destino está acessível.",
@@ -12800,7 +12797,6 @@
       "notFoundDescription": "Este alerta já não existe, ou não tem acesso a ele. Pode ter sido eliminado."
     },
     "timeLabel": "Hora",
-    "unknownHttpStatus": "Desconhecido",
     "previewEvaluation": {
       "realTimeReason": "Quando as condições forem cumpridas",
       "matchingGroup": "grupo correspondente",
@@ -14089,7 +14085,6 @@
       "hideWebhook": "Ocultar URL do webhook do Slack",
       "slackAppFallback": "Aplicação do Slack",
       "previewDisclaimer": "O Slack fornece o ícone real da aplicação e o canal de destino após a instalação.",
-      "successResponseBody": "Resposta do Slack",
       "callbackTitle": "A ligar ao Slack",
       "callbackWorking": "A voltar para {product}…",
       "callbackError": "Esta ligação ao Slack não pode ser concluída. Feche esta janela e tente novamente.",
@@ -18555,7 +18550,6 @@
         "latency": "Latência",
         "output": "Saída extraída",
         "rawRequest": "Pedido enviado",
-        "rawResponse": "Resposta recebida",
         "idle": "O pedido e a resposta aparecem aqui quando executa um teste.",
         "disabledHint": "Preencha o nome e o endpoint primeiro.",
         "failure": {

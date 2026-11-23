@@ -11371,9 +11371,6 @@
     "testErrorClientError": "クライアントエラー (4xx)。認証情報と設定を確認してください。",
     "testErrorServerError": "サーバーエラー (5xx)。宛先サービスに問題が発生しています。",
     "viewDetails": "詳細を表示",
-    "error": "エラー",
-    "httpStatus": "HTTP ステータス",
-    "responseBody": "レスポンスボディ",
     "retry": "リトライ",
     "suggestCheckUrl": "Webhook URL が正しく、アクセス可能であることを確認してください。",
     "suggestCheckFirewall": "ファイアウォール設定を確認し、宛先サービスにアクセスできることを確認してください。",
@@ -12800,7 +12797,6 @@
       "notFoundDescription": "このアラートは存在しないか、アクセス権がない可能性があります。削除された可能性があります。"
     },
     "timeLabel": "時刻",
-    "unknownHttpStatus": "不明",
     "previewEvaluation": {
       "realTimeReason": "条件が一致したとき",
       "matchingGroup": "一致グループ",
@@ -14089,7 +14085,6 @@
       "hideWebhook": "Slack Webhook URLを非表示",
       "slackAppFallback": "Slackアプリ",
       "previewDisclaimer": "インストール後、Slackが実際のアプリアイコンと宛先チャンネルを提供します。",
-      "successResponseBody": "Slack応答",
       "callbackTitle": "Slackに接続中",
       "callbackWorking": "{product} に戻っています…",
       "callbackError": "このSlack接続は完了できません。このウィンドウを閉じて、もう一度お試しください。",
@@ -18555,7 +18550,6 @@
         "latency": "レイテンシ",
         "output": "抽出された出力",
         "rawRequest": "送信されたリクエスト",
-        "rawResponse": "受信したレスポンス",
         "idle": "テストを実行すると、リクエストとレスポンスの両方がここに表示されます。",
         "disabledHint": "最初に名前とエンドポイントを入力してください。",
         "failure": {
