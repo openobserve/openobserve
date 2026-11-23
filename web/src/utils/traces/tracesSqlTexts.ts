@@ -53,6 +53,16 @@ export interface TracesSqlTextsHost {
 const STATEMENT_START =
   /^\s*(?:s|se|sel|sele|selec|w|wi|wit|e|ex|exp|expl|expla|explai|explain(?:\s+\w*)?)?\s*$/i;
 
+const KEYWORD_PREFIX =
+  /^\s*(?:s|se|sel|sele|selec|w|wi|wit|e|ex|exp|expl|expla|explai|explain)(?![\w$])([\s\S]*)$/i;
+
+// A bare keyword prefix, or one still followed by a FROM, is a keyword being typed; `w = 1` is a filter.
+export function isKeywordBeingTyped(text: string): boolean {
+  const rest = KEYWORD_PREFIX.exec(text)?.[1];
+  if (rest === undefined) return false;
+  return !rest.trim() || /\bfrom\b/i.test(rest.replace(/'(?:[^']|'')*'/g, "''"));
+}
+
 /** The editor shows one of the Spans SQL text and the shared filter; this keeps the other, and SQL never writes to the filter. */
 export function createTracesSqlTexts(host: TracesSqlTextsHost, parser: { value: any }) {
   const sqlTexts = reactive({
@@ -165,7 +175,7 @@ export function createTracesSqlTexts(host: TracesSqlTextsHost, parser: { value: 
     const scope = isTracesScope(host.meta.scope)
       ? scopePredicate(host.meta.scope, !!host.data.stream.hasParentColumn)
       : "";
-    // An empty filter with no scope leaves the editor empty, so the template gallery shows.
+    // With no filter and no scope there is nothing to build a WHERE from, so the editor starts empty.
     if (!stream || (!filter.trim() && !scope)) {
       showSql("", filter);
       return;

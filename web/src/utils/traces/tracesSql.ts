@@ -36,6 +36,7 @@ export interface TracesSqlInfo {
   hasLimit: boolean;
   limit: number | null;
   hasOffset: boolean;
+  qualify: boolean;
   /** The WITH clause in front of the main SELECT, as typed; empty without one. */
   withClause: string;
   fromSubquery: boolean;
@@ -276,9 +277,10 @@ export function analyzeTracesSql(sql: string, parser: any): TracesSqlInfo {
     with: firstWord === "with",
     union,
     distinct,
-    hasLimit: limitIdx >= 0,
+    hasLimit: limitIdx >= 0 || hasTop("fetch"),
     limit,
     hasOffset: hasTop("offset"),
+    qualify: hasTop("qualify"),
     withClause,
     fromSubquery,
     explain,
@@ -300,6 +302,7 @@ export function isRowQuery(info: TracesSqlInfo): boolean {
     !info.distinct &&
     !info.hasLimit &&
     !info.hasOffset &&
+    !info.qualify &&
     !info.fromSubquery &&
     info.stream !== null
   );
@@ -1062,8 +1065,9 @@ function fromSubquerySpanSet(
 // An outer WHERE on a column the inner query computes, or on its alias, has no meaning for spans.
 function namesComputedColumn(where: string, innerText: string): boolean {
   const computed = computedColumnNames(innerText);
-  const tokens = tokenize(where).filter((tok) => tok.depth === 0);
-  return tokens.some((tok) => isPunct(tok, ".") || computed.has((nameOf(tok) ?? "").toLowerCase()));
+  return tokenize(where).some(
+    (tok) => isPunct(tok, ".") || computed.has((nameOf(tok) ?? "").toLowerCase()),
+  );
 }
 
 function computedColumnNames(selectText: string): Set<string> {
@@ -1163,7 +1167,11 @@ function joinSpanSet(
     with: "",
     from: left.text,
     where: [...leftConds, matched].join(" AND "),
-    dropped: mergeDropped(dropped, sides.some((s) => s.side === "both") ? ["bothSidesWhere"] : []),
+    dropped: mergeDropped(
+      dropped,
+      sides.some((s) => s.side === "both") ? ["bothSidesWhere"] : [],
+      splitAnd(onText).length > 1 ? ["join"] : [],
+    ),
     keepsSubquery: true,
   };
 }
@@ -1212,7 +1220,7 @@ function conditionSide(
   left: JoinItem,
   right: JoinItem | null,
 ): "left" | "right" | "both" {
-  const tokens = tokenize(cond).filter((tok) => tok.depth === 0);
+  const tokens = tokenize(cond);
   const qualifiers = new Set(
     tokens
       .filter((tok, i) => isPunct(tokens[i + 1], ".") && tokens[i + 1].start === tok.end)

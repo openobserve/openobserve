@@ -316,7 +316,7 @@ onBeforeUnmount(() => {
 });
 
 const apply = (value: GroupValue, action: "include" | "exclude", toList: boolean) => {
-  const term = groupTerm(props.request.key, value, action);
+  const term = groupTerm(props.request.key, value, action, !!props.request.textKey);
   if (toList) emit("open-group", term);
   else searchObj.data.stream.addToFilter = term;
 };

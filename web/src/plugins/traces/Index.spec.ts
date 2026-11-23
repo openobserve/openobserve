@@ -2202,6 +2202,23 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.queryResults.lastTotal).toBeUndefined();
     });
 
+    it("never carries a landed count into a run with another Spans scope", async () => {
+      await mountPage();
+      const before = { mode: mockSearchObj.meta.searchMode, scope: mockSearchObj.meta.scope };
+      mockSearchObj.meta.searchMode = "spans";
+      mockSearchObj.meta.scope = "all";
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      Object.assign(mockSearchObj.data.queryResults, { total: 600, countLanded: true });
+
+      mockSearchObj.meta.scope = "entrypoint";
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      expect(mockSearchObj.data.queryResults.lastTotal).toBeUndefined();
+      mockSearchObj.meta.searchMode = before.mode;
+      mockSearchObj.meta.scope = before.scope;
+    });
+
     // Logs shows its error banner over the last results rather than blanking; traces matches it.
     it("keeps the previous rows when a page fails before writing any", async () => {
       await mountPage();
@@ -4410,6 +4427,21 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(wrapper.vm.streamChangeDialog.show).toBe(false);
     });
 
+    it("forgets the old stream's filter on a stream change, so SQL off later shows an empty editor", async () => {
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT * FROM "default"`;
+      mockSqlTexts().sqlTexts.filter = "service_name = 'svc'";
+
+      await wrapper.vm.applyStreamChange("target-stream");
+      await flushPromises();
+      mockSqlTexts().leaveSql();
+
+      expect(mockSearchObj.data.editorValue).toBe("");
+      mockSearchObj.meta.sqlMode = false;
+    });
+
     it("loads the new stream's own columns on a stream change, before any search", async () => {
       store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: true };
       wrapper = mountIndexStubbed();
@@ -5677,19 +5709,6 @@ describe("Index.vue (Main Traces Page)", () => {
       }
     });
 
-    const runTracesSql = async (sql: string) => {
-      await mountSql();
-      await useRealParser();
-      mockSearchObj.meta.searchMode = "traces";
-      mockSearchObj.meta.sqlMode = true;
-      mockSearchObj.data.editorValue = sql;
-      mockSearchObj.searchApplied = true;
-      wrapper.vm.searchData();
-      await flushPromises();
-      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
-      await nextTick();
-    };
-
     const big = `SELECT trace_id FROM "default" GROUP BY trace_id HAVING count(*) > 200`;
     const redraw = async () => {
       await flushPromises();
@@ -5807,6 +5826,22 @@ describe("Index.vue (Main Traces Page)", () => {
         expect(request.type).toBe("traces");
         expect(request.queryReq.filter).toContain("duration > 1");
         expect(mockSqlTexts().sqlTexts.sql).toBe(grouped);
+      });
+
+      it.each([
+        ["the SQL switch", () => wrapper.vm.onOpenSpansSql()],
+        ["a Spans click back to the stored SQL", () => wrapper.vm.onSearchModeChange("spans")],
+        ["Open in Spans view", () => wrapper.vm.onOpenStatementInSpans()],
+      ])("%s cancels the Traces search still streaming", async (_name, open) => {
+        const tracesRequest = await leaveForTraces(grouped);
+        mockCancelStreamQueryBasedOnRequestId.mockClear();
+        open();
+        await redraw();
+        expect(mockSearchObj.meta.searchMode).toBe("spans");
+        expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledWith(
+          expect.objectContaining({ trace_id: tracesRequest.traceId }),
+        );
+        expect(mockSearchObj.loading).toBe(false);
       });
 
       it("the SQL switch opens Spans with SQL on and the stored text, and runs nothing until Run", async () => {

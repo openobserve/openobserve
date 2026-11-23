@@ -215,8 +215,16 @@ export function isNoValue(value: GroupValue | undefined): boolean {
 }
 
 /** The filter text for one group; the (no value) group holds both null and empty values. */
-export function groupTerm(key: string, value: GroupValue, action: "include" | "exclude"): string {
+export function groupTerm(
+  key: string,
+  value: GroupValue,
+  action: "include" | "exclude",
+  textKey = true,
+): string {
   key = /^[a-z_][a-z0-9_]*$/.test(key) ? key : quoteIdentifier(key);
+  if (isNoValue(value) && !textKey) {
+    return action === "include" ? `${key} IS NULL` : `${key} IS NOT NULL`;
+  }
   if (isNoValue(value)) {
     return action === "include"
       ? `(${key} IS NULL OR ${key} = '')`

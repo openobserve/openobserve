@@ -4116,8 +4116,8 @@ export class TracesPage {
     return dataTest.replace(`logs-search-subfield-add-${field}-`, '');
   }
 
-  // Counts _search_stream requests the page sends while `action` runs.
-  async countSearchStreams(action) {
+  // Counts _search_stream requests sent while `action` runs, until `settled` sees the page at rest and 1.5 s after.
+  async countSearchStreams(action, settled) {
     let searches = 0;
     const onRequest = (request) => {
       if (request.url().includes('_search_stream')) searches++;
@@ -4125,7 +4125,9 @@ export class TracesPage {
     this.page.on('request', onRequest);
     try {
       await action();
-      await this.page.waitForTimeout(1000);
+      await settled();
+      // A search the action set off can start after the prompt shows, so counting goes on a little longer.
+      await this.page.waitForTimeout(1500);
     } finally {
       this.page.off('request', onRequest);
     }

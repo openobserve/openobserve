@@ -20,9 +20,6 @@ export interface CodeProps {
    */
   block?: boolean;
 
-  /** Block mode only: wrap long lines inside the box instead of scrolling them sideways. */
-  wrap?: boolean;
-
   /**
    * Show a copy-to-clipboard button.
    * The button copies the rendered text content of the code element.

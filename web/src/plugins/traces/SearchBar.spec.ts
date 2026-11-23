@@ -3975,6 +3975,49 @@ describe("SearchBar", () => {
       expect(searchObjInstance.data.editorValue).toBe("a = 1");
     });
 
+    it("keeps SQL on while the first letters of a keyword are typed into an empty editor", async () => {
+      searchObjInstance.data.editorValue = "";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      await vm.setSqlMode(true);
+      for (const typed of ["S", "Se", "w", "Expl"]) {
+        searchObjInstance.data.editorValue = typed;
+        vm.updateQueryValue(typed);
+        expect(searchObjInstance.meta.sqlMode).toBe(true);
+      }
+    });
+
+    it.each(["w = 1", "exp(duration) > 1", "explain = 'x'"])(
+      "turns SQL off when %s replaces the statement",
+      async (text) => {
+        searchObjInstance.data.editorValue = "";
+        wrapper = mountSearchBar();
+        await flushPromises();
+        const vm = wrapper.vm as any;
+        await vm.setSqlMode(true);
+        searchObjInstance.data.editorValue = text;
+        vm.updateQueryValue(text);
+        expect(searchObjInstance.meta.sqlMode).toBe(false);
+      },
+    );
+
+    it("keeps the filter while the SELECT keyword is retyped over a pre-fill", async () => {
+      searchObjInstance.data.editorValue = "service_name='a'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      await vm.setSqlMode(true);
+      const rest = String(searchObjInstance.data.editorValue).replace(/^SELECT/, "");
+      for (const word of ["s", "se", "sel", "sele", "selec", "select"]) {
+        searchObjInstance.data.editorValue = word + rest;
+        vm.updateQueryValue(word + rest);
+        expect(searchObjInstance.meta.sqlMode).toBe(true);
+      }
+      await vm.setSqlMode(false);
+      expect(searchObjInstance.data.editorValue).toBe("service_name='a'");
+    });
+
     it("never turns SQL on while typing in the Traces view, which runs only a filter", async () => {
       searchObjInstance.meta.searchMode = "traces";
       wrapper = mountSearchBar();

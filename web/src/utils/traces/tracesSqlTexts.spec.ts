@@ -15,7 +15,11 @@
 
 import { beforeAll, describe, expect, it } from "vitest";
 import { reactive } from "vue";
-import { createTracesSqlTexts, type TracesSqlTextsHost } from "./tracesSqlTexts";
+import {
+  createTracesSqlTexts,
+  isKeywordBeingTyped,
+  type TracesSqlTextsHost,
+} from "./tracesSqlTexts";
 
 const parser: { value: any } = { value: null };
 
@@ -121,7 +125,7 @@ describe("two texts", () => {
     expect(ctx.host.meta.scope).toBe("entrypoint");
   });
 
-  it("keeps an empty editor empty, so the template gallery shows", () => {
+  it("keeps an empty editor empty when there is no filter or scope to pre-fill", () => {
     const ctx = setup("spans", "");
     ctx.turnSqlOn();
     expect(ctx.host.meta.sqlMode).toBe(true);
@@ -431,4 +435,16 @@ describe("normalizeTracesView: moving into SQL", () => {
     expect(ctx.host.data.editorValue).toBe(GROUPED);
     expect(ctx.sqlTexts.filter).toBe("a = 1");
   });
+});
+
+describe("isKeywordBeingTyped", () => {
+  it.each(["S", " se ", "Expl", "w", 's * FROM "default"', 'selec * from "default" WHERE a = 1'])(
+    "reads %j as a keyword being typed",
+    (text) => expect(isKeywordBeingTyped(text)).toBe(true),
+  );
+
+  it.each(["w = 1", "exp(duration) > 1", "explain = 'x'", "e = 'from'", '* FROM "default"'])(
+    "reads %j as a filter",
+    (text) => expect(isKeywordBeingTyped(text)).toBe(false),
+  );
 });

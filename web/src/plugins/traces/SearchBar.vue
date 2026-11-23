@@ -862,6 +862,7 @@ import {
 import { allFieldRef, withAllFieldInserts } from "@/utils/traces/tracesAllFields";
 import { offsetRange, tracesSqlGuards } from "@/utils/traces/tracesSqlErrors";
 import { isAuthoredStatement, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
+import { isKeywordBeingTyped } from "@/utils/traces/tracesSqlTexts";
 import { nlSqlToTracesFilter } from "@/plugins/traces/utils/nlSqlToTracesFilter";
 import { chartInterval } from "./metrics/latencyHeatmap";
 import { buildTracesRedPanels, tracesBucketNotice } from "./metrics/tracesRedPanels";
@@ -1404,7 +1405,12 @@ export default defineComponent({
       _sqlOnQueryChange();
       updateAutoComplete(value);
       // Deleting the SELECT turns SQL off, and what is left becomes the filter.
-      if (searchObj.meta.sqlMode && value.trim() !== "" && !isAuthoredStatement(value)) {
+      if (
+        searchObj.meta.sqlMode &&
+        value.trim() !== "" &&
+        !isAuthoredStatement(value) &&
+        !isKeywordBeingTyped(value)
+      ) {
         deleteSqlText();
         return;
       }

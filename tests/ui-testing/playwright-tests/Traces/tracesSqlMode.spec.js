@@ -112,11 +112,10 @@ test.describe("Traces SQL mode testcases", () => {
     const searches = await pm.tracesPage.countSearchStreams(async () => {
       await pm.tracesPage.toggleSqlModeFromToolbar();
       await pm.tracesPage.expectSqlMode(true);
-    });
+    }, () => expect(pm.tracesPage.getSqlAwaitingRun()).toBeVisible({ timeout: 10000 }));
 
     expect(searches).toBe(0);
     await pm.tracesPage.expectQueryEditorValue(PREFILLED);
-    await expect(pm.tracesPage.getSqlAwaitingRun()).toBeVisible({ timeout: 10000 });
     await expect(pm.tracesPage.getToastMessage('SQL runs in the Spans view')).toBeVisible();
 
     await pm.tracesPage.clickToastAction('Back to Traces');
@@ -160,11 +159,10 @@ test.describe("Traces SQL mode testcases", () => {
       );
       await pm.tracesPage.openStatementInSpans();
       await pm.tracesPage.expectSqlMode(true);
-    });
+    }, () => expect(pm.tracesPage.getSqlAwaitingRun()).toBeVisible({ timeout: 10000 }));
 
     expect(searches).toBe(0);
     await pm.tracesPage.expectQueryEditorValue(GROUPED);
-    await expect(pm.tracesPage.getSqlAwaitingRun()).toBeVisible({ timeout: 10000 });
   });
 
   test("P2: A Traces filter holding IN (SELECT ...) sends nothing and names the subquery", {
@@ -182,11 +180,10 @@ test.describe("Traces SQL mode testcases", () => {
       );
       await pm.tracesPage.openStatementInSpans();
       await pm.tracesPage.expectSqlMode(true);
-    });
+    }, () => expect(pm.tracesPage.getSqlAwaitingRun()).toBeVisible({ timeout: 10000 }));
 
     expect(searches).toBe(0);
     await expect.poll(() => pm.tracesPage.getQueryEditorContent()).toContain(`WHERE ${subquery}`);
-    await expect(pm.tracesPage.getSqlAwaitingRun()).toBeVisible({ timeout: 10000 });
   });
 
   test("P1: Sidebar ticks in SQL mode write one IN condition, and unticking takes a value out", {

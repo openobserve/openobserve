@@ -222,6 +222,12 @@ describe("groupTerm", () => {
     expect(groupTerm("user_id", null, "exclude")).toBe("(user_id IS NOT NULL AND user_id != '')");
   });
 
+  it("matches only null for the (no value) row of a non-text key, where '' cannot cast", () => {
+    expect(groupTerm("status_code", null, "include", false)).toBe("status_code IS NULL");
+    expect(groupTerm("status_code", null, "exclude", false)).toBe("status_code IS NOT NULL");
+    expect(groupTerm("http.status", null, "include", false)).toBe(`"http.status" IS NULL`);
+  });
+
   it("quotes a field name that is not a plain identifier", () => {
     expect(groupTerm("http.method", "GET", "include")).toBe(`"http.method" = 'GET'`);
     expect(groupTerm("http.method", null, "include")).toBe(

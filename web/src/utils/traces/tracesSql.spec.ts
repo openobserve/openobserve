@@ -202,6 +202,18 @@ describe("isRowQuery", () => {
     expect(isRowQuery(info(`SELECT x, count(*) FROM "a" GROUP BY x`))).toBe(false);
     expect(isRowQuery(info(`SELECT * FROM (SELECT * FROM "a")`))).toBe(false);
   });
+
+  it("is false for QUALIFY and FETCH FIRST, which change the rows the WHERE count describes", () => {
+    expect(
+      isRowQuery(
+        info(`SELECT *, row_number() OVER (ORDER BY duration) AS rn FROM "a" QUALIFY rn = 1`),
+      ),
+    ).toBe(false);
+    expect(isRowQuery(info(`SELECT * FROM "a" ORDER BY start_time FETCH FIRST 10 ROWS ONLY`))).toBe(
+      false,
+    );
+    expect(sqlPaging(info(`SELECT * FROM "a" FETCH FIRST 10 ROWS ONLY`), 25, 2).paged).toBe(false);
+  });
 });
 
 describe("deriveSpanSet: the RED span-set ladder", () => {
@@ -366,7 +378,7 @@ describe("deriveSpanSet: the RED span-set ladder", () => {
       where: `p.service_name = 'alertmanager' AND p.trace_id IN (SELECT DISTINCT c.trace_id FROM "default" c WHERE c.service_name = 'querier')`,
       keepsSubquery: true,
     });
-    expect(s.dropped).toEqual([]);
+    expect(s.dropped).toEqual(["join"]);
   });
 
   it("rule 9 (d): a WHERE comparing both sides is not applied", () => {
@@ -392,6 +404,24 @@ describe("deriveSpanSet: the RED span-set ladder", () => {
     expect(s.dropped).toEqual(["join"]);
   });
 
+  it("rule 9: a right-side column inside a function still reads the right side", () => {
+    const s = set(
+      `SELECT * FROM "default" a JOIN "default" b ON a.trace_id = b.trace_id WHERE lower(b.service_name) = 'x'`,
+    );
+    expect(s.where).toBe(
+      `a.trace_id IN (SELECT DISTINCT b.trace_id FROM "default" b WHERE lower(b.service_name) = 'x')`,
+    );
+    expect(s.dropped).toEqual([]);
+  });
+
+  it("rule 9: ON conditions beyond trace_id equality are reported as dropped", () => {
+    const s = set(
+      `SELECT * FROM "default" a JOIN "default" b ON a.trace_id = b.trace_id AND b.span_status = 'ERROR' WHERE a.service_name = 'x'`,
+    );
+    expect(s.subject).toBe("joinMatched");
+    expect(s.dropped).toEqual(["join"]);
+  });
+
   it("rule 10: a subquery in the WHERE is kept, with the stream name inside it verbatim", () => {
     const s = set(
       `SELECT _timestamp, trace_id FROM "default" WHERE service_name = 'querier' AND trace_id IN (SELECT trace_id FROM default WHERE span_status = 'ERROR')`,
@@ -413,6 +443,20 @@ describe("deriveSpanSet: the RED span-set ladder", () => {
       where: "span_status = 'ERROR'",
     });
     expect(s.dropped).toEqual(["window", "outerWhere"]);
+  });
+
+  it("rule 11: drops an outer WHERE that wraps a computed alias in a function", () => {
+    const s = set(
+      `SELECT * FROM (SELECT service_name AS svc FROM "default") WHERE lower(svc) = 'x'`,
+    );
+    expect(s.where).toBe("");
+    expect(s.dropped).toEqual(["outerWhere"]);
+  });
+
+  it("rule 11: drops an outer WHERE whose qualified column sits inside a function", () => {
+    const s = set(`SELECT * FROM (SELECT * FROM "default") t WHERE lower(t.service_name) = 'x'`);
+    expect(s.where).toBe("");
+    expect(s.dropped).toEqual(["outerWhere"]);
   });
 
   it("rule 11: an outer WHERE on a stream column is kept", () => {

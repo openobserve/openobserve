@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { SpanSet } from "@/utils/traces/tracesSql";
-import { buildLatencyHeatmapSql, parseBucketUs } from "./latencyHeatmap";
+import { HEATMAP_ROW_LIMIT, buildLatencyHeatmapSql, parseBucketUs } from "./latencyHeatmap";
 
 export interface RedInterval {
   sql: string;
@@ -53,10 +53,11 @@ export function streamSpanSet(stream: string): SpanSet {
 /** One query for Rate and Errors over the span set; its WHERE appears once. */
 export function buildRedSql(set: SpanSet, interval: RedInterval): RedQuery {
   const where = set.where ? ` WHERE (${set.where})` : "";
+  // One row per bucket, so the heatmap's row cap covers every bucket the range can have.
   const sql =
     `${withPrefix(set)}SELECT ${bucketExpr(set, interval)} AS time_bucket, count(*) AS spans, ` +
     `count(*) FILTER (WHERE span_status = 'ERROR') AS errors FROM ${set.from}${where} ` +
-    `GROUP BY time_bucket ORDER BY time_bucket ASC`;
+    `GROUP BY time_bucket ORDER BY time_bucket ASC LIMIT ${HEATMAP_ROW_LIMIT}`;
   return { sql, size: sizeOf(set) };
 }
 

@@ -43,9 +43,14 @@ describe("buildRedSql", () => {
     expect(sql).toBe(
       `SELECT histogram(_timestamp, '1 minute') AS time_bucket, count(*) AS spans, ` +
         `count(*) FILTER (WHERE span_status = 'ERROR') AS errors FROM "default" ` +
-        `WHERE (service_name = 'a') GROUP BY time_bucket ORDER BY time_bucket ASC`,
+        `WHERE (service_name = 'a') GROUP BY time_bucket ORDER BY time_bucket ASC LIMIT 20000`,
     );
     expect(size).toBe(-1);
+  });
+
+  it("caps rows with a LIMIT, as size -1 alone stops at 1,000 buckets", () => {
+    expect(buildRedSql(plain, MINUTE).sql).toMatch(/ORDER BY time_bucket ASC LIMIT 20000$/);
+    expect(buildRedSql(withSubquery, MINUTE).sql).toMatch(/LIMIT 20000$/);
   });
 
   it("buckets a span set that keeps a subquery by modulo and sends size -999", () => {

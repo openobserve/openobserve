@@ -314,7 +314,7 @@ describe("TracesGroupsTable", () => {
 
   it("row click on (no value) matches both null and empty", async () => {
     respond([hit(null, 5, 0)], []);
-    const wrapper = await mountTable();
+    const wrapper = await mountTable({ request: request({ textKey: true }) });
     wrapper
       .findComponent(OTableStub)
       .vm.$emit("row-click", { value: null }, new MouseEvent("click"));
@@ -323,9 +323,18 @@ describe("TracesGroupsTable", () => {
     ]);
   });
 
+  it("row click on (no value) of a non-text key matches null only", async () => {
+    respond([hit(null, 5, 0)], []);
+    const wrapper = await mountTable({ request: request({ key: "status_code", textKey: false }) });
+    wrapper
+      .findComponent(OTableStub)
+      .vm.$emit("row-click", { value: null }, new MouseEvent("click"));
+    expect(wrapper.emitted("open-group")).toEqual([["status_code IS NULL"]]);
+  });
+
   const openMenu = async (value: string | null) => {
     respond([hit(value, 200, 10)], []);
-    const wrapper = await mountTable();
+    const wrapper = await mountTable({ request: request({ textKey: true }) });
     wrapper.findComponent(OTableStub).vm.$emit("cell-contextmenu", {
       columnId: "spans",
       row: { value },
@@ -370,7 +379,7 @@ describe("TracesGroupsTable", () => {
   describe("cell hover actions", () => {
     const hoverOn = async (column: string, value: string | null, key = "service_name") => {
       respond([hit(value, 200, 10)], []);
-      const wrapper = await mountTable({ request: request({ key }) });
+      const wrapper = await mountTable({ request: request({ key, textKey: true }) });
       hoveredColumn.value = column;
       await flushPromises();
       return wrapper;
