@@ -793,9 +793,6 @@
       "popoverLabel": "Parties masquées de cette page"
     }
   },
-  "pageHeader": {
-    "about": "À propos de cette page"
-  },
   "common": {
     "loadingNoun": "Chargement des {noun}…",
     "loadingNouns": {

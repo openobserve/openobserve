@@ -356,7 +356,6 @@ import SampleDataProgressDock from "@/components/sampleData/SampleDataProgressDo
 import EditorDraftSignOutDialog from "@/components/common/drafts/EditorDraftSignOutDialog.vue";
 import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { providePageNavContext } from "@/lib/core/PageHeader/pageContext";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { confirmLeave, releaseLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
@@ -771,10 +770,6 @@ export default defineComponent({
           ? securityNavLinks.value
           : linksList.value,
     );
-    providePageNavContext({
-      links: navLinks,
-      flat: computed(() => store.state.solutionMode === "security"),
-    });
 
     const langList = [
       {

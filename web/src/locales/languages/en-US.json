@@ -793,9 +793,6 @@
       "popoverLabel": "Hidden parts of this page"
     }
   },
-  "pageHeader": {
-    "about": "About this page"
-  },
   "common": {
     "loadingNoun": "Loading {noun}…",
     "loadingNouns": {

@@ -793,9 +793,6 @@
       "popoverLabel": "الأجزاء المخفية من هذه الصفحة"
     }
   },
-  "pageHeader": {
-    "about": "حول هذه الصفحة"
-  },
   "common": {
     "loadingNoun": "جارٍ تحميل {noun}…",
     "loadingNouns": {

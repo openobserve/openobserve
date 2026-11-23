@@ -1484,181 +1484,6 @@ const o2OverlaysApi = {
   },
 };
 
-// ── local/o2-page-header-api ─────────────────────────────────────
-// The stacked page header (guidelines H1–H8, N3, L3): no icon tile, no subtitle, tabs on their
-// own row, Back as the context link on useSmartBack, and one <h1> per page owned by the header.
-const PAGE_HEADER_TAGS = new Set(["OPageHeader", "OPageLayout"]);
-const PAGE_HEADER_REMOVED = {
-  icon: "nothing; the rail shows the area (H2)",
-  subtitle: "about, the ⓘ popover beside the title, or nothing (H2)",
-  "tabs-below": "nothing; tabs always sit on their own row (H8)",
-  "title-overflow": "nothing; a text title truncates, a #title slot owns its overflow",
-  "overflow-first": "nothing; #actions-overflow always precedes #actions (H3)",
-  "title-min-width": "nothing; the band never wraps (H1)",
-};
-const PAGE_HEADER_REMOVED_SLOTS = {
-  subtitle: "the about prop (H2)",
-  "title-trail": "#status (H5)",
-  "title-prefix": "nothing; the title starts at the content edge (H1)",
-  back: "the back prop (H4)",
-};
-// Header slots a hand-built back button could sit in.
-const PAGE_HEADER_SLOTS = new Set([
-  "actions",
-  "actions-overflow",
-  "title",
-  "status",
-  "header-tabs",
-  "tabs",
-]);
-const BACK_ICONS = new Set(["arrow-back", "arrow_back", "arrow-left", "keyboard-backspace"]);
-const BACK_TEXT = /\bback\b/i;
-const isBackCall = (node) => {
-  const callee = node.callee;
-  if (callee?.type !== "MemberExpression") return false;
-  const method = callee.property?.name;
-  const object = callee.object;
-  const owner =
-    object?.type === "Identifier"
-      ? object.name
-      : object?.type === "MemberExpression"
-        ? object.property?.name
-        : object?.type === "CallExpression"
-          ? object.callee?.name
-          : null;
-  if (method === "back") return ["router", "$router", "history", "useRouter"].includes(owner);
-  if (method !== "go") return false;
-  const arg = node.arguments[0];
-  return (
-    ["router", "$router", "history", "useRouter"].includes(owner) &&
-    arg?.type === "UnaryExpression" &&
-    arg.operator === "-"
-  );
-};
-const attrValue = (element, name) => {
-  for (const attr of element.startTag?.attributes ?? []) {
-    const isBind = attr.directive && attr.key?.name?.name === "bind";
-    const key = isBind ? attr.key.argument?.name : attr.directive ? null : attr.key?.name;
-    if (key !== name) continue;
-    return isBind ? stringLiterals(attr.value?.expression).join(" ") : (attr.value?.value ?? "");
-  }
-  return null;
-};
-const isBackButton = (element) => {
-  const tag = pascalTag(element.rawName);
-  if (!["OButton", "button", "a", "RouterLink", "router-link"].includes(tag)) return false;
-  if (BACK_ICONS.has(attrValue(element, "icon") ?? "")) return true;
-  const glyph = (element.children ?? []).some(
-    (child) =>
-      child.type === "VElement" &&
-      pascalTag(child.rawName) === "OIcon" &&
-      BACK_ICONS.has(attrValue(child, "name") ?? ""),
-  );
-  if (glyph) return true;
-  const named = [attrValue(element, "data-test"), attrValue(element, "aria-label")];
-  return named.some((v) => v && /(^|-)back(-|$)/.test(v)) && BACK_TEXT.test(named.join(" "));
-};
-const headerSlotOf = (element) => {
-  for (let node = element?.parent; node; node = node.parent) {
-    if (node.type !== "VElement") continue;
-    if (node.rawName === "template" && PAGE_HEADER_TAGS.has(pascalTag(node.parent?.rawName))) {
-      const slot = node.startTag.attributes.find(
-        (a) => a.directive && a.key?.name?.name === "slot",
-      );
-      return slot?.key?.argument?.name ?? "default";
-    }
-    if (PAGE_HEADER_TAGS.has(pascalTag(node.rawName))) return "default";
-  }
-  return null;
-};
-const o2PageHeaderApi = {
-  rules: {
-    "o2-page-header-api": {
-      meta: {
-        type: "problem",
-        docs: {
-          description:
-            "OPageHeader / OPageLayout: the stacked v2 header, smart Back, one page title",
-        },
-      },
-      create(context) {
-        const sourceCode = context.sourceCode ?? context.getSourceCode();
-        const services = sourceCode.parserServices ?? context.parserServices;
-        const filename = (context.filename ?? context.getFilename()).replace(/\\/g, "/");
-        const inHeaderLib = /\/src\/lib\/core\/Page(Header|Layout)\//.test(filename);
-        const rendersHeader = /<OPage(Header|Layout)\b/.test(sourceCode.text);
-        const inViews = /\/src\/(enterprise\/)?views\//.test(filename);
-        const report = (node, message) => context.report({ node, message });
-        const scriptVisitor = {
-          CallExpression(node) {
-            if (rendersHeader && !inHeaderLib && isBackCall(node)) {
-              report(
-                node,
-                "A page with OPageHeader goes back through useSmartBack, never router.back() (N3).",
-              );
-            }
-          },
-        };
-        if (!services?.defineTemplateBodyVisitor) return scriptVisitor;
-        return services.defineTemplateBodyVisitor(
-          {
-            CallExpression: scriptVisitor.CallExpression,
-            VElement(node) {
-              const tag = pascalTag(node.rawName);
-              if (inViews && !inHeaderLib && (tag === "h1" || attrValue(node, "as") === "h1")) {
-                report(
-                  node.startTag,
-                  "The page title is OPageHeader's <h1>; a view has no other (H1, T2).",
-                );
-              }
-              if (!rendersHeader || !isBackButton(node)) return;
-              const slot = headerSlotOf(node);
-              const besideHeader = (node.parent?.children ?? []).some(
-                (sibling) =>
-                  sibling.type === "VElement" && PAGE_HEADER_TAGS.has(pascalTag(sibling.rawName)),
-              );
-              if ((slot && PAGE_HEADER_SLOTS.has(slot)) || besideHeader) {
-                report(
-                  node.startTag,
-                  'Back is the header\'s context link: pass :back="{ label, to }" instead of a hand-built button (H4, N3).',
-                );
-              }
-            },
-            VAttribute(node) {
-              const element = node.parent?.parent;
-              const isBind = node.directive && node.key?.name?.name === "bind";
-              if (node.directive && !isBind) {
-                if (node.key?.name?.name !== "slot") return;
-                const owner = pascalTag(element?.parent?.rawName);
-                const slot = node.key.argument?.name;
-                if (!PAGE_HEADER_TAGS.has(owner) || !(slot in PAGE_HEADER_REMOVED_SLOTS)) return;
-                report(
-                  node,
-                  `<${owner}> has no #${slot} slot; use ${PAGE_HEADER_REMOVED_SLOTS[slot]}.`,
-                );
-                return;
-              }
-              const tag = pascalTag(element?.rawName);
-              if (!PAGE_HEADER_TAGS.has(tag)) return;
-              const key = isBind ? node.key.argument : node.key;
-              const raw = key?.rawName ?? key?.name;
-              if (typeof raw !== "string") return;
-              const prop = kebab(raw);
-              if (prop in PAGE_HEADER_REMOVED) {
-                report(
-                  node,
-                  `<${tag}> no longer takes "${prop}"; use ${PAGE_HEADER_REMOVED[prop]}.`,
-                );
-              }
-            },
-          },
-          scriptVisitor,
-        );
-      },
-    },
-  },
-};
-
 // Non-translatable tokens, fed to both i18n rules.
 //
 // An entry is a GLOBAL, PERMANENT exemption with no explanation at the call site,
@@ -1937,7 +1762,6 @@ export default [
           ...o2DisplayApi.rules,
           ...o2TableApi.rules,
           ...o2OverlaysApi.rules,
-          ...o2PageHeaderApi.rules,
         },
       },
       "@intlify/vue-i18n": vueI18n,
@@ -1965,7 +1789,6 @@ export default [
       "local/o2-display-api": ["error"],
       "local/o2-table-api": ["error"],
       "local/o2-overlays-api": ["error"],
-      "local/o2-page-header-api": ["error"],
 
       // A missing key is invisible at build time — vue-i18n renders the raw key to
       // the user. Dynamic keys are skipped by the rule; specs are exempted below.

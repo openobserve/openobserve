@@ -15,33 +15,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  OPageLayout: the one page-structure component (L1–L3). Every routed view is an OPageLayout:
-  the stacked OPageHeader (H1–H8), its tab row, a page banner (K3), an optional left rail and the
-  body inset by the one 16 px gutter.
+  OPageLayout — THE single page-structure component. Every routed view is an
+  OPageLayout: it owns the full-height column, the header, an optional left rail,
+  an optional sub-nav strip, and the body's inset. You plug in data (title,
+  actions, tabs, sidebar, body); there is no place to hand-roll a padded <div>,
+  so no screen can drift off the grid.
 
-  Header: :title :back :context :about :titleDataTest, #title #status #actions
-  #actions-overflow #header-tabs, or the rare #header escape hatch.
-  #banner: one OBanner stating a lasting condition of the page, directly under the header.
-  #subnav: a full-width strip under the header.
-  #sidebar: FolderList / SectionRail; `sidebarWidth` (px) or `resizable`.
-  Body: inset to --spacing-page-edge; `bleed` when the body owns its edge (OTable, chart,
-  router-view), `constrained` for a reading column, `scroll` when the whole body scrolls.
+  Header — from props (the normal case):
+    :title :subtitle :icon :back :titleDataTest
+    #actions      — right-aligned header actions (O2 buttons)
+    #actions-overflow — secondary actions; inline on desktop, behind "More" < md
+    #header-tabs  — inline module tabs in the header row (Level-2 nav)
+    #title        — custom title node (when a string title isn't enough)
+    #header       — ESCAPE HATCH: a fully custom header the props can't express.
+                    Prefer the props; reach for this only when you must.
+
+  Sub-nav — a full-width tab/toolbar strip under the header:
+    #subnav       — put an <OTabs> or a filter bar here. It self-aligns to the
+                    page-edge grid and gets a full-bleed bottom divider.
+
+  Left rail — optional:
+    #sidebar      — FolderList / SectionRail. `sidebarWidth` (px) for a fixed
+                    rail, or `resizable` for a drag-resizable OSplitter.
+
+  Body — the default slot. Inset to the ONE `--spacing-page-edge` grid line by
+  default (so it lines up with the header, tabs and rails). Escape hatches:
+    bleed         — full-bleed body: a table/chart/canvas/router-view that owns
+                    its own edge inset (an OTable self-insets its first column).
+    constrained   — center the body in a max-width reading column (forms/settings);
+                    `contentSize` = 'sm'|'md'|'lg'|'xl'.
+    padY          — also apply the standard vertical inset.
+    scroll        — the WHOLE body scrolls (overflow-auto). Default OFF: the body
+                    is a fixed `flex flex-col` column so inner content (a table,
+                    a dashboard) scrolls internally at full height. Turn on only
+                    for a page whose entire body should scroll (a long form).
+
+  v-model:sidebarWidth — bidirectional bind for the rail width (resizable mode).
 -->
 <template>
-  <!-- Named container: the header's status compacts on the page's width, which the AI panel narrows without changing the viewport.
+  <!-- Named container so the header collapses on ITS width, not the viewport: the AI panel narrows the page without changing the viewport.
        Clipped so the body's entry slide never overflows MainLayout's scroll box and flashes its scrollbar. -->
   <div class="@container/page flex h-full flex-col overflow-y-clip">
+    <!-- ── Header (props → OPageHeader, or #header escape hatch) ── -->
+    <!-- Just a shrink-0 slot: OPageHeader draws its OWN border-b (so the header
+         is a consistent 60px). Don't add a border here — it would double the
+         divider and add 1px. -->
     <div v-if="hasHeader" :class="headerClass ?? 'shrink-0'">
       <slot name="header">
         <OPageHeader
           :title="title"
+          :subtitle="subtitle"
+          :icon="icon"
           :back="back"
-          :context="context"
-          :about="about"
           :title-data-test="titleDataTest"
+          :tabs-below="tabsBelow"
+          :title-overflow="titleOverflow"
+          :overflow-first="overflowFirst"
+          :title-min-width="titleMinWidth"
         >
           <template v-if="!!slots.title" #title><slot name="title" /></template>
-          <template v-if="!!slots.status" #status><slot name="status" /></template>
+          <template v-if="!!slots['title-prefix']" #title-prefix
+            ><slot name="title-prefix"
+          /></template>
+          <template v-if="!!slots['title-trail']" #title-trail
+            ><slot name="title-trail"
+          /></template>
+          <template v-if="!!slots.subtitle" #subtitle><slot name="subtitle" /></template>
           <template v-if="!!slots.actions" #actions><slot name="actions" /></template>
           <template v-if="!!slots['actions-overflow']" #actions-overflow
             ><slot name="actions-overflow"
@@ -49,10 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="!!slots['header-tabs']" #tabs><slot name="header-tabs" /></template>
         </OPageHeader>
       </slot>
-    </div>
-
-    <div v-if="!!slots.banner" class="shrink-0" data-test="o-page-layout-banner">
-      <slot name="banner" />
     </div>
 
     <!-- ── Sub-nav strip (tab/toolbar) under the header ──────────── -->
@@ -187,17 +222,37 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import { useFeatureLock } from "@/composables/useFeatureLock";
 import { PAGE_LAYOUT_SIDEBAR_KEY } from "./pageLayoutSidebar";
 import { PAGE_ENTRANCE_KEY } from "./pageEntrance";
-import type { PageHeaderBack } from "@/lib/core/PageHeader/OPageHeader.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+
+interface BackTarget {
+  /** Optional, as on OPageHeader: without it the button reads plain "Back". */
+  label?: I18nText;
+  to?: import("vue-router").RouteLocationRaw;
+  onClick?: () => void;
+  dataTest?: string;
+}
 
 const RAIL_WIDTH = 230;
 
 const props = withDefaults(
   defineProps<{
+    // Header (from props)
     title?: I18nText;
-    back?: PageHeaderBack;
-    context?: I18nText;
-    about?: I18nText;
+    subtitle?: I18nText;
+    icon?: IconName;
+    back?: BackTarget;
     titleDataTest?: string;
+    /** Render #header-tabs on a second row below the title (Level-2 module nav). */
+    tabsBelow?: boolean;
+    /**
+     * Forwarded to OPageHeader. Pass "visible" when #title hosts an interactive
+     * control (an inline-edited page name) so the <h1> stops clipping it.
+     */
+    titleOverflow?: "truncate" | "visible";
+    /** Forwarded to OPageHeader: desktop renders #actions-overflow before #actions. */
+    overflowFirst?: boolean;
+    /** Forwarded to OPageHeader: the title keeps a 10rem floor at every width. */
+    titleMinWidth?: boolean;
     // Body
     bleed?: boolean;
     padY?: boolean;
@@ -216,11 +271,9 @@ const props = withDefaults(
     headerClass?: string;
   }>(),
   {
-    title: undefined,
-    back: undefined,
-    context: undefined,
-    about: undefined,
-    titleDataTest: undefined,
+    tabsBelow: false,
+    overflowFirst: false,
+    titleMinWidth: false,
     bleed: false,
     padY: false,
     scroll: false,
@@ -267,9 +320,12 @@ if (slots.sidebar) {
 const hasHeader = computed(
   () =>
     !!props.title ||
+    !!props.subtitle ||
+    !!props.icon ||
     !!props.back ||
     !!slots.header ||
     !!slots.title ||
+    !!slots.subtitle ||
     !!slots.actions ||
     !!slots["header-tabs"],
 );

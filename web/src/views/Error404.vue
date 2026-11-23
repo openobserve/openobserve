@@ -38,7 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </svg>
       </div>
 
-      <!-- eslint-disable-next-line local/o2-page-header-api -- a standalone page outside the app shell: this is its error state's heading -->
       <h1 class="text-text-heading m-0 mb-3 text-2xl font-semibold">
         {{ t("common.pageNotFound") }}
       </h1>

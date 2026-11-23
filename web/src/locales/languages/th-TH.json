@@ -1386,9 +1386,6 @@
       "matchAll": "ตรงกับข้อความ"
     }
   },
-  "pageHeader": {
-    "about": "เกี่ยวกับหน้านี้"
-  },
   "flow": {
     "stepPicker": {
       "search": "Search Steps…",

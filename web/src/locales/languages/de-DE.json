@@ -793,9 +793,6 @@
       "popoverLabel": "Ausgeblendete Bereiche dieser Seite"
     }
   },
-  "pageHeader": {
-    "about": "Über diese Seite"
-  },
   "common": {
     "loadingNoun": "{noun} werden geladen…",
     "loadingNouns": {

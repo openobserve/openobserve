@@ -793,9 +793,6 @@
       "popoverLabel": "Partes ocultas de esta página"
     }
   },
-  "pageHeader": {
-    "about": "Acerca de esta página"
-  },
   "common": {
     "loadingNoun": "Cargando {noun}…",
     "loadingNouns": {
