@@ -15,7 +15,7 @@ function selectPrompt(id: string) {
 
 <template>
   <section class="flex w-full flex-col gap-3">
-    <div class="text-typography-meta m-0 self-center text-xs font-normal opacity-75">
+    <div class="text-typography-meta m-0 self-center text-xs font-normal">
       {{ t("aiAssistant.welcome.tryOneOfThese") }}
     </div>
 

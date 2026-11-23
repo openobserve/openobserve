@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="summary-text m-0 tracking-[0.03em] whitespace-pre-line"
         v-html="summaryText"
       />
-      <p v-else class="m-0 italic opacity-60">
+      <p v-else class="text-text-secondary m-0 italic">
         {{ t("alerts.anomaly.fillInSetupStepToSeeSummary") }}
       </p>
     </div>

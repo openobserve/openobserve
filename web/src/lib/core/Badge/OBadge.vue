@@ -310,7 +310,7 @@ function handleRemove(e: MouseEvent): void {
     -->
     <span
       v-if="hasTrailing"
-      :class="['shrink-0 border-s border-current/25 leading-none opacity-75', trailingSizeClasses]"
+      :class="['shrink-0 border-s border-current/25 leading-none', trailingSizeClasses]"
     >
       <slot name="trailing">{{ count }}</slot>
     </span>
