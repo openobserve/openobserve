@@ -3022,18 +3022,10 @@ export default defineComponent({
               dashboardPanelData.data.config.table_dynamic_columns = true;
             }
 
-            const liveGrid = autoRun.engine.currentGeneration("grid");
-            const panelRunOpen =
-              !!liveGrid &&
-              !liveGrid.cancelled &&
-              !liveGrid.settled &&
-              autoRun.hasPanelRun(liveGrid.id);
             // A chart load outside a panel run is never recorded, so the URL keeps the last shown query.
-            if (!hasReusableData && !panelRunOpen) {
-              togglePanelRun = autoRun.openPanelRun(() =>
-                searchBarRef.value?.cancelVisualizeQueries?.(),
-              );
-            }
+            togglePanelRun = autoRun.openToggleChartRun(hasReusableData, () =>
+              searchBarRef.value?.cancelVisualizeQueries?.(),
+            );
             autoRun.notePanelScopeApplied();
             // run query
             await copyDashboardDataToVisualize();

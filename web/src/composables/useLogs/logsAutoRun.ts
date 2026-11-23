@@ -700,6 +700,14 @@ function createLogsAutoRun() {
     return panelRun?.generationId === generationId;
   }
 
+  // A chart load outside a panel run is never recorded, so the URL keeps the last shown query.
+  function openToggleChartRun(reusesLogsResults: boolean, abort?: () => void): number | null {
+    if (reusesLogsResults) return null;
+    const live = engine.currentGeneration("grid");
+    if (live && !live.cancelled && !live.settled && hasPanelRun(live.id)) return null;
+    return openPanelRun(abort);
+  }
+
   function searchAroundActive(): boolean {
     return searchAroundShown.value;
   }
@@ -742,6 +750,7 @@ function createLogsAutoRun() {
     isPanelScopeStale,
     executedTimeMatches,
     hasPanelRun,
+    openToggleChartRun,
     panelSignature: (surface: "visualize" | "build") =>
       panelConfigReader
         ? panelConfigSignature(panelConfigReader(surface), readLogsSignature(searchObj()))

@@ -947,6 +947,51 @@ describe("panel records for Visualize and Build (J7)", () => {
     type = "line";
     expect(run().persistReason("visualize", "add-to-dashboard")).toBeTruthy();
   });
+
+  it("a Visualize toggle that reuses the Logs results opens no panel run", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    const before = run().engine.currentGeneration("grid")?.id;
+    expect(run().openToggleChartRun(true)).toBeNull();
+    expect(run().engine.currentGeneration("grid")?.id).toBe(before);
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, false);
+    expect(fakeSearchObj.value.meta.executedPanel).toBeNull();
+  });
+
+  it("a Visualize toggle that loads the chart records the live query once the load ends", () => {
+    const events: any[] = [];
+    run().engine.onExecutedRecorded((event) => events.push(event));
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.data.query = "level = 'warn'";
+    const id = run().openToggleChartRun(false);
+    expect(id).toEqual(expect.any(Number));
+    expect(run().hasPanelRun(id as number)).toBe(true);
+    expect(run().engine.currentGeneration("grid")?.id).toBe(id);
+    run().markPanelDispatched(id as number);
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, false);
+    expect(run().hasPanelRun(id as number)).toBe(false);
+    const recorded = events.filter((e) => e.surface === "visualize");
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0].generation).toBe(id);
+    expect(recorded[0].signature.query).toBe("level = 'warn'");
+  });
+
+  it("a Visualize toggle keeps a panel run already open for the live grid generation", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    const open = run().openPanelRun();
+    expect(run().openToggleChartRun(false)).toBeNull();
+    expect(run().hasPanelRun(open)).toBe(true);
+    expect(run().engine.currentGeneration("grid")?.id).toBe(open);
+    run().engine.cancelGeneration(null, { cause: "user" });
+    const reopened = run().openToggleChartRun(false);
+    expect(reopened).toEqual(expect.any(Number));
+    expect(reopened).not.toBe(open);
+    expect(run().hasPanelRun(reopened as number)).toBe(true);
+  });
 });
 
 describe("item 1: scan consent in the signature, the Stop guard and G1 inputs", () => {
