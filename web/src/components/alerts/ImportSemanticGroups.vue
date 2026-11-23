@@ -38,23 +38,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="jsonFile"
                 :label="t('correlation.importSemanticGroups.selectJsonFile')"
                 accept=".json"
+                variant="compact"
                 @update:model-value="loadFile"
+                @clear="clearFile"
                 data-test="semantic-groups-import-file"
-                class="compact-file-input"
-              >
-                <template v-slot:prepend>
-                  <OIcon name="cloud-upload" size="sm" />
-                </template>
-                <template v-slot:append>
-                  <OIcon
-                    v-if="jsonFile"
-                    name="close"
-                    size="sm"
-                    @click.stop="clearFile"
-                    class="cursor-pointer"
-                  />
-                </template>
-              </OFile>
+              />
             </div>
             <div class="col-md-4 w-full ps-2 text-right">
               <OButton

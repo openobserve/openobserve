@@ -56,12 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-import-json-file-input"
             :model-value="jsonFiles"
             @update:model-value="updateFiles"
-            :label="t('dashboard.dropFileMsg')"
             accept=".json"
             multiple
-            drop-zone
-            :help-text="t('alerts.jsonFilesOnlyHint')"
-            size="md"
+            :validate="validateJsonFile"
           />
         </div>
         <div class="w-[30%] max-md:w-full">
@@ -290,6 +287,7 @@ import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
+import { createJsonFileValidator } from "@/lib/forms/File/validateJsonFile";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import {
@@ -343,6 +341,7 @@ export default defineComponent({
 
     type AlertErrors = (ErrorMessage | string)[][];
     const { t } = useI18nTyped();
+    const validateJsonFile = createJsonFileValidator(t);
     const store = useStore();
     const router = useRouter();
 
@@ -1133,6 +1132,7 @@ export default defineComponent({
     };
 
     return {
+      validateJsonFile,
       t,
       raw,
       importJson,
