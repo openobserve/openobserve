@@ -91,11 +91,12 @@ describe("useBrowserMatches", () => {
     expect(useBrowserMatches("org").copy.value).toBeNull();
   });
 
-  it("replaces every source on a Home save", () => {
+  it("replaces every source on a Home save, keeping only a set-up pack's last source", () => {
     const matches = useBrowserMatches("org");
     matches.saveFull(result([source("kubernetes", "kubernetes"), NGINX]), ["hosts"]);
     matches.saveBuiltIn([HOSTS], ["kubernetes"], { packId: "kubernetes", label: "Kubernetes" });
-    expect(matches.copy.value?.sources.map(({ id }) => id)).toEqual(["hosts"]);
+    expect(matches.copy.value?.sources.map(({ id }) => id)).toEqual(["hosts", "kubernetes"]);
+    expect(matches.visible.value.map(({ id }) => id)).toEqual(["hosts"]);
     expect(matches.copy.value?.installedPackIds).toEqual(["kubernetes"]);
     expect(matches.copy.value?.interrupted?.packId).toBe("kubernetes");
   });
@@ -142,15 +143,52 @@ describe("useBrowserMatches", () => {
     expect(useBrowserMatches("org").visible.value).toEqual([HOSTS]);
   });
 
-  it("drops an installed source and records a built-in pack as installed", () => {
+  it("records a built-in pack as installed and hides its source, keeping it for an undo", () => {
     const matches = useBrowserMatches("org");
     matches.saveFull(result([HOSTS, NGINX]), ["kubernetes"]);
     matches.markInstalled("hosts", "hosts");
+    expect(matches.visible.value).toEqual([NGINX]);
+    expect(matches.copy.value?.installedPackIds).toEqual(["kubernetes", "hosts"]);
+    matches.markInstalled("library-k8s");
+    expect(matches.copy.value?.installedPackIds).toEqual(["kubernetes", "hosts"]);
+  });
+
+  it("lists a pack again after its setup is undone, and keeps that across a reload", () => {
+    const matches = useBrowserMatches("org");
+    matches.saveFull(result([HOSTS, NGINX]), []);
+    matches.markInstalled("hosts", "hosts");
+    expect(matches.count.value).toBe(1);
+    matches.markRemoved("hosts");
+    expect(matches.count.value).toBe(2);
+    expect(matches.copy.value?.installedPackIds).toEqual([]);
+    resetBrowserMatches();
+    expect(useBrowserMatches("org").visible.value).toEqual([HOSTS, NGINX]);
+  });
+
+  it("lists a pack again after an undo that follows a check run while it was set up", () => {
+    const matches = useBrowserMatches("org");
+    matches.saveFull(result([HOSTS, NGINX]), []);
+    matches.markInstalled("hosts", "hosts");
+    matches.saveFull(result([NGINX]), ["hosts"]);
+    expect(matches.count.value).toBe(1);
+    matches.markRemoved("hosts");
+    expect(matches.visible.value).toEqual([NGINX, HOSTS]);
+    expect(matches.count.value).toBe(2);
+  });
+
+  it("drops a set-up pack's old source once a check finds it no longer set up", () => {
+    const matches = useBrowserMatches("org");
+    matches.saveFull(result([HOSTS]), []);
+    matches.markInstalled("hosts", "hosts");
+    matches.saveFull(result([NGINX]), []);
     expect(matches.copy.value?.sources).toEqual([NGINX]);
-    expect(matches.copy.value?.installedPackIds).toEqual(["kubernetes", "hosts"]);
-    matches.markInstalled("postgresql");
-    expect(matches.copy.value?.sources).toEqual([]);
-    expect(matches.copy.value?.installedPackIds).toEqual(["kubernetes", "hosts"]);
+  });
+
+  it("clears an interrupted setup of the pack that was undone", () => {
+    const matches = useBrowserMatches("org");
+    matches.saveFull(result([HOSTS]), [], { packId: "hosts", label: "Hosts" });
+    matches.markRemoved("hosts");
+    expect(matches.copy.value?.interrupted).toBeNull();
   });
 
   it("shows once a check has run, even with every match set up or none found", () => {

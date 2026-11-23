@@ -35,7 +35,7 @@ export interface BrowserInterrupted {
 export interface BrowserMatchCopy {
   /** Milliseconds since epoch of the last check that ran in this browser. */
   checkedAt: number;
-  /** Built-in packs not yet set up; a copy from an older check may hold Library groups, which load drops. */
+  /** Built-in packs, set-up ones hidden by `installedPackIds`; load drops older copies' Library groups. */
   sources: FindMoreSource[];
   /** Built-in pack ids known to be installed at the last check. */
   installedPackIds: string[];
@@ -125,6 +125,7 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
     interrupted: BrowserInterrupted | null,
   ): void;
   markInstalled(sourceId: string, packId?: string): void;
+  markRemoved(packId: string): void;
 } {
   const state = computed(() => stateOf(toValue(org)));
   const copy = computed(() => state.value.copy);
@@ -143,17 +144,27 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
     writeJson(matchesKey(toValue(org)), next);
   };
 
+  const save = (
+    sources: FindMoreSource[],
+    installedPackIds: string[],
+    interrupted: BrowserInterrupted | null,
+    checkedAt: number,
+  ) => {
+    const installed = [...new Set(installedPackIds)];
+    const fresh = builtInOnly(sources);
+    // A check leaves out a set-up pack, so its last source is kept for an undo to list it again.
+    const kept = (copy.value?.sources ?? []).filter(
+      ({ packId }) =>
+        !!packId && installed.includes(packId) && !fresh.some((row) => row.packId === packId),
+    );
+    setCopy({ checkedAt, sources: [...fresh, ...kept], installedPackIds: installed, interrupted });
+  };
+
   const saveFull = (
     result: FindMoreResult,
     installedPackIds: string[],
     interrupted: BrowserInterrupted | null = null,
-  ) =>
-    setCopy({
-      checkedAt: Date.now(),
-      sources: builtInOnly(result.sources),
-      installedPackIds: [...new Set(installedPackIds)],
-      interrupted,
-    });
+  ) => save(result.sources, installedPackIds, interrupted, Date.now());
 
   const saveBuiltIn = (
     sources: FindMoreSource[],
@@ -161,20 +172,16 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
     interrupted: BrowserInterrupted | null,
   ) =>
     // Home's check is not a full check, so it keeps the last full check time.
-    setCopy({
-      checkedAt: copy.value?.checkedAt ?? Date.now(),
-      sources: builtInOnly(sources),
-      installedPackIds: [...new Set(installedPackIds)],
-      interrupted,
-    });
+    save(sources, installedPackIds, interrupted, copy.value?.checkedAt ?? Date.now());
 
   const markInstalled = (sourceId: string, packId?: string) => {
     const current = copy.value;
     if (!current) return;
     const builtIn = !!packId && isBuiltIn(packId);
+    // A built-in source stays, hidden by its installed id, so an undo can list it again.
     setCopy({
       ...current,
-      sources: current.sources.filter(({ id }) => id !== sourceId),
+      sources: builtIn ? current.sources : current.sources.filter(({ id }) => id !== sourceId),
       installedPackIds: builtIn
         ? [...new Set([...current.installedPackIds, packId])]
         : current.installedPackIds,
@@ -182,5 +189,15 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
     });
   };
 
-  return { copy, visible, count, show, saveFull, saveBuiltIn, markInstalled };
+  const markRemoved = (packId: string) => {
+    const current = copy.value;
+    if (!current) return;
+    setCopy({
+      ...current,
+      installedPackIds: current.installedPackIds.filter((id) => id !== packId),
+      interrupted: current.interrupted?.packId === packId ? null : current.interrupted,
+    });
+  };
+
+  return { copy, visible, count, show, saveFull, saveBuiltIn, markInstalled, markRemoved };
 }

@@ -361,6 +361,23 @@ describe("StarterPackHeaderChip", () => {
     expect(find(wrapper, "pane-kubernetes").exists()).toBe(true);
   });
 
+  it("offers a pack again after setup, a full check and an undo", async () => {
+    save([K8S]);
+    const matches = useBrowserMatches(ORG);
+    matches.markInstalled("kubernetes", "kubernetes");
+    // A full check drops the set-up pack, as groupFindMore leaves out owned items.
+    save([], ["kubernetes"]);
+    const wrapper = render();
+    expect(find(wrapper, "header-starter-packs-count").text()).toBe("0");
+    delete fake.records.kubernetes;
+    matches.markRemoved("kubernetes");
+    await flushPromises();
+    expect(find(wrapper, "header-starter-packs-count").text()).toBe("1");
+    await open(wrapper);
+    expect(railIds(wrapper)).toEqual(["kubernetes"]);
+    wrapper.unmount();
+  });
+
   it("says when nothing matches, keeping Check Again (M7)", async () => {
     save([]);
     const wrapper = render();

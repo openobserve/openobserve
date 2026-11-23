@@ -641,6 +641,10 @@ onMounted(() => {
   if (!installed.value && !flow.forbidden.value) void loadDestinations();
   ensurePreview();
 });
+// Undo or Remove turns a pack opened as set up back into a Review, which needs the destinations.
+watch(installed, (now) => {
+  if (!now && destinations.value === null && !flow.forbidden.value) void loadDestinations();
+});
 // A setup that ends while this shows moves to Ready, with any failures on their rows.
 watch(
   () => flow.running.value,

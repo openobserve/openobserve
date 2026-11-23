@@ -839,10 +839,8 @@ describe("StarterPackDrawer", () => {
     const wrapper = await shown();
     await submit(wrapper).trigger("click");
     await flushPromises();
-    expect(useBrowserMatches("org").copy.value).toMatchObject({
-      sources: [],
-      installedPackIds: ["kubernetes"],
-    });
+    expect(useBrowserMatches("org").visible.value).toEqual([]);
+    expect(useBrowserMatches("org").copy.value?.installedPackIds).toEqual(["kubernetes"]);
   });
 
   it("keeps the header match and stays put when the install failed", async () => {
@@ -1319,6 +1317,31 @@ describe("StarterPackDrawer", () => {
     expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
       "Kept 2 items that were changed or are still in use. Delete them on their own pages.",
     );
+  });
+
+  it("loads the destinations after Undo, so the pack can be set up again at once", async () => {
+    const reads = vi.fn(async () => [SLACK]);
+    mocks.read = reads;
+    const flow = ready({
+      installed: ref(true),
+      canUndo: ref(true),
+      removal: shallowRef({
+        removed: [],
+        kept: [{ kind: "alert", itemId: "a1", reason: "changed" }],
+      }),
+      undo: vi.fn(async () => {
+        flow.installed.value = false;
+        return true;
+      }),
+    });
+    const wrapper = await shown(flow);
+    expect(reads).not.toHaveBeenCalled();
+    await wrapper.get('[data-test="starter-pack-progress-undo-btn"]').trigger("click");
+    await wrapper.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
+    await flushPromises();
+    expect(reads).toHaveBeenCalledTimes(1);
+    expect(has(wrapper, "starter-pack-alert-setup-dest-loading")).toBe(false);
+    expect(submit(wrapper).attributes("disabled")).toBeUndefined();
   });
 
   it("names the built-in pack calmly when the Library is out of reach", () => {
