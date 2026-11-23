@@ -310,21 +310,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :default-columns="false"
               >
                 <template #empty>
-                  <OEmptyState
+                  <div
                     v-if="hasSegmentFilteredOutAllRows"
-                    kind="filtered"
-                    :text="t('rum.noMatchingSessions')"
+                    class="flex flex-col items-center gap-2 py-8"
                     data-test="rum-app-sessions-segment-empty"
                   >
-                    <template #actions>
-                      <OButton
-                        data-test="rum-app-sessions-reset-segments-btn"
-                        @click="resetSegments"
-                      >
-                        {{ t("rum.resetFilters") }}
-                      </OButton>
-                    </template>
-                  </OEmptyState>
+                    <p>{{ t("rum.noMatchingSessions") }}</p>
+                    <OButton
+                      variant="secondary"
+                      data-test="rum-app-sessions-reset-segments-btn"
+                      @click="resetSegments"
+                    >
+                      {{ t("rum.resetFilters") }}
+                    </OButton>
+                  </div>
                   <NoData v-else />
                 </template>
                 <template #cell-action_play="{ row }">
@@ -427,10 +426,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="bg-card-glass-bg">
         <div class="enable-rum max-w-[64rem] p-4">
           <div class="pb-4">
-            <div class="pb-3 text-left text-xl font-semibold">
+            <div class="pb-3 text-left text-xl font-bold font-semibold">
               {{ t("rum.discoverSessionTitle") }}
             </div>
-            <div class="text-sm font-medium">
+            <div class="text-base font-medium">
               {{ t("rum.discoverSessionMessage") }}
             </div>
             <div>
@@ -509,7 +508,6 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import useStreams from "@/composables/useStreams";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import useSessionHeatmap from "@/composables/rum/useSessionHeatmap";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ShareButton from "@/components/common/ShareButton.vue";

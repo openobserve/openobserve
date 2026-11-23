@@ -331,7 +331,7 @@ describe("PatternDetailsDialog", () => {
 
     it("should pass the localized title to ODrawer", () => {
       const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("title")).toBe("Pattern details");
+      expect(drawer.props("title")).toBe("Pattern Details");
     });
 
     it("should pass the localized subTitle to ODrawer", () => {
@@ -380,7 +380,7 @@ describe("PatternDetailsDialog", () => {
   describe("Header (title / subtitle)", () => {
     it("should display the drawer title in the rendered header stub", () => {
       const title = wrapper.find('[data-test-stub="o-drawer-title"]');
-      expect(title.text()).toBe("Pattern details");
+      expect(title.text()).toBe("Pattern Details");
     });
 
     it("should display pattern count in the subtitle stub", () => {
@@ -447,7 +447,7 @@ describe("PatternDetailsDialog", () => {
   describe("Template Section", () => {
     it("should display pattern template", () => {
       const text = wrapper.text();
-      expect(text).toContain("Pattern template");
+      expect(text).toContain("Pattern Template");
       expect(text).toContain("User * logged in from IP *");
     });
   });
@@ -491,7 +491,7 @@ describe("PatternDetailsDialog", () => {
   describe("Examples Section", () => {
     it("should display examples section header with count", () => {
       const text = wrapper.text();
-      expect(text).toContain("Example logs (2)");
+      expect(text).toContain("Example Logs (2)");
     });
 
     it("should display all example log messages", () => {
@@ -509,7 +509,7 @@ describe("PatternDetailsDialog", () => {
       });
 
       const text = wrapper.text();
-      expect(text).not.toContain("Example logs");
+      expect(text).not.toContain("Example Logs");
     });
   });
 
@@ -589,7 +589,7 @@ describe("PatternDetailsDialog", () => {
     it("should render the drawer body content when selectedPattern exists", () => {
       const body = wrapper.find('[data-test-stub="o-drawer-body"]');
       expect(body.exists()).toBe(true);
-      expect(body.text()).toContain("Pattern template");
+      expect(body.text()).toContain("Pattern Template");
     });
 
     it("should not render selected-pattern content when modelValue=false and selectedPattern is null", () => {
@@ -606,7 +606,7 @@ describe("PatternDetailsDialog", () => {
       // pattern content should be visible.
       expect(wrapperWithoutPattern.find('[data-test-stub="o-drawer-body"]').exists()).toBe(false);
       expect(wrapperWithoutPattern.find('[data-test-stub="o-drawer-footer"]').exists()).toBe(false);
-      expect(wrapperWithoutPattern.text()).not.toContain("Pattern template");
+      expect(wrapperWithoutPattern.text()).not.toContain("Pattern Template");
       expect(wrapperWithoutPattern.text()).not.toContain("Occurrences");
     });
   });
@@ -616,7 +616,7 @@ describe("PatternDetailsDialog", () => {
   describe("variableColumns definition", () => {
     it("should render Variable Name column header in variables table", () => {
       const text = wrapper.text();
-      expect(text).toContain("Variable name");
+      expect(text).toContain("Variable Name");
     });
 
     it("should render Type column header in variables table", () => {

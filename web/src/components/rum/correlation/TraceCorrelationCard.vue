@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="border-card-glass-border rounded-default mt-3 border border-solid">
-    <div class="text-text-heading ms-1 mb-2 text-sm font-semibold">
+    <div class="text-text-heading ms-1 mb-2 text-base font-bold">
       {{ t("traces.correlation.distributedTrace") }}
     </div>
 
@@ -27,13 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <OEmptyState
-      v-else-if="!traceId"
-      size="compact"
-      class="px-3"
-      icon="timeline"
-      :title="t('traces.correlation.noTraceInfoAvailable')"
-    />
+    <template v-else-if="!traceId">
+      <div class="text-text-muted p-3 text-center">
+        <OIcon name="info" size="md" class="mb-2" />
+        <div>{{ t("traces.correlation.noTraceInfoAvailable") }}</div>
+      </div>
+    </template>
 
     <template v-else>
       <!-- Trace ID Section -->
@@ -106,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="bg-surface-accent rounded-default p-2 text-sm">
             <div class="mb-1 flex items-center">
               <div class="text-text-label w-5/12">{{ t("traces.correlation.totalDuration") }}</div>
-              <div class="w-7/12 font-semibold">{{ performanceData.total_duration_ms }}ms</div>
+              <div class="w-7/12 font-bold">{{ performanceData.total_duration_ms }}ms</div>
             </div>
             <div class="mb-1 flex items-center" v-if="performanceData.browser_duration_ms">
               <div class="text-text-label w-5/12">{{ t("traces.correlation.browserLabel") }}</div>
@@ -203,7 +202,6 @@ import { normalizeTraceId } from "@/utils/rum/fields";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";

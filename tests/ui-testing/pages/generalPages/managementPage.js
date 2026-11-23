@@ -38,7 +38,7 @@ export
         // the click until the settings page actually renders.
         await expect(async () => {
             await this.managementMenuItem.click({ force: true });
-            await expect(this.page.getByRole('main')).toContainText('General settings', { timeout: 5000 });
+            await expect(this.page.getByRole('main')).toContainText('General Settings', { timeout: 5000 });
         }).toPass({ timeout: 30000 });
     }
 

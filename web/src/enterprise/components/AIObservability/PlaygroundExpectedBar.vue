@@ -24,7 +24,7 @@
       <span class="text-text-heading text-2xs font-semibold">
         {{ t("aiObservability.playground.expectedLabel") }}
       </span>
-      <span class="text-text-tertiary text-2xs">
+      <span class="text-text-tertiary text-3xs">
         {{ t("aiObservability.playground.expectedHint") }}
       </span>
     </div>
@@ -39,7 +39,7 @@
          present, so lighting it never reflows the row. -->
     <div
       ref="fieldRef"
-      class="rounded-default min-w-0 flex-1 ring-2 transition-colors motion-reduce:transition-none"
+      class="rounded-default min-w-0 flex-1 ring-2 transition-colors duration-300 motion-reduce:transition-none"
       :class="flashing ? 'ring-accent' : 'ring-transparent'"
       :data-flashing="flashing || undefined"
       data-test="ai-playground-expected-field"

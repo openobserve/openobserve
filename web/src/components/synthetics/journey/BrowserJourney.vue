@@ -43,7 +43,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -1571,6 +1570,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <OButton
           variant="secondary"
           size="sm"
+          icon="add"
           :disabled="addDisabled"
           class="max-md:hidden"
           data-test="synthetics-journey-add-step-btn"
@@ -2180,15 +2180,23 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
 
     <!-- Normal step list (shown when not recording) -->
     <!-- Empty state -->
-    <OEmptyState
+    <div
       v-else-if="modelValue.length === 0"
-      icon="open-in-browser"
-      :title="t('synthetics.journey.noSteps')"
-      :action-label="t('synthetics.journey.recordJourney')"
-      :secondary-action-label="t('synthetics.journey.addStepManually')"
-      @action="onRecordButtonClick"
-      @secondary-action="addStep"
-    />
+      class="flex flex-col items-center justify-center gap-4 py-16 text-center"
+    >
+      <OIcon name="open-in-browser" size="xl" class="text-text-muted" aria-hidden="true" />
+      <h3 class="text-text-heading m-0 text-base font-semibold">
+        {{ t("synthetics.journey.noSteps") }}
+      </h3>
+      <div class="flex items-center gap-3">
+        <OButton variant="primary" @click="onRecordButtonClick">{{
+          t("synthetics.journey.recordJourney")
+        }}</OButton>
+        <OButton variant="secondary" @click="addStep">{{
+          t("synthetics.journey.addStepManually")
+        }}</OButton>
+      </div>
+    </div>
 
     <!-- JourneySteps — draggable/selectable/expandable as mode permits -->
     <JourneySteps

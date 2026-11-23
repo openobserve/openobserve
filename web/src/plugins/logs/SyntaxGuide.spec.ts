@@ -410,7 +410,7 @@ describe("SyntaxGuide.vue", () => {
   it("should give the toolbar variant the md toolbar height as a secondary button", () => {
     wrapper = createWrapper({ toolbar: true, label: "Syntax Guide" });
     const button = wrapper.findComponent({ name: "OButton" });
-    expect(button.attributes("data-o2-variant")).toBe("secondary");
+    expect(button.props("variant")).toBe("secondary");
     expect(button.classes()).toContain("h-control-md");
     expect(button.classes()).toContain("text-compact");
   });

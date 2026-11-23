@@ -243,7 +243,7 @@ vi.mock("@/services/online-evals.service", async (importOriginal) => {
         list: vi.fn(async () => [{ entity_id: "quality-score", name: "Quality Score" }]),
       },
       scorers: {
-        list: vi.fn(async () => [{ entityId: "llm-judge", name: "LLM judge" }]),
+        list: vi.fn(async () => [{ entityId: "llm-judge", name: "LLM Judge" }]),
       },
       jobs: {
         list: vi.fn(async () => [{ id: "daily-eval", name: "Daily Eval" }]),
@@ -337,7 +337,7 @@ const RESOURCE_CATALOG = [
   },
   {
     key: "service_accounts",
-    display_name: "Service accounts",
+    display_name: "Service Accounts",
     has_entities: false,
     top_level: true,
     visible: true,
@@ -364,7 +364,7 @@ const RESOURCE_CATALOG = [
   },
   {
     key: "provider",
-    display_name: "LLM providers",
+    display_name: "LLM Providers",
     has_entities: true,
     top_level: true,
     visible: true,
@@ -373,7 +373,7 @@ const RESOURCE_CATALOG = [
   },
   {
     key: "score_config",
-    display_name: "Score configs",
+    display_name: "Score Configs",
     has_entities: true,
     top_level: true,
     visible: true,
@@ -443,7 +443,7 @@ const RUM_RESOURCE_CATALOG = [
   ...RESOURCE_CATALOG,
   {
     key: "sourcemaps",
-    display_name: "Source maps",
+    display_name: "Source Maps",
     has_entities: false,
     top_level: true,
     visible: true,
@@ -828,7 +828,7 @@ describe("EditRole - entities population", () => {
     );
     expect(resource.entities[0]).toMatchObject({
       name: "llm-judge",
-      display_name: "LLM judge",
+      display_name: "LLM Judge",
       resourceName: "scorer",
     });
     expect(resource.is_loading).toBe(false);
@@ -1834,7 +1834,7 @@ describe("EditRole - module navigation", () => {
     await openStreamType(wrapper, "metrics");
 
     const ownScope = wrapper.vm.activeModuleView.scopes.find((scope) => scope.key === "metrics");
-    expect(String(ownScope.hint)).toContain("Every stream");
+    expect(String(ownScope.hint)).toContain("Every Stream");
   });
 
   it("lists every stream of the type, not a truncated slice", async () => {
@@ -2598,7 +2598,7 @@ describe("EditRole - active module view [characterization]", () => {
     const vm = await mountEditRoleVm();
     await openModuleView(vm, "provider");
 
-    expect(vm.activeModuleView.trail).toEqual(["LLM providers"]);
+    expect(vm.activeModuleView.trail).toEqual(["LLM Providers"]);
     expect(vm.activeModuleView.scopes.map((scope) => scope.key)).toEqual(["provider"]);
     expect(vm.activeModuleView.entities).toBe(vm.resourceMapper.provider.entities);
     expect(vm.activeModuleView.entities.map((row) => row.name)).toEqual(["openai"]);

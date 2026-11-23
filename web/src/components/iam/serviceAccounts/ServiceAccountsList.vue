@@ -36,7 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-menu-data-test="service-accounts-row-more-actions"
           :loading="loading"
           :forbidden="forbidden"
-          :error="loadError"
           forbidden-resource="service_accounts"
           pagination="client"
           :page-size="20"
@@ -54,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :persist-columns="true"
           table-id="iam-service-accounts-list"
           @update:selected-ids="handleSelectedIdsUpdate"
-          @retry="refreshServiceAccounts"
         >
           <template #toolbar>
             <div class="flex flex-1 items-center gap-2 max-md:contents">
@@ -97,21 +95,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-email="{ row }">
-            <span v-if="row.is_system" class="inline-flex max-w-full min-w-0 items-center gap-2">
-              <span
-                data-test="service-accounts-system-account-label"
-                class="min-w-0 truncate font-medium"
-              >
-                {{ row.first_name }}
-                <OTooltip overflow-only />
-              </span>
+            <template v-if="row.is_system">
+              <span data-test="service-accounts-system-account-label" class="font-medium">{{
+                row.first_name
+              }}</span>
               <OTag
                 data-test="service-accounts-system-badge"
                 type="serviceAccountKind"
                 value="system"
-                class="shrink-0"
+                class="ms-2"
               />
-            </span>
+            </template>
             <template v-else-if="isSyntheticSA(row.email)">
               <!-- UI-created accounts store `<name>.<org>@sa.internal`; show
                      the friendly name first, full identifier (the Basic-auth
@@ -122,10 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="service-accounts-list-name-link"
                   >{{ saDisplayName(row.email) }}</ONameLinkCell
                 >
-                <span class="text-text-secondary truncate text-xs">
-                  {{ row.email }}
-                  <OTooltip overflow-only />
-                </span>
+                <span class="text-text-secondary text-xs">{{ row.email }}</span>
               </div>
             </template>
             <template v-else>
@@ -190,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-accounts-system-managed-badge"
               class="inline-flex items-center gap-1"
             >
-              <OIcon name="lock" size="sm" class="text-text-secondary cursor-help" />
+              <OTag type="serviceAccountKind" value="managed" />
               <OTooltip :content="t('serviceAccounts.row.managedByTooltip')" />
             </span>
           </template>
@@ -463,8 +454,7 @@ import { useQuery } from "@tanstack/vue-query";
 import { serviceAccountsQuery } from "@/services/service_accounts.queries";
 import { allUserRolesQuery } from "@/services/users.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { defineComponent, ref, toRef, onBeforeMount, computed, watch } from "vue";
-import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
+import { defineComponent, ref, onBeforeMount, computed, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -515,7 +505,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { forbiddenState, loadErrorText } from "@/utils/featureGate";
+import { forbiddenState } from "@/utils/featureGate";
 export default defineComponent({
   name: "ServiceAccountsList",
   components: {
@@ -560,10 +550,7 @@ export default defineComponent({
     const isCurrentUserInternal = ref(false);
     const isShowToken = ref(false);
     const confirmRefresh = ref(false);
-    const filterQuery = toRef(
-      useListViewState("iam-serviceAccounts", { filterQuery: "" }, { url: LIST_URL_PARAMS }),
-      "filterQuery",
-    );
+    const filterQuery = ref("");
     const toBeRefreshed = ref<{ email?: string }>({});
 
     const serviceToken = ref("");
@@ -763,7 +750,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: 220,
+        size: COL.description,
         minSize: 160,
         meta: { align: "left", flex: true },
       },
@@ -776,7 +763,7 @@ export default defineComponent({
         sortable: false,
         resizable: true,
         hideable: true,
-        size: 130,
+        size: 160,
         minSize: 120,
         meta: {
           align: "left",
@@ -857,18 +844,7 @@ export default defineComponent({
       Object.assign(serviceAccountsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
     );
 
-    // A failed read with no rows on screen is the error state, never the first-run one (K5).
-    const loadError = computed(() =>
-      serviceAccountsState.service_accounts_users.length
-        ? null
-        : loadErrorText(serviceAccountsList.error.value, t("emptyState.loadError.description")),
-    );
-    // `isPending` is the cold read; a retry from the error state shows the skeleton again.
-    const loading = computed(
-      () =>
-        serviceAccountsList.isPending.value ||
-        (!!loadError.value && serviceAccountsList.isFetching.value),
-    );
+    const loading = serviceAccountsList.isPending;
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = serviceAccountsList.isFetching;
@@ -1246,7 +1222,6 @@ export default defineComponent({
       rowMenu,
       isSystemRow,
       loading,
-      loadError,
       fetching,
       lastUpdatedAt,
       forbidden,

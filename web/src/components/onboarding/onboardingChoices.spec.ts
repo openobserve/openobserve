@@ -15,7 +15,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { aiCategoriesWithLogos as aiCategories } from "@/components/ingestion/ai/cardLogos";
+import { aiCategories } from "@/components/ingestion/ai/data";
 import { hasDataSourceCard } from "@/components/ingestion/setupCard/registry";
 import useEnterpriseRoutes from "@/composables/shared/useEnterpriseRoutes";
 import useIngestionRoutes from "@/composables/shared/useIngestionRoutes";

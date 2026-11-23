@@ -23,16 +23,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bleed
       scroll
     >
-      <div v-if="loading" class="p-3" data-test="org-storage-settings-loading-indicator">
-        <OSkeleton shape="block" class="h-48 max-w-170" />
+      <!-- Loading state -->
+      <div
+        v-if="loading"
+        class="flex min-h-[calc(100vh-var(--navbar-height)-7.5rem)] items-center justify-center"
+      >
+        <OSpinner size="lg" data-test="org-storage-settings-loading-indicator" />
       </div>
 
-      <OEmptyState
-        v-else-if="isCloud && !orgStorageEnabled"
-        kind="denied"
-        :title="t('storage_settings.notEnabled', { product: t('storage_settings.tabLabel') })"
-        data-test="org-storage-settings-not-enabled"
-      />
+      <!-- Cloud: storage not enabled -->
+      <div v-else-if="isCloud && !orgStorageEnabled" class="text-text-secondary py-3 text-sm">
+        {{ t("storage_settings.notEnabled", { product: t("storage_settings.tabLabel") }) }}
+      </div>
 
       <!-- ========== NOT CONFIGURED: cloud hero ========== -->
       <div
@@ -43,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- left -->
           <div class="hero-page__left max-w-120 flex-1">
             <div
-              class="hero-page__headline text-text-heading mb-4.5 text-2xl leading-tight font-semibold tracking-tight"
+              class="hero-page__headline text-text-heading mb-4.5 text-4xl leading-tight font-bold tracking-tight"
             >
               {{ t("storage_settings.heroHeadline") }}
               <span class="hero-page__brand-text text-theme-accent">{{
@@ -51,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</span>
             </div>
 
-            <div class="hero-page__sub text-text-secondary mb-9 max-w-100 text-sm leading-[1.7]">
+            <div class="hero-page__sub text-text-secondary mb-9 max-w-100 text-base leading-[1.7]">
               {{ t("storage_settings.heroSub") }}
             </div>
 
@@ -105,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div class="feature-card__content flex-1 pt-0.5">
-                <div class="feature-card__title text-text-heading mb-1.25 text-sm font-semibold">
+                <div class="feature-card__title text-text-heading mb-1.25 text-sm font-bold">
                   {{ feature.title }}
                 </div>
                 <div class="feature-card__desc text-text-secondary text-compact leading-[1.55]">
@@ -118,59 +120,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- ========== NOT CONFIGURED: enterprise empty state ========== -->
-      <OEmptyState
+      <div
         v-else-if="!isConfigured && !isCloud"
-        :title="t('emptyState.noStorageConfig.title')"
-        :text="t('emptyState.noStorageConfig.description')"
-        data-test="org-storage-settings-empty-state"
-        :action-label="t('emptyState.noStorageConfig.action')"
-        @action="navigateToCreate()"
+        class="min-h-[calc(100vh-var(--navbar-height)-10rem)] w-full"
       >
-        <template #extra>
-          <!-- key fact chips -->
-          <div class="flex flex-wrap items-center justify-center gap-2">
-            <span
-              class="text-text-secondary bg-surface-subtle border-border-default inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
-            >
-              <OIcon name="corporate-fare" size="xs" />
-              {{ t("storage_settings.perOrgIsolation") }}
-            </span>
-            <span
-              class="text-text-secondary bg-surface-subtle border-border-default inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
-            >
-              <OIcon name="bolt" size="xs" />
-              {{ t("storage_settings.appliesImmediately") }}
-            </span>
-            <span
-              class="text-text-secondary bg-surface-subtle border-border-default inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
-            >
-              <OIcon name="lock" size="xs" />
-              {{ t("storage_settings.usesOrgCredentials") }}
-            </span>
-          </div>
-
-          <!-- supported providers -->
-          <div class="flex items-center gap-3">
-            <span class="text-text-disabled text-xs font-medium whitespace-nowrap">{{
-              t("storage_settings.supportedProviders")
-            }}</span>
-            <div class="flex items-center gap-2.5">
-              <div
-                v-for="p in providerDefinitions"
-                :key="p.value"
-                class="flex h-7 w-7 shrink-0 cursor-default items-center justify-center opacity-65 transition-opacity duration-150 hover:opacity-100"
+        <OEmptyState
+          :title="t('emptyState.noStorageConfig.title')"
+          :text="t('emptyState.noStorageConfig.description')"
+          data-test="org-storage-settings-empty-state"
+          :action-label="t('emptyState.noStorageConfig.action')"
+          @action="navigateToCreate()"
+        >
+          <template #extra>
+            <!-- key fact chips -->
+            <div class="flex flex-wrap items-center justify-center gap-2">
+              <span
+                class="text-text-secondary bg-surface-subtle border-border-default inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
               >
-                <img
-                  :src="p.image"
-                  :alt="p.label"
-                  class="block h-7 max-h-7 w-7 max-w-7 object-contain"
-                />
-                <OTooltip :content="p.label" />
+                <OIcon name="corporate-fare" size="xs" />
+                {{ t("storage_settings.perOrgIsolation") }}
+              </span>
+              <span
+                class="text-text-secondary bg-surface-subtle border-border-default inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
+              >
+                <OIcon name="bolt" size="xs" />
+                {{ t("storage_settings.appliesImmediately") }}
+              </span>
+              <span
+                class="text-text-secondary bg-surface-subtle border-border-default inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
+              >
+                <OIcon name="lock" size="xs" />
+                {{ t("storage_settings.usesOrgCredentials") }}
+              </span>
+            </div>
+
+            <!-- supported providers -->
+            <div class="flex items-center gap-3">
+              <span class="text-text-disabled text-xs font-medium whitespace-nowrap">{{
+                t("storage_settings.supportedProviders")
+              }}</span>
+              <div class="flex items-center gap-2.5">
+                <div
+                  v-for="p in providerDefinitions"
+                  :key="p.value"
+                  class="flex h-7 w-7 shrink-0 cursor-default items-center justify-center opacity-65 transition-opacity duration-150 hover:opacity-100"
+                >
+                  <img
+                    :src="p.image"
+                    :alt="p.label"
+                    class="block h-7 max-h-7 w-7 max-w-7 object-contain"
+                  />
+                  <OTooltip :content="p.label" />
+                </div>
               </div>
             </div>
-          </div>
-        </template>
-      </OEmptyState>
+          </template>
+        </OEmptyState>
+      </div>
 
       <!-- ========== CONFIGURED ========== -->
       <div v-else>
@@ -303,7 +309,7 @@ import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OrgStorageEditor from "./OrgStorageEditor.vue";

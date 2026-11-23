@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ normalizeStatus(seg.status) }}
               </div>
               <div class="mt-0.5 opacity-60">{{ seg.startLabel }}</div>
-              <div v-if="seg.count > 1" class="text-2xs opacity-50">
+              <div v-if="seg.count > 1" class="text-3xs opacity-50">
                 {{ seg.count }} {{ t("alerts.historyTimeline.evaluationsSuffix") }}
               </div>
             </div>
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-for="(tick, i) in tickLabels"
           :key="i"
-          class="text-2xs text-text-secondary absolute top-0 -translate-x-1/2 whitespace-nowrap tabular-nums"
+          class="text-3xs text-text-secondary absolute top-0 -translate-x-1/2 whitespace-nowrap tabular-nums"
           :style="{ left: tick.leftPct + '%' }"
         >
           {{ tick.label }}

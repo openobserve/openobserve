@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="p-2">
           <OButton
             variant="secondary"
+            icon="add"
             block
             data-test="inline-select-folder-dropdown-add"
             @click="showDialog = true"

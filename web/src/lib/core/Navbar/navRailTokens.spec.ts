@@ -38,12 +38,12 @@ const RAIL_FILES = [
 const MAIN: Record<string, [string, string]> = {
   "--color-accent": ["#3f7994", "#79a1b4"],
   "--color-black": ["#000000", "#000000"],
-  "--color-border-default": ["#d0d5e1", "#43485a"],
-  "--color-dropdown-bg": ["#ffffff", "#1c1f28"],
+  "--color-border-default": ["#d4d4d4", "#454545"],
+  "--color-dropdown-bg": ["#ffffff", "#202020"],
   "--color-dropdown-item-hover-bg": ["#e5edf1", "#19303b"],
-  "--color-dropdown-item-text": ["#222534", "#e3e5eb"],
+  "--color-dropdown-item-text": ["#262626", "#e5e5e5"],
   "--color-error-500": ["#ef4444", "#ef4444"],
-  "--color-menu-badge-ring": ["#141620", "#141620"],
+  "--color-menu-badge-ring": ["#171717", "#171717"],
   "--color-nav-label-accent": ["#326176", "#79a1b4"],
   "--color-nav-flyout-item-hover-bg": ["#f5f8fa", "#19303b"],
   "--color-nav-flyout-item-selected-bg": ["#e2ebef", "#264959"],
@@ -51,15 +51,15 @@ const MAIN: Record<string, [string, string]> = {
   // The rail paints these two only in dark, where they match main; light is the polished tint.
   "--color-surface-accent-active": ["#d7e3e9", "#264959"],
   "--color-surface-accent-hover": ["#e5edf1", "#19303b"],
-  "--color-surface-base": ["#ffffff", "#14161e"],
-  "--color-surface-chrome-deeper": ["#f1f3f7", "#0f1117"],
+  "--color-surface-base": ["#ffffff", "#111111"],
+  "--color-surface-chrome-deeper": ["#e2ebef", "#0e0f11"],
   "--color-tabs-active-bg": ["#e2ebef", "#19303b"],
   "--color-tabs-active-text": ["#326176", "#ffffff"],
-  "--color-tabs-hover-bg": ["#ecf2f5", "#192630"],
-  "--color-tabs-inactive-text": ["#222534", "#e3e5eb"],
-  "--color-text-body": ["#3b3f4f", "#d0d5e1"],
-  "--color-text-inverse": ["#ffffff", "#141620"],
-  "--color-text-secondary": ["#4b5163", "#9ea4b4"],
+  "--color-tabs-hover-bg": ["#ecf2f5", "#19242a"],
+  "--color-tabs-inactive-text": ["#262626", "#e5e5e5"],
+  "--color-text-body": ["#404040", "#d4d4d4"],
+  "--color-text-inverse": ["#ffffff", "#171717"],
+  "--color-text-secondary": ["#737373", "#a3a3a3"],
 };
 
 const UTILITY =
@@ -89,7 +89,7 @@ function railColourTokens(): string[] {
   return [...names].sort();
 }
 
-describe("nav rail renders with its pinned colours", () => {
+describe("nav rail renders as on main", () => {
   const tokens = railColourTokens();
 
   it("resolves every colour it uses through a pinned token", () => {
@@ -100,14 +100,14 @@ describe("nav rail renders with its pinned colours", () => {
   it.each([
     ["light", 0],
     ["dark", 1],
-  ] as const)("keeps the pinned colours in %s", (theme, index) => {
+  ] as const)("keeps main's colours in %s", (theme, index) => {
     for (const name of tokens) {
       expect(hex(resolveColor(name, THEMES[theme])!), name).toBe(MAIN[name][index]);
     }
   });
 
   it("keeps the inactive label and icon in heading ink and the active pill fill", () => {
-    expect(MAIN["--color-tabs-inactive-text"]).toEqual(["#222534", "#e3e5eb"]);
+    expect(MAIN["--color-tabs-inactive-text"]).toEqual(["#262626", "#e5e5e5"]);
     expect(tokens).toEqual(
       expect.arrayContaining([
         "--color-tabs-inactive-text",

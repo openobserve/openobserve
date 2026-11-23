@@ -243,7 +243,7 @@ describe("OnCallTeams", () => {
     service.listTeams.mockResolvedValue(ok([]));
     const wrapper = render();
     await flushPromises();
-    expect(wrapper.find('[data-test="oncall-teams-add-btn"]').attributes("icon")).toBeUndefined();
+    expect(wrapper.find('[data-test="oncall-teams-add-btn"]').attributes("icon")).toBe("add");
   });
 
   // Search, columns and refresh have nothing to act on until a team exists.

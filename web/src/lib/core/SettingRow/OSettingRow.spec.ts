@@ -69,17 +69,6 @@ describe("OSettingRow", () => {
     expect(wrapper.find(".min-w-0").classes()).toContain("w-[22.5%]");
   });
 
-  it("sets the label in 13 px medium over 13 px secondary help, below the section title", () => {
-    const wrapper = mount(OSettingRow, {
-      props: { label: raw("Require digit"), description: raw("At least one 0-9") },
-    });
-
-    const [label, help] = wrapper.findAll(".min-w-0 > div");
-    expect(label.classes()).toEqual(expect.arrayContaining(["text-compact", "font-medium"]));
-    expect(help.text()).toBe("At least one 0-9");
-    expect(help.classes()).toEqual(expect.arrayContaining(["text-compact", "text-text-secondary"]));
-  });
-
   it("stacks the label above a full-width control below md", () => {
     const wrapper = mount(OSettingRow, {
       props: { label: raw("Require digit") },

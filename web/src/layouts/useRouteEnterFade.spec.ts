@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { flushPromises } from "@vue/test-utils";
 import { defineComponent, effectScope, h, type VNode } from "vue";
 import { createMemoryHistory, createRouter, type Router } from "vue-router";
-import { ROUTE_ENTER } from "@/lib/styles/motion";
+import { ENTER_FADE } from "@/lib/styles/motion";
 import { useRouteEnterFade } from "./useRouteEnterFade";
 
 const view = (name: string) => defineComponent({ name, render: () => h("div") });
@@ -58,9 +58,9 @@ describe("useRouteEnterFade", () => {
   afterEach(() => scope.stop());
 
   it("fades a fresh navigation in", async () => {
-    expect(classFor()).toBe(ROUTE_ENTER);
+    expect(classFor()).toBe(ENTER_FADE);
     await router.push("/other");
-    expect(classFor()).toBe(ROUTE_ENTER);
+    expect(classFor()).toBe(ENTER_FADE);
   });
 
   it("does not fade a page restored by Back or Forward", async () => {
@@ -78,7 +78,7 @@ describe("useRouteEnterFade", () => {
 
   it("does not fade a kept-alive view on its return, but does on its first visit", async () => {
     await router.push("/kept");
-    expect(classFor()).toBe(ROUTE_ENTER);
+    expect(classFor()).toBe(ENTER_FADE);
     await router.push("/other");
     classFor();
     await router.push("/kept");
@@ -138,9 +138,9 @@ describe("useRouteEnterFade", () => {
 
   it("fades a nested child in on a fresh switch and not when Back or Forward remounts it", async () => {
     await router.push("/parent/a");
-    expect(classFor()).toBe(ROUTE_ENTER);
+    expect(classFor()).toBe(ENTER_FADE);
     await router.push("/parent/b");
-    expect(classFor()).toBe(ROUTE_ENTER);
+    expect(classFor()).toBe(ENTER_FADE);
     router.back();
     await flushPromises();
     expect(router.currentRoute.value.path).toBe("/parent/a");
@@ -149,7 +149,7 @@ describe("useRouteEnterFade", () => {
     await flushPromises();
     expect(classFor()).toBe("");
     await router.push("/parent/a");
-    expect(classFor()).toBe(ROUTE_ENTER);
+    expect(classFor()).toBe(ENTER_FADE);
   });
 
   it("keeps a nested child's class through a query-only navigation, so nothing replays", async () => {
@@ -171,6 +171,6 @@ describe("useRouteEnterFade", () => {
     classFor();
     fade.forgetKeptViews();
     await router.push("/kept");
-    expect(classFor()).toBe(ROUTE_ENTER);
+    expect(classFor()).toBe(ENTER_FADE);
   });
 });

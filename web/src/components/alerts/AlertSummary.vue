@@ -42,12 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Scroll to bottom button -->
-    <div v-show="showScrollToBottom" class="pointer-events-none absolute right-5 bottom-5 z-1000">
+    <div
+      v-show="showScrollToBottom"
+      class="pointer-events-none absolute right-5 bottom-5 z-1000 transition-all duration-300"
+    >
       <OButton
         icon-only
         variant="ghost"
         size="sm"
-        class="scroll-to-bottom-btn border-theme-accent! text-theme-accent! pointer-events-auto border-2! bg-[rgba(255,255,255,0.95)]! shadow-sm backdrop-blur-sm transition-[color,background-color,border-color,box-shadow,opacity,scale] hover:scale-110 hover:bg-white! hover:opacity-80 hover:shadow-md active:scale-100 dark:bg-[rgba(30,30,30,0.9)]! dark:hover:bg-[rgba(40,40,40,0.95)]! dark:hover:opacity-80"
+        class="scroll-to-bottom-btn border-theme-accent! text-theme-accent! pointer-events-auto border-2! bg-[rgba(255,255,255,0.95)]! shadow-sm backdrop-blur-sm transition-all duration-300 ease-[ease] hover:scale-110 hover:bg-white! hover:opacity-80 hover:shadow-md active:scale-100 dark:bg-[rgba(30,30,30,0.9)]! dark:hover:bg-[rgba(40,40,40,0.95)]! dark:hover:opacity-80"
         @click="scrollToBottomSmooth"
       >
         <OIcon name="arrow-downward" size="sm" />
@@ -159,7 +162,7 @@ onMounted(async () => {
 /* keep(generated-content): styles v-html output from alertSummaryGenerator (no scope id) */
 .summary-text :deep(strong) {
   display: inline;
-  font-weight: var(--font-semibold);
+  font-weight: 700;
   font-size: var(--text-sm);
 }
 
@@ -175,9 +178,7 @@ onMounted(async () => {
     color-mix(in srgb, var(--color-theme-accent) 8%, transparent),
     color-mix(in srgb, var(--color-theme-accent) 12%, transparent)
   );
-  transition-property: background, box-shadow;
-  transition-duration: var(--duration-control);
-  transition-timing-function: var(--ease-control);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: inline;
   position: relative;
   box-shadow: var(--shadow-ring-hairline-geom)

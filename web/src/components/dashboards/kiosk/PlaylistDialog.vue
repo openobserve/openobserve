@@ -66,20 +66,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="search.isLoading.value" class="flex flex-col gap-2 p-2">
             <OSkeleton v-for="n in 3" :key="n" class="h-4" />
           </div>
-          <OEmptyState
+          <div
             v-else-if="search.isError.value"
-            size="compact"
-            kind="error"
-            :title="t('dashboard.playlist.searchFailed')"
-            class="px-2"
+            class="text-status-error-text flex items-center gap-2 px-2 py-1.5 text-sm"
             data-test="dashboard-playlist-search-error"
           >
-            <template #actions>
-              <OButton variant="secondary" size="sm" @click="search.refetch()">
-                {{ t("common.retry") }}
-              </OButton>
-            </template>
-          </OEmptyState>
+            <OIcon name="error" size="sm" class="shrink-0" />
+            <span class="flex-1">{{ t("dashboard.playlist.searchFailed") }}</span>
+            <OButton variant="secondary" size="sm" @click="search.refetch()">
+              {{ t("common.retry") }}
+            </OButton>
+          </div>
           <template v-else-if="results.length">
             <div
               v-for="hit in results"
@@ -106,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 variant="accent-ghost"
                 size="sm"
+                icon="add"
                 class="shrink-0"
                 :disabled="full"
                 :data-test="`dashboard-playlist-add-${hit.dashboardId}`"
@@ -115,13 +113,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
           </template>
-          <OEmptyState
-            v-else
-            size="compact"
-            kind="filtered"
-            :title="t('dashboard.playlist.noMatches', { query: searchTerm })"
-            class="px-2"
-          />
+          <p v-else class="text-text-secondary px-2 py-1.5 text-sm">
+            {{ t("dashboard.playlist.noMatches", { query: searchTerm }) }}
+          </p>
         </div>
 
         <div class="mt-3 flex items-center justify-between gap-2">
@@ -235,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ol>
         <OEmptyState
           v-else
-          size="compact"
+          size="inline"
           icon="tv"
           :title="t('dashboard.playlist.emptyTitle')"
           :text="t('dashboard.playlist.emptyDescription')"

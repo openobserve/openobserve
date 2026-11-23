@@ -20,38 +20,30 @@ Both break rule P3, "Nothing jumps". This spec fixes them.
 ## Anatomy: stacked header, 56 px, on every page
 
 - **Left column**, starting at the content edge (x = the 16 px gutter):
-  - **Context line**: 16 px tall, 12 px text in `--text-secondary`. The slot always exists, so the title never moves vertically. It names the container, and never the org (the top bar's org switcher already shows it):
-    - Pages inside a module with its own rail (Settings, IAM, AI observability) show the page's rail group: "General", "Access & security", "Monitor". The rail's heading already names the module, so the line never repeats it. Security-solution pages show "Security".
+  - **Context line**: 16 px tall, 12 px text in `--text-secondary`. It always exists, so the title never moves vertically. It names the container:
+    - Pages inside a module with its own rail show the module: "Settings", "IAM", "AI Observability". Security-solution pages show "Security".
     - Grouped top-level pages show the rail group: "Reliability", "Data", "Infra", "Experience", "Dashboards".
+    - Ungrouped top-level pages show the org: "acme-prod". This covers Home, Logs, Metrics, Traces, AutoObserve and Profiles.
     - Detail, editor and import pages show a back link to the parent: "‹ Alerts", "‹ Pipelines". It is real link styling, and Back uses the smart-back rules (N3).
-    - Every other page leaves the slot empty and `aria-hidden`: ungrouped top-level pages (Home, Logs, Metrics, Traces, AutoObserve, Profiles), a module page outside every rail group, and a page whose group is spelled like its title. The title stays at the same y.
-  - **Title line**: 24 px tall, 18 px at weight 600 (`text-lg leading-6 font-title`) in `--text-strong`. An optional status chip (H5) follows the title. An inline-edited title (`#title` slot) uses `OInlineEdit size="lg"` so it matches.
-  - The title is the strongest text on the page (T2): section titles below it are 14 px semibold with no tinted band.
+  - **Title line**: 24 px tall, 16 px semibold in `--text-strong`. An optional status chip (H5) follows the title.
   - The title is the page or object name. It does **not** change when the user switches tabs inside the page.
   - Long titles truncate with an ellipsis and show a tooltip; they never wrap.
 - **Right side**: page actions, vertically centred, right-aligned, in this order: secondary actions, then the primary, then ⋯ More (H3).
   - Actions may change label per tab.
   - Nothing sits to the right of ⋯, so nothing else moves.
 
-## Module rails: one header row with the page
-
-- A module rail's heading row (the module name, and its collapse control) is 56 px, the same as the header band.
-- Its bottom hairline sits at the same y as the band's, so the rail heading and the page header read as one header row.
-- The rail heading names the module; the page's context line names the rail group (above).
-
 ## Tabs: their own row, never inline with the title
 
 - The tab row is 40 px, directly under the header.
   - The first tab starts at the content edge (x = 16).
   - Tabs never sit after the title on the same line.
-- Active and inactive tabs use **one font weight** (500) at 13 px, with 14 px glyphs.
-  - Inactive tabs are `--text-secondary`; the active tab differs only in colour (`--text-strong`) and a 2 px accent underline on the row's divider.
+- Active and inactive tabs use **one font weight** (500).
+  - The active tab differs only in colour (`--text-strong`) and a 2 px accent underline.
   - Hover changes colour only.
 - Counts in tabs:
   - use tabular figures;
-  - sit centred in a compact neutral pill that reserves two digits, so the common counts never move the next tab; a third digit grows it, and "999+" is the cap;
-  - take a status tint only when the caller passes a tone (Firing: a soft error tint).
-- The reorder grip of a reorderable tab shows only on hover or keyboard focus.
+  - reserve the width of their largest value, with a minimum pill width and "999+" as the cap;
+  - so a changing count never moves the next tab.
 - More than six tabs: the rest go into "More ▾" at the end of the row, never wrapped.
 - Areas without peers have no tab row.
 

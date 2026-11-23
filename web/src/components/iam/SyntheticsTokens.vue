@@ -81,10 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OEmptyState
               :kind="filterQuery ? 'filtered' : 'first-run'"
               :icon="filterQuery ? undefined : 'web'"
-              :title="filterQuery ? undefined : t('synthetics.tokens.empty.title')"
-              :text="filterQuery ? undefined : t('synthetics.tokens.empty.description')"
+              :title="t('synthetics.tokens.empty.title')"
+              :text="t('synthetics.tokens.empty.description')"
               data-test="synthetics-tokens-empty-state"
-              @action="filterQuery = ''"
             />
           </template>
 

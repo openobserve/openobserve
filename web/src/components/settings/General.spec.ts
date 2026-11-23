@@ -318,7 +318,7 @@ describe("General", () => {
     it("counts theme colors with the form fields, and Discard restores both", async () => {
       const wrapper = createWrapper();
       const form = wrapper.findComponent({ name: "OForm" }).vm.form;
-      expect(bar(wrapper).exists()).toBe(false);
+      expect(bar(wrapper).attributes("data-state")).toBe("clean");
 
       await wrapper.find('[data-test="theme-light-chip"]').trigger("click");
       Object.assign(wrapper.vm, { tempColor: "#112233" });
@@ -334,7 +334,7 @@ describe("General", () => {
 
       expect((wrapper.vm as any).customLightColor).toBe("#3F7994");
       expect(form.state.values.scrape_interval).toBe("30");
-      expect(bar(wrapper).exists()).toBe(false);
+      expect(bar(wrapper).attributes("data-state")).toBe("clean");
     });
   });
 
@@ -791,7 +791,7 @@ describe("General", () => {
         );
         expect(mockOrganizations.post_organization_settings).not.toHaveBeenCalled();
         expect(successToasts()).toEqual([
-          [{ variant: "success", message: "Dark mode logo updated successfully." }],
+          [{ variant: "success", message: "Dark Mode logo updated successfully." }],
         ]);
       });
 
@@ -823,7 +823,7 @@ describe("General", () => {
 
         expect(mockToast).toHaveBeenCalledWith({
           variant: "error",
-          message: "Light mode logo was not uploaded. Upload failed",
+          message: "Light Mode logo was not uploaded. Upload failed",
         });
         expect(successToasts()).toHaveLength(1);
         expect(wrapper.vm.filesLight).toBe(lightFile);
@@ -875,7 +875,7 @@ describe("General", () => {
       expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith("test-org", "light");
       expect(mockToast).toHaveBeenCalledWith({
         variant: "success",
-        message: "Light mode logo deleted successfully.",
+        message: "Light Mode logo deleted successfully.",
       });
     });
 
@@ -898,7 +898,7 @@ describe("General", () => {
       expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith("test-org", "dark");
       expect(mockToast).toHaveBeenCalledWith({
         variant: "success",
-        message: "Dark mode logo deleted successfully.",
+        message: "Dark Mode logo deleted successfully.",
       });
     });
 
@@ -1002,7 +1002,7 @@ describe("General", () => {
       // Select the color-picker dialog by title (order-independent — other dialogs
       // like the delete-org confirmation also exist in the template).
       const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
-      const colorDialog = dialogs.find((d) => d.attributes("data-title") === "Pick custom color");
+      const colorDialog = dialogs.find((d) => d.attributes("data-title") === "Pick Custom Color");
       const closeBtn = colorDialog.find('[data-test-stub="o-dialog-primary"]');
       await closeBtn.trigger("click");
       await nextTick();
@@ -1028,8 +1028,8 @@ describe("General", () => {
       expect(dialog.props("primary")?.variant).toBe("danger");
       const message = wrapper.find('[data-test="dialog-box"]');
       const name = message.find('[data-test="confirm-dialog-name"]');
-      expect(name.text()).toBe("Dark mode");
-      expect(message.text()).toContain("Dark mode");
+      expect(name.text()).toBe("Dark Mode");
+      expect(message.text()).toContain("Dark Mode");
     });
 
     it("forwards title and size to the color picker ODialog", () => {
@@ -1037,7 +1037,7 @@ describe("General", () => {
       const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
       // Select by title (order-independent — the delete-org confirmation dialog also
       // exists and would otherwise be the last dialog in the template).
-      const colorDialog = dialogs.find((d) => d.attributes("data-title") === "Pick custom color");
+      const colorDialog = dialogs.find((d) => d.attributes("data-title") === "Pick Custom Color");
       expect(colorDialog.attributes("data-size")).toBe("sm");
       expect(colorDialog.attributes("data-primary-label")).toBe("Close");
     });
@@ -1183,7 +1183,9 @@ describe("General", () => {
       expect(
         wrapper.find('[data-test="general-settings-scrape-interval-row"]').attributes("aria-busy"),
       ).toBe("true");
-      expect(wrapper.find('[data-test="general-settings-save-bar"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="general-settings-save-bar"]').attributes("data-state")).toBe(
+        "loading",
+      );
     });
   });
 });

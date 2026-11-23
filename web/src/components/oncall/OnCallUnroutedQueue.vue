@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="signals.length && teamName"
         variant="primary"
+        icon="add"
         class="ms-auto"
         :loading="claiming"
         data-test="oncall-unrouted-claim-all"

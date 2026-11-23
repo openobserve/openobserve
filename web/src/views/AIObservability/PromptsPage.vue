@@ -10,7 +10,7 @@
       <OButton
         v-if="canManageSettings"
         icon-only
-        variant="ghost"
+        variant="secondary"
         icon="settings"
         :aria-label="t('aiObservability.promptManagement.settings')"
         data-test="prompts-settings"
@@ -120,7 +120,7 @@
           <OEmptyState
             kind="error"
             :title="t('emptyState.loadError.title')"
-            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
+            :text="raw(message)"
             @action="refresh"
           />
         </template>
@@ -309,7 +309,6 @@ import config from "@/aws-exports";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";

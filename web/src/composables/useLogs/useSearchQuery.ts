@@ -62,7 +62,6 @@ import {
   freeTextHighlight,
   isFilterHeld,
   markFreeTextBlocked,
-  matchAllBlocked,
   planStreamsFilter,
   type FilterResolveContext,
 } from "@/composables/useLogs/freeTextSearch";
@@ -261,9 +260,6 @@ function resolveStreamFilter(raw: string, stream: string, ctx: FilterResolveCont
   }
   if (isHeldPlan(plan)) throw new HeldFilterError();
   if (plan.kind !== "freeText") {
-    if (matchAllBlocked(filter, ctx.targets[stream])) {
-      return { where: null, blocked: true, sqlNodesOnly: "", plan };
-    }
     const where = commentFree(renderPlan(plan, BLOCKED_TARGET, ctx.knownFields) ?? "");
     return { where, blocked: false, sqlNodesOnly: where, plan };
   }
@@ -304,22 +300,16 @@ export function resolveFiltersForStreams(
   }
 
   const where = commentFree(renderPlan(plan, BLOCKED_TARGET, ctx.knownFields) ?? "");
-  // A typed match_all() on a stream without full-text keys is a server error, so that arm is left out.
-  const searchable = streams.filter((stream) => {
-    if (!matchAllBlocked(filter, ctx.targets[stream])) return true;
-    result.excluded.push({ stream, reason: "no_fts" });
-    return false;
-  });
   if (where.trim() === "" || !fields) {
-    searchable.forEach((stream) => result.perStream.set(stream, where));
+    streams.forEach((stream) => result.perStream.set(stream, where));
     return result;
   }
 
-  const check = checkFilterFields(plan.filter, searchable, fields);
+  const check = checkFilterFields(plan.filter, streams, fields);
   result.errors = check.errors;
   result.filterColumns = check.filterColumns;
   result.fieldMapping = check.mapping;
-  for (const stream of searchable) {
+  for (const stream of streams) {
     if (check.missing.has(stream)) {
       result.excluded.push({ stream, reason: "missing_field" });
       continue;

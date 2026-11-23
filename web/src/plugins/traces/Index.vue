@@ -79,8 +79,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:searchMode="onSearchModeChange"
               @apply-saved-view="onApplySavedView"
               @recent-restore="onRecentRestore"
-              :service-graph-last-run-at="serviceGraphRef?.lastRunAt ?? null"
-              :service-graph-loading="!!serviceGraphRef?.loading"
               @service-graph-refresh="serviceGraphRef?.refresh()"
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
               @filter-builder-growth="filterBuilderGrowth = $event"
@@ -240,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @shareLink="(range: any) => copyTracesUrl(t, range)"
                         @metrics:editor-filter-set="onMetricsEditorFilterSet"
                         @metrics:editor-filter-run="onMetricsEditorFilterRun"
+                        @run-query="searchData()"
                         @remove-filter="onRemoveTracesFilter"
                         @jump-to-stream-data="onJumpToTracesStreamData"
                         @error-only-toggled="onErrorOnlyToggled"
@@ -377,7 +376,6 @@ import { resolveTraceStream } from "@/utils/traces/streamSelection";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import { usePrimaryQueryFocus } from "@/composables/usePrimaryQueryFocus";
 import { recordPageLoad, recordPageRequest, type PageLoadReason } from "@/utils/pageCrossing";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { useRecentSearches } from "@/composables/queryHistory/useRecentSearches";
@@ -563,23 +561,6 @@ let stopUrlSync = syncUrlViewState();
 // A page's stream can open with an empty batch, so only an actual write may end the replace phase.
 const tracesRequestState: Record<string, { hasWritten: boolean; isPartial?: boolean }> = {};
 const searchCancelled = ref(false);
-
-// Here, not in the async SearchResult, so a run that settles before it mounts still dates its data;
-// a failed run leaves the age where it was, so kept rows never read as fresh.
-watch(
-  () => searchObj.loading,
-  (loading, wasLoading) => {
-    if (
-      wasLoading &&
-      !loading &&
-      searchObj.searchApplied &&
-      !searchObj.meta.refreshFailedAt &&
-      !searchObj.data.errorMsg?.trim()?.length
-    ) {
-      searchObj.meta.lastRunAt = Date.now();
-    }
-  },
-);
 
 const selectedStreamName = computed(() => searchObj.data.stream.selectedStream.value);
 
@@ -1247,7 +1228,7 @@ async function getQueryData(
             // Markup + an English "TraceID:" label on purpose: useQueryError reads
             // the id back out of this string with /TraceID:\s*([a-f0-9A-F-]+)/i, so a
             // translated label would stop QueryErrorState from finding the trace id.
-            errorMsg += raw(` <br><span class='text-sm font-medium'>TraceID: ${trace_id}</span>`);
+            errorMsg += raw(` <br><span class='text-base font-medium'>TraceID: ${trace_id}</span>`);
           }
           searchObj.data.errorMsg = errorMsg;
           searchObj.data.errorDetail = error_detail || "";
@@ -2765,6 +2746,16 @@ const tracesShortcuts = [
     },
   },
   {
+    id: "tracesFocusQuery",
+    handler: () => {
+      // The traces query editor is Monaco — focus its inner textarea.
+      const el = document.querySelector<HTMLElement>(
+        '[data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] textarea',
+      );
+      el?.focus();
+    },
+  },
+  {
     id: "tracesCopyUrl",
     // The shortcut copies without the Share button, so it applies the button's gate itself.
     handler: () => {
@@ -2789,7 +2780,6 @@ const tracesShortcuts = [
   },
 ];
 useShortcuts(tracesShortcuts, undefined, { active: pageActive });
-usePrimaryQueryFocus("tracesFocusQuery", [], { active: pageActive });
 </script>
 
 <style scoped>

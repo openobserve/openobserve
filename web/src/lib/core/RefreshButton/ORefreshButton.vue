@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, useId, watch } from "vue";
-import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "../Button/OButton.vue";
 import OButtonGroup from "../Button/OButtonGroup.vue";
@@ -9,15 +8,13 @@ import OTooltip from "../../overlay/Tooltip/OTooltip.vue";
 import ODropdown from "../../overlay/Dropdown/ODropdown.vue";
 import ODropdownGroup from "../../overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "../../overlay/Dropdown/ODropdownItem.vue";
-import ODropdownSeparator from "../../overlay/Dropdown/ODropdownSeparator.vue";
 import { formatRefreshFailed } from "@/utils/formatters";
 import {
   AUTO_REFRESH_INTERVALS,
-  autoRefreshLabel,
-  autoRefreshShortLabel,
-  minAutoRefreshSeconds,
-} from "@/utils/dashboard/autoRefresh";
-import type { RefreshButtonProps, RefreshButtonEmits } from "./ORefreshButton.types";
+  type AutoRefreshInterval,
+  type RefreshButtonProps,
+  type RefreshButtonEmits,
+} from "./ORefreshButton.types";
 
 const { t } = useI18nTyped();
 
@@ -25,13 +22,8 @@ const props = withDefaults(defineProps<RefreshButtonProps>(), {
   lastRunAt: null,
   loading: false,
   disabled: false,
-  disabledReason: null,
   failedAt: null,
   autoRefresh: undefined,
-  intervals: () => AUTO_REFRESH_INTERVALS,
-  minInterval: undefined,
-  autoRefreshNote: undefined,
-  pendingLabel: undefined,
   size: "md",
   shortcut: undefined,
   dataTest: "refresh-button",
@@ -40,9 +32,6 @@ const props = withDefaults(defineProps<RefreshButtonProps>(), {
 });
 
 const emit = defineEmits<RefreshButtonEmits>();
-
-// `useStore()` is an inject(), so a storeless mount gets the built-in floor.
-const store = useStore() as { state?: { zoConfig?: Record<string, unknown> } } | undefined;
 
 const relativeTime = ref<I18nText | "">("");
 let intervalId: ReturnType<typeof setInterval> | null = null;
@@ -60,37 +49,22 @@ const updateRelativeTime = () => {
   relativeTime.value = props.lastRunAt ? getRelativeTime(props.lastRunAt) : "";
 };
 
-// With no age yet the button names its action, so it never reads as an empty field.
-const ageLabel = computed<I18nText>(() => relativeTime.value || t("refreshButton.refresh"));
+const ageLabel = computed(() => relativeTime.value || t("refreshButton.justNow"));
 
-const minSeconds = computed(
-  () =>
-    props.minInterval ?? minAutoRefreshSeconds(store?.state?.zoConfig?.min_auto_refresh_interval),
-);
+const INTERVAL_LABELS: Record<Exclude<AutoRefreshInterval, "off">, () => I18nText> = {
+  "10s": () => t("refreshButton.interval.10s"),
+  "30s": () => t("refreshButton.interval.30s"),
+  "1m": () => t("refreshButton.interval.1m"),
+  "5m": () => t("refreshButton.interval.5m"),
+  "15m": () => t("refreshButton.interval.15m"),
+};
+
+const intervalLabel = (value: AutoRefreshInterval): I18nText =>
+  value === "off" ? t("common.off") : INTERVAL_LABELS[value]();
 
 const autoInterval = computed(() =>
-  props.autoRefresh && props.autoRefresh > 0 ? props.autoRefresh : 0,
+  props.autoRefresh && props.autoRefresh !== "off" ? props.autoRefresh : null,
 );
-
-const intervalSections = computed(() => {
-  const ranges: [I18nText, (s: number) => boolean][] = [
-    [t("search.autoRefreshSeconds"), (s) => s < 60],
-    [t("search.autoRefreshMinutes"), (s) => s >= 60 && s < 3600],
-    [t("search.autoRefreshHours"), (s) => s >= 3600],
-  ];
-  return ranges
-    .map(([label, inRange]) => ({
-      label,
-      items: props.intervals.filter(inRange).map((seconds) => ({
-        seconds,
-        label: autoRefreshLabel(seconds, t),
-        disabled: seconds < minSeconds.value,
-      })),
-    }))
-    .filter((section) => section.items.length > 0);
-});
-
-const hasDisabledInterval = computed(() => props.intervals.some((s) => s < minSeconds.value));
 
 const failedText = computed<I18nText | null>(() => {
   if (!props.failedAt) return null;
@@ -104,18 +78,9 @@ const failedText = computed<I18nText | null>(() => {
 
 const failedId = useId();
 
-const visibleLabel = computed<I18nText>(() => {
-  if (props.pendingLabel && !props.loading) return props.pendingLabel;
-  if (autoInterval.value) {
-    return t("refreshButton.autoOn", { interval: autoRefreshShortLabel(autoInterval.value, t) });
-  }
-  return props.loading ? t("refreshButton.refreshing") : ageLabel.value;
-});
-
 // The age alone is the visible label, so the name leads with the action a screen reader announces.
 const buttonName = computed(() => {
   if (failedText.value) return t("common.retry");
-  if (props.pendingLabel) return props.pendingLabel;
   return props.lastRunAt
     ? t("refreshButton.refreshWithAge", { age: ageLabel.value })
     : t("refreshButton.refresh");
@@ -151,9 +116,8 @@ function handleClick(e: MouseEvent) {
   <OButtonGroup :size="size">
     <!-- A failed refresh restyles this same button rather than swapping it, so focus stays on it. -->
     <OButton
-      :variant="pendingLabel && !failedText ? 'primary' : 'secondary'"
+      variant="secondary"
       :disabled="disabled"
-      :disabled-reason="disabled ? (disabledReason ?? undefined) : undefined"
       :aria-busy="loading || undefined"
       :data-test="dataTest"
       :data-state="failedText ? 'failed' : loading ? 'loading' : undefined"
@@ -162,7 +126,7 @@ function handleClick(e: MouseEvent) {
       @click="handleClick"
     >
       <!-- First child with no element before it, so the tooltip binds to the button itself. -->
-      <OTooltip v-if="!(disabled && disabledReason)" :content="tooltipText" :shortcut="shortcut" />
+      <OTooltip :content="tooltipText" :shortcut="shortcut" />
       <OIcon
         v-if="loading"
         name="progress-activity"
@@ -181,25 +145,24 @@ function handleClick(e: MouseEvent) {
           >{{ t("refreshButton.failed") }}</span
         >
       </template>
-      <!-- The hidden labels reserve the widest steady text, so a load or a refresh never resizes the button. -->
-      <span
-        v-else
-        class="inline-grid text-xs whitespace-nowrap max-lg:hidden"
-        :data-test="`${dataTest}-label`"
-        aria-hidden="true"
-      >
-        <span class="invisible col-start-1 row-start-1">{{ t("refreshButton.refreshing") }}</span>
-        <span class="invisible col-start-1 row-start-1">{{ t("refreshButton.justNow") }}</span>
-        <span v-if="pendingLabel" class="invisible col-start-1 row-start-1">{{
-          pendingLabel
-        }}</span>
+      <template v-else-if="autoInterval || lastRunAt">
+        <span class="bg-border-default h-4 w-px shrink-0 max-lg:hidden" aria-hidden="true" />
         <!-- No colour class: the age is the button's label, so it takes the button's ink. -->
         <span
-          class="col-start-1 row-start-1 text-start tabular-nums"
-          :data-test="autoInterval ? `${dataTest}-auto` : `${dataTest}-age`"
-          >{{ visibleLabel }}</span
+          v-if="autoInterval"
+          class="inline-block min-w-12 text-left text-xs whitespace-nowrap tabular-nums max-lg:hidden"
+          :data-test="`${dataTest}-auto`"
+          aria-hidden="true"
+          >{{ t("refreshButton.autoOn", { interval: intervalLabel(autoInterval) }) }}</span
         >
-      </span>
+        <span
+          v-else
+          class="inline-block min-w-12 text-left text-xs whitespace-nowrap tabular-nums max-lg:hidden"
+          :data-test="`${dataTest}-age`"
+          aria-hidden="true"
+          >{{ loading ? t("refreshButton.refreshing") : ageLabel }}</span
+        >
+      </template>
     </OButton>
     <ODropdown v-if="autoRefresh !== undefined" align="end">
       <template #trigger>
@@ -208,48 +171,25 @@ function handleClick(e: MouseEvent) {
           icon-only
           icon="arrow-drop-down"
           :disabled="disabled"
-          :disabled-reason="disabled ? (disabledReason ?? undefined) : undefined"
           :aria-label="t('refreshButton.autoRefresh')"
           :data-test="`${dataTest}-auto-menu`"
         />
       </template>
       <ODropdownGroup :label="t('refreshButton.autoRefresh')">
         <ODropdownItem
-          :data-test="`${dataTest}-auto-0`"
-          :checked="autoInterval === 0"
-          @select="emit('update:autoRefresh', 0)"
+          v-for="value in AUTO_REFRESH_INTERVALS"
+          :key="value"
+          :data-test="`${dataTest}-auto-${value}`"
+          :checked="value === autoRefresh"
+          @select="emit('update:autoRefresh', value)"
         >
-          {{ t("common.off") }}
+          {{
+            value === "off"
+              ? t("common.off")
+              : t("refreshButton.every", { interval: intervalLabel(value) })
+          }}
         </ODropdownItem>
       </ODropdownGroup>
-      <template v-for="section in intervalSections" :key="section.label">
-        <ODropdownSeparator />
-        <ODropdownGroup :label="section.label">
-          <ODropdownItem
-            v-for="item in section.items"
-            :key="item.seconds"
-            :data-test="`${dataTest}-auto-${item.seconds}`"
-            :checked="autoInterval === item.seconds"
-            :disabled="item.disabled"
-            @select="emit('update:autoRefresh', item.seconds)"
-          >
-            {{ item.label }}
-          </ODropdownItem>
-        </ODropdownGroup>
-      </template>
-      <slot name="menu" />
-      <template v-if="hasDisabledInterval || autoRefreshNote">
-        <ODropdownSeparator />
-        <div
-          class="text-text-muted text-2xs flex flex-col gap-0.5 px-2 py-1.5"
-          :data-test="`${dataTest}-auto-note`"
-        >
-          <span v-if="hasDisabledInterval">{{
-            t("common.minRefreshIntervalMessage", { interval: minSeconds })
-          }}</span>
-          <span v-if="autoRefreshNote">{{ autoRefreshNote }}</span>
-        </div>
-      </template>
     </ODropdown>
   </OButtonGroup>
 </template>

@@ -157,8 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OEmptyState
           v-else-if="!filteredEvents.length"
-          size="compact"
-          class="px-2"
+          size="inline"
           icon="search-off"
           :title="t('logs.noEvents.title')"
           data-test="player-events-empty"

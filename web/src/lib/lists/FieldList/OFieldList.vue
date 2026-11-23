@@ -16,7 +16,6 @@
       <OSearchInput
         :model-value="searchModel"
         data-test="o-field-list-search"
-        :shortcut="searchShortcut"
         :placeholder="searchPlaceholder ?? t('common.searchFields')"
         @update:model-value="onSearchChange"
       >
@@ -59,7 +58,7 @@
           <!-- Field row -->
           <div
             v-else
-            class="o-field-list__row group px-page-edge rounded-default relative mt-1 flex min-h-6 w-full cursor-pointer items-center text-xs leading-4"
+            class="o-field-list__row group px-page-edge rounded-default relative mt-1 flex min-h-6 w-full cursor-pointer items-center text-xs leading-[0.8rem]"
             :class="{
               'o-field-list__row--draggable': draggable,
               'focus-visible:ring-focus-ring-accent outline-none focus-visible:ring-2 focus-visible:ring-inset':
@@ -146,8 +145,6 @@ const props = withDefaults(
     fields: FieldItem[];
     search?: string;
     searchPlaceholder?: I18nText;
-    /** Off where the page sends "/" to its own query, so the search shows no key hint it would not answer. */
-    searchShortcut?: boolean;
     /** Extra classes for the search block — see the template note on gutters. */
     searchClass?: string;
     loading?: boolean;
@@ -166,7 +163,6 @@ const props = withDefaults(
   }>(),
   {
     search: "",
-    searchShortcut: undefined,
     // No default here — a withDefaults default is evaluated at module scope, which
     // would freeze the locale. The template falls back to t() at render time.
     searchClass: "",

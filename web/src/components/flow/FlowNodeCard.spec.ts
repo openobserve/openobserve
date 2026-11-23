@@ -82,7 +82,7 @@ describe("FlowNodeCard", () => {
       // type at once.
       const classes = wrapper.find(".flow-node__container").classes();
       expect(classes).toContain("text-sm!");
-      expect(classes).toContain("font-semibold!");
+      expect(classes).toContain("font-bold!");
       expect(classes).toContain("text-left");
     });
   });

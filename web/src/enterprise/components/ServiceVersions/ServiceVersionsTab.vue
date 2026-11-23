@@ -123,19 +123,16 @@
         class="h-24 w-full"
         data-test="svcver-panel-loading"
       />
-      <OEmptyState
+      <div
         v-else-if="query.isError.value"
-        size="compact"
-        kind="error"
-        :title="t('serviceVersions.compare.error')"
+        class="flex items-center gap-2 text-sm"
         data-test="svcver-panel-error"
       >
-        <template #actions>
-          <OButton size="sm" data-test="svcver-retry" @click="query.refetch()">{{
-            t("serviceVersions.actions.retry")
-          }}</OButton>
-        </template>
-      </OEmptyState>
+        <span>{{ t("serviceVersions.compare.error") }}</span>
+        <OButton variant="secondary" data-test="svcver-retry" @click="query.refetch()">{{
+          t("serviceVersions.actions.retry")
+        }}</OButton>
+      </div>
       <div
         v-if="transitions.isError.value || verdicts.isError.value"
         class="flex items-center gap-2 text-sm"
@@ -156,12 +153,13 @@
           >{{ t("serviceVersions.actions.retry") }}</OButton
         >
       </div>
-      <OEmptyState
+      <p
         v-if="!query.isPending.value && !query.isError.value && !rows.length && !unversioned"
-        size="compact"
-        :title="emptyText"
+        class="text-text-secondary text-sm"
         data-test="svcver-panel-empty"
-      />
+      >
+        {{ emptyText }}
+      </p>
       <OTable
         v-if="rows.length"
         :data="rows"
@@ -404,7 +402,6 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSelectItem from "@/lib/forms/Select/OSelectItem.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";

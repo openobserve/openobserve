@@ -196,8 +196,8 @@ describe("RcaThreadColumn", () => {
       expect(context.findAll("p").map((p) => p.text())).toEqual([
         "Bad deploy of checkout · Past cause",
         "k8s-debug · Skill",
-        "github · AI toolset",
-        "pagerduty · AI toolset",
+        "github · AI Toolset",
+        "pagerduty · AI Toolset",
       ]);
     });
 

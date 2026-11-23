@@ -16,27 +16,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="h-full min-h-125 w-full">
-    <OSkeleton
+    <div
       v-if="isLoading"
-      shape="block"
-      class="h-125"
       data-test="traces-trace-dag-loading-container"
-    />
+      class="flex h-125 flex-col items-center justify-center p-6"
+    >
+      <OSpinner size="lg" />
+      <div class="text-text-secondary mt-3 text-sm">{{ t("traces.loadingTraceDag") }}</div>
+    </div>
 
-    <OEmptyState
-      v-else-if="error"
-      kind="error"
-      :text="errorText"
-      data-test="traces-trace-dag-error-message"
-      @action="fetchDAG"
-    />
+    <div v-else-if="error" data-test="traces-trace-dag-error-message" class="p-3">
+      <OInlineNotice tone="err" :message="t('traces.traceDAG.failedToLoad', { error })" />
+    </div>
 
-    <OEmptyState
+    <div
       v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0"
-      icon="info-outline"
-      :title="t('traces.traceDAG.noData')"
       data-test="traces-trace-dag-empty-container"
-    />
+      class="flex h-125 flex-col items-center justify-center p-6"
+    >
+      <OIcon name="info" style="width: 3rem; height: 3rem" />
+      <div class="text-text-muted mt-3">{{ t("traces.traceDAG.noData") }}</div>
+    </div>
 
     <div
       v-else
@@ -115,9 +115,9 @@ import { useI18nTyped } from "@/types/i18n";
 import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/controls/dist/style.css";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
@@ -150,9 +150,10 @@ export default defineComponent({
     Background,
     Controls,
     Handle,
-    OSkeleton,
-    OEmptyState,
+    OSpinner,
+    OIcon,
     OTag,
+    OInlineNotice,
     OTruncatedText,
   },
   props: {
@@ -531,19 +532,10 @@ export default defineComponent({
       },
     );
 
-    // Axios status text is not a reason a reader can act on (K6).
-    const errorText = computed(() =>
-      error.value && !isRawHttpText(error.value)
-        ? t("traces.traceDAG.failedToLoad", { error: error.value })
-        : t("emptyState.loadError.description"),
-    );
-
     return {
       t,
       isLoading,
       error,
-      errorText,
-      fetchDAG,
       dagData,
       nodes,
       edges,

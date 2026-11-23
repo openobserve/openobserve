@@ -32,12 +32,7 @@ export const LOCKED_FEATURES: Partial<Record<string, { icon: IconName }>> = {
 };
 
 interface RejectedResponse {
-  status?: number;
-  message?: unknown;
-  response?: {
-    status?: number;
-    data?: { code?: unknown; error_detail?: unknown; message?: unknown };
-  };
+  response?: { status?: number; data?: { code?: unknown; error_detail?: unknown } };
 }
 
 /** A key the backend did not send is enabled: older backends and ungated features omit it. */
@@ -89,14 +84,6 @@ export type ForbiddenState = boolean | string[];
 
 export const forbiddenState = (error: unknown): ForbiddenState =>
   licenseDeniedFeatures(error) ?? (error as RejectedResponse | undefined)?.response?.status === 403;
-
-/** A failed list read's text for OTable's error state, or null when nothing failed or the read was denied (K5). */
-export const loadErrorText = (error: unknown, fallback: string): string | null => {
-  const rejected = error as RejectedResponse | null | undefined;
-  if (!rejected || forbiddenState(rejected) !== false || rejected.status === 403) return null;
-  const message = rejected.response?.data?.message ?? rejected.message;
-  return typeof message === "string" && message.trim() ? message : fallback;
-};
 
 /** Missing feature keys of a license denial (403 + 40001), or null for any other error. */
 export const licenseDeniedFeatures = (error: unknown): string[] | null => {

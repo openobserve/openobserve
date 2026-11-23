@@ -28,8 +28,8 @@ import {
 } from "./insightCta";
 
 const LABELS: Record<CtaAction, string> = {
-  openInLogs: "Open in logs",
-  openInTraces: "Open in traces",
+  openInLogs: "Open in Logs",
+  openInTraces: "Open in Traces",
   addAlert: "Add alert",
   reviewAndAddAlerts: "Review and add alerts",
   addSyntheticCheck: "Add synthetic check",

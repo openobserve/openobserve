@@ -54,7 +54,7 @@ const props = withDefaults(
     covers?: boolean;
   }>(),
   {
-    size: "region",
+    size: "page",
     requests: undefined,
     actionLabel: undefined,
     covers: false,

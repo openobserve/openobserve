@@ -28,7 +28,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue, SelectOption } from "@/lib/forms/Select/OSelect.types";
@@ -247,11 +247,14 @@ const otherAppOrgs = (orgIds: readonly string[]): string => orgIds.join(", ");
       }}</span>
     </template>
 
-    <OSkeleton v-if="access.isPending.value" shape="block" class="h-32" />
+    <div v-if="access.isPending.value" class="flex justify-center py-8">
+      <OSpinner size="lg" />
+    </div>
     <OEmptyState
       v-else-if="access.isError.value || !view"
       kind="error"
-      size="compact"
+      :title="t('emptyState.loadError.title')"
+      :text="t('emptyState.loadError.description')"
       data-test="slack-org-access-load-error"
       @action="access.refetch()"
     />

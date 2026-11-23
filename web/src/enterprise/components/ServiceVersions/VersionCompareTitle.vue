@@ -1,6 +1,6 @@
 <template>
   <span
-    class="text-text-heading inline-flex items-baseline gap-1.5 text-sm font-semibold whitespace-nowrap"
+    class="text-text-heading inline-flex items-baseline gap-1.5 text-base font-semibold whitespace-nowrap"
     :data-test="testId"
     ><span>{{ service }}</span
     >{{ " "

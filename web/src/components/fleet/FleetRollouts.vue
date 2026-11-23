@@ -109,9 +109,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="fleet-rollouts-detail-error"
         @action="detail.refetch()"
       />
-      <div v-else class="flex flex-col gap-3" data-test="fleet-rollouts-detail-loading">
-        <OSkeleton preset="statStrip" />
-        <OSkeleton preset="tableRows" :rows="4" />
+      <div v-else class="flex justify-center py-6" data-test="fleet-rollouts-detail-loading">
+        <OSpinner size="lg" />
       </div>
     </div>
 
@@ -142,7 +141,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";

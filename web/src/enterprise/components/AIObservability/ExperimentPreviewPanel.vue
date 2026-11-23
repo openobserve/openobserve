@@ -37,7 +37,7 @@
       </div>
       <template v-else-if="preview">
         <div class="flex items-baseline gap-1.5">
-          <span class="text-text-heading text-2xl font-semibold tabular-nums">
+          <span class="text-text-heading text-2xl font-bold tabular-nums">
             {{ formattedSlots }}
           </span>
           <span class="text-text-secondary text-xs">

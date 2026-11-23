@@ -64,16 +64,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { providePageRailGroup } from "@/lib/core/PageHeader/pageContext";
 import SectionRail from "@/components/common/SectionRail.vue";
+import { type SectionHubGroup, type SectionHubItem } from "@/components/common/SectionHub.vue";
 import { defineComponent, ref, onBeforeMount, onActivated, onUpdated, computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import { menuState } from "@/utils/featureGate";
-import { useSettingsSections } from "./useSettingsSections";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
+import { featureState, menuState } from "@/utils/featureGate";
+import { isSlackSettingsVisible, readSlackOrgConfig } from "@/utils/slackSettings";
 import { PAGE_ACTIONS_SLOT_ID } from "./pageActionsSlot";
 import { SAVE_BAR_SLOT_ID } from "./saveBarSlot";
 
@@ -136,7 +137,13 @@ export default defineComponent({
     // Pages without a header of their own that put buttons in the shell's header.
     const HEADER_ACTION_SECTIONS = new Set(["slack"]);
 
-    const { slackVisible, settingsItems, sectionGroups } = useSettingsSections();
+    const slackVisible = computed(() => {
+      const edition = buildFeatureGateContext(store.state.zoConfig);
+      return (
+        checkFeatureAccess("slack", edition).allowed &&
+        isSlackSettingsVisible(edition, readSlackOrgConfig(store.state.zoConfig))
+      );
+    });
 
     const handleSettingsRouting = () => {
       const name = router.currentRoute.value.name;
@@ -197,6 +204,302 @@ export default defineComponent({
     onActivated(handleSettingsRouting);
     onUpdated(handleSettingsRouting);
 
+    // Order the section groups appear in (hub + switcher).
+    const settingsGroupOrder = [
+      "General",
+      "Access & Security",
+      "Destinations",
+      "Integrations",
+      "Data",
+      "Operations",
+      "Synthetics",
+      "Account",
+    ];
+
+    // Every section, with its group + a one-line description for the hub cards.
+    // Feature-flag visibility stays declarative here (one array, not per-tab v-ifs).
+    const settingsItems = computed<SectionHubItem[]>(() => {
+      const org = store.state.selectedOrganization?.identifier;
+      const isCloud = config.isCloud == "true";
+      const meta = isMetaOrg.value;
+      const featureGateCtx = buildFeatureGateContext(store.state.zoConfig);
+      const z = store.state.zoConfig;
+
+      // Computed once per key, not per call site: `checkFeatureAccess` already
+      // folds the "Cloud never offers this" distinction into `.visible`, so
+      // nothing here re-derives its own `!isCloud` check anymore.
+      const cipherKeysAccess = checkFeatureAccess("cipherKeys", featureGateCtx);
+      const aiToolsetsAccess = checkFeatureAccess("aiToolsets", featureGateCtx);
+      const regexPatternsAccess = checkFeatureAccess("regexPatterns", featureGateCtx);
+      const domainManagementAccess = checkFeatureAccess("domainManagement", featureGateCtx);
+      const passwordPolicyAccess = checkFeatureAccess("passwordPolicy", featureGateCtx);
+      const pipelineDestinationsAccess = checkFeatureAccess("pipelineDestinations", featureGateCtx);
+      const oncallAccess = checkFeatureAccess("oncall", featureGateCtx);
+      const storageSettingsAccess = checkFeatureAccess("storageSettings", featureGateCtx);
+      const correlationSettingsAccess = checkFeatureAccess("correlationSettings", featureGateCtx);
+      const queryManagementAccess = checkFeatureAccess("queryManagement", featureGateCtx);
+      const nodesAccess = checkFeatureAccess("nodes", featureGateCtx);
+      const licenseAccess = checkFeatureAccess("license", featureGateCtx);
+      // A locked license keeps the entry even where its runtime flag is off, so the lock stays discoverable.
+      const syntheticsLicense = menuState(
+        z?.features,
+        "synthetics",
+        z?.synthetics_enabled !== false,
+      );
+      const correlationLicense = menuState(
+        z?.features,
+        "correlation",
+        z?.service_streams_enabled !== false,
+      );
+      const queryManagementLicense = featureState(z?.features, "query_management");
+      const aiToolsetsLicense = featureState(z?.features, "ai_toolsets");
+      const aiAssistantLicense = featureState(z?.features, "ai_assistant");
+      const byobLicense = featureState(z?.features, "byob");
+      const oncallLicense = menuState(z?.features, "oncall", z?.oncall_enabled !== false);
+      const alertsLocked = featureState(z?.features, "alerts") === "locked";
+
+      const items: (SectionHubItem & { group: string })[] = [
+        {
+          key: "general",
+          label: t("settings.generalLabel"),
+          description: t("settings.generalDesc"),
+          icon: "settings",
+          to: `/settings/general?org_identifier=${org}`,
+          dataTest: "general-settings-tab",
+          group: "General",
+        },
+        {
+          key: "organization",
+          label: t("settings.orgLabel"),
+          description: t("settings.orgDesc"),
+          icon: "business",
+          to: `/settings/organization?org_identifier=${org}`,
+          dataTest: "organization-settings-tab",
+          group: "General",
+        },
+        {
+          key: "cipher-keys",
+          label: t("settings.cipherKeys"),
+          description: t("settings.cipherKeysDesc"),
+          icon: "key",
+          to: { name: "cipherKeys", query: { org_identifier: org } },
+          visible: cipherKeysAccess.visible,
+          locked: !cipherKeysAccess.allowed,
+          lockedMessage: cipherKeysAccess.message,
+          dataTest: "management-cipher-key-tab",
+          group: "Access & Security",
+        },
+        {
+          key: "regex_patterns",
+          label: t("regex_patterns.title"),
+          description: t("settings.regexPatternsDesc"),
+          icon: "pattern",
+          to: { name: "regexPatterns", query: { org_identifier: org } },
+          visible: regexPatternsAccess.visible,
+          locked: !regexPatternsAccess.allowed,
+          lockedMessage: regexPatternsAccess.message,
+          dataTest: "regex-patterns-tab",
+          group: "Access & Security",
+        },
+        {
+          key: "domain_management",
+          label: t("settings.ssoDomainRestrictions"),
+          description: t("settings.domainManagementDesc"),
+          icon: "dns",
+          to: { name: "domainManagement", query: { org_identifier: org } },
+          // Meta-org is a cluster-topology restriction, not an edition upsell
+          // (upgrading wouldn't fix it) — stays a hide, not a lock.
+          visible: meta && domainManagementAccess.visible,
+          locked: !domainManagementAccess.allowed,
+          lockedMessage: domainManagementAccess.message,
+          dataTest: "domain-management-tab",
+          group: "Access & Security",
+        },
+        {
+          key: "org_domain_mapping",
+          label: t("settings.orgDomainMapping.tabLabel"),
+          description: t("settings.orgDomainMapping.tabDesc"),
+          icon: "domain",
+          to: { name: "orgDomainMapping", query: { org_identifier: org } },
+          visible: isCloud,
+          dataTest: "org-domain-mapping-tab",
+          group: "Access & Security",
+        },
+        {
+          key: "announcements",
+          label: t("announcements.settings.label"),
+          description: t("announcements.settings.description"),
+          icon: "campaign",
+          to: { name: "announcementBanners", query: { org_identifier: org } },
+          visible: config.isEnterprise == "true" && meta,
+          dataTest: "announcement-banners-tab",
+          group: "General",
+        },
+        {
+          key: "password_policy",
+          label: t("settings.passwordPolicy"),
+          description: t("settings.passwordPolicyDesc"),
+          icon: "lock",
+          to: { name: "passwordPolicy", query: { org_identifier: org } },
+          visible: meta && passwordPolicyAccess.visible,
+          locked: !passwordPolicyAccess.allowed,
+          lockedMessage: passwordPolicyAccess.message,
+          dataTest: "password-policy-tab",
+          group: "Access & Security",
+        },
+        // Notification Destinations and Templates are alerting configuration and
+        // now live under Reliability (/alert-destinations, /alert-templates).
+        // Pipeline Destinations stays here — it belongs to pipelines, not
+        // alerting — so the group is just "Destinations" now.
+        {
+          key: "pipeline_destinations",
+          label: t("pipeline_destinations.header"),
+          description: t("settings.pipelineDestinationsDesc"),
+          icon: "person-pin-circle",
+          to: { name: "pipelineDestinations", query: { org_identifier: org } },
+          visible: pipelineDestinationsAccess.visible,
+          locked: !pipelineDestinationsAccess.allowed,
+          lockedMessage: pipelineDestinationsAccess.message,
+          dataTest: "pipeline-destinations-tab",
+          group: "Destinations",
+        },
+        {
+          key: "telephony",
+          label: t("telephony.title"),
+          description: t("telephony.subtitle"),
+          icon: "call",
+          to: { name: "telephonySettings", query: { org_identifier: org } },
+          // The route guard's rule: only an explicit `oncall_enabled: false` closes it.
+          visible: oncallLicense !== "hidden" && oncallAccess.visible,
+          locked: !oncallAccess.allowed,
+          lockedMessage: oncallAccess.message,
+          licenseLocked: oncallLicense === "locked",
+          dataTest: "telephony-settings-tab",
+          group: "Destinations",
+        },
+        {
+          key: "slack",
+          label: t("settings.slackApp"),
+          icon: "slack",
+          to: { name: "slack", query: { org_identifier: org } },
+          visible: slackVisible.value,
+          dataTest: "slack-settings-tab",
+          description: t("settings.slackAppDesc"),
+          group: "Integrations",
+        },
+        {
+          key: "storageSettings",
+          label: t("storage_settings.tabLabel"),
+          description: t("settings.storageSettingsDesc"),
+          icon: "cloud",
+          to: { name: "storageSettings", query: { org_identifier: org } },
+          // Cloud org-storage enablement is a separate runtime toggle, not an
+          // edition upsell: layered on top of `.visible` (which already hides
+          // this on a pure-Cloud build) for the enterprise+Cloud hybrid case.
+          visible:
+            storageSettingsAccess.visible &&
+            byobLicense !== "hidden" &&
+            (!isCloud ||
+              store.state.organizationData.organizationSettings.org_storage_enabled === true),
+          locked: !storageSettingsAccess.allowed,
+          lockedMessage: storageSettingsAccess.message,
+          licenseLocked: byobLicense === "locked",
+          dataTest: "storage-settings-tab",
+          group: "Data",
+        },
+        {
+          key: "correlation_settings",
+          label: t("settings.correlationSettings"),
+          description: t("settings.correlationSettingsDesc"),
+          icon: "group-work",
+          to: { name: "correlationSettings", query: { org_identifier: org } },
+          visible: correlationLicense !== "hidden" && correlationSettingsAccess.visible,
+          locked: !correlationSettingsAccess.allowed,
+          lockedMessage: correlationSettingsAccess.message,
+          licenseLocked: correlationLicense === "locked" && alertsLocked,
+          dataTest: "correlation-settings-tab",
+          group: "Data",
+        },
+        {
+          key: "ai_toolsets",
+          label: t("aiToolset.header"),
+          description: t("settings.aiToolsetsDesc"),
+          icon: "smart-toy",
+          to: { name: "aiToolsets", query: { org_identifier: org } },
+          visible:
+            aiToolsetsLicense !== "hidden" &&
+            aiAssistantLicense !== "hidden" &&
+            aiToolsetsAccess.visible,
+          locked: !aiToolsetsAccess.allowed,
+          lockedMessage: aiToolsetsAccess.message,
+          licenseLocked: aiToolsetsLicense === "locked" || aiAssistantLicense === "locked",
+          dataTest: "ai-toolsets-tab",
+          group: "Integrations",
+        },
+        {
+          key: "queryManagement",
+          label: t("settings.queryManagement"),
+          description: t("settings.queryManagementDesc"),
+          icon: "query-stats",
+          to: `/settings/query_management?org_identifier=${org}`,
+          visible: meta && queryManagementAccess.visible && queryManagementLicense !== "hidden",
+          locked: !queryManagementAccess.allowed,
+          lockedMessage: queryManagementAccess.message,
+          licenseLocked: queryManagementLicense === "locked",
+          dataTest: "query-management-tab",
+          group: "Operations",
+        },
+        {
+          key: "nodes",
+          label: t("settings.nodes"),
+          description: t("settings.nodesDesc"),
+          icon: "hub",
+          to: { name: "nodes", query: { org_identifier: org } },
+          visible: meta && nodesAccess.visible,
+          locked: !nodesAccess.allowed,
+          lockedMessage: nodesAccess.message,
+          dataTest: "nodes-tab",
+          group: "Operations",
+        },
+        {
+          key: "synthetics_locations",
+          label: t("synthetics.locations.title"),
+          description: t("synthetics.locations.description"),
+          icon: "location-on",
+          to: { name: "syntheticsLocations", query: { org_identifier: org } },
+          // Not `isEnt`: synthetics ships in OSS. Meta-org only (public rows are
+          // cluster-wide) and driven by the same `/config` flag as the feature.
+          visible: meta && syntheticsLicense !== "hidden",
+          licenseLocked: syntheticsLicense === "locked",
+          dataTest: "synthetics-locations-tab",
+          group: "Synthetics",
+        },
+        {
+          key: "license",
+          label: t("settings.license"),
+          description: t("settings.licenseDesc"),
+          icon: "card-membership",
+          to: { name: "license", query: { org_identifier: org } },
+          visible: meta && licenseAccess.visible,
+          locked: !licenseAccess.allowed,
+          lockedMessage: licenseAccess.message,
+          dataTest: "license-tab",
+          group: "Account",
+        },
+        {
+          key: "organization_management",
+          label: t("settings.organizationManagement"),
+          description: t("settings.organizationManagementDesc"),
+          icon: "lan",
+          to: { name: "orgnizationManagement", query: { org_identifier: org } },
+          visible: isCloud && meta,
+          dataTest: "organization-management-tab",
+          group: "Account",
+        },
+      ];
+      return items;
+    });
+
     // The active section's metadata (label + description) — drives the shell-owned
     // full-width header for constrained form sections.
     const activeSectionItem = computed(() =>
@@ -213,13 +516,34 @@ export default defineComponent({
       };
     });
 
-    providePageRailGroup(
-      computed(
-        () =>
-          sectionGroups.value.find((g) => g.items.some((i) => i.key === activeSection.value))
-            ?.label,
-      ),
-    );
+    // Bucket the sections into ordered groups for SectionHub / the breadcrumb switcher.
+    const sectionGroups = computed<SectionHubGroup[]>(() => {
+      const buckets = new Map<string, SectionHubItem[]>();
+      for (const item of settingsItems.value) {
+        const g = (item as any).group ?? "";
+        if (!buckets.has(g)) buckets.set(g, []);
+        buckets.get(g)!.push(item);
+      }
+      const rank = (label: string) => {
+        const i = settingsGroupOrder.indexOf(label);
+        return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+      };
+      // Internal group keys stay English (used for bucketing + rank); only the
+      // displayed label is translated so sorting/ranking is unaffected.
+      const groupLabels: Record<string, I18nText> = {
+        General: t("settings.groupGeneral"),
+        "Access & Security": t("settings.groupAccessSecurity"),
+        Destinations: t("settings.groupDestinations"),
+        Integrations: t("settings.groupIntegrations"),
+        Data: t("settings.groupData"),
+        Operations: t("settings.groupOperations"),
+        Synthetics: t("settings.groupSynthetics"),
+        Account: t("settings.groupAccount"),
+      };
+      return [...buckets.keys()]
+        .sort((a, b) => rank(a) - rank(b))
+        .map((label) => ({ label: groupLabels[label] ?? raw(label), items: buckets.get(label)! }));
+    });
 
     return {
       raw,

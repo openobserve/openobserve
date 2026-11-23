@@ -99,9 +99,7 @@ test.describe("Logs Quickmode testcases", () => {
     await pm.logsPage.ensureFieldIsInteresting("kubernetes_pod_id");
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.waitForQueryEditorTextbox();
-    // The app writes the interesting fields in the order they were picked, so check each one.
-    await pm.logsPage.expectInterestingFieldInEditor("kubernetes_pod_id");
-    await pm.logsPage.expectInterestingFieldInEditor("_timestamp");
+    await pm.logsPage.expectInterestingFieldInEditor("_timestamp,kubernetes_pod_id");
 
     testLogger.info('Interesting fields and query editor test completed');
   });

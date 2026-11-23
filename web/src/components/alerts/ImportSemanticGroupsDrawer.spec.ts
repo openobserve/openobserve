@@ -435,10 +435,10 @@ describe("ImportSemanticGroupsDrawer - ODialog modification compare", () => {
     expect(dialogs[1].props("title")).toBe("Updated Group");
   });
 
-  it("modification ODialog passes 'Compare changes' subTitle", async () => {
+  it("modification ODialog passes 'Compare Changes' subTitle", async () => {
     const w = await mountComp();
     const dialogs = w.findAllComponents(ODialogStub);
-    expect(dialogs[1].props("subtitle")).toBe("Compare changes");
+    expect(dialogs[1].props("subtitle")).toBe("Compare Changes");
   });
 
   it("modification ODialog has primary?.label 'Close'", async () => {

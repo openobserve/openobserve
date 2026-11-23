@@ -123,7 +123,7 @@ describe("PromQLBuilderOptions", () => {
     it("should display step value label", () => {
       wrapper = createWrapper();
       const labels = wrapper.findAll('[data-test="promql-builder-options-field-label"]');
-      expect(labels[1].text()).toBe("Step value");
+      expect(labels[1].text()).toBe("Step Value");
     });
 
     it("should display query type label", () => {

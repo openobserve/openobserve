@@ -20,8 +20,8 @@ export class RumSourcemapsPage {
         // The list's filters carry no data-test and their label is not tied to the trigger, so the label's wrapper finds it.
         this.serviceFilter = page.locator('div:has(> label:text-is("Service")) [role="combobox"]');
         this.filterOptions = page.getByRole('option');
-        this.applyFiltersBtn = page.getByRole('button', { name: 'Apply filters' });
-        this.uploadPageBtn = page.getByRole('button', { name: 'Upload source maps' });
+        this.applyFiltersBtn = page.getByRole('button', { name: 'Apply Filters' });
+        this.uploadPageBtn = page.getByRole('button', { name: 'Upload Source Maps' });
         this.uploadCancelBtn = page.locator('[data-test="rum-upload-source-maps-cancel-btn"]');
         this.versionCells = page.locator('[data-test="o2-table-cell-version"]');
         this.pageSizeTrigger = page.locator('[data-test="o2-table-page-size-select-trigger"]');

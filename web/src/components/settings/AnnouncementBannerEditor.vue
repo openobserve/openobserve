@@ -26,16 +26,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :styles="styles"
     @reload="reload"
   />
-  <OEmptyState
-    v-else-if="configQuery.isError.value"
-    kind="error"
-    :title="t('announcements.settings.loadFailed')"
-    data-test="announcement-editor-error"
-    @action="configQuery.refetch()"
-  />
-  <div v-else class="flex flex-col gap-4 p-4" data-test="announcement-editor-loading">
-    <OSkeleton shape="block" class="h-24" />
-    <OSkeleton shape="block" class="h-64" />
+  <div
+    v-else
+    class="flex h-full items-center justify-center"
+    data-test="announcement-editor-loading"
+  >
+    <div v-if="configQuery.isError.value" class="flex flex-col items-center gap-3">
+      <span class="text-text-secondary text-sm">{{ t("announcements.settings.loadFailed") }}</span>
+      <OButton variant="secondary" @click="configQuery.refetch()">
+        {{ t("common.retry") }}
+      </OButton>
+    </div>
+    <OSpinner v-else size="lg" />
   </div>
 </template>
 
@@ -45,8 +47,8 @@ import { useQuery } from "@tanstack/vue-query";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { announcementConfigQuery } from "@/services/announcements.queries";
 import { useI18nTyped } from "@/types/i18n";
 import AnnouncementBannerEditorForm from "./AnnouncementBannerEditorForm.vue";

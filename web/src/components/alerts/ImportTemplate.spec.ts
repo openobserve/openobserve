@@ -496,7 +496,7 @@ describe("ImportTemplate", () => {
       expect(wrapper.vm.tempalteCreators[0].message).toContain("Conflict");
     });
 
-    it("falls back to 'Unknown error' when response has no message", async () => {
+    it("falls back to 'Unknown Error' when response has no message", async () => {
       const templateService = await import("@/services/alert_templates");
       vi.mocked(templateService.default.create).mockRejectedValueOnce(new Error("net"));
 
@@ -506,7 +506,7 @@ describe("ImportTemplate", () => {
       );
 
       expect(result).toBe(false);
-      expect(wrapper.vm.tempalteCreators[0].message).toContain("Unknown error");
+      expect(wrapper.vm.tempalteCreators[0].message).toContain("Unknown Error");
     });
 
     it("includes title in the service payload for email templates", async () => {

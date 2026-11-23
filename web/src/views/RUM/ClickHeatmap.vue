@@ -160,18 +160,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('rum.heatmap.noPages')"
         data-test="rum-heatmap-empty"
       />
-      <OEmptyState
-        v-else-if="loadError"
-        :kind="loadForbidden ? 'denied' : 'error'"
-        :text="loadError"
-        data-test="rum-heatmap-load-error"
-      >
-        <template v-if="!loadForbidden" #actions>
-          <OButton data-test="rum-heatmap-retry-btn" @click="onRetry">{{
-            t("common.retry")
-          }}</OButton>
-        </template>
-      </OEmptyState>
+      <div v-else-if="loadError" class="p-4">
+        <OInlineNotice
+          tone="warn"
+          :message="loadError ?? undefined"
+          data-test="rum-heatmap-load-error"
+        >
+          <template v-if="!loadForbidden" #actions>
+            <OButton variant="secondary" data-test="rum-heatmap-retry-btn" @click="onRetry">{{
+              t("common.retry")
+            }}</OButton>
+          </template>
+        </OInlineNotice>
+      </div>
       <template v-else>
         <div
           class="border-border-default bg-surface-subtle flex shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2"
@@ -494,7 +495,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="min-h-0 flex-1 overflow-auto">
               <OEmptyState
                 v-if="groups.length && !visibleRows.length"
-                kind="filtered"
                 :title="t('rum.heatmap.noElementMatch')"
                 :action-label="t('rum.heatmap.clearFilters')"
                 data-test="rum-heatmap-no-match"

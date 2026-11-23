@@ -72,16 +72,6 @@ declare module "@tanstack/query-core" {
   }
 }
 
-// The statuses a second attempt can change: a timeout, a rate limit, or a proxy or server not ready yet.
-const TRANSIENT_STATUSES = new Set([408, 429, 502, 503, 504]);
-
-/** Retries twice a read that got no answer or a transient one; any other status is the server's verdict. */
-export const shouldRetryQuery = (failureCount: number, err: any): boolean => {
-  const status = err?.response?.status ?? err?.status;
-  if (typeof status === "number" && !TRANSIENT_STATUSES.has(status)) return false;
-  return failureCount < 2;
-};
-
 // Server-authored text: it has no translation key, so it passes through as-is.
 const serverMessage = (err: any): I18nText =>
   asText(
@@ -126,7 +116,13 @@ export const queryClient = new QueryClient({
       // Every declaration names its tier; this is the safety net for one that forgets — see cachePolicy.ts.
       staleTime: LIVE_STALE_TIME,
       gcTime: GC_TIME,
-      retry: shouldRetryQuery,
+      retry: (failureCount: number, err: any) => {
+        const status = err?.response?.status;
+        // 4xx are the caller's fault; 501 is a disabled feature — both permanent.
+        if (status === 400 || status === 401 || status === 403 || status === 404 || status === 501)
+          return false;
+        return failureCount < 2;
+      },
       // Off everywhere: this console is often left open on a wall display and several endpoints are expensive.
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,

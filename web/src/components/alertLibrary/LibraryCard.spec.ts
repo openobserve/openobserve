@@ -105,7 +105,7 @@ describe("LibraryCard", () => {
       wrapper
         .find(`[data-test="${test}"]`)
         .classes()
-        .filter((c) => c.startsWith("rounded-") || c.startsWith("px-") || c.startsWith("text-2xs"))
+        .filter((c) => c.startsWith("rounded-") || c.startsWith("px-") || c.startsWith("text-3xs"))
         .sort();
     const shape = shapeOf("alert-library-card-needs-data");
     expect(shape.length).toBeGreaterThan(0); // else the comparison is vacuous
@@ -396,7 +396,7 @@ describe("LibraryCard", () => {
       const button = wrapper
         .findAllComponents({ name: "OButton" })
         .find((b) => b.attributes("data-test") === CUSTOMIZE_ID);
-      expect(button?.props("variant")).toBe("ghost");
+      expect(button?.props("variant")).toBe("secondary");
       expect(button?.props("iconOnly")).toBe(true);
       expect(button?.props("icon")).toBe("edit");
     });

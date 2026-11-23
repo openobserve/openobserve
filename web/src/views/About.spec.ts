@@ -60,7 +60,7 @@ const licenseResponse = (overrides: Record<string, unknown> = {}) => ({
     features: ["ai_assistant"],
     feature_definition: {
       features: {
-        ai_assistant: { display_name: "AI assistant", gate: true },
+        ai_assistant: { display_name: "AI Assistant", gate: true },
         oncall: { display_name: "On-Call", gate: true },
         alerts: { display_name: "Alerts", gate: false },
       },
@@ -206,7 +206,7 @@ describe("About", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("Open source libraries");
+    expect(wrapper.text()).toContain("Open Source Libraries");
   });
 
   it("should have links to Cargo.toml and package.json", () => {
@@ -323,7 +323,7 @@ describe("About", () => {
     });
 
     // The grid contains Open Source Libraries and License sections
-    expect(wrapper.text()).toContain("Open source libraries");
+    expect(wrapper.text()).toContain("Open Source Libraries");
     expect(wrapper.text()).toContain("License information");
   });
 
@@ -412,7 +412,7 @@ describe("About", () => {
                   version: "v0.70.0",
                   feature_revision: 1,
                   license_server_url: "https://license.example.com",
-                  feature_names: { oncall: "On-Call", ai_assistant: "AI assistant" },
+                  feature_names: { oncall: "On-Call", ai_assistant: "AI Assistant" },
                   features: { ai_assistant: "enabled", oncall: "locked", alerts: "enabled" },
                 },
               },
@@ -517,7 +517,7 @@ describe("About", () => {
 
       expect(list.text()).toContain("Features");
       expect(list.find('[data-test="settings-license-features-unlocked"]').text()).toContain(
-        "AI assistant",
+        "AI Assistant",
       );
       expect(list.find('[data-test="settings-license-features-missing"]').text()).toContain(
         "On-Call",

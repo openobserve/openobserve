@@ -82,8 +82,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @action="filterQuery = ''"
         />
       </template>
-      <template #error>
-        <OEmptyState kind="error" @action="requests.refetch()" />
+      <template #error="{ message }">
+        <OEmptyState
+          kind="error"
+          :title="t('emptyState.loadError.title')"
+          :text="raw(message)"
+          @action="requests.refetch()"
+        />
       </template>
 
       <template #cell-requested_by="{ row }">

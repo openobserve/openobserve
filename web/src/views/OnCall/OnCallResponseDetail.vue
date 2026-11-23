@@ -195,7 +195,7 @@
         <template #trigger>
           <OButton
             icon-only
-            variant="ghost"
+            variant="secondary"
             icon="more-vert"
             :loading="snoozing || escalatingNow"
             :aria-label="t('oncall.moreActions')"
@@ -527,18 +527,18 @@
 
     <OnCallResponseDetailSkeleton v-else-if="loading" />
 
-    <OContent v-else-if="loadError !== null">
+    <OContent v-else-if="loadError !== null" y>
       <OEmptyState
         kind="error"
         :title="t('oncall.loadResponseFailed')"
-        :text="isRawHttpText(loadError) ? t('emptyState.loadError.description') : raw(loadError)"
+        :text="raw(loadError)"
         data-test="oncall-response-detail-error"
         @action="refreshPage"
       />
     </OContent>
 
     <!-- Reads return 404 for a deleted page, and "nothing here yet" would suggest it is still coming. -->
-    <OContent v-else>
+    <OContent v-else y>
       <OEmptyState
         :title="t('oncall.responseNotFoundTitle')"
         :action-label="t('oncall.openPagesList')"
@@ -736,7 +736,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 

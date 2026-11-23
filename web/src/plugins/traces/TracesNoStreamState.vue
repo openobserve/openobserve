@@ -26,30 +26,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #actions>
-      <OButton
-        variant="primary"
+      <!-- Select a stream -->
+      <EmptyStateIngestionCard
+        icon="account-tree"
+        :label="t('traces.noStream.selectStream')"
+        :sublabel="t('traces.noStream.selectStreamDesc')"
         data-test="traces-no-stream-select-stream-card"
         @click="emit('select-stream')"
-      >
-        {{ t("traces.noStream.selectStream") }}
-      </OButton>
-      <OButton
-        icon-end="open-in-new"
+      />
+
+      <!-- Read the query guide -->
+      <EmptyStateIngestionCard
+        icon="menu-book"
+        :label="t('traces.noStream.queryGuide')"
+        :sublabel="t('traces.noStream.queryGuideDesc')"
+        icon-variant="teal"
         data-test="traces-no-stream-query-guide-card"
         @click="openGuide"
-      >
-        {{ t("traces.noStream.queryGuide") }}
-      </OButton>
+      />
     </template>
 
     <template v-if="recentStream" #extra>
-      <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-        <span class="text-text-secondary text-compact">{{ t("traces.noStream.recent") }}</span>
-        <OButton
-          variant="link"
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <span class="text-text-secondary me-1 text-sm font-semibold">
+          {{ t("traces.noStream.recent") }}
+        </span>
+        <EmptyStateIngestionChip
+          icon="account-tree"
           :data-test="`traces-no-stream-recent-${recentStream}`"
           @click="emit('pick-stream', recentStream)"
-          ><OTruncatedText class="max-w-40">{{ recentStream }}</OTruncatedText></OButton
+          ><OTruncatedText class="max-w-40">{{
+            recentStream
+          }}</OTruncatedText></EmptyStateIngestionChip
         >
       </div>
     </template>
@@ -60,7 +68,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
+import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { restoreTracesStream } from "@/utils/streamPersist";
 import DOMPurify from "dompurify";

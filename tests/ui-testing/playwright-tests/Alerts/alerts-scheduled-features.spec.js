@@ -462,7 +462,7 @@ test.describe("Scheduled Alert Features", () => {
     //            → handleChartDataUpdate evaluates → indicator appears
     //
     // Approach:
-    // 1. Open scheduled alert wizard (stays in "Alert rules" tab, Custom/Builder mode)
+    // 1. Open scheduled alert wizard (stays in "Alert Rules" tab, Custom/Builder mode)
     // 2. Set threshold operator (>=) and value (1) in the "Alert if row" FIRST
     // 3. Switch to SQL tab, enter query, and run it
     // 4. Close SQL editor dialog, clean up portal elements
@@ -544,7 +544,7 @@ test.describe("Scheduled Alert Features", () => {
 
         // In v3, aggregation is controlled by the function dropdown in the "Alert if" row
         // Default is "total events" (no aggregation). Select "count" to enable aggregation.
-        // The "Alert if" condition row is auto-created in v3, so no "Add condition" click needed.
+        // The "Alert if" condition row is auto-created in v3, so no "Add Condition" click needed.
         await pm.alertsPage.enableAggregation();
 
         // Verify group-by section appeared (v-if="selectedFunction !== 'total_events'")

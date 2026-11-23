@@ -234,7 +234,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Destination Creation Success Messages -->
           <div class="error-section mb-2.5 p-2.5" v-if="destinationCreators.length > 0">
-            <div class="text-primary mb-2.5 text-sm" data-test="destination-import-creation-title">
+            <div
+              class="text-primary mb-2.5 text-base"
+              data-test="destination-import-creation-title"
+            >
               {{ t("alert_destinations.import.destinationCreation") }}
             </div>
             <div
@@ -245,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :class="{
-                  'px-0 py-1.25 text-sm font-semibold wrap-break-word': true,
+                  'px-0 py-1.25 text-sm font-bold wrap-break-word': true,
                   'text-green': val.success,
                   'text-status-negative': !val.success,
                 }"

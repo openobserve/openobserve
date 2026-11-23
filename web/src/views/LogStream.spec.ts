@@ -497,7 +497,7 @@ describe("LogStream Component", () => {
       const dialogs = wrapper.findAllComponents({ name: "ODialog" });
       const openDialog = dialogs.find((d: any) => d.props("open") === true);
       expect(openDialog).toBeTruthy();
-      expect(openDialog!.props("title")).toBe("Delete stream");
+      expect(openDialog!.props("title")).toBe("Delete Stream");
       expect(openDialog!.props("primary")?.variant).toBe("danger");
     });
 
@@ -591,7 +591,7 @@ describe("LogStream Component", () => {
         .findAllComponents({ name: "ODialog" })
         .find((d: any) => d.props("open") === true)!;
       expect(dialog).toBeTruthy();
-      expect(dialog.props("title")).toBe("Delete streams");
+      expect(dialog.props("title")).toBe("Delete Streams");
       expect(dialog.props("primary")?.variant).toBe("danger");
     });
 

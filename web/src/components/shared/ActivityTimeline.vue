@@ -25,16 +25,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex h-full min-h-60 flex-col">
-    <div v-if="loading" class="flex flex-col gap-3 p-3">
-      <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-12" />
+    <div v-if="loading" class="flex items-center justify-center py-8">
+      <OSpinner size="lg" />
     </div>
 
-    <OEmptyState
+    <div
       v-else-if="events.length === 0"
-      icon="forum"
-      :title="emptyTitle"
-      :text="emptySubtitle"
-    />
+      class="text-text-muted flex flex-col items-center justify-center py-8"
+    >
+      <OIcon name="forum" class="mb-2 size-10! opacity-40" />
+      <div class="mb-1 text-base font-medium">{{ emptyTitle }}</div>
+      <div class="text-text-muted text-sm">{{ emptySubtitle }}</div>
+    </div>
 
     <div v-else class="relative flex min-h-0 flex-1 flex-col">
       <div v-if="showScrollButtons" class="absolute top-1 right-1 z-10 flex flex-col gap-1">
@@ -230,8 +232,7 @@ import { ref } from "vue";
 import { useTheme } from "@/composables/useTheme";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import { raw, type I18nText } from "@/types/i18n";

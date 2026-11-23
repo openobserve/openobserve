@@ -11,11 +11,7 @@
     "bannerMessage": "この機能はロックされています。ライセンスに {feature} 機能が必要です。",
     "bannerMessageGeneric": "このページにはライセンスに含まれていない機能が必要です。",
     "headerLocked": "ロック中: {feature} が必要",
-    "availableInEnterprise": "{feature} は OpenObserve Enterprise で利用できます",
-    "turnedOffTitle": "この組織では無効です",
-    "enterpriseTitle": "Enterprise で利用できます",
-    "readDocs": "ドキュメントを読む",
-    "rbacOff": "この組織では RBAC がオフです。管理者がサーバー設定で {env} を true に設定するとオンになります。"
+    "availableInEnterprise": "{feature} は OpenObserve Enterprise で利用できます"
   },
   "emptyState": {
     "illustrations": {
@@ -84,6 +80,10 @@
       "title": "パターンが見つかりません",
       "description": "時間範囲を広げるか、ログデータの多い別のストリームを選択してみてください。パターン抽出は、少なくとも 1,000 個のログで最適に機能します。",
       "logsAnalyzed": "{count} 個のログのみが分析されました。"
+    },
+    "noStreamSelected": {
+      "title": "ストリームを選択して始めましょう",
+      "description": "ストリームを選択し、クエリを実行してそのデータを調べます。フィルターとカスタム時間範囲を使用して結果を絞り込みます。"
     },
     "noQueryApplied": {
       "title": "クエリを実行してログを確認する",
@@ -201,6 +201,22 @@
       "action": "新しいキー",
       "actionDesc": "暗号鍵を生成"
     },
+    "noSlackChannelDefaults": {
+      "title": "デフォルトの組織が設定されたチャンネルはまだありません",
+      "description": "デフォルトがないチャンネルでの質問は、各ユーザーのデフォルト組織に送られます（/o2 org で変更できます）。"
+    },
+    "noSlackLinkedPeople": {
+      "title": "この組織ではまだ誰も Slack を連携していません"
+    },
+    "slackNotConnected": {
+      "title": "Slack ワークスペースを接続"
+    },
+    "noAnnouncementBanners": {
+      "title": "バナーはまだありません",
+      "description": "バナーは、選択した組織に対してアプリ上部にお知らせを表示します。",
+      "action": "バナーを追加",
+      "actionDesc": "お知らせを作成してスケジュールを設定"
+    },
     "noAiToolsets": {
       "title": "AI ツールセットはまだありません",
       "description": "AI ツールセットは、組織を外部 AI 機能に接続します。",
@@ -314,6 +330,7 @@
     "noStreams": {
       "title": "ソースを接続して最初のストリームを作成",
       "description": "ストリームは、データが到着した瞬間に自動的に作成されます。アプリ、エージェント、コレクターからの取り込みを設定して始めましょう。",
+      "action": "取り込みを設定する",
       "actionDesc": "データソースを接続する",
       "createAction": "新しいストリーム",
       "createActionDesc": "ストリームスキーマを手動で定義する"
@@ -453,9 +470,7 @@
       "description": "{noun}が現在のフィルターまたは検索に一致しません。調整するかクリアしてみてください。",
       "action": "フィルターをクリア",
       "actionDesc": "すべてのフィルターをリセットして検索",
-      "fallbackNoun": "結果",
-      "noMatches": "一致するものがありません",
-      "noMatchesText": "現在の検索条件やフィルターに一致するものはありません。"
+      "fallbackNoun": "結果"
     },
     "nouns": {
       "logs": "ログ",
@@ -638,26 +653,6 @@
     "noOncallUnrouted": {
       "title": "オーナーが必要なものはありません",
       "description": "発火したすべてのアラートはチームに届きました。"
-    },
-    "noSlackChannelDefaults": {
-      "title": "デフォルトの組織が設定されたチャンネルはまだありません",
-      "description": "デフォルトがないチャンネルでの質問は、各ユーザーのデフォルト組織に送られます（/o2 org で変更できます）。"
-    },
-    "noSlackLinkedPeople": {
-      "title": "この組織ではまだ誰も Slack を連携していません"
-    },
-    "slackNotConnected": {
-      "title": "Slack ワークスペースを接続"
-    },
-    "noAnnouncementBanners": {
-      "title": "バナーはまだありません",
-      "description": "バナーは、選択した組織に対してアプリ上部にお知らせを表示します。",
-      "action": "バナーを追加",
-      "actionDesc": "お知らせを作成してスケジュールを設定"
-    },
-    "pageError": {
-      "title": "このページを読み込めませんでした",
-      "description": "このページのデータを読み込めませんでした。今すぐ再試行するか、しばらくしてからもう一度お試しください。"
     }
   },
   "accessBoundary": {
@@ -805,13 +800,6 @@
       "traces": "トレース",
       "logs": "ログ",
       "charts": "チャート"
-    },
-    "saveBar": {
-      "noChanges": "保存する変更はありません",
-      "unsavedChanges": "{n} 件の未保存の変更 | {n} 件の未保存の変更",
-      "changesShort": "{n} 件の変更 | {n} 件の変更",
-      "fixFields": "{n} 個のフィールドを修正 | {n} 個のフィールドを修正",
-      "discard": "破棄"
     },
     "dismiss": "閉じる",
     "undo": "元に戻す",
@@ -1208,6 +1196,18 @@
     "boolFalse": "偽",
     "browserTimeWithZone": "ブラウザ時間（{zone}）",
     "poweredBy": "提供",
+    "saveBar": {
+      "noChanges": "保存する変更はありません",
+      "unsavedChanges": "{n} 件の未保存の変更 | {n} 件の未保存の変更",
+      "changesShort": "{n} 件の変更 | {n} 件の変更",
+      "fixFields": "{n} 個のフィールドを修正 | {n} 個のフィールドを修正",
+      "discard": "破棄"
+    },
+    "leaveGuard": {
+      "title": "未保存の変更がありますが、離れますか？",
+      "message": "このページに {n} 件の未保存の変更があります。離れると失われます。 | このページに {n} 件の未保存の変更があります。離れると失われます。",
+      "keepEditing": "編集を続ける"
+    },
     "editorDraft": {
       "restoreTitle": "未保存の下書き",
       "restoreTitleInBrowser": "未保存のローカル変更",
@@ -1289,11 +1289,100 @@
       "leaveMessageInBrowser": "{entity}を保存するか、変更をこのブラウザに保持するか、破棄してください。",
       "retentionInBrowser": "変更はこのブラウザに {days} 日間、またはサインアウトするまで保持されます。各種類につき最新の {max} 件のみが保持されます。",
       "dotUndated": "Unsaved draft"
+    }
+  },
+  "filterBar": {
+    "ariaLabel": "フィールドでフィルター",
+    "placeholder": "フィールドでフィルターするか、field=value と入力してください。Enter で実行します",
+    "addFilter": "フィルターを追加",
+    "searchFields": "フィールドを検索",
+    "searchLabels": "ラベルを検索",
+    "searchOperators": "条件を検索",
+    "searchValue": "値を検索または入力",
+    "searchValues": "値を検索",
+    "textField": "テキスト",
+    "useValue": "\"{value}\" を使用",
+    "useField": "フィールド \"{field}\" を使用",
+    "useLabel": "ラベル \"{field}\" を使用",
+    "searchText": "すべてのテキストで「{text}」を検索",
+    "emptyValue": "（空）",
+    "loadingFields": "フィールドを読み込み中…",
+    "noFields": "一致するフィールドがありません",
+    "noValues": "候補がありません。値を入力して Enter キーを押してください",
+    "noOperators": "一致する条件がありません",
+    "removeFilter": "フィルターを削除",
+    "clearAll": "すべてのフィルターをクリア",
+    "toggleConnector": "AND と OR を切り替え",
+    "selectedCount": "値が選択されていません | {count} 個の値を選択済み | {count} 個の値を選択済み",
+    "query": "クエリ",
+    "builderTooltip": "フィールド、条件、値を選択してフィルターを作成",
+    "queryTooltip": "クエリを自分で入力",
+    "queryNotParsableShort": "ビルダーではこのクエリを表示できません:",
+    "clearAndBuild": "クリアして作成",
+    "clearQueryTitle": "クエリをクリアしますか？",
+    "clearQueryMessage": "クエリは削除され、ビルダーは空の状態から始まります。",
+    "where": "条件",
+    "addCondition": "条件を追加",
+    "addGroup": "グループを追加",
+    "startGroup": "グループを開始",
+    "addBelow": "下に条件を追加",
+    "ungroup": "グループ解除",
+    "collapseGroup": "グループを折りたたむ",
+    "expandGroup": "グループを展開",
+    "moreInGroup": "さらに {count} 件",
+    "groupHasIssues": "このグループに修正が必要な項目があります",
+    "chooseField": "フィールドを選択",
+    "chooseValue": "値を選択",
+    "lockedFilter": "このフィルターはここでは編集できません。保存時のまま保持されます。破棄するには削除してください",
+    "limits": {
+      "conditions": "最大 {count} 件のフィルター | 最大 {count} 件のフィルター",
+      "values": "最大 {count} 個の値 | 最大 {count} 個の値"
     },
-    "leaveGuard": {
-      "title": "未保存の変更がありますが、離れますか？",
-      "message": "このページに {n} 件の未保存の変更があります。離れると失われます。 | このページに {n} 件の未保存の変更があります。離れると失われます。",
-      "keepEditing": "編集を続ける"
+    "validation": {
+      "incomplete": "このフィルターを完成させるか削除してください",
+      "required": "少なくとも 1 つのフィルターを追加してください",
+      "uniqueField": "{field} にはすでにフィルターがあります。そのフィルターを編集するか、このフィルターを削除してください",
+      "oneUsageCondition": "ティアは使用条件を 1 つだけ受け付けます。この条件をルールに変換するか削除してください",
+      "rumField": "組み込みフィールド、または小文字・数字・アンダースコアからなる 128 文字以内の列を使用してください",
+      "valueLength": "各値は 1～{max} 文字である必要があります",
+      "regexLength": "パターンは{max}文字以内にしてください。",
+      "regexInvalid": "このパターンは無効か、サポートされていません。先読み、後読み、後方参照は使用できません。"
+    },
+    "operatorNames": {
+      "containsIgnoreCase": "含む（大文字と小文字を区別しない）",
+      "notStartsWith": "～で始まらない",
+      "notEndsWith": "～で終わらない",
+      "isEmpty": "空である",
+      "isNotEmpty": "空でない"
+    },
+    "types": {
+      "string": "テキスト",
+      "number": "数値",
+      "boolean": "ブール値"
+    },
+    "operators": {
+      "eq": "等しい",
+      "neq": "等しくない",
+      "gt": "より大きい",
+      "gte": "以上",
+      "lt": "より小さい",
+      "lte": "以下",
+      "contains": "含む",
+      "containsIgnoreCase": "含む（大文字小文字を無視）",
+      "notContains": "含まない",
+      "startsWith": "で始まる",
+      "notStartsWith": "で始まらない",
+      "endsWith": "で終わる",
+      "notEndsWith": "で終わらない",
+      "in": "のいずれか",
+      "notIn": "のいずれでもない",
+      "regex": "正規表現に一致",
+      "notRegex": "正規表現に一致しない",
+      "isNull": "値がない",
+      "isNotNull": "値がある",
+      "isEmpty": "空または値がない",
+      "isNotEmpty": "空でない値がある",
+      "matchAll": "テキストに一致"
     }
   },
   "flow": {
@@ -1403,9 +1492,11 @@
     "patternNavPrevious": "前へ",
     "patternNavNext": "次へ",
     "patternNoValuesAvailable": "使用可能な値はありません",
+    "sqlModeLabel": "SQL モード",
     "nlpModeLabel": "自然言語モード",
     "quickModeLabel": "クイックモード",
     "menuMore": "もっと",
+    "menuGroupSetOnce": "1 回設定",
     "menuGroupHistory": "歴史",
     "menuGroupDownloads": "ダウンロード",
     "menuGroupSchedule": "スケジュール",
@@ -1779,6 +1870,7 @@
     "viewDeletedSuccessfully": "ビューは正常に削除されました。",
     "viewCreatedSuccessfully": "ビューは正常に作成されました。",
     "viewUpdatedSuccessfully": "ビューは正常に更新されました。",
+    "linkCopiedSuccessfully": "リンクは正常にコピーされました！",
     "errorCopyingLink": "リンクをコピー中にエラーが発生しました。",
     "errorShorteningLink": "リンクを短縮中にエラーが発生しました。",
     "webUrlNotConfigured": "共有 URL は、管理者が ZO_WEB_URL を設定するまで無効になっています。",
@@ -1980,24 +2072,7 @@
     "freeTextNoTextFields": "このストリームには検索可能なテキストフィールドがありません。",
     "freeTextNoTextFieldsNamed": "未検索: {streams}（テキストフィールドなし）。",
     "freeTextBuildNotice": "このフィルターにはテキスト検索が含まれています。SQL で編集してください。",
-    "filterNotChartableNotice": "このフィルターはビルダーではグラフ化できません。検索フィルターは変更されていません。グラフ化するには {custom} に切り替えてください。",
-    "queryModeLabel": "クエリ言語",
-    "queryModeFilter": "フィルター",
-    "queryModeSql": "SQL",
-    "queryModeFilterTooltip": "フィールドと値でログを絞り込みます",
-    "queryModeSqlTooltip": "集計や結合を含む完全な SQL クエリを書きます",
-    "sqlModeNeedsOneStream": "このビューの SQL は 1 つのストリームのみ対象です",
-    "menuGroupViewOptions": "表示オプション",
-    "histogramHiddenForAggregates": "このクエリは時系列のイベントではなくグループを返すため、ヒストグラムはありません。可視化で結果をグラフにできます。",
-    "linkCopied": "リンクをコピーしました",
-    "linkCopiedFixedTime": "リンクをコピーしました · 固定期間 {from} – {to}",
-    "linkCopiedRelativeTime": "リンクをコピーしました · {period}（開いた時点から）",
-    "recordsChipRows": "{total} 行 | {total} 行",
-    "histogramTitleRows": "{total} 行を {took} ms で表示。 | {total} 行を {took} ms で表示。",
-    "histogramTitleRowsWithScan": "{total} 行を {took} ms で表示。（{scanLabel}: {scanSize}） | {total} 行を {took} ms で表示。（{scanLabel}: {scanSize}）",
-    "pickStreamFirst": "先にストリームを選択してください",
-    "autoRefreshPausedInVisualize": "自動更新は検索結果を更新します。可視化中は一時停止します。",
-    "histogramNoTimeAxis": "グループ化された結果には時間軸がありません"
+    "filterNotChartableNotice": "このフィルターはビルダーではグラフ化できません。検索フィルターは変更されていません。グラフ化するには {custom} に切り替えてください。"
   },
   "menu": {
     "alertCalibration": "アラートキャリブレーション",
@@ -2031,14 +2106,6 @@
     "workflows": "ワークフロー",
     "language": "言語",
     "keyboardShortcuts": "キーボードショートカット",
-    "searchOrJumpTo": "検索またはジャンプ…",
-    "jumpToTitle": "ジャンプ",
-    "addData": "データを追加",
-    "jumpToPlaceholder": "ページ、アラート、ダッシュボード、ストリームを検索",
-    "jumpToPlaceholderPages": "ページとアクションを検索",
-    "jumpToPages": "ページ",
-    "jumpToShowAll": "{page}ですべて表示",
-    "jumpToSearchLogs": "ログで「{text}」を検索",
     "synthetic": "合成モニタリング",
     "experience": "エクスペリエンス",
     "slos": "SLOs",
@@ -4119,8 +4186,7 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "ライセンスを管理する権限がありません。"
-      },
-      "usageTitle": "1日あたりの取り込み量"
+      }
     },
     "value_sso_requires_ha": "✅ HA モードが必要",
     "value_rbac_requires_ha": "✅ HA モードが必要",
@@ -4289,9 +4355,7 @@
     "revokeInvitationMsg": "{email} への招待を取り消してもよろしいですか？",
     "deleteUsersTitle": "ユーザーを削除する",
     "deleteUsersMsg": "{count}人のユーザーを削除してもよろしいですか？ | {count}人のユーザーを削除してもよろしいですか？",
-    "deleteUsersBlockNote": "そのうち {count} 人は検証済みドメイン経由で参加したため、削除ではなくブロックされます。",
-    "roleHint": "Admin は組織を管理し、Editor はデータと設定を変更でき、Viewer は閲覧のみ可能です。",
-    "customRolesNeedRbac": "カスタムロールには RBAC が必要ですが、この組織ではオフです。"
+    "deleteUsersBlockNote": "そのうち {count} 人は検証済みドメイン経由で参加したため、削除ではなくブロックされます。"
   },
   "invitation": {
     "pendingInvitations": "保留中の招待状",
@@ -5144,7 +5208,6 @@
   },
   "organization": {
     "searchByNameOrId": "名前または ID で検索",
-    "currentLabel": "組織: {name}",
     "noOrganizationsFound": "組織が見つかりません",
     "header": "組織",
     "orgBeingDeletedSwitching": "この組織は削除処理中です。別の組織に切り替えます。",
@@ -5253,7 +5316,6 @@
     "timezone": "タイムゾーン",
     "deleteActionMessage": "{count} 個のフィールドを削除してもよろしいですか？この操作は元に戻せません。 | {count} 個のフィールドを削除してもよろしいですか？この操作は元に戻せません。",
     "deleteDatesMessage": "{count} 個の日付範囲を削除してもよろしいですか？この操作は元に戻せません。 | {count} 個の日付範囲を削除してもよろしいですか？この操作は元に戻せません。",
-    "summaryAllTypes": "ストリーム（全タイプ）",
     "labelLogs": "ログ",
     "labelMetrics": "メトリクス",
     "labelTraces": "トレース",
@@ -7865,17 +7927,7 @@
       "metricsSketch": "ディストリビューションはヒストグラムのバケットとして保存され、パーセンタイルはそれらのバケットから推定されます。ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA を大きくすると、保存される行数が増える代わりに、より細かいバケットとより正確なパーセンタイルが得られます。"
     },
     "gpu": "GPU",
-    "gpuExporter": "GPU エクスポーター",
-    "rotationNote": "トークンはその場でローテーションされません。ローテーションするには、新しいトークンを作成してソースを切り替え、古いトークンを無効にしてください。",
-    "rotateAction": "ローテーション…",
-    "rotateTitle": "{name} をローテーション",
-    "rotateStep1": "新しいトークンを作成します。",
-    "rotateStep2": "ソースを新しいトークンに切り替えます。",
-    "rotateStep3": "{name} を使うものがなくなったら、行のメニューから無効にします。",
-    "rotateNever": "自動で無効になるものはありません。古いトークンは、無効にするまで使えます。",
-    "rotateCreateNew": "新しいトークンを作成",
-    "rotateNewName": "{name}-new",
-    "rotateDescription": "{name} を置き換えます"
+    "gpuExporter": "GPU エクスポーター"
   },
   "dashboard": {
     "panelDraft": {
@@ -9509,9 +9561,6 @@
       "addClause": "条件を追加"
     },
     "viewDashboard": {
-      "apply": "適用",
-      "lastDataSeen": "最新データ {when}",
-      "jumpToLatest": "最新に移動",
       "refreshToApplyVariables": "最新の変数変更を適用するには更新してください",
       "refresh": "更新",
       "refreshCacheReload": "キャッシュを更新して再読み込み",
@@ -10266,7 +10315,6 @@
     }
   },
   "panel": {
-    "noDataInRange": "範囲内にデータがありません",
     "saveAndStay": "保存して編集を続ける",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10547,32 +10595,12 @@
     "hoursAgo": "{count}時間前",
     "daysAgo": "{count}日前",
     "cards": {
-      "firingAlerts": "発火中のアラート",
-      "failingRules": "失敗しているルール",
-      "openIncidents": "未解決のインシデント",
-      "pipelineErrors": "パイプラインエラー",
-      "pipelinesOf": "うち {enabled} 件有効",
-      "quietStreams": "停止中のストリーム",
-      "firingNone": "発火なし",
-      "noAlertRules": "アラートルールなし",
-      "noEnabledRules": "有効なルールなし",
-      "failingNone": "失敗なし",
-      "failingNote": "前回の評価でエラー",
-      "incidentsNone": "未解決なし",
-      "noPipelines": "パイプラインなし",
-      "noStreams": "ストリームなし",
-      "quietNote": "過去 7 日間に書き込みが停止",
-      "criticalUnit": "クリティカルレベルが {count} 件",
-      "deliveryFailures": "アラート配信の失敗",
-      "deliveryCount": "アラート配信の失敗 {count} 件 | アラート配信の失敗 {count} 件",
-      "deliveryNote": "発火したが通知できなかったアラート",
-      "oldestFiring": "最も古い発火から {age}"
+      "openIncidents": "未解決のインシデント"
     },
     "state": {
       "tileForbidden": "アクセス権限なし",
       "tileLocked": "ロック済み",
       "tileError": "読み込めませんでした",
-      "tileUnavailable": "利用できません",
       "sectionLocked": "エンタープライズライセンスで利用可能",
       "sectionForbidden": "お使いのロールではこのデータを表示できません。組織の管理者にアクセス権を依頼してください。"
     },
@@ -10696,39 +10724,6 @@
     "dataAsOf": "{time} 時点のデータ",
     "timeRange": {
       "heading": "選択した時間範囲内"
-    },
-    "firingNow": {
-      "title": "発火中",
-      "byLevel": "クリティカル {critical} 件 · 警告 {warning} 件",
-      "allQuiet": "異常なし",
-      "watching": "{count} 件のアラートルールが有効、発火なし | {count} 件のアラートルールが有効、発火なし",
-      "noRules": "アラートルールはまだありません",
-      "browseLibrary": "アラートライブラリを見る",
-      "notifyFailed": "通知に失敗",
-      "loadError": "発火中のアラートを読み込めませんでした",
-      "unavailable": "現在アラートの状態を読み取れません"
-    },
-    "health": {
-      "subtitle": "種類ごとの最終受信データ",
-      "lastData": "最終データ: {age} 前",
-      "justNow": "最終データ: たった今",
-      "noDataIn": "過去 {range} にデータがありません",
-      "noRecords": "まだレコードがありません",
-      "loadError": "ストリームを読み込めませんでした"
-    },
-    "start": {
-      "text": "まだデータが届いていません。データを送信するか、既存のデータを確認するか、アラートを設定してください。",
-      "addData": "データを追加",
-      "createAlert": "アラートを作成"
-    },
-    "summary": {
-      "loadError": "組織の概要を読み込めませんでした",
-      "loadErrorRest": "概要の残りを読み込めませんでした",
-      "denied": "組織の概要へのアクセス権がありません。組織の管理者に依頼してください。"
-    },
-    "events": {
-      "runFailed": "実行に失敗",
-      "timesInRange": "選択した期間に {count} 回 | 選択した期間に {count} 回"
     }
   },
   "chatHistory": {
@@ -10909,8 +10904,7 @@
       "taglineAnd": "ログ、トレース、メトリクス、インシデントをご案内します。",
       "signedInAs": "としてサインイン",
       "role": "役割",
-      "tryOneOfThese": "または、次のいずれかを試してください",
-      "panelText": "ログ、トレース、メトリクス、インシデントについて質問したり、クエリの作成を手伝ってもらったりできます。"
+      "tryOneOfThese": "または、次のいずれかを試してください"
     },
     "capabilities": {
       "query": {
@@ -12020,21 +12014,16 @@
     }
   },
   "alerts": {
-    "detail": {
-      "openInLogs": "ログで開く",
-      "openInTraces": "トレースで開く",
-      "openInMetrics": "メトリクスで開く",
-      "evidenceFiringTip": "このアラートのフィルターで {stream} を開きます（今回の発火開始から現在まで）",
-      "evidenceWindowTip": "このアラートのフィルターで {stream} を直近 {window} の範囲で開きます",
-      "threshold": "しきい値",
-      "noIncident": "インシデントはまだありません",
-      "conditionLabel": "アラート条件",
-      "allRows": "すべての行",
-      "viewIncidents": "インシデントを表示"
-    },
-    "summaryTrainingFailed": "トレーニング失敗",
     "columnState": "状態",
-    "startFromTemplate": "テンプレートから開始",
+    "rowAction": {
+      "leftFilter": "フィルターに一致しなくなりました",
+      "pausedLeftFilter": "{name} を一時停止しました。フィルターに一致しなくなりました | {count} 件のアラートを一時停止しました。フィルターに一致しなくなりました",
+      "resumedLeftFilter": "{name} を再開しました。フィルターに一致しなくなりました | {count} 件のアラートを再開しました。フィルターに一致しなくなりました",
+      "bulkPauseFailed": "{total} 件中 {failed} 件のアラートを一時停止できませんでした | {total} 件中 {failed} 件のアラートを一時停止できませんでした",
+      "bulkResumeFailed": "{total} 件中 {failed} 件のアラートを再開できませんでした | {total} 件中 {failed} 件のアラートを再開できませんでした",
+      "paused": "{name} を一時停止しました | {count} 件のアラートを一時停止しました",
+      "resumed": "{name} を再開しました | {count} 件のアラートを再開しました"
+    },
     "moreActions": "その他のアクション",
     "promRuleMode": "ルールモード",
     "promRulePreview": "{count} 件の返されたシリーズが現在一致しています。各シリーズは発火する前に保留期間を完了する必要があります。",
@@ -13468,8 +13457,7 @@
       "condition": "条件",
       "result": "結果",
       "anomalies": "異常",
-      "forGroup": "{group} の",
-      "errorFrom": "{destination} から {status}"
+      "forGroup": "{group} の"
     },
     "continue": "続行",
     "wouldTrigger": "トリガーする",
@@ -15092,17 +15080,6 @@
     "siemDetection": {
       "notice": "このアラートはセキュリティの検知です。クエリは Sigma ルールからコンパイルされるため、ルール、ストリーム、スケジュールはセキュリティで編集します。これによりルールとクエリが常に一致します。",
       "open": "セキュリティで編集"
-    },
-    "newAlertTitle": "新しいアラート",
-    "newAnomalyTitle": "新しい異常検知",
-    "rowAction": {
-      "leftFilter": "フィルターに一致しなくなりました",
-      "pausedLeftFilter": "{name} を一時停止しました。フィルターに一致しなくなりました | {count} 件のアラートを一時停止しました。フィルターに一致しなくなりました",
-      "resumedLeftFilter": "{name} を再開しました。フィルターに一致しなくなりました | {count} 件のアラートを再開しました。フィルターに一致しなくなりました",
-      "bulkPauseFailed": "{total} 件中 {failed} 件のアラートを一時停止できませんでした | {total} 件中 {failed} 件のアラートを一時停止できませんでした",
-      "bulkResumeFailed": "{total} 件中 {failed} 件のアラートを再開できませんでした | {total} 件中 {failed} 件のアラートを再開できませんでした",
-      "paused": "{name} を一時停止しました | {count} 件のアラートを一時停止しました",
-      "resumed": "{name} を再開しました | {count} 件のアラートを再開しました"
     }
   },
   "alert_dependencies": {
@@ -17973,13 +17950,7 @@
       "partial": "このトレースの一部のスパンを読み取れませんでした。ウォーターフォールが不完全な可能性があります。",
       "truncated": "このトレースの最初のスパンを開始時刻順に表示しています。以降のスパンはまだ読み込まれていません。 | このトレースの最初の {count} スパンを開始時刻順に表示しています。以降のスパンはまだ読み込まれていません。",
       "loadMore": "次のスパンを読み込む | 次の {size} スパンを読み込む",
-      "loadMoreFailed": "このトレースのスパンをこれ以上読み込めませんでした",
-      "notFoundTitle": "{from} から {to} の間にこの ID のトレースはありません",
-      "notFoundText": "この範囲の {stream} ストリームに、トレース {traceId} のスパンはありません。古いか新しい、別のストリームにある、または収集されていない可能性があります。",
-      "searchWiderRange": "より広い範囲を検索",
-      "searchSpansInRange": "この範囲でスパンを検索",
-      "loadFailedTitle": "このトレースを読み込めませんでした",
-      "loadFailedText": "トレース {traceId} を読み取れませんでした。しばらくしてから再試行してください。"
+      "loadMoreFailed": "このトレースのスパンをこれ以上読み込めませんでした"
     },
     "traceTree": {
       "clickToExpand": "クリックして展開",
@@ -19907,7 +19878,7 @@
       "streamHint": "このエージェントバージョンは {count} 個のストリームにトレースを送信します。別のストリームを選択しない限り、最も長く使用されているものが表示されます。",
       "agentIdHint": "エージェント ID: {ids}",
       "noAgentIdentity": "エージェント ID が見つかりません",
-      "noAgentIdentityDescription": "これらの LLM スパンにはエージェント名がないため、ストリーム別に表示しています。",
+      "noAgentIdentityDescription": "これらの LLM スパンにはエージェント名がないため、ストリーム別に表示しています。エージェント名を指定する属性をマッピングすると、エージェント別に表示できます。",
       "noAgentIdentityAction": "GenAI エージェントマッピングを開く"
     },
     "agentGraph": {
@@ -21519,6 +21490,58 @@
       "description": "LLMプロバイダーは、LLMジャッジスコアラーが呼び出す言語モデルの接続情報（ベースURLと認証情報）を保存します。プロバイダーを追加すると、ジャッジベースの評価を開始できます。"
     }
   },
+  "genAiAgentMapping": {
+    "tabLabel": "エージェントマッピング",
+    "title": "エージェントマッピング",
+    "subtitle": "エージェントの識別情報、コスト配賦、セッションタイトルがテレメトリーからどのように読み取られるか",
+    "identity": {
+      "title": "エージェント識別フィールド",
+      "help": "OpenObserve が各エージェントに名前を付け、その環境とバージョンを読み取る方法。最初に標準属性を読み取ります。スパンにそれが存在しない場合は、そのスパンが持つ最初のフォールバックフィールドが使用されます。",
+      "agentName": "エージェント名",
+      "agentId": "エージェント ID",
+      "env": "環境",
+      "version": "バージョン"
+    },
+    "agentNameFields": "エージェント名のフォールバックフィールド",
+    "agentNameHelp": "gen_ai.agent.name のフォールバックとして使用する受信属性。",
+    "agentNameInfo": "標準の gen_ai.agent.name 属性が存在しないか空の場合にのみチェックされます。受信テレメトリー属性を1行に1つずつ追加してください。",
+    "agentIdFields": "エージェント ID のフォールバックフィールド",
+    "agentIdHelp": "gen_ai.agent.id のフォールバックとして使用する受信属性。",
+    "agentIdInfo": "標準の gen_ai.agent.id 属性が存在しないか空の場合にのみチェックされます。受信テレメトリー属性を1行に1つずつ追加してください。",
+    "envFields": "環境のフォールバックフィールド",
+    "envHelp": "エージェントの環境として使用する受信属性。",
+    "envInfo": "標準の deployment.environment.name 属性が存在しないか空の場合にのみチェックされます。受信テレメトリー属性を1行に1つずつ追加してください。",
+    "versionFields": "バージョンのフォールバックフィールド",
+    "versionHelp": "エージェントのバージョンとして使用する受信属性。",
+    "versionInfo": "標準の gen_ai.agent.version 属性が存在しないか空の場合にのみチェックされます。受信テレメトリー属性を1行に1つずつ追加してください。",
+    "alwaysAppliedStandard": "標準（最初にチェック）:",
+    "coverageValue": "・過去24時間のトレースの {percent}% で",
+    "fallbacksNote": "フォールバックフィールドはチェックする順にカンマ区切りで入力してください。",
+    "fallbackInvalid": "フィールド名はカンマ区切りで指定してください。使用できるのは英字、数字、および . _ - : / {'@'} のみです。",
+    "sessions": {
+      "title": "セッション表示",
+      "help": "セッションのタイトルの付け方と、セッションから非表示になるラッパーテキストについて。",
+      "noAgents": "エージェントがまだありません。エージェントを追加するとそのラッパーテキストが非表示になります。"
+    },
+    "applyDefaults": "デフォルトを適用",
+    "resetToEmpty": "空にリセット",
+    "clearRegistry": "レジストリをクリア",
+    "clearRegistryTitle": "エージェントレジストリをクリアしますか？",
+    "clearRegistryDescription": "この操作は、この組織で検出された GenAI エージェントレジストリの行をすべて削除します。一致する新しいトレースは、取り込み中にレジストリに再登録されます。",
+    "clearRegistryConfirm": "レジストリをクリア",
+    "saved": "エージェントマッピングを保存しました",
+    "unsavedConfirm": "エージェントマッピングの変更が保存されていません。破棄しますか？",
+    "clearRegistrySuccess": "GenAI エージェントレジストリをクリアしました。保存済みエージェント {deletedCount} 件とキュー内の観測 {bufferCount} 件を削除しました。",
+    "saveFailed": "エージェントマッピングの保存に失敗しました",
+    "clearRegistryFailed": "GenAI エージェントレジストリのクリアに失敗しました",
+    "defaultsLoadFailed": "エージェントマッピングのデフォルトの読み込みに失敗しました",
+    "defaultsFetchFailed": "デフォルトの取得に失敗しました（{status}）"
+  },
+  "copyButton": {
+    "copy": "コピー",
+    "copied": "コピーしました",
+    "failed": "コピーがブロックされました · Ctrl C を押してください"
+  },
   "logs": {
     "noData": {
       "title": "データを{product}に送信開始",
@@ -21534,6 +21557,7 @@
     },
     "noStream": {
       "title": "ストリームを選んで探索を始めましょう",
+      "description": "ストリームを選択し、[<strong>クエリの実行</strong>] を押します。結果が出たら、フィルター、VRL 関数、カスタム時間範囲を使用して絞り込むことができます。",
       "selectStream": "ストリームを選択する",
       "selectStreamDesc": "ログ、トレース、メトリクス、RUM ストリームを参照",
       "queryGuide": "クエリガイドを読む",
@@ -21585,18 +21609,7 @@
     "detailTable": {
       "noDataAvailable": "利用可能なデータがありません。",
       "addIcon": "アイコンを追加",
-      "sendToAiChat": "AIチャットに送信",
-      "openTrace": "トレースを開く",
-      "noTraceTitle": "このログにリンクされたトレースはありません",
-      "noRelatedLogsTitle": "関連するログが見つかりません",
-      "noRelatedMetricsTitle": "関連するメトリクスが見つかりません",
-      "noServiceText": "このログに一致するサービスが見つからないため、関連データを自動で検出できません。",
-      "searchTracesAround": "この時刻前後のトレースを検索",
-      "searchAroundTip": "このイベントの直前と直後に記録されたイベントを読み込みます。",
-      "noOfEventsTip": "このイベントの前後に読み込むイベント数。",
-      "severityTip": "検出されたログレベル。選択すると検出方法を確認できます。",
-      "traceId": "トレース ID",
-      "spanId": "スパン ID"
+      "sendToAiChat": "AIチャットに送信"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "SELECT * クエリは可視化でサポートされていません。",
@@ -21888,7 +21901,6 @@
     "showDetail": "詳細を表示",
     "hideDetail": "詳細を非表示にする",
     "runAs": "実行者",
-    "runSuggestion": "{query} を実行",
     "searchTextFor": "「{text}」のテキストを検索",
     "searchTextDesc": "入力全体を 1 つのフレーズとして検索",
     "explain": {
@@ -21948,9 +21960,6 @@
     "minutesAgo": "{min} 分前",
     "hoursAgo": "{h} 時間前",
     "notYetRefreshed": "まだ更新されていません",
-    "dataFresh": "データは新鮮",
-    "dataGettingStale": "データが古くなっている",
-    "dataStale": "データが古い",
     "lastRefreshed": "最終更新: {time}",
     "refresh": "更新",
     "refreshWithAge": "更新、最終更新 {age}",
@@ -22759,6 +22768,11 @@
       "disabling": "無効化中…",
       "editTitle": "ロケーションの編集",
       "empty": "利用可能なロケーションがありません",
+      "emptyState": {
+        "title": "ロケーションがまだありません",
+        "description": "ロケーションとは、合成モニターがチェックを実行する場所（クラウドリージョンなど）です。",
+        "actionDesc": "チェックを実行する場所を追加します"
+      },
       "enable": "有効にする",
       "enabled": "有効",
       "enabledSuccess": "ロケーションが有効になりました",
@@ -22826,12 +22840,7 @@
       "noPrivateMatches": "検索条件に一致するプライベートロケーションがありません",
       "newPrivateLocation": "新しいプライベートロケーション",
       "publicSubtitle": "クラウドリージョン、常に利用可能",
-      "privateSubtitle": "少なくとも1つのエージェントが稼働している場合、ロケーションは準備完了です",
-      "emptyState": {
-        "title": "ロケーションがまだありません",
-        "description": "ロケーションとは、合成モニターがチェックを実行する場所（クラウドリージョンなど）です。",
-        "actionDesc": "チェックを実行する場所を追加します"
-      }
+      "privateSubtitle": "少なくとも1つのエージェントが稼働している場合、ロケーションは準備完了です"
     },
     "prefill": {
       "pageTitle": "新規合成チェック · HTTP",
@@ -23863,7 +23872,6 @@
     },
     "actions": {
       "openCheatsheet": "キーボードショートカットのチートシートを開く",
-      "searchOrJumpTo": "検索またはページへジャンプ",
       "closeDialog": "ダイアログ、ドロワー、またはモーダルを閉じる",
       "focusSearch": "フォーカス検索バー",
       "focusQuery": "フォーカスクエリエディター",
@@ -24026,6 +24034,14 @@
       "stepOf": "ステップ {current} / {total}",
       "swipeHint": "スワイプして残りを表示"
     },
+    "statStrip": {
+      "filters": "フィルター",
+      "showOnly": "{label} のみ表示",
+      "alsoShow": "{label} も表示",
+      "stopShowing": "{label} の表示を停止",
+      "scrollBack": "前のフィルターを表示",
+      "scrollForward": "さらにフィルターを表示"
+    },
     "attributeValueCell": {
       "addIcon": "アイコンを追加"
     },
@@ -24114,9 +24130,7 @@
       "urlPlaceholder": "ファイルの URL",
       "urlHelp": "インポート時に一度だけ取得します。",
       "textPlaceholder": "ここにコンテンツを貼り付け",
-      "invalidJson": "無効な JSON: {detail}",
-      "removeFile": "ファイルを削除",
-      "clearAll": "すべてクリア"
+      "invalidJson": "無効な JSON: {detail}"
     },
     "date": {
       "openCalendar": "カレンダーを開く",
@@ -24346,7 +24360,7 @@
         "ok": "OK",
         "normal": "正常",
         "firing": "発火中",
-        "notifyfailed": "配信失敗",
+        "notifyfailed": "通知失敗",
         "flapping": "フラッピング",
         "anomaly": "異常",
         "succeeded": "成功",
@@ -24581,14 +24595,6 @@
       "more": "その他",
       "unsaved": "未保存の変更",
       "locked": "ロック中"
-    },
-    "statStrip": {
-      "filters": "フィルター",
-      "showOnly": "{label} のみ表示",
-      "alsoShow": "{label} も表示",
-      "stopShowing": "{label} の表示を停止",
-      "scrollBack": "前のフィルターを表示",
-      "scrollForward": "さらにフィルターを表示"
     }
   },
   "functions": {
@@ -25901,7 +25907,6 @@
       "packUnavailableHint": "このワークロード向けのキュレーションコンテンツはまだ提供されていません。それまでの間、ダッシュボードを作成して可視化してください。",
       "partialTelemetryKubernetes": "Kubernetes のストリームは見つかりましたが、このページに必要なメトリクス（kubeletstats または cluster レシーバー）がありません。コレクターのレシーバーを確認してください。",
       "partialTelemetryHosts": "ホストのストリームは見つかりましたが、このページに必要なメトリクスがありません。コレクターの hostmetrics レシーバーを確認してください。",
-      "hostMetricsMissingTitle": "ホストメトリクスが見つかりません",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first}、他 {count} 件",
       "hiddenFootnote": "アクセス権のないデータソースもここに表示されます。",
@@ -26686,8 +26691,7 @@
         "p95": "遅い側のテール — 呼び出し20回に1回は少なくともこれだけの時間がかかりました。アプリケーションのトレース内の完了した呼び出しから測定しています。",
         "p99": "ワースト1%の呼び出しは少なくともこれだけの時間がかかりました。アプリケーションのトレース内の完了した呼び出しから測定しています。",
         "load": "アプリがこのデータベースへの呼び出しに費やした合計時間。アプリケーションのトレースから測定しています。このデータベースがアプリのために処理したトラフィック量を示します。",
-        "attention": "このインスタンスが、自身のエンジンが公開する制限にどの程度近いか — 現在は、max_connections に対する接続数。そのような比率の中で最悪の値を示し、ブレンドされたスコアではありません。降順にソートされ、健全性を読み取れないインスタンスが先頭に表示されます。見えないものは健全であるとは言えないからです。データベースサーバー上で測定されるため、隣のデータベース時間とは比較できません。",
-        "calls": "アプリがこのデータベースを呼び出した回数。アプリケーションのトレースから計測しています。"
+        "attention": "このインスタンスが、自身のエンジンが公開する制限にどの程度近いか — 現在は、max_connections に対する接続数。そのような比率の中で最悪の値を示し、ブレンドされたスコアではありません。降順にソートされ、健全性を読み取れないインスタンスが先頭に表示されます。見えないものは健全であるとは言えないからです。データベースサーバー上で測定されるため、隣のデータベース時間とは比較できません。"
       },
       "failedChip": "{count} 失敗",
       "columnSubLabels": {
@@ -27128,8 +27132,7 @@
         "tableHealthHint": "テーブルのサイズ、ブロート、およびバキューム状態。ブロートとバキュームはPostgreSQLのみです。",
         "deadlocksLocked": "デッドロックはEnterprise機能です。アップグレードすると、どのクエリが互いにデッドロックしたか、その理由を確認できます。他のデータベースタブはすべてのプランで利用できます。",
         "blockedLocked": "ブロックされたクエリはEnterprise機能です。アップグレードすると、どのセッションがロックを待っているか、何がロックを保持しているかを確認できます。他のデータベースタブはすべてのプランで利用できます。",
-        "tableHealthLocked": "テーブルの健全性はEnterprise機能です。アップグレードすると、テーブルのサイズ、ブロート、バキューム状態を追跡できます。他のデータベースタブはすべてのプランで利用できます。",
-        "queriesHintServer": "この期間にデータベースが報告したクエリの種類。データベース内部でカウントされています。"
+        "tableHealthLocked": "テーブルの健全性はEnterprise機能です。アップグレードすると、テーブルのサイズ、ブロート、バキューム状態を追跡できます。他のデータベースタブはすべてのプランで利用できます。"
       }
     },
     "metrics": {
@@ -30041,6 +30044,423 @@
       }
     }
   },
+  "autoobserveLive": {
+    "where": "{cluster} / {namespace}",
+    "lessThan": "<{value}",
+    "topbar": {
+      "checked": "最終確認: {ago}",
+      "firstCheck": "初回チェックを実行中"
+    },
+    "retry": "再試行",
+    "classes": {
+      "errors": "エラー",
+      "latency": "レイテンシ",
+      "saturation": "飽和",
+      "absence": "送信停止",
+      "external_probe": "合成チェック",
+      "workload_health": "再起動",
+      "node": "ノード"
+    },
+    "classesInline": {
+      "errors": "エラー",
+      "latency": "レイテンシ",
+      "saturation": "飽和",
+      "absence": "欠落",
+      "external_probe": "外部プローブ",
+      "workload_health": "ワークロードヘルス",
+      "node": "ノードヘルス"
+    },
+    "states": {
+      "covered": "監視中",
+      "weak": "弱い",
+      "silent": "サイレント",
+      "blind": "盲点",
+      "unmapped": "未マッピング",
+      "none": "なし"
+    },
+    "monitorKinds": {
+      "alert": "アラート",
+      "anomaly_detector": "異常検知器",
+      "slo": "SLO",
+      "synthetic": "合成"
+    },
+    "coverage": {
+      "summaryWatched": "監視対象 {watched}/{total} · {pct}%",
+      "summaryWatchedShare": "監視対象 {watched}/{total} · {pct}",
+      "splitLabel": "監視中 {watched} 件、カバレッジギャップ {gaps} 件",
+      "stateWatched": "監視中",
+      "stateGap": "カバレッジギャップ",
+      "columns": {
+        "where": "場所",
+        "state": "状態",
+        "lastChecked": "最終確認"
+      },
+      "loading": "カバレッジを読み込み中",
+      "loaded": "カバレッジを読み込みました",
+      "sentence": {
+        "allWatched": "あなたの 1 つのサービスを監視しています。 | あなたの {total} 件のサービスすべてを監視しています。",
+        "allGaps": "あなたの 1 つのサービスにカバレッジギャップがあります。 | あなたの {total} 件のサービスすべてにカバレッジギャップがあります。",
+        "watching": "あなたの {total} 件のサービスのうち {watched} 件を監視しています。",
+        "gaps": "{count} 件にカバレッジギャップがあります。 | {count} 件にカバレッジギャップがあります。",
+        "mixed": "{watching} {gaps}"
+      },
+      "gapAdded": "{checks} に対するアラートを追加しました。AutoObserve は次回のチェック時にカウントします。 | {checks} に対するアラートを追加しました。AutoObserve は次回のチェック時にカウントします。",
+      "gapNone": "{checks} を監視するアラートはありません",
+      "searchPlaceholder": "サービス、クラスタ、名前空間を検索",
+      "labelNamespace": "{name} · {namespace}",
+      "labelPlace": "{name} · {cluster} · {namespace}",
+      "noNamespace": "名前空間なし",
+      "noCluster": "クラスターなし",
+      "noMatch": "「{query}」に一致するサービス、クラスター、名前空間はありません",
+      "showAll": "すべて表示",
+      "bucketThree": "3 以上",
+      "bucketTwo": "2",
+      "bucketOne": "1",
+      "filterHides": "{state} のサービスはありません",
+      "filterHidesSearch": "「{query}」に一致するサービスが {count} 件ありますが、{state} のものはありません | 「{query}」に一致するサービスが {count} 件ありますが、{state} のものはありません"
+    },
+    "cell": {
+      "noClass": "AutoObserve はこのシグナルをまだチェックしていません",
+      "tipNoClass": "{signal}: AutoObserve はこれをまだチェックしていません",
+      "gap": {
+        "weak": "{signal}: 広範なアラートである {monitor} のみが問題を検知できる可能性がありますが、このサービスを対象にしていません | {signal}: 広範なアラートである {monitor} のみが問題を検知できる可能性がありますが、このサービスを対象にしていません",
+        "silent": "{signal}: {monitor} は一致しますが、誰にも通知しません | {signal}: {monitor} は一致しますが、誰にも通知しません",
+        "blind": "{signal}: {monitor} は一致しますが、そのデータを参照できません | {signal}: {monitor} は一致しますが、そのデータを参照できません",
+        "unmapped": "{signal}: {monitor} は一致する可能性がありますが、そのスコープをサービスに紐付けられませんでした | {signal}: {monitor} は一致する可能性がありますが、そのスコープをサービスに紐付けられませんでした",
+        "none": "{signal}: これを監視するアラートはありません"
+      },
+      "added": "追加済み"
+    },
+    "drawer": {
+      "moreChecks": "その他のチェック",
+      "chartNoData": "チャートはまだ利用できません",
+      "monitors": "アラート",
+      "monitorLine": "{kind} · {state}",
+      "noMonitor": "一致するアラートはありません"
+    },
+    "charts": {
+      "empty1h": "過去 1 時間に {service} からのデータはありません",
+      "empty24h": "過去 24 時間に {service} からのデータはありません",
+      "empty7d": "過去 7 日間に {service} からのデータはありません",
+      "emptyPartial1h": "過去 1 時間の検索済み範囲に {service} からのデータはありません",
+      "emptyPartial24h": "過去 24 時間の検索済み範囲に {service} からのデータはありません",
+      "emptyPartial7d": "過去 7 日間の検索済み範囲に {service} からのデータはありません",
+      "noSpanStatus": "{stream} にスパンステータスがありません",
+      "noLevel": "{stream} にログレベルがありません",
+      "noDuration": "{stream} に duration フィールドがありません",
+      "noTraces": "レイテンシはトレースからチャート化されます。{service} はトレースを送信していません。",
+      "noMatch": "このサービスは対応するストリームに紐付けられません",
+      "failedQuery": "{stream} からこのチャートを読み込めませんでした",
+      "failedMatch": "{service} のストリームを検索できませんでした",
+      "partial": "部分データ",
+      "wide": "このストリームを共有する他のサービスを含みます",
+      "loading": "{metric} を読み込み中",
+      "summary": "{metric}、現在 {value}",
+      "summaryNone": "{metric}、最新のバケットでは何も測定されていません"
+    },
+    "suggestions": {
+      "serviceMeta": "{where}、1 時間あたり約 {traffic} イベント",
+      "trafficOnly": "1 時間あたり約 {traffic} イベント",
+      "kinds": {
+        "coverage_gap": "カバレッジギャップ",
+        "no_absence_check": "アラート不足",
+        "silent_coverage": "通知先なし",
+        "coverage_lost": "カバレッジ喪失",
+        "blind_guardrail": "動作していません",
+        "discovery_unusable": "データ品質",
+        "alert_no_destination": "通知先なし",
+        "alert_notify_failed": "通知失敗",
+        "other": "その他"
+      },
+      "severity": {
+        "high": "高",
+        "medium": "中"
+      },
+      "confidence": {
+        "sufficient": "強い根拠",
+        "suggestive": "ある程度の根拠",
+        "insufficient": "弱い根拠"
+      },
+      "body": {
+        "coverageGap": "{service} を監視しているものはありません",
+        "noAbsenceNone": "{service} がデータ送信を停止してもアラートは発火しません",
+        "noAbsenceWeak": "{service} がデータ送信を停止しても、気づくのは広範なアラートだけです",
+        "noAbsenceSilent": "{service} がデータ送信を停止したことに気づくチェックは、通知先がありません",
+        "noAbsenceBlind": "{service} がデータ送信を停止したことに気づくチェックは、そのデータを参照できません",
+        "silentCoverage": "{monitor} は {count} 件のサービスで {classes} を監視していますが、通知先がありません | {monitor} は {count} 件のサービスで {classes} を監視していますが、通知先がありません",
+        "silentWhy": "{monitor} は {services} の停止に気づきますが、通知先がありません。",
+        "silentWhyNoNames": "{monitor} はサービスの停止に気づきますが、通知先がありません。",
+        "silentNext": "宛先を設定してください。",
+        "undeliverable": "{monitor} は {destination} に配信できません",
+        "undeliverableWhy": "{destination} はチケットを受け取るもので、アラートは受け取りません。 | {destination} はチケットを受け取るもので、アラートは受け取りません。",
+        "undeliverableNext": "その隣に webhook またはメールを追加してください。{destination} はそのまま残ります。 | それらの隣に webhook またはメールを追加してください。{destination} はそのまま残ります。",
+        "coverageLost": "{service} の {classes} アラートが {day} に失われました",
+        "blindStreamMissing": "{monitor} が読み取る {detail} は存在しません",
+        "blindNoData": "{monitor} が読み取る {detail} には最近のデータがありません",
+        "blindEmptyScope": "{monitor} は決して届かない行に絞り込んでいます",
+        "blindUnknownField": "{monitor} は、そのストリームに存在しないフィールド {field} でフィルターしています",
+        "blindIgnoredMatcher": "{monitor} はどのシリーズにも存在しないラベル {label} で照合しているため、すべてのシリーズを監視しています",
+        "discovery": "検出された {active} 件のサービスのうち {good} 件のみが利用可能なため、ギャップのランキングは不完全です",
+        "alertSyntax": "{monitor} には解析できないクエリがあります",
+        "alertTimeout": "{monitor} は完了する前にタイムアウトし続けています",
+        "alertMemory": "{monitor} でメモリ不足が繰り返されています",
+        "alertOtherError": "{monitor} はエラーで失敗し続けています",
+        "alertNotWorkingGeneric": "{monitor} は動作していません",
+        "alertNoDestination": "{monitor} は発火しましたが、通知先がありません",
+        "alertNotifyFailed": "{monitor} が発火し、{tried} 件中 {failed} 件の通知が失敗しました。 | {monitor} が発火し、{tried} 件中 {failed} 件の通知が失敗しました。",
+        "alertNotifyFailedNoCounts": "{monitor} が発火し、通知が失敗しました。",
+        "alertStreamGone": "{monitor} はストリームが存在しないため失敗し続けています",
+        "alertFieldGone": "{monitor} は使用するフィールドが存在しないため失敗し続けています",
+        "other": "このページではまだ表示できないものを検出しました"
+      },
+      "detail": {
+        "cell": "{check}: {state}",
+        "cells": "エンジンが検出した内容: {cells}。",
+        "services": "一致するサービスには {services} が含まれます。",
+        "text": "エンジンの詳細: {detail}",
+        "quality": "検出は {mode} モードで実行されています。",
+        "none": "エンジンから追加の詳細は送信されていません。",
+        "joined": "{first} {rest}"
+      },
+      "analysedAt": "キャリブレーション実行から {ago}",
+      "neverFired": "未発火",
+      "lastFired": "最終発火 {time}",
+      "accept": "採用",
+      "dismiss": "却下…",
+      "accepted": "このプレビューで採用しました。何も送信されていません",
+      "dismissed": "このプレビューで却下しました。何も送信されていません",
+      "loading": "提案を読み込み中",
+      "loaded": "提案を読み込みました",
+      "more": "他に {count} 件 | 他に {count} 件",
+      "moreNames": "他に {count} 件 | 他に {count} 件",
+      "whyNext": "{why} {next}",
+      "seeAll": "すべて表示",
+      "drawerTitle": "提案",
+      "drawerLine": "重要なものから順に並んでいます。行を開くと、見つけた内容を確認できます。",
+      "focusGone": "この提案は現在オープンではありません。",
+      "clearKind": "すべての提案を表示",
+      "kindEmptyTitle": "種類 {kind} のオープンな提案はありません",
+      "kindEmptyDesc": "他に {count} 件の提案がオープンです。 | 他に {count} 件の提案がオープンです。",
+      "folder": "フォルダー {folder}",
+      "columns": {
+        "suggestion": "提案",
+        "where": "場所",
+        "kind": "種類",
+        "severity": "重大度"
+      }
+    },
+    "notice": {
+      "offTitle": "AutoObserve が有効になっていません",
+      "details": "詳細",
+      "refreshFailed": "{failedAt} に更新に失敗しました · {dataAt} 時点の{what}を表示しています",
+      "what": {
+        "coverage": "カバレッジ",
+        "suggestions": "提案",
+        "incidents": "呼び出された検出結果",
+        "issues": "問題",
+        "history": "履歴"
+      },
+      "coverage": {
+        "deniedTitle": "カバレッジを表示する権限がありません",
+        "deniedDesc": "カバレッジはすべてのフォルダーのモニターを集計するため、一部のフォルダーだけでなくこの組織内のすべてのアラートを表示する権限が必要です。組織の管理者に依頼してください。",
+        "offDesc": "管理者がこのデプロイで有効にすると表示されます。カバレッジは最初のチェックの後にここへ表示されます。",
+        "unavailableTitle": "カバレッジは一時的に利用できません",
+        "unavailableDesc": "AutoObserve が現在応答していません。通常は 1〜2 分で解消します。",
+        "failedTitle": "カバレッジを読み込めませんでした",
+        "failedDesc": "読み込み中にエラーが発生しました。しばらくしてから再度お試しください。",
+        "noPassTitle": "過去 1 日間に完了したチェックはありません",
+        "noPassDesc": "サービスへの次回のチェックが完了すると、カバレッジがここに表示されます。AutoObserve を有効にしたばかりの場合、最初のチェックには時間がかかることがあります。",
+        "noPassAction": "カバレッジの確認方法",
+        "noServicesTitle": "サービスがまだ見つかりません",
+        "noServicesDesc": "{when} の前回のチェックではサービスが見つかりませんでした。サービス名を含むログ、メトリクス、トレースを送信すると、ここに表示されます。",
+        "noServicesAction": "サービスの検出方法"
+      },
+      "suggestions": {
+        "deniedTitle": "提案を表示する権限がありません",
+        "deniedDesc": "表示するには、この組織のアラートを表示する権限が必要です。組織の管理者に依頼してください。",
+        "offDesc": "管理者がこのデプロイで有効にすると、提案がここに表示されます。",
+        "unavailableTitle": "提案は一時的に利用できません",
+        "unavailableDesc": "AutoObserve が現在応答していません。通常は 1〜2 分で解消します。",
+        "failedTitle": "提案を読み込めませんでした",
+        "failedDesc": "読み込み中にエラーが発生しました。しばらくしてから再度お試しください。",
+        "emptyTitle": "現在、提案はありません",
+        "emptyDesc": "モニターのカバレッジに不足が見つかったら、ここに追加します。",
+        "pageEmptyTitle": "上位の提案はすでに対応済みです",
+        "pageEmptyDesc": "まだ待機中の提案は一覧全体を開いて確認してください。"
+      },
+      "history": {
+        "deniedTitle": "履歴を表示する権限がありません",
+        "deniedDesc": "履歴には AutoObserve がオープンしたインシデントが表示されるため、表示するにはこの組織のインシデントを一覧表示する権限が必要です。組織の管理者に依頼してください。",
+        "offDesc": "履歴は、管理者がこのデプロイメントで有効にするとここに表示されます。",
+        "unavailableTitle": "履歴は一時的に利用できません",
+        "unavailableDesc": "AutoObserve が現在応答していません。通常は 1〜2 分以内に解消します。",
+        "failedTitle": "履歴を読み込めませんでした",
+        "failedDesc": "読み込み中に問題が発生しました。しばらくしてからもう一度お試しください。"
+      },
+      "incidents": {
+        "deniedTitle": "呼び出しが発生した検出結果を表示する権限がありません",
+        "deniedDesc": "呼び出しが発生した検出結果はインシデントを作成するため、表示するにはこの組織でインシデントを一覧表示する権限が必要です。組織の管理者に依頼してください。",
+        "offDesc": "呼び出しが発生した検出結果は、管理者がこのデプロイメントで有効にするとここに表示されます。",
+        "unavailableTitle": "呼び出しが発生した検出結果は一時的に利用できません",
+        "unavailableDesc": "AutoObserve が現在応答していません。通常は 1〜2 分以内に解消します。",
+        "failedTitle": "呼び出しが発生した検出結果を読み込めませんでした",
+        "failedDesc": "読み込み中に問題が発生しました。しばらくしてからもう一度お試しください。"
+      },
+      "issues": {
+        "deniedTitle": "イシューを表示する権限がありません",
+        "deniedDesc": "イシューは AutoObserve が作成したインシデントであるため、表示するにはこの組織でインシデントを一覧表示する権限が必要です。組織の管理者に依頼してください。",
+        "offDesc": "イシューは、管理者がこのデプロイメントで有効にするとここに表示されます。",
+        "unavailableTitle": "イシューは一時的に利用できません",
+        "unavailableDesc": "AutoObserve が現在応答していません。通常は 1〜2 分以内に解消します。",
+        "failedTitle": "イシューを読み込めませんでした",
+        "failedDesc": "読み込み中に問題が発生しました。しばらくしてからもう一度お試しください。"
+      }
+    },
+    "time": {
+      "justNow": "たった今",
+      "ago": "{time} 前"
+    },
+    "history": {
+      "incident": "インシデントを作成しました: {title}",
+      "dismissed": "{actor} が {title} を却下しました",
+      "accepted": "{actor} が {title} を意図されたレポートとしてマークしました",
+      "changed": "{actor} が {title} を変更しました",
+      "denied": {
+        "incidents": "インシデントが一覧表示されていません: 表示する権限がありません。",
+        "decisions": "判断が一覧表示されていません: 表示する権限がありません。"
+      },
+      "untitled": "提案",
+      "openIncident": "インシデントを開く",
+      "newest": "最新の {count} 件を表示しています。それより古いインシデントはイシューページにあります。",
+      "loading": "履歴を読み込み中",
+      "loaded": "履歴を読み込みました"
+    },
+    "incidents": {
+      "title": "呼び出しが発生した検出結果",
+      "subtitle": "オンコールチームのインシデントを作成した検出結果と、その分析。",
+      "pagingNote": "この組織では呼び出しが無効なため、AutoObserve はインシデントを作成しません。",
+      "sharedFor": "{label}: {reason}",
+      "finding": {
+        "stream_silence": "{stream} ({type}) がデータ送信を停止しました",
+        "stream_drop": "{stream} ({type}) のボリュームが急減しました",
+        "stream_rise": "{stream} ({type}) のボリュームが急増しました"
+      },
+      "opened": "インシデントが {when} に作成されました",
+      "openIncident": "インシデントを開く",
+      "viewAnalysis": "分析を表示",
+      "newFindings": "{count} 件の新しい検出結果 | {count} 件の新しい検出結果",
+      "showNew": "表示",
+      "more": "最新の {count} 件を表示しています",
+      "seeAll": "すべてのインシデントを表示",
+      "seeAllIssues": "すべてのイシューを表示",
+      "failedDetail": {
+        "status": "リクエストは {time} にステータス {status} で失敗しました。",
+        "noResponse": "リクエストは {time} に応答がありませんでした。"
+      },
+      "analysis": {
+        "notRunDetail": "分析はまだ開始されていません。インシデントを開いて開始してください。",
+        "disabledDetail": "このデプロイでは AI 分析が無効になっています。",
+        "offOther": "このインシデントでは自動分析が実行されませんでした。",
+        "failedDetail": "分析は完了前に停止しました。詳細は分析をご確認ください。"
+      },
+      "empty": {
+        "title": "まだ誰も呼び出されていません",
+        "desc": "ストリームが停止したり、その量が急激に変化すると、そのインシデントと分析がここに表示されます。"
+      },
+      "emptyOff": {
+        "title": "呼び出しがオフになっています",
+        "desc": "AutoObserve はこの組織のストリームの検出事項を記録しますが、インシデントは作成しません。呼び出しは管理者が有効にします。"
+      },
+      "loading": "呼び出しが発生した検出事項を読み込み中…",
+      "loaded": "呼び出しが発生した検出事項を読み込みました",
+      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
+      "routing": "Set up on-call routing"
+    },
+    "issues": {
+      "searchPlaceholder": "発生した事象またはストリームを検索",
+      "columns": {
+        "incident": "発生内容",
+        "severity": "重要度",
+        "status": "ステータス",
+        "stream": "ストリーム",
+        "opened": "発生日時",
+        "analysis": "分析",
+        "page": "呼び出し先"
+      },
+      "count": "問題なし | {count} 件の問題 | {count} 件の問題",
+      "capNote": "最新の {count} 件の問題を表示しています。範囲を絞り込むと古いものを表示できます。",
+      "emptyRange": "{within}に問題はありません",
+      "streamType": "{type} ストリーム",
+      "streamMore": "{stream} +{count}",
+      "filterOpen": "未解決",
+      "loading": "問題を読み込み中…",
+      "loaded": "問題を読み込みました",
+      "page": {
+        "unrouted": "呼び出しなし",
+        "failed": "呼び出しに失敗しました",
+        "pending": "未確認"
+      },
+      "today": "今日",
+      "yesterday": "昨日",
+      "shared": {
+        "rcaDisabled": "これらのインシデントの発生時に AI 分析はオフでした。",
+        "aiUnavailable": "これらのインシデントの発生時に AI 分析は利用できませんでした。",
+        "quotaExceeded": "これらのインシデントの発生時に、組織は AI 分析の上限に達していました。",
+        "coolingDown": "分析が実行されたばかりだったため、これらのインシデントでは新しい分析は開始されませんでした。",
+        "startFailed": "分析を開始できませんでした。",
+        "offOther": "これらのインシデントでは自動分析が実行されませんでした。",
+        "disabled": "このデプロイでは AI 分析が無効になっています。",
+        "notRun": "分析は開始されていません。インシデントを開いて開始してください。",
+        "failed": "これらの分析は完了前に停止しました。詳細は 1 つを開いて確認してください。"
+      }
+    },
+    "surfaces": {
+      "changes": {
+        "title": "変更はまだありません",
+        "desc": "AutoObserve は修正を提案しますが、アラートや設定はまだ変更していません。変更を行うと、その結果がここに表示されます。現時点では、提案を確認し、必要なものを適用してください。",
+        "action": "提案を確認"
+      },
+      "history": {
+        "title": "履歴はまだありません",
+        "desc": "AutoObserve が見つけた内容、変更した内容、およびあなたの判断がここに新しい順で表示されます。現在、その検出事項はインシデントを作成し、問題ページに表示されます。",
+        "action": "問題を表示"
+      },
+      "scenario": {
+        "tag": "ライブデータ",
+        "text": "この組織のライブデータを表示しています。サンプルシナリオはここには表示されません。",
+        "action": "仕組み"
+      },
+      "settings": {
+        "title": "ここで設定できる項目はまだありません",
+        "desc": "AutoObserve とその呼び出しは、このデプロイで管理者が有効にします。通知先や自律的にどこまで動作するかは、それらの制御が用意され次第ここで設定できるようになります。",
+        "action": "仕組み"
+      }
+    },
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "deniedTitle": "呼び出し設定を表示する権限がありません",
+      "deniedDesc": "呼び出し設定は組織全体で一度だけ設定されます。アクセス権については組織の管理者に問い合わせてください。",
+      "failedTitle": "呼び出し設定を読み込めませんでした",
+      "failedDesc": "読み込み中に問題が発生しました。しばらくしてからもう一度お試しください。",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
+    },
+    "learning": {
+      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
+      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
+      "emptyTitle": "Learning your streams",
+      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
+      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
+      "until": "Learning until {date} · {streams}",
+      "streams": "Learning {count} stream | Learning {count} streams",
+      "streamUntil": "until {date}"
+    }
+  },
   "autoobserve2": {
     "nav": {
       "history": "履歴",
@@ -32745,520 +33165,6 @@
     "deletedQuery": "{query} を削除しました",
     "undo": "元に戻す"
   },
-  "filterBar": {
-    "ariaLabel": "フィールドでフィルター",
-    "placeholder": "フィールドでフィルターするか、field=value と入力してください。Enter で実行します",
-    "addFilter": "フィルターを追加",
-    "searchFields": "フィールドを検索",
-    "searchLabels": "ラベルを検索",
-    "searchOperators": "条件を検索",
-    "searchValue": "値を検索または入力",
-    "searchValues": "値を検索",
-    "textField": "テキスト",
-    "useValue": "\"{value}\" を使用",
-    "useField": "フィールド \"{field}\" を使用",
-    "useLabel": "ラベル \"{field}\" を使用",
-    "searchText": "すべてのテキストで「{text}」を検索",
-    "emptyValue": "（空）",
-    "loadingFields": "フィールドを読み込み中…",
-    "noFields": "一致するフィールドがありません",
-    "noValues": "候補がありません。値を入力して Enter キーを押してください",
-    "noOperators": "一致する条件がありません",
-    "removeFilter": "フィルターを削除",
-    "clearAll": "すべてのフィルターをクリア",
-    "toggleConnector": "AND と OR を切り替え",
-    "selectedCount": "値が選択されていません | {count} 個の値を選択済み | {count} 個の値を選択済み",
-    "query": "クエリ",
-    "validation": {
-      "incomplete": "このフィルターを完成させるか削除してください",
-      "required": "少なくとも 1 つのフィルターを追加してください",
-      "uniqueField": "{field} にはすでにフィルターがあります。そのフィルターを編集するか、このフィルターを削除してください",
-      "oneUsageCondition": "ティアは使用条件を 1 つだけ受け付けます。この条件をルールに変換するか削除してください",
-      "rumField": "組み込みフィールド、または小文字・数字・アンダースコアからなる 128 文字以内の列を使用してください",
-      "valueLength": "各値は 1～{max} 文字である必要があります",
-      "regexLength": "パターンは{max}文字以内にしてください。",
-      "regexInvalid": "このパターンは無効か、サポートされていません。先読み、後読み、後方参照は使用できません。"
-    },
-    "operatorNames": {
-      "containsIgnoreCase": "含む（大文字と小文字を区別しない）",
-      "notStartsWith": "～で始まらない",
-      "notEndsWith": "～で終わらない",
-      "isEmpty": "空である",
-      "isNotEmpty": "空でない"
-    },
-    "types": {
-      "string": "テキスト",
-      "number": "数値",
-      "boolean": "ブール値"
-    },
-    "operators": {
-      "eq": "等しい",
-      "neq": "等しくない",
-      "gt": "より大きい",
-      "gte": "以上",
-      "lt": "より小さい",
-      "lte": "以下",
-      "contains": "含む",
-      "containsIgnoreCase": "含む（大文字小文字を無視）",
-      "notContains": "含まない",
-      "startsWith": "で始まる",
-      "notStartsWith": "で始まらない",
-      "endsWith": "で終わる",
-      "notEndsWith": "で終わらない",
-      "in": "のいずれか",
-      "notIn": "のいずれでもない",
-      "regex": "正規表現に一致",
-      "notRegex": "正規表現に一致しない",
-      "isNull": "値がない",
-      "isNotNull": "値がある",
-      "isEmpty": "空または値がない",
-      "isNotEmpty": "空でない値がある",
-      "matchAll": "テキストに一致"
-    },
-    "queryTooltip": "フィルターをテキストで編集",
-    "queryNotParsableShort": "ビルダーではこのクエリを表示できません:",
-    "clearAndBuild": "クリアして作成",
-    "clearQueryTitle": "クエリをクリアしますか？",
-    "clearQueryMessage": "クエリは削除され、ビルダーは空の状態から始まります。",
-    "where": "条件",
-    "addCondition": "条件を追加",
-    "addGroup": "グループを追加",
-    "startGroup": "グループを開始",
-    "addBelow": "下に条件を追加",
-    "ungroup": "グループ解除",
-    "collapseGroup": "グループを折りたたむ",
-    "expandGroup": "グループを展開",
-    "moreInGroup": "さらに {count} 件",
-    "groupHasIssues": "このグループに修正が必要な項目があります",
-    "chooseField": "フィールドを選択",
-    "chooseValue": "値を選択",
-    "lockedFilter": "このフィルターはここでは編集できません。保存時のまま保持されます。破棄するには削除してください",
-    "limits": {
-      "conditions": "最大 {count} 件のフィルター | 最大 {count} 件のフィルター",
-      "values": "最大 {count} 個の値 | 最大 {count} 個の値"
-    },
-    "builderTooltip": "ビルダーでフィルターを編集",
-    "editorModeLabel": "フィルターエディター",
-    "modeBuilder": "ビルダー",
-    "modeText": "テキスト"
-  },
-  "autoobserveLive": {
-    "where": "{cluster} / {namespace}",
-    "lessThan": "<{value}",
-    "topbar": {
-      "checked": "最終確認: {ago}",
-      "firstCheck": "初回チェックを実行中"
-    },
-    "retry": "再試行",
-    "classes": {
-      "errors": "エラー",
-      "latency": "レイテンシ",
-      "saturation": "飽和",
-      "absence": "送信停止",
-      "external_probe": "合成チェック",
-      "workload_health": "再起動",
-      "node": "ノード"
-    },
-    "classesInline": {
-      "errors": "エラー",
-      "latency": "レイテンシ",
-      "saturation": "飽和",
-      "absence": "欠落",
-      "external_probe": "外部プローブ",
-      "workload_health": "ワークロードヘルス",
-      "node": "ノードヘルス"
-    },
-    "states": {
-      "covered": "監視中",
-      "weak": "弱い",
-      "silent": "サイレント",
-      "blind": "盲点",
-      "unmapped": "未マッピング",
-      "none": "なし"
-    },
-    "monitorKinds": {
-      "alert": "アラート",
-      "anomaly_detector": "異常検知器",
-      "slo": "SLO",
-      "synthetic": "合成"
-    },
-    "coverage": {
-      "summaryWatched": "監視対象 {watched}/{total} · {pct}%",
-      "summaryWatchedShare": "監視対象 {watched}/{total} · {pct}",
-      "splitLabel": "監視中 {watched} 件、カバレッジギャップ {gaps} 件",
-      "stateWatched": "監視中",
-      "stateGap": "カバレッジギャップ",
-      "columns": {
-        "where": "場所",
-        "state": "状態",
-        "lastChecked": "最終確認"
-      },
-      "loading": "カバレッジを読み込み中",
-      "loaded": "カバレッジを読み込みました",
-      "sentence": {
-        "allWatched": "あなたの 1 つのサービスを監視しています。 | あなたの {total} 件のサービスすべてを監視しています。",
-        "allGaps": "あなたの 1 つのサービスにカバレッジギャップがあります。 | あなたの {total} 件のサービスすべてにカバレッジギャップがあります。",
-        "watching": "あなたの {total} 件のサービスのうち {watched} 件を監視しています。",
-        "gaps": "{count} 件にカバレッジギャップがあります。 | {count} 件にカバレッジギャップがあります。",
-        "mixed": "{watching} {gaps}"
-      },
-      "gapAdded": "{checks} に対するアラートを追加しました。AutoObserve は次回のチェック時にカウントします。 | {checks} に対するアラートを追加しました。AutoObserve は次回のチェック時にカウントします。",
-      "gapNone": "{checks} を監視するアラートはありません",
-      "searchPlaceholder": "サービス、クラスタ、名前空間を検索",
-      "labelNamespace": "{name} · {namespace}",
-      "labelPlace": "{name} · {cluster} · {namespace}",
-      "noNamespace": "名前空間なし",
-      "noCluster": "クラスターなし",
-      "noMatch": "「{query}」に一致するサービス、クラスター、名前空間はありません",
-      "showAll": "すべて表示",
-      "bucketThree": "3 以上",
-      "bucketTwo": "2",
-      "bucketOne": "1",
-      "filterHides": "{state} のサービスはありません",
-      "filterHidesSearch": "「{query}」に一致するサービスが {count} 件ありますが、{state} のものはありません | 「{query}」に一致するサービスが {count} 件ありますが、{state} のものはありません"
-    },
-    "cell": {
-      "noClass": "AutoObserve はこのシグナルをまだチェックしていません",
-      "tipNoClass": "{signal}: AutoObserve はこれをまだチェックしていません",
-      "gap": {
-        "weak": "{signal}: 広範なアラートである {monitor} のみが問題を検知できる可能性がありますが、このサービスを対象にしていません | {signal}: 広範なアラートである {monitor} のみが問題を検知できる可能性がありますが、このサービスを対象にしていません",
-        "silent": "{signal}: {monitor} は一致しますが、誰にも通知しません | {signal}: {monitor} は一致しますが、誰にも通知しません",
-        "blind": "{signal}: {monitor} は一致しますが、そのデータを参照できません | {signal}: {monitor} は一致しますが、そのデータを参照できません",
-        "unmapped": "{signal}: {monitor} は一致する可能性がありますが、そのスコープをサービスに紐付けられませんでした | {signal}: {monitor} は一致する可能性がありますが、そのスコープをサービスに紐付けられませんでした",
-        "none": "{signal}: これを監視するアラートはありません"
-      },
-      "added": "追加済み"
-    },
-    "drawer": {
-      "moreChecks": "その他のチェック",
-      "chartNoData": "チャートはまだ利用できません",
-      "monitors": "アラート",
-      "monitorLine": "{kind} · {state}",
-      "noMonitor": "一致するアラートはありません"
-    },
-    "charts": {
-      "empty1h": "過去 1 時間に {service} からのデータはありません",
-      "empty24h": "過去 24 時間に {service} からのデータはありません",
-      "empty7d": "過去 7 日間に {service} からのデータはありません",
-      "emptyPartial1h": "過去 1 時間の検索済み範囲に {service} からのデータはありません",
-      "emptyPartial24h": "過去 24 時間の検索済み範囲に {service} からのデータはありません",
-      "emptyPartial7d": "過去 7 日間の検索済み範囲に {service} からのデータはありません",
-      "noSpanStatus": "{stream} にスパンステータスがありません",
-      "noLevel": "{stream} にログレベルがありません",
-      "noDuration": "{stream} に duration フィールドがありません",
-      "noTraces": "レイテンシはトレースからチャート化されます。{service} はトレースを送信していません。",
-      "noMatch": "このサービスは対応するストリームに紐付けられません",
-      "failedQuery": "{stream} からこのチャートを読み込めませんでした",
-      "failedMatch": "{service} のストリームを検索できませんでした",
-      "partial": "部分データ",
-      "wide": "このストリームを共有する他のサービスを含みます",
-      "loading": "{metric} を読み込み中",
-      "summary": "{metric}、現在 {value}",
-      "summaryNone": "{metric}、最新のバケットでは何も測定されていません"
-    },
-    "suggestions": {
-      "serviceMeta": "{where}、1 時間あたり約 {traffic} イベント",
-      "trafficOnly": "1 時間あたり約 {traffic} イベント",
-      "kinds": {
-        "coverage_gap": "カバレッジギャップ",
-        "no_absence_check": "アラート不足",
-        "silent_coverage": "通知先なし",
-        "coverage_lost": "カバレッジ喪失",
-        "blind_guardrail": "動作していません",
-        "discovery_unusable": "データ品質",
-        "alert_no_destination": "通知先なし",
-        "alert_notify_failed": "通知失敗",
-        "other": "その他"
-      },
-      "severity": {
-        "high": "高",
-        "medium": "中"
-      },
-      "confidence": {
-        "sufficient": "強い根拠",
-        "suggestive": "ある程度の根拠",
-        "insufficient": "弱い根拠"
-      },
-      "body": {
-        "coverageGap": "{service} を監視しているものはありません",
-        "noAbsenceNone": "{service} がデータ送信を停止してもアラートは発火しません",
-        "noAbsenceWeak": "{service} がデータ送信を停止しても、気づくのは広範なアラートだけです",
-        "noAbsenceSilent": "{service} がデータ送信を停止したことに気づくチェックは、通知先がありません",
-        "noAbsenceBlind": "{service} がデータ送信を停止したことに気づくチェックは、そのデータを参照できません",
-        "silentCoverage": "{monitor} は {count} 件のサービスで {classes} を監視していますが、通知先がありません | {monitor} は {count} 件のサービスで {classes} を監視していますが、通知先がありません",
-        "silentWhy": "{monitor} は {services} の停止に気づきますが、通知先がありません。",
-        "silentWhyNoNames": "{monitor} はサービスの停止に気づきますが、通知先がありません。",
-        "silentNext": "宛先を設定してください。",
-        "undeliverable": "{monitor} は {destination} に配信できません",
-        "undeliverableWhy": "{destination} はチケットを受け取るもので、アラートは受け取りません。 | {destination} はチケットを受け取るもので、アラートは受け取りません。",
-        "undeliverableNext": "その隣に webhook またはメールを追加してください。{destination} はそのまま残ります。 | それらの隣に webhook またはメールを追加してください。{destination} はそのまま残ります。",
-        "coverageLost": "{service} の {classes} アラートが {day} に失われました",
-        "blindStreamMissing": "{monitor} が読み取る {detail} は存在しません",
-        "blindNoData": "{monitor} が読み取る {detail} には最近のデータがありません",
-        "blindEmptyScope": "{monitor} は決して届かない行に絞り込んでいます",
-        "blindUnknownField": "{monitor} は、そのストリームに存在しないフィールド {field} でフィルターしています",
-        "blindIgnoredMatcher": "{monitor} はどのシリーズにも存在しないラベル {label} で照合しているため、すべてのシリーズを監視しています",
-        "discovery": "検出された {active} 件のサービスのうち {good} 件のみが利用可能なため、ギャップのランキングは不完全です",
-        "alertSyntax": "{monitor} には解析できないクエリがあります",
-        "alertTimeout": "{monitor} は完了する前にタイムアウトし続けています",
-        "alertMemory": "{monitor} でメモリ不足が繰り返されています",
-        "alertOtherError": "{monitor} はエラーで失敗し続けています",
-        "alertNotWorkingGeneric": "{monitor} は動作していません",
-        "alertNoDestination": "{monitor} は発火しましたが、通知先がありません",
-        "alertNotifyFailed": "{monitor} が発火し、{tried} 件中 {failed} 件の通知が失敗しました。 | {monitor} が発火し、{tried} 件中 {failed} 件の通知が失敗しました。",
-        "alertNotifyFailedNoCounts": "{monitor} が発火し、通知が失敗しました。",
-        "alertStreamGone": "{monitor} はストリームが存在しないため失敗し続けています",
-        "alertFieldGone": "{monitor} は使用するフィールドが存在しないため失敗し続けています",
-        "other": "このページではまだ表示できないものを検出しました"
-      },
-      "detail": {
-        "cell": "{check}: {state}",
-        "cells": "エンジンが検出した内容: {cells}。",
-        "services": "一致するサービスには {services} が含まれます。",
-        "text": "エンジンの詳細: {detail}",
-        "quality": "検出は {mode} モードで実行されています。",
-        "none": "エンジンから追加の詳細は送信されていません。",
-        "joined": "{first} {rest}"
-      },
-      "analysedAt": "キャリブレーション実行から {ago}",
-      "neverFired": "未発火",
-      "lastFired": "最終発火 {time}",
-      "accept": "採用",
-      "dismiss": "却下…",
-      "accepted": "このプレビューで採用しました。何も送信されていません",
-      "dismissed": "このプレビューで却下しました。何も送信されていません",
-      "loading": "提案を読み込み中",
-      "loaded": "提案を読み込みました",
-      "more": "他に {count} 件 | 他に {count} 件",
-      "moreNames": "他に {count} 件 | 他に {count} 件",
-      "whyNext": "{why} {next}",
-      "seeAll": "すべて表示",
-      "drawerTitle": "提案",
-      "drawerLine": "重要なものから順に並んでいます。行を開くと、見つけた内容を確認できます。",
-      "focusGone": "この提案は現在オープンではありません。",
-      "clearKind": "すべての提案を表示",
-      "kindEmptyTitle": "種類 {kind} のオープンな提案はありません",
-      "kindEmptyDesc": "他に {count} 件の提案がオープンです。 | 他に {count} 件の提案がオープンです。",
-      "folder": "フォルダー {folder}",
-      "columns": {
-        "suggestion": "提案",
-        "where": "場所",
-        "kind": "種類",
-        "severity": "重大度"
-      }
-    },
-    "notice": {
-      "offTitle": "AutoObserve が有効になっていません",
-      "details": "詳細",
-      "refreshFailed": "{failedAt} に更新に失敗しました · {dataAt} 時点の{what}を表示しています",
-      "what": {
-        "coverage": "カバレッジ",
-        "suggestions": "提案",
-        "incidents": "呼び出された検出結果",
-        "issues": "問題",
-        "history": "履歴"
-      },
-      "coverage": {
-        "deniedTitle": "カバレッジを表示する権限がありません",
-        "deniedDesc": "カバレッジはすべてのフォルダーのモニターを集計するため、一部のフォルダーだけでなくこの組織内のすべてのアラートを表示する権限が必要です。組織の管理者に依頼してください。",
-        "offDesc": "管理者がこのデプロイで有効にすると表示されます。カバレッジは最初のチェックの後にここへ表示されます。",
-        "unavailableTitle": "カバレッジは一時的に利用できません",
-        "unavailableDesc": "AutoObserve が現在応答していません。通常は 1〜2 分で解消します。",
-        "failedTitle": "カバレッジを読み込めませんでした",
-        "failedDesc": "読み込み中にエラーが発生しました。しばらくしてから再度お試しください。",
-        "noPassTitle": "過去 1 日間に完了したチェックはありません",
-        "noPassDesc": "サービスへの次回のチェックが完了すると、カバレッジがここに表示されます。AutoObserve を有効にしたばかりの場合、最初のチェックには時間がかかることがあります。",
-        "noPassAction": "カバレッジの確認方法",
-        "noServicesTitle": "サービスがまだ見つかりません",
-        "noServicesDesc": "{when} の前回のチェックではサービスが見つかりませんでした。サービス名を含むログ、メトリクス、トレースを送信すると、ここに表示されます。",
-        "noServicesAction": "サービスの検出方法"
-      },
-      "suggestions": {
-        "deniedTitle": "提案を表示する権限がありません",
-        "deniedDesc": "表示するには、この組織のアラートを表示する権限が必要です。組織の管理者に依頼してください。",
-        "offDesc": "管理者がこのデプロイで有効にすると、提案がここに表示されます。",
-        "unavailableTitle": "提案は一時的に利用できません",
-        "unavailableDesc": "AutoObserve が現在応答していません。通常は 1〜2 分で解消します。",
-        "failedTitle": "提案を読み込めませんでした",
-        "failedDesc": "読み込み中にエラーが発生しました。しばらくしてから再度お試しください。",
-        "emptyTitle": "現在、提案はありません",
-        "emptyDesc": "モニターのカバレッジに不足が見つかったら、ここに追加します。",
-        "pageEmptyTitle": "上位の提案はすでに対応済みです",
-        "pageEmptyDesc": "まだ待機中の提案は一覧全体を開いて確認してください。"
-      },
-      "history": {
-        "deniedTitle": "履歴を表示する権限がありません",
-        "deniedDesc": "履歴には AutoObserve がオープンしたインシデントが表示されるため、表示するにはこの組織のインシデントを一覧表示する権限が必要です。組織の管理者に依頼してください。",
-        "offDesc": "履歴は、管理者がこのデプロイメントで有効にするとここに表示されます。",
-        "unavailableTitle": "履歴は一時的に利用できません",
-        "unavailableDesc": "AutoObserve が現在応答していません。通常は 1〜2 分以内に解消します。",
-        "failedTitle": "履歴を読み込めませんでした",
-        "failedDesc": "読み込み中に問題が発生しました。しばらくしてからもう一度お試しください。"
-      },
-      "incidents": {
-        "deniedTitle": "呼び出しが発生した検出結果を表示する権限がありません",
-        "deniedDesc": "呼び出しが発生した検出結果はインシデントを作成するため、表示するにはこの組織でインシデントを一覧表示する権限が必要です。組織の管理者に依頼してください。",
-        "offDesc": "呼び出しが発生した検出結果は、管理者がこのデプロイメントで有効にするとここに表示されます。",
-        "unavailableTitle": "呼び出しが発生した検出結果は一時的に利用できません",
-        "unavailableDesc": "AutoObserve が現在応答していません。通常は 1〜2 分以内に解消します。",
-        "failedTitle": "呼び出しが発生した検出結果を読み込めませんでした",
-        "failedDesc": "読み込み中に問題が発生しました。しばらくしてからもう一度お試しください。"
-      },
-      "issues": {
-        "deniedTitle": "イシューを表示する権限がありません",
-        "deniedDesc": "イシューは AutoObserve が作成したインシデントであるため、表示するにはこの組織でインシデントを一覧表示する権限が必要です。組織の管理者に依頼してください。",
-        "offDesc": "イシューは、管理者がこのデプロイメントで有効にするとここに表示されます。",
-        "unavailableTitle": "イシューは一時的に利用できません",
-        "unavailableDesc": "AutoObserve が現在応答していません。通常は 1〜2 分以内に解消します。",
-        "failedTitle": "イシューを読み込めませんでした",
-        "failedDesc": "読み込み中に問題が発生しました。しばらくしてからもう一度お試しください。"
-      }
-    },
-    "time": {
-      "justNow": "たった今",
-      "ago": "{time} 前"
-    },
-    "history": {
-      "incident": "インシデントを作成しました: {title}",
-      "dismissed": "{actor} が {title} を却下しました",
-      "accepted": "{actor} が {title} を意図されたレポートとしてマークしました",
-      "changed": "{actor} が {title} を変更しました",
-      "denied": {
-        "incidents": "インシデントが一覧表示されていません: 表示する権限がありません。",
-        "decisions": "判断が一覧表示されていません: 表示する権限がありません。"
-      },
-      "untitled": "提案",
-      "openIncident": "インシデントを開く",
-      "newest": "最新の {count} 件を表示しています。それより古いインシデントはイシューページにあります。",
-      "loading": "履歴を読み込み中",
-      "loaded": "履歴を読み込みました"
-    },
-    "incidents": {
-      "title": "呼び出しが発生した検出結果",
-      "subtitle": "オンコールチームのインシデントを作成した検出結果と、その分析。",
-      "pagingNote": "この組織では呼び出しが無効なため、AutoObserve はインシデントを作成しません。",
-      "sharedFor": "{label}: {reason}",
-      "finding": {
-        "stream_silence": "{stream} ({type}) がデータ送信を停止しました",
-        "stream_drop": "{stream} ({type}) のボリュームが急減しました",
-        "stream_rise": "{stream} ({type}) のボリュームが急増しました"
-      },
-      "opened": "インシデントが {when} に作成されました",
-      "openIncident": "インシデントを開く",
-      "viewAnalysis": "分析を表示",
-      "newFindings": "{count} 件の新しい検出結果 | {count} 件の新しい検出結果",
-      "showNew": "表示",
-      "more": "最新の {count} 件を表示しています",
-      "seeAll": "すべてのインシデントを表示",
-      "seeAllIssues": "すべてのイシューを表示",
-      "failedDetail": {
-        "status": "リクエストは {time} にステータス {status} で失敗しました。",
-        "noResponse": "リクエストは {time} に応答がありませんでした。"
-      },
-      "analysis": {
-        "notRunDetail": "分析はまだ開始されていません。インシデントを開いて開始してください。",
-        "disabledDetail": "このデプロイでは AI 分析が無効になっています。",
-        "offOther": "このインシデントでは自動分析が実行されませんでした。",
-        "failedDetail": "分析は完了前に停止しました。詳細は分析をご確認ください。"
-      },
-      "empty": {
-        "title": "まだ誰も呼び出されていません",
-        "desc": "ストリームが停止したり、その量が急激に変化すると、そのインシデントと分析がここに表示されます。"
-      },
-      "emptyOff": {
-        "title": "呼び出しがオフになっています",
-        "desc": "AutoObserve はこの組織のストリームの検出事項を記録しますが、インシデントは作成しません。呼び出しは管理者が有効にします。"
-      },
-      "loading": "呼び出しが発生した検出事項を読み込み中…",
-      "loaded": "呼び出しが発生した検出事項を読み込みました",
-      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
-      "routing": "Set up on-call routing"
-    },
-    "issues": {
-      "searchPlaceholder": "発生した事象またはストリームを検索",
-      "columns": {
-        "incident": "発生内容",
-        "severity": "重要度",
-        "status": "ステータス",
-        "stream": "ストリーム",
-        "opened": "発生日時",
-        "analysis": "分析",
-        "page": "呼び出し先"
-      },
-      "count": "問題なし | {count} 件の問題 | {count} 件の問題",
-      "capNote": "最新の {count} 件の問題を表示しています。範囲を絞り込むと古いものを表示できます。",
-      "emptyRange": "{within}に問題はありません",
-      "streamType": "{type} ストリーム",
-      "streamMore": "{stream} +{count}",
-      "filterOpen": "未解決",
-      "loading": "問題を読み込み中…",
-      "loaded": "問題を読み込みました",
-      "page": {
-        "unrouted": "呼び出しなし",
-        "failed": "呼び出しに失敗しました",
-        "pending": "未確認"
-      },
-      "today": "今日",
-      "yesterday": "昨日",
-      "shared": {
-        "rcaDisabled": "これらのインシデントの発生時に AI 分析はオフでした。",
-        "aiUnavailable": "これらのインシデントの発生時に AI 分析は利用できませんでした。",
-        "quotaExceeded": "これらのインシデントの発生時に、組織は AI 分析の上限に達していました。",
-        "coolingDown": "分析が実行されたばかりだったため、これらのインシデントでは新しい分析は開始されませんでした。",
-        "startFailed": "分析を開始できませんでした。",
-        "offOther": "これらのインシデントでは自動分析が実行されませんでした。",
-        "disabled": "このデプロイでは AI 分析が無効になっています。",
-        "notRun": "分析は開始されていません。インシデントを開いて開始してください。",
-        "failed": "これらの分析は完了前に停止しました。詳細は 1 つを開いて確認してください。"
-      }
-    },
-    "surfaces": {
-      "changes": {
-        "title": "変更はまだありません",
-        "desc": "AutoObserve は修正を提案しますが、アラートや設定はまだ変更していません。変更を行うと、その結果がここに表示されます。現時点では、提案を確認し、必要なものを適用してください。",
-        "action": "提案を確認"
-      },
-      "history": {
-        "title": "履歴はまだありません",
-        "desc": "AutoObserve が見つけた内容、変更した内容、およびあなたの判断がここに新しい順で表示されます。現在、その検出事項はインシデントを作成し、問題ページに表示されます。",
-        "action": "問題を表示"
-      },
-      "scenario": {
-        "tag": "ライブデータ",
-        "text": "この組織のライブデータを表示しています。サンプルシナリオはここには表示されません。",
-        "action": "仕組み"
-      },
-      "settings": {
-        "title": "ここで設定できる項目はまだありません",
-        "desc": "AutoObserve とその呼び出しは、このデプロイで管理者が有効にします。通知先や自律的にどこまで動作するかは、それらの制御が用意され次第ここで設定できるようになります。",
-        "action": "仕組み"
-      }
-    },
-    "paging": {
-      "title": "Paging",
-      "label": "Page on-call when a stream stops",
-      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
-      "routing": "On-call routing",
-      "unavailable": "Paging is turned off for this deployment.",
-      "denied": "{denied} {askAdmin}",
-      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
-      "deniedTitle": "呼び出し設定を表示する権限がありません",
-      "deniedDesc": "呼び出し設定は組織全体で一度だけ設定されます。アクセス権については組織の管理者に問い合わせてください。",
-      "failedTitle": "呼び出し設定を読み込めませんでした",
-      "failedDesc": "読み込み中に問題が発生しました。しばらくしてからもう一度お試しください。",
-      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
-    },
-    "learning": {
-      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
-      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
-      "emptyTitle": "Learning your streams",
-      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
-      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
-      "until": "Learning until {date} · {streams}",
-      "streams": "Learning {count} stream | Learning {count} streams",
-      "streamUntil": "until {date}"
-    }
-  },
   "insight": {
     "targets": {
       "origin": "{date} に {service} の AutoObserve 提案から作成されました。",
@@ -34643,57 +34549,5 @@
   },
   "pageHeader": {
     "about": "このページについて"
-  },
-  "genAiAgentMapping": {
-    "tabLabel": "エージェントマッピング",
-    "title": "エージェントマッピング",
-    "subtitle": "エージェントの識別情報、コスト配賦、セッションタイトルがテレメトリーからどのように読み取られるか",
-    "identity": {
-      "title": "エージェント識別フィールド",
-      "help": "OpenObserve が各エージェントに名前を付け、その環境とバージョンを読み取る方法。最初に標準属性を読み取ります。スパンにそれが存在しない場合は、そのスパンが持つ最初のフォールバックフィールドが使用されます。",
-      "agentName": "エージェント名",
-      "agentId": "エージェント ID",
-      "env": "環境",
-      "version": "バージョン"
-    },
-    "agentNameFields": "エージェント名のフォールバックフィールド",
-    "agentNameHelp": "gen_ai.agent.name のフォールバックとして使用する受信属性。",
-    "agentNameInfo": "標準の gen_ai.agent.name 属性が存在しないか空の場合にのみチェックされます。受信テレメトリー属性を1行に1つずつ追加してください。",
-    "agentIdFields": "エージェント ID のフォールバックフィールド",
-    "agentIdHelp": "gen_ai.agent.id のフォールバックとして使用する受信属性。",
-    "agentIdInfo": "標準の gen_ai.agent.id 属性が存在しないか空の場合にのみチェックされます。受信テレメトリー属性を1行に1つずつ追加してください。",
-    "envFields": "環境のフォールバックフィールド",
-    "envHelp": "エージェントの環境として使用する受信属性。",
-    "envInfo": "標準の deployment.environment.name 属性が存在しないか空の場合にのみチェックされます。受信テレメトリー属性を1行に1つずつ追加してください。",
-    "versionFields": "バージョンのフォールバックフィールド",
-    "versionHelp": "エージェントのバージョンとして使用する受信属性。",
-    "versionInfo": "標準の gen_ai.agent.version 属性が存在しないか空の場合にのみチェックされます。受信テレメトリー属性を1行に1つずつ追加してください。",
-    "alwaysAppliedStandard": "標準（最初にチェック）:",
-    "coverageValue": "・過去24時間のトレースの {percent}% で",
-    "fallbacksNote": "フォールバックフィールドはチェックする順にカンマ区切りで入力してください。",
-    "fallbackInvalid": "フィールド名はカンマ区切りで指定してください。使用できるのは英字、数字、および . _ - : / {'@'} のみです。",
-    "sessions": {
-      "title": "セッション表示",
-      "help": "セッションのタイトルの付け方と、セッションから非表示になるラッパーテキストについて。",
-      "noAgents": "エージェントがまだありません。エージェントを追加するとそのラッパーテキストが非表示になります。"
-    },
-    "applyDefaults": "デフォルトを適用",
-    "resetToEmpty": "空にリセット",
-    "clearRegistry": "レジストリをクリア",
-    "clearRegistryTitle": "エージェントレジストリをクリアしますか？",
-    "clearRegistryDescription": "この操作は、この組織で検出された GenAI エージェントレジストリの行をすべて削除します。一致する新しいトレースは、取り込み中にレジストリに再登録されます。",
-    "clearRegistryConfirm": "レジストリをクリア",
-    "saved": "エージェントマッピングを保存しました",
-    "unsavedConfirm": "エージェントマッピングの変更が保存されていません。破棄しますか？",
-    "clearRegistrySuccess": "GenAI エージェントレジストリをクリアしました。保存済みエージェント {deletedCount} 件とキュー内の観測 {bufferCount} 件を削除しました。",
-    "saveFailed": "エージェントマッピングの保存に失敗しました",
-    "clearRegistryFailed": "GenAI エージェントレジストリのクリアに失敗しました",
-    "defaultsLoadFailed": "エージェントマッピングのデフォルトの読み込みに失敗しました",
-    "defaultsFetchFailed": "デフォルトの取得に失敗しました（{status}）"
-  },
-  "copyButton": {
-    "copy": "コピー",
-    "copied": "コピーしました",
-    "failed": "コピーがブロックされました · Ctrl C を押してください"
   }
 }

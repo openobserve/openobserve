@@ -15,6 +15,7 @@
 
 import { computed, inject, provide, type ComputedRef, type InjectionKey } from "vue";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import { groupNavLinks, moduleRailForRoute, railGroupForRoute } from "@/lib/core/Navbar/navGroups";
@@ -33,24 +34,15 @@ export function providePageNavContext(context: PageNavContext): void {
   provide(PAGE_NAV_CONTEXT_KEY, context);
 }
 
-/** The group of the module rail (Settings, IAM, AI observability) that holds the current page. */
-export const PAGE_RAIL_GROUP_KEY: InjectionKey<ComputedRef<I18nText | null | undefined>> =
-  Symbol("pageRailGroup");
-
-/** Called by a module layout that renders a section rail, for the pages it routes to. */
-export function providePageRailGroup(group: ComputedRef<I18nText | null | undefined>): void {
-  provide(PAGE_RAIL_GROUP_KEY, group);
-}
-
-/** The context line of a page without a parent link: its module rail group, solution or nav group, else empty (H4). */
-export function usePageContextLabel(title?: () => string | undefined): ComputedRef<I18nText> {
+/** The context line of a page without a parent link: its module, solution or rail group, else the org (H4). */
+export function usePageContextLabel(): ComputedRef<I18nText> {
   const { t } = useI18nTyped();
   const router = useRouter();
+  const store = useStore() as { state?: Record<string, any> } | undefined;
   const nav = inject(PAGE_NAV_CONTEXT_KEY, null);
-  const railGroup = inject(PAGE_RAIL_GROUP_KEY, null);
   const gates = useNavGateContext();
 
-  // Until the rail's links arrive every group counts, so the line does not flip from empty to group.
+  // Until the rail's links arrive every group counts, so the line does not flip from org to group.
   const shownGroups = computed<ReadonlySet<string> | undefined>(() => {
     if (!nav) return undefined;
     if (nav.flat.value) return new Set();
@@ -68,23 +60,22 @@ export function usePageContextLabel(title?: () => string | undefined): ComputedR
     }
   };
 
-  const same = (a: string, b?: string) => !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
-
-  // The first two never read the nav's links, so their line is final before the links load.
-  const containerLabel = (route: Parameters<typeof railGroupForRoute>[0]): I18nText | null => {
-    // The module rail's heading already names the module, so its pages name their rail group.
-    if (moduleRailForRoute(route, childPath)) return railGroup?.value ?? null;
+  // Neither reads the rail's links, so the line is final before they load.
+  const moduleOrSolution = (route: { path: string }): I18nText | null => {
+    const module = moduleRailForRoute(route, childPath);
+    if (module) return t(module.titleKey);
     if (solutionModeForPath(route.path ?? "", "observability") === "security")
       return t("solutionSwitcher.security.label");
-    const group = railGroupForRoute(route, childPath, shownGroups.value);
-    return group ? t(group.titleKey) : null;
+    return null;
   };
 
   return computed(() => {
     const route = router?.currentRoute?.value;
-    const label = route ? containerLabel(route) : null;
-    // A container named exactly like the page ("Dashboards / Dashboards") says nothing.
-    if (!label || same(String(label), title?.())) return raw("");
-    return label;
+    const fixed = route ? moduleOrSolution(route) : null;
+    if (fixed) return fixed;
+    const group = route ? railGroupForRoute(route, childPath, shownGroups.value) : null;
+    if (group) return t(group.titleKey);
+    const org = store?.state?.selectedOrganization;
+    return raw(org?.label || org?.identifier || "");
   });
 }

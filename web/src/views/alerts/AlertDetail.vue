@@ -117,19 +117,21 @@
       </div>
     </template>
 
-    <template v-if="!unavailable && headerStateKnown" #actions-overflow>
-      <template v-if="evidence">
-        <OButton
-          variant="secondary"
-          :to="evidence.route"
-          :loading="evidence.pending"
-          :data-test="`alerts-alertdetail-open-in-${evidence.page}`"
-        >
-          {{ evidence.label }}
-        </OButton>
-        <OTooltip :content="evidence.tooltip" />
-      </template>
-      <OTooltip v-if="editAnomalyLocked" :content="anomalyLockedReason">
+    <template #actions>
+      <AlertHeaderActions
+        v-if="showHeaderActions"
+        :alert-id="alertId"
+        :name="alert?.name || alertId"
+        :folder-id="folderId"
+        :firing="isFiringNow"
+        :unacked-groups="unackedGroups"
+        :ack="headerAck"
+        :downtime="alertWideMute"
+        :mute-enabled="downtimesEnabled"
+        :groups="firingGroups"
+        @changed="onAckMuteChanged"
+      />
+      <OTooltip v-if="!unavailable && editAnomalyLocked" :content="anomalyLockedReason">
         <span class="inline-flex">
           <OButton variant="secondary" disabled data-test="alerts-alertdetail-edit">
             <template #icon>
@@ -145,7 +147,7 @@
         </span>
       </OTooltip>
       <OButton
-        v-else
+        v-else-if="!unavailable"
         variant="secondary"
         icon="edit"
         data-test="alerts-alertdetail-edit"
@@ -155,23 +157,7 @@
       </OButton>
     </template>
 
-    <template #actions>
-      <AlertHeaderActions
-        v-if="showHeaderActions && headerStateKnown"
-        :alert-id="alertId"
-        :name="alert?.name || alertId"
-        :folder-id="folderId"
-        :firing="isFiringNow"
-        :unacked-groups="unackedGroups"
-        :ack="headerAck"
-        :downtime="alertWideMute"
-        :mute-enabled="downtimesEnabled"
-        :groups="firingGroups"
-        @changed="onAckMuteChanged"
-      />
-    </template>
-
-    <OContent v-if="unavailable">
+    <OContent v-if="unavailable" class="py-6">
       <OEmptyState
         v-if="loadFailure === 'forbidden'"
         kind="denied"
@@ -222,22 +208,18 @@
         </OTabPanels>
       </template>
 
-      <!-- The strips above the chart wait for the alert and its list row, so the chart and tabs never move down. -->
-      <OContent v-else-if="!bodyReady" class="shrink-0 py-3">
-        <OSkeleton preset="chart" class="h-62.5" data-test="alerts-alertdetail-pending" />
-      </OContent>
-
       <template v-else>
-        <OContent v-if="showConditionLine" class="shrink-0 pt-3">
-          <AlertConditionLine
-            :alert="alert"
-            :incident="listRow?.incident ?? null"
-            :show-incident="isFiringNow"
-            :org="orgId"
-          />
-        </OContent>
         <OContent v-if="isMultiAlert" class="shrink-0 pt-3">
           <OStatStrip :items="groupStats" data-test="alerts-alertdetail-group-stats" />
+        </OContent>
+        <OContent v-else-if="firingTiles.length" class="shrink-0 pt-3">
+          <OStatStrip
+            :items="firingTiles"
+            selectable
+            :tray="false"
+            data-test="alerts-alertdetail-tiles"
+            @select="openIncident"
+          />
         </OContent>
 
         <!-- Above the tabs, not inside the Groups tab: the evaluation chart
@@ -250,105 +232,97 @@
            renders then is an empty frame that reads as "no data" — a lie about
            an alert that is evaluating perfectly well. -->
         <!-- An anomaly config has no query_condition for generate_sql to build from. -->
-        <OContent v-if="showChart" class="shrink-0 py-3">
-          <AlertGroupChart
-            v-model:range="detailRange"
-            :alert="alert"
-            :collapse-empty="chartMayCollapse"
-            @settled="chartSettled = true"
-          />
+        <!-- Mounted before the GET lands so its placeholder holds the chart's height and the tabs never move. -->
+        <OContent v-if="!alert || (!isSloAlertView && !isAnomalyAlert)" class="shrink-0 py-3">
+          <AlertGroupChart :alert="alert" />
         </OContent>
 
-        <!-- Hidden, not unmounted, until the chart settles: an empty chart shrinks to one line, and nothing visible may move. -->
-        <div
-          class="flex min-h-0 flex-1 flex-col"
-          :class="belowChartShown ? '' : 'invisible'"
-          data-test="alerts-alertdetail-below-chart"
-        >
-          <!-- The tabs live HERE, below the stat strip and the chart, not in the
+        <!-- The tabs live HERE, below the stat strip and the chart, not in the
            page header: everything above is shared context visible on every
            tab — only the region below actually switches. A header tab strip
            would promise the whole page changes. Per the tab-strip house rule
            the strip takes no horizontal wrapper padding (the first label
            self-aligns to the px-page-edge grid) and carries its own bottom
            divider via `bordered`. -->
-          <OTabs
-            v-model="activeTab"
-            size="compact"
-            bordered
-            class="shrink-0"
-            data-test="alerts-alertdetail-tabs"
-          >
-            <!-- Custom trigger content: OTab's default slot exists for exactly
+        <!-- Waits for the alert: an SLO or anomaly alert has no chart, and tabs painted under the placeholder would jump up. -->
+        <OTabs
+          v-if="alert"
+          v-model="activeTab"
+          size="compact"
+          bordered
+          class="shrink-0"
+          data-test="alerts-alertdetail-tabs"
+        >
+          <!-- Custom trigger content: OTab's default slot exists for exactly
              this (badges) — prop-driven label/icon cannot carry the firing
              count the mock shows on the Groups tab. -->
-            <OTab v-if="isMultiAlert" name="groups" data-test="alerts-alertdetail-tab-groups">
-              <OIcon name="layers" size="sm" class="o-tab__icon shrink-0" />
-              <span class="o-tab__label truncate">{{ t("alerts.groups.tab") }}</span>
-              <OTag
-                v-if="firingBadge"
-                tone="err"
-                size="sm"
-                :label="firingBadge"
-                data-test="alerts-alertdetail-tab-groups-count"
-              />
-            </OTab>
-            <!-- An anomaly config has no query_condition, so the evaluation chart
+          <OTab v-if="isMultiAlert" name="groups" data-test="alerts-alertdetail-tab-groups">
+            <OIcon name="layers" size="sm" class="o-tab__icon shrink-0" />
+            <span class="o-tab__label truncate">{{ t("alerts.groups.tab") }}</span>
+            <OTag
+              v-if="firingBadge"
+              tone="err"
+              size="sm"
+              :label="firingBadge"
+              data-test="alerts-alertdetail-tab-groups-count"
+            />
+          </OTab>
+          <!-- An anomaly config has no query_condition, so the evaluation chart
              above the tabs is excluded for this family. Its charts read the
              _anomalies stream instead, and there are three of them — too tall
              for the shared strip, so they get the tab region's full height. -->
-            <OTab
-              v-if="isAnomalyAlert"
-              name="charts"
-              :label="t('alerts.anomaly.chartsTab')"
-              icon="bar-chart"
-              :locked="anomalyLocked"
-              :tooltip="anomalyLocked ? anomalyLockedReason : undefined"
-              data-test="alerts-alertdetail-tab-charts"
+          <OTab
+            v-if="isAnomalyAlert"
+            name="charts"
+            :label="t('alerts.anomaly.chartsTab')"
+            icon="bar-chart"
+            :locked="anomalyLocked"
+            :tooltip="anomalyLocked ? anomalyLockedReason : undefined"
+            data-test="alerts-alertdetail-tab-charts"
+          />
+          <OTab name="history" :label="t('alerts.history')" icon="history" />
+          <OTab name="configuration" :label="t('alerts.configuration')" icon="settings" />
+        </OTabs>
+
+        <!-- Without a Groups tab a line per group reads as a bug (M-9); it lands with the alert, so nothing painted moves. -->
+        <OContent v-if="isGroupedButSimple" class="shrink-0 pt-3">
+          <OInlineNotice tone="info" data-test="alerts-alertdetail-simple-grouped-banner">
+            {{
+              t("alerts.multiAlert.groupedButSimple", {
+                columns: (aggregation?.group_by || []).join(", "),
+              })
+            }}
+            <template #actions>
+              <OButton
+                variant="secondary"
+                data-test="alerts-alertdetail-enable-multi"
+                @click="editAlert"
+              >
+                {{ t("alerts.multiAlert.enableCta") }}
+              </OButton>
+            </template>
+          </OInlineNotice>
+        </OContent>
+
+        <!-- Every panel waits for the alert, so an empty box placed early would only be pushed down by the banner. -->
+        <OTabPanels v-if="alert" v-model="activeTab" class="min-h-0 flex-1">
+          <OTabPanel v-if="isMultiAlert" name="groups" stretch>
+            <AlertGroupsTable
+              :groups="groupData?.list || []"
+              :loading="loadingGroups"
+              :load-error="groupsLoadError"
+              :alert-id="alertId"
+              :alert-name="alert?.name || alertId"
+              :folder-id="folderId"
+              :downtime="headerDowntime"
+              :mute-enabled="downtimesEnabled"
+              @refresh="fetchGroups"
+              @show-history="openGroupHistory"
+              @changed="onAckMuteChanged"
             />
-            <OTab name="history" :label="t('alerts.history')" icon="history" />
-            <OTab name="configuration" :label="t('alerts.configuration')" icon="settings" />
-          </OTabs>
+          </OTabPanel>
 
-          <!-- Without a Groups tab a line per group reads as a bug (M-9); it lands with the alert, so nothing painted moves. -->
-          <OContent v-if="isGroupedButSimple" class="shrink-0 pt-3">
-            <OInlineNotice tone="info" data-test="alerts-alertdetail-simple-grouped-banner">
-              {{
-                t("alerts.multiAlert.groupedButSimple", {
-                  columns: (aggregation?.group_by || []).join(", "),
-                })
-              }}
-              <template #actions>
-                <OButton
-                  variant="secondary"
-                  data-test="alerts-alertdetail-enable-multi"
-                  @click="editAlert"
-                >
-                  {{ t("alerts.multiAlert.enableCta") }}
-                </OButton>
-              </template>
-            </OInlineNotice>
-          </OContent>
-
-          <OTabPanels v-model="activeTab" class="min-h-0 flex-1">
-            <OTabPanel v-if="isMultiAlert" name="groups" stretch>
-              <AlertGroupsTable
-                :groups="groupData?.list || []"
-                :loading="loadingGroups"
-                :last-run-at="groupsLoadedAt"
-                :load-error="groupsLoadError"
-                :alert-id="alertId"
-                :alert-name="alert?.name || alertId"
-                :folder-id="folderId"
-                :downtime="headerDowntime"
-                :mute-enabled="downtimesEnabled"
-                @refresh="fetchGroups"
-                @show-history="openGroupHistory"
-                @changed="onAckMuteChanged"
-              />
-            </OTabPanel>
-
-            <!-- Multi-alerts keep the per-group transitions view untouched.
+          <!-- Multi-alerts keep the per-group transitions view untouched.
 
              Simple alerts get TWO readings of "history", because the
              transitions table is write-on-change: an alert that has been
@@ -358,97 +332,89 @@
              "Level changes" reads the rollup row's transitions
              (group_key ""), without the Group column/filter that would
              repeat the same non-answer on every line. -->
-            <OTabPanel v-if="isAnomalyAlert" name="charts" stretch>
-              <OContent class="h-full overflow-y-auto py-4">
-                <LicenseDeniedState
-                  v-if="anomalyLocked"
-                  :features="['anomaly_detection']"
-                  data-test="alerts-alertdetail-anomaly-license-denied"
-                />
-                <template v-else-if="alert">
-                  <!-- The notice text is the server's own message: it carries the dropped row count. -->
-                  <OInlineNotice
-                    v-if="duplicateRowsNotice"
-                    tone="warn"
-                    class="mb-3"
-                    :message="raw(duplicateRowsNotice)"
-                    data-test="alerts-alertdetail-anomaly-duplicate-rows"
-                  />
-                  <AnomalyDetectionChart
-                    :key="alertId"
-                    :alert="alert"
-                    :anomaly-id="alertId"
-                    @reload="fetchAlert"
-                    @refreshed="noticeQuery.refetch()"
-                  />
-                </template>
-              </OContent>
-            </OTabPanel>
-
-            <OTabPanel name="history" stretch>
-              <AlertGroupHistory
-                v-if="isMultiAlert"
-                :transitions="transitions"
-                :loading="loadingTransitions"
-                :last-run-at="transitionsLoadedAt"
-                :group-filter="historyGroupFilter"
-                @clear-filter="clearGroupFilter"
-                @refresh="fetchTransitions"
+          <OTabPanel v-if="isAnomalyAlert" name="charts" stretch>
+            <OContent class="h-full overflow-y-auto py-4">
+              <LicenseDeniedState
+                v-if="anomalyLocked"
+                :features="['anomaly_detection']"
+                data-test="alerts-alertdetail-anomaly-license-denied"
               />
-              <!-- `v-else-if="alert"`, not a bare else: until the GET resolves the
+              <template v-else-if="alert">
+                <!-- The notice text is the server's own message: it carries the dropped row count. -->
+                <OInlineNotice
+                  v-if="duplicateRowsNotice"
+                  tone="warn"
+                  class="mb-3"
+                  :message="raw(duplicateRowsNotice)"
+                  data-test="alerts-alertdetail-anomaly-duplicate-rows"
+                />
+                <AnomalyDetectionChart
+                  :key="alertId"
+                  :alert="alert"
+                  :anomaly-id="alertId"
+                  @reload="fetchAlert"
+                  @refreshed="noticeQuery.refetch()"
+                />
+              </template>
+            </OContent>
+          </OTabPanel>
+
+          <OTabPanel name="history" stretch>
+            <AlertGroupHistory
+              v-if="isMultiAlert"
+              :transitions="transitions"
+              :loading="loadingTransitions"
+              :group-filter="historyGroupFilter"
+              @clear-filter="clearGroupFilter"
+              @refresh="fetchTransitions"
+            />
+            <!-- `v-else-if="alert"`, not a bare else: until the GET resolves the
                page cannot know which mode it is in, and mounting the
                evaluations view speculatively fires its fetch even for alerts
                that turn out to be multi. -->
-              <!-- An anomaly config writes no transitions row for the toggle to show. -->
-              <AlertEvaluationHistory v-else-if="isAnomalyAlert" :alert-id="alertId" is-anomaly />
-              <div v-else-if="alert" class="flex h-full min-h-0 flex-col">
-                <OContent class="shrink-0 py-2">
-                  <OToggleGroup
-                    :model-value="historyView"
-                    data-test="alerts-alertdetail-history-view"
-                    @update:model-value="onHistoryViewChange"
+            <!-- An anomaly config writes no transitions row for the toggle to show. -->
+            <AlertEvaluationHistory v-else-if="isAnomalyAlert" :alert-id="alertId" is-anomaly />
+            <div v-else-if="alert" class="flex h-full min-h-0 flex-col">
+              <OContent class="shrink-0 py-2">
+                <OToggleGroup
+                  :model-value="historyView"
+                  data-test="alerts-alertdetail-history-view"
+                  @update:model-value="onHistoryViewChange"
+                >
+                  <OToggleGroupItem
+                    value="evaluations"
+                    data-test="alerts-alertdetail-history-view-evaluations"
                   >
-                    <OToggleGroupItem
-                      value="evaluations"
-                      data-test="alerts-alertdetail-history-view-evaluations"
-                    >
-                      {{ t("alerts.groups.evaluationsView") }}
-                    </OToggleGroupItem>
-                    <OToggleGroupItem
-                      value="transitions"
-                      data-test="alerts-alertdetail-history-view-transitions"
-                    >
-                      {{ t("alerts.groups.levelChangesView") }}
-                    </OToggleGroupItem>
-                  </OToggleGroup>
-                </OContent>
-                <div class="min-h-0 flex-1">
-                  <AlertEvaluationHistory
-                    v-if="historyView === 'evaluations'"
-                    v-model:range="detailRange"
-                    :alert-id="alertId"
-                    :shared-range="showChart"
-                  />
-                  <AlertGroupHistory
-                    v-else
-                    :transitions="transitions"
-                    :loading="loadingTransitions"
-                    :last-run-at="transitionsLoadedAt"
-                    :show-group-column="false"
-                    @refresh="fetchTransitions"
-                  />
-                </div>
-              </div>
-            </OTabPanel>
-
-            <OTabPanel name="configuration" stretch>
-              <OContent class="h-full overflow-y-auto py-4">
-                <AlertConfigSummary v-if="alert" :alert="alert" :slo-name="sloName" />
-                <AlertCalibrationHeadroomCard v-if="alert && !isAnomalyAlert" :alert-id="alertId" />
+                    {{ t("alerts.groups.evaluationsView") }}
+                  </OToggleGroupItem>
+                  <OToggleGroupItem
+                    value="transitions"
+                    data-test="alerts-alertdetail-history-view-transitions"
+                  >
+                    {{ t("alerts.groups.levelChangesView") }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
               </OContent>
-            </OTabPanel>
-          </OTabPanels>
-        </div>
+              <div class="min-h-0 flex-1">
+                <AlertEvaluationHistory v-if="historyView === 'evaluations'" :alert-id="alertId" />
+                <AlertGroupHistory
+                  v-else
+                  :transitions="transitions"
+                  :loading="loadingTransitions"
+                  :show-group-column="false"
+                  @refresh="fetchTransitions"
+                />
+              </div>
+            </div>
+          </OTabPanel>
+
+          <OTabPanel name="configuration" stretch>
+            <OContent class="h-full overflow-y-auto py-4">
+              <AlertConfigSummary v-if="alert" :alert="alert" :slo-name="sloName" />
+              <AlertCalibrationHeadroomCard v-if="alert && !isAnomalyAlert" :alert-id="alertId" />
+            </OContent>
+          </OTabPanel>
+        </OTabPanels>
       </template>
     </div>
     <ExtendDowntimeDialog
@@ -464,11 +430,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import AlertConditionLine from "@/components/alerts/AlertConditionLine.vue";
 import AlertConfigSummary from "@/components/alerts/AlertConfigSummary.vue";
 import AlertCalibrationHeadroomCard from "@/components/alert_calibration/AlertCalibrationHeadroomCard.vue";
 import AlertEvaluationHistory from "@/components/alerts/AlertEvaluationHistory.vue";
@@ -492,7 +457,6 @@ import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -507,22 +471,14 @@ import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import alertsService from "@/services/alerts";
-import { alertAcksQuery, alertSqlQuery, alertsListQuery } from "@/services/alerts.queries";
+import { alertAcksQuery, alertsListQuery } from "@/services/alerts.queries";
 import { anomalyConfigQuery } from "@/services/anomaly_detection.queries";
 import type { ActiveDowntime } from "@/services/downtimes";
 import { useDowntimesEnabled } from "@/composables/downtimes/useDowntimesEnabled";
 import { useNowMicros } from "@/composables/downtimes/useNowMicros";
+import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { formatDuration } from "@/utils/downtimes/schedule";
-import { formatAlertMinutes } from "@/utils/alerts/alertCondition";
-import {
-  ALERT_EVIDENCE_LABELS,
-  alertEvidenceFilter,
-  alertEvidencePage,
-  alertEvidenceRoute,
-  alertEvidenceWindow,
-  alertStoredSql,
-  type AlertEvidenceFilter,
-} from "@/utils/alerts/alertEvidenceRoute";
+import { formatInZone } from "@/utils/oncall";
 import { isFiringOutcome, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { isFiringNow as isOpenFiring } from "@/utils/alerts/firingAlerts";
 import { ackedCount, unackedFiringCount } from "@/utils/alerts/ackState";
@@ -563,8 +519,6 @@ const groupsLoadError = ref(false);
 const transitions = ref<AlertGroupTransition[]>([]);
 const loadingGroups = ref(false);
 const loadingTransitions = ref(false);
-const groupsLoadedAt = ref<number | null>(null);
-const transitionsLoadedAt = ref<number | null>(null);
 const historyGroupFilter = ref<AlertGroup | null>(null);
 // Why the alert could not be loaded; without it the page showed a phantom alert with a live Edit.
 const loadFailure = ref<"not-found" | "forbidden" | "failed" | null>(null);
@@ -828,13 +782,6 @@ const showHeaderActions = computed(
   () => !!alert.value && !unavailable.value && !isAnomalyAlert.value,
 );
 
-// The buttons wait for the firing state, so a late Acknowledge never pushes Open in logs and Edit aside.
-const headerStateKnown = computed(() => {
-  if (!alert.value) return false;
-  if (alert.value.name && listQuery.isPending.value) return false;
-  return !isMultiAlert.value || groupsLoadedAt.value !== null || groupsLoadError.value;
-});
-
 const isFiringNow = computed(() => {
   const row = listRow.value;
   // Same rule as the list's Firing tile: an errored run during an open firing saw no recovery.
@@ -869,12 +816,8 @@ const isSingleRow = computed(
   () => !isMultiAlert.value && !isCompositeAlert.value && !isAnomalyAlert.value,
 );
 
-// A single alert's tiles come from its list row, which loads after the alert; the body waits for both.
-const bodyReady = computed(
-  () => !!alert.value && (!isSingleRow.value || !alert.value.name || !listQuery.isPending.value),
-);
-
 const nowMicros = useNowMicros();
+const viewerZone = useViewerTimezone();
 
 const firingSince = computed<number | null>(() => {
   // A failed send moves the outcome, and with it last_outcome_since, but not the firing's start.
@@ -888,83 +831,54 @@ const firingFor = computed(() => {
   return t("alerts.firingState.firingFor", { duration: formatDuration(secs, t) });
 });
 
-// The condition line and the chart describe one stream query, which SLO and anomaly alerts do not have.
-const showConditionLine = computed(() => !isSloAlertView.value && !isAnomalyAlert.value);
-const showChart = showConditionLine;
+const LEVEL_TILES: Record<string, { label: I18nKey; tone: StatItem["tone"] }> = {
+  critical: { label: "alerts.groups.critical", tone: "error" },
+  warning: { label: "alerts.groups.warning", tone: "warning" },
+  ok: { label: "alerts.groups.ok", tone: "success" },
+};
 
-const detailRange = ref("1h");
-const chartSettled = ref(false);
-const chartSlow = ref(false);
-// Shrinking once the history shows would move it, so a chart that settles late keeps its height.
-const chartMayCollapse = ref(true);
-// A chart that never settles must not keep the history hidden.
-const chartSlowTimer = setTimeout(() => {
-  if (!chartSettled.value) chartMayCollapse.value = false;
-  chartSlow.value = true;
-}, 4000);
-onBeforeUnmount(() => clearTimeout(chartSlowTimer));
-const belowChartShown = computed(() => !showChart.value || chartSettled.value || chartSlow.value);
-
-// ── Open in logs / traces / metrics ─────────────────────────────────────────
-const evidencePage = computed(() => alertEvidencePage(alert.value));
-const isBuilderAlert = computed(() => alert.value?.query_condition?.type === "custom");
-// A Builder alert stores conditions, not SQL; the server writes the SQL it evaluates.
-const generatedSqlQuery = useQuery(() =>
-  Object.assign(alertSqlQuery(orgId.value, alertId.value, alert.value), {
-    enabled: !!orgId.value && !!evidencePage.value && isBuilderAlert.value,
-    retry: false,
-  }),
-);
-const evidenceSql = computed(
-  () => alertStoredSql(alert.value) || (generatedSqlQuery.data.value ?? ""),
-);
-const evidenceFilter = ref<AlertEvidenceFilter | null>(null);
-const evidenceParsing = ref(false);
-watch(
-  [evidencePage, evidenceSql],
-  async ([page, sql]) => {
-    if (!page) return;
-    evidenceParsing.value = true;
-    const filter = await alertEvidenceFilter(alert.value, sql);
-    if (sql !== evidenceSql.value) return;
-    evidenceFilter.value = filter;
-    evidenceParsing.value = false;
-  },
-  { immediate: true },
-);
-
-const firingStartUs = computed<number | null>(() =>
-  isFiringNow.value
-    ? (listRow.value?.firing_started_at ?? listRow.value?.last_outcome_since ?? null)
-    : null,
-);
-
-const evidence = computed(() => {
-  const page = evidencePage.value;
-  if (!page || !alert.value) return null;
-  const stream = String(alert.value.stream_name);
-  const period = alert.value.trigger_condition?.period;
-  const window = alertEvidenceWindow(period, firingStartUs.value, nowMicros.value);
-  return {
-    page,
-    label: t(ALERT_EVIDENCE_LABELS[page]),
-    pending: evidenceParsing.value || (isBuilderAlert.value && generatedSqlQuery.isPending.value),
-    route: alertEvidenceRoute({
-      page,
-      stream,
-      filter: evidenceFilter.value,
-      window,
-      org: orgId.value,
-    }),
-    tooltip:
-      "period" in window
-        ? t("alerts.detail.evidenceWindowTip", {
-            stream: raw(stream),
-            window: formatAlertMinutes(Number(period) || 15, t),
-          })
-        : t("alerts.detail.evidenceFiringTip", { stream: raw(stream) }),
-  };
+const firingTiles = computed<StatItem[]>(() => {
+  if (firingSince.value === null) return [];
+  const level = LEVEL_TILES[(listRow.value?.level || "").toLowerCase()];
+  const tiles: StatItem[] = [];
+  if (level) {
+    tiles.push({
+      key: "level",
+      label: t("alerts.firingState.level"),
+      value: t(level.label),
+      tone: level.tone,
+      selectable: false,
+      dataTest: "alerts-alertdetail-tile-level",
+    });
+  }
+  tiles.push({
+    key: "firing-since",
+    label: t("alerts.firingState.firingSince"),
+    value: formatInZone(firingSince.value, viewerZone.value, { timeStyle: "short" }),
+    selectable: false,
+    dataTest: "alerts-alertdetail-tile-firing-since",
+  });
+  const incident = listRow.value?.incident;
+  if (incident) {
+    tiles.push({
+      key: "incident",
+      label: t("alerts.firingState.incident"),
+      value: incident.title || incident.id,
+      dataTest: "alerts-alertdetail-tile-incident",
+    });
+  }
+  return tiles;
 });
+
+const openIncident = (key: string) => {
+  const incident = listRow.value?.incident;
+  if (key !== "incident" || !incident) return;
+  router.push({
+    name: "incidentDetail",
+    params: { id: incident.id },
+    query: { org_identifier: orgId.value },
+  });
+};
 
 const unackedGroups = computed(() =>
   isMultiAlert.value ? unackedFiringCount(groupData.value?.list || []) : null,
@@ -1047,7 +961,6 @@ const fetchGroups = async () => {
     if (!isCurrentDetailRequest(request)) return;
     groupData.value = res.data;
     groupsLoadError.value = false;
-    groupsLoadedAt.value = Date.now();
   } catch {
     if (!isCurrentDetailRequest(request)) return;
     groupData.value = null;
@@ -1075,7 +988,6 @@ const fetchTransitions = async () => {
     // hides stale per-group rows left behind if the alert was once a
     // multi-alert; without a Group column they would be unreadable.
     transitions.value = isMultiAlert.value ? list : list.filter((tr) => tr.group_key === "");
-    transitionsLoadedAt.value = Date.now();
   } catch {
     if (!isCurrentDetailRequest(request)) return;
     transitions.value = [];
@@ -1181,12 +1093,6 @@ watch(
     hiddenReferenceCount.value = 0;
     loadingGroups.value = false;
     loadingTransitions.value = false;
-    groupsLoadedAt.value = null;
-    groupsLoadError.value = false;
-    transitionsLoadedAt.value = null;
-    historyView.value = "evaluations";
-    evidenceFilter.value = null;
-    evidenceParsing.value = false;
     sloName.value = "";
     activeTab.value = "history";
     return loadPage();

@@ -34,11 +34,13 @@ const activeItem = computed(() => props.items.find((item) => item.name === props
           'text-compact font-medium whitespace-nowrap outline-none select-none',
           'focus-visible:outline-focus-ring-accent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-solid',
           size === 'compact' ? 'h-control-md' : 'h-tabs-height',
-          activeItem ? 'text-text-heading' : 'text-text-secondary hover:text-tabs-hover-text',
+          activeItem
+            ? 'text-tabs-active-text'
+            : 'text-tabs-inactive-text hover:text-tabs-hover-text',
         ]"
       >
         <span>{{ activeItem ? activeItem.label : t("components.tabs.more") }}</span>
-        <OIcon name="expand-more" size="sm" class="size-3.5! shrink-0" />
+        <OIcon name="expand-more" size="sm" class="shrink-0" />
       </button>
     </template>
     <ODropdownItem

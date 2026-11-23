@@ -29,6 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #actions>
+        <!-- The provider behind the Terraform export tab, which is otherwise
+             only discoverable once the export dialog is already open. -->
         <OTooltip v-if="anomalyTabLicenseLocked" :content="anomalyLockedReason">
           <span class="inline-flex">
             <OButton data-test="alert-list-add-alert-btn" variant="primary" disabled>
@@ -73,23 +75,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-list-add-alert-draft-dot"
           />
         </OButton>
-        <!-- Under 640 px the header's own More holds the overflow, so the pair folds in there instead. -->
-        <ODropdown v-if="smUp" side="bottom" align="end">
-          <template #trigger>
-            <OButton
-              icon-only
-              variant="ghost"
-              icon="more-horiz"
-              data-test="app-page-header-more-btn"
-              :label="t('common.more')"
-            />
-          </template>
-          <IacRegistryLinks menu data-test="alert-list-iac-registries" />
-        </ODropdown>
       </template>
 
       <template #actions-overflow>
-        <IacRegistryLinks v-if="!smUp" data-test="alert-list-iac-registries" compact />
+        <IacRegistryLinks data-test="alert-list-iac-registries" :compact="isCompactToolbar" />
         <!-- Import button -->
         <OButton
           :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
@@ -105,6 +94,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             side="bottom"
             shortcut="alertsImport"
           />
+        </OButton>
+        <OButton
+          v-if="showAlertLibrary"
+          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
+          variant="secondary"
+          icon="menu-book"
+          data-test="alert-list-alert-library-btn"
+          @click="goToAlertLibrary"
+        >
+          <template v-if="!isCompactToolbar">{{ t("alerts.alertLibrary") }}</template>
+          <OTooltip v-if="isCompactToolbar" :content="t('alerts.alertLibrary')" side="bottom" />
         </OButton>
       </template>
 
@@ -559,47 +559,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </router-link>
                 </OTooltip>
-                <span
-                  v-else-if="isFiringListRow(row)"
-                  class="inline-flex min-w-0 items-center gap-1"
-                  :data-test="`alert-list-${row.name}-state`"
-                >
-                  <OTooltip v-if="isAckedFiring(row)" :content="runOutcomeTooltip(row)">
-                    <OTag
-                      tone="neutral"
-                      icon="person"
-                      size="sm"
-                      :label="t('alerts.ack.firingAcknowledged')"
-                      :data-test="`alert-list-${row.name}-last-outcome`"
-                    />
-                  </OTooltip>
-                  <OTooltip v-else :content="runOutcomeTooltip(row)">
-                    <OTag
-                      v-if="row.level === 'warning'"
-                      tone="warn"
-                      icon="error-outline"
-                      size="sm"
-                      :label="t('components.badge.alertState.firing')"
-                      :data-test="`alert-list-${row.name}-last-outcome`"
-                    />
-                    <OTag
-                      v-else
-                      type="alertState"
-                      value="firing"
-                      size="sm"
-                      :data-test="`alert-list-${row.name}-last-outcome`"
-                    />
-                  </OTooltip>
-                  <!-- Delivery is a second fact about a firing, so it never replaces the state (R9: not red). -->
+                <OTooltip v-else-if="isAckedFiring(row)" :content="runOutcomeTooltip(row)">
                   <OTag
-                    v-if="isNotifyFailedOutcome(row.last_outcome)"
-                    tone="warn"
-                    icon="sync-problem"
+                    tone="neutral"
+                    icon="person"
                     size="sm"
-                    :label="t('alerts.summaryDeliveryFailed')"
-                    :data-test="`alert-list-${row.name}-delivery-failed`"
+                    :label="t('alerts.ack.firingAcknowledged')"
+                    :data-test="`alert-list-${row.name}-last-outcome`"
                   />
-                </span>
+                </OTooltip>
                 <OTooltip v-else-if="showRunOutcome(row)" :content="runOutcomeTooltip(row)">
                   <OTag
                     type="alertState"
@@ -608,15 +576,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`alert-list-${row.name}-last-outcome`"
                   />
                 </OTooltip>
-                <OTag
-                  v-else-if="!row.enabled"
-                  tone="neutral"
-                  icon="pause"
-                  size="sm"
-                  :label="t('alerts.summaryPaused')"
-                  :data-test="`alert-list-${row.name}-last-outcome`"
-                />
-                <span v-else class="text-text-muted">—</span>
+                <span v-else class="text-text-body">—</span>
               </template>
 
               <template #cell-folder_name="{ row }">
@@ -627,94 +587,117 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <template #cell-actions="{ row }">
                 <div class="actions-container flex items-center">
-                  <!-- At rest a row shows only its ⋯; the inline icons come in on hover or focus (B7). -->
-                  <span
-                    class="inline-flex items-center transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 max-md:opacity-100 pointer-coarse:opacity-100"
-                    :class="alertStateLoadingMap[row.uuid] ? 'opacity-100' : 'opacity-0'"
+                  <OTooltip
+                    v-if="anomalyRowLocked(row)"
+                    side="bottom"
+                    :content="anomalyLockedReason"
                   >
+                    <span class="ms-1 inline-flex max-md:hidden">
+                      <OButton
+                        icon-only
+                        :data-row-action="row.enabled ? 'pause' : 'resume'"
+                        :data-test="`alert-list-${row.name}-pause-start-alert`"
+                        :aria-label="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                        variant="ghost"
+                        icon="lock"
+                        disabled
+                      />
+                    </span>
+                  </OTooltip>
+                  <OButton
+                    v-else
+                    icon-only
+                    :data-row-action="row.enabled ? 'pause' : 'resume'"
+                    :data-test="`alert-list-${row.name}-pause-start-alert`"
+                    class="ms-1 max-md:hidden"
+                    :variant="row.enabled ? 'danger-ghost' : 'ghost'"
+                    size="sm"
+                    :icon="row.enabled ? 'pause' : 'play-arrow'"
+                    :loading="!!alertStateLoadingMap[row.uuid]"
+                    @click.stop="toggleAlertState(row)"
+                  >
+                    <OTooltip
+                      side="bottom"
+                      exclusive
+                      :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                      :shortcut="row.enabled ? 'alertsRowPause' : undefined"
+                    />
+                  </OButton>
+                  <OTooltip
+                    v-if="rowAnomalyLocked(row)"
+                    side="bottom"
+                    :content="anomalyLockedReason"
+                  >
+                    <span class="inline-flex max-md:hidden">
+                      <OButton
+                        icon-only
+                        data-row-action="edit"
+                        :data-test="`alert-list-${row.name}-update-alert`"
+                        :aria-label="t('alerts.edit')"
+                        variant="ghost"
+                        icon="lock"
+                        disabled
+                      />
+                    </span>
+                  </OTooltip>
+                  <OButton
+                    v-else
+                    icon-only
+                    data-row-action="edit"
+                    :data-test="`alert-list-${row.name}-update-alert`"
+                    variant="ghost"
+                    size="sm"
+                    icon="edit"
+                    class="max-md:hidden"
+                    @click.stop="editAlert(row)"
+                  >
+                    <OTooltip
+                      side="bottom"
+                      exclusive
+                      :content="t('alerts.edit')"
+                      shortcut="alertsRowEdit"
+                    />
+                  </OButton>
+                  <!-- Clone is disabled for SLO alerts (D1). The explanation
+                       hangs off this WRAPPER, not off the button: a disabled
+                       button receives no pointer events, so a tooltip anchored
+                       to it would never open — leaving a greyed-out control
+                       with no way to find out why. -->
+                  <span class="inline-flex max-md:hidden">
                     <OTooltip
                       v-if="anomalyRowLocked(row)"
                       side="bottom"
                       :content="anomalyLockedReason"
-                    >
-                      <span class="ms-1 inline-flex max-md:hidden">
-                        <OButton
-                          icon-only
-                          :data-row-action="row.enabled ? 'pause' : 'resume'"
-                          :data-test="`alert-list-${row.name}-pause-start-alert`"
-                          :aria-label="row.enabled ? t('alerts.pause') : t('alerts.start')"
-                          variant="ghost"
-                          icon="lock"
-                          disabled
-                        />
-                      </span>
-                    </OTooltip>
-                    <OButton
-                      v-else
-                      icon-only
-                      :data-row-action="row.enabled ? 'pause' : 'resume'"
-                      :data-test="`alert-list-${row.name}-pause-start-alert`"
-                      class="ms-1 max-md:hidden"
-                      variant="ghost"
-                      size="sm"
-                      :icon="row.enabled ? 'pause' : 'play-arrow'"
-                      :loading="!!alertStateLoadingMap[row.uuid]"
-                      @click.stop="toggleAlertState(row)"
-                    >
-                      <OTooltip
-                        side="bottom"
-                        exclusive
-                        :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
-                        :shortcut="row.enabled ? 'alertsRowPause' : undefined"
-                      />
-                    </OButton>
+                    />
                     <OTooltip
-                      v-if="rowAnomalyLocked(row)"
+                      v-else-if="isSloRow(row)"
                       side="bottom"
-                      :content="anomalyLockedReason"
-                    >
-                      <span class="inline-flex max-md:hidden">
-                        <OButton
-                          icon-only
-                          data-row-action="edit"
-                          :data-test="`alert-list-${row.name}-update-alert`"
-                          :aria-label="t('alerts.edit')"
-                          variant="ghost"
-                          icon="lock"
-                          disabled
-                        />
-                      </span>
-                    </OTooltip>
+                      exclusive
+                      :content="t('alerts.sloCloneDisabled')"
+                    />
                     <OButton
-                      v-else
                       icon-only
-                      data-row-action="edit"
-                      :data-test="`alert-list-${row.name}-update-alert`"
+                      data-row-action="duplicate"
                       variant="ghost"
                       size="sm"
-                      icon="edit"
-                      class="max-md:hidden"
-                      @click.stop="editAlert(row)"
+                      :icon="anomalyRowLocked(row) ? 'lock' : 'content-copy'"
+                      :disabled="isSloRow(row) || anomalyRowLocked(row)"
+                      :aria-label="isSloRow(row) ? t('alerts.sloCloneDisabled') : t('alerts.clone')"
+                      @click.stop="duplicateAlert(row)"
+                      :data-test="`alert-list-${row.name}-clone-alert`"
                     >
                       <OTooltip
+                        v-if="!isSloRow(row) && !anomalyRowLocked(row)"
                         side="bottom"
                         exclusive
-                        :content="t('alerts.edit')"
-                        shortcut="alertsRowEdit"
+                        :content="t('alerts.clone')"
+                        shortcut="alertsRowDuplicate"
                       />
                     </OButton>
                   </span>
                   <!-- Hidden proxies so the row-hover shortcuts work for
                          actions that live in the more-menu dropdown (which is
-                         teleported out of the row DOM): duplicate, export, delete. -->
-                  <button
-                    type="button"
-                    data-row-action="duplicate"
-                    class="hidden"
-                    tabindex="-1"
-                    aria-hidden="true"
-                    @click.stop="!isSloRow(row) && !anomalyRowLocked(row) && duplicateAlert(row)"
-                  />
+                         teleported out of the row DOM): x = export, Del = delete. -->
                   <button
                     type="button"
                     data-row-action="export"
@@ -777,18 +760,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       {{ t("alerts.edit") }}
                     </ODropdownItem>
-                    <!-- Clone is a third row action, so it lives here, not inline (B7); SLO alerts cannot clone (D1). -->
                     <ODropdownItem
+                      class="md:hidden"
                       :disabled="isSloRow(row) || anomalyRowLocked(row)"
-                      :disabled-reason="
-                        anomalyRowLocked(row)
-                          ? anomalyLockedReason
-                          : isSloRow(row)
-                            ? t('alerts.sloCloneDisabled')
-                            : undefined
-                      "
-                      shortcut="alertsRowDuplicate"
-                      :data-test="`alert-list-${row.name}-clone-alert`"
+                      :disabled-reason="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
+                      :data-test="`alert-list-${row.name}-clone-alert-menu`"
                       @select="duplicateAlert(row)"
                     >
                       <template #icon>
@@ -800,7 +776,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       {{ t("alerts.clone") }}
                     </ODropdownItem>
-                    <ODropdownSeparator />
+                    <ODropdownSeparator class="md:hidden" />
                     <ODropdownItem
                       :disabled="anomalyRowLocked(row)"
                       :disabled-reason="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
@@ -937,7 +913,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #empty>
                 <OEmptyState
                   v-if="statusErrorEmpty"
-                  size="compact"
+                  size="inline"
                   kind="error"
                   icon="warning"
                   role="alert"
@@ -948,7 +924,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #actions>
                     <OButton
                       variant="primary"
-                      size="sm"
                       icon="refresh"
                       :loading="fetching"
                       data-test="alert-list-empty-status-retry"
@@ -958,7 +933,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       v-if="stateFilters.length"
-                      size="sm"
                       icon="format-list-bulleted"
                       data-test="alert-list-empty-show-all"
                       @click="stateFilters = []"
@@ -1029,25 +1003,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-if="showAlertLibrary"
                       variant="primary"
+                      size="lg"
+                      icon="menu-book"
                       data-test="alert-list-empty-alert-library"
                       @click="goToAlertLibrary"
                     >
                       {{ t("alerts.alertLibrary") }}
                     </OButton>
                     <OButton
-                      :variant="showAlertLibrary ? 'secondary' : 'primary'"
+                      v-if="!showAlertLibrary"
+                      variant="primary"
+                      size="lg"
+                      icon="add"
                       data-test="alert-list-empty-new-alert"
                       @click="showAddUpdateFn({})"
                     >
                       {{ t("emptyState.noAlerts.action") }}
                     </OButton>
                     <OButton
-                      v-if="!showAlertLibrary"
                       variant="secondary"
+                      size="lg"
+                      icon="upload-file"
                       data-test="alert-list-empty-import"
                       @click="importAlert"
                     >
                       {{ t("alerts.importAlert") }}
+                    </OButton>
+                    <OButton
+                      v-if="showAlertLibrary"
+                      variant="secondary"
+                      size="lg"
+                      icon="add"
+                      data-test="alert-list-empty-new-alert"
+                      @click="showAddUpdateFn({})"
+                    >
+                      {{ t("emptyState.noAlerts.action") }}
                     </OButton>
                   </template>
                 </OEmptyState>
@@ -1399,7 +1389,7 @@ import { downtimeLink } from "@/utils/downtimes/link";
 import type { MuteActionResult } from "@/utils/downtimes/muteResult";
 import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
+import { useListViewState } from "@/composables/useListViewState";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -1441,7 +1431,6 @@ import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { isAnomalyDataReadinessStatus } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
-import { useUnsavedChanges } from "@/lib/forms/Form/unsavedEdits";
 import { matchesAnyKey, readFilterKeys, toggleFilterKey } from "@/utils/filterKeys";
 import { ALERT_LIST_ALL_FOLDERS, ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import {
@@ -1536,7 +1525,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { t } = useI18nTyped();
-    const { lgUp, smUp } = useBreakpoint();
+    const { lgUp } = useBreakpoint();
 
     // On-call is separately gated, so the column and its lookup vanish with it
     // rather than showing a header nothing can ever fill.
@@ -1574,25 +1563,15 @@ export default defineComponent({
     // Flag to skip clearing search state on the first folder emission after mount.
     // When returning from add/edit screens, the FolderList emits the active folder
     // which would normally clear restored search filters. This flag prevents that.
-    const savedAlertListFilters = useListViewState(
-      "alerts",
-      {
-        searchQuery: "",
-        filterQuery: "",
-        searchAcrossFolders: false,
-        sortBy: "",
-        sortOrder: "asc" as "asc" | "desc",
-        perPage: 20,
-        currentPage: 1,
-      },
-      {
-        url: {
-          filterQuery: LIST_URL_PARAMS.filterQuery,
-          searchQuery: "search",
-          searchAcrossFolders: "all",
-        },
-      },
-    );
+    const savedAlertListFilters = useListViewState("alerts", {
+      searchQuery: "",
+      filterQuery: "",
+      searchAcrossFolders: false,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+      perPage: 20,
+      currentPage: 1,
+    });
     const isRestoringState = ref(
       !!savedAlertListFilters.searchQuery ||
         !!savedAlertListFilters.filterQuery ||
@@ -1932,19 +1911,19 @@ export default defineComponent({
       return s === "failed" ? "!bg-status-error-bg" : s === "paused" ? "!bg-surface-panel" : "";
     };
 
-    // Extreme-left state rail, an inset box-shadow so it paints regardless of border-collapse.
-    // Only the exceptions carry one (C3): a firing, an acknowledged firing, a failure or a pause.
+    // Extreme-left state rail — a full-height colour bar at the very start of the
+    // row (inset box-shadow so it paints regardless of border-collapse). rem width
+    // + token colour keep it theme-aware and hardcode-free.
     const railColor: Record<AlertRailState, string> = {
       failed: "var(--color-error-500)",
       firing: "var(--color-error-500)",
       acknowledged: "var(--color-warning-500)",
       paused: "var(--color-grey-400)",
-      active: "",
+      active: "var(--color-success-500)",
     };
-    const alertRowStyle = (row: any): Record<string, string> => {
-      const color = railColor[alertRailState(row, statusUnavailable.value)];
-      return color ? { boxShadow: `var(--shadow-rail-geom) ${color}` } : {};
-    };
+    const alertRowStyle = (row: any): Record<string, string> => ({
+      boxShadow: `var(--shadow-rail-geom) ${railColor[alertRailState(row, statusUnavailable.value)]}`,
+    });
 
     // Type chip (the "left chip"): glyph + colour by alert type.
     const typeIconName = (row: any): IconName =>
@@ -1983,9 +1962,7 @@ export default defineComponent({
       let recent = 0;
       let error = 0;
       let notify_failed = 0;
-      let anomalies = 0;
       for (const r of rows) {
-        if (r.is_real_time === "anomaly") anomalies += 1;
         // active = unpaused (enabled); paused = disabled. These two partition the
         // rows. `failed` is an orthogonal health overlay (a failed anomaly is still
         // active), so it is counted separately and may overlap with active/paused.
@@ -2008,7 +1985,6 @@ export default defineComponent({
         recent,
         error,
         notify_failed,
-        anomalies,
         total: rows.length,
       };
     });
@@ -2025,8 +2001,17 @@ export default defineComponent({
       const live = (n: number): string | number =>
         statusUnavailable.value || listLoadFailed.value ? "—" : v(n);
       const share = hasData ? c.total : undefined;
-      // Attention first: the firing state, then what went wrong delivering or evaluating it.
-      const items: StatItem[] = [
+      // Severity-descending, matching the Incidents / Eval Jobs strips; Total stays last.
+      return [
+        {
+          key: "failed",
+          label: t("alerts.summaryFailed"),
+          value: v(c.failed),
+          icon: "error-outline",
+          tone: "error",
+          max: share,
+          dataTest: "alert-summary-failed",
+        },
         {
           key: "firing",
           label: t("alerts.summaryFiring"),
@@ -2046,15 +2031,6 @@ export default defineComponent({
           dataTest: "alert-summary-acknowledged",
         },
         {
-          key: "notify_failed",
-          label: t("alerts.summaryDeliveryFailed"),
-          value: live(c.notify_failed),
-          icon: "sync-problem",
-          tone: "warning",
-          max: share,
-          dataTest: "alert-summary-notify-failed",
-        },
-        {
           key: "error",
           label: t("alerts.summaryEvalError"),
           value: live(c.error),
@@ -2063,32 +2039,15 @@ export default defineComponent({
           max: share,
           dataTest: "alert-summary-error",
         },
-      ];
-      // Only anomaly detection trains, so the chip shows where one can fail (or is already picked).
-      if (c.anomalies > 0 || stateFilters.value.includes("failed")) {
-        items.push({
-          key: "failed",
-          label: t("alerts.summaryTrainingFailed"),
-          value: v(c.failed),
-          icon: "error-outline",
+        {
+          key: "notify_failed",
+          label: t("alerts.summaryDeliveryFailed"),
+          value: live(c.notify_failed),
+          icon: "notifications-paused",
           tone: "error",
           max: share,
-          dataTest: "alert-summary-failed",
-        });
-      }
-      // Running is the norm, so it gets no chip of its own (C3); a link that picked it keeps it.
-      if (stateFilters.value.includes("active")) {
-        items.push({
-          key: "active",
-          label: t("alerts.summaryActive"),
-          value: v(c.active),
-          icon: "check-circle",
-          tone: "success",
-          max: share,
-          dataTest: "alert-summary-active",
-        });
-      }
-      items.push(
+          dataTest: "alert-summary-notify-failed",
+        },
         {
           key: "recent",
           label: t("alerts.summaryRecent"),
@@ -2097,6 +2056,15 @@ export default defineComponent({
           tone: "warning",
           max: share,
           dataTest: "alert-summary-recent",
+        },
+        {
+          key: "active",
+          label: t("alerts.summaryActive"),
+          value: v(c.active),
+          icon: "check-circle",
+          tone: "success",
+          max: share,
+          dataTest: "alert-summary-active",
         },
         {
           key: "paused",
@@ -2118,8 +2086,7 @@ export default defineComponent({
           // share of itself is always 100%).
           dataTest: "alert-summary-total",
         },
-      );
-      return items;
+      ];
     });
 
     // ── Stat-tile quick filter ──────────────────────────────────────────────
@@ -2362,12 +2329,12 @@ export default defineComponent({
         {
           id: "last_outcome",
           accessorKey: "last_outcome",
-          header: t("alerts.columnState"),
+          header: t("alerts.lastOutcome"),
           cell: " ",
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 232,
+          size: 176,
           minSize: 130,
           meta: { align: "left" },
         },
@@ -2502,7 +2469,7 @@ export default defineComponent({
           isAction: true,
           sortable: false,
           size: 160,
-          meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+          meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
         },
       ];
 
@@ -2562,28 +2529,6 @@ export default defineComponent({
     const filterQuery = ref<any>(linkedFilter ? "" : savedAlertListFilters.filterQuery || "");
     const searchAcrossFolders = ref<any>(
       urlAllFolders || (!linkedFilter && (savedAlertListFilters.searchAcrossFolders || false)),
-    );
-    // The saved search lives in the URL too, so a link that drops it must clear it there as well.
-    if (linkedFilter) {
-      Object.assign(savedAlertListFilters, {
-        searchQuery: "",
-        filterQuery: "",
-        searchAcrossFolders: urlAllFolders,
-      });
-    }
-    // Back and Forward write the URL's search into the saved view; the search box follows it.
-    watch(
-      () =>
-        [
-          savedAlertListFilters.searchQuery,
-          savedAlertListFilters.filterQuery,
-          savedAlertListFilters.searchAcrossFolders,
-        ] as const,
-      ([search, filter, across]) => {
-        if ((searchQuery.value || "") !== search) searchQuery.value = search;
-        if ((filterQuery.value || "") !== filter) filterQuery.value = filter;
-        if (!!searchAcrossFolders.value !== across) searchAcrossFolders.value = across;
-      },
     );
     if (urlAllFolders) isRestoringState.value = true;
     // The link filters apply once; leaving them in the URL would override the saved search on Back or reload.
@@ -3336,25 +3281,19 @@ export default defineComponent({
           loading.value = false;
           return;
         }
-        // Push before anything clears: the debounced URL write would otherwise land on the previous entry and strip its search.
-        const {
-          "v.search": _s,
-          "v.all": _a,
-          "v.q": _q,
-          "v.page": _p,
-          ...carried
-        } = router.currentRoute.value.query;
-        router.push({
-          name: "alertList",
-          query: {
-            ...carried,
-            org_identifier: store.state.selectedOrganization.identifier,
-            folder: newVal,
-          },
-        });
         // A folder switch starts a new list; the page persisted for the previous folder must not be restored onto it.
         currentPage.value = 1;
         await getAlertsByFolderId(store, newVal);
+        if (router.currentRoute.value.query.folder != newVal) {
+          router.push({
+            name: "alertList",
+            query: {
+              ...router.currentRoute.value.query,
+              org_identifier: store.state.selectedOrganization.identifier,
+              folder: activeFolderId.value,
+            },
+          });
+        }
         filterAlertsByTab();
       },
     );
@@ -3551,16 +3490,16 @@ export default defineComponent({
       showAddAlertDialog.value = true;
     };
 
-    // A stray dismiss asks before dropping an edit (V5); the folder picker settling after open is none.
-    const { dirty: isCloneFormChanged } = useUnsavedChanges(
-      () => [
+    // The clone form as it opened, so a stray dismiss asks before dropping an edit (V5).
+    const cloneFormState = () =>
+      JSON.stringify([
         toBeCloneAlertName.value,
         toBeClonestreamType.value,
         toBeClonestreamName.value,
         folderIdToBeCloned.value,
-      ],
-      () => showForm.value,
-    );
+      ]);
+    const cloneOpenedWith = ref("");
+    const isCloneFormChanged = computed(() => cloneFormState() !== cloneOpenedWith.value);
 
     const duplicateAlert = async (row: any) => {
       if (anomalyRowLocked(row)) return;
@@ -3596,6 +3535,7 @@ export default defineComponent({
       const request = ++cloneSourceRequest;
       toBeClonedAlert.value = null;
       isCloneSourceLoading.value = needsSource;
+      cloneOpenedWith.value = cloneFormState();
       showForm.value = true;
       // Load the stream-name options for the pre-filled stream type so the
       // dialog's dropdown reflects it instead of showing an empty list. A
@@ -4376,8 +4316,6 @@ export default defineComponent({
         await getAlertsByFolderId(store, newVal);
         filterAlertsByTab();
       }
-      // A folder the URL already names came from Back or Forward, and the URL restores its search too.
-      if (newVal == router.currentRoute.value.query.folder) isRestoringState.value = true;
       // When restoring state from a prior navigation, skip clearing search filters
       if (isRestoringState.value) {
         isRestoringState.value = false;
@@ -4541,8 +4479,10 @@ export default defineComponent({
       selectedAlerts.value = [];
       allSelectedAlerts.value = false;
       if (newVal) {
-        // Back restores both fields at once; an empty filter must not wipe the restored search.
-        if (filterQuery.value) searchQuery.value = filterQuery.value;
+        //here we are setting the searchQuery to null and then setting the filterQuery to the searchQuery
+        //this is done because we want to clear the searchQuery and then set the filterQuery to the searchQuery
+        searchQuery.value = null;
+        searchQuery.value = filterQuery.value;
         filterQuery.value = null;
         // An empty term never reaches the searchQuery watcher, so the widened list is loaded here.
         if (!searchQuery.value) void getAlertsByFolderId(store, activeFolderId.value);
@@ -5150,8 +5090,6 @@ export default defineComponent({
       isMutedFiring,
       isAnomalyDataReadinessStatus,
       isAckedFiring,
-      isFiringListRow,
-      isNotifyFailedOutcome,
       canAcknowledgeRow,
       acknowledgeRow,
       isAlertScopedMute,
@@ -5237,7 +5175,6 @@ export default defineComponent({
       bulkDeleteLoading,
       config,
       isCompactToolbar,
-      smUp,
       isAnomalyDetectionEnabled,
       anomalyLicenseLocked,
       anomalyLockedReason,

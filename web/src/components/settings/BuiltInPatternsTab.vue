@@ -48,11 +48,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div v-if="loading && patterns.length === 0" class="p-3">
-      <OSkeleton preset="tableRows" :rows="8" />
+    <!-- Loading State -->
+    <div v-if="loading && patterns.length === 0" class="p-6 text-center">
+      <OSpinner size="lg" />
+      <div class="mt-3">{{ t("regex_patterns.loading_patterns") }}</div>
     </div>
 
-    <OEmptyState v-else-if="error" kind="error" @action="() => fetchPatterns()" />
+    <!-- Error State -->
+    <div v-else-if="error" class="p-6 text-center">
+      <OIcon name="error" style="width: 3.125rem; height: 3.125rem" />
+      <div class="text-status-error-text mt-3">{{ error }}</div>
+      <span class="mt-2">
+        <OButton variant="accent-ghost" @click="() => fetchPatterns()">
+          {{ t("regex_patterns.try_again") }}
+        </OButton>
+      </span>
+    </div>
 
     <!-- Patterns List -->
     <div v-else class="patterns-list min-h-0 flex-1 overflow-y-auto">
@@ -120,13 +131,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </li>
 
-          <li v-if="filteredPatterns.length === 0">
-            <OEmptyState
-              v-if="searchQuery || selectedTags.length"
-              kind="filtered"
-              @action="((searchQuery = ''), (selectedTags = []))"
-            />
-            <OEmptyState v-else :title="t('regex_patterns.no_patterns_found')" />
+          <li v-if="filteredPatterns.length === 0" class="flex items-center px-3 py-2">
+            <div class="text-text-muted flex min-w-0 flex-1 flex-col text-center">
+              <div class="p-6">
+                <OIcon name="search-off" style="width: 3.125rem; height: 3.125rem" />
+                <div class="mt-3">
+                  {{ t("regex_patterns.no_patterns_found") }}
+                </div>
+              </div>
+            </div>
           </li>
         </ul>
       </div>
@@ -145,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div style="max-height: 60vh" class="overflow-y-auto">
         <div class="mb-3">
-          <div class="mb-1 font-semibold">
+          <div class="mb-1 font-bold">
             {{ t("regex_patterns.description") }}
           </div>
           <div>
@@ -154,12 +167,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="mb-3">
-          <div class="mb-1 font-semibold">{{ t("regex_patterns.pattern") }}</div>
+          <div class="mb-1 font-bold">{{ t("regex_patterns.pattern") }}</div>
           <OTextarea :model-value="previewedPattern?.pattern" readonly :rows="3" />
         </div>
 
         <div class="mb-3">
-          <div class="mb-1 font-semibold">{{ t("regex_patterns.tags") }}</div>
+          <div class="mb-1 font-bold">{{ t("regex_patterns.tags") }}</div>
           <div class="flex flex-wrap gap-2">
             <OTag
               v-for="tag in previewedPattern?.tags"
@@ -173,12 +186,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="mb-3">
-          <div class="mb-1 font-semibold">{{ t("regex_patterns.rarity") }}</div>
+          <div class="mb-1 font-bold">{{ t("regex_patterns.rarity") }}</div>
           <div>{{ previewedPattern?.rarity }}</div>
         </div>
 
         <div v-if="(previewedPattern?.examples?.Valid?.length ?? 0) > 0" class="mb-3">
-          <div class="mb-1 font-semibold">
+          <div class="mb-1 font-bold">
             {{ t("regex_patterns.valid_examples") }}
           </div>
           <ul class="divide-border rounded-default flex flex-col divide-y border">
@@ -214,8 +227,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -247,8 +259,7 @@ export default defineComponent({
     OButton,
     ORefreshButton,
     ODialog,
-    OSkeleton,
-    OEmptyState,
+    OSpinner,
     OIcon,
     OTag,
     OSelect,

@@ -177,7 +177,7 @@ const { t } = useI18nTyped();
   transform: translateX(-50%);
   width: 0.125rem;
   background-color: transparent;
-  transition: background-color var(--duration-control) var(--ease-control);
+  transition: background-color 0.3s;
 }
 
 .field-list-separator:hover::after {

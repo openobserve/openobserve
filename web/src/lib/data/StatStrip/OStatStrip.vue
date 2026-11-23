@@ -62,7 +62,7 @@ const props = withDefaults(
     resetKey?: string | number | null;
     /** Default for every item's `compactValue` (an item's own setting wins). */
     compactValues?: boolean;
-    /** Puts each label under its value; on an `inline` strip it is the R4 KPI look. */
+    /** Puts each label under its value, for strips too narrow to fit them side by side. */
     stacked?: boolean;
   }>(),
   {
@@ -134,11 +134,6 @@ const flat = computed(
   () => chipStrip.value || (!props.selectable && (props.inline || isRow.value)),
 );
 
-// R4: a read-only strip on its own row is the page's KPI strip, so its values read large.
-const kpiRow = computed(() => isRow.value && !chipMode.value && !props.inline);
-// An inline strip that sits on its own line asks for the same R4 look with `stacked`.
-const kpiStacked = computed(() => kpiRow.value || (props.stacked && !chipMode.value));
-
 const rootRef = ref<HTMLElement | null>(null);
 const scrollRef = ref<HTMLElement | null>(null);
 
@@ -169,7 +164,7 @@ const rootClass = computed(() => {
     return `shrink grow-0 gap-y-1.5 max-md:flex-wrap ${place}`;
   }
   // Filter rows keep the chip height whether or not chips show, so one appearing never shifts the table.
-  const height = chipMode.value ? "min-h-12 py-2" : kpiRow.value ? "py-3" : "py-1.5";
+  const height = chipStrip.value ? "min-h-12 py-2" : "py-1.5";
   return `px-page-edge border-border-default gap-y-1.5 border-b max-md:flex-wrap ${height}`;
 });
 
@@ -310,20 +305,19 @@ const clear = () => {
     <div
       v-if="kpiItems.length"
       class="flex min-w-0 items-center max-md:flex-wrap max-md:gap-y-1"
-      :class="[chipItems.length ? 'max-md:w-full' : '', kpiStacked ? 'gap-x-6' : '']"
+      :class="chipItems.length ? 'max-md:w-full' : ''"
       data-test="o-stat-strip-kpis"
     >
       <template v-for="(item, index) in kpiItems" :key="item.key">
         <span
-          v-if="index > 0 && !kpiStacked"
+          v-if="index > 0"
           class="bg-border-default h-4 w-px shrink-0"
           aria-hidden="true"
           data-test="o-stat-strip-divider"
         />
         <OStatCard
           variant="kpi"
-          :stacked="kpiStacked"
-          :class="kpiStacked ? '' : index === 0 ? 'pe-3.5' : 'px-3.5 max-md:px-2.5'"
+          :class="index === 0 ? 'pe-3.5' : 'px-3.5 max-md:px-2.5'"
           :label="item.label"
           :value="item.value"
           :sub="item.sub"

@@ -3,7 +3,7 @@ import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import enLocale from "@/locales/languages/en-US.json";
 import ORefreshButton from "./ORefreshButton.vue";
-import { AUTO_REFRESH_INTERVALS } from "@/utils/dashboard/autoRefresh";
+import { AUTO_REFRESH_INTERVALS } from "./ORefreshButton.types";
 import { raw } from "@/types/i18n";
 
 const i18n = createI18n({ locale: "en", legacy: false, messages: { en: enLocale } });
@@ -16,12 +16,11 @@ const stubs = {
   },
   ODropdown: { template: "<div data-stub-dropdown><slot name='trigger' /><slot /></div>" },
   ODropdownGroup: { props: ["label"], template: "<div :data-label='label'><slot /></div>" },
-  ODropdownSeparator: { template: "<hr />" },
   ODropdownItem: {
     emits: ["select"],
-    props: ["checked", "disabled"],
+    props: ["checked"],
     template:
-      "<div role='menuitem' :aria-checked='checked' :aria-disabled='disabled' @click=\"$emit('select')\"><slot /><slot name='end' /></div>",
+      "<div role='menuitem' :aria-checked='checked' @click=\"$emit('select')\"><slot /><slot name='end' /></div>",
   },
 };
 const global = { stubs, plugins: [i18n] };
@@ -39,55 +38,11 @@ describe("ORefreshButton", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("says why it is disabled instead of its usual tooltip", () => {
-    const wrapper = mountButton({ disabled: true, disabledReason: raw("Pick a stream first") });
-    expect(button(wrapper).attributes("aria-disabled")).toBe("true");
-    expect(wrapper.text()).toContain("Pick a stream first");
-    expect(wrapper.text()).not.toContain("Not yet refreshed");
-  });
-
-  it("shows a pending label in place of the age and turns primary", () => {
-    const wrapper = mountButton({ lastRunAt: now, pendingLabel: raw("Apply") });
-    expect(button(wrapper).text()).toContain("Apply");
-    expect(button(wrapper).attributes("aria-label")).toBe("Apply");
-  });
-
-  it("renders the menu slot under the intervals", () => {
-    const wrapper = mount(ORefreshButton, {
-      props: { autoRefresh: 0 },
-      slots: { menu: "<div data-test='extra'>More</div>" },
-      global,
-    });
-    expect(wrapper.find("[data-test='extra']").exists()).toBe(true);
-  });
-
-  it("is one bordered md button labelled Refresh before the first load", () => {
+  it("is one secondary md button with the refresh glyph", () => {
     const wrapper = mountButton();
     expect(button(wrapper).attributes("data-o2-variant")).toBe("secondary");
     expect(button(wrapper).classes()).toContain("h-control-md");
     expect(button(wrapper).attributes("aria-label")).toBe("Refresh");
-    expect(wrapper.get('[data-test="refresh-button-age"]').text()).toBe("Refresh");
-  });
-
-  it("stays the same bordered button once it shows the data age", () => {
-    const wrapper = mountButton({ lastRunAt: now - 2 * 60_000 });
-    expect(button(wrapper).attributes("data-o2-variant")).toBe("secondary");
-    expect(wrapper.get('[data-test="refresh-button-age"]').text()).toBe("2m ago");
-  });
-
-  it("reserves the widest steady label, so loading and the first age keep one width", () => {
-    const sizers = mountButton()
-      .get('[data-test="refresh-button-label"]')
-      .findAll(".invisible")
-      .map((s) => s.text());
-    expect(sizers).toEqual(["Refreshing", "just now"]);
-  });
-
-  it("keeps the auto-refresh segment bordered like the button it joins", () => {
-    const bare = mountButton({ autoRefresh: 0 });
-    expect(bare.get('[data-test="refresh-button-auto-menu"]').attributes("data-o2-variant")).toBe(
-      "secondary",
-    );
   });
 
   it("sits at sm in a panel header", () => {
@@ -98,19 +53,15 @@ describe("ORefreshButton", () => {
     const wrapper = mountButton({ lastRunAt: now - 120_000 });
     const age = wrapper.get('[data-test="refresh-button-age"]');
     expect(age.text()).toBe("2m ago");
-    expect(wrapper.get('[data-test="refresh-button-label"]').classes()).toContain("max-lg:hidden");
+    expect(age.classes()).toContain("max-lg:hidden");
     expect(age.classes()).toContain("tabular-nums");
     expect(button(wrapper).attributes("aria-label")).toBe("Refresh, last refreshed 2m ago");
   });
 
-  it("says it has not refreshed yet before the first run", () => {
+  it("renders no age before the first run", () => {
     const wrapper = mountButton();
+    expect(wrapper.find('[data-test="refresh-button-age"]').exists()).toBe(false);
     expect(wrapper.get("[data-stub-tooltip]").text()).toBe("Not yet refreshed");
-  });
-
-  it("reads Refreshing while the first load runs", () => {
-    const wrapper = mountButton({ loading: true });
-    expect(wrapper.get('[data-test="refresh-button-age"]').text()).toBe("Refreshing");
   });
 
   it("re-evaluates the age as time passes", async () => {
@@ -168,84 +119,37 @@ describe("ORefreshButton", () => {
       expect(mountButton().find('[data-test="refresh-button-auto-menu"]').exists()).toBe(false);
     });
 
-    it("offers Off and the app's intervals by default, ticking the current one", () => {
-      const wrapper = mountButton({ autoRefresh: 30, minInterval: 0 });
+    it("offers Off and the five intervals, ticking the current one", () => {
+      const wrapper = mountButton({ autoRefresh: "30s" });
       const items = wrapper.findAll("[role='menuitem']");
       expect(items.map((item) => item.text())).toEqual([
         "Off",
-        "5 sec",
-        "10 sec",
-        "15 sec",
-        "30 sec",
-        "1 min",
-        "5 min",
-        "15 min",
-        "30 min",
-        "1 hr",
-        "2 hr",
-        "1 day",
+        "Every 10 s",
+        "Every 30 s",
+        "Every 1 min",
+        "Every 5 min",
+        "Every 15 min",
       ]);
-      expect(items).toHaveLength(AUTO_REFRESH_INTERVALS.length + 1);
-      expect(wrapper.get('[data-test="refresh-button-auto-30"]').attributes("aria-checked")).toBe(
-        "true",
-      );
-      expect(wrapper.get('[data-test="refresh-button-auto-0"]').attributes("aria-checked")).toBe(
+      expect(items.map((item) => item.attributes("aria-checked"))).toEqual([
         "false",
-      );
-    });
-
-    it("takes a page's own interval list", () => {
-      const wrapper = mountButton({ autoRefresh: 0, intervals: [60, 300], minInterval: 0 });
-      expect(wrapper.findAll("[role='menuitem']").map((item) => item.text())).toEqual([
-        "Off",
-        "1 min",
-        "5 min",
+        "false",
+        "true",
+        "false",
+        "false",
+        "false",
       ]);
+      expect(items).toHaveLength(AUTO_REFRESH_INTERVALS.length);
     });
 
-    it("disables intervals under the minimum and says why", () => {
-      const wrapper = mountButton({ autoRefresh: 0, minInterval: 30 });
-      expect(wrapper.get('[data-test="refresh-button-auto-15"]').attributes("aria-disabled")).toBe(
-        "true",
-      );
-      expect(
-        wrapper.get('[data-test="refresh-button-auto-30"]').attributes("aria-disabled"),
-      ).not.toBe("true");
-      expect(wrapper.get('[data-test="refresh-button-auto-note"]').text()).toContain("30 seconds");
-    });
-
-    it("defaults the minimum to the server's when the store publishes one", () => {
-      const wrapper = mount(ORefreshButton, {
-        props: { autoRefresh: 0 },
-        global: {
-          ...global,
-          provide: { store: { state: { zoConfig: { min_auto_refresh_interval: 60 } } } },
-        },
-      });
-      expect(wrapper.get('[data-test="refresh-button-auto-30"]').attributes("aria-disabled")).toBe(
-        "true",
-      );
-      expect(
-        wrapper.get('[data-test="refresh-button-auto-60"]').attributes("aria-disabled"),
-      ).not.toBe("true");
-    });
-
-    it("shows the page's note under the intervals", () => {
-      const wrapper = mountButton({ autoRefresh: 0, autoRefreshNote: raw("Relative ranges only") });
-      expect(wrapper.get('[data-test="refresh-button-auto-note"]').text()).toBe(
-        "Relative ranges only",
-      );
-    });
-
-    it("emits the chosen interval in seconds", async () => {
-      const wrapper = mountButton({ autoRefresh: 0, minInterval: 0 });
-      await wrapper.get('[data-test="refresh-button-auto-60"]').trigger("click");
-      expect(wrapper.emitted("update:autoRefresh")?.[0]).toEqual([60]);
+    it("emits the chosen interval", async () => {
+      const wrapper = mountButton({ autoRefresh: "off" });
+      await wrapper.findAll("[role='menuitem']")[3].trigger("click");
+      expect(wrapper.emitted("update:autoRefresh")?.[0]).toEqual(["1m"]);
     });
 
     it("labels the button Auto with the interval while auto-refresh is on", () => {
-      const wrapper = mountButton({ autoRefresh: 30, lastRunAt: now });
-      expect(wrapper.get('[data-test="refresh-button-auto"]').text()).toBe("Auto · 30s");
+      const wrapper = mountButton({ autoRefresh: "30s", lastRunAt: now });
+      expect(wrapper.get('[data-test="refresh-button-auto"]').text()).toBe("Auto · 30 s");
       expect(wrapper.find('[data-test="refresh-button-age"]').exists()).toBe(false);
     });
   });

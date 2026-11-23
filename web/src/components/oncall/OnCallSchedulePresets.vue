@@ -265,6 +265,7 @@
         <span v-if="growable" class="flex items-center gap-2 self-start">
           <OButton
             variant="secondary"
+            icon="add"
             :disabled="atLimit"
             :data-test="`oncall-preset-group-add-${growable.field}`"
             @click="addGroup(growable)"

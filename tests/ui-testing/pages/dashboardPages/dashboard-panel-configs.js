@@ -590,8 +590,8 @@ export default class DashboardPanelConfigs {
     await this._clickVirtualOption("dashboard-config-unit", unit);
   }
 
-  // ========== Unit select — the "Other locale" group of per-locale Locale Format units ==========
-  // The locale options nest under a non-selectable "Other locale" expander row, so they
+  // ========== Unit select — the "Other Locale" group of per-locale Locale Format units ==========
+  // The locale options nest under a non-selectable "Other Locale" expander row, so they
   // only exist in the DOM while that row is expanded or a search is flattening the list.
 
   /** Trigger of a unit OSelect; carries the saved unit in data-test-selected-value. */
@@ -599,7 +599,7 @@ export default class DashboardPanelConfigs {
     return this.page.locator(`[data-test="${parentDataTest}-trigger"]`);
   }
 
-  /** The non-selectable "Other locale" expander row of a unit OSelect. */
+  /** The non-selectable "Other Locale" expander row of a unit OSelect. */
   getLocaleGroupRow(parentDataTest = "dashboard-config-unit") {
     return this.page.locator(
       `[data-test="${parentDataTest}-expand"][data-test-value="other-locale"]`
@@ -620,7 +620,7 @@ export default class DashboardPanelConfigs {
     );
   }
 
-  /** Expand/collapse the "Other locale" row and wait for its new aria-expanded state. */
+  /** Expand/collapse the "Other Locale" row and wait for its new aria-expanded state. */
   async toggleLocaleGroup(parentDataTest = "dashboard-config-unit") {
     const row = this.getLocaleGroupRow(parentDataTest);
     await row.waitFor({ state: "visible", timeout: 10000 });
@@ -1883,7 +1883,7 @@ export default class DashboardPanelConfigs {
     return this.columnOrderRow(index).locator('[data-test="dashboard-column-order-column-number"]');
   }
 
-  /** Opens the column order dialog via the "Configure column order" button in the config sidebar. */
+  /** Opens the column order dialog via the "Configure Column Order" button in the config sidebar. */
   async openColumnOrderDialog() {
     await this.scrollSidebarToElement(this.columnOrderBtn);
     await this.columnOrderBtn.click();

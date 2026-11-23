@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="add" size="sm" />
         {{ t("dashboard.seriesFormattingAddSeries") }}
       </button>
-      <OButton v-else variant="primary" :data-test="`${dataTest}-trigger`">
+      <OButton v-else variant="primary" icon="add" :data-test="`${dataTest}-trigger`">
         {{ t("dashboard.seriesFormattingAddSeries") }}
       </OButton>
     </template>

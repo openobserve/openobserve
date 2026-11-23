@@ -89,7 +89,7 @@ describe("OSelect expandable rows", () => {
     await open({ modelValue: "bytes" });
     const row = expandRow()!;
     expect(row.classList.contains("text-select-item-text")).toBe(true);
-    expect(row.classList.contains("font-semibold")).toBe(false);
+    expect(row.classList.contains("font-bold")).toBe(false);
     expect(row.classList.contains("bg-surface-subtle")).toBe(false);
     expect(row.firstElementChild?.textContent?.trim()).toBe("Other Locale");
     expect(row.lastElementChild).not.toBe(row.firstElementChild);

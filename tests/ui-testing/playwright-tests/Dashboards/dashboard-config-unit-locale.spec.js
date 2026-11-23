@@ -50,7 +50,7 @@ test.describe("ConfigPanel — Locale Format unit per panel and column", () => {
     await ingestion(page);
   });
 
-  test('"Other locale" is an expander, not a unit: it toggles the locale list open and closed without changing the selection', async ({
+  test('"Other Locale" is an expander, not a unit: it toggles the locale list open and closed without changing the selection', async ({
     page,
   }) => {
     const pm = new PageManager(page);
@@ -198,7 +198,7 @@ test.describe("ConfigPanel — Locale Format unit per panel and column", () => {
 
     await setupTablePanelWithConfig(page, pm, dashboardName);
 
-    await pm.dashboardPanelConfigs.selectUnit("Locale format (auto)");
+    await pm.dashboardPanelConfigs.selectUnit("Locale Format (Auto)");
     await pm.dashboardPanelActions.applyDashboardBtn();
     const autoText = await readValueCell(page);
     testLogger.info("Locale Format (Auto) rendering", { autoText });
@@ -233,7 +233,7 @@ test.describe("ConfigPanel — Locale Format unit per panel and column", () => {
     // shows under the default "auto" field type — no field_type override needed.
     await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
-    await pm.dashboardPanelConfigs.selectUnit("Locale format (auto)");
+    await pm.dashboardPanelConfigs.selectUnit("Locale Format (Auto)");
     await pm.dashboardPanelActions.applyDashboardBtn();
     const autoText = await readValueCell(page);
     testLogger.info("Measure column under the panel's Auto locale", { autoText });

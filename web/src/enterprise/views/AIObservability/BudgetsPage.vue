@@ -27,9 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @date-change="onDateStateChange"
     @refresh="reload"
   >
-    <!-- The gutter goes on the rows that need it, so the table keeps its own edge inset (L3). -->
-    <div class="flex min-h-0 flex-1 flex-col gap-2 py-2">
-      <div class="px-page-edge flex items-center gap-2">
+    <div class="px-page-edge flex min-h-0 flex-1 flex-col gap-2 py-2">
+      <div class="flex items-center gap-2">
         <OSelect
           v-model="stream"
           :options="availableStreams.map((s) => ({ value: s, label: raw(s) }))"
@@ -42,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-2xs text-text-secondary flex-1">{{ t("aiBudgets.signalNote") }}</span>
         <OButton
           variant="primary"
+          icon="add"
           :disabled="noStream || !!forbidden"
           data-test="ai-budgets-new"
           @click="openNew"
@@ -51,22 +51,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Spend is read from an LLM trace stream; without one nothing can be budgeted. -->
-      <OInlineNotice
-        v-if="noStream"
-        tone="info"
-        class="mx-page-edge"
-        data-test="ai-budgets-no-stream"
-      >
+      <OInlineNotice v-if="noStream" tone="info" data-test="ai-budgets-no-stream">
         {{ t("aiBudgets.noStream") }}
       </OInlineNotice>
 
       <!-- One compact line, as the page's other notes: the message, then its action. -->
-      <OInlineNotice
-        v-if="unpricedTraces > 0"
-        tone="warn"
-        class="mx-page-edge"
-        data-test="ai-budgets-unpriced"
-      >
+      <OInlineNotice v-if="unpricedTraces > 0" tone="warn" data-test="ai-budgets-unpriced">
         {{ t("aiBudgets.unpriced", { n: unpricedTraces }, unpricedTraces) }}
         <template #actions>
           <OButton
@@ -164,7 +154,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODialog
       v-model:open="dialogOpen"
-      :dirty="draftChanged"
       size="md"
       :title="editing ? t('aiBudgets.edit') : t('aiBudgets.new')"
       :primary="{
@@ -261,7 +250,6 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import { useUnsavedChanges } from "@/lib/forms/Form/unsavedEdits";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -356,11 +344,6 @@ const blankDraft = (): BudgetDef => ({
 });
 // `stream` is the budget's: the page's stream for a new one, its own when edited.
 const draft = reactive<BudgetDef>(blankDraft());
-// A stray dismiss asks before dropping a typed budget (V5).
-const { dirty: draftChanged } = useUnsavedChanges(
-  () => [draft, destination.value],
-  () => dialogOpen.value,
-);
 
 const destinationOptions = computed(() =>
   destinations.value.map((d) => ({ value: d, label: raw(d) })),

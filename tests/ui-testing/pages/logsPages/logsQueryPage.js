@@ -20,11 +20,9 @@ export class LogsQueryPage {
     // OSwitch states explicitly to avoid the strict-mode collision.
     this.histogramToggleCheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="checked"]';
     this.histogramToggleUncheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="unchecked"]';
-    // The toolbar's "Filter | SQL" tray; each segment carries data-state="on|off" itself.
-    this.sqlModeToggle = '[data-test="logs-search-bar-query-mode-sql"]';
-    this.filterModeToggle = '[data-test="logs-search-bar-query-mode-filter"]';
-    this.sqlModeToggleCheckedBtn = '[data-test="logs-search-bar-query-mode-sql"][data-state="on"]';
-    this.sqlModeToggleUncheckedBtn = '[data-test="logs-search-bar-query-mode-sql"][data-state="off"]';
+    this.sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
+    this.sqlModeToggleCheckedBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state="checked"]';
+    this.sqlModeToggleUncheckedBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state="unchecked"]';
     this.autoRunDropdownBtn = '[data-test="logs-search-bar-refresh-btn"] ~ button';
     this.autoRunToggleItem = '[data-test="logs-search-bar-live-mode-toggle-btn"]';
     this._autoQueryEnabledCache = undefined;
@@ -122,7 +120,8 @@ export class LogsQueryPage {
   }
 
   async toggleHistogram() {
-    // The ⋯ item, or the toolbar copy when the user pinned it.
+    // In normal viewport the histogram is a standalone toolbar button (inline).
+    // In narrow viewport it moves into the More menu.
     await this.page.keyboard.press('Escape').catch(() => {});
     const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
     const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
@@ -130,6 +129,7 @@ export class LogsQueryPage {
       await inlineBtn.click();
       return;
     }
+    // Narrow-viewport fallback: open utilities menu and click the menu item.
     await this.page.locator(this.utilitiesMenuButton).click();
     const histogramMenuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
     await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
@@ -137,13 +137,16 @@ export class LogsQueryPage {
   }
 
   async isHistogramOn() {
-    // A pinned toolbar copy reports aria-pressed; otherwise read the ⋯ item's switch.
+    // In normal viewport the histogram is a standalone inline toolbar button.
+    // Check its OSwitch state directly without opening the More menu.
     await this.page.keyboard.press('Escape').catch(() => {});
     const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
     const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
     if (isInline) {
-      return (await inlineBtn.getAttribute('aria-pressed')) === 'true';
+      const switchChecked = inlineBtn.locator('[data-state="checked"]');
+      return (await switchChecked.count()) > 0;
     }
+    // Narrow-viewport fallback: check state via the More menu item.
     await this.page.locator(this.utilitiesMenuButton).click();
     const histogramMenuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
     await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
@@ -160,32 +163,15 @@ export class LogsQueryPage {
     }
   }
 
-  /** SQL mode now lives in the toolbar's "Filter | SQL" tray, not the utilities menu. */
+  /** SQL mode toggle was removed from the UI — no-op, always returns false. */
   async _openUtilitiesMenuForSqlMode() {
+    // SQL mode is now auto-detected from query content (SELECT...FROM = SQL ON, else OFF).
+    // There is no longer a dedicated SQL mode toggle button in the utilities menu.
     return false;
   }
 
-  /**
-   * Switches the query language through the tray, clicking only when the mode differs.
-   * @returns {Promise<boolean>} false when the tray is not on screen (callers then type the query)
-   */
-  async _setQueryMode(sql) {
-    const sqlSegment = this.page.locator(this.sqlModeToggle);
-    if (!(await sqlSegment.isVisible({ timeout: 3000 }).catch(() => false))) return false;
-    const isSql = (await sqlSegment.getAttribute('data-state')) === 'on';
-    if (isSql !== sql) {
-      await this.page.locator(sql ? this.sqlModeToggle : this.filterModeToggle).click();
-      await expect(sqlSegment).toHaveAttribute('data-state', sql ? 'on' : 'off', { timeout: 10000 });
-    }
-    return true;
-  }
-
   async isSQLModeOn() {
-    const sqlSegment = this.page.locator(this.sqlModeToggle);
-    if (await sqlSegment.isVisible({ timeout: 2000 }).catch(() => false)) {
-      return (await sqlSegment.getAttribute('data-state')) === 'on';
-    }
-    // Tray folded into ⋯ on a narrow window: fall back to the editor text.
+    // SQL mode is auto-detected: if the Monaco editor contains SELECT...FROM, SQL mode is ON.
     const text = await this.page.evaluate((selector) => {
       const host = document.querySelector(selector);
       if (!host) return null;
@@ -202,13 +188,15 @@ export class LogsQueryPage {
   }
 
   async ensureSQLMode() {
-    const switched = await this._setQueryMode(true);
-    testLogger.info('ensureSQLMode: ' + (switched ? 'SQL selected in the query mode tray' : 'tray not shown; the next query decides'));
+    // SQL mode toggle removed from UI. SQL mode is auto-detected from SELECT...FROM in query.
+    // Callers that need SQL mode should set a SELECT query via the editor after this call.
+    testLogger.info('ensureSQLMode: SQL mode toggle removed — SQL mode is auto-detected from query content');
   }
 
   async ensureFTSMode() {
-    const switched = await this._setQueryMode(false);
-    testLogger.info('ensureFTSMode: ' + (switched ? 'Filter selected in the query mode tray' : 'tray not shown; the next query decides'));
+    // SQL mode toggle removed from UI. SQL mode is auto-detected from SELECT...FROM in query.
+    // Callers that need FTS mode should set a non-SELECT query via the editor after this call.
+    testLogger.info('ensureFTSMode: SQL mode toggle removed — SQL mode is auto-detected from query content');
   }
 
   async _isAutoQueryEnabled() {

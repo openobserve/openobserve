@@ -439,7 +439,7 @@ const rcaHtml = computed(() => {
   const issue = props.issue;
   if (!issue) return "";
   const h2 = (text: string) =>
-    `<div class="rca-h2 font-semibold text-lg mt-5 mb-3 rca-section-bg px-4 py-3 rounded-default border-s-4">${escapeHtml(text)}</div>`;
+    `<div class="rca-h2 font-bold text-lg mt-5 mb-3 rca-section-bg px-4 py-3 rounded-default border-s-4">${escapeHtml(text)}</div>`;
   const p = (text: string) => `<p class="mb-3">${escapeHtml(text)}</p>`;
   const evidence = issue.evidence
     .map(

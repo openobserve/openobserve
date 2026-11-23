@@ -466,8 +466,8 @@ describe("BrowserJourneyStep", () => {
 
       const errorCard = wrapper.find('[data-test="synthetics-journey-step-error-card"]');
       expect(errorCard.exists()).toBe(true);
-      // Component maps 'TimeoutError' name to human label 'Timeout error'
-      expect(errorCard.text()).toContain("Timeout error");
+      // Component maps 'TimeoutError' name to human label 'Timeout Error'
+      expect(errorCard.text()).toContain("Timeout Error");
       expect(errorCard.text()).toContain("Timeout 30000ms exceeded");
     });
 

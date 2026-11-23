@@ -133,7 +133,7 @@ test.describe('IAM · Edit Role · wider scope', { tag: '@enterprise' }, () => {
         await openWith(page, 'every', [{ object: obj('stream'), permission: 'AllowAll' }]);
         await pm.rolesPage.openModule('stream');
 
-        // All four stream types sit under "Every stream"; each must read as covered
+        // All four stream types sit under "Every Stream"; each must read as covered
         // AND be refused direct edits, or the user can create a contradiction.
         for (const key of ['logs', 'metrics', 'traces', 'index']) {
             const box = pm.rolesPage.scopeCheckbox(key, 'AllowAll');

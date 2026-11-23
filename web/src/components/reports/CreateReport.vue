@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="my-3 w-256 px-4 max-md:max-w-full max-md:[&_[style*=width]]:max-w-full"
         >
           <OForm :id="formId" :form="form" class="create-report-form">
-            <div class="flex items-start gap-4 max-md:flex-wrap">
+            <div class="flex items-start gap-4 px-2 pt-3 max-md:flex-wrap">
               <div data-test="add-report-name-input" class="o2-input">
                 <OFormInput
                   data-test="add-report-name-input"
@@ -63,7 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div data-test="add-report-description-input" class="report-name-input o2-input pt-4">
+            <div
+              data-test="add-report-description-input"
+              class="report-name-input o2-input px-2 pt-3"
+            >
               <OFormInput
                 data-test="add-report-description-input"
                 name="description"
@@ -190,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="mt-3 w-full" data-test="add-report-format-section">
                       <div
                         style="font-size: var(--text-sm)"
-                        class="text-text-secondary mb-2 font-semibold"
+                        class="text-text-secondary mb-2 font-bold"
                       >
                         {{ t("reports.reportFormat") }}
                       </div>
@@ -260,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="sm"
                             class="me-1"
                           />
-                          <span class="text-text-secondary font-semibold">{{
+                          <span class="text-text-secondary font-bold">{{
                             t("reports.customDimensions")
                           }}</span>
                         </div>
@@ -329,10 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mt-3"
               >
                 <div class="my-2 px-2">
-                  <div
-                    style="font-size: var(--text-sm)"
-                    class="text-text-secondary mb-2 font-semibold"
-                  >
+                  <div style="font-size: var(--text-sm)" class="text-text-secondary mb-2 font-bold">
                     {{ t("reports.frequency") }}
                   </div>
                   <OFormToggleGroup
@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="o2-input me-2 pt-0"
                         style="width: 20rem"
                       >
-                        <div class="text-text-secondary mb-1 font-semibold">
+                        <div class="text-text-secondary mb-1 font-bold">
                           {{ t("reports.cronExpression") + " *" }}
                           <OIcon name="info" size="sm" class="text-text-muted ms-1 cursor-pointer">
                             <OTooltip side="right">
@@ -538,10 +538,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                   <div data-test="add-report-share-message-section" class="pt-3">
-                    <div
-                      style="font-size: var(--text-sm)"
-                      class="text-text-secondary font-semibold"
-                    >
+                    <div style="font-size: var(--text-sm)" class="text-text-secondary font-bold">
                       {{ t("reports.messageLabel") }}
                     </div>
 

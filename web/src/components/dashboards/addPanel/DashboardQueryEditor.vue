@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 pb-0 select-none"
                   >
                     <span
-                      class="text-text-placeholder text-compact overflow-hidden font-mono leading-5 text-ellipsis whitespace-nowrap"
+                      class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
                       >{{ vrlPlaceholder }}</span
                     >
                   </div>

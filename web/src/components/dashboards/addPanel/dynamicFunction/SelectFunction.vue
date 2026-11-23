@@ -194,6 +194,7 @@
       variant="secondary"
       @click="addArgument()"
       class="mt-3 w-fit border-dashed"
+      icon="add"
       :data-test="`dashboard-function-dropdown-add-argument-button`"
     >
       {{ t("dashboard.selectFunction.add") }}

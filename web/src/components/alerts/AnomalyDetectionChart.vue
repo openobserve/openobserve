@@ -43,7 +43,7 @@
     />
 
     <div class="flex items-center justify-between gap-2">
-      <span class="text-compact text-text-heading font-semibold">
+      <span class="text-compact text-text-heading font-bold">
         {{ t("alerts.anomaly.detectionCharts") }}
       </span>
       <OToggleGroup
@@ -82,30 +82,31 @@
         </span>
       </PanelBar>
       <div class="relative h-100 w-full">
-        <OSkeleton
+        <div
           v-if="!kindColumnsReady || metricLoading"
-          preset="chart"
-          class="h-full p-4"
+          class="flex h-full items-center justify-center"
           data-test="alerts-anomalydetectionchart-metric-loading"
-        />
-        <OEmptyState
-          v-else-if="metricError"
-          kind="error"
-          data-test="alerts-anomalydetectionchart-metric-error"
-          @action="loadMetric"
-        />
-        <OEmptyState
-          v-else-if="!metricQuery"
-          icon="bar-chart"
-          :title="t('alerts.groups.chartUnavailable')"
+        >
+          <OSpinner size="lg" />
+        </div>
+        <div
+          v-else-if="!metricQuery || metricError"
+          class="flex h-full items-center justify-center px-4 text-center"
           data-test="alerts-anomalydetectionchart-metric-empty"
-        />
-        <OEmptyState
+        >
+          <span class="text-text-secondary text-sm">
+            {{ metricError || t("alerts.groups.chartUnavailable") }}
+          </span>
+        </div>
+        <div
           v-else-if="!metricRows.length"
-          icon="bar-chart"
-          :title="t('alerts.anomaly.noDetectionResults')"
+          class="flex h-full items-center justify-center px-4 text-center"
           data-test="alerts-anomalydetectionchart-metric-nodata"
-        />
+        >
+          <span class="text-text-secondary text-sm">
+            {{ t("alerts.anomaly.noDetectionResults") }}
+          </span>
+        </div>
         <!-- ChartRenderer, not PanelSchemaRenderer: the point popover needs the chart click,
              which the schema renderer does not forward. -->
         <ChartRenderer
@@ -149,12 +150,13 @@
             <span class="text-text-secondary text-2xs font-normal">{{ panel.hint }}</span>
           </PanelBar>
           <div class="h-62.5 w-full">
-            <OSkeleton
+            <div
               v-if="!kindColumnsReady"
-              preset="chart"
-              class="h-full p-4"
+              class="flex h-full items-center justify-center"
               :data-test="`alerts-anomalydetectionchart-${panel.key}-loading`"
-            />
+            >
+              <OSpinner size="lg" />
+            </div>
             <PanelSchemaRenderer
               v-else-if="panel.schema"
               :height="5"
@@ -166,12 +168,15 @@
               searchType="ui"
               :data-test="`alerts-anomalydetectionchart-${panel.key}-panel`"
             />
-            <OEmptyState
+            <div
               v-else
-              icon="bar-chart"
-              :title="t('alerts.groups.chartUnavailable')"
+              class="flex h-full items-center justify-center px-4 text-center"
               :data-test="`alerts-anomalydetectionchart-${panel.key}-empty`"
-            />
+            >
+              <span class="text-text-secondary text-sm">
+                {{ t("alerts.groups.chartUnavailable") }}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -187,8 +192,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import PanelBar from "@/components/common/PanelBar.vue";

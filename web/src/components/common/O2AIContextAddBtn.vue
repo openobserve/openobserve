@@ -7,7 +7,7 @@
     @click.stop="sendToAiChat"
     data-test="o2-ai-context-add-btn"
     :aria-label="t('menu.aiAssistant')"
-    class="group hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35! [background:var(--color-gradient-ai-subtle)]! [transition:background_var(--duration-control)_var(--ease-control),box-shadow_var(--duration-control)_var(--ease-control)] hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:shadow-md dark:hover:shadow-md"
+    class="group hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease] hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:shadow-md dark:hover:shadow-md"
     :class="props.class"
     :style="props.style"
   >
@@ -17,7 +17,7 @@
         :height="props.imageHeight"
         :width="props.imageWidth"
         :src="getBtnLogo"
-        class="header-icon ai-icon [transition:transform_var(--duration-indicator)_var(--ease-control)] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert"
+        class="header-icon ai-icon [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert"
       />
     </div>
   </OButton>

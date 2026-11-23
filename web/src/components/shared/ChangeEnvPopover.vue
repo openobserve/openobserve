@@ -64,15 +64,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSkeleton shape="block" class="h-8 w-full" />
         <OSkeleton shape="block" class="h-24 w-full" />
       </div>
-      <OEmptyState
+      <div
         v-else-if="loadFailed"
-        kind="error"
-        size="compact"
-        :title="t('serviceVersions.envEdit.loadError')"
-        :action-label="t('serviceVersions.actions.retry')"
+        class="text-text-secondary flex items-center gap-2"
         data-test="svcver-env-load-error"
-        @action="reload"
-      />
+      >
+        <span>{{ t("serviceVersions.envEdit.loadError") }}</span>
+        <OButton variant="accent-ghost" size="sm" @click="reload">{{
+          t("serviceVersions.actions.retry")
+        }}</OButton>
+      </div>
       <div v-else class="flex min-h-0 flex-col gap-3">
         <div class="flex flex-col gap-1">
           <span class="text-text-secondary text-xs font-medium">{{
@@ -90,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-if="hint" class="text-text-secondary text-xs">{{ hint }}</span>
         </div>
         <div
-          class="rounded-default bg-surface-panel border-border-default text-compact border px-3 py-2"
+          class="rounded-default bg-surface-panel border-border-default border px-3 py-2 text-[0.8125rem]"
           data-test="svcver-env-impact"
         >
           <div>
@@ -533,7 +534,6 @@ import {
 import { serviceVersionKeys } from "@/services/service_versions.querykeys";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

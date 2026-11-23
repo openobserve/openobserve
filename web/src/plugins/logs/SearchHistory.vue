@@ -14,14 +14,28 @@
     <template #actions>
       <OButton
         icon-only
-        icon="wrap-text"
-        variant="ghost"
-        size="md"
-        :label="t('search.messageWrapContent')"
-        :pressed="wrapText"
         data-test="search-history-wrap-content-btn"
+        variant="ghost"
+        size="xs"
+        class="border-card-glass-border! rounded-default! m-0 flex! items-center! justify-center! border-[0.0626rem]! border-solid! backdrop-blur-[0.625rem]! [transition:all_0.2s_ease]"
+        :class="
+          wrapText
+            ? 'bg-theme-accent! text-white hover:opacity-85'
+            : 'bg-white/10! hover:bg-white/15!'
+        "
         @click="wrapText = !wrapText"
-      />
+      >
+        <OIcon name="wrap-text" size="sm" />
+        <OTooltip :content="t('search.messageWrapContent')" />
+      </OButton>
+      <div
+        class="text-status-warning-text border-status-warning-text rounded-default flex h-9 items-center border px-2 max-md:hidden"
+      >
+        <OIcon name="info" class="me-1" size="sm" />
+        <div>
+          {{ t("search_history.delayMessage") }} <b>{{ delayMessage }}</b>
+        </div>
+      </div>
       <div>
         <!-- Without its shift arrows on phones the picker fits beside the title. -->
         <ODateTimeRange
@@ -38,20 +52,30 @@
       </div>
 
       <div>
-        <ORefreshButton
-          :last-run-at="lastUpdatedAt"
+        <OButton
+          icon-only
+          variant="secondary"
+          icon="refresh"
           :loading="isLoading"
-          shortcut="searchHistoryRefresh"
           data-test="search-history-get-history-btn"
           @click="fetchSearchHistory"
-        />
+        >
+          <OTooltip
+            side="bottom"
+            :content="t('search_history.get_history')"
+            shortcut="searchHistoryRefresh"
+          />
+        </OButton>
       </div>
     </template>
-    <template #banner>
-      <OBanner tone="warn" data-test="search-history-delay-banner">
+    <div
+      class="text-status-warning-text border-border-default flex shrink-0 items-center border-b px-3 py-1.5 text-xs md:hidden"
+    >
+      <OIcon name="info" class="me-1 shrink-0" size="sm" />
+      <div>
         {{ t("search_history.delayMessage") }} <b>{{ delayMessage }}</b>
-      </OBanner>
-    </template>
+      </div>
+    </div>
     <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
       <OTable
         ref="oTableRef"
@@ -253,7 +277,7 @@
         <div>
           <OIcon name="history" class="h-25 w-25 opacity-10" />
         </div>
-        <div class="text-2xl font-semibold opacity-80">
+        <div class="text-3xl font-semibold opacity-80">
           {{ t("logs.index.searchHistoryNotEnabled") }}
         </div>
         <div class="mt-2 flex items-center justify-center opacity-80">
@@ -299,16 +323,15 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -330,15 +353,14 @@ export default defineComponent({
     OTab,
     QueryEditor,
     OButton,
-    ORefreshButton,
     OCopyButton,
     OIcon,
     OTag,
+    OTooltip,
     OTruncatedText,
     OTable,
     OTimeCell,
     OPageLayout,
-    OBanner,
   },
   setup() {
     const router = useRouter();
@@ -387,7 +409,6 @@ export default defineComponent({
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
-    const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref<ForbiddenState>(false);
     const moreDetailsToDisplay = ref("");
 
@@ -541,7 +562,6 @@ export default defineComponent({
           );
         });
         dataToBeLoaded.value = filteredHits;
-        lastUpdatedAt.value = Date.now();
         isLoading.value = false;
         if (pendingPageRestore) {
           pendingPageRestore = false;
@@ -790,7 +810,6 @@ export default defineComponent({
       t,
       route,
       isLoading,
-      lastUpdatedAt,
       forbidden,
       updateDateTime,
       searchDateTimeRef,

@@ -666,7 +666,7 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
 
-    it("opens the page in place, with its lock, when rbac_enabled is explicitly false", async () => {
+    it("redirects to the locked page when rbac_enabled is explicitly false", async () => {
       store.state.zoConfig = { ...store.state.zoConfig, rbac_enabled: false };
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
@@ -677,7 +677,7 @@ describe("useEnterpriseRoutes.ts", () => {
       const mockNext = vi.fn();
 
       groupsRoute.beforeEnter(mockTo, mockFrom, mockNext);
-      expect(mockNext).not.toHaveBeenCalledWith(
+      expect(mockNext).toHaveBeenCalledWith(
         expect.objectContaining({ name: "enterpriseFeatureLocked" }),
       );
     });

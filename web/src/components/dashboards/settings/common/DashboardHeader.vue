@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-only
           :aria-label="t('common.goBack')"
           data-test="dashboard-header-back-button"
-          variant="ghost"
+          variant="secondary"
           class="me-2"
           @click="onBackClicked"
           icon="arrow-back-ios-new"
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div data-test="dashboard-header-title-container" class="flex flex-1 flex-col">
-        <div data-test="dashboard-header-title" class="text-sm font-semibold">
+        <div data-test="dashboard-header-title" class="text-base font-semibold">
           {{ title }}
         </div>
       </div>

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <LiveNoticeState
     v-else-if="loadNotice"
     :notice="loadNotice"
-    size="region"
+    size="page"
     :busy="paging.retrying.value"
     :class="inPage && 'p-4'"
     data-test="autoobserve-live-settings-paging-notice"

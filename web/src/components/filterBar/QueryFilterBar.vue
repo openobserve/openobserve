@@ -53,7 +53,6 @@ const props = withDefaults(defineProps<QueryFilterBarProps>(), {
   size: "md",
   appearance: "field",
   maxRows: undefined,
-  submitOnEnter: false,
   dataTest: "query-filter-bar",
 });
 const emit = defineEmits<QueryFilterBarEmits>();
@@ -93,7 +92,6 @@ const editor = useFilterBarEditor({
   t,
   commit: commitTree,
   submit: () => emit("submit"),
-  submitOnEnter: toRef(props, "submitOnEnter"),
 });
 
 const {
@@ -546,6 +544,7 @@ const draftOperator = computed(() => {
             <OButton
               variant="ghost"
               size="sm"
+              icon="add"
               :disabled="Boolean(limitReason)"
               :data-test="`${dataTest}-add-condition`"
               @mousedown.prevent
@@ -558,6 +557,7 @@ const draftOperator = computed(() => {
             <OButton
               variant="ghost"
               size="sm"
+              icon="add"
               :disabled="Boolean(limitReason)"
               :data-test="`${dataTest}-add-group`"
               @mousedown.prevent

@@ -19,82 +19,187 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="lg"
     v-model:open="showDialog"
     data-test="enterprise-upgrade-dialog"
-    :aria-title="dialogConfig.heroTitle"
-    :primary="
-      dialogConfig.showPrimaryButton
-        ? { label: dialogConfig.primaryButtonText, dataTest: 'enterprise-upgrade-download-btn' }
-        : undefined
-    "
-    :secondary="
-      dialogConfig.showContactSales
-        ? {
-            label: t('about.enterprise_offer.buttons.contact_sales'),
-            dataTest: 'enterprise-upgrade-contact-sales-btn',
-          }
-        : {
-            label: t('about.enterprise_offer.buttons.learn_more'),
-            dataTest: 'enterprise-upgrade-learn-more-btn',
-          }
-    "
-    @click:primary="handlePrimaryButtonClick"
-    @click:secondary="dialogConfig.showContactSales ? contactSales() : openDocsLink()"
+    :show-close="false"
     @update:open="(v) => !v && onDialogHide()"
   >
-    <template #header>
-      <div class="flex min-w-0 items-center gap-3">
-        <div class="min-w-0 flex-1">
-          <OTruncatedText
-            data-test="enterprise-upgrade-hero-title"
-            class="text-dialog-header-text text-title block font-semibold"
-            >{{ dialogConfig.heroTitle }}</OTruncatedText
+    <div
+      class="enterprise-dialog-v3 relative -mx-(--spacing-dialog-content-px) -my-(--spacing-dialog-content-py) overflow-hidden"
+    >
+      <!-- Close Button -->
+      <div class="text-text-secondary hover:text-text-body absolute top-4 right-4 z-100">
+        <OButton
+          icon-only
+          :aria-label="t('common.close')"
+          variant="ghost"
+          size="xs"
+          @click="showDialog = false"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
           >
-          <OTruncatedText class="text-text-secondary text-compact block">{{
-            dialogConfig.offerText
-          }}</OTruncatedText>
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </OButton>
+      </div>
+
+      <div
+        class="dialog-split-layout flex max-h-[92vh] max-[56.25rem]:flex-col"
+        :class="{ 'cloud-layout': dialogConfig.isCloudLayout }"
+      >
+        <!-- Left Panel - Hero Section (hidden for Cloud) -->
+        <div
+          v-if="!dialogConfig.isCloudLayout"
+          class="hero-panel relative flex min-h-0 [flex:0_0_35%] flex-col overflow-y-auto bg-[linear-gradient(135deg,var(--color-theme-accent)_0%,color-mix(in_srgb,var(--color-theme-accent)_85%,black_15%)_100%)] p-10 text-white max-[56.25rem]:min-h-100 max-[56.25rem]:flex-none"
+        >
+          <div class="m-auto flex w-full max-w-100 flex-1 flex-col items-center justify-center">
+            <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
+            <div
+              class="rounded-default mb-6 flex h-20 w-20 items-center justify-center bg-[rgba(255,255,255,0.15)] backdrop-blur-[10px]"
+            >
+              <!-- eslint-enable local/no-hardcoded-px -->
+              <OIcon name="workspace-premium" size="xl" />
+            </div>
+
+            <div
+              data-test="enterprise-upgrade-hero-title"
+              class="mb-4 text-center text-3xl leading-[1.2] font-bold text-white"
+            >
+              {{ dialogConfig.heroTitle }}
+            </div>
+
+            <div class="mb-6 text-center text-sm leading-[1.6] text-white opacity-[0.95]">
+              {{ dialogConfig.offerText }}
+            </div>
+
+            <div class="mb-8 flex flex-row items-center justify-center gap-4">
+              <!-- Loading State: Show skeleton -->
+              <template v-if="isLoadingLicense && dialogConfig.showUsageIndicator">
+                <OSkeleton
+                  shape="circle"
+                  class="h-10 w-10 shrink-0"
+                  data-test="enterprise-upgrade-usage-indicator-skeleton"
+                />
+                <OSkeleton
+                  shape="block"
+                  class="h-11 w-50 shrink-0"
+                  data-test="enterprise-upgrade-offer-badge-skeleton"
+                />
+              </template>
+
+              <!-- Loaded State: Show actual data -->
+              <template v-else>
+                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling shadow and blur with text makes elevation bloom -->
+                <div
+                  data-test="enterprise-upgrade-offer-badge"
+                  class="rounded-default shadow-success-500/40 inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-lg backdrop-blur-[10px]"
+                  :class="{
+                    'bg-[rgba(255,255,255,0.2)]! shadow-md!': dialogConfig.isLicensed,
+                  }"
+                >
+                  <!-- eslint-enable local/no-hardcoded-px -->
+                  <OIcon
+                    v-if="!dialogConfig.showUsageIndicator"
+                    :name="dialogConfig.badgeIcon"
+                    size="md"
+                    class="me-1"
+                  />
+                  <span>{{ dialogConfig.badgeText }}</span>
+                </div>
+              </template>
+            </div>
+
+            <!-- Usage Chart (only for Enterprise with license) -->
+            <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling the backdrop blur with text makes elevation bloom -->
+            <div
+              v-if="dialogConfig.isLicensed"
+              class="rounded-default mb-6 w-full border border-[rgba(255,255,255,0.2)] bg-[rgba(255,255,255,0.1)] p-4 backdrop-blur-[10px]"
+            >
+              <!-- eslint-enable local/no-hardcoded-px -->
+              <!-- Loading skeleton -->
+              <template v-if="isLoadingLicense">
+                <OSkeleton
+                  preset="chart"
+                  class="h-37.5"
+                  data-test="enterprise-upgrade-chart-skeleton"
+                />
+              </template>
+              <!-- Loaded chart -->
+              <template v-else-if="chartData">
+                <div class="relative w-full">
+                  <div
+                    class="usage-chart-container mx-auto max-h-37.5 min-h-37.5 w-full overflow-visible p-0"
+                    style="height: 9.375rem"
+                  >
+                    <ChartRenderer :key="dashboardRenderKey" :data="chartData" />
+                  </div>
+                  <div
+                    v-if="isIngestionUnlimited"
+                    class="mt-1 text-center text-xs"
+                    style="color: rgba(255, 255, 255, 0.7); font-size: var(--text-3xs)"
+                  >
+                    {{ t("about.usage_shows_zero_unlimited") }}
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <div class="flex w-full flex-col gap-3">
+              <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — shadow offsets/blurs and the 1px active-press nudge must not scale with text -->
+              <OButton
+                v-if="dialogConfig.showPrimaryButton"
+                variant="secondary"
+                size="lg"
+                @click="handlePrimaryButtonClick"
+                data-test="enterprise-upgrade-download-btn"
+                class="rounded-default! text-theme-accent! bg-white! px-8 py-2.5 text-sm font-bold! [letter-spacing:0.01875rem] shadow-md transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] hover:[transform:translateY(-0.1875rem)_scale(1.02)] hover:shadow-lg active:[transform:translateY(-1px)_scale(0.98)]"
+              >
+                <!-- eslint-enable local/no-hardcoded-px -->
+                {{ dialogConfig.primaryButtonText }}
+                <template v-if="dialogConfig.primaryButtonIcon" #icon-end>
+                  <OIcon :name="dialogConfig.primaryButtonIcon" size="sm" />
+                </template>
+              </OButton>
+              <OButton
+                v-if="dialogConfig.showContactSales"
+                variant="secondary"
+                size="lg"
+                @click="contactSales"
+              >
+                {{ t("about.enterprise_offer.buttons.contact_sales") }}
+              </OButton>
+              <OButton
+                v-else
+                variant="secondary"
+                size="lg"
+                @click="openDocsLink"
+                data-test="enterprise-upgrade-learn-more-btn"
+              >
+                {{ t("about.enterprise_offer.buttons.learn_more") }}
+              </OButton>
+            </div>
+          </div>
         </div>
-        <OSkeleton
-          v-if="isLoadingLicense && dialogConfig.showUsageIndicator"
-          shape="block"
-          class="h-5 w-32 shrink-0"
-          data-test="enterprise-upgrade-offer-badge-skeleton"
-        />
-        <OTag
-          v-else
-          tone="accent"
-          class="shrink-0"
-          :label="dialogConfig.badgeText"
-          data-test="enterprise-upgrade-offer-badge"
+
+        <!-- Right Panel - Features List -->
+        <EnterpriseOfferFeatureGrid
+          :is-cloud-layout="dialogConfig.isCloudLayout"
+          :features-title="dialogConfig.featuresTitle"
+          :features-subtitle="dialogConfig.featuresSubtitle"
+          :core-features="coreFeatures"
+          :enterprise-features="enterpriseFeatures"
+          :is-dark="isDark"
         />
       </div>
-    </template>
-
-    <div class="flex flex-col gap-4" :class="{ 'cloud-layout': dialogConfig.isCloudLayout }">
-      <!-- A licensed install sees its daily ingestion against the limit before the catalog. -->
-      <section v-if="dialogConfig.isLicensed" class="flex flex-col gap-2">
-        <h3 class="text-text-heading text-sm font-semibold">
-          {{ t("about.enterprise_offer.usageTitle") }}
-        </h3>
-        <OSkeleton
-          v-if="isLoadingLicense"
-          preset="chart"
-          class="h-37.5"
-          data-test="enterprise-upgrade-chart-skeleton"
-        />
-        <template v-else-if="chartData">
-          <div class="usage-chart-container h-37.5 w-full">
-            <ChartRenderer :key="dashboardRenderKey" :data="chartData" />
-          </div>
-          <OText v-if="isIngestionUnlimited" variant="meta">
-            {{ t("about.usage_shows_zero_unlimited") }}
-          </OText>
-        </template>
-      </section>
-
-      <EnterpriseOfferFeatureGrid
-        :is-cloud-layout="dialogConfig.isCloudLayout"
-        :core-features="coreFeatures"
-        :enterprise-features="enterpriseFeatures"
-      />
     </div>
   </ODialog>
 </template>
@@ -103,9 +208,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
-import OTag from "@/lib/core/Badge/OTag.vue";
-import OText from "@/lib/core/Typography/OText.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import EnterpriseOfferFeatureGrid from "@/components/EnterpriseOfferFeatureGrid.vue";
@@ -119,10 +223,9 @@ const ChartRenderer = defineAsyncComponent(
 export default defineComponent({
   name: "EnterpriseUpgradeDialog",
   components: {
+    OIcon,
     ChartRenderer,
-    OTag,
-    OText,
-    OTruncatedText,
+    OButton,
     ODialog,
     OSkeleton,
     EnterpriseOfferFeatureGrid,
@@ -285,19 +388,6 @@ export default defineComponent({
 
         const yAxisInterval = yAxisMax > 0 ? calculateInterval(yAxisMax) : undefined;
 
-        // The chart sits on the dialog surface, so its ink follows the theme.
-        const ink = isDark.value
-          ? {
-              line: "rgba(255, 255, 255, 0.2)",
-              label: "rgba(255, 255, 255, 0.7)",
-              split: "rgba(255, 255, 255, 0.08)",
-            }
-          : {
-              line: "rgba(0, 0, 0, 0.15)",
-              label: "rgba(0, 0, 0, 0.6)",
-              split: "rgba(0, 0, 0, 0.06)",
-            };
-
         // Create mark line for threshold if limit exists
         const markLine: any =
           thresholdGB && thresholdGB > 0
@@ -337,15 +427,15 @@ export default defineComponent({
               data: dates,
               axisLine: {
                 show: true,
-                lineStyle: { color: ink.line },
+                lineStyle: { color: "rgba(255, 255, 255, 0.3)" },
               },
               axisTick: {
                 show: true,
-                lineStyle: { color: ink.line },
+                lineStyle: { color: "rgba(255, 255, 255, 0.3)" },
               },
               axisLabel: {
                 show: true,
-                color: ink.label,
+                color: "rgba(255, 255, 255, 0.8)",
                 fontSize: 10,
                 interval: Math.floor(dates.length / 6), // Show ~6 labels based on actual data length
               },
@@ -357,15 +447,15 @@ export default defineComponent({
               interval: yAxisInterval,
               axisLine: {
                 show: true,
-                lineStyle: { color: ink.line },
+                lineStyle: { color: "rgba(255, 255, 255, 0.3)" },
               },
               axisTick: {
                 show: true,
-                lineStyle: { color: ink.line },
+                lineStyle: { color: "rgba(255, 255, 255, 0.3)" },
               },
               axisLabel: {
                 show: true,
-                color: ink.label,
+                color: "rgba(255, 255, 255, 0.8)",
                 fontSize: 10,
                 formatter: (value: number) => {
                   return value.toFixed(0) + dataUnit;
@@ -374,7 +464,7 @@ export default defineComponent({
               splitLine: {
                 show: true,
                 lineStyle: {
-                  color: ink.split,
+                  color: "rgba(255, 255, 255, 0.1)",
                   type: "dashed",
                 },
               },

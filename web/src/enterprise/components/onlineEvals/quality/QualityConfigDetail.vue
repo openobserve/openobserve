@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Any failure, including one with no HTTP status (server unreachable), so it never reads as "no scores". -->
     <div
       v-if="scoresQuery.error.value"
-      class="flex min-h-0 flex-1 flex-col"
+      class="flex min-h-0 flex-1 items-center justify-center"
       data-test="quality-detail-error"
     >
       <OEmptyState
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-else-if="summary.total === 0"
-      class="flex min-h-0 flex-1 flex-col"
+      class="flex min-h-0 flex-1 items-center justify-center"
       data-test="quality-detail-empty"
     >
       <OEmptyState
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OEmptyState
               v-else-if="timelineQuery.error.value"
               class="h-full"
-              size="compact"
+              size="inline"
               kind="error"
               :title="t('emptyState.loadError.title')"
               :text="t('emptyState.loadError.description')"
@@ -257,7 +257,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #empty>
-                <OEmptyState icon="filter-list" :title="t('onlineEvals.quality.review.noMatch')" />
+                <OEmptyState
+                  size="inline"
+                  icon="filter-list"
+                  :title="t('onlineEvals.quality.review.noMatch')"
+                />
               </template>
             </OTable>
           </div>

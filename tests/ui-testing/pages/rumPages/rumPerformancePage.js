@@ -15,7 +15,7 @@ export class RumPerformancePage {
         this.tabsDropdownBtn = page.locator('[data-test="rum-performance-tabs-dropdown-btn"]');
         this.shareLinkBtn = page.locator('[data-test="rum-performance-share-link-btn"]');
         this.shareLinkToast = page.locator(
-            '[data-test-variant="success"][data-test-message*="Link copied"]',
+            '[data-test-variant="success"][data-test-message*="Link Copied"]',
         );
         this.refreshOptionsBtn = page.locator('[data-test="rum-performance-refresh-options-btn"]');
         this.autoRunToggleBtn = page.locator('[data-test="rum-performance-auto-run-toggle-btn"]');

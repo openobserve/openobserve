@@ -37,7 +37,7 @@ const i18n = createI18n({
   silentTranslationWarn: true,
   silentFallbackWarn: true,
   // Use the real en.json so dialog titles/labels resolve exactly as in the app.
-  // Dialog titles (e.g. "Delete users") are now translated via t("user.deleteUsersTitle");
+  // Dialog titles (e.g. "Delete Users") are now translated via t("user.deleteUsersTitle");
   // sourcing the real dictionary keeps the title-based dialog lookups in this spec working.
   messages: {
     en: enLocale,
@@ -325,7 +325,7 @@ describe("User Component", () => {
       await flushPromises();
       const dialog = wrapper
         .findAllComponents(ODialogStub)
-        .find((d: any) => d.props("title") === "Delete user")!;
+        .find((d: any) => d.props("title") === "Delete User")!;
       expect(dialog.props("primary")?.variant).toBe("danger");
       const name = dialog.find('[data-test="confirm-dialog-name"]');
       expect(name.text()).toBe("to-delete@example.com");
@@ -336,7 +336,7 @@ describe("User Component", () => {
       await flushPromises();
       const dialog = wrapper
         .findAllComponents(ODialogStub)
-        .find((d: any) => d.props("title") === "Delete user")!;
+        .find((d: any) => d.props("title") === "Delete User")!;
       await dialog.vm.$emit("click:secondary");
       expect(wrapper.vm.confirmDelete).toBe(false);
     });
@@ -346,7 +346,7 @@ describe("User Component", () => {
       await flushPromises();
       const dialog = wrapper
         .findAllComponents(ODialogStub)
-        .find((d: any) => d.props("title") === "Delete user")!;
+        .find((d: any) => d.props("title") === "Delete User")!;
       await dialog.vm.$emit("click:primary");
       await flushPromises();
       expect(mockUsersService.delete).toHaveBeenCalledWith(
@@ -373,7 +373,7 @@ describe("User Component", () => {
       await flushPromises();
       const dialog = wrapper
         .findAllComponents(ODialogStub)
-        .find((d: any) => d.props("title") === "Revoke invitation")!;
+        .find((d: any) => d.props("title") === "Revoke Invitation")!;
       expect(dialog.props("primary")?.variant).toBe("danger");
       const name = dialog.find('[data-test="user-revoke-dialog-message"] span.font-semibold');
       expect(name.text()).toBe("pending@example.com");
@@ -384,7 +384,7 @@ describe("User Component", () => {
       await flushPromises();
       const dialog = wrapper
         .findAllComponents(ODialogStub)
-        .find((d: any) => d.props("title") === "Revoke invitation")!;
+        .find((d: any) => d.props("title") === "Revoke Invitation")!;
       await dialog.vm.$emit("click:secondary");
       expect(wrapper.vm.confirmRevoke).toBe(false);
     });
@@ -397,7 +397,7 @@ describe("User Component", () => {
       await flushPromises();
       const dialog = wrapper
         .findAllComponents(ODialogStub)
-        .find((d: any) => d.props("title") === "Revoke invitation")!;
+        .find((d: any) => d.props("title") === "Revoke Invitation")!;
       await dialog.vm.$emit("click:primary");
       await flushPromises();
       expect(mockOrganizationsService.revoke_invite).toHaveBeenCalledWith(
@@ -420,7 +420,7 @@ describe("User Component", () => {
       await flushPromises();
       const dialog = wrapper
         .findAllComponents(ODialogStub)
-        .find((d: any) => d.props("title") === "Delete users");
+        .find((d: any) => d.props("title") === "Delete Users");
       expect(dialog).toBeTruthy();
       expect(dialog!.props("size")).toBe("sm");
       expect(dialog!.props("primary")?.label).toBe("OK");
@@ -434,7 +434,7 @@ describe("User Component", () => {
       await flushPromises();
       const dialog = wrapper
         .findAllComponents(ODialogStub)
-        .find((d: any) => d.props("title") === "Delete users")!;
+        .find((d: any) => d.props("title") === "Delete Users")!;
       await dialog.vm.$emit("click:secondary");
       expect(wrapper.vm.confirmBulkDelete).toBe(false);
     });
@@ -451,7 +451,7 @@ describe("User Component", () => {
       await flushPromises();
       const dialog = wrapper
         .findAllComponents(ODialogStub)
-        .find((d: any) => d.props("title") === "Delete users")!;
+        .find((d: any) => d.props("title") === "Delete Users")!;
       await dialog.vm.$emit("click:primary");
       await flushPromises();
       expect(mockUsersService.bulkDelete).toHaveBeenCalledWith(
@@ -473,7 +473,7 @@ describe("User Component", () => {
       await flushPromises();
       const dialog = wrapper
         .findAllComponents(ODialogStub)
-        .find((d: any) => d.props("title") === "Delete users")!;
+        .find((d: any) => d.props("title") === "Delete Users")!;
       await dialog.vm.$emit("click:primary");
       await flushPromises();
       expect(wrapper.vm.selectedUsers).toEqual([]);

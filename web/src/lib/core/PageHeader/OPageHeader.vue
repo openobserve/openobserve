@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="headerEl"
     class="app-page-header relative shrink-0"
     data-test="o-page-header"
-    data-o2-page-shell
     :data-drawer-anchor="ownsSidebarTrigger ? 'page-layout-sidebar' : undefined"
   >
     <!-- Fixed rows, never sized by content, so the title's box is the same on every page (H1, H8). -->
@@ -40,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :is="backHref ? 'a' : 'button'"
               :href="backHref"
               :type="backHref ? undefined : 'button'"
-              class="rounded-chip text-text-link hover:text-text-link-hover focus-visible:ring-focus-ring-accent inline-flex max-w-full min-w-0 cursor-pointer items-center gap-0.5 underline-offset-2 transition-[color,box-shadow] outline-none hover:underline focus-visible:ring-2"
+              class="rounded-chip text-text-link hover:text-text-link-hover focus-visible:ring-focus-ring-accent inline-flex max-w-full min-w-0 cursor-pointer items-center gap-0.5 underline-offset-2 outline-none hover:underline focus-visible:ring-2"
               :aria-label="t('common.backTo', { label: back.label })"
               :data-test="back.dataTest ?? 'app-page-header-back'"
               @click="onBack"
@@ -49,21 +48,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="min-w-0 truncate">{{ back.label }}</span>
             </component>
           </FeatureLockExempt>
-          <!-- An ungrouped page keeps the empty slot so its title sits where every other title does (H1). -->
-          <span
-            v-else
-            class="min-w-0 truncate"
-            :aria-hidden="contextLabel ? undefined : 'true'"
-            data-test="o-page-header-context-label"
-            >{{ contextLabel }}</span
-          >
+          <span v-else class="min-w-0 truncate" data-test="o-page-header-context-label">{{
+            context || derivedContext
+          }}</span>
         </div>
 
         <div class="flex h-6 min-w-0 items-center gap-2" data-test="o-page-header-title-row">
           <!-- A slotted title (an inline-edited name) owns its overflow, so its focus ring is not clipped. -->
           <h1
             v-if="slots.title"
-            class="text-text-heading font-title flex min-w-0 items-center text-lg leading-6 tracking-normal"
+            class="text-text-heading flex min-w-0 items-center text-base leading-6 font-semibold tracking-normal"
             :data-test="titleDataTest"
           >
             <slot name="title" />
@@ -71,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTruncatedText
             v-else
             as="h1"
-            class="text-text-heading font-title min-w-0 text-lg leading-6 tracking-normal"
+            class="text-text-heading min-w-0 text-base leading-6 font-semibold tracking-normal"
             :data-test="titleDataTest"
             >{{ title }}</OTruncatedText
           >
@@ -234,8 +228,7 @@ const lockedLabel = computed(() =>
   }),
 );
 const aboutLabel = computed(() => t("pageHeader.about"));
-const derivedContext = usePageContextLabel(() => props.title);
-const contextLabel = computed(() => props.context || derivedContext.value);
+const derivedContext = usePageContextLabel();
 
 const backHref = computed(() => {
   const to = props.back?.to;

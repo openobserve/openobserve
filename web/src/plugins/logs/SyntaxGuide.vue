@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="toolbar"
           :icon-only="!label"
           data-cy="syntax-guide-button"
+          variant="secondary"
           :class="sqlmode ? 'sql-mode' : 'normal-mode'"
         >
           <OIcon name="help" size="sm" />
@@ -68,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <div v-if="!sqlmode">
         <div class="w-105">
-          <div class="label text-sm font-semibold">{{ t("search.syntaxGuideLabel") }}</div>
+          <div class="label text-sm font-bold">{{ t("search.syntaxGuideLabel") }}</div>
         </div>
         <div class="border-dropdown-separator my-1 border-t" />
         <div class="answers">
@@ -139,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else>
         <div class="w-105">
-          <div class="label text-sm font-semibold">{{ t("search.syntaxGuide.sqlTitle") }}</div>
+          <div class="label text-sm font-bold">{{ t("search.syntaxGuide.sqlTitle") }}</div>
         </div>
         <div class="border-dropdown-separator my-1 border-t" />
         <div class="answers">

@@ -302,7 +302,7 @@ describe("Custom Component", () => {
       await wrapper.vm.copyToClipboardFn(mockContent);
 
       expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
-        successMessage: "Content copied successfully!",
+        successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -323,7 +323,7 @@ describe("Custom Component", () => {
       }
 
       expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
-        successMessage: "Content copied successfully!",
+        successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -862,7 +862,7 @@ describe("Custom Component", () => {
     });
   });
 
-  describe("Product analytics", () => {
+  describe("Product Analytics", () => {
     it("should track analytics with correct parameters for different routes", async () => {
       const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockResolvedValue(true);
@@ -919,7 +919,7 @@ describe("Custom Component", () => {
       await wrapper.vm.copyToClipboardFn(mockContent);
 
       expect(copyToClipboard).toHaveBeenCalledWith("", expect.any(Function), {
-        successMessage: "Content copied successfully!",
+        successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -936,7 +936,7 @@ describe("Custom Component", () => {
       await wrapper.vm.copyToClipboardFn(mockContent);
 
       expect(copyToClipboard).toHaveBeenCalledWith(null, expect.any(Function), {
-        successMessage: "Content copied successfully!",
+        successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -951,7 +951,7 @@ describe("Custom Component", () => {
       await wrapper.vm.copyToClipboardFn(mockContent);
 
       expect(copyToClipboard).toHaveBeenCalledWith(undefined, expect.any(Function), {
-        successMessage: "Content copied successfully!",
+        successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });

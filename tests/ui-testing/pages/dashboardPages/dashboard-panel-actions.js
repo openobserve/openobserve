@@ -472,8 +472,6 @@ export default class DashboardactionPage {
   }
 
   async enterLayoutEdit() {
-    // Edit layout lives in the More menu.
-    await this.page.locator('[data-test="dashboard-more-options-btn"]').click();
     await this.layoutEditBtn.waitFor({ state: "visible" });
     await this.layoutEditBtn.click();
     await this.layoutEditSaveBtn.waitFor({ state: "visible" });

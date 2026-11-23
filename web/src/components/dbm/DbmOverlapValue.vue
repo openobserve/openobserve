@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="fromApp">
           <DbmAppSourceMarker v-if="withMarker" />
         </template>
-        <span v-else class="text-text-secondary text-2xs" data-test="dbm-overlap-qualifier">
+        <span v-else class="text-text-secondary text-3xs" data-test="dbm-overlap-qualifier">
           <OTooltip v-if="qualifierTitle" :content="qualifierTitle" />
           {{ qualifierLabel }}
         </span>

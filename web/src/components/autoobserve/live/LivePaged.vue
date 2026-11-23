@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="autoobserve2-paged"
   >
     <template #title>
-      <h2 class="text-text-heading text-sm font-semibold whitespace-nowrap">
+      <h2 class="text-text-heading text-base font-semibold whitespace-nowrap">
         <ODropdown align="start">
           <template #trigger>
             <button
@@ -169,10 +169,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSkeleton shape="block" class="hidden h-9 w-40 self-center sm:block" />
         </li>
       </ul>
-      <div v-else-if="notice" class="px-5 pb-3 sm:px-6">
+      <div v-else-if="notice" class="px-3 pb-3 sm:px-4">
         <LiveNoticeState
           :notice="notice"
-          size="compact"
+          size="inline"
           :detail="state.detail"
           :busy="state.busy"
           :data-test="NOTICE_TEST[notice.failure]"
@@ -182,8 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OEmptyState
         v-else-if="settled && !rows.length && waiting"
-        size="compact"
-        class="px-5 sm:px-6"
+        size="inline"
         icon="hourglass-empty"
         :title="waiting.title"
         :text="waiting.desc"
@@ -191,8 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OEmptyState
         v-else-if="settled && !rows.length && !paging"
-        size="compact"
-        class="px-5 sm:px-6"
+        size="inline"
         icon="toggle-off"
         :title="copy.offTitle"
         :text="copy.offDesc"
@@ -200,8 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OEmptyState
         v-else-if="settled && !view.ranged.length"
-        size="compact"
-        class="px-5 sm:px-6"
+        size="inline"
         icon="task-alt"
         :title="allClear.title"
         :text="allClear.desc"

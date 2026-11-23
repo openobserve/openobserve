@@ -99,7 +99,7 @@ describe("OtelConfig.vue", () => {
     it("should render OTLP HTTP and gRPC sections", () => {
       wrapper = createWrapper();
 
-      const subtitleElements = wrapper.findAll(".font-semibold");
+      const subtitleElements = wrapper.findAll(".font-bold");
       expect(subtitleElements.length).toBeGreaterThanOrEqual(2);
 
       // Check that OTLP sections exist in the rendered content

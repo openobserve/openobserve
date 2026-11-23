@@ -121,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="module === 'synthetics' && !tagsOpen"
         variant="ghost"
+        icon="add"
         :data-test="`downtime-target-${module}-add-tags`"
         @click="openBlock('tags')"
       >
@@ -129,6 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="!idsOpen"
         variant="ghost"
+        icon="add"
         :data-test="`downtime-target-${module}-add-items`"
         @click="openBlock('ids')"
       >

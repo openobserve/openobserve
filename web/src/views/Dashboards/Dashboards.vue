@@ -262,7 +262,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template #cell-actions="{ row }">
                 <span class="row-actions flex items-center justify-end gap-0.5">
-                  <!-- Icon actions appear on row hover or focus; at rest only the overflow shows. -->
                   <OButton
                     v-if="row.actions == 'true'"
                     icon-only
@@ -270,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :aria-label="t('dashboard.move_to_another_folder')"
                     variant="ghost"
                     size="sm"
-                    class="opacity-0 focus-visible:opacity-100 max-md:hidden [tr:focus-within_&]:opacity-100 [tr:hover_&]:opacity-100"
+                    class="max-md:hidden"
                     data-test="dashboard-move-to-another-folder"
                     @click.stop="showMoveDashboardPanel(row)"
                   >
@@ -283,13 +282,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :aria-label="t('dashboard.duplicate')"
                     variant="ghost"
                     size="sm"
-                    class="opacity-0 focus-visible:opacity-100 max-md:hidden [tr:focus-within_&]:opacity-100 [tr:hover_&]:opacity-100"
+                    class="max-md:hidden"
                     data-test="dashboard-duplicate"
                     data-row-action="duplicate"
                     @click.stop="duplicateDashboard(row.id, row.folder_id)"
                   >
                     <OTooltip side="bottom" :content="t('dashboard.duplicate')" />
                   </OButton>
+                  <OButton
+                    v-if="row.actions == 'true'"
+                    icon-only
+                    icon="delete"
+                    :aria-label="t('dashboard.delete')"
+                    variant="danger-ghost"
+                    size="sm"
+                    class="max-md:hidden"
+                    data-test="dashboard-delete"
+                    data-row-action="delete"
+                    @click.stop="showDeleteDialogFn({ row })"
+                  >
+                    <OTooltip side="bottom" :content="t('dashboard.delete')" />
+                  </OButton>
+                  <!-- Overflow menu (rightmost) — houses the low-frequency "set as
+                       home" action so it doesn't clutter every row with an
+                       always-on icon. Move/Duplicate/Delete stay inline. -->
                   <ODropdown v-if="row.actions == 'true'" side="bottom" align="end">
                     <template #trigger>
                       <OButton
@@ -304,7 +320,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OTooltip side="bottom" :content="t('dashboard.moreActions')" />
                       </OButton>
                     </template>
-                    <!-- Mirrors of the hover icons, which are hidden below md. -->
                     <ODropdownItem
                       icon="drive-file-move"
                       class="md:hidden"
@@ -330,10 +345,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         isHome(row.id) ? t("dashboard.removeFromHome") : t("dashboard.setAsHome")
                       }}</span>
                     </ODropdownItem>
-                    <ODropdownSeparator />
+                    <ODropdownSeparator class="md:hidden" />
                     <ODropdownItem
                       icon="delete"
                       tone="danger"
+                      class="md:hidden"
                       data-test="dashboard-delete-menu"
                       @select="showDeleteDialogFn({ row })"
                     >
@@ -567,7 +583,6 @@ import {
   ref,
   watch,
   toRaw,
-  toRef,
 } from "vue";
 import { useStore } from "vuex";
 import { isCancelledError } from "@tanstack/vue-query";
@@ -604,7 +619,7 @@ import useNotifications from "@/composables/useNotifications";
 import { debounce } from "lodash-es";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { useLoading } from "@/composables/useLoading";
-import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
+import { useListViewState } from "@/composables/useListViewState";
 import { useReo } from "@/services/reodotdev_analytics";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
@@ -640,12 +655,6 @@ const AddDashboardFromGitHub = defineAsyncComponent(() => {
 const PublicLinksTable = defineAsyncComponent(() => {
   return import("@/components/dashboards/PublicLinksTable.vue");
 });
-
-const NAME_COLUMN_MIN = 160;
-const NAME_COLUMN_MAX = 360;
-// The favorite star, its gap and the cell's padding beside the name.
-const NAME_CELL_CHROME = 64;
-const DESCRIPTION_COLUMN_MIN = 120;
 
 interface DashboardRow {
   "#": string | number;
@@ -725,30 +734,24 @@ export default defineComponent({
     // Set once the onMounted landing decision has run; folder-selection events
     // arriving earlier are child-initialization noise, not user intent.
     let landingDecided = false;
-    let folderFromUrl = false;
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref<string | null>(null);
     const selectedFolderToEdit = ref<string | null>(null);
-    const savedView = useListViewState(
-      "dashboards",
-      {
-        searchQuery: "",
-        filterQuery: "",
-        searchAcrossFolders: false,
-        sortBy: "",
-        sortOrder: "asc" as "asc" | "desc",
-        pageSize: 20,
-      },
-      { url: { ...LIST_URL_PARAMS, searchQuery: "search", searchAcrossFolders: "all" } },
-    );
-    // Bound to the saved view, not copied, so Back between folder entries updates the fields too.
-    const searchQuery = toRef(savedView, "searchQuery");
+    const savedView = useListViewState("dashboards", {
+      searchQuery: "",
+      filterQuery: "",
+      searchAcrossFolders: false,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+      pageSize: 20,
+    });
+    const searchQuery = ref(savedView.searchQuery);
     const filteredResults = ref<DashboardSearchResult[]>([]);
     const confirmDeleteFolderDialog = ref<boolean>(false);
     const selectedDashboardToMove = ref<DashboardRow | null>(null);
     const selectedDashboardIdToMove = ref<string[] | null>(null);
     const showMoveDashboardDialog = ref(false);
-    const searchAcrossFolders = toRef(savedView, "searchAcrossFolders");
+    const searchAcrossFolders = ref(savedView.searchAcrossFolders);
     const searchScopeOptions = computed<SearchScopeOption[]>(() => [
       {
         value: "this",
@@ -765,10 +768,20 @@ export default defineComponent({
         dataTest: "dashboard-search-across-folders-toggle",
       },
     ]);
-    const filterQuery = toRef(savedView, "filterQuery");
-    const sortBy = toRef(savedView, "sortBy");
-    const sortOrder = toRef(savedView, "sortOrder");
-    const pageSize = toRef(savedView, "pageSize");
+    const filterQuery = ref(savedView.filterQuery);
+    const sortBy = ref<string>(savedView.sortBy);
+    const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+    const pageSize = ref<number>(savedView.pageSize);
+    watch([searchQuery, filterQuery, searchAcrossFolders, sortBy, sortOrder, pageSize], () => {
+      Object.assign(savedView, {
+        searchQuery: searchQuery.value,
+        filterQuery: filterQuery.value,
+        searchAcrossFolders: searchAcrossFolders.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+        pageSize: pageSize.value,
+      });
+    });
     const folderSearchQuery = ref("");
     const selectedIds = ref<string[]>([]);
     const { track } = useReo();
@@ -933,17 +946,6 @@ export default defineComponent({
     });
 
     let currentSearchAbortController: AbortController | null = null;
-    // A name is what the reader scans, so it sizes to the longest one (to a cap) and the
-    // description takes what is left; 13 px text averages about 7 px a character.
-    const nameColumnWidth = computed(() => {
-      const longest = dashboards.value.reduce(
-        (max: number, row: any) => Math.max(max, String(row.name ?? "").length),
-        0,
-      );
-      return Math.round(
-        Math.min(NAME_COLUMN_MAX, Math.max(NAME_COLUMN_MIN, longest * 7.2 + NAME_CELL_CHROME)),
-      );
-    });
     const columns = computed(() => {
       const baseColumns: OTableColumnDef[] = [
         {
@@ -953,9 +955,9 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: nameColumnWidth.value,
-          minSize: NAME_COLUMN_MIN,
-          meta: { align: "left" },
+          size: COL.name,
+          minSize: 160,
+          meta: { align: "left", flex: true },
         },
         // {
         //   id: "identifier",
@@ -974,8 +976,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: COL.description,
-          minSize: DESCRIPTION_COLUMN_MIN,
-          meta: { align: "left", flex: true },
+          meta: { align: "left" },
         },
         {
           id: "owner",
@@ -1063,23 +1064,11 @@ export default defineComponent({
         //the selected dashboards are not shown
         selectedIds.value = [];
         // A folder switch starts a new list (page 1 in table and URL alike); the landing run has no previous folder and is the Back restore, which keeps the page.
-        const fromUrl = folderFromUrl;
-        folderFromUrl = false;
-        // Back/Forward restore the entry exactly: its page and scope are in the URL, not reset like a click.
-        const switching = previousFolder !== null && !fromUrl;
+        const switching = previousFolder !== null;
         const navigate = replaceFolderRoute ? router.replace : router.push;
         replaceFolderRoute = false;
         if (switching) currentPage.value = 1;
-        else if (fromUrl) currentPage.value = Number(route.query.page) || 1;
-        // A click starts a new list, so the old list's search params must not ride into the new entry and be read back as state.
-        const {
-          page: _page,
-          "v.search": _search,
-          "v.all": _all,
-          "v.q": _q,
-          "v.page": _vpage,
-          ...carriedQuery
-        } = route.query;
+        const { page: _page, ...carriedQuery } = route.query;
         const baseQuery = switching ? carriedQuery : route.query;
         const showFolder = (query: typeof route.query) =>
           navigate({
@@ -1262,18 +1251,6 @@ export default defineComponent({
         page: "Dashboards",
       });
     };
-
-    // "New dashboard" from the Jump to palette arrives as ?action=add; consumed so a refresh does not reopen it.
-    watch(
-      () => route.query.action,
-      (action) => {
-        if (action !== "add") return;
-        const { action: _consumed, ...rest } = route.query;
-        router.replace({ query: rest }).catch(() => {});
-        addDashboard();
-      },
-      { immediate: true },
-    );
     const addFolder = () => {
       isFolderEditMode.value = false;
       showAddFolderDialog.value = true;
@@ -1746,13 +1723,7 @@ export default defineComponent({
       // presentation state, not a user action — letting it through would
       // clobber the favorites-first landing with "default".
       if (!landingDecided) return;
-      // The rail re-emitting the open folder is not a folder change, so the search stays.
-      if (folderId === activeFolderId.value) return;
-      // A new folder the URL already names came from Back or Forward, and the URL restores its search too.
-      const fromUrl = folderId === route.query.folder;
-      folderFromUrl = fromUrl;
       activeFolderId.value = folderId;
-      if (fromUrl) return;
       filterQuery.value = "";
       searchQuery.value = "";
     };

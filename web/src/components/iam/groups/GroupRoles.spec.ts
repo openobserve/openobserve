@@ -145,7 +145,7 @@ describe("GroupRoles Component", () => {
     });
 
     it("has correct search placeholder", () => {
-      const searchInput = wrapper.find('input[placeholder="Search roles"]');
+      const searchInput = wrapper.find('input[placeholder="Search Roles"]');
       expect(searchInput.exists()).toBe(true);
     });
 
@@ -756,7 +756,7 @@ describe("GroupRoles Component", () => {
     });
 
     it("has proper form labels and placeholders", () => {
-      const searchInput = wrapper.find('input[placeholder="Search roles"]');
+      const searchInput = wrapper.find('input[placeholder="Search Roles"]');
       expect(searchInput.exists()).toBe(true);
     });
 

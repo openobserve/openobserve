@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         class="ms-auto"
         variant="ghost"
+        icon="add"
         data-test="downtime-condition-add"
         @click="openSection"
       >

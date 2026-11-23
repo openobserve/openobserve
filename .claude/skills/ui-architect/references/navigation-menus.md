@@ -43,7 +43,7 @@ These are produced by three files — learn which one owns each surface:
 | Flat top-level list (the rail items)   | `web/src/layouts/MainLayout.vue` → `linksList` ref            |
 | Reshaping flat list → groups + flyouts | `web/src/lib/core/Navbar/navGroups.ts` → `NAV_GROUPS`         |
 | Settings sub-nav                       | `web/src/components/settings/index.vue` → `settingsItems`     |
-| IAM sub-nav                            | `web/src/composables/iam/useIamSections.ts` → `sectionGroups` |
+| IAM sub-nav                            | `web/src/views/IdentityAccessManagement.vue` → sections array |
 | Routes (by domain)                     | the router composables in [§1](#1-register-the-route)         |
 
 > The rail renderer is `web/src/lib/core/Navbar/ONavbar.vue` (+ `ONavGroup.vue` in
@@ -64,7 +64,7 @@ what the page _is_:
 | A top-level product area (its own concern, reached often) | a **plain rail item**                           | `MainLayout.vue` `linksList` + a route         |
 | One of several related data destinations                  | a **flyout child** under an existing rail group | `navGroups.ts` `NAV_GROUPS` + a route          |
 | An admin / configuration screen                           | a **sub-page under Settings**                   | `settings/index.vue` `settingsItems` + a route |
-| An access-control screen                                  | a **sub-page under IAM**                        | `useIamSections.ts` + a route                  |
+| An access-control screen                                  | a **sub-page under IAM**                        | `IdentityAccessManagement.vue` + a route       |
 
 A new page **always** needs step 1 (a route). It then needs **exactly one** of
 2a / 2b / 2c to be reachable from navigation. Don't register it in two surfaces.
@@ -175,8 +175,7 @@ into `sectionGroups`). Item shape:
 `SectionRail` filters on `item.visible !== false`, so a gated section is hidden by
 setting `visible` to the same predicate the route uses.
 
-**IAM** (`web/src/composables/iam/useIamSections.ts`, read by both the IAM shell and the
-Jump to palette, so the two cannot drift) uses the identical
+**IAM** (`web/src/views/IdentityAccessManagement.vue`) uses the identical
 `SectionRail` pattern (users, service accounts, tokens, groups, roles, quota, …).
 
 **To add a Settings sub-page:**
@@ -336,6 +335,6 @@ strings in `navGroups.ts` (flyout children may also use feature namespaces like
       `activeOnRoutes`, then the deepest path prefix, the same match that lights
       the rail) and keeps only the groups MainLayout's links actually emit
       (`providePageNavContext`). A grouped page shows the group's label; an
-      ungrouped one leaves the line empty (never the org). So a new page needs no header wiring: register
+      ungrouped one shows the org. So a new page needs no header wiring: register
       it in the right group and the line follows. A drill-down page passes
       `:back="{ label, to }"` instead, where `label` is the parent's own title key.

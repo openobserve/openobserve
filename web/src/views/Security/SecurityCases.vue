@@ -10,7 +10,6 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -25,13 +24,12 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
-import SecurityMoreMenu from "@/components/security/SecurityMoreMenu.vue";
-import SecurityLoadError from "@/components/security/SecurityLoadError.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
 import { failedRequests, viewDenial, type AccessDenial } from "@/composables/useAccessStore";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -238,9 +236,6 @@ const cases = computed<CaseRow[]>(() => {
 });
 const total = computed(() => Number(list.data.value?.total ?? cases.value.length));
 const loading = computed(() => list.isFetching.value);
-const lastRunAt = computed(() => list.dataUpdatedAt.value || null);
-// A failed read is the button's failed state, never a fresh data age.
-const failedAt = computed(() => (list.isError.value ? list.errorUpdatedAt.value || null : null));
 // The tiles count under every active filter except status, which the tiles themselves pick.
 const tileFilters = computed<CaseSearchFilters>(() => {
   const { status: _status, ...rest } = filters.value;
@@ -273,12 +268,8 @@ const error = computed(() => {
   return e?.response?.data?.message ?? e?.message ?? t("siem.cases.loadError");
 });
 
-// A failed list read is the table's error state with Retry (K5), not a bar that mounts above it late.
-const tableError = computed(() => (cases.value.length ? null : error.value || null));
-
-// A refresh that fails over rows still on screen keeps them and says so in the bar.
 const notices = computed<SecurityNotice[]>(() => [
-  ...(error.value && !tableError.value
+  ...(error.value
     ? [
         {
           key: "error",
@@ -386,7 +377,7 @@ const rowClass = (c: CaseRow) => {
 
 const filtersActive = computed(
   () =>
-    (statusFilter.value !== null && statusFilter.value !== ALL_STATUSES) ||
+    statusFilter.value !== null ||
     priorityFilter.value.length > 0 ||
     detectionFilter.value.length > 0 ||
     !!assigneeFilter.value ||
@@ -402,12 +393,7 @@ function onEmptyAction() {
   search.value = "";
 }
 
-const priorityFilterOptions = computed(() =>
-  PRIORITIES.map((p) => ({
-    label: t(toneLabelKey(toneOfPriority(p))),
-    value: p,
-  })),
-);
+const priorityFilterOptions = computed(() => PRIORITIES.map((p) => ({ label: raw(p), value: p })));
 // Facets are counted without the detection filter, so picking one never hides the others.
 const detectionlessFilters = computed<CaseSearchFilters>(() => {
   const { alert_id: _alertId, ...rest } = filters.value;
@@ -1142,7 +1128,7 @@ async function setAssignee(value: unknown) {
 
 const priorityOptions = computed(() =>
   PRIORITIES.map((p) => ({
-    label: t(toneLabelKey(toneOfPriority(p))),
+    label: t("siem.cases.priorityOption", { p, level: t(toneLabelKey(toneOfPriority(p))) }),
     value: p,
   })),
 );
@@ -1349,41 +1335,26 @@ onMounted(() => {
     bleed
     title-data-test="security-cases-title"
   >
-    <template #actions>
-      <div class="flex items-center gap-2">
-        <OButton
-          v-if="canTriage"
-          variant="secondary"
-          icon="notifications-paused"
-          data-test="security-cases-suppressions"
-          @click="suppressionsOpen = true"
-          >{{ t("siem.cases.activeSuppressions") }}</OButton
-        >
-        <ORefreshButton
-          :last-run-at="lastRunAt"
-          :failed-at="failedAt"
-          :loading="loading"
-          data-test="security-cases-refresh"
-          @click="refresh"
-        />
-        <SecurityMoreMenu data-test="security-cases-more">
-          <ODropdownItem
-            :checked="showingClosed"
-            data-test="security-cases-show-closed"
-            @select="toggleClosed"
-          >
-            {{ t("siem.cases.filter.showClosed") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="canAdmin"
-            icon="settings"
-            data-test="security-cases-settings"
-            @select="settingsOpen = true"
-          >
-            {{ t("siem.cases.settings.open") }}
-          </ODropdownItem>
-        </SecurityMoreMenu>
-      </div>
+    <template v-if="canTriage || canAdmin" #actions>
+      <OButton
+        v-if="canTriage"
+        variant="secondary"
+        icon="notifications-paused"
+        data-test="security-cases-suppressions"
+        @click="suppressionsOpen = true"
+        >{{ t("siem.cases.activeSuppressions") }}</OButton
+      >
+      <OButton
+        v-if="canAdmin"
+        icon-only
+        variant="secondary"
+        icon="settings"
+        :aria-label="t('siem.cases.settings.open')"
+        data-test="security-cases-settings"
+        @click="settingsOpen = true"
+      >
+        <OTooltip side="bottom" :content="t('siem.cases.settings.open')" />
+      </OButton>
     </template>
     <div class="flex min-h-0 flex-1 flex-col">
       <SecurityNotices
@@ -1392,14 +1363,7 @@ onMounted(() => {
         data-test="security-cases-notices"
       />
 
-      <SecurityLoadError
-        v-if="tableError"
-        :what="t('siem.cases.whatCases')"
-        :hint="t('siem.cases.loadFailedHint')"
-        @retry="refetchCases"
-      />
       <OTable
-        v-else
         :data="cases"
         :columns="columns"
         row-key="id"
@@ -1417,11 +1381,9 @@ onMounted(() => {
         :column-visibility="{ first_alert_at: false }"
         :row-class="rowClass"
         :get-row-status-color="rowRail"
-        :error="tableError"
         class="min-h-0 flex-1"
         data-test="security-cases-table"
         @row-click="open"
-        @retry="refetchCases"
       >
         <template v-if="canTriage" #selection-actions>
           <SecurityCaseBulkBar
@@ -1478,7 +1440,7 @@ onMounted(() => {
               data-test="security-cases-filter-assignee"
               @update:model-value="(v: unknown) => (assigneeFilter = v ? String(v) : null)"
             />
-            <div v-if="entityFilter" class="w-48 shrink-0 max-md:w-full">
+            <div class="w-48 shrink-0 max-md:w-full">
               <OSearchInput
                 v-model="entityFilter"
                 :placeholder="t('siem.cases.filter.entity')"
@@ -1486,6 +1448,13 @@ onMounted(() => {
                 data-test="security-cases-filter-entity"
               />
             </div>
+            <OSwitch
+              :model-value="showingClosed"
+              :label="t('siem.cases.filter.showClosed')"
+              class="shrink-0"
+              data-test="security-cases-show-closed"
+              @update:model-value="toggleClosed"
+            />
             <OStatStrip
               compact-values
               :items="stats"
@@ -1499,14 +1468,21 @@ onMounted(() => {
             />
           </div>
         </template>
+        <template #toolbar-trailing>
+          <OButton
+            icon-only
+            variant="secondary"
+            icon="refresh"
+            :loading="loading"
+            data-test="security-cases-refresh"
+            @click="refresh"
+          >
+            <OTooltip side="bottom" :content="t('siem.cases.refresh')" />
+          </OButton>
+        </template>
 
         <template #cell-severity="{ row }">
-          <OTag
-            type="severity"
-            :value="row.severity.toLowerCase()"
-            :label="t(toneLabelKey(toneOfPriority(row.severity)))"
-            size="sm"
-          />
+          <OTag type="severity" :value="row.severity.toLowerCase()" size="sm" />
         </template>
         <template #cell-title="{ row }">
           <div class="flex min-w-0 flex-col">
@@ -1598,14 +1574,6 @@ onMounted(() => {
           <OTimeCell :value="row.last_alert_at" unit="us" />
         </template>
 
-        <template #error>
-          <SecurityLoadError
-            :what="t('siem.cases.whatCases')"
-            :hint="t('siem.cases.loadFailedHint')"
-            @retry="refetchCases"
-          />
-        </template>
-
         <template #empty>
           <SecurityAccessLock
             v-if="caseDenials.length"
@@ -1651,12 +1619,7 @@ onMounted(() => {
       @next="step(1)"
     >
       <template v-if="summary" #chips>
-        <OTag
-          type="severity"
-          :value="summary.severity.toLowerCase()"
-          :label="t(toneLabelKey(toneOfPriority(summary.severity)))"
-          size="sm"
-        />
+        <OTag type="severity" :value="summary.severity.toLowerCase()" size="sm" />
         <OTag :tone="STATUS_VARIANT[summary.status as CaseStatus]" size="sm">{{
           t(`siem.caseStatus.${summary.status}`)
         }}</OTag>
@@ -1700,12 +1663,10 @@ onMounted(() => {
           <h3 class="text-text-secondary text-xs font-semibold tracking-wide uppercase">
             {{ t("siem.cases.detections") }}
           </h3>
-          <div v-if="detailLoading" class="flex flex-col gap-2">
-            <OSkeleton v-for="row in 3" :key="row" class="h-8" />
-          </div>
+          <div v-if="detailLoading" class="flex justify-center py-4"><OSpinner size="lg" /></div>
           <OEmptyState
             v-else-if="!detections.length"
-            size="compact"
+            size="inline"
             icon="rule"
             :title="t('siem.cases.noDetections')"
           />
@@ -1754,16 +1715,15 @@ onMounted(() => {
             :rows="entityRows"
             data-test="security-cases-drawer-entities"
           />
-          <OEmptyState v-else size="compact" :title="t('siem.cases.noEntities')" />
+          <span v-else class="text-text-secondary text-xs">{{ t("siem.cases.noEntities") }}</span>
         </section>
       </template>
 
       <template #tab-alerts>
-        <div v-if="detailLoading" class="flex flex-col gap-2">
-          <OSkeleton v-for="row in 5" :key="row" class="h-10" />
-        </div>
+        <div v-if="detailLoading" class="flex justify-center py-6"><OSpinner size="lg" /></div>
         <OEmptyState
           v-else-if="!alertRows.length"
+          size="inline"
           icon="notifications-active"
           :title="t('siem.cases.noAlerts')"
         />
@@ -1838,10 +1798,13 @@ onMounted(() => {
         >
           {{ t("siem.cases.timelinePartial") }}
         </OInlineNotice>
-        <div v-if="eventsLoading" class="flex flex-col gap-3">
-          <OSkeleton v-for="row in 5" :key="row" class="h-8" />
-        </div>
-        <OEmptyState v-else-if="!events.length" icon="history" :title="t('siem.cases.noEvents')" />
+        <div v-if="eventsLoading" class="flex justify-center py-6"><OSpinner size="lg" /></div>
+        <OEmptyState
+          v-else-if="!events.length"
+          size="inline"
+          icon="history"
+          :title="t('siem.cases.noEvents')"
+        />
         <OTimeline v-else data-test="security-cases-drawer-timeline">
           <OTimelineItem
             v-for="(e, i) in events"
@@ -1885,7 +1848,7 @@ onMounted(() => {
         </p>
         <OEmptyState
           v-else-if="!analyzing"
-          size="compact"
+          size="inline"
           icon="psychology"
           :title="t('siem.cases.noAnalysis')"
         />
@@ -1918,7 +1881,7 @@ onMounted(() => {
           <template #trigger>
             <OButton
               icon-only
-              variant="ghost"
+              variant="secondary"
               icon="more-vert"
               :label="t('siem.cases.moreActions')"
               data-test="security-cases-drawer-more"

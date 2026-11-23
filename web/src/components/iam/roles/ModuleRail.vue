@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- A query that matches nothing says so even under Selected, where "nothing selected" would be false. -->
       <OEmptyState
         v-if="!visibleGroups.length && (term || scope === 'granted')"
-        size="compact"
+        size="inline"
         kind="filtered"
         class="px-1.5"
         :title="

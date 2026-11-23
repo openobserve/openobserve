@@ -39,7 +39,7 @@ test.describe('Web server guides', () => {
             expect(shown).toContain(`URI               /api/${orgId}/${server}/_json`);
             expect(shown).toContain('HTTP_Passwd');
             expect(shown).toContain('•');
-            expect(shown).not.toContain('Access key');
+            expect(shown).not.toContain('Access Key');
             await expect(page.locator(`[data-test="ingestion-${server}-config-code-block-token-link"]`)).toContainText('org token');
             await expect(page.locator(`[data-test="ingestion-${server}-install-code-block"]`)).toHaveCount(install ? 1 : 0);
 

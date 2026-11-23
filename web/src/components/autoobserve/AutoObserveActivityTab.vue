@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <LiveNoticeState
         v-else-if="live.notice.value"
         :notice="live.notice.value"
-        size="region"
+        size="page"
         :busy="live.busy.value"
         data-test="autoobserve-activity-error"
         retry-test="autoobserve-activity-retry"
@@ -259,12 +259,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </tbody>
         </table>
       </div>
-      <OEmptyState
+      <p
         v-else-if="changes.length || approvals.length"
-        kind="filtered"
+        class="text-text-secondary py-6 text-center text-sm"
         data-test="autoobserve-activity-filter-empty"
-        @action="filter = 'all'"
-      />
+      >
+        {{ t("autoobserve2.activityPage.empty.filter") }}
+      </p>
       <LiveSurfaceEmpty v-else surface="changes" @action="emit('see-suggestions')" />
     </OContent>
     <AlertCalibrationDismissDialog
@@ -280,7 +281,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, reactive, ref } from "vue";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import OContent from "@/lib/core/Content/OContent.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";

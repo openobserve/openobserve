@@ -267,7 +267,7 @@ describe("AWSConfig", () => {
   it("should display AWS Integrations heading", () => {
     const heading = wrapper.find('[data-test="aws-config-page-title"]');
     expect(heading.exists()).toBe(true);
-    expect(heading.text()).toBe("AWS integrations");
+    expect(heading.text()).toBe("AWS Integrations");
   });
 
   // Test 17: Template description text

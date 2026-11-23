@@ -123,11 +123,14 @@ function handleClear() {
 }
 
 const wrapperClasses = computed(() => [
-  "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)",
+  "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
+  "ring-offset-1 ring-offset-surface-base",
   "bg-datepicker-bg",
   hasError.value
-    ? "border-datepicker-error-border focus-within:ring-3 focus-within:ring-control-error-halo"
-    : "border-datepicker-border hover:not-focus-within:border-datepicker-hover-border focus-within:border-datepicker-focus-border focus-within:ring-3 focus-within:ring-control-focus-halo",
+    ? "border-datepicker-error-border"
+    : "border-datepicker-border hover:border-datepicker-hover-border",
+  "focus-within:border-datepicker-focus-border",
+  "focus-within:ring-2 focus-within:ring-datepicker-focus-ring",
   isDisabled.value ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60" : "",
   heightClasses[props.size ?? "md"],
 ]);
@@ -159,7 +162,7 @@ const wrapperClasses = computed(() => [
           type="button"
           :disabled="isDisabled || readonly"
           :aria-label="label ? t('common.pickColorFor', { label }) : t('common.pickColor')"
-          class="ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-s-default flex shrink-0 items-center ps-2 pe-1 ring-offset-1 transition-[box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none focus-visible:ring-2"
+          class="ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-s-default flex shrink-0 items-center ps-2 pe-1 ring-offset-1 transition-[box-shadow] duration-150 outline-none focus-visible:ring-2"
           :class="isDisabled || readonly ? 'cursor-not-allowed' : 'cursor-pointer'"
         >
           <span
@@ -173,7 +176,7 @@ const wrapperClasses = computed(() => [
           <PopoverContent
             :side-offset="6"
             align="start"
-            class="rounded-default bg-colorpicker-popup-bg shadow-overlay border-border-default z-10001 flex w-55 flex-col gap-3 border p-3 max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
+            class="rounded-default bg-colorpicker-popup-bg border-colorpicker-popup-border z-10001 flex w-55 flex-col gap-3 border p-3 shadow-md max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
           >
             <!-- Saturation / Brightness area -->
             <!-- ColorAreaRoot passes gradient styles via scoped slot -->
@@ -188,7 +191,7 @@ const wrapperClasses = computed(() => [
             >
               <ColorAreaArea class="h-full w-full" :style="areaStyle" />
               <ColorAreaThumb
-                class="border-colorpicker-thumb ring-offset-surface-base focus-visible:ring-datepicker-focus-ring size-4 rounded-full border-2 shadow ring-offset-1 transition-[box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none focus-visible:ring-2"
+                class="border-colorpicker-thumb ring-offset-surface-base focus-visible:ring-datepicker-focus-ring size-4 rounded-full border-2 shadow ring-offset-1 transition-[box-shadow] duration-150 outline-none focus-visible:ring-2"
               />
             </ColorAreaRoot>
 
@@ -202,7 +205,7 @@ const wrapperClasses = computed(() => [
             >
               <ColorSliderTrack class="rounded-default h-3 w-full overflow-hidden" />
               <ColorSliderThumb
-                class="border-colorpicker-thumb ring-offset-surface-base focus-visible:ring-datepicker-focus-ring size-4 rounded-full border-2 shadow ring-offset-1 transition-[box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none focus-visible:ring-2"
+                class="border-colorpicker-thumb ring-offset-surface-base focus-visible:ring-datepicker-focus-ring size-4 rounded-full border-2 shadow ring-offset-1 transition-[box-shadow] duration-150 outline-none focus-visible:ring-2"
               />
             </ColorSliderRoot>
 

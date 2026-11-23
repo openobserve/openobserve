@@ -65,27 +65,3 @@ describe("a mutation's stales meta", () => {
     unsubscribe();
   });
 });
-
-describe("the default query retry", () => {
-  const retryFor = async (status: number | undefined) => {
-    const { shouldRetryQuery } = await import("./queryClient");
-    return shouldRetryQuery(
-      0,
-      status === undefined ? new Error("offline") : { response: { status } },
-    );
-  };
-
-  it("answers a server error at once instead of retrying it", async () => {
-    for (const status of [400, 403, 404, 409, 500, 501]) {
-      expect(await retryFor(status)).toBe(false);
-    }
-  });
-
-  it("retries a request that got no answer or a transient one, twice", async () => {
-    for (const status of [undefined, 408, 429, 502, 503, 504]) {
-      expect(await retryFor(status)).toBe(true);
-    }
-    const { shouldRetryQuery } = await import("./queryClient");
-    expect(shouldRetryQuery(2, { response: { status: 503 } })).toBe(false);
-  });
-});

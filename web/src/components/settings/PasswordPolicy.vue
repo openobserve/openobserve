@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Headless: the owner reads the form for the dependent rows, previews and change count. -->
       <OForm id="password-policy-form" :form="form">
         <div
-          class="flex flex-col gap-6"
+          class="flex flex-col gap-4"
           :data-test="pending ? 'password-policy-loading' : undefined"
         >
           <OFormSection
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <p
               v-if="rotationOn"
-              class="text-text-secondary py-3 text-xs"
+              class="text-text-secondary px-4 py-3 text-xs"
               data-test="settings-password-policy-rotation-preview"
             >
               {{ rotationPreview }}
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OSettingRow>
 
-            <p class="text-text-secondary py-3 text-xs">
+            <p class="text-text-secondary px-4 py-3 text-xs">
               {{ t("passwordPolicy.reuseExplainer") }}
             </p>
           </OFormSection>
@@ -333,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <p
               v-if="lockoutOn"
-              class="text-text-secondary py-3 text-xs"
+              class="text-text-secondary px-4 py-3 text-xs"
               data-test="settings-password-policy-lockout-preview"
             >
               {{ lockoutPreview }}

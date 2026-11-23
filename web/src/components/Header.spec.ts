@@ -206,7 +206,6 @@ describe("Header Component", () => {
       plugins: [i18n],
       stubs: {
         ThemeSwitcher: true,
-        SolutionSwitcher: true,
       },
     };
 
@@ -494,39 +493,6 @@ describe("Header Component", () => {
       aiWrapper.unmount();
     });
 
-    it("holds no place while loading when the button did not show last time", async () => {
-      window.localStorage.setItem("o2.topBar", JSON.stringify({ aiButton: false }));
-      try {
-        const aiWrapper = createWrapper({
-          mountType: "mount",
-          storeOverrides: { state: { zoConfig: { version: "" } } },
-          configOverrides: { isEnterprise: "true" },
-          stubsOverrides: {},
-        });
-        await aiWrapper.vm.$nextTick();
-
-        expect(aiWrapper.find('[data-test="header-ai-slot-placeholder"]').exists()).toBe(false);
-        aiWrapper.unmount();
-      } finally {
-        window.localStorage.removeItem("o2.topBar");
-      }
-    });
-
-    it("remembers whether the button showed once the config has loaded", async () => {
-      window.localStorage.removeItem("o2.topBar");
-      const aiWrapper = createWrapper({
-        mountType: "mount",
-        storeOverrides: { state: { zoConfig: { version: "v1", ai_enabled: false } } },
-        configOverrides: { isEnterprise: "true" },
-        stubsOverrides: {},
-      });
-      await aiWrapper.vm.$nextTick();
-
-      expect(JSON.parse(window.localStorage.getItem("o2.topBar") ?? "{}").aiButton).toBe(false);
-      aiWrapper.unmount();
-      window.localStorage.removeItem("o2.topBar");
-    });
-
     it("drops the held place once the config has loaded", async () => {
       const aiWrapper = createWrapper({
         mountType: "mount",
@@ -605,10 +571,10 @@ describe("Header Component", () => {
       const tooltip = aiButton.findComponent({ name: "OTooltip" });
       expect(tooltip.exists()).toBe(true);
       expect(String(tooltip.props("content"))).toBe(
-        "AI assistant is available in OpenObserve Enterprise",
+        "AI Assistant is available in OpenObserve Enterprise",
       );
       expect(aiButton.attributes("aria-label")).toBe(
-        "AI assistant is available in OpenObserve Enterprise",
+        "AI Assistant is available in OpenObserve Enterprise",
       );
       aiWrapper.unmount();
     });
@@ -1231,83 +1197,6 @@ describe("Header Component", () => {
     });
   });
 
-  describe("Top bar layout (R5)", () => {
-    const menuOpen = {
-      ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
-      ODropdownItem: { template: '<div role="menuitem"><slot /></div>' },
-    };
-    const helpMenu = (w: any) =>
-      w.find('[data-test="menu-link-help-item"]').element.parentElement as HTMLElement;
-
-    it("is one 48 px row", () => {
-      expect(wrapper.find('[data-test="app-top-bar"]').classes()).toContain("h-12");
-    });
-
-    it.each([
-      ["enterprise", { isEnterprise: "true", isCloud: "false" }, "Edition: Enterprise"],
-      ["Cloud", { isEnterprise: "true", isCloud: "true" }, "OpenObserve Features"],
-    ])("lists the %s edition in the Help menu, not in the bar", (_label, edition, text) => {
-      const w = createWrapper({ configOverrides: edition, stubsOverrides: menuOpen });
-      const entries = w.findAll('[data-test="upgrade-to-enterprise-btn"]');
-      expect(entries).toHaveLength(1);
-      expect(helpMenu(w).contains(entries[0].element)).toBe(true);
-      expect(entries[0].text()).toContain(text);
-    });
-
-    it("keeps the open-source upgrade link in the bar as a quiet text link", () => {
-      const w = createWrapper({ stubsOverrides: menuOpen });
-      const entries = w.findAll('[data-test="upgrade-to-enterprise-btn"]');
-      expect(entries).toHaveLength(1);
-      expect(helpMenu(w).contains(entries[0].element)).toBe(false);
-      expect(entries[0].attributes("variant")).toBe("accent-ghost");
-    });
-
-    it("draws every bar control borderless", () => {
-      const w = createWrapper({
-        configOverrides: { isEnterprise: "true" },
-        storeOverrides: {
-          state: {
-            zoConfig: { ai_enabled: true, ingestion_quota_used: 90 },
-            organizationData: { quotaThresholdMsg: "Quota at 90%" },
-          },
-        },
-        stubsOverrides: menuOpen,
-      });
-      const variants = w
-        .findAllComponents({ name: "OButton" })
-        .map((b: any) => b.props("variant") ?? (b.props("iconOnly") ? "ghost" : "secondary"));
-      expect(variants.length).toBeGreaterThan(4);
-      for (const variant of variants) expect(["ghost", "accent-ghost"]).toContain(variant);
-    });
-
-    it("gives both sides an equal share from xl, so the trigger stays at the bar's centre", () => {
-      const w = createWrapper({ mountType: "mount", stubsOverrides: { ODropdown: true } });
-      expect(w.get('[data-test="header-start"]').classes()).toContain("xl:flex-1");
-      expect(w.get('[data-test="header-end"]').classes()).toEqual(
-        expect.arrayContaining(["xl:flex-1", "xl:justify-end"]),
-      );
-      const centre = w.get('[data-test="header-search-trigger"]').element.parentElement!;
-      expect(centre.classList).toContain("xl:grow-0");
-    });
-
-    it("opens Search or jump to from its trigger", async () => {
-      const w = createWrapper({ mountType: "mount", stubsOverrides: { ODropdown: true } });
-      const trigger = w.find('[data-test="header-search-trigger"]');
-      expect(trigger.text()).toContain("Search or jump to…");
-      await trigger.trigger("click");
-      expect(w.emitted("openJumpTo")).toHaveLength(1);
-    });
-
-    it("has no Search or jump to on a focus-mode route, which has no navigation", () => {
-      const w = createWrapper({
-        propsOverrides: {
-          router: { ...mockRouter, currentRoute: { value: { meta: { focusMode: true } } } },
-        },
-      });
-      expect(w.find('[data-test="header-search-trigger"]').exists()).toBe(false);
-    });
-  });
-
   describe("Linked accounts (AC-1.4 Header part)", () => {
     const menuOpen = {
       ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
@@ -1608,7 +1497,6 @@ describe("Header Component", () => {
           provide: { store },
           stubs: {
             ThemeSwitcher: true,
-            SolutionSwitcher: true,
             OrganizationSelector: true,
             EnterpriseUpgradeDialog: true,
             ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
@@ -1783,7 +1671,6 @@ describe("Header Component", () => {
           provide: { store },
           stubs: {
             ThemeSwitcher: true,
-            SolutionSwitcher: true,
             OrganizationSelector: true,
             EnterpriseUpgradeDialog: true,
             ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },

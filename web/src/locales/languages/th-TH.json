@@ -11,11 +11,7 @@
     "bannerMessage": "ฟีเจอร์นี้ถูกล็อก ต้องมีฟีเจอร์ {feature} ในสิทธิ์การใช้งานของคุณ",
     "bannerMessageGeneric": "หน้านี้ต้องใช้ฟีเจอร์ที่ไม่มีในสิทธิ์การใช้งานของคุณ",
     "headerLocked": "ล็อกอยู่: ต้องมี {feature}",
-    "availableInEnterprise": "{feature} ใช้งานได้ใน OpenObserve Enterprise",
-    "turnedOffTitle": "ปิดใช้งานสำหรับองค์กรนี้",
-    "enterpriseTitle": "มีให้ใช้ใน Enterprise",
-    "readDocs": "อ่านเอกสาร",
-    "rbacOff": "RBAC ปิดอยู่สำหรับองค์กรนี้ ผู้ดูแลระบบเปิดได้โดยตั้งค่า {env} เป็น true ในการกำหนดค่าเซิร์ฟเวอร์"
+    "availableInEnterprise": "{feature} ใช้งานได้ใน OpenObserve Enterprise"
   },
   "emptyState": {
     "requestId": "คำขอ {id}",
@@ -84,6 +80,10 @@
       "title": "No patterns found",
       "description": "Try increasing the time range or selecting a different stream with more log data. Pattern extraction works best with at least 1,000 logs.",
       "logsAnalyzed": "Only {count} logs were analyzed."
+    },
+    "noStreamSelected": {
+      "title": "Select a stream to get started",
+      "description": "Pick a stream, then run your query to explore its data. Refine results with filters and a custom time range."
     },
     "noQueryApplied": {
       "title": "Run a query to see results",
@@ -201,6 +201,22 @@
       "action": "New key",
       "actionDesc": "Generate a cipher key"
     },
+    "noSlackChannelDefaults": {
+      "title": "ยังไม่มีช่องใดที่ตั้งองค์กรเริ่มต้นไว้",
+      "description": "คำถามในช่องที่ไม่มีค่าเริ่มต้นจะถูกส่งไปยังองค์กรเริ่มต้นของแต่ละคน (เปลี่ยนได้ด้วย /o2 org)."
+    },
+    "noSlackLinkedPeople": {
+      "title": "ยังไม่มีใครในองค์กรนี้เชื่อมโยง Slack"
+    },
+    "slackNotConnected": {
+      "title": "เชื่อมต่อเวิร์กสเปซ Slack"
+    },
+    "noAnnouncementBanners": {
+      "title": "ยังไม่มีแบนเนอร์",
+      "description": "แบนเนอร์จะแสดงประกาศที่ด้านบนของแอปให้กับองค์กรที่คุณเลือก.",
+      "action": "เพิ่มแบนเนอร์",
+      "actionDesc": "เขียนประกาศและตั้งเวลา"
+    },
     "noAiToolsets": {
       "title": "No AI toolsets yet",
       "description": "AI toolsets connect your organization to external AI capabilities.",
@@ -314,6 +330,7 @@
     "noStreams": {
       "title": "Connect a source to create your first stream",
       "description": "Streams are created automatically the moment data arrives. Set up ingestion from your app, agent, or collector to get started.",
+      "action": "Set up ingestion",
       "actionDesc": "Connect a data source",
       "createAction": "New stream",
       "createActionDesc": "Manually define a stream schema"
@@ -453,9 +470,7 @@
       "description": "No {noun} match your current filters or search. Try adjusting or clearing them.",
       "action": "Clear filters",
       "actionDesc": "Reset all filters and search",
-      "fallbackNoun": "results",
-      "noMatches": "ไม่พบรายการที่ตรงกัน",
-      "noMatchesText": "ไม่มีรายการที่ตรงกับการค้นหาหรือตัวกรองปัจจุบัน"
+      "fallbackNoun": "results"
     },
     "nouns": {
       "logs": "logs",
@@ -638,26 +653,6 @@
     "noOncallUnrouted": {
       "title": "ยังไม่มีรายการที่ต้องมีผู้รับผิดชอบ",
       "description": "การแจ้งเตือนที่เกิดขึ้นทุกครั้งส่งถึงทีมแล้ว"
-    },
-    "noSlackChannelDefaults": {
-      "title": "ยังไม่มีช่องใดที่ตั้งองค์กรเริ่มต้นไว้",
-      "description": "คำถามในช่องที่ไม่มีค่าเริ่มต้นจะถูกส่งไปยังองค์กรเริ่มต้นของแต่ละคน (เปลี่ยนได้ด้วย /o2 org)."
-    },
-    "noSlackLinkedPeople": {
-      "title": "ยังไม่มีใครในองค์กรนี้เชื่อมโยง Slack"
-    },
-    "slackNotConnected": {
-      "title": "เชื่อมต่อเวิร์กสเปซ Slack"
-    },
-    "noAnnouncementBanners": {
-      "title": "ยังไม่มีแบนเนอร์",
-      "description": "แบนเนอร์จะแสดงประกาศที่ด้านบนของแอปให้กับองค์กรที่คุณเลือก.",
-      "action": "เพิ่มแบนเนอร์",
-      "actionDesc": "เขียนประกาศและตั้งเวลา"
-    },
-    "pageError": {
-      "title": "โหลดหน้านี้ไม่ได้",
-      "description": "ไม่สามารถโหลดข้อมูลของหน้านี้ได้ ลองอีกครั้งตอนนี้หรืออีกสักครู่"
     }
   },
   "accessBoundary": {
@@ -805,13 +800,6 @@
       "traces": "เทรซ",
       "logs": "ล็อก",
       "charts": "แผนภูมิ"
-    },
-    "saveBar": {
-      "noChanges": "ไม่มีการเปลี่ยนแปลงที่ต้องบันทึก",
-      "unsavedChanges": "{n} การเปลี่ยนแปลงที่ยังไม่ได้บันทึก | {n} การเปลี่ยนแปลงที่ยังไม่ได้บันทึก",
-      "changesShort": "{n} การเปลี่ยนแปลง | {n} การเปลี่ยนแปลง",
-      "fixFields": "แก้ไข {n} ฟิลด์ | แก้ไข {n} ฟิลด์",
-      "discard": "ละทิ้ง"
     },
     "dismiss": "ปิดการแจ้งเตือน",
     "undo": "เลิกทำ",
@@ -1208,6 +1196,18 @@
     "boolFalse": "False",
     "browserTimeWithZone": "Browser Time ({zone})",
     "poweredBy": "Powered by",
+    "saveBar": {
+      "noChanges": "ไม่มีการเปลี่ยนแปลงที่ต้องบันทึก",
+      "unsavedChanges": "{n} การเปลี่ยนแปลงที่ยังไม่ได้บันทึก | {n} การเปลี่ยนแปลงที่ยังไม่ได้บันทึก",
+      "changesShort": "{n} การเปลี่ยนแปลง | {n} การเปลี่ยนแปลง",
+      "fixFields": "แก้ไข {n} ฟิลด์ | แก้ไข {n} ฟิลด์",
+      "discard": "ละทิ้ง"
+    },
+    "leaveGuard": {
+      "title": "ออกจากหน้านี้ทั้งที่มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึกหรือไม่",
+      "message": "ในหน้านี้มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก {n} รายการ และจะสูญหายหากคุณออกไป. | ในหน้านี้มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก {n} รายการ และจะสูญหายหากคุณออกไป.",
+      "keepEditing": "แก้ไขต่อ"
+    },
     "editorDraft": {
       "restoreTitle": "ฉบับร่างที่ยังไม่ได้บันทึก",
       "restoreTitleInBrowser": "การเปลี่ยนแปลงในเครื่องที่ยังไม่ได้บันทึก",
@@ -1289,12 +1289,104 @@
       "leaveMessageInBrowser": "บันทึก {entity} หรือเก็บการเปลี่ยนแปลงของคุณไว้ในเบราว์เซอร์นี้ หรือทิ้งการเปลี่ยนแปลงเหล่านั้น",
       "retentionInBrowser": "การเปลี่ยนแปลงจะถูกเก็บไว้ในเบราว์เซอร์นี้เป็นเวลา {days} วัน หรือจนกว่าคุณจะออกจากระบบ โดยจะเก็บเฉพาะ {max} รายการใหม่ล่าสุดของแต่ละประเภทเท่านั้น",
       "dotUndated": "ฉบับร่างที่ยังไม่ได้บันทึก"
-    },
-    "leaveGuard": {
-      "title": "ออกจากหน้านี้ทั้งที่มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึกหรือไม่",
-      "message": "ในหน้านี้มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก {n} รายการ และจะสูญหายหากคุณออกไป. | ในหน้านี้มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก {n} รายการ และจะสูญหายหากคุณออกไป.",
-      "keepEditing": "แก้ไขต่อ"
     }
+  },
+  "filterBar": {
+    "ariaLabel": "กรองตามฟิลด์",
+    "placeholder": "กรองตามฟิลด์ หรือพิมพ์ field=value. กด Enter เพื่อเรียกใช้",
+    "addFilter": "เพิ่มตัวกรอง",
+    "searchFields": "ค้นหาฟิลด์",
+    "searchLabels": "ค้นหาป้ายกำกับ",
+    "searchOperators": "ค้นหาเงื่อนไข",
+    "searchValue": "ค้นหาหรือพิมพ์ค่า",
+    "searchValues": "ค้นหาค่า",
+    "textField": "ข้อความ",
+    "useValue": "ใช้ \"{value}\"",
+    "useField": "ใช้ฟิลด์ \"{field}\"",
+    "useLabel": "ใช้ป้ายกำกับ \"{field}\"",
+    "searchText": "ค้นหาข้อความทั้งหมดสำหรับ \"{text}\"",
+    "emptyValue": "(ว่าง)",
+    "loadingFields": "กำลังโหลดฟิลด์…",
+    "noFields": "ไม่พบฟิลด์ที่ตรงกัน",
+    "noValues": "ไม่มีคำแนะนำ พิมพ์ค่าแล้วกด Enter",
+    "noOperators": "ไม่พบเงื่อนไขที่ตรงกัน",
+    "removeFilter": "ลบตัวกรอง",
+    "clearAll": "ล้างตัวกรองทั้งหมด",
+    "toggleConnector": "สลับระหว่าง AND และ OR",
+    "selectedCount": "ไม่ได้เลือกค่า | เลือก {count} ค่า | เลือก {count} ค่า",
+    "query": "คิวรี",
+    "builderTooltip": "สร้างตัวกรองโดยเลือกฟิลด์ เงื่อนไข และค่า",
+    "queryTooltip": "เขียนคิวรีด้วยตนเอง",
+    "queryNotParsableShort": "ตัวสร้างไม่สามารถแสดงคิวรีนี้ได้:",
+    "clearAndBuild": "ล้างและสร้าง",
+    "clearQueryTitle": "ล้างคิวรีหรือไม่?",
+    "clearQueryMessage": "คิวรีจะถูกลบ และตัวสร้างจะเริ่มต้นด้วยค่าว่าง",
+    "where": "โดยที่",
+    "addCondition": "เพิ่มเงื่อนไข",
+    "addGroup": "เพิ่มกลุ่ม",
+    "startGroup": "เริ่มกลุ่ม",
+    "addBelow": "เพิ่มเงื่อนไขด้านล่าง",
+    "ungroup": "แยกกลุ่ม",
+    "collapseGroup": "ยุบกลุ่ม",
+    "expandGroup": "ขยายกลุ่ม",
+    "moreInGroup": "อีก {count} รายการ",
+    "groupHasIssues": "มีบางอย่างในกลุ่มนี้ที่ต้องแก้ไข",
+    "chooseField": "เลือกฟิลด์",
+    "chooseValue": "เลือกค่า",
+    "lockedFilter": "ไม่สามารถแก้ไขตัวกรองนี้ได้ที่นี่ ตัวกรองจะถูกเก็บไว้ตามที่บันทึกไว้ ลบออกเพื่อละทิ้ง",
+    "limits": {
+      "conditions": "สูงสุด {count} ตัวกรอง | สูงสุด {count} ตัวกรอง",
+      "values": "สูงสุด {count} ค่า | สูงสุด {count} ค่า"
+    },
+    "validation": {
+      "incomplete": "กรอกตัวกรองนี้ให้เสร็จหรือลบออก",
+      "required": "เพิ่มตัวกรองอย่างน้อยหนึ่งรายการ",
+      "uniqueField": "{field} มีตัวกรองอยู่แล้ว แก้ไขตัวกรองนั้นหรือลบตัวกรองนี้",
+      "oneUsageCondition": "แต่ละระดับรับเงื่อนไขการใช้งานได้หนึ่งเงื่อนไข เปลี่ยนเงื่อนไขนี้เป็นกฎหรือลบออก",
+      "rumField": "ใช้ฟิลด์ในตัวหรือคอลัมน์ที่ประกอบด้วยตัวพิมพ์เล็ก ตัวเลข และขีดล่าง ไม่เกิน 128 ตัวอักษร",
+      "valueLength": "แต่ละค่าต้องมีความยาว 1 ถึง {max} ตัวอักษร",
+      "regexLength": "รูปแบบต้องมีความยาวไม่เกิน {max} ตัวอักษร",
+      "regexInvalid": "รูปแบบนี้ไม่ถูกต้องหรือไม่รองรับ ไม่สามารถใช้ lookahead, lookbehind และ backreference ได้"
+    },
+    "operatorNames": {
+      "containsIgnoreCase": "มี (ไม่สนตัวพิมพ์)",
+      "notStartsWith": "ไม่เริ่มต้นด้วย",
+      "notEndsWith": "ไม่ลงท้ายด้วย",
+      "isEmpty": "ว่าง",
+      "isNotEmpty": "ไม่ว่าง"
+    },
+    "types": {
+      "string": "ข้อความ",
+      "number": "ตัวเลข",
+      "boolean": "บูลีน"
+    },
+    "operators": {
+      "eq": "คือ",
+      "neq": "ไม่ใช่",
+      "gt": "มากกว่า",
+      "gte": "มากกว่าหรือเท่ากับ",
+      "lt": "น้อยกว่า",
+      "lte": "น้อยกว่าหรือเท่ากับ",
+      "contains": "มี",
+      "containsIgnoreCase": "มี โดยไม่คำนึงถึงตัวพิมพ์เล็ก-ใหญ่",
+      "notContains": "ไม่มี",
+      "startsWith": "ขึ้นต้นด้วย",
+      "notStartsWith": "ไม่ขึ้นต้นด้วย",
+      "endsWith": "ลงท้ายด้วย",
+      "notEndsWith": "ไม่ลงท้ายด้วย",
+      "in": "เป็นค่าใดค่าหนึ่งใน",
+      "notIn": "ไม่เป็นค่าใดเลยใน",
+      "regex": "ตรงกับ regex",
+      "notRegex": "ไม่ตรงกับ regex",
+      "isNull": "ไม่มีค่า",
+      "isNotNull": "มีค่า",
+      "isEmpty": "ว่างเปล่าหรือไม่มีค่า",
+      "isNotEmpty": "มีค่าที่ไม่ใช่ค่าว่าง",
+      "matchAll": "ตรงกับข้อความ"
+    }
+  },
+  "pageHeader": {
+    "about": "เกี่ยวกับหน้านี้"
   },
   "flow": {
     "stepPicker": {
@@ -1403,9 +1495,11 @@
     "patternNavPrevious": "ก่อนหน้า",
     "patternNavNext": "ถัดไป",
     "patternNoValuesAvailable": "No values available",
+    "sqlModeLabel": "SQL Mode",
     "nlpModeLabel": "Natural Language Mode",
     "quickModeLabel": "Quick Mode",
     "menuMore": "More",
+    "menuGroupSetOnce": "Set Once",
     "menuGroupHistory": "History",
     "menuGroupDownloads": "Downloads",
     "menuGroupSchedule": "Schedule",
@@ -1779,6 +1873,7 @@
     "viewDeletedSuccessfully": "View deleted successfully.",
     "viewCreatedSuccessfully": "View created successfully.",
     "viewUpdatedSuccessfully": "View updated successfully.",
+    "linkCopiedSuccessfully": "Link Copied Successfully!",
     "errorCopyingLink": "Error while copy link.",
     "errorShorteningLink": "Error while shortening link.",
     "webUrlNotConfigured": "Share URL is disabled until ZO_WEB_URL is configured by your administrator.",
@@ -1980,24 +2075,7 @@
     "freeTextNoTextFields": "This stream has no text fields to search.",
     "freeTextNoTextFieldsNamed": "Not searched: {streams} (no text fields).",
     "freeTextBuildNotice": "This filter has text search; edit it in SQL.",
-    "filterNotChartableNotice": "ตัวกรองนี้ไม่สามารถสร้างกราฟในตัวสร้างได้ ตัวกรองการค้นหาของคุณไม่เปลี่ยนแปลง สลับไปที่ {custom} เพื่อสร้างกราฟ",
-    "queryModeLabel": "ภาษาคิวรี",
-    "queryModeFilter": "ตัวกรอง",
-    "queryModeSql": "SQL",
-    "queryModeFilterTooltip": "กรองล็อกตามฟิลด์และค่า",
-    "queryModeSqlTooltip": "เขียนคิวรี SQL แบบเต็ม พร้อมการรวมและการเชื่อมตาราง",
-    "sqlModeNeedsOneStream": "SQL ในมุมมองนี้ใช้ได้กับสตรีมเดียว",
-    "menuGroupViewOptions": "ตัวเลือกการแสดงผล",
-    "histogramHiddenForAggregates": "คิวรีนี้คืนค่าเป็นกลุ่ม ไม่ใช่เหตุการณ์ตามเวลา จึงไม่มีฮิสโทแกรม ใช้การแสดงผลเพื่อสร้างกราฟของผลลัพธ์",
-    "linkCopied": "คัดลอกลิงก์แล้ว",
-    "linkCopiedFixedTime": "คัดลอกลิงก์แล้ว · ช่วงเวลาคงที่ {from} – {to}",
-    "linkCopiedRelativeTime": "คัดลอกลิงก์แล้ว · {period} นับจากตอนที่เปิด",
-    "recordsChipRows": "{total} แถว | {total} แถว",
-    "histogramTitleRows": "แสดง {total} แถวใน {took} ms | แสดง {total} แถวใน {took} ms",
-    "histogramTitleRowsWithScan": "แสดง {total} แถวใน {took} ms ({scanLabel}: {scanSize}) | แสดง {total} แถวใน {took} ms ({scanLabel}: {scanSize})",
-    "pickStreamFirst": "เลือกสตรีมก่อน",
-    "autoRefreshPausedInVisualize": "การรีเฟรชอัตโนมัติจะอัปเดตผลการค้นหา และจะหยุดชั่วคราวขณะที่คุณสร้างภาพข้อมูล",
-    "histogramNoTimeAxis": "ผลลัพธ์ที่จัดกลุ่มไม่มีแกนเวลา"
+    "filterNotChartableNotice": "ตัวกรองนี้ไม่สามารถสร้างกราฟในตัวสร้างได้ ตัวกรองการค้นหาของคุณไม่เปลี่ยนแปลง สลับไปที่ {custom} เพื่อสร้างกราฟ"
   },
   "menu": {
     "alertCalibration": "การปรับเทียบการแจ้งเตือน",
@@ -2031,14 +2109,6 @@
     "workflows": "เวิร์กโฟลว์ (Workflows)",
     "language": "ภาษา",
     "keyboardShortcuts": "คีย์ลัด",
-    "searchOrJumpTo": "ค้นหาหรือไปที่…",
-    "jumpToTitle": "ไปที่",
-    "addData": "เพิ่มข้อมูล",
-    "jumpToPlaceholder": "ค้นหาหน้า การแจ้งเตือน แดชบอร์ด และสตรีม",
-    "jumpToPlaceholderPages": "ค้นหาหน้าและการดำเนินการ",
-    "jumpToPages": "หน้า",
-    "jumpToShowAll": "แสดงทั้งหมดใน {page}",
-    "jumpToSearchLogs": "ค้นหา \"{text}\" ในบันทึก",
     "synthetic": "การตรวจสอบสังเคราะห์ (Synthetics)",
     "experience": "ประสบการณ์ใช้งาน (Experience)",
     "slos": "SLOs",
@@ -4119,8 +4189,7 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "You are not authorized to manage the license."
-      },
-      "usageTitle": "ปริมาณการนำเข้ารายวัน"
+      }
     },
     "value_sso_requires_ha": "✅ Requires HA mode",
     "value_rbac_requires_ha": "✅ Requires HA mode",
@@ -4289,9 +4358,7 @@
     "revokeInvitationMsg": "Are you sure you want to revoke the invitation for {email}?",
     "deleteUsersTitle": "Delete Users",
     "deleteUsersMsg": "Are you sure you want to delete {count} user? | Are you sure you want to delete {count} users?",
-    "deleteUsersBlockNote": "{count} รายในจำนวนนี้เข้าร่วมผ่านโดเมนที่ยืนยันแล้วของคุณ และจะถูกบล็อกแทนการลบ",
-    "roleHint": "Admin จัดการองค์กร Editor เปลี่ยนข้อมูลและการตั้งค่า Viewer อ่านได้อย่างเดียว",
-    "customRolesNeedRbac": "บทบาทแบบกำหนดเองต้องใช้ RBAC ซึ่งปิดอยู่สำหรับองค์กรนี้"
+    "deleteUsersBlockNote": "{count} รายในจำนวนนี้เข้าร่วมผ่านโดเมนที่ยืนยันแล้วของคุณ และจะถูกบล็อกแทนการลบ"
   },
   "invitation": {
     "pendingInvitations": "Pending Invitations",
@@ -5144,7 +5211,6 @@
   },
   "organization": {
     "searchByNameOrId": "Search by name or ID",
-    "currentLabel": "องค์กร: {name}",
     "noOrganizationsFound": "No organizations found",
     "header": "Organizations",
     "orgBeingDeletedSwitching": "This organization is being deleted. Switching you to another organization.",
@@ -5253,7 +5319,6 @@
     "timezone": "Timezone",
     "deleteActionMessage": "Are you sure you want to delete {count} field? This action cannot be undone. | Are you sure you want to delete {count} fields? This action cannot be undone.",
     "deleteDatesMessage": "Are you sure you want to delete {count} date range? This action cannot be undone. | Are you sure you want to delete {count} date ranges? This action cannot be undone.",
-    "summaryAllTypes": "Streams (ทุกประเภท)",
     "labelLogs": "Logs",
     "labelMetrics": "Metrics",
     "labelTraces": "Traces",
@@ -6410,7 +6475,7 @@
     "confirmPauseBackfillJob": "Are you sure you want to pause the backfill job for \"{name}\"? You can resume it later.",
     "confirmResumeBackfillJob": "Are you sure you want to resume the backfill job for \"{name}\"?",
     "confirmDeleteBackfillJob": "Are you sure you want to delete the backfill job for the {name} pipeline? This will remove the job from the list but will not affect the backfilled data.",
-    "frequencyMins": "{count} นาที"
+    "frequencyMins": "{count} Mins"
   },
   "function": {
     "updateModeLabel": "Update Mode",
@@ -7865,17 +7930,7 @@
       "metricsSketch": "ดิสทริบิวชันถูกจัดเก็บเป็นบักเก็ตของฮิสโตแกรม และเปอร์เซ็นไทล์จะถูกประมาณจากบักเก็ตเหล่านั้น ค่า ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA ที่สูงขึ้นจะให้บักเก็ตที่ละเอียดขึ้นและเปอร์เซ็นไทล์ที่แม่นยำขึ้น โดยแลกกับจำนวนแถวที่จัดเก็บมากขึ้น"
     },
     "gpu": "GPU",
-    "gpuExporter": "GPU exporter",
-    "rotationNote": "โทเค็นไม่ได้หมุนเวียนในที่เดิม หากต้องการหมุนเวียน ให้สร้างโทเค็นใหม่ สลับแหล่งข้อมูลไปใช้ แล้วปิดใช้งานโทเค็นเก่า",
-    "rotateAction": "หมุนเวียน…",
-    "rotateTitle": "หมุนเวียน {name}",
-    "rotateStep1": "สร้างโทเค็นใหม่",
-    "rotateStep2": "สลับแหล่งข้อมูลของคุณไปใช้โทเค็นใหม่",
-    "rotateStep3": "เมื่อไม่มีสิ่งใดใช้ {name} แล้ว ให้ปิดใช้งานจากเมนูของแถว",
-    "rotateNever": "ระบบจะไม่ปิดใช้งานให้อัตโนมัติ โทเค็นเก่าจะยังใช้งานได้จนกว่าคุณจะปิดใช้งาน",
-    "rotateCreateNew": "สร้างโทเค็นใหม่",
-    "rotateNewName": "{name}-ใหม่",
-    "rotateDescription": "แทนที่ {name}"
+    "gpuExporter": "GPU exporter"
   },
   "dashboard": {
     "panelDraft": {
@@ -9507,9 +9562,6 @@
       "addClause": "Add clause"
     },
     "viewDashboard": {
-      "apply": "ใช้",
-      "lastDataSeen": "ข้อมูลล่าสุด {when}",
-      "jumpToLatest": "ไปยังข้อมูลล่าสุด",
       "refreshToApplyVariables": "Refresh to apply latest variable changes",
       "refresh": "รีเฟรช",
       "refreshCacheReload": "Refresh cache & reload",
@@ -10264,7 +10316,6 @@
     }
   },
   "panel": {
-    "noDataInRange": "ไม่มีข้อมูลในช่วงเวลา",
     "saveAndStay": "Save and keep editing",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10545,32 +10596,12 @@
     "hoursAgo": "{count}h ago",
     "daysAgo": "{count}d ago",
     "cards": {
-      "firingAlerts": "การแจ้งเตือนที่กำลังแจ้งเตือน",
-      "failingRules": "กฎที่ล้มเหลว",
-      "openIncidents": "เหตุการณ์ขัดข้องที่เปิดอยู่",
-      "pipelineErrors": "ข้อผิดพลาดของไปป์ไลน์",
-      "pipelinesOf": "จาก {enabled} ที่เปิดใช้งาน",
-      "quietStreams": "สตรีมที่ไม่มีการเขียนข้อมูล",
-      "firingNone": "ไม่มีรายการที่กำลังแจ้งเตือน",
-      "noAlertRules": "ไม่มีกฎการแจ้งเตือน",
-      "noEnabledRules": "ไม่มีกฎที่เปิดใช้งาน",
-      "failingNone": "ไม่มีรายการที่ล้มเหลว",
-      "failingNote": "การประเมินครั้งล่าสุดเกิดข้อผิดพลาด",
-      "incidentsNone": "ไม่มีรายการที่เปิดอยู่",
-      "noPipelines": "ไม่มีไปป์ไลน์",
-      "noStreams": "ไม่มีสตรีม",
-      "quietNote": "หยุดเขียนข้อมูลใน 7 วันที่ผ่านมา",
-      "criticalUnit": "{count} รายการที่ระดับวิกฤต",
-      "deliveryFailures": "ความล้มเหลวในการส่งการแจ้งเตือน",
-      "deliveryCount": "การส่งการแจ้งเตือนล้มเหลว {count} รายการ | การส่งการแจ้งเตือนล้มเหลว {count} รายการ",
-      "deliveryNote": "การแจ้งเตือนที่ถูกทริกเกอร์แล้วแต่ไม่สามารถส่งการแจ้งเตือนได้",
-      "oldestFiring": "รายการที่กำลังแจ้งเตือนนานที่สุดเป็นเวลา {age}"
+      "openIncidents": "เหตุการณ์ขัดข้องที่เปิดอยู่"
     },
     "state": {
       "tileForbidden": "ไม่มีสิทธิ์เข้าถึง",
       "tileLocked": "ถูกล็อก",
       "tileError": "ไม่สามารถโหลดได้",
-      "tileUnavailable": "ไม่พร้อมใช้งาน",
       "sectionLocked": "ใช้งานได้ด้วยใบอนุญาตระดับองค์กร",
       "sectionForbidden": "บทบาทของคุณไม่สามารถดูข้อมูลนี้ได้ โปรดขอสิทธิ์เข้าถึงจากผู้ดูแลองค์กร"
     },
@@ -10694,39 +10725,6 @@
     "dataAsOf": "ข้อมูล ณ {time}",
     "timeRange": {
       "heading": "ในช่วงเวลาที่เลือก"
-    },
-    "firingNow": {
-      "title": "กำลังแจ้งเตือน",
-      "byLevel": "วิกฤต {critical} · คำเตือน {warning}",
-      "allQuiet": "ทุกอย่างปกติ",
-      "watching": "เปิดใช้กฎการแจ้งเตือน {count} รายการ ไม่มีการแจ้งเตือน | เปิดใช้กฎการแจ้งเตือน {count} รายการ ไม่มีการแจ้งเตือน",
-      "noRules": "ยังไม่มีกฎการแจ้งเตือน",
-      "browseLibrary": "ดูคลังการแจ้งเตือน",
-      "notifyFailed": "แจ้งเตือนไม่สำเร็จ",
-      "loadError": "โหลดการแจ้งเตือนที่กำลังทำงานไม่ได้",
-      "unavailable": "ขณะนี้อ่านสถานะการแจ้งเตือนไม่ได้"
-    },
-    "health": {
-      "subtitle": "ข้อมูลล่าสุดที่ได้รับ แยกตามประเภท",
-      "lastData": "ข้อมูลล่าสุดเมื่อ {age} ที่แล้ว",
-      "justNow": "ข้อมูลล่าสุดเมื่อสักครู่",
-      "noDataIn": "ไม่มีข้อมูลใน {range} ที่ผ่านมา",
-      "noRecords": "ยังไม่มีเรคคอร์ด",
-      "loadError": "อ่านสตรีมของคุณไม่ได้"
-    },
-    "start": {
-      "text": "ยังไม่มีข้อมูลเข้ามา ส่งข้อมูล ดูข้อมูลที่มี หรือตั้งค่าการแจ้งเตือน",
-      "addData": "เพิ่มข้อมูล",
-      "createAlert": "สร้างการแจ้งเตือน"
-    },
-    "summary": {
-      "loadError": "โหลดสรุปขององค์กรไม่ได้",
-      "loadErrorRest": "โหลดส่วนที่เหลือของสรุปไม่ได้",
-      "denied": "ไม่มีสิทธิ์เข้าถึงสรุปขององค์กร ติดต่อผู้ดูแลองค์กร"
-    },
-    "events": {
-      "runFailed": "การรันล้มเหลว",
-      "timesInRange": "{count} ครั้งในช่วงที่เลือก | {count} ครั้งในช่วงที่เลือก"
     }
   },
   "chatHistory": {
@@ -10907,8 +10905,7 @@
       "taglineAnd": "and walk you through your logs, traces, metrics and incidents.",
       "signedInAs": "Signed in as",
       "role": "บทบาท",
-      "tryOneOfThese": "Or try one of these",
-      "panelText": "ถามเกี่ยวกับล็อก เทรซ เมตริก และเหตุการณ์ หรือขอความช่วยเหลือในการเขียนคิวรี"
+      "tryOneOfThese": "Or try one of these"
     },
     "capabilities": {
       "query": {
@@ -12018,21 +12015,16 @@
     }
   },
   "alerts": {
-    "detail": {
-      "openInLogs": "เปิดในบันทึก",
-      "openInTraces": "เปิดในเทรซ",
-      "openInMetrics": "เปิดในเมตริก",
-      "evidenceFiringTip": "เปิด {stream} ด้วยตัวกรองของการแจ้งเตือนนี้ ตั้งแต่เริ่มการแจ้งเตือนครั้งนี้จนถึงตอนนี้",
-      "evidenceWindowTip": "เปิด {stream} ด้วยตัวกรองของการแจ้งเตือนนี้ในช่วง {window} ล่าสุด",
-      "threshold": "เกณฑ์",
-      "noIncident": "ยังไม่มีเหตุการณ์",
-      "conditionLabel": "เงื่อนไขการแจ้งเตือน",
-      "allRows": "ทุกแถว",
-      "viewIncidents": "ดูเหตุการณ์"
-    },
-    "summaryTrainingFailed": "การฝึกล้มเหลว",
     "columnState": "สถานะ",
-    "startFromTemplate": "เริ่มจากเทมเพลต",
+    "rowAction": {
+      "leftFilter": "ไม่ตรงกับตัวกรองอีกต่อไป",
+      "pausedLeftFilter": "{name} ถูกหยุดชั่วคราว ไม่ตรงกับตัวกรองอีกต่อไป | การแจ้งเตือน {count} รายการถูกหยุดชั่วคราว ไม่ตรงกับตัวกรองอีกต่อไป",
+      "resumedLeftFilter": "{name} กลับมาทำงานแล้ว ไม่ตรงกับตัวกรองอีกต่อไป | การแจ้งเตือน {count} รายการกลับมาทำงานแล้ว ไม่ตรงกับตัวกรองอีกต่อไป",
+      "bulkPauseFailed": "ไม่สามารถหยุดการแจ้งเตือน {failed} จาก {total} รายการ | ไม่สามารถหยุดการแจ้งเตือน {failed} จาก {total} รายการ",
+      "bulkResumeFailed": "ไม่สามารถทำให้การแจ้งเตือนกลับมาทำงานได้ {failed} จาก {total} รายการ | ไม่สามารถทำให้การแจ้งเตือนกลับมาทำงานได้ {failed} จาก {total} รายการ",
+      "paused": "หยุด {name} ชั่วคราวแล้ว | หยุดการแจ้งเตือน {count} รายการชั่วคราวแล้ว",
+      "resumed": "เปิดใช้ {name} ต่อแล้ว | เปิดใช้การแจ้งเตือน {count} รายการต่อแล้ว"
+    },
     "moreActions": "การดำเนินการเพิ่มเติม",
     "promRuleMode": "โหมดกฎการแจ้งเตือน",
     "promRulePreview": "{count} returned series match now. Each series must complete the pending period before firing.",
@@ -13466,8 +13458,7 @@
       "condition": "Condition",
       "result": "Result",
       "anomalies": "Anomalies",
-      "forGroup": "for {group}",
-      "errorFrom": "{status} จาก {destination}"
+      "forGroup": "for {group}"
     },
     "continue": "Continue",
     "wouldTrigger": "WOULD TRIGGER",
@@ -15090,17 +15081,6 @@
     "siemDetection": {
       "notice": "การแจ้งเตือนนี้เป็นการตรวจจับของ Security คิวรีของการแจ้งเตือนถูกคอมไพล์จากกฎ Sigma ดังนั้นกฎ สตรีม และกำหนดเวลาจะต้องแก้ไขใน Security ซึ่งช่วยให้กฎและคิวรีสอดคล้องกันเสมอ",
       "open": "แก้ไขใน Security"
-    },
-    "newAlertTitle": "การแจ้งเตือนใหม่",
-    "newAnomalyTitle": "การตรวจจับความผิดปกติใหม่",
-    "rowAction": {
-      "leftFilter": "ไม่ตรงกับตัวกรองอีกต่อไป",
-      "pausedLeftFilter": "{name} ถูกหยุดชั่วคราว ไม่ตรงกับตัวกรองอีกต่อไป | การแจ้งเตือน {count} รายการถูกหยุดชั่วคราว ไม่ตรงกับตัวกรองอีกต่อไป",
-      "resumedLeftFilter": "{name} กลับมาทำงานแล้ว ไม่ตรงกับตัวกรองอีกต่อไป | การแจ้งเตือน {count} รายการกลับมาทำงานแล้ว ไม่ตรงกับตัวกรองอีกต่อไป",
-      "bulkPauseFailed": "ไม่สามารถหยุดการแจ้งเตือน {failed} จาก {total} รายการ | ไม่สามารถหยุดการแจ้งเตือน {failed} จาก {total} รายการ",
-      "bulkResumeFailed": "ไม่สามารถทำให้การแจ้งเตือนกลับมาทำงานได้ {failed} จาก {total} รายการ | ไม่สามารถทำให้การแจ้งเตือนกลับมาทำงานได้ {failed} จาก {total} รายการ",
-      "paused": "หยุด {name} ชั่วคราวแล้ว | หยุดการแจ้งเตือน {count} รายการชั่วคราวแล้ว",
-      "resumed": "เปิดใช้ {name} ต่อแล้ว | เปิดใช้การแจ้งเตือน {count} รายการต่อแล้ว"
     }
   },
   "alert_dependencies": {
@@ -17971,13 +17951,7 @@
       "partial": "Some spans of this trace could not be read. The waterfall may be incomplete.",
       "truncated": "Showing the first span of this trace, in start-time order. Later spans are not loaded yet. | Showing the first {count} spans of this trace, in start-time order. Later spans are not loaded yet.",
       "loadMore": "Load the next span | Load next {size} spans",
-      "loadMoreFailed": "Could not load more spans of this trace",
-      "notFoundTitle": "ไม่พบเทรซที่มี ID นี้ระหว่าง {from} ถึง {to}",
-      "notFoundText": "เทรซ {traceId} ไม่มีสแปนในสตรีม {stream} ในช่วงนี้ อาจเก่าหรือใหม่กว่านี้ อยู่ในสตรีมอื่น หรือไม่ได้ถูกเก็บ",
-      "searchWiderRange": "ค้นหาในช่วงที่กว้างขึ้น",
-      "searchSpansInRange": "ค้นหาสแปนในช่วงนี้",
-      "loadFailedTitle": "โหลดเทรซนี้ไม่ได้",
-      "loadFailedText": "อ่านเทรซ {traceId} ไม่ได้ ลองอีกครั้งในอีกสักครู่"
+      "loadMoreFailed": "Could not load more spans of this trace"
     },
     "traceTree": {
       "clickToExpand": "Click to expand",
@@ -19905,7 +19879,7 @@
       "streamHint": "เอเจนต์เวอร์ชันนี้ส่งเทรซไปยัง {count} สตรีม ระบบจะแสดงสตรีมที่ใช้งานนานที่สุด เว้นแต่คุณจะเลือกสตรีมอื่น",
       "agentIdHint": "รหัสเอเจนต์: {ids}",
       "noAgentIdentity": "ไม่พบข้อมูลระบุตัวตนของเอเจนต์",
-      "noAgentIdentityDescription": "สแปน LLM เหล่านี้ไม่มีชื่อเอเจนต์ จึงแสดงผลตามสตรีม",
+      "noAgentIdentityDescription": "สแปน LLM เหล่านี้ไม่มีชื่อเอเจนต์ จึงแสดงผลตามสตรีม แมปแอตทริบิวต์ที่ระบุชื่อเอเจนต์ของคุณเพื่อดูข้อมูลแยกตามเอเจนต์",
       "noAgentIdentityAction": "เปิดการแมปเอเจนต์ GenAI"
     },
     "agentGraph": {
@@ -21517,6 +21491,58 @@
       "description": "LLM Providers store the connection details (base URL + credentials) for the language models your LLM Judge scorers call. Add one to start running judge-based evaluations."
     }
   },
+  "genAiAgentMapping": {
+    "tabLabel": "การแมปเอเจนต์",
+    "title": "การแมปเอเจนต์",
+    "subtitle": "วิธีที่ระบบอ่านข้อมูลระบุตัวตนของเอเจนต์ การจัดสรรต้นทุน และชื่อเซสชันจากข้อมูลเทเลเมทรี",
+    "identity": {
+      "title": "ฟิลด์ระบุตัวตนของเอเจนต์",
+      "help": "วิธีที่ OpenObserve ตั้งชื่อเอเจนต์แต่ละตัวและอ่านสภาพแวดล้อมกับเวอร์ชัน โดยจะอ่านแอตทริบิวต์มาตรฐานก่อน หากสแปนไม่มีแอตทริบิวต์นั้น ระบบจะใช้ฟิลด์สำรองแรกที่สแปนมีอยู่",
+      "agentName": "ชื่อเอเจนต์",
+      "agentId": "ID เอเจนต์",
+      "env": "สภาพแวดล้อม",
+      "version": "เวอร์ชัน"
+    },
+    "agentNameFields": "ฟิลด์สำรองสำหรับชื่อเอเจนต์",
+    "agentNameHelp": "แอตทริบิวต์ขาเข้าที่ใช้เป็นฟิลด์สำรองสำหรับ gen_ai.agent.name",
+    "agentNameInfo": "ตรวจสอบเฉพาะเมื่อแอตทริบิวต์มาตรฐาน gen_ai.agent.name หายไปหรือว่างเปล่า เพิ่มแอตทริบิวต์เทเลเมทรีขาเข้าบรรทัดละหนึ่งรายการ",
+    "agentIdFields": "ฟิลด์สำรองสำหรับ ID เอเจนต์",
+    "agentIdHelp": "แอตทริบิวต์ขาเข้าที่ใช้เป็นฟิลด์สำรองสำหรับ gen_ai.agent.id",
+    "agentIdInfo": "ตรวจสอบเฉพาะเมื่อแอตทริบิวต์มาตรฐาน gen_ai.agent.id หายไปหรือว่างเปล่า เพิ่มแอตทริบิวต์เทเลเมทรีขาเข้าบรรทัดละหนึ่งรายการ",
+    "envFields": "ฟิลด์สำรองสำหรับสภาพแวดล้อม",
+    "envHelp": "แอตทริบิวต์ขาเข้าที่ใช้เป็นสภาพแวดล้อมของเอเจนต์",
+    "envInfo": "ตรวจสอบเฉพาะเมื่อแอตทริบิวต์มาตรฐาน deployment.environment.name หายไปหรือว่างเปล่า เพิ่มแอตทริบิวต์เทเลเมทรีขาเข้าบรรทัดละหนึ่งรายการ",
+    "versionFields": "ฟิลด์สำรองสำหรับเวอร์ชัน",
+    "versionHelp": "แอตทริบิวต์ขาเข้าที่ใช้เป็นเวอร์ชันของเอเจนต์",
+    "versionInfo": "ตรวจสอบเฉพาะเมื่อแอตทริบิวต์มาตรฐาน gen_ai.agent.version หายไปหรือว่างเปล่า เพิ่มแอตทริบิวต์เทเลเมทรีขาเข้าบรรทัดละหนึ่งรายการ",
+    "alwaysAppliedStandard": "มาตรฐาน (ตรวจสอบก่อน):",
+    "coverageValue": "· ใน {percent}% ของเทรซ ในช่วง 24 ชั่วโมงที่ผ่านมา",
+    "fallbacksNote": "ป้อนฟิลด์สำรองคั่นด้วยเครื่องหมายจุลภาค ตามลำดับที่จะตรวจสอบ",
+    "fallbackInvalid": "ใช้ชื่อฟิลด์คั่นด้วยเครื่องหมายจุลภาค ใช้ได้เฉพาะตัวอักษร ตัวเลข และ . _ - : / {'@'} เท่านั้น",
+    "sessions": {
+      "title": "การแสดงผลเซสชัน",
+      "help": "วิธีตั้งชื่อเซสชันและข้อความห่อหุ้มที่ถูกซ่อนจากเซสชัน",
+      "noAgents": "ยังไม่มีเอเจนต์ เพิ่มเอเจนต์เพื่อซ่อนข้อความห่อหุ้มของเอเจนต์นั้น"
+    },
+    "applyDefaults": "นำค่าเริ่มต้นไปใช้",
+    "resetToEmpty": "รีเซ็ตเป็นค่าว่าง",
+    "clearRegistry": "ล้างรีจิสทรี",
+    "clearRegistryTitle": "ล้างรีจิสทรีเอเจนต์หรือไม่",
+    "clearRegistryDescription": "การดำเนินการนี้จะลบแถวรีจิสทรีเอเจนต์ GenAI ที่ค้นพบทั้งหมดขององค์กรนี้ เทรซที่ตรงกันรายการใหม่จะถูกเพิ่มกลับเข้าสู่รีจิสทรีระหว่างการนำเข้าข้อมูล",
+    "clearRegistryConfirm": "ล้างรีจิสทรี",
+    "saved": "บันทึกการแมปเอเจนต์แล้ว",
+    "unsavedConfirm": "การเปลี่ยนแปลงการแมปเอเจนต์ของคุณยังไม่ได้บันทึก ต้องการละทิ้งหรือไม่",
+    "clearRegistrySuccess": "ล้างรีจิสทรีเอเจนต์ GenAI แล้ว ลบเอเจนต์ที่จัดเก็บไว้ {deletedCount} รายการ และข้อสังเกตที่อยู่ในคิว {bufferCount} รายการ",
+    "saveFailed": "ไม่สามารถบันทึกการแมปเอเจนต์ได้",
+    "clearRegistryFailed": "ไม่สามารถล้างรีจิสทรีเอเจนต์ GenAI ได้",
+    "defaultsLoadFailed": "ไม่สามารถโหลดค่าเริ่มต้นของการแมปเอเจนต์ได้",
+    "defaultsFetchFailed": "ไม่สามารถดึงค่าเริ่มต้นได้ ({status})"
+  },
+  "copyButton": {
+    "copy": "คัดลอก",
+    "copied": "คัดลอกแล้ว",
+    "failed": "การคัดลอกถูกบล็อก · กด Ctrl C"
+  },
   "logs": {
     "noData": {
       "title": "Start sending data to {product}",
@@ -21532,6 +21558,7 @@
     },
     "noStream": {
       "title": "Pick a stream to start exploring",
+      "description": "Choose a stream, then press <strong>Run query</strong>. You can refine with filters, a VRL function, and a custom time range once results come in.",
       "selectStream": "Select a stream",
       "selectStreamDesc": "Browse logs, traces, metrics & RUM streams",
       "queryGuide": "Read the query guide",
@@ -21583,18 +21610,7 @@
     "detailTable": {
       "noDataAvailable": "No data available.",
       "addIcon": "Add icon",
-      "sendToAiChat": "Send to AI Chat",
-      "openTrace": "เปิดเทรซ",
-      "noTraceTitle": "ไม่มีเทรซที่เชื่อมโยงกับบันทึกนี้",
-      "noRelatedLogsTitle": "ไม่พบบันทึกที่เกี่ยวข้อง",
-      "noRelatedMetricsTitle": "ไม่พบเมตริกที่เกี่ยวข้อง",
-      "noServiceText": "ไม่สามารถจับคู่บริการกับบันทึกนี้ได้ จึงไม่สามารถค้นหาข้อมูลที่เกี่ยวข้องโดยอัตโนมัติ",
-      "searchTracesAround": "ค้นหาเทรซรอบช่วงเวลานี้",
-      "searchAroundTip": "โหลดเหตุการณ์ที่บันทึกก่อนและหลังเหตุการณ์นี้",
-      "noOfEventsTip": "จำนวนเหตุการณ์ที่จะโหลดรอบเหตุการณ์นี้",
-      "severityTip": "ระดับบันทึกที่ตรวจพบ เลือกเพื่อดูว่าตรวจพบอย่างไร",
-      "traceId": "Trace ID",
-      "spanId": "Span ID"
+      "sendToAiChat": "Send to AI Chat"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Select * query is not supported for visualization.",
@@ -21886,7 +21902,6 @@
     "showDetail": "Show details",
     "hideDetail": "Hide details",
     "runAs": "Run as",
-    "runSuggestion": "เรียกใช้ {query}",
     "searchTextFor": "Search text for \"{text}\"",
     "searchTextDesc": "Search the whole input as one phrase",
     "explain": {
@@ -21946,9 +21961,6 @@
     "minutesAgo": "{min}m ago",
     "hoursAgo": "{h}h ago",
     "notYetRefreshed": "Not yet refreshed",
-    "dataFresh": "Data is fresh",
-    "dataGettingStale": "Data is getting stale",
-    "dataStale": "Data is stale",
     "lastRefreshed": "Last refreshed: {time}",
     "refresh": "รีเฟรช",
     "refreshWithAge": "รีเฟรช, รีเฟรชล่าสุด {age}",
@@ -22757,6 +22769,11 @@
       "disabling": "Disabling…",
       "editTitle": "Edit Location",
       "empty": "No locations available",
+      "emptyState": {
+        "title": "ยังไม่มีตำแหน่ง",
+        "description": "ตำแหน่งคือสถานที่ที่มอนิเตอร์สังเคราะห์ของคุณรันการตรวจสอบ เช่น ภูมิภาคคลาวด์",
+        "actionDesc": "เพิ่มสถานที่สำหรับรันการตรวจสอบ"
+      },
       "enable": "Enable",
       "enabled": "เปิดใช้งาน",
       "enabledSuccess": "Location enabled",
@@ -22824,12 +22841,7 @@
       "noPrivateMatches": "No private locations match your search",
       "newPrivateLocation": "New private location",
       "publicSubtitle": "Cloud regions, always available",
-      "privateSubtitle": "Location is ready when at least one of its agents is live",
-      "emptyState": {
-        "title": "ยังไม่มีตำแหน่ง",
-        "description": "ตำแหน่งคือสถานที่ที่มอนิเตอร์สังเคราะห์ของคุณรันการตรวจสอบ เช่น ภูมิภาคคลาวด์",
-        "actionDesc": "เพิ่มสถานที่สำหรับรันการตรวจสอบ"
-      }
+      "privateSubtitle": "Location is ready when at least one of its agents is live"
     },
     "prefill": {
       "pageTitle": "การตรวจสอบสังเคราะห์ใหม่ · HTTP",
@@ -23861,7 +23873,6 @@
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
-      "searchOrJumpTo": "ค้นหาหรือไปที่หน้า",
       "closeDialog": "Close any dialog, drawer, or modal",
       "focusSearch": "Focus search bar",
       "focusQuery": "Focus query editor",
@@ -24024,6 +24035,14 @@
       "stepOf": "Step {current} of {total}",
       "swipeHint": "swipe to see the rest"
     },
+    "statStrip": {
+      "filters": "ตัวกรอง",
+      "showOnly": "แสดงเฉพาะ {label}",
+      "alsoShow": "แสดง {label} ด้วย",
+      "stopShowing": "หยุดแสดง {label}",
+      "scrollBack": "แสดงตัวกรองก่อนหน้า",
+      "scrollForward": "แสดงตัวกรองเพิ่มเติม"
+    },
     "attributeValueCell": {
       "addIcon": "Add icon"
     },
@@ -24112,9 +24131,7 @@
       "urlPlaceholder": "URL ของไฟล์",
       "urlHelp": "เราจะดึงไฟล์เพียงครั้งเดียวเมื่อคุณนำเข้า",
       "textPlaceholder": "วางเนื้อหาที่นี่",
-      "invalidJson": "JSON ไม่ถูกต้อง: {detail}",
-      "removeFile": "Remove file",
-      "clearAll": "ล้างทั้งหมด"
+      "invalidJson": "JSON ไม่ถูกต้อง: {detail}"
     },
     "date": {
       "openCalendar": "Open calendar",
@@ -24344,7 +24361,7 @@
         "ok": "Ok",
         "normal": "Normal",
         "firing": "Firing",
-        "notifyfailed": "ส่งไม่สำเร็จ",
+        "notifyfailed": "Notify Failed",
         "flapping": "Flapping",
         "anomaly": "Anomaly",
         "succeeded": "Succeeded",
@@ -24579,14 +24596,6 @@
       "more": "เพิ่มเติม",
       "unsaved": "การเปลี่ยนแปลงที่ยังไม่บันทึก",
       "locked": "ล็อกอยู่"
-    },
-    "statStrip": {
-      "filters": "ตัวกรอง",
-      "showOnly": "แสดงเฉพาะ {label}",
-      "alsoShow": "แสดง {label} ด้วย",
-      "stopShowing": "หยุดแสดง {label}",
-      "scrollBack": "แสดงตัวกรองก่อนหน้า",
-      "scrollForward": "แสดงตัวกรองเพิ่มเติม"
     }
   },
   "functions": {
@@ -25899,7 +25908,6 @@
       "packUnavailableHint": "Curated content for this workload hasn't shipped. Build a dashboard to chart it in the meantime.",
       "partialTelemetryKubernetes": "We found Kubernetes streams, but not the metrics this page needs (kubeletstats or cluster receiver). Check your collector's receivers.",
       "partialTelemetryHosts": "We found host streams, but not the metrics this page needs. Check your collector's hostmetrics receiver.",
-      "hostMetricsMissingTitle": "ไม่พบเมตริกของโฮสต์",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first}, and {count} more",
       "hiddenFootnote": "Data sources you don't have access to also appear here.",
@@ -26684,8 +26692,7 @@
         "p95": "The slow tail — 1 call in 20 took at least this long. Measured from completed calls in your application's traces.",
         "p99": "The worst 1% of calls took at least this long. Measured from completed calls in your application's traces.",
         "load": "Total time your apps spent on calls to this database, measured from your application's traces. It shows how much traffic this database served for your apps.",
-        "attention": "How close this instance is to a limit its own engine publishes — today, connections against max_connections. The worst such ratio, not a blended score. Sorted highest first, with instances whose health cannot be read at the top, because one you cannot see is not one you know is healthy. Measured on the database server, so it is not comparable with Database time beside it.",
-        "calls": "จำนวนครั้งที่แอปของคุณเรียกฐานข้อมูลนี้ วัดจากเทรซของแอปพลิเคชันของคุณ"
+        "attention": "How close this instance is to a limit its own engine publishes — today, connections against max_connections. The worst such ratio, not a blended score. Sorted highest first, with instances whose health cannot be read at the top, because one you cannot see is not one you know is healthy. Measured on the database server, so it is not comparable with Database time beside it."
       },
       "failedChip": "{count} failed",
       "columnSubLabels": {
@@ -27126,8 +27133,7 @@
         "tableHealthHint": "Table size, bloat and vacuum state. Bloat and vacuum are PostgreSQL only.",
         "deadlocksLocked": "Deadlocks is an Enterprise feature. Upgrade to see which queries deadlocked against each other, and why. The other database tabs work on every plan.",
         "blockedLocked": "Blocked queries is an Enterprise feature. Upgrade to see which sessions are waiting on a lock and what is holding it. The other database tabs work on every plan.",
-        "tableHealthLocked": "Table health is an Enterprise feature. Upgrade to track table size, bloat and vacuum state. The other database tabs work on every plan.",
-        "queriesHintServer": "ประเภทคิวรีที่ฐานข้อมูลของคุณรายงานในช่วงเวลานี้ นับภายในฐานข้อมูล"
+        "tableHealthLocked": "Table health is an Enterprise feature. Upgrade to track table size, bloat and vacuum state. The other database tabs work on every plan."
       }
     },
     "metrics": {
@@ -30039,6 +30045,423 @@
       }
     }
   },
+  "autoobserveLive": {
+    "where": "{cluster} / {namespace}",
+    "lessThan": "<{value}",
+    "topbar": {
+      "checked": "ตรวจสอบเมื่อ {ago}",
+      "firstCheck": "กำลังตรวจสอบครั้งแรก"
+    },
+    "retry": "ลองใหม่",
+    "classes": {
+      "errors": "ข้อผิดพลาด",
+      "latency": "ความหน่วง",
+      "saturation": "ความอิ่มตัว",
+      "absence": "หยุดส่งข้อมูล",
+      "external_probe": "การตรวจสอบสังเคราะห์",
+      "workload_health": "การรีสตาร์ต",
+      "node": "โหนด"
+    },
+    "classesInline": {
+      "errors": "ข้อผิดพลาด",
+      "latency": "ความหน่วง",
+      "saturation": "ความอิ่มตัว",
+      "absence": "การไม่ส่งข้อมูล",
+      "external_probe": "โพรบภายนอก",
+      "workload_health": "สุขภาพเวิร์กโหลด",
+      "node": "สุขภาพโหนด"
+    },
+    "states": {
+      "covered": "เฝ้าดูอยู่",
+      "weak": "อ่อนแอ",
+      "silent": "เงียบ",
+      "blind": "มองไม่เห็น",
+      "unmapped": "ไม่ได้แมป",
+      "none": "ไม่มี"
+    },
+    "monitorKinds": {
+      "alert": "การแจ้งเตือน",
+      "anomaly_detector": "ตัวตรวจจับความผิดปกติ",
+      "slo": "SLO",
+      "synthetic": "การตรวจสอบสังเคราะห์"
+    },
+    "coverage": {
+      "summaryWatched": "{watched} จาก {total} รายการที่เฝ้าดู · {pct}%",
+      "summaryWatchedShare": "{watched} จาก {total} รายการที่เฝ้าดู · {pct}",
+      "splitLabel": "{watched} รายการที่เฝ้าดู, {gaps} รายการมีช่องว่างการครอบคลุม",
+      "stateWatched": "เฝ้าดูอยู่",
+      "stateGap": "ช่องว่างการครอบคลุม",
+      "columns": {
+        "where": "ตำแหน่ง",
+        "state": "สถานะ",
+        "lastChecked": "ตรวจสอบล่าสุด"
+      },
+      "loading": "กำลังโหลดข้อมูลการครอบคลุม",
+      "loaded": "โหลดข้อมูลการครอบคลุมแล้ว",
+      "sentence": {
+        "allWatched": "ฉันกำลังเฝ้าดูบริการ 1 รายการของคุณ | ฉันกำลังเฝ้าดูบริการทั้งหมด {total} รายการของคุณ",
+        "allGaps": "บริการ 1 รายการของคุณมีช่องว่างการครอบคลุม | บริการทั้งหมด {total} รายการของคุณมีช่องว่างการครอบคลุม",
+        "watching": "ฉันกำลังเฝ้าดู {watched} จาก {total} บริการของคุณ",
+        "gaps": "{count} รายการมีช่องว่างการครอบคลุม | {count} รายการมีช่องว่างการครอบคลุม",
+        "mixed": "{watching} {gaps}"
+      },
+      "gapAdded": "เพิ่มการแจ้งเตือนสำหรับ {checks} แล้ว AutoObserve จะนับเมื่อถึงการตรวจสอบครั้งถัดไป | เพิ่มการแจ้งเตือนสำหรับ {checks} แล้ว AutoObserve จะนับเมื่อถึงการตรวจสอบครั้งถัดไป",
+      "gapNone": "ไม่มีการแจ้งเตือนใดเฝ้าดู {checks}",
+      "searchPlaceholder": "ค้นหาบริการ คลัสเตอร์ หรือเนมสเปซ",
+      "labelNamespace": "{name} · {namespace}",
+      "labelPlace": "{name} · {cluster} · {namespace}",
+      "noNamespace": "ไม่มีเนมสเปซ",
+      "noCluster": "ไม่มีคลัสเตอร์",
+      "noMatch": "ไม่มีบริการ คลัสเตอร์ หรือเนมสเปซที่ตรงกับ “{query}”",
+      "showAll": "แสดงทั้งหมด",
+      "bucketThree": "3 ขึ้นไป",
+      "bucketTwo": "2",
+      "bucketOne": "1",
+      "filterHides": "ไม่มีบริการใดอยู่ในสถานะ {state}",
+      "filterHidesSearch": "มีบริการ {count} รายการที่ตรงกับ “{query}” แต่ไม่มีรายการใดอยู่ในสถานะ {state} | มีบริการ {count} รายการที่ตรงกับ “{query}” แต่ไม่มีรายการใดอยู่ในสถานะ {state}"
+    },
+    "cell": {
+      "noClass": "AutoObserve ยังไม่ตรวจสอบสัญญาณนี้",
+      "tipNoClass": "{signal}: AutoObserve ยังไม่ตรวจสอบส่วนนี้",
+      "gap": {
+        "weak": "{signal}: มีเพียง {monitor} ซึ่งเป็นการแจ้งเตือนแบบกว้างที่อาจตรวจพบปัญหา แต่ไม่ได้จำกัดขอบเขตไว้ที่บริการนี้ | {signal}: มีเพียง {monitor} ซึ่งเป็นการแจ้งเตือนแบบกว้างที่อาจตรวจพบปัญหา แต่ไม่ได้จำกัดขอบเขตไว้ที่บริการนี้",
+        "silent": "{signal}: {monitor} ตรงกัน แต่ไม่แจ้งเตือนถึงใคร | {signal}: {monitor} ตรงกัน แต่ไม่แจ้งเตือนถึงใคร",
+        "blind": "{signal}: {monitor} ตรงกัน แต่ไม่สามารถมองเห็นข้อมูลของตนได้ | {signal}: {monitor} ตรงกัน แต่ไม่สามารถมองเห็นข้อมูลของตนได้",
+        "unmapped": "{signal}: {monitor} อาจตรงกัน แต่ไม่สามารถเชื่อมขอบเขตกับบริการได้ | {signal}: {monitor} อาจตรงกัน แต่ไม่สามารถเชื่อมขอบเขตกับบริการได้",
+        "none": "{signal}: ไม่มีการแจ้งเตือนใดเฝ้าดูส่วนนี้"
+      },
+      "added": "เพิ่มแล้ว"
+    },
+    "drawer": {
+      "moreChecks": "การตรวจสอบอื่น ๆ",
+      "chartNoData": "แผนภูมิยังไม่พร้อมใช้งาน",
+      "monitors": "การแจ้งเตือน",
+      "monitorLine": "{kind} · {state}",
+      "noMonitor": "ไม่มีการแจ้งเตือนที่ตรงกัน"
+    },
+    "charts": {
+      "empty1h": "ไม่มีข้อมูลจาก {service} ในชั่วโมงที่ผ่านมา",
+      "empty24h": "ไม่มีข้อมูลจาก {service} ใน 24 ชั่วโมงที่ผ่านมา",
+      "empty7d": "ไม่มีข้อมูลจาก {service} ใน 7 วันที่ผ่านมา",
+      "emptyPartial1h": "ไม่มีข้อมูลจาก {service} ในช่วงที่ค้นหาของชั่วโมงที่ผ่านมา",
+      "emptyPartial24h": "ไม่มีข้อมูลจาก {service} ในช่วงที่ค้นหาของ 24 ชั่วโมงที่ผ่านมา",
+      "emptyPartial7d": "ไม่มีข้อมูลจาก {service} ในช่วงที่ค้นหาของ 7 วันที่ผ่านมา",
+      "noSpanStatus": "ไม่มีสถานะสแปนใน {stream}",
+      "noLevel": "ไม่มีระดับล็อกใน {stream}",
+      "noDuration": "ไม่มีฟิลด์ระยะเวลาใน {stream}",
+      "noTraces": "ความหน่วงแสดงเป็นแผนภูมิจากเทรซ แต่ {service} ไม่ได้ส่งข้อมูลเทรซใดเลย",
+      "noMatch": "ไม่สามารถเชื่อมโยงบริการนี้กับสตรีมที่เกี่ยวข้องได้",
+      "failedQuery": "ไม่สามารถโหลดแผนภูมินี้จาก {stream} ได้",
+      "failedMatch": "ไม่สามารถค้นหาสตรีมของ {service} ได้",
+      "partial": "ข้อมูลบางส่วน",
+      "wide": "รวมบริการอื่นที่ใช้สตรีมนี้ร่วมกัน",
+      "loading": "กำลังโหลด {metric}",
+      "summary": "{metric}, {value} ในขณะนี้",
+      "summaryNone": "{metric}, ไม่มีการวัดค่าในช่วงเวลาล่าสุด"
+    },
+    "suggestions": {
+      "serviceMeta": "{where}, ประมาณ {traffic} เหตุการณ์ต่อชั่วโมง",
+      "trafficOnly": "ประมาณ {traffic} เหตุการณ์ต่อชั่วโมง",
+      "kinds": {
+        "coverage_gap": "ช่องว่างการครอบคลุม",
+        "no_absence_check": "การแจ้งเตือนที่ยังไม่มี",
+        "silent_coverage": "ไม่แจ้งเตือนใคร",
+        "coverage_lost": "การครอบคลุมขาดหาย",
+        "blind_guardrail": "ไม่ทำงาน",
+        "discovery_unusable": "คุณภาพข้อมูล",
+        "alert_no_destination": "ไม่แจ้งเตือนใคร",
+        "alert_notify_failed": "การแจ้งเตือนล้มเหลว",
+        "other": "อื่น ๆ"
+      },
+      "severity": {
+        "high": "สูง",
+        "medium": "ปานกลาง"
+      },
+      "confidence": {
+        "sufficient": "หลักฐานหนักแน่น",
+        "suggestive": "หลักฐานบางส่วน",
+        "insufficient": "หลักฐานอ่อน"
+      },
+      "body": {
+        "coverageGap": "ไม่มีอะไรคอยเฝ้าดู {service}",
+        "noAbsenceNone": "ไม่มีการแจ้งเตือนใด ๆ หาก {service} หยุดส่งข้อมูล",
+        "noAbsenceWeak": "มีเพียงการแจ้งเตือนแบบกว้างเท่านั้นที่จะสังเกตเห็นหาก {service} หยุดส่งข้อมูล",
+        "noAbsenceSilent": "การตรวจสอบที่จะสังเกตเห็นเมื่อ {service} หยุดส่งข้อมูลนั้นไม่แจ้งเตือนใคร",
+        "noAbsenceBlind": "การตรวจสอบที่จะสังเกตเห็นเมื่อ {service} หยุดส่งข้อมูลนั้นมองไม่เห็นข้อมูลของบริการดังกล่าว",
+        "silentCoverage": "{monitor} เฝ้าดู {classes} ใน {count} บริการ แต่ไม่แจ้งเตือนใคร | {monitor} เฝ้าดู {classes} ใน {count} บริการ แต่ไม่แจ้งเตือนใคร",
+        "silentWhy": "{monitor} จะสังเกตเห็นหาก {services} หยุดทำงาน แต่ไม่แจ้งเตือนใคร",
+        "silentWhyNoNames": "{monitor} จะสังเกตเห็นหากมีบริการหยุดทำงาน แต่ไม่แจ้งเตือนใคร",
+        "silentNext": "กำหนดปลายทางให้กับการแจ้งเตือนนี้.",
+        "undeliverable": "{monitor} ส่งไปยัง {destination} ไม่ได้",
+        "undeliverableWhy": "{destination} รองรับตั๋ว ไม่ใช่การแจ้งเตือน. | {destination} รองรับตั๋ว ไม่ใช่การแจ้งเตือน.",
+        "undeliverableNext": "เพิ่มเว็บฮุกหรืออีเมลควบคู่ไปด้วย; {destination} ยังคงอยู่. | เพิ่มเว็บฮุกหรืออีเมลควบคู่ไปด้วย; {destination} ยังคงอยู่.",
+        "coverageLost": "{service} สูญเสียการแจ้งเตือน {classes} เมื่อ {day}",
+        "blindStreamMissing": "{monitor} อ่าน {detail} ซึ่งไม่มีอยู่",
+        "blindNoData": "{monitor} อ่าน {detail} ซึ่งไม่มีข้อมูลล่าสุด",
+        "blindEmptyScope": "{monitor} กรองเฉพาะแถวที่ไม่มีข้อมูลเข้ามาเลย",
+        "blindUnknownField": "{monitor} กรองด้วย {field} ซึ่งเป็นฟิลด์ที่สตรีมของมันไม่มี",
+        "blindIgnoredMatcher": "{monitor} จับคู่กับ {label} ซึ่งเป็นเลเบลที่ไม่มีอยู่ในซีรีส์ใดเลย ดังนั้นจึงเฝ้าดูทุกซีรีส์",
+        "discovery": "มีเพียง {good} จาก {active} บริการที่ค้นพบเท่านั้นที่ใช้งานได้ ดังนั้นการจัดอันดับช่องว่างจึงเป็นเพียงบางส่วน",
+        "alertSyntax": "{monitor} มีคิวรีที่ไม่สามารถแยกวิเคราะห์ได้",
+        "alertTimeout": "{monitor} หมดเวลาเป็นประจำก่อนทำงานเสร็จ",
+        "alertMemory": "{monitor} ประสบปัญหาหน่วยความจำไม่เพียงพอซ้ำ ๆ",
+        "alertOtherError": "{monitor} เกิดข้อผิดพลาดและล้มเหลวซ้ำ ๆ",
+        "alertNotWorkingGeneric": "{monitor} ไม่ทำงาน",
+        "alertNoDestination": "{monitor} ถูกทริกเกอร์แล้วแต่ไม่แจ้งเตือนใคร",
+        "alertNotifyFailed": "{monitor} ถูกทริกเกอร์แล้ว และการแจ้งเตือน {failed} จาก {tried} รายการล้มเหลว. | {monitor} ถูกทริกเกอร์แล้ว และการแจ้งเตือน {failed} จาก {tried} รายการล้มเหลว.",
+        "alertNotifyFailedNoCounts": "{monitor} ถูกทริกเกอร์แล้ว และการแจ้งเตือนล้มเหลว.",
+        "alertStreamGone": "{monitor} ล้มเหลวซ้ำ ๆ เพราะสตรีมของมันไม่มีอยู่",
+        "alertFieldGone": "{monitor} ล้มเหลวซ้ำ ๆ เพราะฟิลด์ที่ใช้งานไม่มีอยู่",
+        "other": "พบสิ่งที่หน้านี้ยังแสดงไม่ได้ในขณะนี้"
+      },
+      "detail": {
+        "cell": "{check}: {state}",
+        "cells": "สิ่งที่เอนจินพบ: {cells}.",
+        "services": "บริการที่ตรงกันรวมถึง {services}.",
+        "text": "รายละเอียดจากเอนจิน: {detail}",
+        "quality": "การค้นพบกำลังทำงานในโหมด {mode}.",
+        "none": "เอนจินไม่ได้ส่งรายละเอียดเพิ่มเติม.",
+        "joined": "{first} {rest}"
+      },
+      "analysedAt": "จากการทำงานปรับเทียบ {ago}",
+      "neverFired": "ไม่เคยถูกทริกเกอร์",
+      "lastFired": "แจ้งเตือนล่าสุดเมื่อ {time}",
+      "accept": "ยอมรับ",
+      "dismiss": "ไม่สนใจ…",
+      "accepted": "ยอมรับแล้วในตัวอย่างนี้; ไม่มีการส่งข้อมูลใด ๆ",
+      "dismissed": "ไม่สนใจแล้วในตัวอย่างนี้; ไม่มีการส่งข้อมูลใด ๆ",
+      "loading": "กำลังโหลดคำแนะนำ",
+      "loaded": "โหลดคำแนะนำแล้ว",
+      "more": "และอีก {count} รายการ | และอีก {count} รายการ",
+      "moreNames": "อีก {count} รายการ | อีก {count} รายการ",
+      "whyNext": "{why} {next}",
+      "seeAll": "ดูทั้งหมด",
+      "drawerTitle": "คำแนะนำ",
+      "drawerLine": "จัดอันดับตามสิ่งที่สำคัญที่สุดก่อน เปิดแถวเพื่อดูสิ่งที่ฉันพบ",
+      "focusGone": "คำแนะนำนี้ไม่ได้เปิดอยู่แล้ว",
+      "clearKind": "แสดงคำแนะนำทั้งหมด",
+      "kindEmptyTitle": "ไม่มีคำแนะนำที่เปิดอยู่ประเภท {kind}",
+      "kindEmptyDesc": "มีคำแนะนำอื่นที่เปิดอยู่อีก {count} รายการ | มีคำแนะนำอื่นที่เปิดอยู่อีก {count} รายการ",
+      "folder": "โฟลเดอร์ {folder}",
+      "columns": {
+        "suggestion": "คำแนะนำ",
+        "where": "ตำแหน่ง",
+        "kind": "ประเภท",
+        "severity": "ความรุนแรง"
+      }
+    },
+    "notice": {
+      "offTitle": "AutoObserve ยังไม่ได้เปิดใช้งาน",
+      "details": "รายละเอียด",
+      "refreshFailed": "รีเฟรชล้มเหลวเมื่อ {failedAt} · กำลังแสดง {what} จาก {dataAt}",
+      "what": {
+        "coverage": "ความครอบคลุม",
+        "suggestions": "คำแนะนำ",
+        "incidents": "ข้อค้นพบที่แจ้งเตือนเรียกเวร",
+        "issues": "ปัญหา",
+        "history": "ประวัติ"
+      },
+      "coverage": {
+        "deniedTitle": "คุณไม่มีสิทธิ์ดูความครอบคลุม",
+        "deniedDesc": "ความครอบคลุมจะนับมอนิเตอร์ในทุกโฟลเดอร์ จึงต้องมีสิทธิ์ดูการแจ้งเตือนทั้งหมดในองค์กรนี้ ไม่ใช่เพียงบางโฟลเดอร์ โปรดขอสิทธิ์ดังกล่าวจากผู้ดูแลองค์กร",
+        "offDesc": "ผู้ดูแลระบบจะเปิดใช้งานสำหรับการติดตั้งใช้งานนี้ ความครอบคลุมจะแสดงที่นี่หลังจากการตรวจสอบครั้งแรก",
+        "unavailableTitle": "ความครอบคลุมไม่พร้อมใช้งานชั่วคราว",
+        "unavailableDesc": "AutoObserve ไม่ตอบสนองในขณะนี้ โดยปกติปัญหานี้จะหายไปภายในหนึ่งหรือสองนาที",
+        "failedTitle": "ไม่สามารถโหลดความครอบคลุมได้",
+        "failedDesc": "เกิดข้อผิดพลาดขณะโหลดความครอบคลุม โปรดลองอีกครั้งในอีกสักครู่",
+        "noPassTitle": "ไม่มีการตรวจสอบใดเสร็จสิ้นในช่วงหนึ่งวันที่ผ่านมา",
+        "noPassDesc": "ความครอบคลุมจะแสดงที่นี่หลังจากการตรวจสอบบริการของคุณครั้งถัดไปเสร็จสิ้น หากเพิ่งเปิดใช้งาน AutoObserve การตรวจสอบครั้งแรกอาจใช้เวลาสักครู่",
+        "noPassAction": "ฉันตรวจสอบความครอบคลุมอย่างไร",
+        "noServicesTitle": "ยังไม่พบบริการ",
+        "noServicesDesc": "การตรวจสอบครั้งล่าสุดของฉันเมื่อ {when} ไม่พบบริการ บริการจะแสดงที่นี่เมื่อส่งล็อก เมทริกซ์ หรือเทรซที่ระบุชื่อบริการ",
+        "noServicesAction": "ฉันค้นหาบริการอย่างไร"
+      },
+      "suggestions": {
+        "deniedTitle": "คุณไม่มีสิทธิ์ดูคำแนะนำ",
+        "deniedDesc": "การดูคำแนะนำต้องมีสิทธิ์ดูการแจ้งเตือนในองค์กรนี้ โปรดขอสิทธิ์ดังกล่าวจากผู้ดูแลองค์กร",
+        "offDesc": "คำแนะนำจะแสดงที่นี่หลังจากผู้ดูแลระบบเปิดใช้งานสำหรับการติดตั้งใช้งานนี้",
+        "unavailableTitle": "คำแนะนำไม่พร้อมใช้งานชั่วคราว",
+        "unavailableDesc": "AutoObserve ไม่ตอบสนองในขณะนี้ โดยปกติปัญหานี้จะหายไปภายในหนึ่งหรือสองนาที",
+        "failedTitle": "ไม่สามารถโหลดคำแนะนำได้",
+        "failedDesc": "เกิดข้อผิดพลาดขณะโหลดคำแนะนำ โปรดลองอีกครั้งในอีกสักครู่",
+        "emptyTitle": "ยังไม่มีคำแนะนำในขณะนี้",
+        "emptyDesc": "ฉันจะเพิ่มคำแนะนำที่นี่เมื่อพบช่องว่างในการครอบคลุมของตัวตรวจสอบของคุณ",
+        "pageEmptyTitle": "คำแนะนำอันดับสูงสุดได้รับการจัดการแล้ว",
+        "pageEmptyDesc": "เปิดรายการทั้งหมดเพื่อดูรายการที่ยังรออยู่"
+      },
+      "history": {
+        "deniedTitle": "คุณไม่มีสิทธิ์ดูประวัติ",
+        "deniedDesc": "ประวัติแสดงรายการเหตุการณ์ขัดข้องที่ AutoObserve เปิดขึ้น ดังนั้นการดูประวัตินี้ต้องมีสิทธิ์ในการแสดงรายการเหตุการณ์ขัดข้องในองค์กรนี้ โปรดขอสิทธิ์จากผู้ดูแลองค์กร",
+        "offDesc": "ประวัติจะแสดงที่นี่หลังจากผู้ดูแลระบบเปิดใช้งานสำหรับการติดตั้งนี้",
+        "unavailableTitle": "ประวัติไม่พร้อมใช้งานชั่วคราว",
+        "unavailableDesc": "AutoObserve ไม่ตอบสนองในขณะนี้ โดยปกติจะกลับมาใช้งานได้ภายในหนึ่งถึงสองนาที",
+        "failedTitle": "ไม่สามารถโหลดประวัติได้",
+        "failedDesc": "เกิดข้อผิดพลาดขณะโหลด โปรดลองอีกครั้งในอีกสักครู่"
+      },
+      "incidents": {
+        "deniedTitle": "คุณไม่มีสิทธิ์ดูข้อค้นพบที่แจ้งเตือนเรียกเวร",
+        "deniedDesc": "ข้อค้นพบที่แจ้งเตือนเรียกเวรจะเปิดเหตุการณ์ขัดข้อง ดังนั้นการดูข้อค้นพบเหล่านี้ต้องมีสิทธิ์ในการแสดงรายการเหตุการณ์ขัดข้องในองค์กรนี้ โปรดขอสิทธิ์จากผู้ดูแลองค์กร",
+        "offDesc": "ข้อค้นพบที่แจ้งเตือนเรียกเวรจะแสดงที่นี่หลังจากผู้ดูแลระบบเปิดใช้งานสำหรับการติดตั้งนี้",
+        "unavailableTitle": "ข้อค้นพบที่แจ้งเตือนเรียกเวรไม่พร้อมใช้งานชั่วคราว",
+        "unavailableDesc": "AutoObserve ไม่ตอบสนองในขณะนี้ โดยปกติจะกลับมาใช้งานได้ภายในหนึ่งถึงสองนาที",
+        "failedTitle": "ไม่สามารถโหลดข้อค้นพบที่แจ้งเตือนเรียกเวรได้",
+        "failedDesc": "เกิดข้อผิดพลาดขณะโหลด โปรดลองอีกครั้งในอีกสักครู่"
+      },
+      "issues": {
+        "deniedTitle": "คุณไม่มีสิทธิ์ดูปัญหา",
+        "deniedDesc": "ปัญหาเป็นเหตุการณ์ขัดข้องที่ AutoObserve เปิดขึ้น ดังนั้นการดูปัญหาเหล่านี้ต้องมีสิทธิ์ในการแสดงรายการเหตุการณ์ขัดข้องในองค์กรนี้ โปรดขอสิทธิ์จากผู้ดูแลองค์กร",
+        "offDesc": "ปัญหาจะแสดงที่นี่หลังจากผู้ดูแลระบบเปิดใช้งานสำหรับการติดตั้งนี้",
+        "unavailableTitle": "ปัญหาไม่พร้อมใช้งานชั่วคราว",
+        "unavailableDesc": "AutoObserve ไม่ตอบสนองในขณะนี้ โดยปกติจะกลับมาใช้งานได้ภายในหนึ่งถึงสองนาที",
+        "failedTitle": "ไม่สามารถโหลดปัญหาได้",
+        "failedDesc": "เกิดข้อผิดพลาดขณะโหลด โปรดลองอีกครั้งในอีกสักครู่"
+      }
+    },
+    "time": {
+      "justNow": "เมื่อสักครู่",
+      "ago": "{time} ที่แล้ว"
+    },
+    "history": {
+      "incident": "เปิดเหตุการณ์ขัดข้อง: {title}",
+      "dismissed": "{actor} ไม่สนใจ {title}",
+      "accepted": "{actor} ทำเครื่องหมาย {title} ว่าเป็นรายงานตามที่ตั้งใจไว้",
+      "changed": "{actor} เปลี่ยนแปลง {title}",
+      "denied": {
+        "incidents": "ไม่ได้แสดงรายการเหตุการณ์ขัดข้อง: คุณไม่มีสิทธิ์ดู",
+        "decisions": "ไม่ได้แสดงรายการการตัดสินใจ: คุณไม่มีสิทธิ์ดู"
+      },
+      "untitled": "คำแนะนำ",
+      "openIncident": "เปิดเหตุการณ์ขัดข้อง",
+      "newest": "กำลังแสดง {count} รายการใหม่ล่าสุด เหตุการณ์ขัดข้องที่เก่ากว่าอยู่ในหน้าปัญหา",
+      "loading": "กำลังโหลดประวัติ",
+      "loaded": "โหลดประวัติแล้ว"
+    },
+    "incidents": {
+      "title": "ข้อค้นพบที่แจ้งเตือนเรียกเวร",
+      "subtitle": "ข้อค้นพบที่เปิดเหตุการณ์ขัดข้องให้ทีมเวรประจำการของคุณ พร้อมการวิเคราะห์",
+      "pagingNote": "การแจ้งเตือนเรียกเวรปิดอยู่สำหรับองค์กรนี้ ดังนั้น AutoObserve จะไม่เปิดเหตุการณ์ขัดข้อง",
+      "sharedFor": "{label}: {reason}",
+      "finding": {
+        "stream_silence": "{stream} ({type}) หยุดส่งข้อมูล",
+        "stream_drop": "ปริมาณข้อมูลของ {stream} ({type}) ลดลงอย่างรวดเร็ว",
+        "stream_rise": "ปริมาณข้อมูลของ {stream} ({type}) เพิ่มขึ้นอย่างรวดเร็ว"
+      },
+      "opened": "เปิดเหตุการณ์ขัดข้องเมื่อ {when}",
+      "openIncident": "เปิดเหตุการณ์ขัดข้อง",
+      "viewAnalysis": "ดูการวิเคราะห์",
+      "newFindings": "{count} ข้อค้นพบใหม่ | {count} ข้อค้นพบใหม่",
+      "showNew": "แสดง",
+      "more": "กำลังแสดง {count} รายการใหม่สุด",
+      "seeAll": "ดูเหตุการณ์ขัดข้องทั้งหมด",
+      "seeAllIssues": "ดูปัญหาทั้งหมด",
+      "failedDetail": {
+        "status": "คำขอล้มเหลวด้วยสถานะ {status} เมื่อ {time}.",
+        "noResponse": "คำขอไม่ได้รับการตอบกลับเมื่อ {time}."
+      },
+      "analysis": {
+        "notRunDetail": "ยังไม่มีการเริ่มการวิเคราะห์ เปิดเหตุการณ์ขัดข้องเพื่อเริ่มการวิเคราะห์.",
+        "disabledDetail": "การวิเคราะห์ด้วย AI ถูกปิดสำหรับการติดตั้งใช้งานนี้.",
+        "offOther": "การวิเคราะห์อัตโนมัติไม่ได้ทำงานสำหรับเหตุการณ์ขัดข้องนี้.",
+        "failedDetail": "การวิเคราะห์หยุดก่อนเสร็จสิ้น ดูรายละเอียดได้จากรายการนั้น."
+      },
+      "empty": {
+        "title": "ยังไม่มีเหตุการณ์ใดแจ้งเตือนเรียกเวรถึงใคร",
+        "desc": "เมื่อสตรีมหยุดหรือปริมาณข้อมูลเปลี่ยนแปลงอย่างรวดเร็ว เหตุการณ์ขัดข้องและการวิเคราะห์จะแสดงที่นี่."
+      },
+      "emptyOff": {
+        "title": "การแจ้งเตือนเรียกเวรปิดอยู่",
+        "desc": "AutoObserve บันทึกข้อค้นพบของสตรีมสำหรับองค์กรนี้ แต่ไม่เปิดเหตุการณ์ขัดข้องใด ๆ ผู้ดูแลระบบเป็นผู้เปิดการแจ้งเตือนเรียกเวร."
+      },
+      "loading": "กำลังโหลดข้อค้นพบที่มีการแจ้งเตือนเรียกเวร…",
+      "loaded": "โหลดข้อค้นพบที่มีการแจ้งเตือนเรียกเวรแล้ว",
+      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
+      "routing": "Set up on-call routing"
+    },
+    "issues": {
+      "searchPlaceholder": "ค้นหาเหตุการณ์ที่เกิดขึ้นหรือสตรีม",
+      "columns": {
+        "incident": "สิ่งที่เกิดขึ้น",
+        "severity": "ความรุนแรง",
+        "status": "สถานะ",
+        "stream": "สตรีม",
+        "opened": "เปิดเมื่อ",
+        "analysis": "การวิเคราะห์",
+        "page": "ผู้ที่ได้รับการแจ้งเตือนเรียกเวร"
+      },
+      "count": "ไม่มีปัญหา | {count} ปัญหา | {count} ปัญหา",
+      "capNote": "กำลังแสดงปัญหาใหม่สุด {count} รายการ ลดช่วงเวลาเพื่อดูรายการที่เก่ากว่า.",
+      "emptyRange": "ไม่มีปัญหา {within}",
+      "streamType": "สตรีมประเภท {type}",
+      "streamMore": "{stream} +{count}",
+      "filterOpen": "เปิดอยู่",
+      "loading": "กำลังโหลดปัญหา…",
+      "loaded": "โหลดปัญหาแล้ว",
+      "page": {
+        "unrouted": "ไม่มีการแจ้งเตือนเรียกเวรถึงใคร",
+        "failed": "การแจ้งเตือนเรียกเวรล้มเหลว",
+        "pending": "ยังไม่ได้รับการยืนยัน"
+      },
+      "today": "วันนี้",
+      "yesterday": "เมื่อวาน",
+      "shared": {
+        "rcaDisabled": "การวิเคราะห์ด้วย AI ถูกปิดอยู่เมื่อเหตุการณ์ขัดข้องเหล่านี้เปิดขึ้น.",
+        "aiUnavailable": "การวิเคราะห์ด้วย AI ไม่พร้อมใช้งานเมื่อเหตุการณ์ขัดข้องเหล่านี้เปิดขึ้น.",
+        "quotaExceeded": "องค์กรถึงขีดจำกัดการวิเคราะห์ด้วย AI เมื่อเหตุการณ์ขัดข้องเหล่านี้เปิดขึ้น.",
+        "coolingDown": "การวิเคราะห์เพิ่งทำงานไป จึงไม่มีการเริ่มการวิเคราะห์ใหม่สำหรับเหตุการณ์ขัดข้องเหล่านี้.",
+        "startFailed": "ไม่สามารถเริ่มการวิเคราะห์ได้.",
+        "offOther": "การวิเคราะห์อัตโนมัติไม่ได้ทำงานสำหรับเหตุการณ์ขัดข้องเหล่านี้.",
+        "disabled": "การวิเคราะห์ด้วย AI ถูกปิดสำหรับการติดตั้งใช้งานนี้.",
+        "notRun": "ยังไม่มีการเริ่มการวิเคราะห์ เปิดเหตุการณ์ขัดข้องเพื่อเริ่มการวิเคราะห์.",
+        "failed": "การวิเคราะห์เหล่านี้หยุดก่อนเสร็จสิ้น ดูรายการหนึ่งเพื่อดูรายละเอียด."
+      }
+    },
+    "surfaces": {
+      "changes": {
+        "title": "ยังไม่มีการเปลี่ยนแปลง",
+        "desc": "AutoObserve แนะนำวิธีแก้ไขแต่ยังไม่ได้เปลี่ยนแปลงการแจ้งเตือนหรือการตั้งค่าใด ๆ เมื่อมีการเปลี่ยนแปลง จะแสดงที่นี่พร้อมผลว่าสำเร็จหรือไม่ ตอนนี้ โปรดตรวจดูข้อเสนอแนะและนำไปใช้รายการที่ต้องการ.",
+        "action": "ตรวจดูข้อเสนอแนะ"
+      },
+      "history": {
+        "title": "ยังไม่มีประวัติ",
+        "desc": "สิ่งที่ AutoObserve ค้นพบ สิ่งที่เปลี่ยนแปลง และสิ่งที่คุณตัดสินใจจะแสดงที่นี่ โดยใหม่สุดก่อน ปัจจุบัน ข้อค้นพบของระบบจะเปิดเหตุการณ์ขัดข้อง ซึ่งแสดงอยู่บนหน้าปัญหา.",
+        "action": "ปัญหาที่เปิดอยู่"
+      },
+      "scenario": {
+        "tag": "ข้อมูลเรียลไทม์",
+        "text": "คุณกำลังดูข้อมูลเรียลไทม์ขององค์กรนี้ สถานการณ์ตัวอย่างจะไม่แสดงที่นี่",
+        "action": "วิธีการทำงาน"
+      },
+      "settings": {
+        "title": "ยังไม่มีอะไรให้ตั้งค่าที่นี่",
+        "desc": "ผู้ดูแลระบบเปิดใช้งาน AutoObserve และการแจ้งเตือนเรียกเวรสำหรับการติดตั้งนี้ จะมีการกำหนดว่าผู้ใดจะได้รับการแจ้งเตือนและระบบจะดำเนินการเองได้มากเพียงใดที่นี่ เมื่อมีตัวควบคุมดังกล่าว",
+        "action": "วิธีการทำงาน"
+      }
+    },
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "deniedTitle": "คุณไม่มีสิทธิ์ดูการตั้งค่าการแจ้งเตือนเรียกเวร",
+      "deniedDesc": "การแจ้งเตือนเรียกเวรตั้งค่าเพียงครั้งเดียวสำหรับทั้งองค์กร โปรดขอสิทธิ์จากผู้ดูแลระบบขององค์กร",
+      "failedTitle": "ไม่สามารถโหลดการตั้งค่าการแจ้งเตือนเรียกเวรได้",
+      "failedDesc": "เกิดข้อผิดพลาดขณะโหลด โปรดลองอีกครั้งในอีกสักครู่",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
+    },
+    "learning": {
+      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
+      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
+      "emptyTitle": "Learning your streams",
+      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
+      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
+      "until": "Learning until {date} · {streams}",
+      "streams": "Learning {count} stream | Learning {count} streams",
+      "streamUntil": "until {date}"
+    }
+  },
   "autoobserve2": {
     "nav": {
       "history": "History",
@@ -30223,7 +30646,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "ขั้นตอนที่ 1 · ข้อกำหนดเบื้องต้นของเซิร์ฟเวอร์",
+      "title": "Step 1 · Server prerequisites",
       "subtitle": "Checked on this server before any Slack work",
       "columnSetting": "Setting",
       "columnResult": "Result",
@@ -30297,7 +30720,7 @@
       "back": "ย้อนกลับ",
       "finish": "Finish",
       "connection": {
-        "title": "ขั้นตอนที่ 2 · การเชื่อมต่อ",
+        "title": "Step 2 · Connection",
         "description": "The check reaches Slack from this server through the same code path production uses.",
         "allPassed": "Slack is reachable from this server",
         "someFailed": "Slack is not reachable from this server. Allow *.slack.com through your proxy or firewall, then Re-check.",
@@ -30306,7 +30729,7 @@
         "socketHost": "WebSocket host {host}"
       },
       "create": {
-        "title": "ขั้นตอนที่ 3 · สร้างแอป",
+        "title": "Step 3 · Create the app",
         "modeLabel": "Connection mode",
         "socket": "Socket Mode",
         "socketDescription": "Recommended. OpenObserve opens the connection, so Slack needs no public URL",
@@ -30335,7 +30758,7 @@
         "signingSecretRequired": "HTTP mode needs the signing secret"
       },
       "install": {
-        "title": "ขั้นตอนที่ 4 · ติดตั้ง",
+        "title": "Step 4 · Install",
         "created": "App created · {appId}",
         "allowHint": "Opens Slack's install screen: click Allow there. The bot token comes back from Slack by itself; nothing to copy.",
         "allow": "Allow in Slack",
@@ -30358,7 +30781,7 @@
         "appNotCreatedByO2": "OpenObserve did not create this app, so it stays in Slack. Delete it there if you no longer need it."
       },
       "test": {
-        "title": "ขั้นตอนที่ 5 · ทดสอบและเชื่อมบัญชี",
+        "title": "Step 5 · Test and linking",
         "run": "Run checks",
         "signIn": "Test Sign in with Slack",
         "signInPassed": "Sign in with Slack works",
@@ -32743,423 +33166,6 @@
     "deletedQuery": "ลบ {query} แล้ว",
     "undo": "เลิกทำ"
   },
-  "autoobserveLive": {
-    "where": "{cluster} / {namespace}",
-    "lessThan": "<{value}",
-    "topbar": {
-      "checked": "ตรวจสอบเมื่อ {ago}",
-      "firstCheck": "กำลังตรวจสอบครั้งแรก"
-    },
-    "retry": "ลองใหม่",
-    "classes": {
-      "errors": "ข้อผิดพลาด",
-      "latency": "ความหน่วง",
-      "saturation": "ความอิ่มตัว",
-      "absence": "หยุดส่งข้อมูล",
-      "external_probe": "การตรวจสอบสังเคราะห์",
-      "workload_health": "การรีสตาร์ต",
-      "node": "โหนด"
-    },
-    "classesInline": {
-      "errors": "ข้อผิดพลาด",
-      "latency": "ความหน่วง",
-      "saturation": "ความอิ่มตัว",
-      "absence": "การไม่ส่งข้อมูล",
-      "external_probe": "โพรบภายนอก",
-      "workload_health": "สุขภาพเวิร์กโหลด",
-      "node": "สุขภาพโหนด"
-    },
-    "states": {
-      "covered": "เฝ้าดูอยู่",
-      "weak": "อ่อนแอ",
-      "silent": "เงียบ",
-      "blind": "มองไม่เห็น",
-      "unmapped": "ไม่ได้แมป",
-      "none": "ไม่มี"
-    },
-    "monitorKinds": {
-      "alert": "การแจ้งเตือน",
-      "anomaly_detector": "ตัวตรวจจับความผิดปกติ",
-      "slo": "SLO",
-      "synthetic": "การตรวจสอบสังเคราะห์"
-    },
-    "coverage": {
-      "summaryWatched": "{watched} จาก {total} รายการที่เฝ้าดู · {pct}%",
-      "summaryWatchedShare": "{watched} จาก {total} รายการที่เฝ้าดู · {pct}",
-      "splitLabel": "{watched} รายการที่เฝ้าดู, {gaps} รายการมีช่องว่างการครอบคลุม",
-      "stateWatched": "เฝ้าดูอยู่",
-      "stateGap": "ช่องว่างการครอบคลุม",
-      "columns": {
-        "where": "ตำแหน่ง",
-        "state": "สถานะ",
-        "lastChecked": "ตรวจสอบล่าสุด"
-      },
-      "loading": "กำลังโหลดข้อมูลการครอบคลุม",
-      "loaded": "โหลดข้อมูลการครอบคลุมแล้ว",
-      "sentence": {
-        "allWatched": "ฉันกำลังเฝ้าดูบริการ 1 รายการของคุณ | ฉันกำลังเฝ้าดูบริการทั้งหมด {total} รายการของคุณ",
-        "allGaps": "บริการ 1 รายการของคุณมีช่องว่างการครอบคลุม | บริการทั้งหมด {total} รายการของคุณมีช่องว่างการครอบคลุม",
-        "watching": "ฉันกำลังเฝ้าดู {watched} จาก {total} บริการของคุณ",
-        "gaps": "{count} รายการมีช่องว่างการครอบคลุม | {count} รายการมีช่องว่างการครอบคลุม",
-        "mixed": "{watching} {gaps}"
-      },
-      "gapAdded": "เพิ่มการแจ้งเตือนสำหรับ {checks} แล้ว AutoObserve จะนับเมื่อถึงการตรวจสอบครั้งถัดไป | เพิ่มการแจ้งเตือนสำหรับ {checks} แล้ว AutoObserve จะนับเมื่อถึงการตรวจสอบครั้งถัดไป",
-      "gapNone": "ไม่มีการแจ้งเตือนใดเฝ้าดู {checks}",
-      "searchPlaceholder": "ค้นหาบริการ คลัสเตอร์ หรือเนมสเปซ",
-      "labelNamespace": "{name} · {namespace}",
-      "labelPlace": "{name} · {cluster} · {namespace}",
-      "noNamespace": "ไม่มีเนมสเปซ",
-      "noCluster": "ไม่มีคลัสเตอร์",
-      "noMatch": "ไม่มีบริการ คลัสเตอร์ หรือเนมสเปซที่ตรงกับ “{query}”",
-      "showAll": "แสดงทั้งหมด",
-      "bucketThree": "3 ขึ้นไป",
-      "bucketTwo": "2",
-      "bucketOne": "1",
-      "filterHides": "ไม่มีบริการใดอยู่ในสถานะ {state}",
-      "filterHidesSearch": "มีบริการ {count} รายการที่ตรงกับ “{query}” แต่ไม่มีรายการใดอยู่ในสถานะ {state} | มีบริการ {count} รายการที่ตรงกับ “{query}” แต่ไม่มีรายการใดอยู่ในสถานะ {state}"
-    },
-    "cell": {
-      "noClass": "AutoObserve ยังไม่ตรวจสอบสัญญาณนี้",
-      "tipNoClass": "{signal}: AutoObserve ยังไม่ตรวจสอบส่วนนี้",
-      "gap": {
-        "weak": "{signal}: มีเพียง {monitor} ซึ่งเป็นการแจ้งเตือนแบบกว้างที่อาจตรวจพบปัญหา แต่ไม่ได้จำกัดขอบเขตไว้ที่บริการนี้ | {signal}: มีเพียง {monitor} ซึ่งเป็นการแจ้งเตือนแบบกว้างที่อาจตรวจพบปัญหา แต่ไม่ได้จำกัดขอบเขตไว้ที่บริการนี้",
-        "silent": "{signal}: {monitor} ตรงกัน แต่ไม่แจ้งเตือนถึงใคร | {signal}: {monitor} ตรงกัน แต่ไม่แจ้งเตือนถึงใคร",
-        "blind": "{signal}: {monitor} ตรงกัน แต่ไม่สามารถมองเห็นข้อมูลของตนได้ | {signal}: {monitor} ตรงกัน แต่ไม่สามารถมองเห็นข้อมูลของตนได้",
-        "unmapped": "{signal}: {monitor} อาจตรงกัน แต่ไม่สามารถเชื่อมขอบเขตกับบริการได้ | {signal}: {monitor} อาจตรงกัน แต่ไม่สามารถเชื่อมขอบเขตกับบริการได้",
-        "none": "{signal}: ไม่มีการแจ้งเตือนใดเฝ้าดูส่วนนี้"
-      },
-      "added": "เพิ่มแล้ว"
-    },
-    "drawer": {
-      "moreChecks": "การตรวจสอบอื่น ๆ",
-      "chartNoData": "แผนภูมิยังไม่พร้อมใช้งาน",
-      "monitors": "การแจ้งเตือน",
-      "monitorLine": "{kind} · {state}",
-      "noMonitor": "ไม่มีการแจ้งเตือนที่ตรงกัน"
-    },
-    "charts": {
-      "empty1h": "ไม่มีข้อมูลจาก {service} ในชั่วโมงที่ผ่านมา",
-      "empty24h": "ไม่มีข้อมูลจาก {service} ใน 24 ชั่วโมงที่ผ่านมา",
-      "empty7d": "ไม่มีข้อมูลจาก {service} ใน 7 วันที่ผ่านมา",
-      "emptyPartial1h": "ไม่มีข้อมูลจาก {service} ในช่วงที่ค้นหาของชั่วโมงที่ผ่านมา",
-      "emptyPartial24h": "ไม่มีข้อมูลจาก {service} ในช่วงที่ค้นหาของ 24 ชั่วโมงที่ผ่านมา",
-      "emptyPartial7d": "ไม่มีข้อมูลจาก {service} ในช่วงที่ค้นหาของ 7 วันที่ผ่านมา",
-      "noSpanStatus": "ไม่มีสถานะสแปนใน {stream}",
-      "noLevel": "ไม่มีระดับล็อกใน {stream}",
-      "noDuration": "ไม่มีฟิลด์ระยะเวลาใน {stream}",
-      "noTraces": "ความหน่วงแสดงเป็นแผนภูมิจากเทรซ แต่ {service} ไม่ได้ส่งข้อมูลเทรซใดเลย",
-      "noMatch": "ไม่สามารถเชื่อมโยงบริการนี้กับสตรีมที่เกี่ยวข้องได้",
-      "failedQuery": "ไม่สามารถโหลดแผนภูมินี้จาก {stream} ได้",
-      "failedMatch": "ไม่สามารถค้นหาสตรีมของ {service} ได้",
-      "partial": "ข้อมูลบางส่วน",
-      "wide": "รวมบริการอื่นที่ใช้สตรีมนี้ร่วมกัน",
-      "loading": "กำลังโหลด {metric}",
-      "summary": "{metric}, {value} ในขณะนี้",
-      "summaryNone": "{metric}, ไม่มีการวัดค่าในช่วงเวลาล่าสุด"
-    },
-    "suggestions": {
-      "serviceMeta": "{where}, ประมาณ {traffic} เหตุการณ์ต่อชั่วโมง",
-      "trafficOnly": "ประมาณ {traffic} เหตุการณ์ต่อชั่วโมง",
-      "kinds": {
-        "coverage_gap": "ช่องว่างการครอบคลุม",
-        "no_absence_check": "การแจ้งเตือนที่ยังไม่มี",
-        "silent_coverage": "ไม่แจ้งเตือนใคร",
-        "coverage_lost": "การครอบคลุมขาดหาย",
-        "blind_guardrail": "ไม่ทำงาน",
-        "discovery_unusable": "คุณภาพข้อมูล",
-        "alert_no_destination": "ไม่แจ้งเตือนใคร",
-        "alert_notify_failed": "การแจ้งเตือนล้มเหลว",
-        "other": "อื่น ๆ"
-      },
-      "severity": {
-        "high": "สูง",
-        "medium": "ปานกลาง"
-      },
-      "confidence": {
-        "sufficient": "หลักฐานหนักแน่น",
-        "suggestive": "หลักฐานบางส่วน",
-        "insufficient": "หลักฐานอ่อน"
-      },
-      "body": {
-        "coverageGap": "ไม่มีอะไรคอยเฝ้าดู {service}",
-        "noAbsenceNone": "ไม่มีการแจ้งเตือนใด ๆ หาก {service} หยุดส่งข้อมูล",
-        "noAbsenceWeak": "มีเพียงการแจ้งเตือนแบบกว้างเท่านั้นที่จะสังเกตเห็นหาก {service} หยุดส่งข้อมูล",
-        "noAbsenceSilent": "การตรวจสอบที่จะสังเกตเห็นเมื่อ {service} หยุดส่งข้อมูลนั้นไม่แจ้งเตือนใคร",
-        "noAbsenceBlind": "การตรวจสอบที่จะสังเกตเห็นเมื่อ {service} หยุดส่งข้อมูลนั้นมองไม่เห็นข้อมูลของบริการดังกล่าว",
-        "silentCoverage": "{monitor} เฝ้าดู {classes} ใน {count} บริการ แต่ไม่แจ้งเตือนใคร | {monitor} เฝ้าดู {classes} ใน {count} บริการ แต่ไม่แจ้งเตือนใคร",
-        "silentWhy": "{monitor} จะสังเกตเห็นหาก {services} หยุดทำงาน แต่ไม่แจ้งเตือนใคร",
-        "silentWhyNoNames": "{monitor} จะสังเกตเห็นหากมีบริการหยุดทำงาน แต่ไม่แจ้งเตือนใคร",
-        "silentNext": "กำหนดปลายทางให้กับการแจ้งเตือนนี้.",
-        "undeliverable": "{monitor} ส่งไปยัง {destination} ไม่ได้",
-        "undeliverableWhy": "{destination} รองรับตั๋ว ไม่ใช่การแจ้งเตือน. | {destination} รองรับตั๋ว ไม่ใช่การแจ้งเตือน.",
-        "undeliverableNext": "เพิ่มเว็บฮุกหรืออีเมลควบคู่ไปด้วย; {destination} ยังคงอยู่. | เพิ่มเว็บฮุกหรืออีเมลควบคู่ไปด้วย; {destination} ยังคงอยู่.",
-        "coverageLost": "{service} สูญเสียการแจ้งเตือน {classes} เมื่อ {day}",
-        "blindStreamMissing": "{monitor} อ่าน {detail} ซึ่งไม่มีอยู่",
-        "blindNoData": "{monitor} อ่าน {detail} ซึ่งไม่มีข้อมูลล่าสุด",
-        "blindEmptyScope": "{monitor} กรองเฉพาะแถวที่ไม่มีข้อมูลเข้ามาเลย",
-        "blindUnknownField": "{monitor} กรองด้วย {field} ซึ่งเป็นฟิลด์ที่สตรีมของมันไม่มี",
-        "blindIgnoredMatcher": "{monitor} จับคู่กับ {label} ซึ่งเป็นเลเบลที่ไม่มีอยู่ในซีรีส์ใดเลย ดังนั้นจึงเฝ้าดูทุกซีรีส์",
-        "discovery": "มีเพียง {good} จาก {active} บริการที่ค้นพบเท่านั้นที่ใช้งานได้ ดังนั้นการจัดอันดับช่องว่างจึงเป็นเพียงบางส่วน",
-        "alertSyntax": "{monitor} มีคิวรีที่ไม่สามารถแยกวิเคราะห์ได้",
-        "alertTimeout": "{monitor} หมดเวลาเป็นประจำก่อนทำงานเสร็จ",
-        "alertMemory": "{monitor} ประสบปัญหาหน่วยความจำไม่เพียงพอซ้ำ ๆ",
-        "alertOtherError": "{monitor} เกิดข้อผิดพลาดและล้มเหลวซ้ำ ๆ",
-        "alertNotWorkingGeneric": "{monitor} ไม่ทำงาน",
-        "alertNoDestination": "{monitor} ถูกทริกเกอร์แล้วแต่ไม่แจ้งเตือนใคร",
-        "alertNotifyFailed": "{monitor} ถูกทริกเกอร์แล้ว และการแจ้งเตือน {failed} จาก {tried} รายการล้มเหลว. | {monitor} ถูกทริกเกอร์แล้ว และการแจ้งเตือน {failed} จาก {tried} รายการล้มเหลว.",
-        "alertNotifyFailedNoCounts": "{monitor} ถูกทริกเกอร์แล้ว และการแจ้งเตือนล้มเหลว.",
-        "alertStreamGone": "{monitor} ล้มเหลวซ้ำ ๆ เพราะสตรีมของมันไม่มีอยู่",
-        "alertFieldGone": "{monitor} ล้มเหลวซ้ำ ๆ เพราะฟิลด์ที่ใช้งานไม่มีอยู่",
-        "other": "พบสิ่งที่หน้านี้ยังแสดงไม่ได้ในขณะนี้"
-      },
-      "detail": {
-        "cell": "{check}: {state}",
-        "cells": "สิ่งที่เอนจินพบ: {cells}.",
-        "services": "บริการที่ตรงกันรวมถึง {services}.",
-        "text": "รายละเอียดจากเอนจิน: {detail}",
-        "quality": "การค้นพบกำลังทำงานในโหมด {mode}.",
-        "none": "เอนจินไม่ได้ส่งรายละเอียดเพิ่มเติม.",
-        "joined": "{first} {rest}"
-      },
-      "analysedAt": "จากการทำงานปรับเทียบ {ago}",
-      "neverFired": "ไม่เคยถูกทริกเกอร์",
-      "lastFired": "แจ้งเตือนล่าสุดเมื่อ {time}",
-      "accept": "ยอมรับ",
-      "dismiss": "ไม่สนใจ…",
-      "accepted": "ยอมรับแล้วในตัวอย่างนี้; ไม่มีการส่งข้อมูลใด ๆ",
-      "dismissed": "ไม่สนใจแล้วในตัวอย่างนี้; ไม่มีการส่งข้อมูลใด ๆ",
-      "loading": "กำลังโหลดคำแนะนำ",
-      "loaded": "โหลดคำแนะนำแล้ว",
-      "more": "และอีก {count} รายการ | และอีก {count} รายการ",
-      "moreNames": "อีก {count} รายการ | อีก {count} รายการ",
-      "whyNext": "{why} {next}",
-      "seeAll": "ดูทั้งหมด",
-      "drawerTitle": "คำแนะนำ",
-      "drawerLine": "จัดอันดับตามสิ่งที่สำคัญที่สุดก่อน เปิดแถวเพื่อดูสิ่งที่ฉันพบ",
-      "focusGone": "คำแนะนำนี้ไม่ได้เปิดอยู่แล้ว",
-      "clearKind": "แสดงคำแนะนำทั้งหมด",
-      "kindEmptyTitle": "ไม่มีคำแนะนำที่เปิดอยู่ประเภท {kind}",
-      "kindEmptyDesc": "มีคำแนะนำอื่นที่เปิดอยู่อีก {count} รายการ | มีคำแนะนำอื่นที่เปิดอยู่อีก {count} รายการ",
-      "folder": "โฟลเดอร์ {folder}",
-      "columns": {
-        "suggestion": "คำแนะนำ",
-        "where": "ตำแหน่ง",
-        "kind": "ประเภท",
-        "severity": "ความรุนแรง"
-      }
-    },
-    "notice": {
-      "offTitle": "AutoObserve ยังไม่ได้เปิดใช้งาน",
-      "details": "รายละเอียด",
-      "refreshFailed": "รีเฟรชล้มเหลวเมื่อ {failedAt} · กำลังแสดง {what} จาก {dataAt}",
-      "what": {
-        "coverage": "ความครอบคลุม",
-        "suggestions": "คำแนะนำ",
-        "incidents": "ข้อค้นพบที่แจ้งเตือนเรียกเวร",
-        "issues": "ปัญหา",
-        "history": "ประวัติ"
-      },
-      "coverage": {
-        "deniedTitle": "คุณไม่มีสิทธิ์ดูความครอบคลุม",
-        "deniedDesc": "ความครอบคลุมจะนับมอนิเตอร์ในทุกโฟลเดอร์ จึงต้องมีสิทธิ์ดูการแจ้งเตือนทั้งหมดในองค์กรนี้ ไม่ใช่เพียงบางโฟลเดอร์ โปรดขอสิทธิ์ดังกล่าวจากผู้ดูแลองค์กร",
-        "offDesc": "ผู้ดูแลระบบจะเปิดใช้งานสำหรับการติดตั้งใช้งานนี้ ความครอบคลุมจะแสดงที่นี่หลังจากการตรวจสอบครั้งแรก",
-        "unavailableTitle": "ความครอบคลุมไม่พร้อมใช้งานชั่วคราว",
-        "unavailableDesc": "AutoObserve ไม่ตอบสนองในขณะนี้ โดยปกติปัญหานี้จะหายไปภายในหนึ่งหรือสองนาที",
-        "failedTitle": "ไม่สามารถโหลดความครอบคลุมได้",
-        "failedDesc": "เกิดข้อผิดพลาดขณะโหลดความครอบคลุม โปรดลองอีกครั้งในอีกสักครู่",
-        "noPassTitle": "ไม่มีการตรวจสอบใดเสร็จสิ้นในช่วงหนึ่งวันที่ผ่านมา",
-        "noPassDesc": "ความครอบคลุมจะแสดงที่นี่หลังจากการตรวจสอบบริการของคุณครั้งถัดไปเสร็จสิ้น หากเพิ่งเปิดใช้งาน AutoObserve การตรวจสอบครั้งแรกอาจใช้เวลาสักครู่",
-        "noPassAction": "ฉันตรวจสอบความครอบคลุมอย่างไร",
-        "noServicesTitle": "ยังไม่พบบริการ",
-        "noServicesDesc": "การตรวจสอบครั้งล่าสุดของฉันเมื่อ {when} ไม่พบบริการ บริการจะแสดงที่นี่เมื่อส่งล็อก เมทริกซ์ หรือเทรซที่ระบุชื่อบริการ",
-        "noServicesAction": "ฉันค้นหาบริการอย่างไร"
-      },
-      "suggestions": {
-        "deniedTitle": "คุณไม่มีสิทธิ์ดูคำแนะนำ",
-        "deniedDesc": "การดูคำแนะนำต้องมีสิทธิ์ดูการแจ้งเตือนในองค์กรนี้ โปรดขอสิทธิ์ดังกล่าวจากผู้ดูแลองค์กร",
-        "offDesc": "คำแนะนำจะแสดงที่นี่หลังจากผู้ดูแลระบบเปิดใช้งานสำหรับการติดตั้งใช้งานนี้",
-        "unavailableTitle": "คำแนะนำไม่พร้อมใช้งานชั่วคราว",
-        "unavailableDesc": "AutoObserve ไม่ตอบสนองในขณะนี้ โดยปกติปัญหานี้จะหายไปภายในหนึ่งหรือสองนาที",
-        "failedTitle": "ไม่สามารถโหลดคำแนะนำได้",
-        "failedDesc": "เกิดข้อผิดพลาดขณะโหลดคำแนะนำ โปรดลองอีกครั้งในอีกสักครู่",
-        "emptyTitle": "ยังไม่มีคำแนะนำในขณะนี้",
-        "emptyDesc": "ฉันจะเพิ่มคำแนะนำที่นี่เมื่อพบช่องว่างในการครอบคลุมของตัวตรวจสอบของคุณ",
-        "pageEmptyTitle": "คำแนะนำอันดับสูงสุดได้รับการจัดการแล้ว",
-        "pageEmptyDesc": "เปิดรายการทั้งหมดเพื่อดูรายการที่ยังรออยู่"
-      },
-      "history": {
-        "deniedTitle": "คุณไม่มีสิทธิ์ดูประวัติ",
-        "deniedDesc": "ประวัติแสดงรายการเหตุการณ์ขัดข้องที่ AutoObserve เปิดขึ้น ดังนั้นการดูประวัตินี้ต้องมีสิทธิ์ในการแสดงรายการเหตุการณ์ขัดข้องในองค์กรนี้ โปรดขอสิทธิ์จากผู้ดูแลองค์กร",
-        "offDesc": "ประวัติจะแสดงที่นี่หลังจากผู้ดูแลระบบเปิดใช้งานสำหรับการติดตั้งนี้",
-        "unavailableTitle": "ประวัติไม่พร้อมใช้งานชั่วคราว",
-        "unavailableDesc": "AutoObserve ไม่ตอบสนองในขณะนี้ โดยปกติจะกลับมาใช้งานได้ภายในหนึ่งถึงสองนาที",
-        "failedTitle": "ไม่สามารถโหลดประวัติได้",
-        "failedDesc": "เกิดข้อผิดพลาดขณะโหลด โปรดลองอีกครั้งในอีกสักครู่"
-      },
-      "incidents": {
-        "deniedTitle": "คุณไม่มีสิทธิ์ดูข้อค้นพบที่แจ้งเตือนเรียกเวร",
-        "deniedDesc": "ข้อค้นพบที่แจ้งเตือนเรียกเวรจะเปิดเหตุการณ์ขัดข้อง ดังนั้นการดูข้อค้นพบเหล่านี้ต้องมีสิทธิ์ในการแสดงรายการเหตุการณ์ขัดข้องในองค์กรนี้ โปรดขอสิทธิ์จากผู้ดูแลองค์กร",
-        "offDesc": "ข้อค้นพบที่แจ้งเตือนเรียกเวรจะแสดงที่นี่หลังจากผู้ดูแลระบบเปิดใช้งานสำหรับการติดตั้งนี้",
-        "unavailableTitle": "ข้อค้นพบที่แจ้งเตือนเรียกเวรไม่พร้อมใช้งานชั่วคราว",
-        "unavailableDesc": "AutoObserve ไม่ตอบสนองในขณะนี้ โดยปกติจะกลับมาใช้งานได้ภายในหนึ่งถึงสองนาที",
-        "failedTitle": "ไม่สามารถโหลดข้อค้นพบที่แจ้งเตือนเรียกเวรได้",
-        "failedDesc": "เกิดข้อผิดพลาดขณะโหลด โปรดลองอีกครั้งในอีกสักครู่"
-      },
-      "issues": {
-        "deniedTitle": "คุณไม่มีสิทธิ์ดูปัญหา",
-        "deniedDesc": "ปัญหาเป็นเหตุการณ์ขัดข้องที่ AutoObserve เปิดขึ้น ดังนั้นการดูปัญหาเหล่านี้ต้องมีสิทธิ์ในการแสดงรายการเหตุการณ์ขัดข้องในองค์กรนี้ โปรดขอสิทธิ์จากผู้ดูแลองค์กร",
-        "offDesc": "ปัญหาจะแสดงที่นี่หลังจากผู้ดูแลระบบเปิดใช้งานสำหรับการติดตั้งนี้",
-        "unavailableTitle": "ปัญหาไม่พร้อมใช้งานชั่วคราว",
-        "unavailableDesc": "AutoObserve ไม่ตอบสนองในขณะนี้ โดยปกติจะกลับมาใช้งานได้ภายในหนึ่งถึงสองนาที",
-        "failedTitle": "ไม่สามารถโหลดปัญหาได้",
-        "failedDesc": "เกิดข้อผิดพลาดขณะโหลด โปรดลองอีกครั้งในอีกสักครู่"
-      }
-    },
-    "time": {
-      "justNow": "เมื่อสักครู่",
-      "ago": "{time} ที่แล้ว"
-    },
-    "history": {
-      "incident": "เปิดเหตุการณ์ขัดข้อง: {title}",
-      "dismissed": "{actor} ไม่สนใจ {title}",
-      "accepted": "{actor} ทำเครื่องหมาย {title} ว่าเป็นรายงานตามที่ตั้งใจไว้",
-      "changed": "{actor} เปลี่ยนแปลง {title}",
-      "denied": {
-        "incidents": "ไม่ได้แสดงรายการเหตุการณ์ขัดข้อง: คุณไม่มีสิทธิ์ดู",
-        "decisions": "ไม่ได้แสดงรายการการตัดสินใจ: คุณไม่มีสิทธิ์ดู"
-      },
-      "untitled": "คำแนะนำ",
-      "openIncident": "เปิดเหตุการณ์ขัดข้อง",
-      "newest": "กำลังแสดง {count} รายการใหม่ล่าสุด เหตุการณ์ขัดข้องที่เก่ากว่าอยู่ในหน้าปัญหา",
-      "loading": "กำลังโหลดประวัติ",
-      "loaded": "โหลดประวัติแล้ว"
-    },
-    "incidents": {
-      "title": "ข้อค้นพบที่แจ้งเตือนเรียกเวร",
-      "subtitle": "ข้อค้นพบที่เปิดเหตุการณ์ขัดข้องให้ทีมเวรประจำการของคุณ พร้อมการวิเคราะห์",
-      "pagingNote": "การแจ้งเตือนเรียกเวรปิดอยู่สำหรับองค์กรนี้ ดังนั้น AutoObserve จะไม่เปิดเหตุการณ์ขัดข้อง",
-      "sharedFor": "{label}: {reason}",
-      "finding": {
-        "stream_silence": "{stream} ({type}) หยุดส่งข้อมูล",
-        "stream_drop": "ปริมาณข้อมูลของ {stream} ({type}) ลดลงอย่างรวดเร็ว",
-        "stream_rise": "ปริมาณข้อมูลของ {stream} ({type}) เพิ่มขึ้นอย่างรวดเร็ว"
-      },
-      "opened": "เปิดเหตุการณ์ขัดข้องเมื่อ {when}",
-      "openIncident": "เปิดเหตุการณ์ขัดข้อง",
-      "viewAnalysis": "ดูการวิเคราะห์",
-      "newFindings": "{count} ข้อค้นพบใหม่ | {count} ข้อค้นพบใหม่",
-      "showNew": "แสดง",
-      "more": "กำลังแสดง {count} รายการใหม่สุด",
-      "seeAll": "ดูเหตุการณ์ขัดข้องทั้งหมด",
-      "seeAllIssues": "ดูปัญหาทั้งหมด",
-      "failedDetail": {
-        "status": "คำขอล้มเหลวด้วยสถานะ {status} เมื่อ {time}.",
-        "noResponse": "คำขอไม่ได้รับการตอบกลับเมื่อ {time}."
-      },
-      "analysis": {
-        "notRunDetail": "ยังไม่มีการเริ่มการวิเคราะห์ เปิดเหตุการณ์ขัดข้องเพื่อเริ่มการวิเคราะห์.",
-        "disabledDetail": "การวิเคราะห์ด้วย AI ถูกปิดสำหรับการติดตั้งใช้งานนี้.",
-        "offOther": "การวิเคราะห์อัตโนมัติไม่ได้ทำงานสำหรับเหตุการณ์ขัดข้องนี้.",
-        "failedDetail": "การวิเคราะห์หยุดก่อนเสร็จสิ้น ดูรายละเอียดได้จากรายการนั้น."
-      },
-      "empty": {
-        "title": "ยังไม่มีเหตุการณ์ใดแจ้งเตือนเรียกเวรถึงใคร",
-        "desc": "เมื่อสตรีมหยุดหรือปริมาณข้อมูลเปลี่ยนแปลงอย่างรวดเร็ว เหตุการณ์ขัดข้องและการวิเคราะห์จะแสดงที่นี่."
-      },
-      "emptyOff": {
-        "title": "การแจ้งเตือนเรียกเวรปิดอยู่",
-        "desc": "AutoObserve บันทึกข้อค้นพบของสตรีมสำหรับองค์กรนี้ แต่ไม่เปิดเหตุการณ์ขัดข้องใด ๆ ผู้ดูแลระบบเป็นผู้เปิดการแจ้งเตือนเรียกเวร."
-      },
-      "loading": "กำลังโหลดข้อค้นพบที่มีการแจ้งเตือนเรียกเวร…",
-      "loaded": "โหลดข้อค้นพบที่มีการแจ้งเตือนเรียกเวรแล้ว",
-      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
-      "routing": "Set up on-call routing"
-    },
-    "issues": {
-      "searchPlaceholder": "ค้นหาเหตุการณ์ที่เกิดขึ้นหรือสตรีม",
-      "columns": {
-        "incident": "สิ่งที่เกิดขึ้น",
-        "severity": "ความรุนแรง",
-        "status": "สถานะ",
-        "stream": "สตรีม",
-        "opened": "เปิดเมื่อ",
-        "analysis": "การวิเคราะห์",
-        "page": "ผู้ที่ได้รับการแจ้งเตือนเรียกเวร"
-      },
-      "count": "ไม่มีปัญหา | {count} ปัญหา | {count} ปัญหา",
-      "capNote": "กำลังแสดงปัญหาใหม่สุด {count} รายการ ลดช่วงเวลาเพื่อดูรายการที่เก่ากว่า.",
-      "emptyRange": "ไม่มีปัญหา {within}",
-      "streamType": "สตรีมประเภท {type}",
-      "streamMore": "{stream} +{count}",
-      "filterOpen": "เปิดอยู่",
-      "loading": "กำลังโหลดปัญหา…",
-      "loaded": "โหลดปัญหาแล้ว",
-      "page": {
-        "unrouted": "ไม่มีการแจ้งเตือนเรียกเวรถึงใคร",
-        "failed": "การแจ้งเตือนเรียกเวรล้มเหลว",
-        "pending": "ยังไม่ได้รับการยืนยัน"
-      },
-      "today": "วันนี้",
-      "yesterday": "เมื่อวาน",
-      "shared": {
-        "rcaDisabled": "การวิเคราะห์ด้วย AI ถูกปิดอยู่เมื่อเหตุการณ์ขัดข้องเหล่านี้เปิดขึ้น.",
-        "aiUnavailable": "การวิเคราะห์ด้วย AI ไม่พร้อมใช้งานเมื่อเหตุการณ์ขัดข้องเหล่านี้เปิดขึ้น.",
-        "quotaExceeded": "องค์กรถึงขีดจำกัดการวิเคราะห์ด้วย AI เมื่อเหตุการณ์ขัดข้องเหล่านี้เปิดขึ้น.",
-        "coolingDown": "การวิเคราะห์เพิ่งทำงานไป จึงไม่มีการเริ่มการวิเคราะห์ใหม่สำหรับเหตุการณ์ขัดข้องเหล่านี้.",
-        "startFailed": "ไม่สามารถเริ่มการวิเคราะห์ได้.",
-        "offOther": "การวิเคราะห์อัตโนมัติไม่ได้ทำงานสำหรับเหตุการณ์ขัดข้องเหล่านี้.",
-        "disabled": "การวิเคราะห์ด้วย AI ถูกปิดสำหรับการติดตั้งใช้งานนี้.",
-        "notRun": "ยังไม่มีการเริ่มการวิเคราะห์ เปิดเหตุการณ์ขัดข้องเพื่อเริ่มการวิเคราะห์.",
-        "failed": "การวิเคราะห์เหล่านี้หยุดก่อนเสร็จสิ้น ดูรายการหนึ่งเพื่อดูรายละเอียด."
-      }
-    },
-    "surfaces": {
-      "changes": {
-        "title": "ยังไม่มีการเปลี่ยนแปลง",
-        "desc": "AutoObserve แนะนำวิธีแก้ไขแต่ยังไม่ได้เปลี่ยนแปลงการแจ้งเตือนหรือการตั้งค่าใด ๆ เมื่อมีการเปลี่ยนแปลง จะแสดงที่นี่พร้อมผลว่าสำเร็จหรือไม่ ตอนนี้ โปรดตรวจดูข้อเสนอแนะและนำไปใช้รายการที่ต้องการ.",
-        "action": "ตรวจดูข้อเสนอแนะ"
-      },
-      "history": {
-        "title": "ยังไม่มีประวัติ",
-        "desc": "สิ่งที่ AutoObserve ค้นพบ สิ่งที่เปลี่ยนแปลง และสิ่งที่คุณตัดสินใจจะแสดงที่นี่ โดยใหม่สุดก่อน ปัจจุบัน ข้อค้นพบของระบบจะเปิดเหตุการณ์ขัดข้อง ซึ่งแสดงอยู่บนหน้าปัญหา.",
-        "action": "ปัญหาที่เปิดอยู่"
-      },
-      "scenario": {
-        "tag": "ข้อมูลเรียลไทม์",
-        "text": "คุณกำลังดูข้อมูลเรียลไทม์ขององค์กรนี้ สถานการณ์ตัวอย่างจะไม่แสดงที่นี่",
-        "action": "วิธีการทำงาน"
-      },
-      "settings": {
-        "title": "ยังไม่มีอะไรให้ตั้งค่าที่นี่",
-        "desc": "ผู้ดูแลระบบเปิดใช้งาน AutoObserve และการแจ้งเตือนเรียกเวรสำหรับการติดตั้งนี้ จะมีการกำหนดว่าผู้ใดจะได้รับการแจ้งเตือนและระบบจะดำเนินการเองได้มากเพียงใดที่นี่ เมื่อมีตัวควบคุมดังกล่าว",
-        "action": "วิธีการทำงาน"
-      }
-    },
-    "paging": {
-      "title": "Paging",
-      "label": "Page on-call when a stream stops",
-      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
-      "routing": "On-call routing",
-      "unavailable": "Paging is turned off for this deployment.",
-      "denied": "{denied} {askAdmin}",
-      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
-      "deniedTitle": "คุณไม่มีสิทธิ์ดูการตั้งค่าการแจ้งเตือนเรียกเวร",
-      "deniedDesc": "การแจ้งเตือนเรียกเวรตั้งค่าเพียงครั้งเดียวสำหรับทั้งองค์กร โปรดขอสิทธิ์จากผู้ดูแลระบบขององค์กร",
-      "failedTitle": "ไม่สามารถโหลดการตั้งค่าการแจ้งเตือนเรียกเวรได้",
-      "failedDesc": "เกิดข้อผิดพลาดขณะโหลด โปรดลองอีกครั้งในอีกสักครู่",
-      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
-    },
-    "learning": {
-      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
-      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
-      "emptyTitle": "Learning your streams",
-      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
-      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
-      "until": "Learning until {date} · {streams}",
-      "streams": "Learning {count} stream | Learning {count} streams",
-      "streamUntil": "until {date}"
-    }
-  },
   "insight": {
     "targets": {
       "origin": "สร้างจากคำแนะนำของ AutoObserve สำหรับ {service} เมื่อ {date}",
@@ -34541,157 +34547,5 @@
       },
       "noHighConfidence": "ไม่มีชื่อที่มีความมั่นใจสูง"
     }
-  },
-  "filterBar": {
-    "ariaLabel": "กรองตามฟิลด์",
-    "placeholder": "กรองตามฟิลด์ หรือพิมพ์ field=value. กด Enter เพื่อเรียกใช้",
-    "addFilter": "เพิ่มตัวกรอง",
-    "searchFields": "ค้นหาฟิลด์",
-    "searchLabels": "ค้นหาป้ายกำกับ",
-    "searchOperators": "ค้นหาเงื่อนไข",
-    "searchValue": "ค้นหาหรือพิมพ์ค่า",
-    "searchValues": "ค้นหาค่า",
-    "textField": "ข้อความ",
-    "useValue": "ใช้ \"{value}\"",
-    "useField": "ใช้ฟิลด์ \"{field}\"",
-    "useLabel": "ใช้ป้ายกำกับ \"{field}\"",
-    "searchText": "ค้นหาข้อความทั้งหมดสำหรับ \"{text}\"",
-    "emptyValue": "(ว่าง)",
-    "loadingFields": "กำลังโหลดฟิลด์…",
-    "noFields": "ไม่พบฟิลด์ที่ตรงกัน",
-    "noValues": "ไม่มีคำแนะนำ พิมพ์ค่าแล้วกด Enter",
-    "noOperators": "ไม่พบเงื่อนไขที่ตรงกัน",
-    "removeFilter": "ลบตัวกรอง",
-    "clearAll": "ล้างตัวกรองทั้งหมด",
-    "toggleConnector": "สลับระหว่าง AND และ OR",
-    "selectedCount": "ไม่ได้เลือกค่า | เลือก {count} ค่า | เลือก {count} ค่า",
-    "query": "คิวรี",
-    "queryTooltip": "แก้ไขตัวกรองเป็นข้อความ",
-    "queryNotParsableShort": "ตัวสร้างไม่สามารถแสดงคิวรีนี้ได้:",
-    "clearAndBuild": "ล้างและสร้าง",
-    "clearQueryTitle": "ล้างคิวรีหรือไม่?",
-    "clearQueryMessage": "คิวรีจะถูกลบ และตัวสร้างจะเริ่มต้นด้วยค่าว่าง",
-    "where": "โดยที่",
-    "addCondition": "เพิ่มเงื่อนไข",
-    "addGroup": "เพิ่มกลุ่ม",
-    "startGroup": "เริ่มกลุ่ม",
-    "addBelow": "เพิ่มเงื่อนไขด้านล่าง",
-    "ungroup": "แยกกลุ่ม",
-    "collapseGroup": "ยุบกลุ่ม",
-    "expandGroup": "ขยายกลุ่ม",
-    "moreInGroup": "อีก {count} รายการ",
-    "groupHasIssues": "มีบางอย่างในกลุ่มนี้ที่ต้องแก้ไข",
-    "chooseField": "เลือกฟิลด์",
-    "chooseValue": "เลือกค่า",
-    "lockedFilter": "ไม่สามารถแก้ไขตัวกรองนี้ได้ที่นี่ ตัวกรองจะถูกเก็บไว้ตามที่บันทึกไว้ ลบออกเพื่อละทิ้ง",
-    "limits": {
-      "conditions": "สูงสุด {count} ตัวกรอง | สูงสุด {count} ตัวกรอง",
-      "values": "สูงสุด {count} ค่า | สูงสุด {count} ค่า"
-    },
-    "validation": {
-      "incomplete": "กรอกตัวกรองนี้ให้เสร็จหรือลบออก",
-      "required": "เพิ่มตัวกรองอย่างน้อยหนึ่งรายการ",
-      "uniqueField": "{field} มีตัวกรองอยู่แล้ว แก้ไขตัวกรองนั้นหรือลบตัวกรองนี้",
-      "oneUsageCondition": "แต่ละระดับรับเงื่อนไขการใช้งานได้หนึ่งเงื่อนไข เปลี่ยนเงื่อนไขนี้เป็นกฎหรือลบออก",
-      "rumField": "ใช้ฟิลด์ในตัวหรือคอลัมน์ที่ประกอบด้วยตัวพิมพ์เล็ก ตัวเลข และขีดล่าง ไม่เกิน 128 ตัวอักษร",
-      "valueLength": "แต่ละค่าต้องมีความยาว 1 ถึง {max} ตัวอักษร",
-      "regexLength": "รูปแบบต้องมีความยาวไม่เกิน {max} ตัวอักษร",
-      "regexInvalid": "รูปแบบนี้ไม่ถูกต้องหรือไม่รองรับ ไม่สามารถใช้ lookahead, lookbehind และ backreference ได้"
-    },
-    "operatorNames": {
-      "containsIgnoreCase": "มี (ไม่สนตัวพิมพ์)",
-      "notStartsWith": "ไม่เริ่มต้นด้วย",
-      "notEndsWith": "ไม่ลงท้ายด้วย",
-      "isEmpty": "ว่าง",
-      "isNotEmpty": "ไม่ว่าง"
-    },
-    "types": {
-      "string": "ข้อความ",
-      "number": "ตัวเลข",
-      "boolean": "บูลีน"
-    },
-    "operators": {
-      "eq": "คือ",
-      "neq": "ไม่ใช่",
-      "gt": "มากกว่า",
-      "gte": "มากกว่าหรือเท่ากับ",
-      "lt": "น้อยกว่า",
-      "lte": "น้อยกว่าหรือเท่ากับ",
-      "contains": "มี",
-      "containsIgnoreCase": "มี โดยไม่คำนึงถึงตัวพิมพ์เล็ก-ใหญ่",
-      "notContains": "ไม่มี",
-      "startsWith": "ขึ้นต้นด้วย",
-      "notStartsWith": "ไม่ขึ้นต้นด้วย",
-      "endsWith": "ลงท้ายด้วย",
-      "notEndsWith": "ไม่ลงท้ายด้วย",
-      "in": "เป็นค่าใดค่าหนึ่งใน",
-      "notIn": "ไม่เป็นค่าใดเลยใน",
-      "regex": "ตรงกับ regex",
-      "notRegex": "ไม่ตรงกับ regex",
-      "isNull": "ไม่มีค่า",
-      "isNotNull": "มีค่า",
-      "isEmpty": "ว่างเปล่าหรือไม่มีค่า",
-      "isNotEmpty": "มีค่าที่ไม่ใช่ค่าว่าง",
-      "matchAll": "ตรงกับข้อความ"
-    },
-    "builderTooltip": "แก้ไขตัวกรองด้วยตัวสร้าง",
-    "editorModeLabel": "ตัวแก้ไขตัวกรอง",
-    "modeBuilder": "ตัวสร้าง",
-    "modeText": "ข้อความ"
-  },
-  "pageHeader": {
-    "about": "เกี่ยวกับหน้านี้"
-  },
-  "genAiAgentMapping": {
-    "tabLabel": "การแมปเอเจนต์",
-    "title": "การแมปเอเจนต์",
-    "subtitle": "วิธีที่ระบบอ่านข้อมูลระบุตัวตนของเอเจนต์ การจัดสรรต้นทุน และชื่อเซสชันจากข้อมูลเทเลเมทรี",
-    "identity": {
-      "title": "ฟิลด์ระบุตัวตนของเอเจนต์",
-      "help": "วิธีที่ OpenObserve ตั้งชื่อเอเจนต์แต่ละตัวและอ่านสภาพแวดล้อมกับเวอร์ชัน โดยจะอ่านแอตทริบิวต์มาตรฐานก่อน หากสแปนไม่มีแอตทริบิวต์นั้น ระบบจะใช้ฟิลด์สำรองแรกที่สแปนมีอยู่",
-      "agentName": "ชื่อเอเจนต์",
-      "agentId": "ID เอเจนต์",
-      "env": "สภาพแวดล้อม",
-      "version": "เวอร์ชัน"
-    },
-    "agentNameFields": "ฟิลด์สำรองสำหรับชื่อเอเจนต์",
-    "agentNameHelp": "แอตทริบิวต์ขาเข้าที่ใช้เป็นฟิลด์สำรองสำหรับ gen_ai.agent.name",
-    "agentNameInfo": "ตรวจสอบเฉพาะเมื่อแอตทริบิวต์มาตรฐาน gen_ai.agent.name หายไปหรือว่างเปล่า เพิ่มแอตทริบิวต์เทเลเมทรีขาเข้าบรรทัดละหนึ่งรายการ",
-    "agentIdFields": "ฟิลด์สำรองสำหรับ ID เอเจนต์",
-    "agentIdHelp": "แอตทริบิวต์ขาเข้าที่ใช้เป็นฟิลด์สำรองสำหรับ gen_ai.agent.id",
-    "agentIdInfo": "ตรวจสอบเฉพาะเมื่อแอตทริบิวต์มาตรฐาน gen_ai.agent.id หายไปหรือว่างเปล่า เพิ่มแอตทริบิวต์เทเลเมทรีขาเข้าบรรทัดละหนึ่งรายการ",
-    "envFields": "ฟิลด์สำรองสำหรับสภาพแวดล้อม",
-    "envHelp": "แอตทริบิวต์ขาเข้าที่ใช้เป็นสภาพแวดล้อมของเอเจนต์",
-    "envInfo": "ตรวจสอบเฉพาะเมื่อแอตทริบิวต์มาตรฐาน deployment.environment.name หายไปหรือว่างเปล่า เพิ่มแอตทริบิวต์เทเลเมทรีขาเข้าบรรทัดละหนึ่งรายการ",
-    "versionFields": "ฟิลด์สำรองสำหรับเวอร์ชัน",
-    "versionHelp": "แอตทริบิวต์ขาเข้าที่ใช้เป็นเวอร์ชันของเอเจนต์",
-    "versionInfo": "ตรวจสอบเฉพาะเมื่อแอตทริบิวต์มาตรฐาน gen_ai.agent.version หายไปหรือว่างเปล่า เพิ่มแอตทริบิวต์เทเลเมทรีขาเข้าบรรทัดละหนึ่งรายการ",
-    "alwaysAppliedStandard": "มาตรฐาน (ตรวจสอบก่อน):",
-    "coverageValue": "· ใน {percent}% ของเทรซ ในช่วง 24 ชั่วโมงที่ผ่านมา",
-    "fallbacksNote": "ป้อนฟิลด์สำรองคั่นด้วยเครื่องหมายจุลภาค ตามลำดับที่จะตรวจสอบ",
-    "fallbackInvalid": "ใช้ชื่อฟิลด์คั่นด้วยเครื่องหมายจุลภาค ใช้ได้เฉพาะตัวอักษร ตัวเลข และ . _ - : / {'@'} เท่านั้น",
-    "sessions": {
-      "title": "การแสดงผลเซสชัน",
-      "help": "วิธีตั้งชื่อเซสชันและข้อความห่อหุ้มที่ถูกซ่อนจากเซสชัน",
-      "noAgents": "ยังไม่มีเอเจนต์ เพิ่มเอเจนต์เพื่อซ่อนข้อความห่อหุ้มของเอเจนต์นั้น"
-    },
-    "applyDefaults": "นำค่าเริ่มต้นไปใช้",
-    "resetToEmpty": "รีเซ็ตเป็นค่าว่าง",
-    "clearRegistry": "ล้างรีจิสทรี",
-    "clearRegistryTitle": "ล้างรีจิสทรีเอเจนต์หรือไม่",
-    "clearRegistryDescription": "การดำเนินการนี้จะลบแถวรีจิสทรีเอเจนต์ GenAI ที่ค้นพบทั้งหมดขององค์กรนี้ เทรซที่ตรงกันรายการใหม่จะถูกเพิ่มกลับเข้าสู่รีจิสทรีระหว่างการนำเข้าข้อมูล",
-    "clearRegistryConfirm": "ล้างรีจิสทรี",
-    "saved": "บันทึกการแมปเอเจนต์แล้ว",
-    "unsavedConfirm": "การเปลี่ยนแปลงการแมปเอเจนต์ของคุณยังไม่ได้บันทึก ต้องการละทิ้งหรือไม่",
-    "clearRegistrySuccess": "ล้างรีจิสทรีเอเจนต์ GenAI แล้ว ลบเอเจนต์ที่จัดเก็บไว้ {deletedCount} รายการ และข้อสังเกตที่อยู่ในคิว {bufferCount} รายการ",
-    "saveFailed": "ไม่สามารถบันทึกการแมปเอเจนต์ได้",
-    "clearRegistryFailed": "ไม่สามารถล้างรีจิสทรีเอเจนต์ GenAI ได้",
-    "defaultsLoadFailed": "ไม่สามารถโหลดค่าเริ่มต้นของการแมปเอเจนต์ได้",
-    "defaultsFetchFailed": "ไม่สามารถดึงค่าเริ่มต้นได้ ({status})"
-  },
-  "copyButton": {
-    "copy": "คัดลอก",
-    "copied": "คัดลอกแล้ว",
-    "failed": "การคัดลอกถูกบล็อก · กด Ctrl C"
   }
 }

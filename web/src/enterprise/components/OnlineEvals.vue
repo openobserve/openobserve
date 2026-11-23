@@ -62,7 +62,7 @@ the Free Software Foundation, either version 3 of the License, or
         class="online-evals__header bg-card-glass-bg flex min-h-17 shrink-0 items-center justify-between gap-4 px-4 py-2.5"
       >
         <div>
-          <h1 class="text-text-heading font-title m-0 text-lg leading-6 [letter-spacing:0]">
+          <h1 class="text-text-heading m-0 font-semibold [letter-spacing:0] text-[var(--text-lg)]">
             {{ t("onlineEvals.title") }}
           </h1>
         </div>
@@ -171,6 +171,13 @@ the Free Software Foundation, either version 3 of the License, or
         @created="reloadLists(true)"
       >
         <template #header-actions>
+          <!-- Last-refreshed indicator + labeled primary Refresh button, matching the other AI pages. -->
+          <AiLastRefreshed
+            class="me-1 max-lg:hidden"
+            :last-run-at="qualityStatus.updatedAt"
+            :loading="qualityBusy"
+            data-test="quality-last-refreshed"
+          />
           <DateTimePickerDashboard
             ref="qualityDatePickerRef"
             v-model="qualitySelectedDate"
@@ -179,12 +186,16 @@ the Free Software Foundation, either version 3 of the License, or
             class="max-lg:[&_.date-time-label]:hidden"
             data-test="quality-time-range-picker"
           />
-          <ORefreshButton
-            :last-run-at="qualityStatus.updatedAt"
+          <OButton
+            variant="primary"
+            icon="refresh"
+            :disabled="qualityBusy"
             :loading="qualityBusy"
             data-test="quality-refresh-btn"
             @click="onQualityRefresh"
-          />
+          >
+            {{ t("common.refresh") }}
+          </OButton>
         </template>
         <template #filters>
           <AgentScopeCascade
@@ -461,7 +472,7 @@ import { useAiSectionTabs } from "@/enterprise/components/AIObservability/aiSect
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import AiLastRefreshed from "@/enterprise/components/AIObservability/AiLastRefreshed.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";

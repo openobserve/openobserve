@@ -19,8 +19,8 @@ import type { I18nText } from "@/types/i18n";
 /** The four empty states of guideline K5; a failed load is `error`, never `first-run`. */
 export type EmptyStateKind = "first-run" | "filtered" | "denied" | "error";
 
-/** `region`: a table body, page body or panel over 240 px, top-aligned at 64 px. `compact`: a short panel or cell, left-aligned. */
-export type EmptyStateSize = "region" | "compact";
+/** `page` fills a page or panel body; `inline` sits inside a table body, list or dropdown. */
+export type EmptyStateSize = "page" | "inline";
 
 export const EMPTY_STATE_KINDS = [
   "first-run",
@@ -29,14 +29,14 @@ export const EMPTY_STATE_KINDS = [
   "error",
 ] as const satisfies readonly EmptyStateKind[];
 
-export const EMPTY_STATE_SIZES = ["region", "compact"] as const satisfies readonly EmptyStateSize[];
+export const EMPTY_STATE_SIZES = ["page", "inline"] as const satisfies readonly EmptyStateSize[];
 
 export interface EmptyStateProps {
-  /** Picks the default icon, copy and action. Defaults to `first-run`. */
+  /** Picks the default icon, the tile tone and the default action. Defaults to `first-run`. */
   kind?: EmptyStateKind;
-  /** Defaults to `region`. */
+  /** Defaults to `page`. */
   size?: EmptyStateSize;
-  /** Says what is empty; `filtered`, `denied` and `error` fall back to their own copy. */
+  /** Says what is empty. */
   title?: I18nText;
   /** One or two sentences: why it is empty and what to do. */
   text?: I18nText;
@@ -44,7 +44,6 @@ export interface EmptyStateProps {
   icon?: IconName;
   /** Primary action; `error` defaults to Retry and `filtered` to Clear filters. */
   actionLabel?: I18nText;
-  /** Region only: compact shows one action at most. */
   secondaryActionLabel?: I18nText;
   /** Error detail, shown in mono under the text. */
   requestId?: string;
@@ -58,8 +57,8 @@ export interface EmptyStateProps {
 export interface EmptyStateSlots {
   /** Rich text in place of the `text` prop. */
   text?: () => unknown;
-  /** OButtons in place of the action buttons: md in a region, sm in compact, never cards. */
+  /** Custom action content (onboarding cards) in place of the action buttons. */
   actions?: () => unknown;
-  /** Content below the actions, such as a checklist. */
+  /** Content below the actions. */
   extra?: () => unknown;
 }

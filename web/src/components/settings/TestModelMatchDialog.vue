@@ -113,21 +113,29 @@
       <!-- ── Right: Live Results ── -->
       <div class="flex-1 overflow-y-auto py-5 ps-5 pe-6">
         <transition name="tmm-fade" mode="out-in">
-          <OEmptyState
+          <!-- Empty state -->
+          <div
             v-if="!testModelName"
             key="empty"
-            icon="manage-search"
-            :title="t('modelPricing.enterModelName')"
+            class="flex h-full min-h-50 items-center justify-center"
             data-test="test-match-empty"
-          />
+          >
+            <OEmptyState
+              size="inline"
+              icon="manage-search"
+              :title="t('modelPricing.enterModelName')"
+            />
+          </div>
 
-          <OEmptyState
+          <!-- Typed but not yet tested -->
+          <div
             v-else-if="testResult === null"
             key="waiting"
-            icon="ads-click"
-            :title="t('modelPricing.clickToTest')"
+            class="flex h-full min-h-50 items-center justify-center"
             data-test="test-match-waiting"
-          />
+          >
+            <OEmptyState size="inline" icon="ads-click" :title="t('modelPricing.clickToTest')" />
+          </div>
 
           <!-- No Match -->
           <div
@@ -137,7 +145,7 @@
             data-test="test-match-no-result"
           >
             <OInlineNotice tone="err">
-              <div class="text-compact font-semibold">
+              <div class="text-compact font-bold">
                 {{ t("modelPricing.noMatchFound") }}
               </div>
               <div class="text-text-secondary mt-0.5 text-xs">
@@ -166,7 +174,7 @@
           <div v-else key="match" class="flex flex-col gap-3" data-test="test-match-result">
             <!-- Match status -->
             <OInlineNotice :tone="isApproximateMatch ? 'warn' : 'ok'">
-              <div class="text-compact font-semibold">
+              <div class="text-compact font-bold">
                 {{
                   isApproximateMatch
                     ? t("modelPricing.approximateMatchFound")
@@ -209,7 +217,7 @@
                   <div
                     class="rounded-default border-card-glass-border text-2xs flex items-center gap-1.25 border bg-transparent px-2.5 py-1.25 font-medium"
                     :class="{
-                      'border-status-positive bg-banner-success-bg font-semibold':
+                      'border-status-positive bg-banner-success-bg font-bold':
                         step.key === winnerSource,
                       'opacity-40': step.key !== winnerSource,
                     }"
@@ -231,7 +239,7 @@
             <div class="border-card-glass-border rounded-default overflow-hidden border">
               <div class="bg-surface-panel border-card-glass-border border-b px-3.5 py-3">
                 <div>
-                  <div class="text-compact font-semibold">
+                  <div class="text-compact font-bold">
                     {{ testResult.tier || t("settings.testModelMatchDialog.defaultTier") }}
                   </div>
                   <div class="text-2xs text-text-secondary mt-0.5" v-if="matchedTierDef?.condition">
@@ -298,7 +306,7 @@
               </div>
               <OEmptyState
                 v-else
-                size="compact"
+                size="inline"
                 icon="info-outline"
                 :title="t('modelPricing.noPricingForTier')"
               />

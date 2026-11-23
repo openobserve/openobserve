@@ -327,7 +327,7 @@ describe("IngestMetrics Component", () => {
         "prometheus config snippet",
         expect.any(Function),
         {
-          successMessage: "Content copied successfully!",
+          successMessage: "Content Copied Successfully!",
           errorMessage: "Error while copy content.",
           timeout: 5000,
         },
@@ -340,7 +340,7 @@ describe("IngestMetrics Component", () => {
       wrapper.vm.copyToClipboardFn({ innerText: "some text" });
 
       expect(copyToClipboard).toHaveBeenCalledWith("some text", expect.any(Function), {
-        successMessage: "Content copied successfully!",
+        successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -352,7 +352,7 @@ describe("IngestMetrics Component", () => {
       wrapper.vm.copyToClipboardFn({ innerText: "fail text" });
 
       expect(copyToClipboard).toHaveBeenCalledWith("fail text", expect.any(Function), {
-        successMessage: "Content copied successfully!",
+        successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -405,7 +405,7 @@ describe("IngestMetrics Component", () => {
       wrapper.vm.copyToClipboardFn({ innerText: "" });
 
       expect(copyToClipboard).toHaveBeenCalledWith("", expect.any(Function), {
-        successMessage: "Content copied successfully!",
+        successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -417,7 +417,7 @@ describe("IngestMetrics Component", () => {
       wrapper.vm.copyToClipboardFn({});
 
       expect(copyToClipboard).toHaveBeenCalledWith(undefined, expect.any(Function), {
-        successMessage: "Content copied successfully!",
+        successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });

@@ -556,7 +556,7 @@ describe("TraceDetailsSidebar", async () => {
 
         expect(viewLogsButton().attributes("aria-busy")).toBe("true");
         expect(viewLogsButton().attributes("disabled")).toBeUndefined();
-        expect(viewLogsButton().text()).toContain("View logs");
+        expect(viewLogsButton().text()).toContain("View Logs");
 
         resolveLookup(null);
         await flushPromises();
@@ -712,7 +712,7 @@ describe("TraceDetailsSidebar", async () => {
           expect(spinner().exists()).toBe(false);
           await vi.advanceTimersByTimeAsync(300);
           expect(spinner().exists()).toBe(true);
-          expect(viewLogsButton().text()).toBe("View logs");
+          expect(viewLogsButton().text()).toBe("View Logs");
           expect(viewLogsButton().find(".text-transparent").exists()).toBe(false);
           resolveLookup(null);
           await run;
@@ -1853,7 +1853,7 @@ describe("TraceDetailsSidebar", async () => {
       await correlationWrapper.setProps({ activeTab: "correlated-metrics" });
       await flushPromises();
 
-      expect(correlationWrapper.vm.correlationError).toContain("No data found");
+      expect(correlationWrapper.vm.correlationError).toContain("No Data Found");
     });
   });
 
@@ -2924,7 +2924,7 @@ describe("TraceDetailsSidebar — span to profile link", () => {
     ];
     const w = await mountWith();
     expect(w.find(BUTTON).exists()).toBe(true);
-    expect(w.find(BUTTON).text()).toBe("View profile");
+    expect(w.find(BUTTON).text()).toBe("View Profile");
     w.unmount();
   });
 
@@ -3217,7 +3217,7 @@ describe("TraceDetailsSidebar — logs license lock", () => {
     const w = mountSidebar({ streamName: "default", parentMode: "standalone" });
     await flushPromises();
     expect(w.vm.logsLocked).toBe(false);
-    expect(w.vm.viewLogsTooltipContent).toBe("View logs");
+    expect(w.vm.viewLogsTooltipContent).toBe("View Logs");
     w.unmount();
   });
 });

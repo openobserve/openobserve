@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex items-center gap-2">
         <OIcon name="forum" size="sm" class="text-accent" />
-        <h2 class="text-text-heading m-0 text-sm font-semibold">
+        <h2 class="text-text-heading m-0 text-sm font-bold">
           {{ t("alerts.incidents.rcaThread.title") }}
         </h2>
         <OBadge v-if="runLive" data-test="rca-thread-live-pill" tone="ok" size="sm" dot>
@@ -68,26 +68,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("alerts.incidents.rcaThread.loading") }}
       </p>
 
-      <OEmptyState
+      <div
         v-else-if="emptyMessage"
-        size="compact"
-        :kind="threadFailed ? 'error' : 'first-run'"
-        :icon="threadFailed ? undefined : 'info'"
-        :title="emptyMessage"
         data-test="rca-thread-empty"
+        class="text-text-secondary text-compact flex flex-col items-start gap-2"
       >
+        <p class="m-0 flex items-start gap-2">
+          <OIcon name="info" size="sm" class="mt-0.5 shrink-0" />
+          {{ emptyMessage }}
+        </p>
         <!-- A live run retries on its own poll; a finished run needs the user. -->
-        <template v-if="status === 'unavailable' && !runLive" #actions>
-          <OButton
-            data-test="rca-thread-retry-btn"
-            variant="secondary"
-            size="sm"
-            @click="$emit('retry')"
-          >
-            {{ t("common.retry") }}
-          </OButton>
-        </template>
-      </OEmptyState>
+        <OButton
+          v-if="status === 'unavailable' && !runLive"
+          data-test="rca-thread-retry-btn"
+          variant="secondary"
+          icon="refresh"
+          @click="$emit('retry')"
+        >
+          {{ t("common.retry") }}
+        </OButton>
+      </div>
 
       <p
         v-else-if="!thread && runLive"
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <div class="flex min-w-0 flex-col gap-1">
             <div class="flex min-w-0 items-baseline gap-2">
-              <span class="text-text-heading text-compact shrink-0 font-semibold">
+              <span class="text-text-heading text-compact shrink-0 font-bold">
                 {{ t("alerts.incidents.rcaThread.analysisStarted") }}
               </span>
               <span
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-tint-warning flex min-w-0 flex-col gap-1 px-3 py-2"
             >
               <div class="flex min-w-0 items-baseline gap-2">
-                <span class="text-text-heading text-compact min-w-0 flex-1 font-semibold">
+                <span class="text-text-heading text-compact min-w-0 flex-1 font-bold">
                   {{ t("alerts.incidents.rcaSteer.needsInput") }}
                 </span>
                 <span
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <p
                 v-if="questionStatus(entry.question)"
                 data-test="rca-thread-question-status"
-                class="text-text-heading m-0 text-xs font-semibold"
+                class="text-text-heading m-0 text-xs font-bold"
               >
                 {{ questionStatus(entry.question) }}
               </p>
@@ -269,14 +269,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ t("alerts.incidents.rcaSteer.pill.leadNotEvidence") }}
               </OBadge>
-              <span class="text-text-heading truncate text-xs font-semibold">
+              <span class="text-text-heading truncate text-xs font-bold">
                 {{ userLocalPart(entry.item.author_email) }}
               </span>
               <span class="text-text-secondary text-2xs shrink-0 font-mono">
                 {{ clock(entry.item.created_at) }}
               </span>
               <span
-                class="bg-surface-tint-accent text-accent text-2xs inline-flex size-5 shrink-0 items-center justify-center rounded-full font-semibold uppercase"
+                class="bg-surface-tint-accent text-accent text-3xs inline-flex size-5 shrink-0 items-center justify-center rounded-full font-bold uppercase"
                 aria-hidden="true"
               >
                 {{ initials(entry.item.author_email) }}
@@ -411,7 +411,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, ref, useId, watch } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
@@ -549,9 +548,6 @@ const conclusionStep = computed<RcaStep | null>(() => {
   return thread.steps.at(-1) ?? null;
 });
 
-const threadFailed = computed(
-  () => !props.noTranscript && ["unavailable", "missing", "unsupported"].includes(props.status),
-);
 const emptyMessage = computed<I18nText | null>(() => {
   if (props.noTranscript) return t("alerts.incidents.rcaThread.noTranscript");
   // A live run's session is created after the run starts, so "expired" is only a race there.

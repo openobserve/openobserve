@@ -19,7 +19,8 @@
 
     <OEmptyState
       v-else-if="!records.length"
-      size="compact"
+      size="inline"
+      kind="filtered"
       :title="t('oncall.deliveriesNone')"
       data-test="oncall-deliveries-empty"
     />

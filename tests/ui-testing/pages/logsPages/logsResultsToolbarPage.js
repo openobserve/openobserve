@@ -27,6 +27,7 @@ export class LogsResultsToolbarPage {
     this.inlineWrapButton = '[data-test="logs-search-result-wrap-table-content-btn"]';
     this.overflowMenuButton = '[data-test="logs-result-actions-menu-btn"]';
     this.overflowWrapItem = '[data-test="logs-result-wrap-menu-item"]';
+    this.overflowRefreshItem = '[data-test="logs-result-refresh-menu-item"]';
   }
 
   /**
@@ -50,12 +51,12 @@ export class LogsResultsToolbarPage {
 
   async openOverflowMenu() {
     await this.page.locator(this.overflowMenuButton).click();
-    await expect(this.page.locator(this.overflowWrapItem)).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.overflowRefreshItem)).toBeVisible({ timeout: 10000 });
   }
 
   async clickOverflowWrapItem() {
     await this.page.locator(this.overflowWrapItem).click();
-    await expect(this.page.locator(this.overflowWrapItem)).toHaveCount(0);
+    await expect(this.page.locator(this.overflowRefreshItem)).toHaveCount(0);
   }
 
   async readStoredWrapContent() {

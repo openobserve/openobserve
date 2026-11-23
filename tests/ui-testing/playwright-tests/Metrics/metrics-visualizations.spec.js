@@ -139,7 +139,7 @@ test.describe("Metrics Visualization and Chart Tests", () => {
       },
       {
         type: 'metric',
-        name: 'Metric text',
+        name: 'Metric Text',
         checkValue: true,
         skipIfNotFound: true
       },

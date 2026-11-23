@@ -165,7 +165,7 @@ const onNamespaces = (value: unknown) =>
         v-if="namespaced"
         icon-only
         class="md:hidden"
-        variant="ghost"
+        variant="secondary"
         :aria-label="t('infra.k8s2.namespaceFilter')"
         data-test="k8s2-namespace-filter-btn"
         @click="filterOpen = true"

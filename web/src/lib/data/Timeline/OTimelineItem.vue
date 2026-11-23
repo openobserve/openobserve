@@ -87,7 +87,7 @@ const isOIcon = computed<boolean>(() =>
           : 'pt-0.5 pb-1'
       "
     >
-      <p v-if="title" class="text-text-heading m-0 text-sm leading-5 font-medium">
+      <p v-if="title" class="text-text-heading m-0 text-sm leading-snug font-medium">
         {{ title }}
       </p>
       <p

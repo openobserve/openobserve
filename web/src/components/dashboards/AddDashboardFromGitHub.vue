@@ -31,14 +31,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="show = false"
     @click:primary="handleNext"
   >
-    <div v-if="loading" class="px-page-edge grid grid-cols-2 gap-1.5 pt-3">
-      <OSkeleton v-for="n in 10" :key="n" shape="block" class="h-11" />
+    <!-- Loading -->
+    <div
+      v-if="loading"
+      class="px-page-edge flex min-h-80 flex-col items-center justify-center gap-3"
+    >
+      <OSpinner size="lg" />
+      <OText variant="meta">{{ t("dashboard.addDashboardFromGitHub.loading") }}</OText>
     </div>
 
+    <!-- Error -->
     <OEmptyState
       v-else-if="error"
       kind="error"
-      :text="isRawHttpText(error) ? undefined : raw(error)"
+      :title="t('emptyState.loadError.title')"
+      :text="raw(error)"
       @action="loadDashboards"
     />
 
@@ -243,13 +250,12 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
@@ -269,7 +275,7 @@ export default defineComponent({
     OSearchInput,
     OSelect,
     OCheckbox,
-    OSkeleton,
+    OSpinner,
   },
   props: {
     modelValue: {
@@ -643,7 +649,6 @@ export default defineComponent({
 
     return {
       raw,
-      isRawHttpText,
       t,
       show,
       loading,

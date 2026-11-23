@@ -32,23 +32,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="mx-auto max-w-125 p-6 pt-15">
       <!-- No Token Error -->
-      <OEmptyState
-        v-if="state === 'no_token'"
-        kind="error"
-        :title="t('billing.azureMarketplace.noTokenFound')"
-        :text="t('billing.azureMarketplace.noTokenDescription')"
-        :action-label="t('billing.azureMarketplace.goToDashboard')"
-        @action="goToDashboard"
-      />
+      <div v-if="state === 'no_token'" class="text-center">
+        <OIcon name="warning" style="width: 5rem; height: 5rem" />
+        <h5 class="mt-3">{{ t("billing.azureMarketplace.noTokenFound") }}</h5>
+        <p class="text-text-secondary">
+          {{ t("billing.azureMarketplace.noTokenDescription") }}
+        </p>
+        <OButton variant="primary" class="mt-4" @click="goToDashboard">{{
+          t("billing.azureMarketplace.goToDashboard")
+        }}</OButton>
+      </div>
 
       <!-- Error State -->
-      <OEmptyState
-        v-else-if="state === 'error'"
-        kind="error"
-        :text="raw(errorMessage)"
-        :action-label="t('billing.azureMarketplace.tryAgain')"
-        @action="resetAndRetry"
-      />
+      <div v-else-if="state === 'error'" class="text-center">
+        <OIcon name="error" style="width: 5rem; height: 5rem" />
+        <h5 class="mt-3">{{ errorMessage }}</h5>
+        <OButton variant="primary" class="mt-4" @click="resetAndRetry">{{
+          t("billing.azureMarketplace.tryAgain")
+        }}</OButton>
+      </div>
 
       <!-- Org Selection/Creation -->
       <div v-else-if="state === 'select_org'" class="text-center">
@@ -146,18 +148,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Payment Failed State -->
-      <OEmptyState
-        v-else-if="state === 'payment_failed'"
-        kind="error"
-        :title="t('billing.azureMarketplace.paymentFailed')"
-        :text="t('billing.azureMarketplace.paymentFailedDescription', { product: raw('Azure') })"
-      >
-        <template #actions>
-          <OButton href="mailto:support@openobserve.ai">
-            {{ t("billing.azureMarketplace.contactSupport") }}
-          </OButton>
-        </template>
-      </OEmptyState>
+      <div v-else-if="state === 'payment_failed'" class="text-center">
+        <OIcon name="error" style="width: 5rem; height: 5rem" />
+        <h5 class="mt-3">{{ t("billing.azureMarketplace.paymentFailed") }}</h5>
+        <p class="text-text-secondary">
+          {{
+            t("billing.azureMarketplace.paymentFailedDescription", {
+              product: raw("Azure"),
+            })
+          }}
+        </p>
+        <OButton href="mailto:support@openobserve.ai" variant="primary" class="mt-4">{{
+          t("billing.azureMarketplace.contactSupport")
+        }}</OButton>
+      </div>
     </div>
   </div>
 </template>
@@ -175,7 +179,6 @@ import organizationsService from "@/services/organizations";
 import { ensureBrowserRum } from "@/utils/rum/ensureBrowserRum";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -195,7 +198,7 @@ type SetupState = "select_org" | "no_token" | "processing" | "success" | "paymen
 
 export default defineComponent({
   name: "AzureMarketplaceSetup",
-  components: { OButton, OSpinner, OForm, OFormInput, OFormSelect, OIcon, OCard, OEmptyState },
+  components: { OButton, OSpinner, OForm, OFormInput, OFormSelect, OIcon, OCard },
   setup() {
     const store = useStore();
     const { isDark } = useTheme();

@@ -123,7 +123,7 @@ function onTickChange(newVal: CheckboxModelValue) {
       <!-- Expand / collapse arrow (parents only) -->
       <span
         v-if="!isLeaf"
-        class="text-text-secondary flex size-4 shrink-0 items-center justify-center transition-transform duration-(--duration-indicator) ease-(--ease-control)"
+        class="text-text-secondary flex size-4 shrink-0 items-center justify-center transition-transform duration-200 ease-in-out"
         :class="isExpanded ? 'rotate-0' : '-rotate-90'"
         aria-hidden="true"
       >
@@ -177,7 +177,7 @@ function onTickChange(newVal: CheckboxModelValue) {
 
       <!-- Label -->
       <OTruncatedText
-        class="text-text-body text-sm leading-5"
+        class="text-text-body text-sm leading-snug"
         :class="isDisabled ? 'opacity-50' : ''"
       >
         {{ node.label }}
@@ -187,7 +187,7 @@ function onTickChange(newVal: CheckboxModelValue) {
     <!-- Children (recursive) — animated expand/collapse ──────────── -->
     <div
       v-if="!isLeaf"
-      class="grid overflow-hidden transition-[grid-template-rows] duration-(--duration-expand) ease-(--ease-control)"
+      class="grid overflow-hidden transition-[grid-template-rows] duration-200 ease-in-out"
       :style="{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }"
     >
       <ul role="group" class="m-0 min-h-0 list-none overflow-hidden p-0 ps-5">

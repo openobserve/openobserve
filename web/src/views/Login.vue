@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-card-glass-bg flex h-[100vh] w-[100vw] flex-col items-center justify-center gap-4 max-md:h-dvh max-md:w-full"
   >
     <OSpinner size="lg" />
-    <div class="text-text-secondary text-sm">
+    <div class="text-text-secondary text-base">
       {{ t("login.signingIn") }}
     </div>
   </div>

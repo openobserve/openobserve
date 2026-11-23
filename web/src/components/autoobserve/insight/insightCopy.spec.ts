@@ -192,7 +192,7 @@ describe("insightCopy: Not working next step and actions (test 5)", () => {
         { actions: [{ type: "review_source", stream_type: "logs", stream_name: "batch_logs" }] },
       ),
     );
-    expect(quiet.cta?.label).toBe("Open in logs");
+    expect(quiet.cta?.label).toBe("Open in Logs");
     expect(quiet.cta?.target).toMatchObject({
       type: "route",
       to: {
@@ -231,7 +231,7 @@ describe("insightCopy: Not working next step and actions (test 5)", () => {
   it("adds Open in Logs on the alert's logs stream, but not on a stream that is gone", () => {
     const withStream = parts(notWorking({ pattern: "field_missing", stream: "logs/app_logs" }));
     expect(withStream.secondary.map((c) => c.label)).toEqual([
-      "Open in logs",
+      "Open in Logs",
       "Open in Alert calibration",
     ]);
     const gone = parts(notWorking({ pattern: "stream_missing", stream: "logs/orders_v1" }));

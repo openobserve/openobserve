@@ -63,6 +63,6 @@ describe("Error404", () => {
   it("should have a 'Go back' button", () => {
     const button = wrapper.find('[data-test="error-404-go-back-btn"]');
     expect(button.exists()).toBe(true);
-    expect(button.text()).toContain("Go back");
+    expect(button.text()).toContain("Go Back");
   });
 });

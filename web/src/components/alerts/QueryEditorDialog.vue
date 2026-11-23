@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span class="text-2xs text-text-label font-semibold">{{ t("alerts.streamType") }}</span>
             <span class="text-2xs text-text-label">:</span>
-            <span class="text-text-link text-xs font-semibold">{{ streamType }}</span>
+            <span class="text-text-link text-xs font-bold">{{ streamType }}</span>
           </div>
           <span v-if="streamType && streamName" class="opacity-20 select-none">|</span>
           <div
@@ -59,10 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               t("alerts.stream_name")
             }}</span>
             <span class="text-2xs text-text-label">:</span>
-            <span v-if="streamName" class="text-sql-accent text-xs font-semibold">{{
+            <span v-if="streamName" class="text-sql-accent text-xs font-bold">{{
               streamName
             }}</span>
-            <span v-else class="text-text-muted text-xs font-semibold italic">{{
+            <span v-else class="text-text-muted text-xs font-bold italic">{{
               t("alerts.queryEditor.noStream")
             }}</span>
           </div>
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="menu-link-ai-item"
           :aria-label="t('menu.aiAssistant')"
           variant="ghost"
-          class="group hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-(--duration-control) ease-(--ease-control) [background:var(--color-gradient-ai-subtle)]! hover:shadow-md hover:[background:var(--color-gradient-ai)]!"
+          class="group hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 ease-[ease] [background:var(--color-gradient-ai-subtle)]! hover:shadow-md hover:[background:var(--color-gradient-ai)]!"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
@@ -132,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="bg-surface-subtle border-border-default flex min-h-12 shrink-0 items-center justify-between border-b px-3 py-2"
                     >
                       <div class="flex items-center gap-2">
+                        <div class="rounded-default bg-theme-accent h-3.5 w-0.75 shrink-0" />
                         <span class="text-xs font-semibold">{{
                           localTab === "sql" ? t("alerts.sqlEditor") : t("alerts.promqlEditor")
                         }}</span>
@@ -197,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
                       >
                         <span
-                          class="text-text-placeholder text-compact overflow-hidden font-mono leading-5 text-ellipsis whitespace-nowrap"
+                          class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
                           >{{ fullEditorPlaceholder }}</span
                         >
                       </div>
@@ -329,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
                     >
                       <span
-                        class="text-text-placeholder text-compact overflow-hidden font-mono leading-5 text-ellipsis whitespace-nowrap"
+                        class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
                         >{{ vrlPlaceholder }}</span
                       >
                     </div>
@@ -349,12 +350,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="bg-surface-subtle border-border-default flex min-h-12 shrink-0 items-center justify-between border-b px-3 py-2"
                 >
                   <div class="flex items-center gap-2">
+                    <div class="rounded-default bg-theme-accent h-3.5 w-0.75 shrink-0" />
                     <span class="text-xs font-semibold">{{
                       t("alerts.queryEditor.queryResult")
                     }}</span>
                     <span
                       v-if="multiTimeRange && multiTimeRange.length > 0"
-                      class="text-2xs rounded-default bg-status-info-bg border-banner-info-border text-text-link border px-1.75 py-px font-semibold tracking-[0.04em]"
+                      class="text-3xs rounded-default bg-status-info-bg border-banner-info-border text-text-link border px-1.75 py-px font-bold tracking-[0.04em]"
                       >{{ t("alerts.queryEditor.resultsAcrossWindows") }}</span
                     >
                   </div>
@@ -362,19 +364,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Content -->
                 <div class="min-h-0 flex-1 overflow-hidden">
+                  <!-- Idle: not yet run -->
                   <div
                     v-if="!tempRunQuery && outputEvents == ''"
-                    class="bg-card-glass-bg h-full w-full"
+                    class="bg-card-glass-bg flex h-full w-full flex-col items-center justify-center"
                   >
-                    <OEmptyState icon="table-chart" :title="t('alerts.runQueryForOutput')" />
+                    <div class="flex flex-col items-center gap-2">
+                      <OIcon name="table-chart" class="size-12! opacity-[0.18]" />
+                      <span class="text-xs opacity-[0.45]">{{
+                        t("alerts.runQueryForOutput")
+                      }}</span>
+                    </div>
                   </div>
+                  <!-- No results after run -->
                   <div
                     v-else-if="outputEvents == '' && !runQueryLoading"
-                    class="bg-card-glass-bg h-full w-full"
+                    class="bg-card-glass-bg flex h-full flex-col items-center justify-center"
                   >
-                    <OEmptyState icon="table-chart" :title="t('search.noResult')" />
+                    <div class="flex flex-col items-center gap-2">
+                      <OIcon name="warning" size="xl" class="text-warning opacity-60" />
+                    </div>
                   </div>
-                  <OSkeleton v-else-if="runQueryLoading" preset="tableRows" :rows="8" />
+                  <!-- Loading -->
+                  <div
+                    v-else-if="runQueryLoading"
+                    class="flex h-full flex-col items-center justify-center gap-2"
+                  >
+                    <OSpinner size="lg" />
+                    <span class="text-text-secondary text-sm">{{
+                      t("search.fetchingResults")
+                    }}</span>
+                  </div>
                   <!-- Results -->
                   <QueryEditor
                     v-else
@@ -406,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       t("alerts.queryEditor.combinedOutput")
                     }}</span>
                     <span
-                      class="text-2xs rounded-default bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-ol-text border px-1.75 py-px font-semibold tracking-[0.04em]"
+                      class="text-3xs rounded-default bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-ol-text border px-1.75 py-px font-bold tracking-[0.04em]"
                       >{{ t("alerts.queryEditor.sqlVrlBadge") }}</span
                     >
                   </div>
@@ -415,7 +435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       class="query-editor-run-dot bg-status-positive h-1.5 w-1.5 rounded-full"
                     />
-                    <span class="text-2xs text-status-positive font-semibold">{{
+                    <span class="text-3xs text-status-positive font-semibold">{{
                       t("alerts.queryEditor.running")
                     }}</span>
                   </div>
@@ -423,19 +443,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Content -->
                 <div class="min-h-0 flex-1 overflow-hidden">
+                  <!-- Idle -->
                   <div
                     v-if="!tempTestFunction && !runFnQueryLoading"
-                    class="bg-card-glass-bg h-full w-full"
+                    class="bg-card-glass-bg flex h-full w-full flex-col items-center justify-center"
                   >
-                    <OEmptyState icon="data-object" :title="t('alerts.applyVRLForOutput')" />
+                    <div class="flex flex-col items-center gap-2">
+                      <OIcon name="data-object" class="size-12! opacity-[0.18]" />
+                      <span class="text-xs opacity-[0.45]">{{
+                        t("alerts.applyVRLForOutput")
+                      }}</span>
+                    </div>
                   </div>
+                  <!-- No results -->
                   <div
                     v-else-if="outputFnEvents == '' && !runFnQueryLoading && tempTestFunction"
-                    class="bg-card-glass-bg h-full w-full"
+                    class="bg-card-glass-bg flex h-full flex-col items-center justify-center"
                   >
-                    <OEmptyState icon="data-object" :title="t('search.noResult')" />
+                    <div class="flex flex-col items-center gap-2">
+                      <OIcon name="warning" size="xl" class="text-warning opacity-60" />
+                    </div>
                   </div>
-                  <OSkeleton v-else-if="runFnQueryLoading" preset="tableRows" :rows="8" />
+                  <!-- Loading -->
+                  <div
+                    v-else-if="runFnQueryLoading"
+                    class="flex h-full flex-col items-center justify-center gap-2"
+                  >
+                    <OSpinner size="lg" />
+                    <span class="text-text-secondary text-sm">{{
+                      t("search.fetchingResults")
+                    }}</span>
+                  </div>
                   <!-- Results -->
                   <QueryEditor
                     v-else
@@ -505,8 +543,6 @@ import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

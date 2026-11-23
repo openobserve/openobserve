@@ -90,6 +90,6 @@ const labelClass = (position: number) =>
   position < current.value
     ? "text-text-body"
     : position === current.value
-      ? "text-text-heading font-semibold"
+      ? "text-text-heading font-bold"
       : "text-text-secondary";
 </script>

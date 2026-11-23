@@ -7,7 +7,7 @@ exports[`synthetic check form without an AutoObserve prefill > renders the confi
   "<div class="rounded-default border-border-default mb-4 border">
   <div class="border-border-default flex items-center border-b px-3 py-2.5">
     <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0"></div>
-    <h3 class="text-text-heading text-sm font-semibold">synthetics.checkDetails.title</h3>
+    <h3 class="text-text-heading text-base font-semibold">synthetics.checkDetails.title</h3>
   </div>
   <div class="flex flex-col gap-4 px-3 py-2">
     <o-input-stub modelvalue="HTTP Health Check" label="synthetics.checkDetails.name" errormessage="" placeholder="synthetics.checkDetails.namePlaceholder" type="text" error="false" clearable="false" copyable="false" disabled="false" required="true" mono="false" autofocus="false" size="md" width="full" data-test="synthetics-check-details-name-input"></o-input-stub>
@@ -30,7 +30,7 @@ exports[`synthetic check form without an AutoObserve prefill > renders the confi
   "<div class="rounded-default border-border-default mb-4 border">
   <div class="border-border-default flex items-center border-b px-3 py-2.5">
     <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0"></div>
-    <h3 class="text-text-heading text-sm font-semibold">synthetics.locations.title</h3>
+    <h3 class="text-text-heading text-base font-semibold">synthetics.locations.title</h3>
   </div>
   <div class="flex flex-col gap-3 px-3 py-2">
     <div class="flex items-center gap-2">
@@ -84,7 +84,7 @@ exports[`synthetic check form without an AutoObserve prefill > renders the confi
   "<div class="rounded-default border-border-default mb-4 border">
   <div class="border-border-default flex items-center border-b px-3 py-2.5">
     <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0"></div>
-    <h3 class="text-text-heading text-sm font-semibold">synthetics.scheduleAlert.schedule</h3>
+    <h3 class="text-text-heading text-base font-semibold">synthetics.scheduleAlert.schedule</h3>
   </div>
   <div class="flex flex-col gap-4 px-3 py-2">
     <div class="flex flex-wrap items-end gap-8">
@@ -101,7 +101,7 @@ exports[`synthetic check form without an AutoObserve prefill > renders the confi
   "<div class="rounded-default border-border-default mb-4 border" data-test="synthetics-check-alerts">
   <div class="border-border-default flex items-center border-b px-3 py-2.5">
     <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0"></div>
-    <h3 class="text-text-heading text-sm font-semibold">synthetics.scheduleAlert.alerts</h3>
+    <h3 class="text-text-heading text-base font-semibold">synthetics.scheduleAlert.alerts</h3>
   </div>
   <div class="flex flex-col gap-4 px-3 py-2">
     <alert-destinations-field-stub destinations="dest-1" workflows="" destinationoptions="ops-webhook" label="synthetics.scheduleAlert.destinations" tooltip="" placeholder="alerts.summary.noDestination" notifiesnobody="false" showstatus="false" targetrequired="false" supportsworkflows="false" data-test="synthetics-check-alerts-destinations"></alert-destinations-field-stub>

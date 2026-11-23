@@ -173,7 +173,7 @@ describe("EditGroup Component", () => {
       });
       expect(wrapper.vm.tabs[2]).toMatchObject({
         value: "serviceAccounts",
-        label: "Service accounts",
+        label: "Service Accounts",
       });
     });
 
@@ -182,7 +182,7 @@ describe("EditGroup Component", () => {
       expect(wrapper.vm.tabs).toHaveLength(3);
       expect(wrapper.vm.tabs[2]).toMatchObject({
         value: "serviceAccounts",
-        label: "Service accounts",
+        label: "Service Accounts",
       });
     });
 
@@ -325,7 +325,7 @@ describe("EditGroup Component", () => {
     });
   });
 
-  describe("Save changes", () => {
+  describe("Save Changes", () => {
     beforeEach(() => {
       vi.mocked(toast).mockClear();
     });

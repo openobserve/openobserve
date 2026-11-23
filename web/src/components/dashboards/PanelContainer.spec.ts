@@ -251,7 +251,7 @@ describe("PanelContainer", () => {
             template: '<div data-test="panel-schema-renderer"></div>',
             props: ["panelSchema", "selectedTimeObj", "width", "height"],
             emits: ["show-legends", "series-data-update"],
-            // The real component exposes `noData` as "" | "No data"
+            // The real component exposes `noData` as "" | "No Data"
             // (PanelSchemaRenderer.vue:1448-1480, exposed at :1802). Tests drive
             // it through setNoData() so the consumer reads the same contract the
             // real renderer publishes, not a shape invented by the stub.
@@ -659,7 +659,7 @@ describe("PanelContainer", () => {
 
     it("shows a loading skeleton instead of an empty body until the first result or error", async () => {
       wrapper = createWrapper({ kiosk: true });
-      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.setNoData("No data");
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.setNoData("No Data");
       await wrapper.vm.$nextTick();
       expect(wrapper.find('[data-test="dashboard-panel-kiosk-loading"]').exists()).toBe(true);
 
@@ -670,7 +670,7 @@ describe("PanelContainer", () => {
 
     it("keeps the skeleton through the first load only, never on later refreshes", async () => {
       wrapper = createWrapper({ kiosk: true });
-      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.setNoData("No data");
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.setNoData("No Data");
       const skeleton = () => wrapper.find('[data-test="dashboard-panel-kiosk-loading"]').exists();
 
       wrapper.vm.handleLoadingStateChange(true);
@@ -688,7 +688,7 @@ describe("PanelContainer", () => {
 
     it("never shows the skeleton outside kiosk", async () => {
       wrapper = createWrapper();
-      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.setNoData("No data");
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.setNoData("No Data");
       await wrapper.vm.$nextTick();
       expect(wrapper.find('[data-test="dashboard-panel-kiosk-loading"]').exists()).toBe(false);
     });
@@ -946,7 +946,7 @@ describe("PanelContainer", () => {
     });
   });
 
-  describe("Delete panel", () => {
+  describe("Delete Panel", () => {
     it("should open delete confirmation dialog", async () => {
       wrapper = createWrapper();
 
@@ -1623,7 +1623,7 @@ describe("PanelContainer", () => {
     });
   });
 
-  describe("Query inspector", () => {
+  describe("Query Inspector", () => {
     it("should open query inspector dialog", async () => {
       const metaDataWithQueries = {
         queries: [{ query: "SELECT * FROM test" }],
@@ -1682,7 +1682,7 @@ describe("PanelContainer", () => {
     });
   });
 
-  describe("Edit layout", () => {
+  describe("Edit Layout", () => {
     it("should emit onEditLayout event", async () => {
       wrapper = createWrapper();
 
@@ -1920,7 +1920,7 @@ describe("PanelContainer", () => {
     });
   });
 
-  describe("Last triggered at", () => {
+  describe("Last Triggered At", () => {
     it("should display last refreshed time when not view-only", async () => {
       wrapper = createWrapper({ viewOnly: false });
       const timestamp = Date.now();
@@ -2610,7 +2610,7 @@ describe("PanelContainer", () => {
     });
 
     // THE SEAM. PanelSchemaRenderer owns the no-data verdict — a type-aware,
-    // loading-aware computed exposed as `noData` ("" | "No data",
+    // loading-aware computed exposed as `noData` ("" | "No Data",
     // PanelSchemaRenderer.vue:1448-1480, :1802) — and emits series-data-update
     // once its conversion settles. Driving BOTH is what exercises the real
     // contract; a pin that only hand-fires a payload proves nothing, because
@@ -2626,7 +2626,7 @@ describe("PanelContainer", () => {
       // tile is read as a zero — the engine's worst possible output.
       wrapper = createWrapper({ data: eligible(), viewOnly: true });
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
-      await settle(renderer, "No data");
+      await settle(renderer, "No Data");
       expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(true);
     });
 
@@ -2641,7 +2641,7 @@ describe("PanelContainer", () => {
         viewOnly: true,
       });
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
-      await settle(renderer, "No data");
+      await settle(renderer, "No Data");
       const overlay = wrapper.find('[data-test="dashboard-panel-curated-no-data"]');
       expect(overlay.exists()).toBe(true);
       expect(overlay.text()).toContain("All clear");
@@ -2654,7 +2654,7 @@ describe("PanelContainer", () => {
         viewOnly: true,
       });
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
-      await settle(renderer, "No data");
+      await settle(renderer, "No Data");
       const overlay = wrapper.find('[data-test="dashboard-panel-curated-no-data"]');
       const classes = overlay.classes();
       expect(classes.some((name) => name.startsWith("bg-"))).toBe(false);
@@ -2674,7 +2674,7 @@ describe("PanelContainer", () => {
         viewOnly: true,
       });
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
-      await settle(renderer, "No data");
+      await settle(renderer, "No Data");
       expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
     });
 
@@ -2687,7 +2687,7 @@ describe("PanelContainer", () => {
         viewOnly: true,
       });
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
-      await settle(renderer, "No data");
+      await settle(renderer, "No Data");
       expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
     });
 
@@ -2710,14 +2710,14 @@ describe("PanelContainer", () => {
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
       await settle(renderer, "");
       expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
-      await settle(renderer, "No data");
+      await settle(renderer, "No Data");
       expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(true);
     });
 
     it("a panel WITHOUT curated_no_data_eligible never renders the state", async () => {
       wrapper = createWrapper({ data: mockPanelData, viewOnly: true });
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
-      await settle(renderer, "No data");
+      await settle(renderer, "No Data");
       expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
     });
 
@@ -3048,7 +3048,7 @@ describe("PanelContainer", () => {
       expect(itemDot().attributes("aria-label")).toBe("Unsaved changes in this browser");
       const item = editItem().element;
       expect(item.contains(itemDot().element)).toBe(true);
-      expect(item.textContent?.trim().startsWith("Edit panel")).toBe(true);
+      expect(item.textContent?.trim().startsWith("Edit Panel")).toBe(true);
       expect(item.lastElementChild).toBe(itemDot().element);
     });
 

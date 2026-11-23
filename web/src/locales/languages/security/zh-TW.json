@@ -20,8 +20,7 @@
       "close": "關閉",
       "mitre": "MITRE ATT&CK",
       "severity": "嚴重性",
-      "viewAll": "查看全部",
-      "moreActions": "更多操作"
+      "viewAll": "查看全部"
     },
     "caseStatus": {
       "open": "新增",
@@ -162,15 +161,7 @@
       "explore": "探索",
       "noSources": "尚無安全來源",
       "noSourcesHint": "擷取 CloudTrail、Okta、VPC Flow 或 syslog。名稱中含有 security、audit、auth 或 firewall 的串流會自動顯示在這裡。",
-      "summaryPartial": "此時間範圍的警示歷程超過單一摘要可容納的數量，因此計數與圖表僅為下限；請選擇較短的時間範圍以取得完整數字。",
-      "autoRefresh": "每分鐘自動重新整理",
-      "whatDetections": "偵測",
-      "rulesFailedHint": "無法讀取偵測，因此無法統計觸發次數。請重試，或檢查「偵測」頁面。",
-      "historyFailedHint": "觸發歷程無法使用，因此不統計觸發次數。請重試，或檢查「警示」頁面。",
-      "whatFirings": "觸發",
-      "emptyTitle": "尚未啟用任何偵測",
-      "emptyHint": "從 Sigma 目錄啟用偵測即可開始監控。請在「來源」中確認安全資料是否正在送達。",
-      "openSources": "開啟來源"
+      "summaryPartial": "此時間範圍的警示歷程超過單一摘要可容納的數量，因此計數與圖表僅為下限；請選擇較短的時間範圍以取得完整數字。"
     },
     "events": {
       "title": "安全事件",
@@ -288,8 +279,7 @@
           "outcome": "結果",
           "message": "訊息"
         }
-      },
-      "openSources": "開啟來源"
+      }
     },
     "drawer": {
       "event": "安全事件",
@@ -469,9 +459,7 @@
         "action": "動作",
         "object": "物件",
         "host": "主機"
-      },
-      "whatAlerts": "警示",
-      "loadFailedHint": "無法讀取觸發歷程。請重試，或在「偵測」中確認已啟用偵測。"
+      }
     },
     "cases": {
       "title": "案件",
@@ -720,9 +708,7 @@
         "showAll": "顯示所有列",
         "onlyEntity": "僅此案件的實體",
         "noneForEntity": "此次觸發中沒有列指明此案件的實體"
-      },
-      "whatCases": "案件",
-      "loadFailedHint": "無法讀取案件。請重試，或確認此組織已啟用案件管理。"
+      }
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -785,9 +771,7 @@
       "manageDetections": "管理偵測",
       "historyNarrowed": "警示歷史的最大查詢範圍會將觸發紀錄限制為自 {from} 起；此時間範圍內較早的觸發不計入。",
       "cellNone": "無規則",
-      "coverageError": "無法載入 ATT&CK 涵蓋範圍：{reason}",
-      "whatCoverage": "ATT&CK 涵蓋率",
-      "loadFailedHint": "無法計算涵蓋率，因此不顯示數量。請重試，或檢查「偵測」頁面。"
+      "coverageError": "無法載入 ATT&CK 涵蓋範圍：{reason}"
     },
     "detections": {
       "title": "偵測",
@@ -1014,9 +998,7 @@
           "in_cidr": "在範圍內 (CIDR)",
           "in_list": "在允許清單中"
         }
-      },
-      "whatDetections": "偵測",
-      "loadFailedHint": "無法讀取偵測。請重試，或確認您有權檢視此組織的警示。"
+      }
     },
     "tuning": {
       "open": "調校",
@@ -1233,9 +1215,7 @@
         "openAllowlists": "開啟允許清單"
       },
       "otherSourceOnly": "僅其他來源",
-      "otherSourceOnlyHint": "為 {logsource} 撰寫。它只因共用欄位名稱才能在你的資料流上編譯，因此不計為可安裝。",
-      "whatRules": "偵測目錄",
-      "loadFailedHint": "Sigma 目錄未能載入，因此規則與來源數量未知。請稍後重試。"
+      "otherSourceOnlyHint": "為 {logsource} 撰寫。它只因共用欄位名稱才能在你的資料流上編譯，因此不計為可安裝。"
     },
     "entities": {
       "title": "實體",
@@ -1355,9 +1335,7 @@
       "loadError": "無法載入安全性來源",
       "detailFailed": "此實體的部分資料無法讀取：{streams}。",
       "aliasCount": "+{n} 種拼寫 | +{n} 種拼寫",
-      "aliasHint": "以此拼寫記錄，屬於同一身分。",
-      "whatEntities": "實體",
-      "loadFailedHint": "無法連線至安全來源。請在「來源」中確認已連接來源，然後重試。"
+      "aliasHint": "以此拼寫記錄，屬於同一身分。"
     },
     "ueba": {
       "title": "使用者行為分析",
@@ -1456,9 +1434,7 @@
       "volumeNotJudged": "未為此使用者判定流量：短於一天的時間範圍會與基準中相同的一天中的小時比較，這需要至少一天的歷史資料。",
       "baselineBuilding": "基準建立中",
       "baselineBuildingHint": "目前已有 {span} 的歷史。待累積滿 {baseline} 的完整歷史後，才會開始與該使用者自身的過去比較；在此期間，僅標記相對其他使用者的明顯異常值。",
-      "buildingNotice": "{n} 位使用者的基準仍在建立中：在累積滿 {baseline} 的完整歷史之前，僅標記相對其他使用者的明顯異常值。 | {n} 位使用者的基準仍在建立中：在累積滿 {baseline} 的完整歷史之前，僅標記相對其他使用者的明顯異常值。",
-      "whatUsers": "使用者行為",
-      "loadFailedHint": "無法連線至安全來源。請在「來源」中確認已連接來源，然後重試。"
+      "buildingNotice": "{n} 位使用者的基準仍在建立中：在累積滿 {baseline} 的完整歷史之前，僅標記相對其他使用者的明顯異常值。 | {n} 位使用者的基準仍在建立中：在累積滿 {baseline} 的完整歷史之前，僅標記相對其他使用者的明顯異常值。"
     },
     "intel": {
       "title": "威脅情報",
@@ -1626,11 +1602,7 @@
       },
       "partialChecked": "結果不完整：已檢查 {total} 個指標中的 {checked} 個。其餘指標的計數可能偏低。",
       "partialCapped": "結果不完整：已檢查 {total} 個指標中的 {checked} 個。掃描在 {n} 個查詢處停止；嚴重程度最低的指標未被檢查。",
-      "inText": "{column}（文字中）",
-      "runSweepDisabled": "至少新增一個指標才能執行掃描。",
-      "whatIndicators": "威脅情資",
-      "loadFailedHint": "無法讀取指標清單。請重試，或確認您有權讀取此組織的查閱資料表。",
-      "filterType": "類型"
+      "inText": "{column}（文字中）"
     },
     "sources": {
       "title": "資料來源",
@@ -1695,9 +1667,7 @@
         "pipeline_missing": "已不存在",
         "other_stream": "目前讀取的是另一個串流",
         "other_pack": "目前執行的是另一個套件"
-      },
-      "whatSources": "安全來源",
-      "loadFailedHint": "無法連線至安全來源。請檢查網路連線或權限後重試。"
+      }
     },
     "nav": {
       "overview": "概覽",
@@ -1765,10 +1735,6 @@
       "indicatorType": "指標類型",
       "severityFilter": "嚴重性篩選",
       "stream": "串流"
-    },
-    "loadError": {
-      "title": "無法載入{what}",
-      "hint": "伺服器未對{what}作出回應。請檢查網路連線或權限後重試。"
     }
   }
 }

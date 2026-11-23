@@ -24,11 +24,13 @@ import { statusOfError } from "./chatShare";
 import { useIsOrgAdmin, useShareActions } from "./useChatShareDialog";
 import AiChatShareRow from "./AiChatShareRow.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const open = defineModel<boolean>("open", { required: true });
 
@@ -73,12 +75,17 @@ const { pendingShareId, refreshSnapshot, switchMode, toggleRedaction, revoke, co
     data-test="ai-chat-shared-by-me"
   >
     <template #header-right>
-      <ORefreshButton
-        :last-run-at="sharesQuery.dataUpdatedAt.value || null"
+      <OButton
+        icon-only
+        variant="ghost"
         :loading="fetching"
         data-test="ai-chat-shared-by-me-refresh"
+        :aria-label="t('common.refresh')"
         @click="refreshShares"
-      />
+      >
+        <OIcon name="refresh" size="sm" />
+        <OTooltip :content="t('common.refresh')" />
+      </OButton>
     </template>
     <div class="flex flex-col">
       <OToggleGroup
@@ -96,17 +103,19 @@ const { pendingShareId, refreshSnapshot, switchMode, toggleRedaction, revoke, co
           {{ t("aiChatShare.scopeAll") }}
         </OToggleGroupItem>
       </OToggleGroup>
-      <OSkeleton v-if="loading" preset="tableRows" :rows="4" />
+      <div v-if="loading" class="flex justify-center py-6">
+        <OSpinner size="lg" />
+      </div>
       <OEmptyState
         v-else-if="forbidden"
-        size="compact"
-        kind="denied"
+        size="inline"
+        icon="lock"
         :title="t('aiChatShare.allSharesForbidden')"
         data-test="ai-chat-shared-by-me-forbidden"
       />
       <OEmptyState
         v-else-if="failed"
-        size="compact"
+        size="inline"
         kind="error"
         :title="t('aiChatShare.loadFailed')"
         data-test="ai-chat-shared-by-me-error"
@@ -114,7 +123,7 @@ const { pendingShareId, refreshSnapshot, switchMode, toggleRedaction, revoke, co
       />
       <OEmptyState
         v-else-if="shares.length === 0"
-        size="compact"
+        size="inline"
         icon="share"
         :title="showAll ? t('aiChatShare.allSharesEmpty') : t('aiChatShare.sharedByMeEmpty')"
         data-test="ai-chat-shared-by-me-empty"

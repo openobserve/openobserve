@@ -18,12 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OFormSection
     v-if="rows.length"
     variant="plain"
-    class="mt-6"
+    class="mt-4"
     :title="t('about.waivers_title')"
     :description="t('about.waivers_from_key')"
     data-test="license-waivers-card"
   >
-    <div class="rounded-surface border-border-default overflow-hidden border">
+    <div class="rounded-b-surface -mx-4 -my-3 overflow-hidden">
       <OTable
         :data="rows"
         :columns="columns"

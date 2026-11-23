@@ -5,9 +5,10 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 import { computed } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { securityTime } from "@/utils/security/time";
@@ -67,25 +68,25 @@ async function onEnd(s: Suppression) {
   <div class="flex flex-col gap-3" data-test="security-suppressions">
     <span class="text-text-secondary text-xs">{{ t("siem.tuning.suppressions.about") }}</span>
 
-    <OSkeleton v-if="query.isLoading.value" preset="tableRows" :rows="3" />
-    <OEmptyState
+    <div v-if="query.isLoading.value" class="flex items-center justify-center py-6">
+      <OSpinner size="sm" />
+    </div>
+    <OInlineNotice
       v-else-if="query.isError.value && isForbiddenError(query.error.value)"
-      kind="denied"
-      size="compact"
-      :title="t('siem.tuning.suppressions.forbidden')"
+      tone="warn"
+      icon="lock"
       data-test="security-suppressions-forbidden"
-    />
-    <OEmptyState
+      >{{ t("siem.tuning.suppressions.forbidden") }}</OInlineNotice
+    >
+    <OInlineNotice
       v-else-if="query.isError.value"
-      kind="error"
-      size="compact"
-      :title="t('siem.tuning.suppressions.loadError')"
+      tone="err"
       data-test="security-suppressions-error"
-      @action="query.refetch()"
-    />
+      >{{ t("siem.tuning.suppressions.loadError") }}</OInlineNotice
+    >
     <OEmptyState
       v-else-if="!suppressions.length"
-      size="compact"
+      size="inline"
       icon="notifications-paused"
       :title="t('siem.tuning.suppressions.empty')"
       :text="t('siem.tuning.suppressions.emptyHint')"

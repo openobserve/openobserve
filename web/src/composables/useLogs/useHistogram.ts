@@ -44,7 +44,6 @@ import { formatLargeNumber } from "@/utils/formatters";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { isAggregateQuery } from "@/utils/logs/sqlResultShape";
 
 export const useHistogram = () => {
   const store = useStore();
@@ -151,9 +150,6 @@ export const useHistogram = () => {
         total: formatLargeNumber(totalCount) + plusSign,
         took: searchObj.data.queryResults.took,
       };
-      if (searchObj.meta.sqlMode && isAggregateQuery(fnParsedSQL(), searchObj.data.query ?? "")) {
-        parts.rows = true;
-      }
 
       if (searchObj.meta.logsVisualizeToggle === "logs") {
         parts.scanLabel = scanSizeLabel;
@@ -176,13 +172,6 @@ export const useHistogram = () => {
 
     const { start, end, total, took } = parts;
     if (parts.scanLabel !== undefined) {
-      if (parts.rows) {
-        return t(
-          "search.histogramTitleRowsWithScan",
-          { total, took, scanLabel: parts.scanLabel, scanSize: parts.scanSize },
-          end,
-        );
-      }
       return t("search.histogramTitleWithScan", {
         start,
         end,
@@ -192,7 +181,6 @@ export const useHistogram = () => {
         scanSize: parts.scanSize,
       });
     }
-    if (parts.rows) return t("search.histogramTitleRows", { total, took }, end);
     return t("search.histogramTitle", { start, end, total, took });
   };
 

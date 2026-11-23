@@ -203,21 +203,21 @@ describe("IncidentAlertTriggersTable", () => {
     it("shows Service Discovery label for service_discovery reason", () => {
       wrapper = mountComp({ triggers: [makeAlert({ correlation_reason: "service_discovery" })] });
       expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toBe(
-        "Service discovery",
+        "Service Discovery",
       );
     });
 
     it("shows Primary Match label for primary_match reason", () => {
       wrapper = mountComp({ triggers: [makeAlert({ correlation_reason: "primary_match" })] });
       expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toContain(
-        "Primary match",
+        "Primary Match",
       );
     });
 
     it("shows Secondary Match label for secondary_match reason", () => {
       wrapper = mountComp({ triggers: [makeAlert({ correlation_reason: "secondary_match" })] });
       expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toContain(
-        "Secondary match",
+        "Secondary Match",
       );
     });
 

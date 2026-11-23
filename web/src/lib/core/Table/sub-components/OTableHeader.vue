@@ -21,10 +21,7 @@ import {
   type OTableColumnMeta,
   type OTableDensity,
 } from "../OTable.types";
-import {
-  TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH,
-  TABLE_EXPAND_COL_STYLE,
-} from "../OTable.types";
+import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH } from "../OTable.types";
 
 const { t } = useI18nTyped();
 const props = defineProps<{
@@ -293,8 +290,7 @@ function headerPaddingClass(header: any): string {
   return m?.compactPadding ? "px-1" : "px-3";
 }
 
-// The actions header names its column for screen readers only; it stays opaque like its cells,
-// or a label scrolled under the pinned column would show through above the row icons (D7).
+// The sticky actions header is empty and see-through, so a label scrolled under it stays readable (D7).
 function isActionHeader(header: any): boolean {
   return !!(header.column.columnDef.meta as any)?.isAction;
 }
@@ -521,7 +517,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
     v-for="headerGroup in headerGroups"
     :key="headerGroup.id"
     :class="[
-      'group/thead bg-table-header-bg',
+      'bg-table-header-bg',
       'border-table-header-border border-b',
       stickyHeader ? 'sticky top-0 z-10' : '',
     ]"
@@ -545,11 +541,10 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
       @end="handleDragEnd"
       @update:model-value="handleDraggableUpdate"
     >
-      <!-- Expand placeholder: the chevron sits on the table edge line, as the selection checkbox does. -->
+      <!-- Expand placeholder -->
       <th
         v-if="expansionEnabled"
-        class="border-table-header-border border-b pe-0"
-        :style="TABLE_EXPAND_COL_STYLE"
+        class="border-table-header-border w-6 max-w-6 min-w-6 border-b px-0"
         data-test="o2-table-th-expand"
       />
 
@@ -606,7 +601,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           // Sortable's `filter` selector — this header can't start a drag, so it
           // must not advertise the move cursor the draggable <tr> sets either.
           header.id === pinnedFirstColumn ? 'o2-table-th-pinned-first cursor-default' : '',
-          headerPin(header) ? 'bg-table-header-bg' : '',
+          headerPin(header) && !isActionHeader(header) ? 'bg-table-header-bg' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
@@ -642,7 +637,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 position: 'sticky',
                 right: `${header.column.getAfter?.('right') ?? 0}px`,
                 zIndex: 20,
-                boxShadow: 'var(--shadow-sticky-right)',
+                boxShadow: isActionHeader(header) ? 'none' : 'var(--shadow-sticky-right)',
               }
             : {}),
           // Sticky pivot total column in single-level pivots (last, so it wins).
@@ -688,7 +683,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             <button
               type="button"
               :class="[
-                'rounded-default focus-visible:ring-focus-ring-accent flex min-w-0 items-center gap-1 text-start transition-shadow focus-visible:ring-2 focus-visible:outline-none',
+                'rounded-default focus-visible:ring-focus-ring-accent flex min-w-0 items-center gap-1 text-start focus-visible:ring-2 focus-visible:outline-none',
                 sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
                 isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
                 headerAlignClass(header),
@@ -795,7 +790,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               <button
                 type="button"
                 :class="[
-                  'rounded-default focus-visible:ring-focus-ring-accent flex shrink-0 items-center transition-shadow focus-visible:ring-2 focus-visible:outline-none',
+                  'rounded-default focus-visible:ring-focus-ring-accent flex shrink-0 items-center focus-visible:ring-2 focus-visible:outline-none',
                   sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
                 ]"
                 data-test="o2-table-th-sort-trigger"
@@ -983,10 +978,10 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                default, the accent (full-height) while hovering it or resizing. -->
           <div
             :class="[
-              'rounded-full transition-[background-color,height,width] duration-(--duration-control) ease-(--ease-control)',
+              'rounded-full transition-all duration-150',
               header.column.getIsResizing()
                 ? 'bg-table-resize-handle h-full w-0.5'
-                : 'group-hover/thead:bg-border-default group-hover/resizer:bg-table-resize-handle h-4 w-px bg-transparent group-hover/resizer:h-full group-hover/resizer:w-0.5',
+                : 'bg-border-default group-hover/resizer:bg-table-resize-handle h-4 w-px group-hover/resizer:h-full group-hover/resizer:w-0.5',
             ]"
           />
         </div>
@@ -1005,8 +1000,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
            checkbox gutter had its header columns offset from its body. -->
       <th
         v-if="expansionEnabled"
-        class="border-table-header-border border-b pe-0"
-        :style="TABLE_EXPAND_COL_STYLE"
+        class="border-table-header-border w-6 max-w-6 min-w-6 border-b px-0"
         data-test="o2-table-th-expand"
       />
 
@@ -1053,7 +1047,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           `${headerPaddingClass(header)} text-table-header-text relative text-left text-xs font-medium select-none`,
           density === 'compact' ? 'group h-control-sm' : 'group h-control-md',
           'border-table-header-border border-b',
-          headerPin(header) ? 'bg-table-header-bg' : '',
+          headerPin(header) && !isActionHeader(header) ? 'bg-table-header-bg' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
@@ -1089,7 +1083,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 position: 'sticky',
                 right: `${header.column.getAfter?.('right') ?? 0}px`,
                 zIndex: 20,
-                boxShadow: 'var(--shadow-sticky-right)',
+                boxShadow: isActionHeader(header) ? 'none' : 'var(--shadow-sticky-right)',
               }
             : {}),
           // Sticky pivot total column in single-level pivots (last, so it wins).
@@ -1133,7 +1127,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             <button
               type="button"
               :class="[
-                'rounded-default focus-visible:ring-focus-ring-accent flex items-center gap-1 overflow-hidden text-start whitespace-nowrap transition-shadow focus-visible:ring-2 focus-visible:outline-none',
+                'rounded-default focus-visible:ring-focus-ring-accent flex items-center gap-1 overflow-hidden text-start whitespace-nowrap focus-visible:ring-2 focus-visible:outline-none',
                 sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
                 isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
                 headerAlignClass(header),
@@ -1220,7 +1214,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               <button
                 type="button"
                 :class="[
-                  'rounded-default focus-visible:ring-focus-ring-accent flex shrink-0 items-center transition-shadow focus-visible:ring-2 focus-visible:outline-none',
+                  'rounded-default focus-visible:ring-focus-ring-accent flex shrink-0 items-center focus-visible:ring-2 focus-visible:outline-none',
                   sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
                 ]"
                 data-test="o2-table-th-sort-trigger"
@@ -1393,10 +1387,10 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                default, the accent (full-height) while hovering it or resizing. -->
           <div
             :class="[
-              'rounded-full transition-[background-color,height,width] duration-(--duration-control) ease-(--ease-control)',
+              'rounded-full transition-all duration-150',
               header.column.getIsResizing()
                 ? 'bg-table-resize-handle h-full w-0.5'
-                : 'group-hover/thead:bg-border-default group-hover/resizer:bg-table-resize-handle h-4 w-px bg-transparent group-hover/resizer:h-full group-hover/resizer:w-0.5',
+                : 'bg-border-default group-hover/resizer:bg-table-resize-handle h-4 w-px group-hover/resizer:h-full group-hover/resizer:w-0.5',
             ]"
           />
         </div>

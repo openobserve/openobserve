@@ -5,7 +5,7 @@
     <section class="eval-test-panel min-h-full p-5">
       <!-- Header -->
       <div class="flex flex-col gap-1">
-        <h3 class="text-text-heading m-0 text-sm font-semibold">
+        <h3 class="text-text-heading m-0 text-sm font-bold">
           {{ t("onlineEvals.scorer.testPanel.title") }}
         </h3>
         <p class="text-text-secondary m-0 text-xs leading-[1.45]">
@@ -94,7 +94,7 @@
                 {{ t("onlineEvals.scorer.testPanel.resultScore") }}
               </dt>
               <dd
-                class="eval-test-panel__result-score text-text-secondary text-compact m-0 font-mono font-semibold"
+                class="eval-test-panel__result-score text-text-secondary text-compact m-0 font-mono font-bold"
               >
                 {{ displayValue }}
               </dd>

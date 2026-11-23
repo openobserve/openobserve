@@ -512,7 +512,7 @@ test.describe(
       // --- F2: Edit env to introduce cycle in env→region→pod chain ---
       // Change env from Constant to Query Values with stream=$pod
       await scopedVars.editVariable("env");
-      await scopedVars.changeVariableType("Query values");
+      await scopedVars.changeVariableType("Query Values");
       // Wait for Query Values form fields to render after type change
       await scopedVars.getVariableStreamTypeSelectLocator().waitFor({ state: "visible", timeout: 10000 });
       await selectStreamType(page, "logs");

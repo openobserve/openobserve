@@ -29,14 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #actions>
-      <OButton
+      <QuickStartCard
         v-if="!viewOnly && !hideAddAction"
-        variant="primary"
+        icon="add"
+        :label="t('emptyState.noPanels.action')"
+        :sublabel="t('emptyState.noPanels.actionDesc')"
         data-test="dashboard-if-no-panel-add-panel-btn"
         @click="$emit('add')"
-      >
-        {{ t("emptyState.noPanels.action") }}
-      </OButton>
+      />
     </template>
   </EmptyState>
 </template>
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useI18nTyped } from "@/types/i18n";
 import EmptyState from "./EmptyState.vue";
 import EmptyPanel from "../illustrations/EmptyPanel.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import QuickStartCard from "./QuickStartCard.vue";
 
 const { t } = useI18nTyped();
 

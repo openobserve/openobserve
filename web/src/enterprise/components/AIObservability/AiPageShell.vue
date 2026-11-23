@@ -24,6 +24,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-if="hasTabs" #header-tabs><AiSectionTabs /></template>
     <template #actions>
+      <!-- Last-refreshed indicator (staleness dot + relative time), left of the
+           picker — the labeled Refresh button carries no timestamp of its own. -->
+      <AiLastRefreshed
+        class="me-1"
+        :last-run-at="lastRunAt"
+        :loading="isLoading"
+        :data-test="`${dataTest}-last-refreshed`"
+      />
+
       <!-- Compare mode (version-compare) makes windows per-version, so the
            page-level picker is disabled and explains why via a tooltip. Wrapping
            in OTooltip even when enabled is harmless — `disabled` on OTooltip
@@ -48,12 +57,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @on:date-change="$emit('date-change', $event)"
         />
       </OTooltip>
-      <ORefreshButton
-        :last-run-at="lastRunAt"
+      <!-- Labeled primary Refresh button, matching the Metrics explorer toolbar.
+           Disabled + spinning while a query is in flight (cancel isn't
+           supported). -->
+      <OButton
+        variant="primary"
+        icon="refresh"
+        :disabled="isLoading"
         :loading="isLoading"
         :data-test="`${dataTest}-refresh-btn`"
         @click="$emit('refresh')"
-      />
+      >
+        <!-- Icon-only on phones so the actions share the title row; sr-only keeps the button named. -->
+        <span class="max-md:sr-only">{{ t("common.refresh") }}</span>
+      </OButton>
     </template>
 
     <template v-if="$slots.subnav" #subnav><slot name="subnav" /></template>
@@ -62,16 +79,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { raw, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { ref } from "vue";
 import type { AiDateState } from "@/enterprise/composables/useAiDateRange";
 import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import AiSectionTabs from "./AiSectionTabs.vue";
 import { useAiSectionTabs } from "./aiSectionTabs";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import AiLastRefreshed from "./AiLastRefreshed.vue";
 
+const { t } = useI18nTyped();
 const { hasTabs, header } = useAiSectionTabs();
 
 defineProps<{

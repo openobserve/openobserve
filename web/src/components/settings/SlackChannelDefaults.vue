@@ -219,6 +219,7 @@ const save = async (value: DefaultForm): Promise<void> => {
     <template #actions>
       <OButton
         variant="secondary"
+        icon="add"
         :disabled="readOnly"
         data-test="slack-channel-set-default"
         @click="openDrawer(null)"
@@ -228,7 +229,7 @@ const save = async (value: DefaultForm): Promise<void> => {
       </OButton>
     </template>
 
-    <div class="rounded-surface border-border-default overflow-hidden border">
+    <div class="rounded-b-surface -mx-4 -my-3 overflow-hidden">
       <OTable
         :data="rows"
         :columns="columns"

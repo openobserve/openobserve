@@ -32,6 +32,9 @@
     bleed
   >
     <template #actions>
+      <!-- The provider behind the Terraform export, which is otherwise only
+           discoverable once the export dialog is already open. -->
+      <IacRegistryLinks data-test="slos-slolist-iac-registries" :compact="isMobile" />
       <OButton
         variant="secondary"
         icon="upload-file"
@@ -56,18 +59,6 @@
           data-test="slos-slolist-new-draft-dot"
         />
       </OButton>
-      <ODropdown side="bottom" align="end">
-        <template #trigger>
-          <OButton
-            icon-only
-            variant="ghost"
-            icon="more-horiz"
-            data-test="app-page-header-more-btn"
-            :label="t('common.more')"
-          />
-        </template>
-        <IacRegistryLinks menu data-test="slos-slolist-iac-registries" />
-      </ODropdown>
     </template>
 
     <!-- SLOs share the ALERT folder namespace (there is no FolderType::Slos),
@@ -407,9 +398,11 @@
           icon="target"
           :title="t('slos.empty.title')"
           :text="t('slos.empty.description')"
-          :action-label="t('slos.new')"
-          @action="goToNew"
-        />
+        >
+          <OButton variant="primary" icon="add" @click="goToNew">
+            {{ t("slos.new") }}
+          </OButton>
+        </OEmptyState>
       </template>
 
       <template #selection-actions>
@@ -496,7 +489,6 @@
 
     <ODialog
       v-model:open="moveDialog"
-      :dirty="moveTargetChanged"
       :title="t('slos.moveTitle', { count: pendingMove.length })"
       data-test="slos-slolist-move-dialog"
     >
@@ -557,7 +549,6 @@ import { useStore } from "vuex";
 
 import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
-import { useUnsavedChanges } from "@/lib/forms/Form/unsavedEdits";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
@@ -589,6 +580,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { SloListItem } from "@/ts/interfaces/slo";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useListViewState } from "@/composables/useListViewState";
 import alertsService from "@/services/alerts";
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
@@ -609,6 +601,7 @@ import {
 } from "@/composables/useSloFormat";
 
 const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
@@ -687,11 +680,6 @@ const selectedIds = ref<string[]>([]);
 const moveDialog = ref(false);
 const moveTarget = ref("");
 const pendingMove = ref<SloListItem[]>([]);
-// The picker settles on a folder once its list loads; only a pick after that is the user's (V5).
-const { dirty: moveTargetChanged } = useUnsavedChanges(
-  () => moveTarget.value,
-  () => moveDialog.value,
-);
 const oTableRef: any = ref(null);
 
 // URL-synced so returning from add/edit/detail (Back/Update/Cancel) lands on the same page instead of resetting to page 1.

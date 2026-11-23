@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-2xs text-text-secondary font-semibold tracking-wide uppercase">
         {{ tag }}
       </span>
-      <span class="text-text-heading text-sm leading-tight font-semibold">{{ title }}</span>
+      <span class="text-text-heading text-sm leading-tight font-bold">{{ title }}</span>
       <span class="text-text-secondary text-xs leading-snug">{{ hint }}</span>
     </span>
   </button>

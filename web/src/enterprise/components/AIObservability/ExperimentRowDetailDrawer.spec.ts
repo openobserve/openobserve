@@ -179,8 +179,8 @@ describe("ExperimentRowDetailDrawer", () => {
     // The stepper is icon-only now, so target it by hook rather than by label.
     await wrapper.get('[data-test="ai-experiment-row-previous"]').trigger("click");
     const buttons = wrapper.findAll("button");
-    await buttons.find((button) => button.text().includes("Retry failed slot"))?.trigger("click");
-    await buttons.find((button) => button.text().includes("View trace"))?.trigger("click");
+    await buttons.find((button) => button.text().includes("Retry Failed Slot"))?.trigger("click");
+    await buttons.find((button) => button.text().includes("View Trace"))?.trigger("click");
     await wrapper.get('[data-test="ai-experiment-row-score-trace-quality:3"]').trigger("click");
 
     expect(wrapper.emitted("navigate")?.[0]).toEqual(["row-0"]);

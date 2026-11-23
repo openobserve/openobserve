@@ -35,12 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
     </div>
 
-    <OEmptyState
-      v-if="filteredIntegrations.length === 0"
-      kind="filtered"
-      :title="t('ingestion.awsSetup.noResults')"
-      @action="((searchQuery = ''), (activeCategory = 'all'))"
-    />
+    <div v-if="filteredIntegrations.length === 0" class="text-text-secondary py-12 text-center">
+      <OIcon name="search-off" class="mb-2 h-12 w-12" />
+      <div class="text-base">{{ t("ingestion.awsSetup.noResults") }}</div>
+    </div>
 
     <!-- Responsive columns via Tailwind utilities — replaces a scoped-style
          block whose px media queries leaked to every page in the app. -->
@@ -66,7 +64,7 @@ import { useI18nTyped } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { awsIntegrations } from "@/utils/awsIntegrations";
 import AWSIntegrationTile from "./AWSIntegrationTile.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "AWSIndividualServices",
@@ -75,7 +73,7 @@ export default defineComponent({
     OTab,
     AWSIntegrationTile,
     OSearchInput,
-    OEmptyState,
+    OIcon,
   },
   props: {
     initialSearch: {

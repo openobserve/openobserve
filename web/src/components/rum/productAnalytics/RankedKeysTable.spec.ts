@@ -126,8 +126,8 @@ describe("RankedKeysTable navigation actions name where they go", () => {
     const btn = (id: string) =>
       wrapper!.findAllComponents(OButton).find((b) => b.attributes("data-test") === id)!;
     const cases: [string, string, string][] = [
-      [`${DT}-row-0-funnel-btn`, "filter-alt", "Open in funnels"],
-      [`${DT}-row-0-paths-btn`, "account-tree", "Open in paths"],
+      [`${DT}-row-0-funnel-btn`, "filter-alt", "Open in Funnels"],
+      [`${DT}-row-0-paths-btn`, "account-tree", "Open in Paths"],
       [`${DT}-row-0-define-event-btn`, "bookmark-add", "Create a named event"],
     ];
     for (const [id, icon, tip] of cases) {

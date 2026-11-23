@@ -19,7 +19,6 @@ import { b64EncodeStandard, b64EncodeUnicode, useLocalTraceFilterField } from "@
 import { useStore } from "vuex";
 import { useRouter, type LocationQueryRaw } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
-import { shareLinkCopiedMessage } from "@/composables/useShareLink";
 import type { TranslateFn } from "@/types/i18n";
 import { getOrSetServiceColor as registryGetOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
@@ -501,7 +500,7 @@ const useTraces = () => {
     }
 
     copyToClipboard(shareURL, t, {
-      successMessage: shareLinkCopiedMessage(shareURL, t, store.state.timezone),
+      successMessage: t("search.linkCopiedSuccessfully"),
       errorMessage: t("toastMessages.views.errorWhileCopyLink"),
       timeout: 5000,
     });

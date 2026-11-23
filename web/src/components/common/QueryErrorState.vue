@@ -100,63 +100,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="w-full shrink-0"
     >
       <template #actions>
-        <!-- Caller can replace all actions via #actions slot -->
+        <!-- Caller can replace all action cards via #actions slot -->
         <slot name="actions" v-bind="slotProps">
-          <OButton
+          <EmptyStateActionCard
             v-if="showRunSuggestion"
-            variant="primary"
-            class="max-w-105"
+            icon="play-arrow"
+            :label="t('queryError.runAs')"
+            :sublabel="raw(runSuggestionText)"
             data-test="query-error-run-suggestion-card"
             @click="emit('run-suggestion', runSuggestionText)"
-          >
-            <OTruncatedText>{{
-              t("queryError.runSuggestion", { query: runSuggestionText })
-            }}</OTruncatedText>
-          </OButton>
-          <OButton
-            v-else-if="showSearchText"
-            variant="primary"
-            class="max-w-105"
-            data-test="query-error-search-text-card"
-            @click="emit('search-text', searchTextFull)"
-          >
-            <OTruncatedText>{{
-              t("queryError.searchTextFor", { text: searchTextFull })
-            }}</OTruncatedText>
-          </OButton>
-          <OButton
+          />
+          <template v-if="showSearchText">
+            <EmptyStateActionCard
+              icon="search"
+              :label="t('queryError.searchTextFor', { text: searchTextFull })"
+              :sublabel="t('queryError.searchTextDesc')"
+              data-test="query-error-search-text-card"
+              @click="emit('search-text', searchTextFull)"
+            >
+              <template #label>
+                <span class="flex min-w-0">
+                  <OTruncatedText>{{
+                    t("queryError.searchTextFor", { text: searchTextFull })
+                  }}</OTruncatedText>
+                </span>
+              </template>
+            </EmptyStateActionCard>
+          </template>
+          <EmptyStateActionCard
             v-if="errorCode === 20003"
-            :variant="fixVariant"
+            icon="settings"
+            :label="t('queryError.configureResource')"
+            :sublabel="t('queryError.configureResourceDesc')"
             data-test="query-error-configure-resource-card"
             @click="emit('configure-resource')"
-          >
-            {{ t("queryError.configureResource") }}
-          </OButton>
-          <OButton
+          />
+          <EmptyStateActionCard
             v-else-if="isQueryError"
-            :variant="fixVariant"
+            icon="edit"
+            :label="t('queryError.fixQuery')"
+            :sublabel="t('queryError.fixQueryDesc')"
             data-test="query-error-fix-query-card"
             @click="emit('fix-query')"
-          >
-            {{ t("queryError.fixQuery") }}
-          </OButton>
-          <OButton
+          />
+          <EmptyStateActionCard
             v-else-if="errorCode === 20006"
-            :variant="fixVariant"
+            icon="schedule"
+            :label="t('queryError.expandRange')"
+            :sublabel="t('queryError.expandRangeDesc')"
             data-test="query-error-expand-range-card"
             @click="emit('widen-range')"
-          >
-            {{ t("queryError.expandRange") }}
-          </OButton>
-          <OButton
+          />
+          <EmptyStateActionCard
             v-else-if="errorCode === 20014 && calibrationEnabled"
-            :variant="fixVariant"
-            icon-end="open-in-new"
+            icon="open-in-new"
+            :label="t('queryError.openCalibration')"
+            :sublabel="t('queryError.openCalibrationDesc')"
             data-test="query-error-open-calibration-card"
             @click="openCalibration"
-          >
-            {{ t("queryError.openCalibration") }}
-          </OButton>
+          />
         </slot>
       </template>
     </OEmptyState>
@@ -184,14 +186,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="aiEnabled && (isQueryError || errorCode === 0)"
           variant="ghost"
-          class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_var(--duration-control)_var(--ease-control),box-shadow_var(--duration-control)_var(--ease-control),color_var(--duration-control)_var(--ease-control)] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
+          class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
           data-test="query-error-ask-ai-btn"
           @click="emit('ask-ai')"
         >
           <template #icon>
             <img
               :src="aiIconSrc"
-              class="h-4 w-4 shrink-0 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_var(--duration-control)_var(--ease-control)]"
+              class="h-4 w-4 shrink-0 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
               alt=""
             />
           </template>
@@ -208,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="ghost"
         icon="bolt"
-        class="text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_var(--duration-control)_var(--ease-control),box-shadow_var(--duration-control)_var(--ease-control),color_var(--duration-control)_var(--ease-control)] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
+        class="text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
         data-test="query-error-ask-ai-btn"
         @click="emit('ask-ai')"
       >
@@ -222,13 +224,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- ── BLOCK layout (dashboard panels, alerts) ───────────────────────── -->
   <div v-else class="flex w-full flex-col gap-3 p-4" data-test="query-error-state">
-    <OEmptyState size="compact" kind="error" :title="resolvedTitle">
-      <template v-if="explanation || summaryLine" #text>
-        <span class="break-words" data-test="query-error-summary">{{
-          explanation || summaryLine
-        }}</span>
-      </template>
-    </OEmptyState>
+    <!-- Title row -->
+    <div class="flex items-start gap-2">
+      <OIcon
+        name="error-outline"
+        size="sm"
+        class="text-status-error-text mt-0.5 shrink-0"
+        data-test="query-error-block-icon"
+      />
+      <div class="flex min-w-0 flex-col gap-0.5">
+        <p class="text-text-body m-0 text-sm font-semibold">
+          {{ resolvedTitle }}
+        </p>
+        <p
+          v-if="explanation || summaryLine"
+          class="text-text-secondary m-0 text-xs break-words"
+          data-test="query-error-summary"
+        >
+          {{ explanation || summaryLine }}
+        </p>
+      </div>
+    </div>
 
     <!-- Expandable detail -->
     <template v-if="hasDetail">
@@ -265,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="errorCode === 20003"
           variant="secondary"
-          size="sm"
+          icon="settings"
           data-test="query-error-configure-resource-btn"
           @click="emit('configure-resource')"
         >
@@ -274,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-else-if="isQueryError"
           variant="secondary"
-          size="sm"
+          icon="edit"
           data-test="query-error-fix-query-btn"
           @click="emit('fix-query')"
         >
@@ -283,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-else-if="errorCode === 20006"
           variant="secondary"
-          size="sm"
+          icon="schedule"
           data-test="query-error-expand-range-btn"
           @click="emit('widen-range')"
         >
@@ -293,7 +309,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OButton
         variant="ghost"
-        size="sm"
         :icon="copied ? 'check' : 'content-copy'"
         data-test="query-error-copy-btn"
         @click="handleCopy"
@@ -303,9 +318,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="aiEnabled && (isQueryError || errorCode === 0)"
         variant="ghost"
-        size="sm"
         icon="bolt"
-        class="text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_var(--duration-control)_var(--ease-control),box-shadow_var(--duration-control)_var(--ease-control),color_var(--duration-control)_var(--ease-control)] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
+        class="text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
         data-test="query-error-ask-ai-btn"
         @click="emit('ask-ai')"
       >
@@ -319,9 +333,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useAiIcon } from "@/composables/useAiIcon";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useQueryError } from "@/composables/useQueryError";
@@ -412,10 +427,6 @@ const showRunSuggestion = computed(() => isQueryError.value && runSuggestionText
 const searchTextFull = computed(() => props.freeTextCandidate?.trim() ?? "");
 const showSearchText = computed(
   () => isQueryError.value && searchTextFull.value !== "" && !showRunSuggestion.value,
-);
-// The quick fix leads when there is one; the error-code fix is then the secondary.
-const fixVariant = computed(() =>
-  showRunSuggestion.value || showSearchText.value ? "secondary" : "primary",
 );
 
 const router = useRouter();

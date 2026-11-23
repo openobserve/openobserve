@@ -71,8 +71,6 @@ const isCreate = computed(() => props.mode === "create");
 const changed = computed(() => props.loaded && changes.value > 0);
 // A new record has no saved values to be equal to, so its primary never waits for a change.
 const canSave = computed(() => props.loaded && (isCreate.value || changed.value));
-// V3: an edit bar appears with the first change; a create bar is always the form's footer.
-const visible = computed(() => isCreate.value || isSaving.value || changed.value);
 const state = computed(() => {
   if (!props.loaded) return "loading";
   if (isSaving.value) return "saving";
@@ -111,7 +109,6 @@ function discard() {
 
 <template>
   <div
-    v-if="visible"
     ref="root"
     role="region"
     :aria-label="isCreate ? t('common.actions') : t('common.unsavedChanges')"

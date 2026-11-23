@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex shrink-0 items-center gap-2">
-    <span data-test="edit-role-permissions-count" class="text-sm font-semibold">
+    <span data-test="edit-role-permissions-count" class="text-sm font-bold">
       <!-- A populated role must never read "0 Permissions" while its grants are still loading. -->
       {{ loading ? raw("—") : t("iam.editRole.permissionCountSingular", { count }) }}
     </span>

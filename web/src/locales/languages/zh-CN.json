@@ -11,11 +11,7 @@
     "bannerMessage": "此功能已锁定。您的许可证需要包含 {feature} 功能。",
     "bannerMessageGeneric": "此页面需要一项您的许可证中未包含的功能。",
     "headerLocked": "已锁定：需要 {feature}",
-    "availableInEnterprise": "{feature} 适用于 OpenObserve 企业版",
-    "turnedOffTitle": "已为此组织关闭",
-    "enterpriseTitle": "Enterprise 版可用",
-    "readDocs": "阅读文档",
-    "rbacOff": "此组织已关闭 RBAC。管理员在服务器配置中将 {env} 设为 true 即可开启。"
+    "availableInEnterprise": "{feature} 适用于 OpenObserve 企业版"
   },
   "emptyState": {
     "illustrations": {
@@ -84,6 +80,10 @@
       "title": "未找到模式",
       "description": "尝试增加时间范围或选择包含更多日志数据的其他流。对于至少 1,000 个日志，模式提取效果最佳。",
       "logsAnalyzed": "只分析了 {count} 个日志。"
+    },
+    "noStreamSelected": {
+      "title": "选择数据流开始",
+      "description": "选择一个数据流，然后运行查询来浏览其数据。使用筛选条件和自定义时间范围优化结果。"
     },
     "noQueryApplied": {
       "title": "运行查询以查看日志",
@@ -201,6 +201,22 @@
       "action": "新建加密密钥",
       "actionDesc": "生成密钥"
     },
+    "noSlackChannelDefaults": {
+      "title": "尚无频道设置默认组织",
+      "description": "在没有默认组织的频道中，问题会发送到每个人的默认组织（他们可以用 /o2 org 更改）。"
+    },
+    "noSlackLinkedPeople": {
+      "title": "此组织中尚无人关联 Slack"
+    },
+    "slackNotConnected": {
+      "title": "连接 Slack 工作区"
+    },
+    "noAnnouncementBanners": {
+      "title": "暂无横幅",
+      "description": "横幅会在应用顶部向您选择的组织显示通知。",
+      "action": "添加横幅",
+      "actionDesc": "编写通知并安排发布时间"
+    },
     "noAiToolsets": {
       "title": "还没有 AI 工具集",
       "description": "AI 工具集将您的组织与外部 AI 功能连接起来。",
@@ -314,6 +330,7 @@
     "noStreams": {
       "title": "连接源来创建你的第一个数据流",
       "description": "数据到达时会自动创建数据流。配置应用程序、代理或收集器的数据摄取即可开始使用。",
+      "action": "设置摄取",
       "actionDesc": "连接数据源",
       "createAction": "新数据流",
       "createActionDesc": "手动定义数据流架构"
@@ -453,9 +470,7 @@
       "description": "没有 {noun} 与您当前的筛选条件或搜索条件相匹配。尝试调整或清除它们。",
       "action": "清除筛选条件",
       "actionDesc": "重置所有筛选条件和搜索",
-      "fallbackNoun": "结果",
-      "noMatches": "无匹配项",
-      "noMatchesText": "没有内容符合当前的搜索或筛选条件。"
+      "fallbackNoun": "结果"
     },
     "nouns": {
       "logs": "Logs",
@@ -638,26 +653,6 @@
     "noOncallUnrouted": {
       "title": "无需归属人",
       "description": "所有已触发的告警都已送达团队。"
-    },
-    "noSlackChannelDefaults": {
-      "title": "尚无频道设置默认组织",
-      "description": "在没有默认组织的频道中，问题会发送到每个人的默认组织（他们可以用 /o2 org 更改）。"
-    },
-    "noSlackLinkedPeople": {
-      "title": "此组织中尚无人关联 Slack"
-    },
-    "slackNotConnected": {
-      "title": "连接 Slack 工作区"
-    },
-    "noAnnouncementBanners": {
-      "title": "暂无横幅",
-      "description": "横幅会在应用顶部向您选择的组织显示通知。",
-      "action": "添加横幅",
-      "actionDesc": "编写通知并安排发布时间"
-    },
-    "pageError": {
-      "title": "无法加载此页面",
-      "description": "此页面的数据均未加载。请立即重试,或稍后一分钟再试。"
     }
   },
   "accessBoundary": {
@@ -805,13 +800,6 @@
       "traces": "追踪",
       "logs": "日志",
       "charts": "图表"
-    },
-    "saveBar": {
-      "noChanges": "没有要保存的更改",
-      "unsavedChanges": "{n} 项未保存的更改 | {n} 项未保存的更改",
-      "changesShort": "{n} 项更改 | {n} 项更改",
-      "fixFields": "修复 {n} 个字段 | 修复 {n} 个字段",
-      "discard": "放弃"
     },
     "dismiss": "关闭",
     "undo": "撤销",
@@ -1208,6 +1196,18 @@
     "boolFalse": "假",
     "browserTimeWithZone": "浏览器时间（{zone}）",
     "poweredBy": "技术支持",
+    "saveBar": {
+      "noChanges": "没有要保存的更改",
+      "unsavedChanges": "{n} 项未保存的更改 | {n} 项未保存的更改",
+      "changesShort": "{n} 项更改 | {n} 项更改",
+      "fixFields": "修复 {n} 个字段 | 修复 {n} 个字段",
+      "discard": "放弃"
+    },
+    "leaveGuard": {
+      "title": "有未保存的更改，仍要离开吗？",
+      "message": "此页面有 {n} 项未保存的更改。离开后将丢失。 | 此页面有 {n} 项未保存的更改。离开后将丢失。",
+      "keepEditing": "继续编辑"
+    },
     "editorDraft": {
       "restoreTitle": "未保存的草稿",
       "restoreTitleInBrowser": "未保存的本地更改",
@@ -1289,11 +1289,100 @@
       "leaveMessageInBrowser": "保存 {entity}，将更改保留在此浏览器中，或丢弃更改。",
       "retentionInBrowser": "更改会在此浏览器中保留 {days} 天，或保留到您退出登录。每种类型仅保留最新的 {max} 个。",
       "dotUndated": "Unsaved draft"
+    }
+  },
+  "filterBar": {
+    "ariaLabel": "按字段过滤",
+    "placeholder": "按字段过滤，或输入 field=value。按 Enter 运行",
+    "addFilter": "添加过滤器",
+    "searchFields": "搜索字段",
+    "searchLabels": "搜索标签",
+    "searchOperators": "搜索条件",
+    "searchValue": "搜索或输入值",
+    "searchValues": "搜索值",
+    "textField": "文本",
+    "useValue": "使用“{value}”",
+    "useField": "使用字段“{field}”",
+    "useLabel": "使用标签“{field}”",
+    "searchText": "在所有文本中搜索“{text}”",
+    "emptyValue": "（空）",
+    "loadingFields": "正在加载字段…",
+    "noFields": "没有匹配的字段",
+    "noValues": "无建议。输入值后按 Enter",
+    "noOperators": "没有匹配的条件",
+    "removeFilter": "移除过滤器",
+    "clearAll": "清除所有过滤器",
+    "toggleConnector": "在 AND 和 OR 之间切换",
+    "selectedCount": "未选择任何值 | 已选择 {count} 个值 | 已选择 {count} 个值",
+    "query": "查询",
+    "builderTooltip": "通过选择字段、条件和值来构建过滤器",
+    "queryTooltip": "自行编写查询",
+    "queryNotParsableShort": "构建器无法显示此查询：",
+    "clearAndBuild": "清除并构建",
+    "clearQueryTitle": "清除查询？",
+    "clearQueryMessage": "查询将被移除，构建器将从空白开始。",
+    "where": "筛选条件",
+    "addCondition": "添加条件",
+    "addGroup": "添加组",
+    "startGroup": "开始分组",
+    "addBelow": "在下方添加条件",
+    "ungroup": "取消分组",
+    "collapseGroup": "折叠分组",
+    "expandGroup": "展开分组",
+    "moreInGroup": "还有 {count} 个",
+    "groupHasIssues": "此分组中有内容需要修复",
+    "chooseField": "选择字段",
+    "chooseValue": "选择值",
+    "lockedFilter": "此过滤器无法在此编辑。它将保持已保存的状态；如需丢弃，请将其移除。",
+    "limits": {
+      "conditions": "最多 {count} 个过滤器 | 最多 {count} 个过滤器",
+      "values": "最多 {count} 个值 | 最多 {count} 个值"
     },
-    "leaveGuard": {
-      "title": "有未保存的更改，仍要离开吗？",
-      "message": "此页面有 {n} 项未保存的更改。离开后将丢失。 | 此页面有 {n} 项未保存的更改。离开后将丢失。",
-      "keepEditing": "继续编辑"
+    "validation": {
+      "incomplete": "完成此过滤器或将其移除",
+      "required": "至少添加一个过滤器",
+      "uniqueField": "{field} 已有过滤器；请编辑该过滤器或移除此过滤器",
+      "oneUsageCondition": "每个层级只能有一个使用条件；请将此条件转为规则或将其移除",
+      "rumField": "请使用内置字段，或使用由小写字母、数字和下划线组成且长度不超过 128 个字符的列",
+      "valueLength": "每个值需要 1 到 {max} 个字符",
+      "regexLength": "模式最多 {max} 个字符。",
+      "regexInvalid": "此模式无效或不受支持。不能使用先行断言、后行断言和反向引用。"
+    },
+    "operatorNames": {
+      "containsIgnoreCase": "包含（忽略大小写）",
+      "notStartsWith": "不以…开头",
+      "notEndsWith": "不以…结尾",
+      "isEmpty": "为空",
+      "isNotEmpty": "不为空"
+    },
+    "types": {
+      "string": "文本",
+      "number": "数字",
+      "boolean": "布尔值"
+    },
+    "operators": {
+      "eq": "等于",
+      "neq": "不等于",
+      "gt": "大于",
+      "gte": "大于或等于",
+      "lt": "小于",
+      "lte": "小于等于",
+      "contains": "包含",
+      "containsIgnoreCase": "包含（忽略大小写）",
+      "notContains": "不包含",
+      "startsWith": "开头为",
+      "notStartsWith": "开头不为",
+      "endsWith": "结尾为",
+      "notEndsWith": "结尾不为",
+      "in": "是以下任一",
+      "notIn": "不是以下任一",
+      "regex": "匹配正则",
+      "notRegex": "不匹配正则",
+      "isNull": "没有值",
+      "isNotNull": "有值",
+      "isEmpty": "为空或没有值",
+      "isNotEmpty": "有非空值",
+      "matchAll": "匹配文本"
     }
   },
   "flow": {
@@ -1403,9 +1492,11 @@
     "patternNavPrevious": "以前",
     "patternNavNext": "下一步",
     "patternNoValuesAvailable": "没有可用值",
+    "sqlModeLabel": "SQL 模式",
     "nlpModeLabel": "自然语言模式",
     "quickModeLabel": "快速模式",
     "menuMore": "更多",
+    "menuGroupSetOnce": "设置一次",
     "menuGroupHistory": "历史",
     "menuGroupDownloads": "下载",
     "menuGroupSchedule": "日程安排",
@@ -1779,6 +1870,7 @@
     "viewDeletedSuccessfully": "视图已成功删除。",
     "viewCreatedSuccessfully": "视图已成功创建。",
     "viewUpdatedSuccessfully": "视图已成功更新。",
+    "linkCopiedSuccessfully": "链接复制成功！",
     "errorCopyingLink": "复制链接时出错。",
     "errorShorteningLink": "缩短链接时出错。",
     "webUrlNotConfigured": "在管理员配置 ZO_WEB_URL 之前，共享 URL 处于禁用状态。",
@@ -1980,24 +2072,7 @@
     "freeTextNoTextFields": "此数据流没有可搜索的文本字段。",
     "freeTextNoTextFieldsNamed": "未搜索：{streams}（无文本字段）。",
     "freeTextBuildNotice": "此过滤器包含文本搜索；请在 SQL 中编辑。",
-    "filterNotChartableNotice": "此筛选条件无法在构建器中绘制图表。您的搜索筛选条件未更改；请切换到 {custom} 以绘制图表。",
-    "queryModeLabel": "查询语言",
-    "queryModeFilter": "筛选",
-    "queryModeSql": "SQL",
-    "queryModeFilterTooltip": "按字段和值缩小日志范围",
-    "queryModeSqlTooltip": "编写完整的 SQL 查询，可使用聚合和连接",
-    "sqlModeNeedsOneStream": "此视图中的 SQL 只能使用一个流",
-    "menuGroupViewOptions": "视图选项",
-    "histogramHiddenForAggregates": "此查询返回的是分组，而不是随时间分布的事件，因此没有直方图。可用可视化绘制结果。",
-    "linkCopied": "已复制链接",
-    "linkCopiedFixedTime": "已复制链接 · 固定时间 {from} – {to}",
-    "linkCopiedRelativeTime": "已复制链接 · {period}，从打开时起算",
-    "recordsChipRows": "{total} 行 | {total} 行",
-    "histogramTitleRows": "在 {took} 毫秒内显示 {total} 行。 | 在 {took} 毫秒内显示 {total} 行。",
-    "histogramTitleRowsWithScan": "在 {took} 毫秒内显示 {total} 行。（{scanLabel}：{scanSize}） | 在 {took} 毫秒内显示 {total} 行。（{scanLabel}：{scanSize}）",
-    "pickStreamFirst": "请先选择一个流",
-    "autoRefreshPausedInVisualize": "自动刷新会更新搜索结果。可视化期间会暂停。",
-    "histogramNoTimeAxis": "分组结果没有时间轴"
+    "filterNotChartableNotice": "此筛选条件无法在构建器中绘制图表。您的搜索筛选条件未更改；请切换到 {custom} 以绘制图表。"
   },
   "menu": {
     "alertCalibration": "告警校准",
@@ -2031,14 +2106,6 @@
     "workflows": "工作流",
     "language": "语言",
     "keyboardShortcuts": "键盘快捷键",
-    "searchOrJumpTo": "搜索或跳转到…",
-    "jumpToTitle": "跳转到",
-    "addData": "添加数据",
-    "jumpToPlaceholder": "搜索页面、告警、仪表板和数据流",
-    "jumpToPlaceholderPages": "搜索页面和操作",
-    "jumpToPages": "页面",
-    "jumpToShowAll": "在{page}中查看全部",
-    "jumpToSearchLogs": "在日志中搜索“{text}”",
     "synthetic": "合成监控",
     "experience": "体验",
     "slos": "SLO",
@@ -4119,8 +4186,7 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "您无权管理许可证。"
-      },
-      "usageTitle": "每日摄取量"
+      }
     },
     "value_sso_requires_ha": "✅ 需要 HA 模式",
     "value_rbac_requires_ha": "✅ 需要 HA 模式",
@@ -4289,9 +4355,7 @@
     "revokeInvitationMsg": "你确定要撤销 {email} 的邀请吗？",
     "deleteUsersTitle": "删除用户",
     "deleteUsersMsg": "您确定要删除 {count} 个用户吗？ | 您确定要删除 {count} 个用户吗？",
-    "deleteUsersBlockNote": "其中 {count} 名用户通过您的已验证域名加入，将被阻止而不是删除。",
-    "roleHint": "Admin 管理组织，Editor 可更改数据和设置，Viewer 只能查看。",
-    "customRolesNeedRbac": "自定义角色需要 RBAC，但此组织已关闭 RBAC。"
+    "deleteUsersBlockNote": "其中 {count} 名用户通过您的已验证域名加入，将被阻止而不是删除。"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -5144,7 +5208,6 @@
   },
   "organization": {
     "searchByNameOrId": "按名称或 ID 搜索",
-    "currentLabel": "组织：{name}",
     "noOrganizationsFound": "未找到组织",
     "header": "组织",
     "orgBeingDeletedSwitching": "此组织正在被删除。正在为您切换到另一个组织。",
@@ -5253,7 +5316,6 @@
     "timezone": "时区",
     "deleteActionMessage": "您确定要删除 {count} 个字段吗？此操作无法撤销。 | 您确定要删除 {count} 个字段吗？此操作无法撤销。",
     "deleteDatesMessage": "您确定要删除 {count} 个日期范围吗？此操作无法撤销。 | 您确定要删除 {count} 个日期范围吗？此操作无法撤销。",
-    "summaryAllTypes": "数据流（全部类型）",
     "labelLogs": "日志",
     "labelMetrics": "指标",
     "labelTraces": "追踪",
@@ -7865,17 +7927,7 @@
       "metricsSketch": "分布存储为直方图桶，百分位数根据这些桶估算。更高的 ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA 会带来更细的桶和更精确的百分位数，代价是存储更多行。"
     },
     "gpu": "GPU",
-    "gpuExporter": "GPU 导出器",
-    "rotationNote": "令牌不会原地轮换。要轮换，请创建新令牌，将数据源切换到新令牌，然后停用旧令牌。",
-    "rotateAction": "轮换…",
-    "rotateTitle": "轮换 {name}",
-    "rotateStep1": "创建新令牌。",
-    "rotateStep2": "将数据源切换到新令牌。",
-    "rotateStep3": "当不再有任何内容使用 {name} 时，从其行菜单中停用它。",
-    "rotateNever": "不会自动停用任何内容。旧令牌在你停用之前仍可使用。",
-    "rotateCreateNew": "创建新令牌",
-    "rotateNewName": "{name}-new",
-    "rotateDescription": "替换 {name}"
+    "gpuExporter": "GPU 导出器"
   },
   "dashboard": {
     "panelDraft": {
@@ -9509,9 +9561,6 @@
       "addClause": "添加子句"
     },
     "viewDashboard": {
-      "apply": "应用",
-      "lastDataSeen": "最新数据 {when}",
-      "jumpToLatest": "跳转到最新",
       "refreshToApplyVariables": "刷新以应用最新的变量更改",
       "refresh": "刷新",
       "refreshCacheReload": "刷新缓存并重新加载",
@@ -10266,7 +10315,6 @@
     }
   },
   "panel": {
-    "noDataInRange": "范围内无数据",
     "saveAndStay": "保存并继续编辑",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10547,32 +10595,12 @@
     "hoursAgo": "{count} 小时前",
     "daysAgo": "{count} 天前",
     "cards": {
-      "firingAlerts": "触发中的告警",
-      "failingRules": "失败的规则",
-      "openIncidents": "未解决事件",
-      "pipelineErrors": "流水线错误",
-      "pipelinesOf": "共 {enabled} 个已启用",
-      "quietStreams": "静默数据流",
-      "firingNone": "无触发",
-      "noAlertRules": "无告警规则",
-      "noEnabledRules": "无已启用规则",
-      "failingNone": "无失败",
-      "failingNote": "上次评估出错",
-      "incidentsNone": "无未解决",
-      "noPipelines": "无流水线",
-      "noStreams": "无数据流",
-      "quietNote": "过去 7 天内停止写入",
-      "criticalUnit": "{count} 个处于严重级别",
-      "deliveryFailures": "告警投递失败",
-      "deliveryCount": "{count} 次告警送达失败 | {count} 次告警送达失败",
-      "deliveryNote": "已触发但无法通知的告警",
-      "oldestFiring": "最早触发已持续 {age}"
+      "openIncidents": "未解决事件"
     },
     "state": {
       "tileForbidden": "无访问权限",
       "tileLocked": "已锁定",
       "tileError": "无法加载",
-      "tileUnavailable": "不可用",
       "sectionLocked": "需企业许可证方可使用",
       "sectionForbidden": "您的角色无法查看此数据。请联系组织管理员获取访问权限。"
     },
@@ -10696,39 +10724,6 @@
     "dataAsOf": "数据截至 {time}",
     "timeRange": {
       "heading": "在所选时间范围内"
-    },
-    "firingNow": {
-      "title": "正在触发",
-      "byLevel": "严重 {critical} 个 · 警告 {warning} 个",
-      "allQuiet": "一切正常",
-      "watching": "已启用 {count} 条告警规则，均未触发 | 已启用 {count} 条告警规则，均未触发",
-      "noRules": "还没有告警规则",
-      "browseLibrary": "浏览告警库",
-      "notifyFailed": "通知失败",
-      "loadError": "无法加载触发中的告警",
-      "unavailable": "暂时无法读取告警状态"
-    },
-    "health": {
-      "subtitle": "按类型显示最近收到的数据",
-      "lastData": "最近数据：{age}前",
-      "justNow": "最近数据：刚刚",
-      "noDataIn": "过去 {range} 没有数据",
-      "noRecords": "还没有记录",
-      "loadError": "无法读取您的数据流"
-    },
-    "start": {
-      "text": "尚未收到数据。发送数据、查看已有数据，或设置告警。",
-      "addData": "添加数据",
-      "createAlert": "创建告警"
-    },
-    "summary": {
-      "loadError": "无法加载组织概要",
-      "loadErrorRest": "无法加载概要的其余部分",
-      "denied": "无权访问组织概要。请联系组织管理员。"
-    },
-    "events": {
-      "runFailed": "运行失败",
-      "timesInRange": "在所选范围内 {count} 次 | 在所选范围内 {count} 次"
     }
   },
   "chatHistory": {
@@ -10909,8 +10904,7 @@
       "taglineAnd": "并引导您查看日志、追踪、指标和事件。",
       "signedInAs": "登录身份",
       "role": "角色",
-      "tryOneOfThese": "或者试试其中一个",
-      "panelText": "询问你的日志、追踪、指标和事件，或获取编写查询的帮助。"
+      "tryOneOfThese": "或者试试其中一个"
     },
     "capabilities": {
       "query": {
@@ -12020,21 +12014,16 @@
     }
   },
   "alerts": {
-    "detail": {
-      "openInLogs": "在日志中打开",
-      "openInTraces": "在追踪中打开",
-      "openInMetrics": "在指标中打开",
-      "evidenceFiringTip": "使用此告警的过滤条件打开 {stream}，从本次触发开始到现在",
-      "evidenceWindowTip": "使用此告警的过滤条件打开 {stream}，范围为最近 {window}",
-      "threshold": "阈值",
-      "noIncident": "暂无事件",
-      "conditionLabel": "告警条件",
-      "allRows": "所有行",
-      "viewIncidents": "查看事件"
-    },
-    "summaryTrainingFailed": "训练失败",
     "columnState": "状态",
-    "startFromTemplate": "从模板开始",
+    "rowAction": {
+      "leftFilter": "不再匹配过滤器",
+      "pausedLeftFilter": "{name} 已暂停。不再匹配过滤器 | {count} 个告警已暂停。不再匹配过滤器",
+      "resumedLeftFilter": "{name} 已恢复。不再匹配过滤器 | {count} 个告警已恢复。不再匹配过滤器",
+      "bulkPauseFailed": "{total} 个告警中有 {failed} 个无法暂停 | {total} 个告警中有 {failed} 个无法暂停",
+      "bulkResumeFailed": "{total} 个告警中有 {failed} 个无法恢复 | {total} 个告警中有 {failed} 个无法恢复",
+      "paused": "{name} 已暂停",
+      "resumed": "{name} 已恢复"
+    },
     "moreActions": "更多操作",
     "promRuleMode": "规则模式",
     "promRulePreview": "{count} 个返回的序列当前匹配。每个序列必须在触发前完成待处理期。",
@@ -13468,8 +13457,7 @@
       "condition": "条件",
       "result": "结果",
       "anomalies": "异常",
-      "forGroup": "对于 {group}",
-      "errorFrom": "来自 {destination} 的 {status}"
+      "forGroup": "对于 {group}"
     },
     "continue": "继续",
     "wouldTrigger": "会触发",
@@ -15092,17 +15080,6 @@
     "siemDetection": {
       "notice": "此告警是一个安全检测。其查询由 Sigma 规则编译而来，因此规则、数据流和计划需在安全模块中编辑，以保持规则与查询一致。",
       "open": "在安全模块中编辑"
-    },
-    "newAlertTitle": "新建告警",
-    "newAnomalyTitle": "新建异常检测",
-    "rowAction": {
-      "leftFilter": "不再匹配过滤器",
-      "pausedLeftFilter": "{name} 已暂停。不再匹配过滤器 | {count} 个告警已暂停。不再匹配过滤器",
-      "resumedLeftFilter": "{name} 已恢复。不再匹配过滤器 | {count} 个告警已恢复。不再匹配过滤器",
-      "bulkPauseFailed": "{total} 个告警中有 {failed} 个无法暂停 | {total} 个告警中有 {failed} 个无法暂停",
-      "bulkResumeFailed": "{total} 个告警中有 {failed} 个无法恢复 | {total} 个告警中有 {failed} 个无法恢复",
-      "paused": "{name} 已暂停",
-      "resumed": "{name} 已恢复"
     }
   },
   "alert_dependencies": {
@@ -17973,13 +17950,7 @@
       "partial": "此追踪的部分 Span 无法读取。瀑布图可能不完整。",
       "truncated": "正在按开始时间顺序显示此追踪的第一个 Span。后续 Span 尚未加载。 | 正在按开始时间顺序显示此追踪的前 {count} 个 Span。后续 Span 尚未加载。",
       "loadMore": "加载下一个 Span | 加载接下来的 {size} 个 Span",
-      "loadMoreFailed": "无法加载此追踪的更多 Span",
-      "notFoundTitle": "在 {from} 到 {to} 之间没有此 ID 的链路追踪",
-      "notFoundText": "链路追踪 {traceId} 在此范围内的 {stream} 流中没有 span。它可能更早或更晚、位于其他流中,或未被采集。",
-      "searchWiderRange": "搜索更大的范围",
-      "searchSpansInRange": "在此范围内搜索 span",
-      "loadFailedTitle": "无法加载此链路追踪",
-      "loadFailedText": "无法读取链路追踪 {traceId}。请稍后重试。"
+      "loadMoreFailed": "无法加载此追踪的更多 Span"
     },
     "traceTree": {
       "clickToExpand": "点击展开",
@@ -19907,7 +19878,7 @@
       "streamHint": "此智能体版本将追踪发送到 {count} 个数据流。除非你选择其他数据流，否则显示其使用时间最长的那个。",
       "agentIdHint": "Agent ID：{ids}",
       "noAgentIdentity": "未找到 Agent 身份",
-      "noAgentIdentityDescription": "这些 LLM Span 没有 Agent 名称，因此按数据流显示。",
+      "noAgentIdentityDescription": "这些 LLM Span 没有 Agent 名称，因此按数据流显示。映射用于指定 Agent 名称的属性后，即可按 Agent 查看它们。",
       "noAgentIdentityAction": "打开智能体映射"
     },
     "agentGraph": {
@@ -21519,6 +21490,58 @@
       "description": "LLM 提供方存储 LLM Judge 评分器所调用语言模型的连接详情（基础 URL + 凭据）。添加一个即可开始运行基于 LLM Judge 的评估。"
     }
   },
+  "genAiAgentMapping": {
+    "tabLabel": "智能体映射",
+    "title": "智能体映射",
+    "subtitle": "如何从遥测中读取智能体身份、成本归因和会话标题",
+    "identity": {
+      "title": "智能体身份字段",
+      "help": "OpenObserve 如何命名每个智能体并读取其环境和版本。它首先读取标准属性。当 Span 没有该属性时，将使用该 Span 携带的第一个回退字段。",
+      "agentName": "智能体名称",
+      "agentId": "智能体 ID",
+      "env": "环境",
+      "version": "版本"
+    },
+    "agentNameFields": "智能体名称回退字段",
+    "agentNameHelp": "用作 gen_ai.agent.name 回退的传入属性。",
+    "agentNameInfo": "仅当标准 gen_ai.agent.name 属性缺失或为空时检查。每行添加一个传入遥测属性。",
+    "agentIdFields": "智能体 ID 回退字段",
+    "agentIdHelp": "用作 gen_ai.agent.id 回退的传入属性。",
+    "agentIdInfo": "仅当标准 gen_ai.agent.id 属性缺失或为空时检查。每行添加一个传入遥测属性。",
+    "envFields": "环境回退字段",
+    "envHelp": "用作智能体环境的传入属性。",
+    "envInfo": "仅当标准 deployment.environment.name 属性缺失或为空时检查。每行添加一个传入遥测属性。",
+    "versionFields": "版本回退字段",
+    "versionHelp": "用作智能体版本的传入属性。",
+    "versionInfo": "仅当标准 gen_ai.agent.version 属性缺失或为空时检查。每行添加一个传入遥测属性。",
+    "alwaysAppliedStandard": "标准（最先检查）：",
+    "coverageValue": "· 过去 24 小时内，出现在 {percent}% 的追踪中",
+    "fallbacksNote": "输入回退字段，用逗号分隔，并按检查顺序排列。",
+    "fallbackInvalid": "使用以逗号分隔的字段名。仅允许字母、数字以及 . _ - : / {'@'}。",
+    "sessions": {
+      "title": "会话显示",
+      "help": "如何为会话命名，以及隐藏其中的哪些包装文本。",
+      "noAgents": "暂无智能体。添加智能体以隐藏其包装文本。"
+    },
+    "applyDefaults": "应用默认值",
+    "resetToEmpty": "重置为空",
+    "clearRegistry": "清空注册表",
+    "clearRegistryTitle": "清空智能体注册表？",
+    "clearRegistryDescription": "这将删除此组织中发现的所有 GenAI 智能体注册表行。数据摄取期间，新的匹配追踪将重新填充注册表。",
+    "clearRegistryConfirm": "清空注册表",
+    "saved": "智能体映射已保存",
+    "unsavedConfirm": "您的智能体映射更改尚未保存。要丢弃这些更改吗？",
+    "clearRegistrySuccess": "GenAI 智能体注册表已清空。已删除 {deletedCount} 个已存储智能体和 {bufferCount} 条排队观察记录。",
+    "saveFailed": "保存智能体映射失败",
+    "clearRegistryFailed": "清空 GenAI 智能体注册表失败",
+    "defaultsLoadFailed": "加载智能体映射默认值失败",
+    "defaultsFetchFailed": "获取默认值失败（{status}）"
+  },
+  "copyButton": {
+    "copy": "复制",
+    "copied": "已复制",
+    "failed": "复制被阻止 · 请按 Ctrl C"
+  },
   "logs": {
     "noData": {
       "title": "开始向 {product} 发送数据",
@@ -21534,6 +21557,7 @@
     },
     "noStream": {
       "title": "选择数据流开始探索",
+      "description": "选择一个数据流，然后按<strong>运行查询</strong>。结果出来后，您可以使用过滤器、VRL 函数和自定义时间范围进行优化。",
       "selectStream": "选择一个数据流",
       "selectStreamDesc": "浏览日志、追踪、指标和 RUM 数据流",
       "queryGuide": "阅读查询指南",
@@ -21585,18 +21609,7 @@
     "detailTable": {
       "noDataAvailable": "无可用数据。",
       "addIcon": "添加图标",
-      "sendToAiChat": "发送到AI聊天",
-      "openTrace": "打开追踪",
-      "noTraceTitle": "没有追踪与此日志关联",
-      "noRelatedLogsTitle": "未找到相关日志",
-      "noRelatedMetricsTitle": "未找到相关指标",
-      "noServiceText": "无法将任何服务与此日志匹配，因此无法自动找到相关数据。",
-      "searchTracesAround": "搜索此时间前后的追踪",
-      "searchAroundTip": "加载紧邻此事件之前和之后记录的事件。",
-      "noOfEventsTip": "围绕此事件加载的事件数量。",
-      "severityTip": "检测到的日志级别。选择即可查看检测方式。",
-      "traceId": "链路追踪 ID",
-      "spanId": "Span ID"
+      "sendToAiChat": "发送到AI聊天"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "可视化不支持SELECT * 查询。",
@@ -21888,7 +21901,6 @@
     "showDetail": "显示详情",
     "hideDetail": "隐藏细节",
     "runAs": "运行身份",
-    "runSuggestion": "运行 {query}",
     "searchTextFor": "搜索文本“{text}”",
     "searchTextDesc": "将整个输入作为短语进行搜索",
     "explain": {
@@ -21948,9 +21960,6 @@
     "minutesAgo": "{min} m 之前",
     "hoursAgo": "{h} 小时前",
     "notYetRefreshed": "尚未刷新",
-    "dataFresh": "数据很新",
-    "dataGettingStale": "数据变得陈旧了",
-    "dataStale": "数据已过时",
     "lastRefreshed": "上次刷新时间：{time}",
     "refresh": "刷新",
     "refreshWithAge": "刷新，上次刷新 {age}",
@@ -22759,6 +22768,11 @@
       "disabling": "正在禁用…",
       "editTitle": "编辑位置",
       "empty": "没有可用位置",
+      "emptyState": {
+        "title": "暂无位置",
+        "description": "位置是合成监控器运行检查的地点，例如云区域。",
+        "actionDesc": "添加运行检查的地点"
+      },
       "enable": "启用",
       "enabled": "已启用",
       "enabledSuccess": "位置已启用",
@@ -22826,12 +22840,7 @@
       "noPrivateMatches": "没有私有位置符合你的搜索",
       "newPrivateLocation": "新建私有位置",
       "publicSubtitle": "云区域，始终可用",
-      "privateSubtitle": "当至少有一个代理在线时，位置即为就绪",
-      "emptyState": {
-        "title": "暂无位置",
-        "description": "位置是合成监控器运行检查的地点，例如云区域。",
-        "actionDesc": "添加运行检查的地点"
-      }
+      "privateSubtitle": "当至少有一个代理在线时，位置即为就绪"
     },
     "prefill": {
       "pageTitle": "新建合成检查 · HTTP",
@@ -23863,7 +23872,6 @@
     },
     "actions": {
       "openCheatsheet": "打开键盘快捷键备忘单",
-      "searchOrJumpTo": "搜索或跳转到页面",
       "closeDialog": "关闭任何对话框、抽屉或模态",
       "focusSearch": "聚焦搜索栏",
       "focusQuery": "聚焦查询编辑器",
@@ -24026,6 +24034,14 @@
       "stepOf": "第 {current} 步，共 {total} 步",
       "swipeHint": "滑动以查看其余内容"
     },
+    "statStrip": {
+      "filters": "过滤器",
+      "showOnly": "仅显示 {label}",
+      "alsoShow": "同时显示 {label}",
+      "stopShowing": "停止显示 {label}",
+      "scrollBack": "显示上一个过滤器",
+      "scrollForward": "显示更多过滤器"
+    },
     "attributeValueCell": {
       "addIcon": "添加图标"
     },
@@ -24114,9 +24130,7 @@
       "urlPlaceholder": "文件 URL",
       "urlHelp": "导入时我们只获取一次。",
       "textPlaceholder": "在此粘贴内容",
-      "invalidJson": "不是有效的 JSON:{detail}",
-      "removeFile": "移除文件",
-      "clearAll": "全部清除"
+      "invalidJson": "不是有效的 JSON:{detail}"
     },
     "date": {
       "openCalendar": "打开日历",
@@ -24346,7 +24360,7 @@
         "ok": "确定",
         "normal": "正常",
         "firing": "触发中",
-        "notifyfailed": "投递失败",
+        "notifyfailed": "通知失败",
         "flapping": "抖动",
         "anomaly": "异常",
         "succeeded": "成功",
@@ -24581,14 +24595,6 @@
       "more": "更多",
       "unsaved": "未保存的更改",
       "locked": "已锁定"
-    },
-    "statStrip": {
-      "filters": "过滤器",
-      "showOnly": "仅显示 {label}",
-      "alsoShow": "同时显示 {label}",
-      "stopShowing": "停止显示 {label}",
-      "scrollBack": "显示上一个过滤器",
-      "scrollForward": "显示更多过滤器"
     }
   },
   "functions": {
@@ -25901,7 +25907,6 @@
       "packUnavailableHint": "此工作负载的精选内容尚未发布。你可以先构建一个仪表盘来展示它。",
       "partialTelemetryKubernetes": "我们找到了 Kubernetes 数据流，但缺少此页面所需的指标（kubeletstats 或 cluster receiver）。请检查收集器的 receiver。",
       "partialTelemetryHosts": "我们找到了主机数据流，但缺少此页面所需的指标。请检查收集器的 hostmetrics receiver。",
-      "hostMetricsMissingTitle": "未找到主机指标",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first}，以及另外 {count} 项",
       "hiddenFootnote": "你无权访问的数据源也会显示在此处。",
@@ -26686,8 +26691,7 @@
         "p95": "慢速尾部——每 20 次调用中就有 1 次至少耗时这么久。根据应用程序追踪中已完成的调用测得。",
         "p99": "最慢的 1% 调用至少耗时这么久。根据应用程序追踪中已完成的调用测得。",
         "load": "你的应用调用此数据库所花费的总时间，根据应用程序的追踪测得。它反映了此数据库为你的应用承载了多少流量。",
-        "attention": "该实例与其自身引擎发布的上限之间的接近程度——目前为连接数与 max_connections 的比值。取最差值而非综合得分。按从高到低排序，健康状况无法读取的实例排在顶部，因为看不见的实例无法确认是健康的。在数据库服务器上测量，因此与旁边的数据库耗时不可比。",
-        "calls": "你的应用调用此数据库的次数，根据应用的追踪数据测量。"
+        "attention": "该实例与其自身引擎发布的上限之间的接近程度——目前为连接数与 max_connections 的比值。取最差值而非综合得分。按从高到低排序，健康状况无法读取的实例排在顶部，因为看不见的实例无法确认是健康的。在数据库服务器上测量，因此与旁边的数据库耗时不可比。"
       },
       "failedChip": "{count} 次失败",
       "columnSubLabels": {
@@ -27128,8 +27132,7 @@
         "tableHealthHint": "表大小、膨胀和清理状态。膨胀和清理仅适用于 PostgreSQL。",
         "deadlocksLocked": "死锁是企业版功能。升级以查看哪些查询相互死锁以及原因。其他数据库选项卡在任何计划中都可用。",
         "blockedLocked": "被阻塞的查询是企业版功能。升级以查看哪些会话正在等待锁以及是什么持有锁。其他数据库选项卡在任何计划中都可用。",
-        "tableHealthLocked": "表健康状况是企业版功能。升级以跟踪表大小、膨胀和清理状态。其他数据库选项卡在任何计划中都可用。",
-        "queriesHintServer": "此时间范围内数据库上报的查询种类，在数据库内部统计。"
+        "tableHealthLocked": "表健康状况是企业版功能。升级以跟踪表大小、膨胀和清理状态。其他数据库选项卡在任何计划中都可用。"
       }
     },
     "metrics": {
@@ -30041,6 +30044,423 @@
       }
     }
   },
+  "autoobserveLive": {
+    "where": "{cluster} / {namespace}",
+    "lessThan": "<{value}",
+    "topbar": {
+      "checked": "已于 {ago} 检查",
+      "firstCheck": "首次检查进行中"
+    },
+    "retry": "重试",
+    "classes": {
+      "errors": "错误",
+      "latency": "延迟",
+      "saturation": "饱和度",
+      "absence": "停止发送",
+      "external_probe": "合成检查",
+      "workload_health": "重启",
+      "node": "节点"
+    },
+    "classesInline": {
+      "errors": "错误",
+      "latency": "延迟",
+      "saturation": "饱和度",
+      "absence": "缺失",
+      "external_probe": "外部探测",
+      "workload_health": "工作负载健康",
+      "node": "节点健康"
+    },
+    "states": {
+      "covered": "已监控",
+      "weak": "薄弱",
+      "silent": "静默",
+      "blind": "盲区",
+      "unmapped": "未映射",
+      "none": "无"
+    },
+    "monitorKinds": {
+      "alert": "告警",
+      "anomaly_detector": "异常检测器",
+      "slo": "SLO",
+      "synthetic": "合成监控"
+    },
+    "coverage": {
+      "summaryWatched": "{watched}/{total} 已监控 · {pct}%",
+      "summaryWatchedShare": "{watched}/{total} 已监控 · {pct}",
+      "splitLabel": "已监控 {watched} 个，{gaps} 个存在覆盖缺口",
+      "stateWatched": "已监控",
+      "stateGap": "覆盖缺口",
+      "columns": {
+        "where": "位置",
+        "state": "状态",
+        "lastChecked": "最近检查"
+      },
+      "loading": "正在加载覆盖情况",
+      "loaded": "覆盖情况已加载",
+      "sentence": {
+        "allWatched": "我正在监控您的 1 个服务。 | 我正在监控您的全部 {total} 个服务。",
+        "allGaps": "您的 1 个服务存在覆盖缺口。 | 您的全部 {total} 个服务都存在覆盖缺口。",
+        "watching": "我正在监控您的 {total} 个服务中的 {watched} 个。",
+        "gaps": "{count} 个存在覆盖缺口。 | {count} 个存在覆盖缺口。",
+        "mixed": "{watching} {gaps}"
+      },
+      "gapAdded": "已为 {checks} 添加告警。AutoObserve 将在其下次检查时计入。 | 已为 {checks} 添加告警。AutoObserve 将在其下次检查时计入。",
+      "gapNone": "没有告警监控 {checks}",
+      "searchPlaceholder": "搜索服务、集群或命名空间",
+      "labelNamespace": "{name} · {namespace}",
+      "labelPlace": "{name} · {cluster} · {namespace}",
+      "noNamespace": "无命名空间",
+      "noCluster": "无集群",
+      "noMatch": "没有服务、集群或命名空间与“{query}”匹配",
+      "showAll": "显示全部",
+      "bucketThree": "3 个及以上",
+      "bucketTwo": "2 个",
+      "bucketOne": "1 个",
+      "filterHides": "没有服务处于{state}状态",
+      "filterHidesSearch": "{count} 个服务匹配“{query}”，但没有一个处于{state}状态 | {count} 个服务匹配“{query}”，但没有一个处于{state}状态"
+    },
+    "cell": {
+      "noClass": "AutoObserve 尚未检查此信号",
+      "tipNoClass": "{signal}：AutoObserve 尚未检查此项",
+      "gap": {
+        "weak": "{signal}：只有{monitor}（宽泛告警）可能发现问题；其范围未限定到此服务 | {signal}：只有{monitor}（宽泛告警）可能发现问题；其范围未限定到此服务",
+        "silent": "{signal}：{monitor} 匹配，但不会通知任何人 | {signal}：{monitor} 匹配，但不会通知任何人",
+        "blind": "{signal}：{monitor} 匹配，但无法看到其数据 | {signal}：{monitor} 匹配，但无法看到其数据",
+        "unmapped": "{signal}：{monitor} 可能匹配，但其范围无法关联到服务 | {signal}：{monitor} 可能匹配，但其范围无法关联到服务",
+        "none": "{signal}：没有告警监控此项"
+      },
+      "added": "已添加"
+    },
+    "drawer": {
+      "moreChecks": "其他检查",
+      "chartNoData": "图表尚不可用",
+      "monitors": "告警",
+      "monitorLine": "{kind} · {state}",
+      "noMonitor": "没有匹配的告警"
+    },
+    "charts": {
+      "empty1h": "过去一小时内没有来自{service}的数据",
+      "empty24h": "过去 24 小时内没有来自{service}的数据",
+      "empty7d": "过去 7 天内没有来自{service}的数据",
+      "emptyPartial1h": "过去一小时已搜索时段内没有来自{service}的数据",
+      "emptyPartial24h": "过去 24 小时已搜索时段内没有来自{service}的数据",
+      "emptyPartial7d": "过去 7 天已搜索时段内没有来自{service}的数据",
+      "noSpanStatus": "{stream} 中没有 Span 状态",
+      "noLevel": "{stream} 中没有日志级别",
+      "noDuration": "{stream} 中没有持续时间字段",
+      "noTraces": "延迟图表基于追踪数据。{service} 未发送任何追踪。",
+      "noMatch": "无法将此服务与其数据流匹配",
+      "failedQuery": "无法从{stream}加载此图表",
+      "failedMatch": "无法查找{service}的数据流",
+      "partial": "部分数据",
+      "wide": "包含共享此数据流的其他服务",
+      "loading": "正在加载{metric}",
+      "summary": "{metric}，当前为{value}",
+      "summaryNone": "{metric}，最新时间桶中无测量值"
+    },
+    "suggestions": {
+      "serviceMeta": "{where}，每小时约 {traffic} 个事件",
+      "trafficOnly": "每小时约 {traffic} 个事件",
+      "kinds": {
+        "coverage_gap": "覆盖缺口",
+        "no_absence_check": "缺少告警",
+        "silent_coverage": "不通知任何人",
+        "coverage_lost": "覆盖丢失",
+        "blind_guardrail": "未生效",
+        "discovery_unusable": "数据质量",
+        "alert_no_destination": "无人收到通知",
+        "alert_notify_failed": "通知失败",
+        "other": "其他"
+      },
+      "severity": {
+        "high": "高",
+        "medium": "中"
+      },
+      "confidence": {
+        "sufficient": "有力证据",
+        "suggestive": "部分证据",
+        "insufficient": "证据薄弱"
+      },
+      "body": {
+        "coverageGap": "没有任何监控覆盖 {service}",
+        "noAbsenceNone": "如果 {service} 停止发送数据，不会有任何告警",
+        "noAbsenceWeak": "如果 {service} 停止发送数据，只有宽泛的告警才会发现",
+        "noAbsenceSilent": "能发现 {service} 停止上报的检查不会通知任何人",
+        "noAbsenceBlind": "能发现 {service} 停止上报的检查看不到其数据",
+        "silentCoverage": "{monitor} 监控 {count} 个服务上的 {classes}，但不通知任何人 | {monitor} 监控 {count} 个服务上的 {classes}，但不通知任何人",
+        "silentWhy": "{monitor} 会发现 {services} 停止，但它不通知任何人。",
+        "silentWhyNoNames": "{monitor} 会发现有服务停止，但它不通知任何人。",
+        "silentNext": "为它配置一个目标。",
+        "undeliverable": "{monitor} 无法送达 {destination}",
+        "undeliverableWhy": "{destination} 接收工单，而非告警。 | {destination} 接收工单，而非告警。",
+        "undeliverableNext": "在旁边添加 webhook 或电子邮件；{destination} 保留。 | 在旁边添加 webhook 或电子邮件；{destination} 保留。",
+        "coverageLost": "{service} 在 {day} 失去了其 {classes} 告警",
+        "blindStreamMissing": "{monitor} 读取的 {detail} 不存在",
+        "blindNoData": "{monitor} 读取的 {detail} 没有近期数据",
+        "blindEmptyScope": "{monitor} 过滤到永远不会到达的行",
+        "blindUnknownField": "{monitor} 按 {field} 过滤，而其数据流没有该字段",
+        "blindIgnoredMatcher": "{monitor} 按 {label} 匹配，但没有任何序列带有该标签，因此它会监控所有序列",
+        "discovery": "发现的 {active} 个服务中只有 {good} 个可用，因此缺口排名不完整",
+        "alertSyntax": "{monitor} 的查询无法解析",
+        "alertTimeout": "{monitor} 总是在完成前超时",
+        "alertMemory": "{monitor} 总是内存不足",
+        "alertOtherError": "{monitor} 总是因错误而失败",
+        "alertNotWorkingGeneric": "{monitor} 无法正常工作",
+        "alertNoDestination": "{monitor} 已触发，但不通知任何人",
+        "alertNotifyFailed": "{monitor} 已触发，{tried} 个通知中有 {failed} 个失败。 | {monitor} 已触发，{tried} 个通知中有 {failed} 个失败。",
+        "alertNotifyFailedNoCounts": "{monitor} 已触发，但其通知失败。",
+        "alertStreamGone": "{monitor} 总是失败，因为其数据流不存在",
+        "alertFieldGone": "{monitor} 总是失败，因为它使用的某个字段不存在",
+        "other": "我发现了此页面尚无法显示的内容"
+      },
+      "detail": {
+        "cell": "{check}：{state}",
+        "cells": "引擎发现的内容：{cells}。",
+        "services": "它匹配的服务包括 {services}。",
+        "text": "引擎详情：{detail}",
+        "quality": "发现功能正以 {mode} 模式运行。",
+        "none": "引擎未发送更多详情。",
+        "joined": "{first} {rest}"
+      },
+      "analysedAt": "来自 {ago} 的校准运行",
+      "neverFired": "从未触发",
+      "lastFired": "上次触发于 {time}",
+      "accept": "接受",
+      "dismiss": "忽略…",
+      "accepted": "已在此预览中接受；未发送任何内容",
+      "dismissed": "已在此预览中忽略；未发送任何内容",
+      "loading": "正在加载建议",
+      "loaded": "建议已加载",
+      "more": "以及另外 {count} 个 | 以及另外 {count} 个",
+      "moreNames": "另外 {count} 个 | 另外 {count} 个",
+      "whyNext": "{why} {next}",
+      "seeAll": "查看全部",
+      "drawerTitle": "建议",
+      "drawerLine": "按重要程度从高到低排序。打开一行查看我发现的内容。",
+      "focusGone": "此建议已不再处于待处理状态。",
+      "clearKind": "显示所有建议",
+      "kindEmptyTitle": "没有类型为 {kind} 的待处理建议",
+      "kindEmptyDesc": "还有 {count} 条其他待处理建议。 | 还有 {count} 条其他待处理建议。",
+      "folder": "文件夹 {folder}",
+      "columns": {
+        "suggestion": "建议",
+        "where": "位置",
+        "kind": "类型",
+        "severity": "严重程度"
+      }
+    },
+    "notice": {
+      "offTitle": "AutoObserve 未开启",
+      "details": "详情",
+      "refreshFailed": "在 {failedAt} 刷新失败 · 显示来自 {dataAt} 的{what}",
+      "what": {
+        "coverage": "覆盖情况",
+        "suggestions": "建议",
+        "incidents": "已触发值班通知的发现",
+        "issues": "问题",
+        "history": "历史记录"
+      },
+      "coverage": {
+        "deniedTitle": "您没有权限查看覆盖情况",
+        "deniedDesc": "覆盖情况会统计每个文件夹中的监控项，因此需要拥有查看此组织中所有告警的权限，不能只查看部分文件夹。请联系组织管理员授予该权限。",
+        "offDesc": "管理员会为此部署开启该功能。首次检查完成后，覆盖情况会显示在这里。",
+        "unavailableTitle": "覆盖情况暂时不可用",
+        "unavailableDesc": "AutoObserve 当前无响应。通常一两分钟内会恢复。",
+        "failedTitle": "无法加载覆盖情况",
+        "failedDesc": "加载时出现问题。请稍后重试。",
+        "noPassTitle": "过去一天内没有完成任何检查",
+        "noPassDesc": "我下次检查完您的服务后，覆盖情况会显示在这里。如果 AutoObserve 刚刚开启，首次检查可能需要一些时间。",
+        "noPassAction": "我如何检查覆盖情况",
+        "noServicesTitle": "尚未找到任何服务",
+        "noServicesDesc": "我上次检查（{when}）未找到任何服务。服务在发送包含服务名称的日志、指标或追踪后，就会显示在这里。",
+        "noServicesAction": "我如何发现服务"
+      },
+      "suggestions": {
+        "deniedTitle": "您没有权限查看建议",
+        "deniedDesc": "查看这些建议需要拥有查看此组织中告警的权限。请联系组织管理员授予该权限。",
+        "offDesc": "管理员为此部署开启该功能后，建议将显示在这里。",
+        "unavailableTitle": "建议暂时不可用",
+        "unavailableDesc": "AutoObserve 当前无响应。通常一两分钟内会恢复。",
+        "failedTitle": "无法加载建议",
+        "failedDesc": "加载这些建议时出现问题。请稍后重试。",
+        "emptyTitle": "当前没有建议",
+        "emptyDesc": "当我发现您的监控项存在覆盖缺口时，会在这里添加建议。",
+        "pageEmptyTitle": "排名靠前的建议均已处理",
+        "pageEmptyDesc": "打开完整列表，查看仍在等待的项。"
+      },
+      "history": {
+        "deniedTitle": "您没有查看历史记录的权限",
+        "deniedDesc": "历史记录列出了 AutoObserve 打开的事件，因此查看它需要拥有列出此组织中事件的权限。请联系组织管理员获取。",
+        "offDesc": "管理员为此部署开启后，历史记录将显示在此处。",
+        "unavailableTitle": "历史记录暂时不可用",
+        "unavailableDesc": "AutoObserve 当前无响应。通常在一两分钟内会恢复正常。",
+        "failedTitle": "无法加载历史记录",
+        "failedDesc": "加载时出现问题。请稍后重试。"
+      },
+      "incidents": {
+        "deniedTitle": "您没有查看已触发寻呼的发现的权限",
+        "deniedDesc": "已触发寻呼的发现会打开事件，因此查看它们需要拥有列出此组织中事件的权限。请联系组织管理员获取。",
+        "offDesc": "管理员为此部署开启后，已触发寻呼的发现将显示在此处。",
+        "unavailableTitle": "已触发寻呼的发现暂时不可用",
+        "unavailableDesc": "AutoObserve 当前无响应。通常在一两分钟内会恢复正常。",
+        "failedTitle": "无法加载已触发寻呼的发现",
+        "failedDesc": "加载时出现问题。请稍后重试。"
+      },
+      "issues": {
+        "deniedTitle": "您没有查看问题的权限",
+        "deniedDesc": "问题是 AutoObserve 打开的事件，因此查看它们需要拥有列出此组织中事件的权限。请联系组织管理员获取。",
+        "offDesc": "管理员为此部署开启后，问题将显示在此处。",
+        "unavailableTitle": "问题暂时不可用",
+        "unavailableDesc": "AutoObserve 当前无响应。通常在一两分钟内会恢复正常。",
+        "failedTitle": "无法加载问题",
+        "failedDesc": "加载时出现问题。请稍后重试。"
+      }
+    },
+    "time": {
+      "justNow": "刚刚",
+      "ago": "{time}前"
+    },
+    "history": {
+      "incident": "打开了一个事件：{title}",
+      "dismissed": "{actor} 忽略了 {title}",
+      "accepted": "{actor} 将 {title} 标记为预期报告",
+      "changed": "{actor} 更改了 {title}",
+      "denied": {
+        "incidents": "未列出事件：您没有查看它们的权限。",
+        "decisions": "未列出决策：您没有查看它们的权限。"
+      },
+      "untitled": "一条建议",
+      "openIncident": "打开事件",
+      "newest": "显示最新的 {count} 条。较早的事件位于“问题”页面。",
+      "loading": "正在加载历史记录",
+      "loaded": "历史记录已加载"
+    },
+    "incidents": {
+      "title": "已触发寻呼的发现",
+      "subtitle": "为您的值班团队打开事件并附带其分析的发现。",
+      "pagingNote": "此组织已关闭寻呼，因此 AutoObserve 不会打开任何事件。",
+      "sharedFor": "{label}：{reason}",
+      "finding": {
+        "stream_silence": "{stream} ({type}) 已停止发送数据",
+        "stream_drop": "{stream} ({type}) 数据量急剧下降",
+        "stream_rise": "{stream} ({type}) 数据量急剧上升"
+      },
+      "opened": "事件打开于 {when}",
+      "openIncident": "打开事件",
+      "viewAnalysis": "查看分析",
+      "newFindings": "{count} 条新发现 | {count} 条新发现",
+      "showNew": "显示",
+      "more": "显示最新的 {count} 条",
+      "seeAll": "查看所有事件",
+      "seeAllIssues": "查看所有问题",
+      "failedDetail": {
+        "status": "请求在 {time} 失败，状态为 {status}。",
+        "noResponse": "请求在 {time} 未收到响应。"
+      },
+      "analysis": {
+        "notRunDetail": "尚未开始分析。打开该事件以启动分析。",
+        "disabledDetail": "此部署已关闭 AI 分析。",
+        "offOther": "此事件未运行自动分析。",
+        "failedDetail": "分析在完成前中止。查看详情。"
+      },
+      "empty": {
+        "title": "尚未通知任何人值班",
+        "desc": "当数据流停止或其数据量剧烈变化时，其事件和分析会显示在此处。"
+      },
+      "emptyOff": {
+        "title": "值班通知已关闭",
+        "desc": "AutoObserve 会为此组织记录数据流发现项，但不会创建事件。由管理员开启值班通知。"
+      },
+      "loading": "正在加载值班通知发现项…",
+      "loaded": "值班通知发现项已加载",
+      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
+      "routing": "Set up on-call routing"
+    },
+    "issues": {
+      "searchPlaceholder": "搜索发生了什么或数据流",
+      "columns": {
+        "incident": "发生了什么",
+        "severity": "严重程度",
+        "status": "状态",
+        "stream": "数据流",
+        "opened": "开启时间",
+        "analysis": "分析",
+        "page": "通知了谁"
+      },
+      "count": "无问题 | {count} 个问题 | {count} 个问题",
+      "capNote": "仅显示最新的 {count} 个问题。缩小时间范围以查看更早的问题。",
+      "emptyRange": "{within}没有问题",
+      "streamType": "{type}数据流",
+      "streamMore": "{stream} +{count}",
+      "filterOpen": "未解决",
+      "loading": "正在加载问题…",
+      "loaded": "问题已加载",
+      "page": {
+        "unrouted": "未通知任何人",
+        "failed": "值班通知失败",
+        "pending": "尚未确认"
+      },
+      "today": "今天",
+      "yesterday": "昨天",
+      "shared": {
+        "rcaDisabled": "这些事件开启时 AI 分析处于关闭状态。",
+        "aiUnavailable": "这些事件开启时 AI 分析不可用。",
+        "quotaExceeded": "这些事件开启时，该组织已达到其 AI 分析额度上限。",
+        "coolingDown": "刚运行过一次分析，因此这些事件未启动新的分析。",
+        "startFailed": "这些分析无法启动。",
+        "offOther": "这些事件未运行自动分析。",
+        "disabled": "此部署已关闭 AI 分析。",
+        "notRun": "尚未开始分析。打开一个事件以启动分析。",
+        "failed": "这些分析在完成前中止。查看其中一个以了解详情。"
+      }
+    },
+    "surfaces": {
+      "changes": {
+        "title": "尚无变更",
+        "desc": "AutoObserve 会提出修复建议，但尚未更改任何告警或设置。当它做出更改时，会在此处显示并说明是否生效。目前，请查看其建议并应用您需要的建议。",
+        "action": "查看建议"
+      },
+      "history": {
+        "title": "尚无历史记录",
+        "desc": "AutoObserve 的发现、所做的更改以及您的决定都会列在此处，最新的在前。目前，其发现会创建事件，这些事件位于问题页面。",
+        "action": "打开问题"
+      },
+      "scenario": {
+        "tag": "实时数据",
+        "text": "您正在查看此组织的实时数据。此处不显示示例场景。",
+        "action": "工作原理"
+      },
+      "settings": {
+        "title": "此处暂无可设置的内容",
+        "desc": "管理员会为此部署开启 AutoObserve 及其呼叫功能。这些控制项就绪后，将在此设置通知对象及其自主行动范围。",
+        "action": "工作原理"
+      }
+    },
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "deniedTitle": "您没有权限查看呼叫设置",
+      "deniedDesc": "呼叫设置对整个组织统一配置。请联系组织管理员获取访问权限。",
+      "failedTitle": "无法加载呼叫设置",
+      "failedDesc": "加载时出现问题。请稍后重试。",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
+    },
+    "learning": {
+      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
+      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
+      "emptyTitle": "Learning your streams",
+      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
+      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
+      "until": "Learning until {date} · {streams}",
+      "streams": "Learning {count} stream | Learning {count} streams",
+      "streamUntil": "until {date}"
+    }
+  },
   "autoobserve2": {
     "nav": {
       "history": "历史",
@@ -32745,520 +33165,6 @@
     "deletedQuery": "已删除 {query}",
     "undo": "撤销"
   },
-  "filterBar": {
-    "ariaLabel": "按字段过滤",
-    "placeholder": "按字段过滤，或输入 field=value。按 Enter 运行",
-    "addFilter": "添加过滤器",
-    "searchFields": "搜索字段",
-    "searchLabels": "搜索标签",
-    "searchOperators": "搜索条件",
-    "searchValue": "搜索或输入值",
-    "searchValues": "搜索值",
-    "textField": "文本",
-    "useValue": "使用“{value}”",
-    "useField": "使用字段“{field}”",
-    "useLabel": "使用标签“{field}”",
-    "searchText": "在所有文本中搜索“{text}”",
-    "emptyValue": "（空）",
-    "loadingFields": "正在加载字段…",
-    "noFields": "没有匹配的字段",
-    "noValues": "无建议。输入值后按 Enter",
-    "noOperators": "没有匹配的条件",
-    "removeFilter": "移除过滤器",
-    "clearAll": "清除所有过滤器",
-    "toggleConnector": "在 AND 和 OR 之间切换",
-    "selectedCount": "未选择任何值 | 已选择 {count} 个值 | 已选择 {count} 个值",
-    "query": "查询",
-    "validation": {
-      "incomplete": "完成此过滤器或将其移除",
-      "required": "至少添加一个过滤器",
-      "uniqueField": "{field} 已有过滤器；请编辑该过滤器或移除此过滤器",
-      "oneUsageCondition": "每个层级只能有一个使用条件；请将此条件转为规则或将其移除",
-      "rumField": "请使用内置字段，或使用由小写字母、数字和下划线组成且长度不超过 128 个字符的列",
-      "valueLength": "每个值需要 1 到 {max} 个字符",
-      "regexLength": "模式最多 {max} 个字符。",
-      "regexInvalid": "此模式无效或不受支持。不能使用先行断言、后行断言和反向引用。"
-    },
-    "operatorNames": {
-      "containsIgnoreCase": "包含（忽略大小写）",
-      "notStartsWith": "不以…开头",
-      "notEndsWith": "不以…结尾",
-      "isEmpty": "为空",
-      "isNotEmpty": "不为空"
-    },
-    "types": {
-      "string": "文本",
-      "number": "数字",
-      "boolean": "布尔值"
-    },
-    "operators": {
-      "eq": "等于",
-      "neq": "不等于",
-      "gt": "大于",
-      "gte": "大于或等于",
-      "lt": "小于",
-      "lte": "小于等于",
-      "contains": "包含",
-      "containsIgnoreCase": "包含（忽略大小写）",
-      "notContains": "不包含",
-      "startsWith": "开头为",
-      "notStartsWith": "开头不为",
-      "endsWith": "结尾为",
-      "notEndsWith": "结尾不为",
-      "in": "是以下任一",
-      "notIn": "不是以下任一",
-      "regex": "匹配正则",
-      "notRegex": "不匹配正则",
-      "isNull": "没有值",
-      "isNotNull": "有值",
-      "isEmpty": "为空或没有值",
-      "isNotEmpty": "有非空值",
-      "matchAll": "匹配文本"
-    },
-    "queryTooltip": "以文本编辑筛选条件",
-    "queryNotParsableShort": "构建器无法显示此查询：",
-    "clearAndBuild": "清除并构建",
-    "clearQueryTitle": "清除查询？",
-    "clearQueryMessage": "查询将被移除，构建器将从空白开始。",
-    "where": "筛选条件",
-    "addCondition": "添加条件",
-    "addGroup": "添加组",
-    "startGroup": "开始分组",
-    "addBelow": "在下方添加条件",
-    "ungroup": "取消分组",
-    "collapseGroup": "折叠分组",
-    "expandGroup": "展开分组",
-    "moreInGroup": "还有 {count} 个",
-    "groupHasIssues": "此分组中有内容需要修复",
-    "chooseField": "选择字段",
-    "chooseValue": "选择值",
-    "lockedFilter": "此过滤器无法在此编辑。它将保持已保存的状态；如需丢弃，请将其移除。",
-    "limits": {
-      "conditions": "最多 {count} 个过滤器 | 最多 {count} 个过滤器",
-      "values": "最多 {count} 个值 | 最多 {count} 个值"
-    },
-    "builderTooltip": "使用构建器编辑筛选条件",
-    "editorModeLabel": "筛选编辑器",
-    "modeBuilder": "构建器",
-    "modeText": "文本"
-  },
-  "autoobserveLive": {
-    "where": "{cluster} / {namespace}",
-    "lessThan": "<{value}",
-    "topbar": {
-      "checked": "已于 {ago} 检查",
-      "firstCheck": "首次检查进行中"
-    },
-    "retry": "重试",
-    "classes": {
-      "errors": "错误",
-      "latency": "延迟",
-      "saturation": "饱和度",
-      "absence": "停止发送",
-      "external_probe": "合成检查",
-      "workload_health": "重启",
-      "node": "节点"
-    },
-    "classesInline": {
-      "errors": "错误",
-      "latency": "延迟",
-      "saturation": "饱和度",
-      "absence": "缺失",
-      "external_probe": "外部探测",
-      "workload_health": "工作负载健康",
-      "node": "节点健康"
-    },
-    "states": {
-      "covered": "已监控",
-      "weak": "薄弱",
-      "silent": "静默",
-      "blind": "盲区",
-      "unmapped": "未映射",
-      "none": "无"
-    },
-    "monitorKinds": {
-      "alert": "告警",
-      "anomaly_detector": "异常检测器",
-      "slo": "SLO",
-      "synthetic": "合成监控"
-    },
-    "coverage": {
-      "summaryWatched": "{watched}/{total} 已监控 · {pct}%",
-      "summaryWatchedShare": "{watched}/{total} 已监控 · {pct}",
-      "splitLabel": "已监控 {watched} 个，{gaps} 个存在覆盖缺口",
-      "stateWatched": "已监控",
-      "stateGap": "覆盖缺口",
-      "columns": {
-        "where": "位置",
-        "state": "状态",
-        "lastChecked": "最近检查"
-      },
-      "loading": "正在加载覆盖情况",
-      "loaded": "覆盖情况已加载",
-      "sentence": {
-        "allWatched": "我正在监控您的 1 个服务。 | 我正在监控您的全部 {total} 个服务。",
-        "allGaps": "您的 1 个服务存在覆盖缺口。 | 您的全部 {total} 个服务都存在覆盖缺口。",
-        "watching": "我正在监控您的 {total} 个服务中的 {watched} 个。",
-        "gaps": "{count} 个存在覆盖缺口。 | {count} 个存在覆盖缺口。",
-        "mixed": "{watching} {gaps}"
-      },
-      "gapAdded": "已为 {checks} 添加告警。AutoObserve 将在其下次检查时计入。 | 已为 {checks} 添加告警。AutoObserve 将在其下次检查时计入。",
-      "gapNone": "没有告警监控 {checks}",
-      "searchPlaceholder": "搜索服务、集群或命名空间",
-      "labelNamespace": "{name} · {namespace}",
-      "labelPlace": "{name} · {cluster} · {namespace}",
-      "noNamespace": "无命名空间",
-      "noCluster": "无集群",
-      "noMatch": "没有服务、集群或命名空间与“{query}”匹配",
-      "showAll": "显示全部",
-      "bucketThree": "3 个及以上",
-      "bucketTwo": "2 个",
-      "bucketOne": "1 个",
-      "filterHides": "没有服务处于{state}状态",
-      "filterHidesSearch": "{count} 个服务匹配“{query}”，但没有一个处于{state}状态 | {count} 个服务匹配“{query}”，但没有一个处于{state}状态"
-    },
-    "cell": {
-      "noClass": "AutoObserve 尚未检查此信号",
-      "tipNoClass": "{signal}：AutoObserve 尚未检查此项",
-      "gap": {
-        "weak": "{signal}：只有{monitor}（宽泛告警）可能发现问题；其范围未限定到此服务 | {signal}：只有{monitor}（宽泛告警）可能发现问题；其范围未限定到此服务",
-        "silent": "{signal}：{monitor} 匹配，但不会通知任何人 | {signal}：{monitor} 匹配，但不会通知任何人",
-        "blind": "{signal}：{monitor} 匹配，但无法看到其数据 | {signal}：{monitor} 匹配，但无法看到其数据",
-        "unmapped": "{signal}：{monitor} 可能匹配，但其范围无法关联到服务 | {signal}：{monitor} 可能匹配，但其范围无法关联到服务",
-        "none": "{signal}：没有告警监控此项"
-      },
-      "added": "已添加"
-    },
-    "drawer": {
-      "moreChecks": "其他检查",
-      "chartNoData": "图表尚不可用",
-      "monitors": "告警",
-      "monitorLine": "{kind} · {state}",
-      "noMonitor": "没有匹配的告警"
-    },
-    "charts": {
-      "empty1h": "过去一小时内没有来自{service}的数据",
-      "empty24h": "过去 24 小时内没有来自{service}的数据",
-      "empty7d": "过去 7 天内没有来自{service}的数据",
-      "emptyPartial1h": "过去一小时已搜索时段内没有来自{service}的数据",
-      "emptyPartial24h": "过去 24 小时已搜索时段内没有来自{service}的数据",
-      "emptyPartial7d": "过去 7 天已搜索时段内没有来自{service}的数据",
-      "noSpanStatus": "{stream} 中没有 Span 状态",
-      "noLevel": "{stream} 中没有日志级别",
-      "noDuration": "{stream} 中没有持续时间字段",
-      "noTraces": "延迟图表基于追踪数据。{service} 未发送任何追踪。",
-      "noMatch": "无法将此服务与其数据流匹配",
-      "failedQuery": "无法从{stream}加载此图表",
-      "failedMatch": "无法查找{service}的数据流",
-      "partial": "部分数据",
-      "wide": "包含共享此数据流的其他服务",
-      "loading": "正在加载{metric}",
-      "summary": "{metric}，当前为{value}",
-      "summaryNone": "{metric}，最新时间桶中无测量值"
-    },
-    "suggestions": {
-      "serviceMeta": "{where}，每小时约 {traffic} 个事件",
-      "trafficOnly": "每小时约 {traffic} 个事件",
-      "kinds": {
-        "coverage_gap": "覆盖缺口",
-        "no_absence_check": "缺少告警",
-        "silent_coverage": "不通知任何人",
-        "coverage_lost": "覆盖丢失",
-        "blind_guardrail": "未生效",
-        "discovery_unusable": "数据质量",
-        "alert_no_destination": "无人收到通知",
-        "alert_notify_failed": "通知失败",
-        "other": "其他"
-      },
-      "severity": {
-        "high": "高",
-        "medium": "中"
-      },
-      "confidence": {
-        "sufficient": "有力证据",
-        "suggestive": "部分证据",
-        "insufficient": "证据薄弱"
-      },
-      "body": {
-        "coverageGap": "没有任何监控覆盖 {service}",
-        "noAbsenceNone": "如果 {service} 停止发送数据，不会有任何告警",
-        "noAbsenceWeak": "如果 {service} 停止发送数据，只有宽泛的告警才会发现",
-        "noAbsenceSilent": "能发现 {service} 停止上报的检查不会通知任何人",
-        "noAbsenceBlind": "能发现 {service} 停止上报的检查看不到其数据",
-        "silentCoverage": "{monitor} 监控 {count} 个服务上的 {classes}，但不通知任何人 | {monitor} 监控 {count} 个服务上的 {classes}，但不通知任何人",
-        "silentWhy": "{monitor} 会发现 {services} 停止，但它不通知任何人。",
-        "silentWhyNoNames": "{monitor} 会发现有服务停止，但它不通知任何人。",
-        "silentNext": "为它配置一个目标。",
-        "undeliverable": "{monitor} 无法送达 {destination}",
-        "undeliverableWhy": "{destination} 接收工单，而非告警。 | {destination} 接收工单，而非告警。",
-        "undeliverableNext": "在旁边添加 webhook 或电子邮件；{destination} 保留。 | 在旁边添加 webhook 或电子邮件；{destination} 保留。",
-        "coverageLost": "{service} 在 {day} 失去了其 {classes} 告警",
-        "blindStreamMissing": "{monitor} 读取的 {detail} 不存在",
-        "blindNoData": "{monitor} 读取的 {detail} 没有近期数据",
-        "blindEmptyScope": "{monitor} 过滤到永远不会到达的行",
-        "blindUnknownField": "{monitor} 按 {field} 过滤，而其数据流没有该字段",
-        "blindIgnoredMatcher": "{monitor} 按 {label} 匹配，但没有任何序列带有该标签，因此它会监控所有序列",
-        "discovery": "发现的 {active} 个服务中只有 {good} 个可用，因此缺口排名不完整",
-        "alertSyntax": "{monitor} 的查询无法解析",
-        "alertTimeout": "{monitor} 总是在完成前超时",
-        "alertMemory": "{monitor} 总是内存不足",
-        "alertOtherError": "{monitor} 总是因错误而失败",
-        "alertNotWorkingGeneric": "{monitor} 无法正常工作",
-        "alertNoDestination": "{monitor} 已触发，但不通知任何人",
-        "alertNotifyFailed": "{monitor} 已触发，{tried} 个通知中有 {failed} 个失败。 | {monitor} 已触发，{tried} 个通知中有 {failed} 个失败。",
-        "alertNotifyFailedNoCounts": "{monitor} 已触发，但其通知失败。",
-        "alertStreamGone": "{monitor} 总是失败，因为其数据流不存在",
-        "alertFieldGone": "{monitor} 总是失败，因为它使用的某个字段不存在",
-        "other": "我发现了此页面尚无法显示的内容"
-      },
-      "detail": {
-        "cell": "{check}：{state}",
-        "cells": "引擎发现的内容：{cells}。",
-        "services": "它匹配的服务包括 {services}。",
-        "text": "引擎详情：{detail}",
-        "quality": "发现功能正以 {mode} 模式运行。",
-        "none": "引擎未发送更多详情。",
-        "joined": "{first} {rest}"
-      },
-      "analysedAt": "来自 {ago} 的校准运行",
-      "neverFired": "从未触发",
-      "lastFired": "上次触发于 {time}",
-      "accept": "接受",
-      "dismiss": "忽略…",
-      "accepted": "已在此预览中接受；未发送任何内容",
-      "dismissed": "已在此预览中忽略；未发送任何内容",
-      "loading": "正在加载建议",
-      "loaded": "建议已加载",
-      "more": "以及另外 {count} 个 | 以及另外 {count} 个",
-      "moreNames": "另外 {count} 个 | 另外 {count} 个",
-      "whyNext": "{why} {next}",
-      "seeAll": "查看全部",
-      "drawerTitle": "建议",
-      "drawerLine": "按重要程度从高到低排序。打开一行查看我发现的内容。",
-      "focusGone": "此建议已不再处于待处理状态。",
-      "clearKind": "显示所有建议",
-      "kindEmptyTitle": "没有类型为 {kind} 的待处理建议",
-      "kindEmptyDesc": "还有 {count} 条其他待处理建议。 | 还有 {count} 条其他待处理建议。",
-      "folder": "文件夹 {folder}",
-      "columns": {
-        "suggestion": "建议",
-        "where": "位置",
-        "kind": "类型",
-        "severity": "严重程度"
-      }
-    },
-    "notice": {
-      "offTitle": "AutoObserve 未开启",
-      "details": "详情",
-      "refreshFailed": "在 {failedAt} 刷新失败 · 显示来自 {dataAt} 的{what}",
-      "what": {
-        "coverage": "覆盖情况",
-        "suggestions": "建议",
-        "incidents": "已触发值班通知的发现",
-        "issues": "问题",
-        "history": "历史记录"
-      },
-      "coverage": {
-        "deniedTitle": "您没有权限查看覆盖情况",
-        "deniedDesc": "覆盖情况会统计每个文件夹中的监控项，因此需要拥有查看此组织中所有告警的权限，不能只查看部分文件夹。请联系组织管理员授予该权限。",
-        "offDesc": "管理员会为此部署开启该功能。首次检查完成后，覆盖情况会显示在这里。",
-        "unavailableTitle": "覆盖情况暂时不可用",
-        "unavailableDesc": "AutoObserve 当前无响应。通常一两分钟内会恢复。",
-        "failedTitle": "无法加载覆盖情况",
-        "failedDesc": "加载时出现问题。请稍后重试。",
-        "noPassTitle": "过去一天内没有完成任何检查",
-        "noPassDesc": "我下次检查完您的服务后，覆盖情况会显示在这里。如果 AutoObserve 刚刚开启，首次检查可能需要一些时间。",
-        "noPassAction": "我如何检查覆盖情况",
-        "noServicesTitle": "尚未找到任何服务",
-        "noServicesDesc": "我上次检查（{when}）未找到任何服务。服务在发送包含服务名称的日志、指标或追踪后，就会显示在这里。",
-        "noServicesAction": "我如何发现服务"
-      },
-      "suggestions": {
-        "deniedTitle": "您没有权限查看建议",
-        "deniedDesc": "查看这些建议需要拥有查看此组织中告警的权限。请联系组织管理员授予该权限。",
-        "offDesc": "管理员为此部署开启该功能后，建议将显示在这里。",
-        "unavailableTitle": "建议暂时不可用",
-        "unavailableDesc": "AutoObserve 当前无响应。通常一两分钟内会恢复。",
-        "failedTitle": "无法加载建议",
-        "failedDesc": "加载这些建议时出现问题。请稍后重试。",
-        "emptyTitle": "当前没有建议",
-        "emptyDesc": "当我发现您的监控项存在覆盖缺口时，会在这里添加建议。",
-        "pageEmptyTitle": "排名靠前的建议均已处理",
-        "pageEmptyDesc": "打开完整列表，查看仍在等待的项。"
-      },
-      "history": {
-        "deniedTitle": "您没有查看历史记录的权限",
-        "deniedDesc": "历史记录列出了 AutoObserve 打开的事件，因此查看它需要拥有列出此组织中事件的权限。请联系组织管理员获取。",
-        "offDesc": "管理员为此部署开启后，历史记录将显示在此处。",
-        "unavailableTitle": "历史记录暂时不可用",
-        "unavailableDesc": "AutoObserve 当前无响应。通常在一两分钟内会恢复正常。",
-        "failedTitle": "无法加载历史记录",
-        "failedDesc": "加载时出现问题。请稍后重试。"
-      },
-      "incidents": {
-        "deniedTitle": "您没有查看已触发寻呼的发现的权限",
-        "deniedDesc": "已触发寻呼的发现会打开事件，因此查看它们需要拥有列出此组织中事件的权限。请联系组织管理员获取。",
-        "offDesc": "管理员为此部署开启后，已触发寻呼的发现将显示在此处。",
-        "unavailableTitle": "已触发寻呼的发现暂时不可用",
-        "unavailableDesc": "AutoObserve 当前无响应。通常在一两分钟内会恢复正常。",
-        "failedTitle": "无法加载已触发寻呼的发现",
-        "failedDesc": "加载时出现问题。请稍后重试。"
-      },
-      "issues": {
-        "deniedTitle": "您没有查看问题的权限",
-        "deniedDesc": "问题是 AutoObserve 打开的事件，因此查看它们需要拥有列出此组织中事件的权限。请联系组织管理员获取。",
-        "offDesc": "管理员为此部署开启后，问题将显示在此处。",
-        "unavailableTitle": "问题暂时不可用",
-        "unavailableDesc": "AutoObserve 当前无响应。通常在一两分钟内会恢复正常。",
-        "failedTitle": "无法加载问题",
-        "failedDesc": "加载时出现问题。请稍后重试。"
-      }
-    },
-    "time": {
-      "justNow": "刚刚",
-      "ago": "{time}前"
-    },
-    "history": {
-      "incident": "打开了一个事件：{title}",
-      "dismissed": "{actor} 忽略了 {title}",
-      "accepted": "{actor} 将 {title} 标记为预期报告",
-      "changed": "{actor} 更改了 {title}",
-      "denied": {
-        "incidents": "未列出事件：您没有查看它们的权限。",
-        "decisions": "未列出决策：您没有查看它们的权限。"
-      },
-      "untitled": "一条建议",
-      "openIncident": "打开事件",
-      "newest": "显示最新的 {count} 条。较早的事件位于“问题”页面。",
-      "loading": "正在加载历史记录",
-      "loaded": "历史记录已加载"
-    },
-    "incidents": {
-      "title": "已触发寻呼的发现",
-      "subtitle": "为您的值班团队打开事件并附带其分析的发现。",
-      "pagingNote": "此组织已关闭寻呼，因此 AutoObserve 不会打开任何事件。",
-      "sharedFor": "{label}：{reason}",
-      "finding": {
-        "stream_silence": "{stream} ({type}) 已停止发送数据",
-        "stream_drop": "{stream} ({type}) 数据量急剧下降",
-        "stream_rise": "{stream} ({type}) 数据量急剧上升"
-      },
-      "opened": "事件打开于 {when}",
-      "openIncident": "打开事件",
-      "viewAnalysis": "查看分析",
-      "newFindings": "{count} 条新发现 | {count} 条新发现",
-      "showNew": "显示",
-      "more": "显示最新的 {count} 条",
-      "seeAll": "查看所有事件",
-      "seeAllIssues": "查看所有问题",
-      "failedDetail": {
-        "status": "请求在 {time} 失败，状态为 {status}。",
-        "noResponse": "请求在 {time} 未收到响应。"
-      },
-      "analysis": {
-        "notRunDetail": "尚未开始分析。打开该事件以启动分析。",
-        "disabledDetail": "此部署已关闭 AI 分析。",
-        "offOther": "此事件未运行自动分析。",
-        "failedDetail": "分析在完成前中止。查看详情。"
-      },
-      "empty": {
-        "title": "尚未通知任何人值班",
-        "desc": "当数据流停止或其数据量剧烈变化时，其事件和分析会显示在此处。"
-      },
-      "emptyOff": {
-        "title": "值班通知已关闭",
-        "desc": "AutoObserve 会为此组织记录数据流发现项，但不会创建事件。由管理员开启值班通知。"
-      },
-      "loading": "正在加载值班通知发现项…",
-      "loaded": "值班通知发现项已加载",
-      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
-      "routing": "Set up on-call routing"
-    },
-    "issues": {
-      "searchPlaceholder": "搜索发生了什么或数据流",
-      "columns": {
-        "incident": "发生了什么",
-        "severity": "严重程度",
-        "status": "状态",
-        "stream": "数据流",
-        "opened": "开启时间",
-        "analysis": "分析",
-        "page": "通知了谁"
-      },
-      "count": "无问题 | {count} 个问题 | {count} 个问题",
-      "capNote": "仅显示最新的 {count} 个问题。缩小时间范围以查看更早的问题。",
-      "emptyRange": "{within}没有问题",
-      "streamType": "{type}数据流",
-      "streamMore": "{stream} +{count}",
-      "filterOpen": "未解决",
-      "loading": "正在加载问题…",
-      "loaded": "问题已加载",
-      "page": {
-        "unrouted": "未通知任何人",
-        "failed": "值班通知失败",
-        "pending": "尚未确认"
-      },
-      "today": "今天",
-      "yesterday": "昨天",
-      "shared": {
-        "rcaDisabled": "这些事件开启时 AI 分析处于关闭状态。",
-        "aiUnavailable": "这些事件开启时 AI 分析不可用。",
-        "quotaExceeded": "这些事件开启时，该组织已达到其 AI 分析额度上限。",
-        "coolingDown": "刚运行过一次分析，因此这些事件未启动新的分析。",
-        "startFailed": "这些分析无法启动。",
-        "offOther": "这些事件未运行自动分析。",
-        "disabled": "此部署已关闭 AI 分析。",
-        "notRun": "尚未开始分析。打开一个事件以启动分析。",
-        "failed": "这些分析在完成前中止。查看其中一个以了解详情。"
-      }
-    },
-    "surfaces": {
-      "changes": {
-        "title": "尚无变更",
-        "desc": "AutoObserve 会提出修复建议，但尚未更改任何告警或设置。当它做出更改时，会在此处显示并说明是否生效。目前，请查看其建议并应用您需要的建议。",
-        "action": "查看建议"
-      },
-      "history": {
-        "title": "尚无历史记录",
-        "desc": "AutoObserve 的发现、所做的更改以及您的决定都会列在此处，最新的在前。目前，其发现会创建事件，这些事件位于问题页面。",
-        "action": "打开问题"
-      },
-      "scenario": {
-        "tag": "实时数据",
-        "text": "您正在查看此组织的实时数据。此处不显示示例场景。",
-        "action": "工作原理"
-      },
-      "settings": {
-        "title": "此处暂无可设置的内容",
-        "desc": "管理员会为此部署开启 AutoObserve 及其呼叫功能。这些控制项就绪后，将在此设置通知对象及其自主行动范围。",
-        "action": "工作原理"
-      }
-    },
-    "paging": {
-      "title": "Paging",
-      "label": "Page on-call when a stream stops",
-      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
-      "routing": "On-call routing",
-      "unavailable": "Paging is turned off for this deployment.",
-      "denied": "{denied} {askAdmin}",
-      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
-      "deniedTitle": "您没有权限查看呼叫设置",
-      "deniedDesc": "呼叫设置对整个组织统一配置。请联系组织管理员获取访问权限。",
-      "failedTitle": "无法加载呼叫设置",
-      "failedDesc": "加载时出现问题。请稍后重试。",
-      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
-    },
-    "learning": {
-      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
-      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
-      "emptyTitle": "Learning your streams",
-      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
-      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
-      "until": "Learning until {date} · {streams}",
-      "streams": "Learning {count} stream | Learning {count} streams",
-      "streamUntil": "until {date}"
-    }
-  },
   "insight": {
     "targets": {
       "origin": "由 AutoObserve 于 {date} 为 {service} 生成的建议创建。",
@@ -34643,57 +34549,5 @@
   },
   "pageHeader": {
     "about": "关于此页面"
-  },
-  "genAiAgentMapping": {
-    "tabLabel": "智能体映射",
-    "title": "智能体映射",
-    "subtitle": "如何从遥测中读取智能体身份、成本归因和会话标题",
-    "identity": {
-      "title": "智能体身份字段",
-      "help": "OpenObserve 如何命名每个智能体并读取其环境和版本。它首先读取标准属性。当 Span 没有该属性时，将使用该 Span 携带的第一个回退字段。",
-      "agentName": "智能体名称",
-      "agentId": "智能体 ID",
-      "env": "环境",
-      "version": "版本"
-    },
-    "agentNameFields": "智能体名称回退字段",
-    "agentNameHelp": "用作 gen_ai.agent.name 回退的传入属性。",
-    "agentNameInfo": "仅当标准 gen_ai.agent.name 属性缺失或为空时检查。每行添加一个传入遥测属性。",
-    "agentIdFields": "智能体 ID 回退字段",
-    "agentIdHelp": "用作 gen_ai.agent.id 回退的传入属性。",
-    "agentIdInfo": "仅当标准 gen_ai.agent.id 属性缺失或为空时检查。每行添加一个传入遥测属性。",
-    "envFields": "环境回退字段",
-    "envHelp": "用作智能体环境的传入属性。",
-    "envInfo": "仅当标准 deployment.environment.name 属性缺失或为空时检查。每行添加一个传入遥测属性。",
-    "versionFields": "版本回退字段",
-    "versionHelp": "用作智能体版本的传入属性。",
-    "versionInfo": "仅当标准 gen_ai.agent.version 属性缺失或为空时检查。每行添加一个传入遥测属性。",
-    "alwaysAppliedStandard": "标准（最先检查）：",
-    "coverageValue": "· 过去 24 小时内，出现在 {percent}% 的追踪中",
-    "fallbacksNote": "输入回退字段，用逗号分隔，并按检查顺序排列。",
-    "fallbackInvalid": "使用以逗号分隔的字段名。仅允许字母、数字以及 . _ - : / {'@'}。",
-    "sessions": {
-      "title": "会话显示",
-      "help": "如何为会话命名，以及隐藏其中的哪些包装文本。",
-      "noAgents": "暂无智能体。添加智能体以隐藏其包装文本。"
-    },
-    "applyDefaults": "应用默认值",
-    "resetToEmpty": "重置为空",
-    "clearRegistry": "清空注册表",
-    "clearRegistryTitle": "清空智能体注册表？",
-    "clearRegistryDescription": "这将删除此组织中发现的所有 GenAI 智能体注册表行。数据摄取期间，新的匹配追踪将重新填充注册表。",
-    "clearRegistryConfirm": "清空注册表",
-    "saved": "智能体映射已保存",
-    "unsavedConfirm": "您的智能体映射更改尚未保存。要丢弃这些更改吗？",
-    "clearRegistrySuccess": "GenAI 智能体注册表已清空。已删除 {deletedCount} 个已存储智能体和 {bufferCount} 条排队观察记录。",
-    "saveFailed": "保存智能体映射失败",
-    "clearRegistryFailed": "清空 GenAI 智能体注册表失败",
-    "defaultsLoadFailed": "加载智能体映射默认值失败",
-    "defaultsFetchFailed": "获取默认值失败（{status}）"
-  },
-  "copyButton": {
-    "copy": "复制",
-    "copied": "已复制",
-    "failed": "复制被阻止 · 请按 Ctrl C"
   }
 }

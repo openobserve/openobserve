@@ -104,7 +104,7 @@ describe("AwsMarketplaceSetup", () => {
     await flushPromises();
 
     expect(wrapper.vm.state).toBe("no_token");
-    expect(wrapper.text()).toContain("No marketplace token found");
+    expect(wrapper.text()).toContain("No Marketplace Token Found");
   });
 
   it("should show select_org state when token is present", async () => {
@@ -123,8 +123,8 @@ describe("AwsMarketplaceSetup", () => {
     const wrapper = mountSetup();
     await flushPromises();
 
-    expect(wrapper.text()).toContain("Complete AWS Marketplace setup");
-    expect(wrapper.text()).toContain("Create new organization");
+    expect(wrapper.text()).toContain("Complete AWS Marketplace Setup");
+    expect(wrapper.text()).toContain("Create New Organization");
   });
 
   it("should render the create-org input and submit button", async () => {
@@ -152,7 +152,7 @@ describe("AwsMarketplaceSetup", () => {
     wrapper.vm.state = "pending_activation";
     await nextTick();
 
-    expect(wrapper.text()).toContain("Waiting for AWS confirmation");
+    expect(wrapper.text()).toContain("Waiting for AWS Confirmation");
   });
 
   it("should display success state", async () => {
@@ -175,7 +175,9 @@ describe("AwsMarketplaceSetup", () => {
     await nextTick();
 
     expect(wrapper.text()).toContain("Test error message");
-    expect(wrapper.find('[data-o2-empty="region"][data-kind="error"]').exists()).toBe(true);
+    const icon = wrapper.findComponent({ name: "OIcon" });
+    expect(icon.exists()).toBe(true);
+    expect(icon.props("name")).toBe("error");
   });
 
   it("should display payment failed state", async () => {
@@ -184,7 +186,7 @@ describe("AwsMarketplaceSetup", () => {
     wrapper.vm.state = "payment_failed";
     await nextTick();
 
-    expect(wrapper.text()).toContain("Payment failed");
+    expect(wrapper.text()).toContain("Payment Failed");
   });
 
   it("should reset state when resetAndRetry is called", async () => {
@@ -226,7 +228,7 @@ describe("AwsMarketplaceSetup", () => {
     const wrapper = mountSetup();
     await flushPromises();
 
-    expect(wrapper.text()).toContain("Link to existing organization");
+    expect(wrapper.text()).toContain("Link to Existing Organization");
   });
 
   it("should use correct theme logo", async () => {

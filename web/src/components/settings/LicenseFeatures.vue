@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OEmptyState
         v-if="!visibleGroups.length"
-        size="compact"
+        size="inline"
         icon="search"
         :title="search.trim() ? t('about.features_no_match') : t('about.features_none')"
         data-test="settings-license-features-empty"

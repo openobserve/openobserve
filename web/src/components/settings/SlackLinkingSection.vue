@@ -163,7 +163,8 @@ const runLinkAll = async (): Promise<void> => {
     <OEmptyState
       v-else-if="linking.isError.value"
       kind="error"
-      size="compact"
+      :title="t('emptyState.loadError.title')"
+      :text="t('emptyState.loadError.description')"
       data-test="slack-linking-error"
       @action="linking.refetch()"
     />

@@ -20,8 +20,7 @@
       "close": "Chiudi",
       "mitre": "MITRE ATT&CK",
       "severity": "Gravità",
-      "viewAll": "Visualizza tutto",
-      "moreActions": "Altre azioni"
+      "viewAll": "Visualizza tutto"
     },
     "caseStatus": {
       "open": "Nuovo",
@@ -162,15 +161,7 @@
       "explore": "Esplora",
       "noSources": "Nessuna sorgente di sicurezza",
       "noSourcesHint": "Ingerisci CloudTrail, Okta, VPC Flow o syslog. Gli stream con security, audit, auth o firewall nel nome compaiono qui automaticamente.",
-      "summaryPartial": "Questa finestra contiene più cronologia avvisi di quanta ne possa contenere un riepilogo, quindi i conteggi e i grafici sono un limite inferiore; scegli una finestra più breve per numeri completi.",
-      "autoRefresh": "Aggiorna automaticamente ogni minuto",
-      "whatDetections": "rilevamenti",
-      "rulesFailedHint": "Impossibile leggere i rilevamenti, quindi le attivazioni non si possono contare. Riprova o controlla la pagina Rilevamenti.",
-      "historyFailedHint": "La cronologia delle attivazioni non è disponibile, quindi non vengono contate. Riprova o controlla la pagina Avvisi.",
-      "whatFirings": "attivazioni",
-      "emptyTitle": "Nessun rilevamento ancora abilitato",
-      "emptyHint": "Abilita i rilevamenti dal catalogo Sigma per iniziare il monitoraggio. Controlla in Sorgenti che i tuoi dati di sicurezza arrivino.",
-      "openSources": "Apri sorgenti"
+      "summaryPartial": "Questa finestra contiene più cronologia avvisi di quanta ne possa contenere un riepilogo, quindi i conteggi e i grafici sono un limite inferiore; scegli una finestra più breve per numeri completi."
     },
     "events": {
       "title": "Eventi di sicurezza",
@@ -288,8 +279,7 @@
           "outcome": "Esito",
           "message": "Messaggio"
         }
-      },
-      "openSources": "Apri sorgenti"
+      }
     },
     "drawer": {
       "event": "Evento di sicurezza",
@@ -469,9 +459,7 @@
         "action": "Azione",
         "object": "Oggetto",
         "host": "Host"
-      },
-      "whatAlerts": "avvisi",
-      "loadFailedHint": "Impossibile leggere la cronologia delle attivazioni. Riprova o verifica in Rilevamenti che ci siano rilevamenti abilitati."
+      }
     },
     "cases": {
       "title": "Casi",
@@ -720,9 +708,7 @@
         "showAll": "Mostra tutte le righe",
         "onlyEntity": "Solo le entità di questo caso",
         "noneForEntity": "Nessuna riga di questa attivazione indica le entità di questo caso"
-      },
-      "whatCases": "casi",
-      "loadFailedHint": "Impossibile leggere i casi. Riprova o verifica che la gestione dei casi sia abilitata per questa organizzazione."
+      }
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -785,9 +771,7 @@
       "manageDetections": "Gestisci rilevamenti",
       "historyNarrowed": "L'intervallo massimo di query della cronologia degli avvisi limita le attivazioni a quelle a partire da {from}; le attivazioni precedenti in questa finestra non vengono conteggiate.",
       "cellNone": "Nessuna regola",
-      "coverageError": "Impossibile caricare la copertura ATT&CK: {reason}",
-      "whatCoverage": "la copertura ATT&CK",
-      "loadFailedHint": "Impossibile calcolare la copertura, quindi non vengono mostrati conteggi. Riprova o controlla la pagina Rilevamenti."
+      "coverageError": "Impossibile caricare la copertura ATT&CK: {reason}"
     },
     "detections": {
       "title": "Rilevamenti",
@@ -1014,9 +998,7 @@
           "in_cidr": "è nell'intervallo (CIDR)",
           "in_list": "è nell'allowlist"
         }
-      },
-      "whatDetections": "rilevamenti",
-      "loadFailedHint": "Impossibile leggere i rilevamenti. Riprova o verifica di poter vedere gli avvisi in questa organizzazione."
+      }
     },
     "tuning": {
       "open": "Ottimizzazione",
@@ -1233,9 +1215,7 @@
         "openAllowlists": "Apri allowlist"
       },
       "otherSourceOnly": "Solo altre sorgenti",
-      "otherSourceOnlyHint": "Scritta per {logsource}. Si compila sui tuoi stream solo tramite nomi di campo condivisi, quindi non è conteggiata come pronta da installare.",
-      "whatRules": "il catalogo dei rilevamenti",
-      "loadFailedHint": "Il catalogo Sigma non si è caricato, quindi i conteggi di regole e sorgenti sono sconosciuti. Riprova tra poco."
+      "otherSourceOnlyHint": "Scritta per {logsource}. Si compila sui tuoi stream solo tramite nomi di campo condivisi, quindi non è conteggiata come pronta da installare."
     },
     "entities": {
       "title": "Entità",
@@ -1355,9 +1335,7 @@
       "loadError": "Impossibile caricare le sorgenti di sicurezza",
       "detailFailed": "Non è stato possibile leggere alcuni dati di questa entità: {streams}.",
       "aliasCount": "+{n} grafia | +{n} grafie",
-      "aliasHint": "Registrata con questa grafia; è la stessa identità.",
-      "whatEntities": "entità",
-      "loadFailedHint": "Le sorgenti di sicurezza non sono raggiungibili. Verifica in Sorgenti che una sorgente sia connessa, poi riprova."
+      "aliasHint": "Registrata con questa grafia; è la stessa identità."
     },
     "ueba": {
       "title": "Analisi del comportamento degli utenti",
@@ -1456,9 +1434,7 @@
       "volumeNotJudged": "Il volume non viene valutato per questo utente: le finestre inferiori a un giorno vengono confrontate con le stesse ore del giorno nella baseline, il che richiede almeno un giorno di cronologia.",
       "baselineBuilding": "Baseline in costruzione",
       "baselineBuildingHint": "{span} di cronologia finora. Il confronto con il passato di questo utente inizia quando esiste una cronologia completa di {baseline}; nel frattempo vengono segnalati solo i valori anomali evidenti rispetto agli altri utenti.",
-      "buildingNotice": "La baseline è ancora in costruzione per {n} utente: finché non esiste una cronologia completa di {baseline}, vengono segnalati solo i valori anomali evidenti rispetto agli altri utenti. | Le baseline sono ancora in costruzione per {n} utenti: finché non esiste una cronologia completa di {baseline}, vengono segnalati solo i valori anomali evidenti rispetto agli altri utenti.",
-      "whatUsers": "comportamento degli utenti",
-      "loadFailedHint": "Le sorgenti di sicurezza non sono raggiungibili. Verifica in Sorgenti che una sorgente sia connessa, poi riprova."
+      "buildingNotice": "La baseline è ancora in costruzione per {n} utente: finché non esiste una cronologia completa di {baseline}, vengono segnalati solo i valori anomali evidenti rispetto agli altri utenti. | Le baseline sono ancora in costruzione per {n} utenti: finché non esiste una cronologia completa di {baseline}, vengono segnalati solo i valori anomali evidenti rispetto agli altri utenti."
     },
     "intel": {
       "title": "Threat Intel",
@@ -1626,11 +1602,7 @@
       },
       "partialChecked": "Risultato parziale: controllati {checked} indicatori su {total}. I conteggi per gli altri potrebbero essere bassi.",
       "partialCapped": "Risultato parziale: controllati {checked} indicatori su {total}. La scansione si ferma a {n} query; gli indicatori meno gravi non sono stati controllati.",
-      "inText": "{column} (nel testo)",
-      "runSweepDisabled": "Aggiungi almeno un indicatore per eseguire una scansione.",
-      "whatIndicators": "threat intelligence",
-      "loadFailedHint": "Impossibile leggere gli elenchi di indicatori. Riprova o verifica di poter leggere le tabelle di lookup in questa organizzazione.",
-      "filterType": "Tipo"
+      "inText": "{column} (nel testo)"
     },
     "sources": {
       "title": "Origini dei dati",
@@ -1695,9 +1667,7 @@
         "pipeline_missing": "non esiste più",
         "other_stream": "ora legge un altro stream",
         "other_pack": "ora esegue un pacchetto diverso"
-      },
-      "whatSources": "sorgenti di sicurezza",
-      "loadFailedHint": "Le sorgenti di sicurezza non sono raggiungibili. Controlla la connessione o i permessi e riprova."
+      }
     },
     "nav": {
       "overview": "Panoramica",
@@ -1765,10 +1735,6 @@
       "indicatorType": "Tipo di indicatore",
       "severityFilter": "Filtro gravità",
       "stream": "Stream"
-    },
-    "loadError": {
-      "title": "Impossibile caricare {what}",
-      "hint": "Il server non ha risposto per {what}. Controlla la connessione o i permessi e riprova."
     }
   }
 }

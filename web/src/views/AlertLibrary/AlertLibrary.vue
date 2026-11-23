@@ -105,12 +105,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Selection shares the search row: its own row would push the grid down.
                  Only the search field and the chips' scroll box give up width to it. -->
             <div
-              class="border-border-default px-page-edge flex shrink-0 flex-wrap items-center gap-2 border-b py-2"
+              class="border-border-default px-page-edge flex shrink-0 flex-wrap items-center gap-3 border-b py-2"
               data-test="alert-library-toolbar"
             >
               <OButton
                 icon-only
-                variant="ghost"
+                variant="secondary"
                 icon="filter-list"
                 class="md:hidden"
                 data-test="alert-library-mobile-filters-btn"
@@ -234,10 +234,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSkeleton v-for="index in 6" :key="index" shape="block" class="h-32 w-full" />
               </div>
 
-              <!-- An empty catalog is not a filter problem: Clear filters there
-                   would be a button that changes nothing. -->
+              <!-- A catalog that loaded but holds nothing is not a filter
+                   problem, and "try another category" is not advice when there
+                   are no categories. Offering Clear filters there would be a
+                   button that changes nothing. -->
               <OEmptyState
                 v-else-if="entries.length === 0"
+                class="py-8"
                 :title="t('alert_library.emptyLibraryTitle')"
                 :text="t('alert_library.emptyLibraryDescription')"
                 :action-label="t('alert_library.retry')"
@@ -247,6 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <OEmptyState
                 v-else-if="groupedEntries.length === 0"
+                class="py-8"
                 kind="filtered"
                 :title="t('alert_library.noMatchesTitle')"
                 :text="t('alert_library.noMatchesDescription')"

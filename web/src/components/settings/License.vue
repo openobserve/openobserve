@@ -3,14 +3,14 @@
   <div>
     <LicensePeriod @renew="redirectToGetLicense()"></LicensePeriod>
 
-    <div v-if="loading" class="flex flex-col gap-4 pb-4">
-      <OSkeleton shape="block" class="h-36" />
-      <OSkeleton shape="block" class="h-48" />
+    <div v-if="loading" class="flex flex-col items-center justify-center p-3">
+      <OSpinner size="lg" />
+      <div class="mt-3">{{ t("about.loading_license_info") }}</div>
     </div>
     <div v-else class="grid grid-cols-1 items-start gap-4 pb-4">
       <div class="col-span-1 min-h-0">
         <div v-if="licenseData.license === null || !licenseData.license">
-          <OFormSection variant="plain" class="mb-6" :title="t('about.no_license_found')">
+          <OFormSection variant="plain" class="mb-4" :title="t('about.no_license_found')">
             <div class="pb-2">
               <div class="text-sm">
                 {{ t("about.installation_id") }}:
@@ -104,7 +104,7 @@
             @add-license-key="showUpdateFormAndFocus"
             @refreshed="reloadLicenseData"
           />
-          <OFormSection variant="plain" class="mb-6" :title="t('about.license_info')">
+          <OFormSection variant="plain" class="mb-4" :title="t('about.license_info')">
             <template v-if="licenseData.can_update_license" #actions>
               <OButton
                 variant="secondary"
@@ -211,7 +211,7 @@
           <OFormSection
             v-show="showUpdateForm"
             variant="plain"
-            class="mt-6"
+            class="mt-4"
             :title="t('about.update_license_key')"
           >
             <div class="pt-2 pb-2">
@@ -405,7 +405,7 @@
                 <div
                   v-if="isIngestionUnlimited"
                   class="text-text-secondary mt-1 text-center text-xs"
-                  style="font-size: var(--text-2xs)"
+                  style="font-size: var(--text-3xs)"
                 >
                   {{ t("about.usage_shows_zero_unlimited") }}
                 </div>
@@ -481,7 +481,7 @@ import LicenseFeatures from "./LicenseFeatures.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -521,7 +521,7 @@ export default defineComponent({
     RenderDashboardCharts,
     OButton,
     ODialog,
-    OSkeleton,
+    OSpinner,
     OIcon,
     OBadge,
     OTextarea,

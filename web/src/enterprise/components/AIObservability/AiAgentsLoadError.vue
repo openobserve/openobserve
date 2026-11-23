@@ -53,7 +53,7 @@ withDefaults(
     dataTest: string;
     size?: EmptyStateSize;
   }>(),
-  { size: "region" },
+  { size: "page" },
 );
 
 defineEmits<{

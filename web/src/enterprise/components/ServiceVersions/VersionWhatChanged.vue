@@ -160,12 +160,14 @@
           ></OTable
         ></template
       >
-      <OEmptyState
+      <p
         v-if="!endpointRows.length && !errorRows.length && !coarseNotes.length"
-        size="compact"
-        :title="t('serviceVersions.compare.empty')"
         data-test="svcver-evidence-empty"
-    /></template>
+        class="text-text-secondary text-compact"
+      >
+        {{ t("serviceVersions.compare.empty") }}
+      </p></template
+    >
   </div>
 </template>
 <script setup lang="ts">
@@ -174,7 +176,6 @@ import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import NotComparedMark from "./NotComparedMark.vue";
 import { detailGapText } from "@/utils/serviceVersionsCopy";

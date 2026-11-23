@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Global variables sit above the tab bar: they apply dashboard-wide, not to the active tab. -->
         <VariablesValueSelector
-          v-if="showGlobalVariablesRow"
+          v-if="globalVariables.length > 0 || dashboardData?.variables?.showDynamicFilters"
           :scope="'global'"
           :tabId="selectedTabId"
           :variablesConfig="{ list: globalVariables }"
@@ -74,24 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :layoutMode="layoutMode"
           @refresh="refreshDashboard"
           @layoutChange="$emit('layoutChange')"
-        >
-          <template #end>
-            <div class="flex items-center gap-3">
-              <VariablesValueSelector
-                v-if="filterInTabRow"
-                :scope="'global'"
-                :tabId="selectedTabId"
-                :variablesConfig="{ list: globalVariables }"
-                :variablesManager="variablesManager"
-                :selectedTimeDate="currentTimeObj['__global']"
-                :initialVariableValues="initialVariableValues"
-                class="global-variables-selector"
-                data-test="global-variables-selector"
-              />
-              <slot name="tab_end" />
-            </div>
-          </template>
-        </TabList>
+        />
 
         <!-- Tab-scoped Variables (for active tab, if using manager) -->
         <VariablesValueSelector
@@ -702,20 +685,6 @@ export default defineComponent({
       );
     });
 
-    // Dynamic filters alone are one icon: they ride the tab row instead of taking a band of their own.
-    const filterInTabRow = computed(
-      () =>
-        !props.kiosk &&
-        !!props.showTabs &&
-        selectedTabId.value !== null &&
-        globalVariables.value.length === 0 &&
-        !!props.dashboardData?.variables?.showDynamicFilters,
-    );
-    const showGlobalVariablesRow = computed(
-      () =>
-        !filterInTabRow.value &&
-        (globalVariables.value.length > 0 || !!props.dashboardData?.variables?.showDynamicFilters),
-    );
     const kioskHasTabs = computed(() => (props.dashboardData?.tabs?.length ?? 0) > 1);
 
     const kioskControlsVisible = computed(
@@ -2018,8 +1987,6 @@ export default defineComponent({
     return {
       KIOSK_VARIABLES_CLASS,
       kioskHasTabs,
-      filterInTabRow,
-      showGlobalVariablesRow,
       kioskControlsVisible,
       store,
       dashboardScrollRef,

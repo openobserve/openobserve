@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aria-label="t('dashboard.newTab')"
       data-test="dashboard-tab-new-add"
       variant="secondary"
+      size="sm"
       @click="
         () => {
           showAddTabDialog = true;

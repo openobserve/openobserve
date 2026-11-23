@@ -26,80 +26,135 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span v-else v-html="description" />
     </template>
 
-    <template v-if="!alternativesOnly" #actions>
+    <template #actions>
       <div v-if="$slots.status" class="flex basis-full justify-center">
         <slot name="status" />
       </div>
-      <OButton variant="primary" data-test="home-no-data-logs-card" @click="setUp('logs', 'curl')">
-        {{ t("home.noDataState.logs") }}
-      </OButton>
-      <OButton data-test="home-no-data-traces-card" @click="setUp('backend', 'tracesOTLP')">
-        {{ t("home.noDataState.traces") }}
-      </OButton>
+
+      <!-- Send Logs -->
+      <EmptyStateIngestionCard
+        icon="search"
+        :label="t('home.noDataState.logs')"
+        :sublabel="
+          t('home.noDataState.logsDesc', {
+            product1: raw('Curl'),
+            product2: raw('Filebeat'),
+            product3: raw('Fluentbit'),
+            product4: raw('Vector'),
+          })
+        "
+        icon-variant="blue"
+        data-test="home-no-data-logs-card"
+        @click="setUp('logs', 'curl')"
+      />
+
+      <!-- Send Traces -->
+      <EmptyStateIngestionCard
+        icon="account-tree"
+        :label="t('home.noDataState.traces')"
+        :sublabel="
+          t('home.noDataState.tracesDesc', {
+            product1: raw('OTLP'),
+            product2: raw('Jaeger'),
+            product3: raw('Zipkin'),
+          })
+        "
+        icon-variant="purple"
+        data-test="home-no-data-traces-card"
+        @click="setUp('backend', 'tracesOTLP')"
+      />
+
+      <!-- Send Metrics -->
+      <EmptyStateIngestionCard
+        icon="bar-chart"
+        :label="t('home.noDataState.metrics')"
+        :sublabel="
+          t('home.noDataState.metricsDesc', {
+            product1: raw('Prometheus'),
+            product2: raw('OTel Collector'),
+            product3: raw('Telegraf'),
+          })
+        "
+        icon-variant="teal"
+        data-test="home-no-data-metrics-card"
+        @click="setUp('infrastructure', 'prometheus')"
+      />
+
       <div v-if="sampleDataFlow" class="flex basis-full justify-center">
         <SampleDataCallout class="max-w-200" />
       </div>
     </template>
 
     <template #extra>
-      <div
-        :class="[
-          'flex flex-wrap items-center gap-x-4 gap-y-1',
-          alternativesOnly ? 'justify-start' : 'justify-center',
-        ]"
-      >
-        <span class="text-text-secondary text-compact">{{ t("home.noDataState.or") }}</span>
-        <template v-if="alternativesOnly">
-          <OButton variant="link" data-test="home-no-data-logs-card" @click="setUp('logs', 'curl')">
-            {{ t("home.noDataState.logs") }}
-          </OButton>
-          <OButton
-            variant="link"
-            data-test="home-no-data-traces-card"
-            @click="setUp('backend', 'tracesOTLP')"
-          >
-            {{ t("home.noDataState.traces") }}
-          </OButton>
-        </template>
-        <OButton
-          variant="link"
-          data-test="home-no-data-metrics-card"
-          @click="setUp('infrastructure', 'prometheus')"
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <span class="text-text-secondary me-1 text-sm font-semibold">
+          {{ t("home.noDataState.or") }}
+        </span>
+        <EmptyStateIngestionChip
+          data-test="home-no-data-otel-btn"
+          @click="go('ingestLogsFromOtel')"
         >
-          {{ t("home.noDataState.metrics") }}
-        </OButton>
-        <OButton variant="link" data-test="home-no-data-otel-btn" @click="go('ingestLogsFromOtel')">
+          <img
+            :src="getImageURL('images/ingestion/otlp.svg')"
+            class="h-3.5 w-3.5 shrink-0 object-contain"
+            alt=""
+          />
           {{ raw("OpenTelemetry") }}
-        </OButton>
-        <OButton
-          variant="link"
+        </EmptyStateIngestionChip>
+        <EmptyStateIngestionChip
           data-test="home-no-data-kubernetes-btn"
           @click="go('ingestFromKubernetes')"
         >
+          <img
+            :src="getImageURL('images/common/kubernetes.svg')"
+            class="h-3.5 w-3.5 shrink-0 object-contain"
+            alt=""
+          />
           {{ raw("Kubernetes") }}
-        </OButton>
-        <OButton variant="link" data-test="home-no-data-aws-btn" @click="go('AWSConfig')">
+        </EmptyStateIngestionChip>
+        <EmptyStateIngestionChip data-test="home-no-data-aws-btn" @click="go('AWSConfig')">
+          <img
+            :src="getImageURL('images/ingestion/aws.svg')"
+            class="h-3.5 w-3.5 shrink-0 object-contain"
+            alt=""
+          />
           {{ t("home.noDataState.aws") }}
-        </OButton>
-        <OButton variant="link" data-test="home-no-data-ai-btn" @click="go('ai-integrations')">
-          {{ t("home.noDataState.aiIntegrations") }}
-        </OButton>
-        <OButton variant="link" data-test="home-no-data-shippers-btn" @click="go('ingestLogs')">
-          {{ t("home.noDataState.shippers") }}
-        </OButton>
-        <OButton
-          v-if="store.state.zoConfig?.profiling_enabled"
-          variant="link"
-          :disabled="profilesLocked"
-          :disabled-reason="profilesLocked ? profilesLockedReason : undefined"
+        </EmptyStateIngestionChip>
+        <EmptyStateIngestionChip
+          icon="insights"
+          data-test="home-no-data-ai-btn"
+          @click="go('ai-integrations')"
+          >{{ t("home.noDataState.aiIntegrations") }}</EmptyStateIngestionChip
+        >
+        <EmptyStateIngestionChip
+          icon="alt-route"
+          data-test="home-no-data-shippers-btn"
+          @click="go('ingestLogs')"
+          >{{ t("home.noDataState.shippers") }}</EmptyStateIngestionChip
+        >
+        <OTooltip
+          v-if="store.state.zoConfig?.profiling_enabled && profilesLocked"
+          :content="profilesLockedReason"
+        >
+          <span class="inline-flex">
+            <EmptyStateIngestionChip unavailable data-test="home-no-data-profiles-btn">
+              <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
+              {{ t("home.noDataState.profiles") }}
+            </EmptyStateIngestionChip>
+          </span>
+        </OTooltip>
+        <EmptyStateIngestionChip
+          v-else-if="store.state.zoConfig?.profiling_enabled"
+          icon="memory"
           data-test="home-no-data-profiles-btn"
           @click="go('ingestProfiles')"
         >
           {{ t("home.noDataState.profiles") }}
-        </OButton>
+        </EmptyStateIngestionChip>
+      </div>
+      <div v-if="tab" class="mt-2 flex justify-center">
         <OButton
-          v-if="tab"
-          variant="link"
+          variant="accent-ghost"
           data-test="home-no-data-all-sources-link"
           @click="go('recommended')"
         >
@@ -116,9 +171,14 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
+import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import SampleDataCallout from "@/components/sampleData/SampleDataCallout.vue";
 import { sampleDataOffered } from "@/utils/firstRunFlow";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { getImageURL } from "@/utils/zincutils";
 import { useSetupTarget } from "@/composables/useSetupTarget";
 import type { OnboardingChoiceId } from "@/components/onboarding/onboardingChoices";
 import { useLicenseLock } from "@/composables/useFeatureLock";
@@ -146,7 +206,7 @@ const { locked: profilesLocked, lockedReason: profilesLockedReason } =
 
 const shell = computed(() => {
   if (props.alternativesOnly)
-    return { size: "compact" as const, title: t("ingestion.firstDataPanel.anotherWay") };
+    return { size: "inline" as const, title: t("ingestion.firstDataPanel.anotherWay") };
   if (props.tab)
     return {
       icon: "link" as const,

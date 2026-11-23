@@ -37,12 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
     data-test="version-error-diff"
   >
-    <OEmptyState
-      v-if="showEmpty"
-      size="compact"
-      :title="t('aiObservability.errorDiff.noData')"
-      data-test="version-error-diff-empty"
-    />
+    <span v-if="showEmpty" class="text-text-muted text-xs" data-test="version-error-diff-empty">
+      {{ t("aiObservability.errorDiff.noData") }}
+    </span>
 
     <!-- Three parallel groups side-by-side (not stacked) and the body height is
          capped + scrollable, so a version with many failure classes never grows
@@ -141,7 +138,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { ErrorDiff } from "@/services/gen-ai-agent-mapping.service";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 

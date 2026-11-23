@@ -54,29 +54,4 @@ describe("OFormSection", () => {
       expect(wrapper.find('[data-test="add"]').exists()).toBe(true);
     },
   );
-
-  it.each(["plain", "accent"] as const)(
-    "titles the %s section at 14 px semibold, under the 18 px page title",
-    (variant) => {
-      const wrapper = mount(OFormSection, {
-        props: { title: raw("Retention"), variant, description: raw("Per stream"), dataTest: "s" },
-        global: { stubs: { OTooltip: true } },
-      });
-
-      const title = wrapper.findAll("h2, span").find((el) => el.text() === "Retention");
-      expect(title?.classes()).toEqual(expect.arrayContaining(["text-sm", "font-semibold"]));
-      expect(wrapper.get('[data-test="s-description"]').classes()).toContain("text-compact");
-    },
-  );
-
-  it("draws the plain section as a title over one hairline, with no tinted band or box", () => {
-    const wrapper = mount(OFormSection, {
-      props: { title: raw("Retention"), variant: "plain" },
-    });
-
-    expect(wrapper.element.tagName).toBe("SECTION");
-    expect(wrapper.classes()).not.toContain("border");
-    expect(wrapper.html()).not.toContain("bg-surface-subtle");
-    expect(wrapper.get("h2").element.closest(".border-b")).not.toBeNull();
-  });
 });

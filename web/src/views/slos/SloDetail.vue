@@ -100,7 +100,7 @@
         class="mb-3"
         data-test="slos-slodetail-frozen-banner"
       >
-        <span class="font-semibold">{{ frozenBanner.title }}</span>
+        <span class="font-bold">{{ frozenBanner.title }}</span>
         {{ frozenBanner.body }}
       </OInlineNotice>
 
@@ -291,7 +291,7 @@
       </OTabPanels>
     </div>
 
-    <OContent v-if="notFound">
+    <OContent v-if="notFound" class="py-6">
       <OEmptyState
         :title="t('slos.notFound')"
         :text="t('slos.notFoundDescription')"

@@ -173,7 +173,7 @@ afterEach(() => {
 describe("correlation drawer service versions", () => {
   it("titles the drawer with the trace name and keeps the detected key muted", async () => {
     await render();
-    expect($("svcver-service-name")?.textContent).toContain("Correlated streams - ingester");
+    expect($("svcver-service-name")?.textContent).toContain("Correlated Streams - ingester");
     expect($("svcver-service-name-detected")?.textContent).toBe(
       "detected as c1-openobserve-ingester",
     );

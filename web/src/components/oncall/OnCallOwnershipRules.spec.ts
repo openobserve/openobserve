@@ -237,7 +237,7 @@ describe("OnCallOwnershipRules", () => {
     expect(own.find('[data-test="oncall-routing-catch-all"]').text()).toContain(
       "Also gets every alert no team owns",
     );
-    expect(own.find('[data-test="oncall-routing-catch-all-set"]').text()).toBe("Change in routing");
+    expect(own.find('[data-test="oncall-routing-catch-all-set"]').text()).toBe("Change in Routing");
     // The team's last rule, so it is the body's last row and never part of the pager.
     const body = own.find('[data-test="o2-table-body"]');
     const rows = body.findAll("tr");

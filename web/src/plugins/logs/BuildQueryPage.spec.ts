@@ -519,40 +519,6 @@ describe("BuildQueryPage Component", () => {
     });
   });
 
-  describe("Keeps the user's SQL", () => {
-    const userSql = 'SELECT service, count(*) FROM "app_logs" GROUP BY service';
-    const translated =
-      'SELECT service as "service", count(_timestamp) as "count" FROM "app_logs" GROUP BY service ORDER BY service ASC';
-
-    it("shows the user's SQL while the builder only translates it", async () => {
-      mockMakeAutoSQLQuery.mockResolvedValue(translated);
-      wrapper = createWrapper({ searchQuery: userSql, selectedStream: "app_logs" });
-      await flushPromises();
-
-      wrapper.vm.onQueryGenerated("");
-      wrapper.vm.onQueryGenerated(translated);
-      await flushPromises();
-
-      const emitted = (wrapper.emitted("queryGenerated") ?? []).map((args: string[]) => args[0]);
-      expect(emitted).toContain(userSql);
-      expect(emitted).not.toContain(translated);
-      mockMakeAutoSQLQuery.mockReset();
-    });
-
-    it("forwards the builder's SQL once the user changes the chart's fields", async () => {
-      mockMakeAutoSQLQuery.mockResolvedValue(translated);
-      wrapper = createWrapper({ searchQuery: userSql, selectedStream: "app_logs" });
-      await flushPromises();
-
-      const edited = 'SELECT level as "level", count(_timestamp) as "count" FROM "app_logs"';
-      wrapper.vm.onQueryGenerated(edited);
-      await flushPromises();
-
-      expect(wrapper.emitted("queryGenerated")?.at(-1)).toEqual([edited]);
-      mockMakeAutoSQLQuery.mockReset();
-    });
-  });
-
   describe("Events", () => {
     it("should forward queryGenerated event from PanelEditor", async () => {
       wrapper = createWrapper({

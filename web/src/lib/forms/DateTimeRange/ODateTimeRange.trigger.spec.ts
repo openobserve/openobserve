@@ -152,7 +152,7 @@ describe("ODateTimeRange trigger", () => {
   it("leaves relative labels and the caller's trigger text as they are", async () => {
     createWrapper({ autoApply: true });
     await flushPromises();
-    expect(wrapper!.vm.triggerLabel).toBe("Past 15 minutes");
+    expect(wrapper!.vm.triggerLabel).toBe("Past 15 Minutes");
     expect(wrapper!.vm.triggerTooltip).toBeUndefined();
     wrapper!.unmount();
     createWrapper({ autoApply: true, triggerText: "Next 24 hours" });

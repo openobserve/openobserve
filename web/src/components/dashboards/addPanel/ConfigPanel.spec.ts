@@ -663,7 +663,7 @@ describe("ConfigPanel", () => {
     const toggleOf = () =>
       wrapper
         .findAllComponents({ name: "OToggleGroup" })
-        .find((group: any) => group.text().includes("Axis labels"));
+        .find((group: any) => group.text().includes("Axis Labels"));
 
     it("offers Auto, Show and Hide and writes config.axis_label_mode", async () => {
       const panel = panelOf("bar", { axis_label_mode: "auto" });
@@ -1642,10 +1642,10 @@ describe("ConfigPanel", () => {
       expect(select.props("collapsibleGroups")).toBe(false);
       const options = select.props("options");
       expect(options).toContainEqual(
-        expect.objectContaining({ label: "Locale format (auto)", value: "locale" }),
+        expect.objectContaining({ label: "Locale Format (Auto)", value: "locale" }),
       );
       expect(options).toContainEqual(
-        expect.objectContaining({ label: "Other locale", value: "other-locale", expandable: true }),
+        expect.objectContaining({ label: "Other Locale", value: "other-locale", expandable: true }),
       );
       expect(options).toContainEqual(
         expect.objectContaining({
@@ -1669,7 +1669,7 @@ describe("ConfigPanel", () => {
 
     it("shows Auto for the plain Locale Format unit", () => {
       wrapper = createWrapper({ dashboardPanelData: makePanel({ unit: "locale" }) });
-      expect(trigger().attributes("data-test-selected-label")).toBe("Locale format (auto)");
+      expect(trigger().attributes("data-test-selected-label")).toBe("Locale Format (Auto)");
     });
 
     it("keeps an unlisted pinned locale selectable", () => {

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="monitor-status-timeline"
   >
     <div class="flex items-center gap-2 px-3.5 pt-2.5 pb-2">
-      <span class="text-text-heading text-xs font-semibold">
+      <span class="text-text-heading text-xs font-bold">
         {{ t("synthetics.timeline.title") }}
       </span>
       <span class="flex-1" />
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTruncatedText
             v-for="lane in lanes"
             :key="lane.label"
-            class="text-2xs text-text-secondary h-3 max-w-24 pe-1 text-right font-mono leading-3"
+            class="text-3xs text-text-secondary h-3 max-w-24 pe-1 text-right font-mono leading-3"
           >
             {{ lane.label }}
           </OTruncatedText>
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="chevron-right" size="xs" />
         </OButton>
       </div>
-      <div class="text-2xs text-text-secondary flex justify-between font-mono tabular-nums">
+      <div class="text-3xs text-text-secondary flex justify-between font-mono tabular-nums">
         <span>{{ endLabel }}</span>
         <span>{{ rangeLabel }}</span>
         <span>{{ startLabel }}</span>

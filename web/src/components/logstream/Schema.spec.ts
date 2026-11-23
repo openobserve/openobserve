@@ -2137,7 +2137,7 @@ describe("Schema Component Tests", () => {
       await flushPromises();
 
       expect(wrapper.vm.confirmQueryModeChangeDialog).toBe(true);
-      const dialog = findConfirmDialog("Delete fields");
+      const dialog = findConfirmDialog("Delete Fields");
       expect(dialog.props("message")).toBe(
         "Are you sure you want to delete 2 fields? This action cannot be undone.",
       );
@@ -2150,7 +2150,7 @@ describe("Schema Component Tests", () => {
       wrapper.vm.selectedFields = [];
       await flushPromises();
 
-      expect(findConfirmDialog("Delete field").props("message")).toBe(
+      expect(findConfirmDialog("Delete Field").props("message")).toBe(
         "Are you sure you want to delete 1 field? This action cannot be undone.",
       );
     });
@@ -2180,7 +2180,7 @@ describe("Schema Component Tests", () => {
       await flushPromises();
 
       expect(wrapper.vm.confirmDeleteDatesDialog).toBe(true);
-      const dialog = findConfirmDialog("Delete dates");
+      const dialog = findConfirmDialog("Delete Dates");
       expect(dialog.props("message")).toBe(
         "Are you sure you want to delete 3 date ranges? This action cannot be undone.",
       );
@@ -2571,8 +2571,8 @@ describe("Schema Component Tests", () => {
     });
 
     it.each([
-      [1, "View 1 pattern"],
-      [2, "View 2 patterns"],
+      [1, "View 1 Pattern"],
+      [2, "View 2 Patterns"],
     ])("labels %i pattern(s) as %s", async (count, label) => {
       mockGetStream.mockResolvedValue({
         name: "test-stream",

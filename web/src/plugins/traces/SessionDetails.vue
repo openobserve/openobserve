@@ -194,26 +194,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Error -->
-        <OEmptyState
-          v-else-if="error"
-          kind="error"
-          :title="t('traces.sessionDetail.failedToLoad')"
-          :text="isRawHttpText(error) ? t('emptyState.loadError.description') : raw(error)"
-          data-test="session-detail-error"
-        >
-          <template #actions>
-            <OButton @click="load">{{ t("traces.sessionDetail.retry") }}</OButton>
-          </template>
-        </OEmptyState>
+        <div v-else-if="error" class="flex flex-1 flex-col items-center justify-center text-center">
+          <OIcon name="error-outline" size="xl" class="text-error-600 mb-3" />
+          <div class="text-text-heading mb-2 text-base">
+            {{ t("traces.sessionDetail.failedToLoad") }}
+          </div>
+          <div class="text-text-muted mb-3 max-w-[30rem] text-sm">
+            {{ error }}
+          </div>
+          <OButton variant="secondary" @click="load">{{ t("traces.sessionDetail.retry") }}</OButton>
+        </div>
 
         <!-- Not found -->
-        <OEmptyState
+        <div
           v-else-if="!detail"
-          icon="search-off"
-          :title="t('traces.sessionDetail.sessionNotFound')"
-          :text="t('traces.sessionDetail.noSpansFound', { id: sessionId })"
-          data-test="session-detail-not-found"
-        />
+          class="flex flex-1 flex-col items-center justify-center text-center"
+        >
+          <OIcon name="search-off" size="xl" class="text-text-muted mb-3" />
+          <div class="text-text-heading mb-2 text-base">
+            {{ t("traces.sessionDetail.sessionNotFound") }}
+          </div>
+          <div class="text-text-muted max-w-[30rem] text-sm">
+            {{ t("traces.sessionDetail.noSpansFound", { id: sessionId }) }}
+          </div>
+        </div>
 
         <!-- Content -->
         <template v-else>
@@ -254,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-baseline gap-[0.2rem]">
                   <span
                     :class="[
-                      'text-2xl leading-none font-semibold tabular-nums',
+                      'text-2xl leading-none font-bold tabular-nums',
                       kpiAccentClass(card.variant) || 'text-text-secondary',
                     ]"
                   >
@@ -296,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </div>
                 <div
-                  class="text-2xs text-text-secondary flex flex-wrap items-center gap-1 leading-normal font-medium"
+                  class="text-3xs text-text-secondary flex flex-wrap items-center gap-1 leading-normal font-medium"
                 >
                   <span v-if="card.subLead">{{ card.subLead }}</span>
                   <template v-for="chip in card.subTurns" :key="chip.n">
@@ -308,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :user-text="turnPreviewText(turnAt(chip.n))"
                     >
                       <span
-                        class="rounded-default border-border-default bg-surface-base text-text-body text-2xs hover:border-border-tint-neutral hover:bg-surface-tint-neutral inline-flex h-[1.05rem] min-w-4 cursor-pointer items-center justify-center border px-[0.3rem] leading-none font-semibold transition-colors"
+                        class="rounded-default border-border-default bg-surface-base text-text-body text-2xs hover:border-border-tint-neutral hover:bg-surface-tint-neutral inline-flex h-[1.05rem] min-w-4 cursor-pointer items-center justify-center border px-[0.3rem] leading-none font-bold transition-colors"
                         @click="jumpToTurn(chip.n)"
                         >{{ chip.label }}</span
                       >
@@ -391,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="border-border-default flex flex-shrink-0 items-center gap-2.5 border-b px-4 py-3"
                 >
-                  <span class="text-text-heading text-sm font-semibold">
+                  <span class="text-text-heading text-base font-semibold">
                     {{ t("traces.sessionDetail.conversation") }}
                   </span>
                   <OTag type="countChip" value="neutral">
@@ -493,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-text-muted flex-shrink-0"
                         />
                         <span
-                          class="text-2xs inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full font-semibold tabular-nums"
+                          class="text-2xs inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full font-bold tabular-nums"
                           :class="
                             trace.status === 'error'
                               ? 'text-error-500 bg-error-500/15'
@@ -606,7 +610,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div
                               class="border-border-default flex items-center justify-between border-b px-2.5 py-1.5"
                             >
-                              <span class="text-text-heading text-xs font-semibold">
+                              <span class="text-text-heading text-xs font-bold">
                                 {{ t("traces.sessionDetail.roles.user") }}
                               </span>
                               <!-- Harness text hidden by the agent's patterns; Show puts it back. -->
@@ -660,7 +664,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="border-border-default flex items-center justify-between border-b px-2.5 py-1.5"
                             >
                               <span
-                                class="text-text-heading flex items-center gap-1.5 text-xs font-semibold"
+                                class="text-text-heading flex items-center gap-1.5 text-xs font-bold"
                               >
                                 {{ t("traces.sessionDetail.roles.assistant") }}
                                 <OTag
@@ -727,11 +731,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <!-- empty state -->
-                    <OEmptyState
+                    <div
                       v-if="filteredTraces.length === 0"
-                      kind="filtered"
-                      :title="t('traces.sessionDetail.noTurnsMatch')"
-                    />
+                      class="text-text-muted flex flex-col items-center justify-center gap-2 py-12"
+                    >
+                      <OIcon name="search-off" size="lg" />
+                      <span class="text-compact">{{ t("traces.sessionDetail.noTurnsMatch") }}</span>
+                    </div>
                   </div>
 
                   <!-- Pretty (transcript) view — reuses ThreadView, rendered from the
@@ -816,7 +822,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="jumpToTurn(turnNumberOf(row.topTraceId))"
                     >
                       <span
-                        class="rounded-default text-2xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-semibold tabular-nums"
+                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -842,12 +848,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTooltip side="left" content-class="p-0!">
                       <template #content>
                         <div class="text-text-body w-50 px-3 py-2.25 text-xs">
-                          <div class="mb-0.5 font-semibold break-words">{{ row.name }}</div>
-                          <div class="text-2xs text-text-muted mb-1.75">
+                          <div class="mb-0.5 font-bold break-words">{{ row.name }}</div>
+                          <div class="text-3xs text-text-muted mb-1.75">
                             {{ t("traces.sessionDetail.rail.call", { n: row.calls }) }}
                           </div>
                           <div
-                            class="text-2xs text-text-secondary mb-1 font-semibold tracking-[0.05em]"
+                            class="text-3xs text-text-secondary mb-1 font-bold tracking-[0.05em]"
                           >
                             {{ t("traces.sessionDetail.rail.usedIn") }}
                           </div>
@@ -855,7 +861,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <span
                               v-for="tn in row.turns"
                               :key="tn"
-                              class="rounded-default border-border-default bg-surface-base text-2xs inline-flex h-[1.05rem] items-center border px-[0.35rem] font-semibold tabular-nums"
+                              class="rounded-default border-border-default bg-surface-base text-3xs inline-flex h-[1.05rem] items-center border px-[0.35rem] font-semibold tabular-nums"
                               >{{ t("traces.sessionDetail.turnLabel") }} {{ tn }}</span
                             >
                           </div>
@@ -864,12 +870,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OTooltip>
                   </span>
                 </div>
-                <OEmptyState
+                <div
                   v-else-if="!spansFailed.size"
-                  size="compact"
-                  class="px-3"
-                  :title="t('traces.sessionDetail.rail.noTools')"
-                />
+                  class="text-text-muted px-3 py-5 text-center text-xs"
+                >
+                  {{ t("traces.sessionDetail.rail.noTools") }}
+                </div>
               </div>
 
               <!-- Cost Hotspots -->
@@ -899,7 +905,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="jumpToTurn(row.n)"
                     >
                       <span
-                        class="rounded-default text-2xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-semibold tabular-nums"
+                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -915,7 +921,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                         <span
                           v-if="detail && detail.cost > 0"
-                          class="text-2xs text-text-muted tabular-nums"
+                          class="text-3xs text-text-muted tabular-nums"
                         >
                           {{ ((row.cost / detail.cost) * 100).toFixed(1) }}%
                         </span>
@@ -952,7 +958,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="jumpToTurn(row.n)"
                     >
                       <span
-                        class="rounded-default text-2xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-semibold tabular-nums"
+                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -1016,8 +1022,6 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
@@ -2052,10 +2056,10 @@ onMounted(load);
     line-height: 1.3;
   }
   :deep(h1) {
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
   }
   :deep(h2) {
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
   }
   :deep(h3) {
     font-size: var(--text-sm);

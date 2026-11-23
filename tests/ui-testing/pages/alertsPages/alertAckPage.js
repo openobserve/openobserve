@@ -11,12 +11,11 @@ export class AlertAckPage {
       ack: '[data-test="alerts-alertdetail-ack"]',
       ackChip: '[data-test="alerts-alertdetail-ack-chip"]',
       mutedChip: '[data-test="alerts-alertdetail-muted-chip"]',
-      // One ⋯ holds Mute, Extend, End mute and the ack follow-ups.
-      ackMenu: '[data-test="alerts-alertdetail-more"]',
+      ackMenu: '[data-test="alerts-alertdetail-ack-menu"]',
       unack: '[data-test="alerts-alertdetail-unack"]',
       takeOver: '[data-test="alerts-alertdetail-take-over"]',
-      mute: '[data-test="alerts-alertdetail-more"]',
-      extend: '[data-test="alerts-alertdetail-more"]',
+      mute: '[data-test="alerts-alertdetail-mute"]',
+      extend: '[data-test="alerts-alertdetail-extend"]',
       endMute: '[data-test="alerts-alertdetail-end-mute"]',
       groupsTab: '[data-test="alerts-alertdetail-tab-groups"]',
       groupsTable: '[data-test="alerts-alertgroupstable-table"]',
@@ -93,10 +92,7 @@ export class AlertAckPage {
     await this.page.locator(`[data-test="alerts-alertdetail-extend-${key}"]`).click();
   }
 
-  async headerEndMute() {
-    await this.page.locator(this.detail.extend).click();
-    await this.page.locator(this.detail.endMute).click();
-  }
+  async headerEndMute() { await this.page.locator(this.detail.endMute).click(); }
 
   async openGroupsTab() {
     await this.page.locator(this.detail.groupsTab).click();

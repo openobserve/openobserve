@@ -34,7 +34,7 @@ const fill = (variant: SegmentedBarVariant | undefined) => SEGMENT_SWATCH[varian
       <div
         v-for="segment in props.segments"
         :key="segment.id"
-        class="h-full transition-[width] duration-(--duration-expand) ease-(--ease-control)"
+        class="h-full transition-[width] duration-300"
         :class="[
           segment.series ? undefined : fill(segment.variant),
           props.gapped ? (segment.pct > 0 ? 'min-w-1 shrink' : 'hidden') : 'shrink-0',

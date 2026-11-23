@@ -154,52 +154,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-actions="{ row }">
             <div class="actions-container flex items-center">
-              <div
-                class="flex items-center opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 pointer-coarse:opacity-100"
+              <OButton
+                icon-only
+                :data-test="`pipeline-list-${row.name}-pause-start-action`"
+                :data-row-action="row.enabled ? 'pause' : 'resume'"
+                :variant="row.enabled ? 'danger-ghost' : 'ghost'"
+                size="sm"
+                :icon="row.enabled ? 'pause' : 'play-arrow'"
+                class="max-md:hidden"
+                @click.stop="togglePipeline(row)"
               >
-                <OButton
-                  icon-only
-                  :data-test="`pipeline-list-${row.name}-pause-start-action`"
-                  :data-row-action="row.enabled ? 'pause' : 'resume'"
-                  variant="ghost"
-                  size="sm"
-                  :icon="row.enabled ? 'pause' : 'play-arrow'"
-                  class="max-md:hidden"
-                  @click.stop="togglePipeline(row)"
-                >
-                  <OTooltip
-                    side="bottom"
-                    :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
-                    :shortcut="row.enabled ? 'pipelinesRowPause' : undefined"
-                  />
-                </OButton>
-                <!-- Hover-only preview with no click action, so it has no menu counterpart below md. -->
-                <OButton
-                  icon-only
-                  :data-test="`pipeline-list-${row.name}-view-pipeline`"
-                  variant="ghost"
-                  size="sm"
-                  :title="t('pipeline.view')"
-                  class="max-md:hidden"
-                  icon="visibility"
-                >
-                  <OTooltip side="left">
-                    <template #content><PipelineView :pipeline="row" /></template>
-                  </OTooltip>
-                </OButton>
-                <OButton
-                  icon-only
-                  :data-test="`pipeline-list-${row.name}-update-pipeline`"
-                  data-row-action="edit"
-                  variant="ghost"
-                  size="sm"
-                  class="max-md:hidden"
-                  @click.stop="editPipeline(row)"
-                  icon="edit"
-                >
-                  <OTooltip side="bottom" :content="t('alerts.edit')" shortcut="pipelinesRowEdit" />
-                </OButton>
-              </div>
+                <OTooltip
+                  side="bottom"
+                  :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                  :shortcut="row.enabled ? 'pipelinesRowPause' : undefined"
+                />
+              </OButton>
+              <!-- Hover-only preview with no click action, so it has no menu counterpart below md. -->
+              <OButton
+                icon-only
+                :data-test="`pipeline-list-${row.name}-view-pipeline`"
+                variant="ghost"
+                size="sm"
+                :title="t('pipeline.view')"
+                class="max-md:hidden"
+                icon="visibility"
+              >
+                <OTooltip side="left">
+                  <template #content><PipelineView :pipeline="row" /></template>
+                </OTooltip>
+              </OButton>
+              <OButton
+                icon-only
+                :data-test="`pipeline-list-${row.name}-update-pipeline`"
+                data-row-action="edit"
+                variant="ghost"
+                size="sm"
+                class="max-md:hidden"
+                @click.stop="editPipeline(row)"
+                icon="edit"
+              >
+                <OTooltip side="bottom" :content="t('alerts.edit')" shortcut="pipelinesRowEdit" />
+              </OButton>
               <!-- Hidden proxies so the row-hover shortcuts reach the more-menu
                  actions (teleported out of the row): x = export, Del = delete. -->
               <button
@@ -534,7 +530,7 @@ import { normalizeNodeErrorMessages } from "@/utils/pipelines/nodeErrors";
 import { MarkerType } from "@vue-flow/core";
 import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
-import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
+import { useListViewState } from "@/composables/useListViewState";
 import StreamSelection from "./StreamSelection.vue";
 import pipelineService from "@/services/pipelines";
 import { useStore } from "vuex";
@@ -591,6 +587,14 @@ interface PipelineRow {
   sql_query?: string;
 }
 
+const viewState = useListViewState("pipelines", {
+  filterQuery: "",
+  tab: "all",
+  stateFilter: [] as PipelineStateKey[],
+  pageSize: 20,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
 // A state link shows that state across every tab with no saved search, so its rows match the count behind it.
 const urlState = router.currentRoute.value.query.state;
 const urlPipelineStates = readFilterKeys(urlState, isPipelineStateKey);
@@ -598,23 +602,6 @@ if (urlState !== undefined) {
   const { state: _consumed, ...rest } = router.currentRoute.value.query;
   router.replace({ query: rest });
 }
-// That one-off view keeps the saved search for the next visit, so it stays out of the URL too.
-const viewState = useListViewState(
-  "pipelines",
-  {
-    filterQuery: "",
-    tab: "all",
-    stateFilter: [] as PipelineStateKey[],
-    pageSize: 20,
-    sortBy: "",
-    sortOrder: "asc" as "asc" | "desc",
-  },
-  {
-    url: urlPipelineStates.length
-      ? undefined
-      : { ...LIST_URL_PARAMS, tab: "tab", stateFilter: "state" },
-  },
-);
 const filterQuery = ref(urlPipelineStates.length ? "" : viewState.filterQuery);
 const pageSize = ref(viewState.pageSize);
 const sortBy = ref(viewState.sortBy);
@@ -650,10 +637,10 @@ const shapePipelines = (list: any[]) =>
         ? {
             stream_name: pipeline.source.stream_name,
             stream_type: pipeline.source.stream_type,
-            frequency: "—",
-            period: "—",
-            cron: "—",
-            sql_query: "—",
+            frequency: "--",
+            period: "--",
+            cron: "--",
+            sql_query: "--",
           }
         : {
             stream_type: pipeline.source.stream_type,
@@ -671,8 +658,8 @@ const shapePipelines = (list: any[]) =>
             }),
             cron:
               pipeline.source.trigger_condition.frequency_type == "minutes"
-                ? t("common.no")
-                : t("common.yes"),
+                ? t("common.boolFalse")
+                : t("common.boolTrue"),
             sql_query: pipeline.source.query_condition.sql,
           };
 
@@ -812,7 +799,8 @@ const stateLabel = (row: any): string => {
       : t("pipeline_list.stateActive");
 };
 
-// The wash is for the exceptions only: errored red, paused grey; healthy rows read from the green rail.
+// Full-row wash for the EXCEPTIONS only — errored gets a light red, paused a
+// muted grey, healthy rows stay clean (their state reads from the green rail).
 // Scheduled rows keep their click affordance for the SQL expansion.
 const pipelineRowClass = (row: any): string => {
   const s = pipelineState(row);
@@ -822,7 +810,8 @@ const pipelineRowClass = (row: any): string => {
   return [cursorClass, stateClass].filter(Boolean).join(" ");
 };
 
-// Inset box-shadow so the rail paints regardless of border-collapse; the green live rail is Calm Signal's, as on Streams.
+// Extreme-left state rail — inset box-shadow so it paints regardless of
+// border-collapse; rem width + token colour keep it theme-aware.
 const pipelineRowStyle = (row: any): Record<string, string> => {
   const s = pipelineState(row);
   const color =

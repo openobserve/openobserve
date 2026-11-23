@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <label
         :for="directionId"
-        class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+        class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
         >{{ t("alerts.forecast.alertWhen") }} *</label
       >
       <div class="flex flex-wrap items-start gap-2">
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <label
         :for="windowId"
-        class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+        class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
         >{{ t("alerts.forecast.basedOn") }}</label
       >
       <div class="flex flex-col gap-1">

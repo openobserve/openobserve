@@ -985,23 +985,6 @@ describe("SyntheticMonitoring", () => {
       expect((wrapper.vm as any).showDuplicateDialog).toBe(true);
     });
 
-    it("closes on Escape when only the folder picker settled after the dialog opened", async () => {
-      wrapper = mount(SyntheticMonitoring, {
-        attachTo: document.body,
-        global: { plugins: [store], stubs: { ...baseStubs, ODialog: false } },
-      });
-      await flushPromises();
-      await openDuplicate();
-      findFolderSelect().vm.$emit("folder-selected", { label: "Default", value: "default" });
-      await flushPromises();
-
-      pressEscape();
-      await flushPromises();
-
-      expect(byTest("o-dialog-discard-row")).toBeNull();
-      expect((wrapper.vm as any).showDuplicateDialog).toBe(false);
-    });
-
     it("creates the copy in the folder chosen in the dropdown", async () => {
       wrapper = mountPage();
       await flushPromises();

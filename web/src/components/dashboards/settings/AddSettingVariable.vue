@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-type-select"
               />
             </div>
-            <div class="mt-4 text-sm font-semibold">
+            <div class="mt-4 text-base font-bold">
               {{ t("dashboard.addGeneralSettings") }}
             </div>
             <div class="mt-3 flex gap-4 max-md:flex-col max-md:gap-2">
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div
-              class="mt-4 flex w-full justify-between text-sm font-semibold"
+              class="mt-4 flex w-full justify-between text-base font-bold"
               v-if="variableData.type !== 'dynamic_filters'"
             >
               <span>{{ t("dashboard.extraOptions") }}</span>
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="mt-4">
                 <div class="flex flex-row items-center gap-1.5">
-                  <div data-test="dashboard-query-values-filter" class="text-sm font-semibold">
+                  <div data-test="dashboard-query-values-filter" class="text-base font-bold">
                     {{ t("dashboard.addSettingVariable.filters") }}
                   </div>
                   <OTooltip>
@@ -314,6 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mt-3 w-fit"
                 @click="addField()"
                 data-test="dashboard-add-option-btn"
+                icon="add"
               >
                 {{ t("dashboard.addOption") }}
               </OButton>
@@ -393,6 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="mt-3"
                   @click="addCustomValue"
                   data-test="dashboard-add-custom-value-btn"
+                  icon="add"
                 >
                 </OButton>
               </div>

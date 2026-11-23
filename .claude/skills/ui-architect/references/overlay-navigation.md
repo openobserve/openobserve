@@ -450,7 +450,7 @@ unfiltered page spends one button and a filtered one shows its scope as chips).
 
 **Import:** `@/lib/navigation/Tabs/OTab.vue`
 **Use when:** One tab inside OTabs. One font weight (500) in every state: selecting changes only the colour and the 2 px accent bar, so nothing moves (H8, P3).
-**Key props:** `name` (required) · `label` (`I18nText`) · `icon` · `count` (number; tabular, centred in a neutral pill at least two digits wide, capped at "999+"; `null` reserves the width while it loads) · `countTone` (`"default"|"error"`; error only when the count is the exception, C3) · `locked` + `lockedLabel` (lock glyph and its screen-reader text) · `dirty` (unsaved dot) · `disabled` · `tooltip` · `to` (RouteLocationRaw: a route tab that navigates on click and selects itself while `route.name === name`; replaces ORouteTab)
+**Key props:** `name` (required) · `label` (`I18nText`) · `icon` · `count` (number; tabular, capped at "999+" and always as wide as "999+"; `null` reserves the width while it loads) · `countTone` (`"default"|"error"`; error only when the count is the exception, C3) · `locked` + `lockedLabel` (lock glyph and its screen-reader text) · `dirty` (unsaved dot) · `disabled` · `tooltip` · `to` (RouteLocationRaw: a route tab that navigates on click and selects itself while `route.name === name`; replaces ORouteTab)
 **Removed:** `disable` → `disabled`, `suffixIcon="lock"` → `locked`, `suffixLabel` → `lockedLabel`, an OTag/OBadge count in the slot → `count`. Never set a height or font weight on a tab by class (`local/o2-control-height`).
 **Slots:** `default` (custom trigger content), `icon`, `trailing` (controls beside the trigger)
 **Example:**

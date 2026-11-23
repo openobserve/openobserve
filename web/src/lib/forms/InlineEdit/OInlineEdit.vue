@@ -37,7 +37,6 @@ const props = withDefaults(defineProps<InlineEditProps>(), {
   size: "md",
   tone: "title",
   disabled: false,
-  field: false,
   readonly: false,
   error: false,
   submitOnEnter: true,
@@ -226,14 +225,9 @@ const onDisplayKeydown = (event: KeyboardEvent) => {
 // The value must render at an identical size and weight in BOTH modes,
 // otherwise the header jumps as it swaps between the button and the input.
 const textClasses = computed(() => {
-  if (props.field) return "text-compact leading-5 font-normal";
-  if (props.tone === "meta") return "text-xs leading-4 font-normal";
-  const scale = {
-    sm: "text-sm leading-5",
-    md: "text-title leading-5.5",
-    lg: "text-lg leading-6",
-  }[props.size];
-  return `${scale} font-semibold tracking-[-0.02em]`;
+  if (props.tone === "meta") return "text-xs leading-normal font-normal";
+  const scale = { sm: "text-sm", md: "text-base", lg: "text-lg" }[props.size];
+  return `${scale} leading-[1.45] font-semibold tracking-[-0.02em]`;
 });
 
 /** Colour of a filled value — headings lead, meta values recede. */
@@ -253,13 +247,8 @@ const valueToneClass = computed(() =>
 // uses plain text. Hence RINGS, not borders — `ring-inset` paints inside the
 // box and contributes no size — and a `-my-0.5` on the root that cancels the
 // vertical padding exactly. Net contribution to the line box: zero.
-const TRANSITION =
-  "ring-1 ring-inset transition-[background-color,box-shadow,color] duration-(--duration-control) ease-(--ease-control)";
-const BOX_CLASSES = computed(() =>
-  props.field
-    ? `rounded-default h-control-md px-3 ${TRANSITION}`
-    : `rounded-default px-1.5 py-0.5 ${TRANSITION}`,
-);
+const BOX_CLASSES =
+  "rounded-default px-1.5 py-0.5 ring-1 ring-inset transition-[background-color,box-shadow,color] duration-150 ease-out";
 
 // Imperative focus for callers that walk to "the invalid field and focus it"
 // (e.g. the alert form's focus manager). In display mode there is no input to
@@ -271,11 +260,7 @@ defineExpose({ focus: startEdit });
   <!-- The -mx-1.5 lives on the ROOT, not on either mode's box, so the shared
        inline padding cancels out identically whichever one is showing and the
        text still lines up with whatever sits above/below it. -->
-  <div
-    v-bind="$attrs"
-    class="group/inline-edit flex min-w-0 items-center gap-1.5"
-    :class="field ? 'w-full' : '-mx-1.5 -my-0.5'"
-  >
+  <div v-bind="$attrs" class="group/inline-edit -mx-1.5 -my-0.5 flex min-w-0 items-center gap-1.5">
     <!-- EDIT MODE — the input shares a grid cell with an invisible sizer span,
          so the track (and therefore the input) is exactly as wide as the text.
          The sizer mirrors the input's box exactly and only widens its trailing
@@ -288,11 +273,9 @@ defineExpose({ focus: startEdit });
     <div
       v-if="isEditing"
       ref="editRootEl"
-      class="grid max-w-full items-center"
-      :class="field ? 'w-full grid-cols-[minmax(0,1fr)]' : 'grid-cols-[minmax(0,max-content)]'"
+      class="grid max-w-full grid-cols-[minmax(0,max-content)] items-center"
     >
       <span
-        v-if="!field"
         aria-hidden="true"
         :class="[
           'invisible col-start-1 row-start-1 pe-7 whitespace-pre ring-transparent',
@@ -359,13 +342,12 @@ defineExpose({ focus: startEdit });
         data-inline-edit-trigger
         :class="[
           'focus-visible:outline-accent/40 flex max-w-full min-w-0 items-center gap-1.5 text-start outline-none focus-visible:outline-2',
-          field ? 'bg-input-bg w-full' : '',
           BOX_CLASSES,
           // An invalid name draws the same red box in display mode that the input
           // shows while editing, so the field reads as an error even before it is
           // clicked into — the required-name state must be visible at rest, not
           // only mid-edit (matches the pipeline/panel headers).
-          error ? 'ring-input-border-error' : field ? 'ring-input-border' : 'ring-transparent',
+          error ? 'ring-input-border-error' : 'ring-transparent',
           isDisabled
             ? 'cursor-not-allowed opacity-60'
             : error
@@ -391,7 +373,7 @@ defineExpose({ focus: startEdit });
              sits at reduced opacity so it reads as an affordance, not a control,
              and brightens on hover. -->
         <OIcon
-          v-if="!isDisabled && !field"
+          v-if="!isDisabled"
           name="edit"
           size="sm"
           class="text-text-secondary shrink-0 opacity-50 transition-opacity group-hover/inline-edit:opacity-100"

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="onboarding-get-started-connect-card"
       >
         <div class="flex items-center gap-2">
-          <strong class="text-text-heading text-sm">{{
+          <strong class="text-text-heading text-base">{{
             t("login.getStarted.connect.title")
           }}</strong>
           <OBadge tone="accent" size="sm">{{ t("ingestion.firstSource.recommended") }}</OBadge>
@@ -92,7 +92,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default bg-surface-base rounded-surface flex flex-col gap-3 border p-4"
         data-test="onboarding-get-started-sample-card"
       >
-        <strong class="text-text-heading text-sm">{{ t("login.getStarted.sample.title") }}</strong>
+        <strong class="text-text-heading text-base">{{
+          t("login.getStarted.sample.title")
+        }}</strong>
         <ul class="m-0 flex flex-1 list-none flex-col gap-1.5 p-0">
           <li
             v-for="point in samplePoints"

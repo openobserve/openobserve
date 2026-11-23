@@ -120,7 +120,7 @@ describe("GenAiAgentMappingSettings", () => {
   it("enables Save only once the form differs from what was read", async () => {
     mockGet.mockResolvedValue(config(["my.agent"]));
     const wrapper = await mountPage();
-    expect(saveButton(wrapper).exists()).toBe(false);
+    expect(saveButton(wrapper).attributes("disabled")).toBeDefined();
 
     await wrapper.find('[data-test="gen-ai-agent-name-fields-input"] textarea').setValue("other");
     expect(saveButton(wrapper).attributes("disabled")).toBeUndefined();
@@ -128,7 +128,7 @@ describe("GenAiAgentMappingSettings", () => {
     await wrapper
       .find('[data-test="gen-ai-agent-name-fields-input"] textarea')
       .setValue("my.agent");
-    expect(saveButton(wrapper).exists()).toBe(false);
+    expect(saveButton(wrapper).attributes("disabled")).toBeDefined();
   });
 
   // An org with nothing saved is shown the defaults in effect; that alone is not an edit.
@@ -141,7 +141,7 @@ describe("GenAiAgentMappingSettings", () => {
           .element as HTMLInputElement
       ).value,
     ).toBe("default.agent");
-    expect(saveButton(wrapper).exists()).toBe(false);
+    expect(saveButton(wrapper).attributes("disabled")).toBeDefined();
   });
 
   // Typing in the patterns box keeps the text as typed and saves one pattern per line.
@@ -156,7 +156,7 @@ describe("GenAiAgentMappingSettings", () => {
 
     await textarea.setValue("tag environment_context\n");
     expect((textarea.element as HTMLTextAreaElement).value).toBe("tag environment_context\n");
-    expect(saveButton(wrapper).exists()).toBe(false);
+    expect(saveButton(wrapper).attributes("disabled")).toBeDefined();
 
     await textarea.setValue("tag environment_context\n  tag job \n\n");
     expect(saveButton(wrapper).attributes("disabled")).toBeUndefined();

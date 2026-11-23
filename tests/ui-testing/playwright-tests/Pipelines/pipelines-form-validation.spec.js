@@ -64,7 +64,7 @@ test.describe(
                 await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             }
 
-            // Locate the first "Create backfill job" trigger button in the list
+            // Locate the first "Create Backfill Job" trigger button in the list
             const backfillTriggerBtn = pm.pipelinesFormValidation.getPipelineListBackfillBtnLocator().first();
 
             if (!(await backfillTriggerBtn.isVisible({ timeout: 5000 }))) {

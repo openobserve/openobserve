@@ -357,7 +357,7 @@ describe("FirstEventStatus — received", () => {
     fake.result.value = { ...result, streamType: "metrics", streamName: "up" };
     fake.state.value = "received";
     await nextTick();
-    expect(q("first-event-status-open-btn").text()).toBe("Open in metrics");
+    expect(q("first-event-status-open-btn").text()).toBe("Open in Metrics");
     await q("first-event-status-open-btn").trigger("click");
     await flushPromises();
     expect(router.currentRoute.value.query).toMatchObject({
@@ -371,7 +371,7 @@ describe("FirstEventStatus — received", () => {
     fake.result.value = { ...result, streamType: "profiles", streamName: "default" };
     fake.state.value = "received";
     await nextTick();
-    expect(q("first-event-status-open-btn").text()).toBe("Open in profiles");
+    expect(q("first-event-status-open-btn").text()).toBe("Open in Profiles");
     await q("first-event-status-open-btn").trigger("click");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("profiles");

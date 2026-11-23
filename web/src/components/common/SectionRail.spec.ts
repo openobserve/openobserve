@@ -63,20 +63,6 @@ describe("SectionRail", () => {
     expect(wrapper.text()).toContain("AI Observability");
   });
 
-  // The heading row and the page header band read as one header row only at one height and hairline.
-  it.each([false, true])(
-    "draws the heading on the header band's 56 px row (collapsed: %s)",
-    async (fold) => {
-      const wrapper = mountRail({ collapsible: true, icon: "auto-awesome" });
-      if (fold) await wrapper.get('[data-test="section-rail-toggle"]').trigger("click");
-      const head = wrapper.get('[data-test="section-rail-head"]');
-      expect(head.classes()).toEqual(
-        expect.arrayContaining(["h-14", "border-b", "border-border-default"]),
-      );
-      expect(head.find('[data-test="section-rail-toggle"]').exists()).toBe(true);
-    },
-  );
-
   it("keeps the title and every label while expanded", () => {
     const wrapper = mountRail({ collapsible: true, icon: "auto-awesome" });
     expect(wrapper.text()).toContain("AI Observability");
@@ -178,11 +164,11 @@ describe("SectionRail", () => {
     wrapper.unmount();
   });
 
-  it("opens an edition-locked item's own page, which shows its lock in place", async () => {
+  it("routes an edition-locked item to the upgrade page", async () => {
     const wrapper = mountRail({ groups: lockedGroups({ locked: true }) });
     expect(wrapper.findComponent({ name: "OTab" }).props("locked")).toBe(true);
     await wrapper.get('[data-name="roles"]').trigger("click");
-    expect(push).toHaveBeenCalledWith({ name: "roles" });
+    expect(push).toHaveBeenCalledWith({ name: "enterpriseFeatures" });
   });
 
   // The licensed page shows its own banner, so the upgrade page would only hide it.

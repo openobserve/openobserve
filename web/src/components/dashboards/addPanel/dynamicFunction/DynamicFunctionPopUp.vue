@@ -112,6 +112,7 @@
                 variant="secondary"
                 class="ms-auto"
                 data-test="dynamic-function-popup-having-add-btn"
+                icon="add"
                 @click="toggleHavingFilter"
               >
                 {{ t("dashboard.dynamicFunctionPopUp.add") }}

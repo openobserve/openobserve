@@ -73,6 +73,7 @@ vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
 
 import TracesComparison from "./TracesComparison.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const search = vi.mocked(searchService.search);
 const store = createStore({
@@ -601,21 +602,38 @@ describe("TracesComparison", () => {
       );
     });
 
-    it("renders each preset as a link button with its name", async () => {
+    it("renders each preset as a card with its name and what it compares", async () => {
       await mountPanel(null);
       expect(wrapper.findAllComponents(OEmptyState)).toHaveLength(1);
-      for (const [id, label] of [
-        ["errors", "Errors vs rest"],
-        ["slowest", "Slowest 10% vs rest"],
-        ["recent", "Recent vs earlier"],
+      for (const [id, label, description, icon] of [
+        [
+          "errors",
+          "Errors vs rest",
+          "Spans with an error against all other spans",
+          "error-outline",
+        ],
+        [
+          "slowest",
+          "Slowest 10% vs rest",
+          "Spans at or above p90 against faster spans",
+          "hourglass-empty",
+        ],
+        [
+          "recent",
+          "Recent vs earlier",
+          "Second half of the time range against the first half",
+          "history-toggle-off",
+        ],
       ]) {
-        const button = wrapper.find(`[data-test="traces-drill-down-preset-${id}"]`);
-        expect(button.element.tagName).toBe("BUTTON");
-        expect(button.text()).toContain(label);
+        const card = wrapper.find(`[data-test="traces-drill-down-preset-${id}"]`);
+        expect(card.element.tagName).toBe("BUTTON");
+        expect(card.text()).toContain(label);
+        expect(card.text()).toContain(description);
+        expect(card.findComponent(OIcon).props("name")).toBe(icon);
       }
     });
 
-    it("puts the presets inside the no-selection message, under the preset label", async () => {
+    it("puts the preset cards inside the no-selection message, under the preset label", async () => {
       await mountPanel(null);
       const presets = wrapper.find(
         '[data-test="traces-comparison-no-selection"] [data-test="traces-drill-down-presets"]',

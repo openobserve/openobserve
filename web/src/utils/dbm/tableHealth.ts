@@ -323,7 +323,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     accessorKey: "overheadBytes",
     sortable: true,
     resizable: true,
-    size: 136,
+    size: 120,
     meta: { align: "right", bar: "max", format: (value: number | null) => tableSizeLabel(value) },
   },
   {

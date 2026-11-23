@@ -2026,7 +2026,7 @@ function onClearResults() {
           icon-only
           :pressed="variablesPanelOpen"
           ref="variablesToggleRef"
-          variant="ghost"
+          variant="secondary"
           size="sm"
           :aria-label="variablesToggleLabel"
           :aria-pressed="variablesPanelOpen"
@@ -2182,7 +2182,7 @@ function onClearResults() {
     <!-- ── Editor phase ── -->
     <template v-else>
       <CreateBrowserTestSkeleton v-if="isLoadingEdit" :rows="10" />
-      <div v-else-if="loadError" class="flex flex-1 flex-col">
+      <div v-else-if="loadError" class="flex flex-1 flex-col items-center justify-center">
         <OEmptyState
           kind="error"
           :title="t('emptyState.loadError.title')"
@@ -2290,7 +2290,7 @@ function onClearResults() {
               </template>
               <template #separator>
                 <div
-                  class="hover:bg-table-resize-handle h-full w-1 border-t bg-transparent transition-colors"
+                  class="hover:bg-table-resize-handle h-full w-1 border-t bg-transparent transition-colors duration-300"
                 />
               </template>
               <template #after>

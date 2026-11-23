@@ -212,22 +212,11 @@ describe("AlertHeaderActions", () => {
     });
   });
 
-  it("keeps Mute in the ⋯ menu, after the primary, so the header holds two secondaries (H3)", async () => {
-    await mountActions();
-    const html = wrapper.html();
-    expect(html.indexOf("alerts-alertdetail-ack")).toBeLessThan(
-      html.indexOf("alerts-alertdetail-more"),
-    );
-    const more = wrapper.findComponent('[data-test="alerts-alertdetail-more"]') as any;
-    expect(more.props("variant")).toBe("ghost");
-    expect(find("alerts-alertdetail-mute-until-clear").exists()).toBe(true);
-    expect(wrapper.findAll('[data-o2-variant="secondary"]')).toHaveLength(0);
-  });
-
   it("swaps Mute for Extend and End mute while a mute is active", async () => {
     vi.mocked(alerts.cancelAlertMute).mockResolvedValue({ data: {} } as any);
     await mountActions({ downtime });
-    expect(find("alerts-alertdetail-mute-until-clear").exists()).toBe(false);
+    expect(find("alerts-alertdetail-mute").exists()).toBe(false);
+    expect(find("alerts-alertdetail-extend").exists()).toBe(true);
     expect(find("alerts-alertdetail-extend-until-clear").exists()).toBe(true);
     await find("alerts-alertdetail-end-mute").trigger("click");
     await flushPromises();
@@ -238,9 +227,9 @@ describe("AlertHeaderActions", () => {
   it("shows only Muted by for a downtime this alert does not own, which opens it", async () => {
     push.mockReset();
     await mountActions({ downtime: { ...downtime, name: "Weekly patch", end_here: false } });
-    expect(find("alerts-alertdetail-extend-until-clear").exists()).toBe(false);
+    expect(find("alerts-alertdetail-extend").exists()).toBe(false);
     expect(find("alerts-alertdetail-end-mute").exists()).toBe(false);
-    expect(find("alerts-alertdetail-mute-until-clear").exists()).toBe(false);
+    expect(find("alerts-alertdetail-mute").exists()).toBe(false);
     const link = find("alerts-alertdetail-muted-by");
     expect(link.text()).toContain("Muted by Weekly patch");
     await link.trigger("click");
@@ -269,8 +258,8 @@ describe("AlertHeaderActions", () => {
 
   it("shows no mute controls where downtimes are off", async () => {
     await mountActions({ muteEnabled: false, downtime });
-    expect(find("alerts-alertdetail-more").exists()).toBe(false);
-    expect(find("alerts-alertdetail-extend-until-clear").exists()).toBe(false);
+    expect(find("alerts-alertdetail-mute").exists()).toBe(false);
+    expect(find("alerts-alertdetail-extend").exists()).toBe(false);
     expect(find("alerts-alertdetail-end-mute").exists()).toBe(false);
   });
 });

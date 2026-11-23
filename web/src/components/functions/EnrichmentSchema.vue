@@ -27,13 +27,8 @@
     @update:open="$emit('update:open', $event)"
   >
     <div>
-      <div
-        v-if="loadingState"
-        class="flex flex-col gap-5 p-5"
-        data-test="enrichment-schema-loading-indicator"
-      >
-        <OSkeleton shape="block" class="h-24" />
-        <OSkeleton preset="tableRows" :rows="8" />
+      <div v-if="loadingState" class="flex h-full w-full items-center justify-center py-10">
+        <OSpinner size="lg" data-test="enrichment-schema-loading-indicator" />
       </div>
       <div v-else class="indexDetailsContainer h-screen w-full p-5">
         <div
@@ -45,26 +40,26 @@
           >
             <div data-test="schema-stream-title-text">
               {{ t("alerts.stream_name") }}
-              <span class="title mb-4 ps-1 font-semibold"> {{ schemaData.name }}</span>
+              <span class="title mb-4 ps-1 font-bold"> {{ schemaData.name }}</span>
             </div>
             <div
               v-if="store.state.zoConfig.show_stream_stats_doc_num"
               data-test="schema-stream-title-text"
             >
               {{ t("logStream.docsCount") }}
-              <span class="title mb-4 ps-1 font-semibold">
+              <span class="title mb-4 ps-1 font-bold">
                 {{ parseInt(schemaData.stats.doc_num).toLocaleString("en-US") }}
               </span>
             </div>
             <div data-test="schema-stream-title-text">
               {{ t("logStream.storageSize") }}
-              <span class="title mb-4 ps-1 font-semibold">
+              <span class="title mb-4 ps-1 font-bold">
                 {{ formatSizeFromMB(schemaData.stats.storage_size) }}</span
               >
             </div>
             <div v-if="isCloud !== 'true'" data-test="schema-stream-title-text">
               {{ t("logStream.compressedSize") }}
-              <span class="title mb-4 ps-1 font-semibold">
+              <span class="title mb-4 ps-1 font-bold">
                 {{ formatSizeFromMB(schemaData.stats.compressed_size) }}</span
               >
             </div>
@@ -118,7 +113,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 const defaultStreamData = {
   name: "",
   schema: [],
@@ -146,7 +141,7 @@ export default defineComponent({
     OTable,
     ODrawer,
     OSearchInput,
-    OSkeleton,
+    OSpinner,
   },
   emits: ["update:open"],
   setup(props) {

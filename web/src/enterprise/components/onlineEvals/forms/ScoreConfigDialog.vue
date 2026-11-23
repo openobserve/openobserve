@@ -28,7 +28,7 @@
             class="font-normal"
           >
             <template #nextVersion>
-              <strong class="font-semibold">{{ nextVersionLabel }}</strong>
+              <strong class="font-bold">{{ nextVersionLabel }}</strong>
             </template>
           </i18n-t>
           <em class="text-text-secondary font-normal italic">{{
@@ -107,7 +107,7 @@
               :data-test="`score-config-datatype-${type}`"
             >
               <template #label>
-                <span class="text-compact text-text-heading font-semibold">{{
+                <span class="text-compact text-text-heading font-bold">{{
                   t(`onlineEvals.scoreConfig.dataTypes.${type}`)
                 }}</span>
                 <span class="text-2xs text-text-secondary mt-0.75 leading-[1.4] font-normal">{{
@@ -204,7 +204,7 @@
                 :checked="formValues.healthyDirection === 'gte'"
                 @change="form.setFieldValue('healthyDirection', 'gte')"
               />
-              <span class="text-text-body text-center font-mono text-lg font-semibold">{{
+              <span class="text-text-body text-center font-mono text-lg font-bold">{{
                 t("onlineEvals.scoreConfig.gteSymbol")
               }}</span>
               <span class="text-compact text-text-body">{{
@@ -234,7 +234,7 @@
                 :checked="formValues.healthyDirection === 'lte'"
                 @change="form.setFieldValue('healthyDirection', 'lte')"
               />
-              <span class="text-text-body text-center font-mono text-lg font-semibold">{{
+              <span class="text-text-body text-center font-mono text-lg font-bold">{{
                 t("onlineEvals.scoreConfig.lteSymbol")
               }}</span>
               <span class="text-compact text-text-body">{{

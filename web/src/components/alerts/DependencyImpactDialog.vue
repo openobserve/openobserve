@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="depKindColor(focusNode ?? { kind: focus.kind, orphan: false, missing: false })"
         />
         <div class="min-w-0">
-          <OTruncatedText as="div" class="text-text-heading text-title font-semibold">
+          <OTruncatedText as="div" class="text-text-heading text-base font-semibold">
             {{ entityName }}
           </OTruncatedText>
           <OTruncatedText
@@ -53,21 +53,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="flex flex-col" data-test="dependency-impact-body">
-      <OSkeleton v-if="loading" shape="block" class="h-72" data-test="dependency-impact-loading" />
+      <div
+        v-if="loading"
+        class="text-text-secondary flex h-72 items-center justify-center gap-2 text-sm"
+        data-test="dependency-impact-loading"
+      >
+        <OSpinner size="lg" />
+        {{ t("alert_dependencies.loading") }}
+      </div>
 
-      <OEmptyState
+      <OInlineNotice
         v-else-if="error"
-        kind="error"
+        tone="err"
+        :message="t('alert_dependencies.failedToLoad', { error })"
         data-test="dependency-impact-error"
-        @action="loadGraph(org())"
       />
 
-      <OEmptyState
-        v-else-if="noConsumers"
-        icon="account-tree"
-        :title="t('alert_dependencies.noConsumers')"
-        data-test="dependency-impact-no-consumers"
-      />
+      <template v-else-if="noConsumers">
+        <div
+          class="text-text-muted flex h-72 items-center justify-center px-2 text-center text-xs"
+          data-test="dependency-impact-no-consumers"
+        >
+          {{ t("alert_dependencies.noConsumers") }}
+        </div>
+      </template>
 
       <template v-else>
         <OSearchInput
@@ -98,15 +107,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="border-border-default bg-surface-panel rounded-surface h-72 space-y-1 overflow-y-auto border p-1.5"
               >
-                <OEmptyState
+                <div
                   v-if="!filteredDestinations.length"
-                  size="compact"
-                  :kind="search ? 'filtered' : 'first-run'"
-                  :title="
-                    search ? t('alert_dependencies.noMatches') : t('alert_dependencies.laneEmpty')
-                  "
-                  class="px-2"
-                />
+                  class="text-text-muted flex h-full items-center justify-center px-2 text-center text-xs"
+                >
+                  {{
+                    search ? t("alert_dependencies.noMatches") : t("alert_dependencies.laneEmpty")
+                  }}
+                </div>
                 <div
                   v-for="d in filteredDestinations"
                   :key="d.id"
@@ -158,15 +166,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="border-border-default bg-surface-panel rounded-surface overflow-y-auto border p-1.5"
               :class="isTemplateFocus ? 'h-72' : 'max-h-72 min-h-16'"
             >
-              <OEmptyState
+              <div
                 v-if="alertsEmpty"
-                size="compact"
-                :kind="search ? 'filtered' : 'first-run'"
-                :title="
-                  search ? t('alert_dependencies.noMatches') : t('alert_dependencies.laneEmpty')
-                "
-                class="px-2"
-              />
+                class="text-text-muted flex h-full items-center justify-center px-2 text-center text-xs"
+              >
+                {{ search ? t("alert_dependencies.noMatches") : t("alert_dependencies.laneEmpty") }}
+              </div>
 
               <!-- Destination focus: one destination, so a flat list — no boxes,
                    no highlighting (every alert obviously belongs to it). -->
@@ -314,8 +319,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import DependencyEntityRow from "./DependencyEntityRow.vue";

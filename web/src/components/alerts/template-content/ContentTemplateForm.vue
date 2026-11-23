@@ -40,10 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="flex flex-col gap-2">
-      <div
-        class="flex items-center gap-0.5 font-semibold"
-        data-test="content-template-form-body-title"
-      >
+      <div class="flex items-center gap-0.5 font-bold" data-test="content-template-form-body-title">
         <span>{{ t("alert_templates.contentBody") }}</span>
       </div>
       <div class="flex flex-wrap gap-1" data-test="content-template-form-toolbar">
@@ -147,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-col gap-4 pt-3">
         <div class="bg-card-glass-bg rounded-default overflow-hidden">
           <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
+            <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
             <span
               class="text-compact font-semibold tracking-[0.01em]"
               data-test="content-template-form-fields-title"
@@ -176,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="bg-card-glass-bg rounded-default overflow-hidden">
           <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
+            <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
             <span
               class="text-compact font-semibold tracking-[0.01em]"
               data-test="content-template-form-links-title"
@@ -205,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="bg-card-glass-bg rounded-default overflow-hidden">
           <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
+            <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
             <span
               class="text-compact font-semibold tracking-[0.01em]"
               data-test="content-template-form-rows-title"
@@ -269,6 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="bg-card-glass-bg rounded-default overflow-hidden">
           <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
+            <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
             <span
               class="text-compact font-semibold tracking-[0.01em]"
               data-test="content-template-form-channel-titles-title"
@@ -332,6 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <OButton
               variant="ghost"
+              icon="add"
               class="self-start"
               :disabled="titleOverrideRows.length >= overrideChannels.length"
               data-test="content-template-form-channel-titles-add-btn"
@@ -343,6 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="bg-card-glass-bg rounded-default overflow-hidden">
           <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
+            <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
             <span
               class="text-compact font-semibold tracking-[0.01em]"
               data-test="content-template-form-chart-title"

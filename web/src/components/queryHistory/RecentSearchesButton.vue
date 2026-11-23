@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OButton
     v-if="enabled"
     icon-only
-    variant="ghost"
+    variant="secondary"
     icon="manage-search"
     :aria-label="t('recentSearches.title')"
     :data-test="dataTest"

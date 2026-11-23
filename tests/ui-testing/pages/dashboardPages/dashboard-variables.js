@@ -472,7 +472,7 @@ export default class DashboardVariables {
     await addVariableBtn.waitFor({ state: "visible", timeout: 10000 });
     await addVariableBtn.click();
 
-    // Select variable type "Query values"
+    // Select variable type "Query Values"
     const typeSelect = this.page.locator('[data-test="dashboard-variable-type-select"]');
     await typeSelect.waitFor({ state: "visible", timeout: 10000 });
     await typeSelect.click();

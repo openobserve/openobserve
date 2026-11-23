@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OTruncatedText
           as="div"
-          class="text-2xs text-text-secondary font-mono"
+          class="text-3xs text-text-secondary font-mono"
           :data-test="`metrics-fn-expr-${variant.id}`"
         >
           {{ exprOf(variant) }}
@@ -124,23 +124,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
 
-          <OEmptyState
+          <div
             v-else-if="previewOf(variant).status === 'unavailable'"
-            size="compact"
-            icon="show-chart"
-            class="h-full"
-            :title="t('metrics.explorer.fn.noPreview')"
+            class="text-text-secondary flex h-full items-center justify-center text-xs"
             :data-test="`metrics-fn-nopreview-${variant.id}`"
-          />
+          >
+            {{ t("metrics.explorer.fn.noPreview") }}
+          </div>
 
-          <OEmptyState
+          <div
             v-else-if="previewOf(variant).status === 'done' && isEmpty(variant)"
-            size="compact"
-            icon="bar-chart"
-            class="h-full"
-            :title="t('metrics.explorer.noData')"
+            class="rounded-default text-text-secondary flex h-full items-center justify-center text-xs"
             :data-test="`metrics-fn-nodata-${variant.id}`"
-          />
+          >
+            {{ t("metrics.explorer.noData") }}
+          </div>
 
           <!-- @error: a conversion throw lands the tile in the SAME error state
                a failed query does — without it the tile is a blank region with
@@ -220,7 +218,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -261,7 +258,6 @@ export default defineComponent({
     OButton,
     OIcon,
     OSkeleton,
-    OEmptyState,
     ORadioGroup,
     ORadio,
     OCheckbox,

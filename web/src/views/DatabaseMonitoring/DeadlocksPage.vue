@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState
             kind="error"
             :title="t('emptyState.loadError.title')"
-            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
+            :text="raw(message)"
             data-test="dbm-deadlocks-error"
             @action="onRefresh()"
           />
@@ -83,30 +83,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @clear="clearScope"
               />
             </template>
-            <template #view>
-              <!-- What a ROW means. Not a data-processing mode — the reader is
-                   choosing between "name the bug" and "give me a timestamp". -->
-              <OToggleGroup
-                v-model="grouping"
-                class="shrink-0"
-                mobile-dropdown
-                data-test="dbm-deadlocks-grouping"
-              >
-                <OToggleGroupItem value="pairs" data-test="dbm-deadlocks-grouping-pairs">
-                  {{ t("dbm.deadlocks.grouping.pairs") }}
-                  <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.pairsHint')" />
-                </OToggleGroupItem>
-                <OToggleGroupItem value="events" data-test="dbm-deadlocks-grouping-events">
-                  {{ t("dbm.deadlocks.grouping.events") }}
-                  <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.eventsHint')" />
-                </OToggleGroupItem>
-              </OToggleGroup>
-            </template>
+            <!-- What a ROW means. Not a data-processing mode — the reader is
+                 choosing between "name the bug" and "give me a timestamp". -->
+            <OToggleGroup
+              v-model="grouping"
+              class="shrink-0"
+              mobile-dropdown
+              data-test="dbm-deadlocks-grouping"
+            >
+              <OToggleGroupItem value="pairs" data-test="dbm-deadlocks-grouping-pairs">
+                {{ t("dbm.deadlocks.grouping.pairs") }}
+                <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.pairsHint')" />
+              </OToggleGroupItem>
+              <OToggleGroupItem value="events" data-test="dbm-deadlocks-grouping-events">
+                {{ t("dbm.deadlocks.grouping.events") }}
+                <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.eventsHint')" />
+              </OToggleGroupItem>
+            </OToggleGroup>
           </DbmTableToolbar>
         </template>
 
         <template #toolbar-trailing>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1.5">
             <ODateTimeRange
               auto-apply
               menu-align="end"
@@ -146,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="border-status-error-text/25 rounded-none border-b"
             data-test="dbm-deadlocks-storm"
           >
-            <span class="font-semibold">{{ t("dbm.deadlocks.storm.title") }}</span>
+            <span class="font-bold">{{ t("dbm.deadlocks.storm.title") }}</span>
             {{ stormBody }}
             <span class="block">{{ t("dbm.deadlocks.storm.biasWarning") }}</span>
             <template #actions>
@@ -193,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("dbm.deadlocks.detail.noQueryCaptured") }}
               </span>
             </div>
-            <div class="text-text-secondary text-2xs flex min-w-0 items-center gap-1">
+            <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
               <OTag type="dbSystem" :value="row.db_system" size="sm" />
               <template v-if="row.db_instance">
                 <span class="opacity-45">·</span>
@@ -202,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-for="chip in row.chips"
                 :key="chip.id"
-                class="rounded-default text-2xs ms-0.5 shrink-0 px-1 py-px font-semibold"
+                class="rounded-default text-3xs ms-0.5 shrink-0 px-1 py-px font-semibold"
                 :class="chip.tone"
               >
                 {{ chip.label }}
@@ -230,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-heading text-compact font-mono font-medium tabular-nums">
               {{ row.objects.length || raw("—") }}
             </span>
-            <OTruncatedText class="text-text-secondary text-2xs max-w-full">{{
+            <OTruncatedText class="text-text-secondary text-3xs max-w-full">{{
               raw(row.objects[0] ?? "")
             }}</OTruncatedText>
           </div>
@@ -241,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-body font-mono text-xs tabular-nums">
               {{ formatClock(row.lastSeen) }}
             </span>
-            <span class="text-text-secondary text-2xs">{{ formatAge(row.lastSeen) }}</span>
+            <span class="text-text-secondary text-3xs">{{ formatAge(row.lastSeen) }}</span>
           </div>
         </template>
 
@@ -252,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex flex-col items-end leading-tight">
               <span class="text-text-heading text-compact font-mono font-semibold tabular-nums">
                 {{ row.count }}
-                <span class="text-text-secondary text-2xs font-normal">
+                <span class="text-text-secondary text-3xs font-normal">
                   {{ formatPercent(row.share, 0) }}
                 </span>
               </span>
@@ -338,14 +336,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("dbm.deadlocks.detail.occurrencesTitle", { count: row.count }) }}
                   </h4>
                   <div class="flex-1"></div>
-                  <span class="text-text-secondary text-2xs">
+                  <span class="text-text-secondary text-3xs">
                     {{ t("dbm.deadlocks.detail.occurrencesHint") }}
                   </span>
                 </div>
 
                 <div class="flex flex-col gap-1">
                   <div v-for="lane in row.lanes" :key="lane.pid" class="flex items-center gap-2">
-                    <span class="text-text-secondary text-2xs w-16 shrink-0 text-right font-mono">
+                    <span class="text-text-secondary text-3xs w-16 shrink-0 text-right font-mono">
                       {{ t("dbm.deadlocks.detail.lostLabel", { pid: lane.pid }) }}
                     </span>
                     <div
@@ -377,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
 
-                <p class="text-text-secondary text-2xs mt-1.5">
+                <p class="text-text-secondary text-3xs mt-1.5">
                   {{ row.victimSummary }}
                 </p>
               </div>
@@ -438,7 +436,6 @@ import DbmLockEmptyState, {
 } from "@/components/dbm/DbmLockEmptyState.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -756,7 +753,7 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
     hideable: true,
     accessorKey: "objects",
     header: t("dbm.deadlocks.columns.objects"),
-    size: 136,
+    size: 104,
     meta: { align: "right" },
     enableSorting: false,
   },

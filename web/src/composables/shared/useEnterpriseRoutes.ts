@@ -22,7 +22,6 @@ import {
   buildFeatureGateContext,
 } from "@/utils/enterpriseFeatures";
 import { oncallRouteGuard } from "./oncallRouteGuard";
-import { lockGatedRoutes, lockInPlace } from "./lockInPlace";
 
 // "rbac" needs the backend `rbac_enabled` flag, which only `store.state.zoConfig`
 // carries — every other key here is edition-only and could use the default.
@@ -494,15 +493,16 @@ const useEnterpriseRoutes = () => {
           titleKey: "iam.groups",
         },
         component: AppGroups,
+        beforeEnter: withFeatureGate("rbac", routeGuard),
       },
       {
         path: "groups/edit/:group_name",
         name: "editGroup",
         meta: {
           titleKey: "routeTitles.editGroup",
-          lockTitleKey: "iam.groups",
         },
         component: EditGroup,
+        beforeEnter: withFeatureGate("rbac", routeGuard),
       },
       {
         path: "roles",
@@ -511,26 +511,25 @@ const useEnterpriseRoutes = () => {
           titleKey: "iam.roles",
         },
         component: AppRoles,
+        beforeEnter: withFeatureGate("rbac", routeGuard),
       },
       {
         path: "roles/edit/:role_name",
         name: "editRole",
         meta: {
           titleKey: "routeTitles.editRole",
-          lockTitleKey: "iam.roles",
         },
         component: EditRole,
+        beforeEnter: withFeatureGate("rbac", routeGuard),
       },
-    ].map((route) => withLicenseFeature("rbac", lockInPlace("rbac", route))),
-    withLicenseFeature(
-      "ratelimit",
-      lockInPlace("rbac", {
-        path: "quota",
-        name: "quota",
-        meta: { titleKey: "iam.quota" },
-        component: Quota,
-      }),
-    ),
+    ].map((route) => withLicenseFeature("rbac", route)),
+    withLicenseFeature("ratelimit", {
+      path: "quota",
+      name: "quota",
+      meta: { titleKey: "iam.quota" },
+      component: Quota,
+      beforeEnter: withFeatureGate("rbac", routeGuard),
+    }),
   );
 
   if (config.isCloud == "true") {
@@ -556,7 +555,7 @@ const useEnterpriseRoutes = () => {
     });
   }
 
-  return lockGatedRoutes(routes);
+  return routes;
 };
 
 export default useEnterpriseRoutes;

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :aria-disabled="unavailable || undefined"
     @click="handleClick"
     :class="[
-      'group rounded-default border-border-default bg-surface-base focus-visible:ring-accent/40 relative flex min-h-16 min-w-0 flex-1 basis-56 items-center border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow,transform] duration-(--duration-control) ease-(--ease-control) outline-none focus-visible:ring-[0.125rem] max-md:min-h-0 max-md:basis-full max-md:py-2',
+      'group rounded-default border-border-default bg-surface-base focus-visible:ring-accent/40 relative flex min-h-16 min-w-0 flex-1 basis-56 items-center border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow,transform] duration-150 outline-none focus-visible:ring-[0.125rem] max-md:min-h-0 max-md:basis-full max-md:py-2',
       size === 'compact' ? 'max-w-80 gap-2 max-md:max-w-80' : 'max-w-72 gap-3 max-md:max-w-full',
       unavailable
         ? 'cursor-not-allowed'
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ]"
         ><slot name="label">{{ label }}</slot></span
       >
-      <span v-if="sublabel" class="text-text-secondary block text-xs leading-4">{{
+      <span v-if="sublabel" class="text-text-secondary block text-xs leading-snug">{{
         sublabel
       }}</span>
     </span>

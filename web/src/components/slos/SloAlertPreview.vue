@@ -42,25 +42,27 @@
         </span>
       </PanelBar>
 
-      <div v-if="loading" class="h-16 p-2" data-test="slos-sloalertpreview-loading">
-        <OSkeleton shape="block" class="h-6" />
+      <div
+        v-if="loading"
+        class="flex h-16 items-center justify-center"
+        data-test="slos-sloalertpreview-loading"
+      >
+        <OSpinner size="lg" />
       </div>
-      <OEmptyState
+      <div
         v-else-if="error"
-        kind="error"
-        size="compact"
-        class="h-16 px-4"
-        :title="raw(error)"
+        class="text-text-secondary flex h-16 items-center justify-center px-4 text-center text-sm"
         data-test="slos-sloalertpreview-error"
-      />
-      <OEmptyState
+      >
+        {{ error }}
+      </div>
+      <div
         v-else-if="!hasHistory"
-        size="compact"
-        class="h-16 px-4"
-        icon="history"
-        :title="t('slos.alertSli.preview.noHistory')"
+        class="text-text-secondary flex h-16 items-center justify-center px-4 text-center text-sm"
         data-test="slos-sloalertpreview-empty"
-      />
+      >
+        {{ t("slos.alertSli.preview.noHistory") }}
+      </div>
       <template v-else>
         <div class="p-2">
           <div class="bg-surface-subtle rounded-default relative h-6 w-full overflow-hidden">
@@ -104,8 +106,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import sloService from "@/services/slos";
 import { useLicenseLock } from "@/composables/useFeatureLock";

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <OEmptyState
         v-if="!model"
-        size="compact"
+        size="inline"
         icon="bar-chart"
         :title="t('alerts.incidents.overview.noFirings')"
         data-test="incident-overview-alerts-empty"

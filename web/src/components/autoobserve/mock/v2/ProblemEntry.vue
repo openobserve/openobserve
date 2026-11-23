@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <button
         ref="titleEl"
         type="button"
-        class="text-text-heading focus-visible:ring-focus-ring-accent rounded-default self-start text-start text-sm leading-5 font-semibold text-pretty focus-visible:ring-2 focus-visible:outline-none"
+        class="text-text-heading focus-visible:ring-focus-ring-accent rounded-default self-start text-start text-base leading-snug font-semibold text-pretty focus-visible:ring-2 focus-visible:outline-none"
         :data-test="`autoobserve2-problem-${problem.id}`"
       >
         {{ t(problem.title) }}

@@ -56,15 +56,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OProgressBar :value="progressValue * 100" :tone="progressBarVariant" />
       </div>
 
-      <div v-if="loading && !tasks.length" class="flex flex-col gap-1.5">
-        <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-9" />
+      <!-- Loading -->
+      <div v-if="loading && !tasks.length" class="text-text-secondary py-8 text-center text-sm">
+        {{ t("iam.orgCleanupTasksDialog.loading") }}
       </div>
 
-      <OEmptyState
-        v-else-if="!tasks.length"
-        size="compact"
-        :title="t('iam.orgCleanupTasksDialog.noTasks')"
-      />
+      <!-- Empty -->
+      <div v-else-if="!tasks.length" class="text-text-secondary py-8 text-center text-sm">
+        {{ t("iam.orgCleanupTasksDialog.noTasks") }}
+      </div>
 
       <!-- Task rows -->
       <div v-else class="space-y-1.5">
@@ -250,8 +250,6 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 
 interface CleanupTask {
@@ -269,16 +267,7 @@ interface CleanupTask {
 
 export default defineComponent({
   name: "OrgCleanupTasksDialog",
-  components: {
-    ODialog,
-    OButton,
-    OBadge,
-    OIcon,
-    OProgressBar,
-    OTruncatedText,
-    OEmptyState,
-    OSkeleton,
-  },
+  components: { ODialog, OButton, OBadge, OIcon, OProgressBar, OTruncatedText },
   props: {
     open: { type: Boolean, required: true },
     orgId: { type: String, required: true },

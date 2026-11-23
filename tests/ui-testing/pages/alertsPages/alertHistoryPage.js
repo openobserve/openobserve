@@ -34,7 +34,7 @@ export class AlertHistoryPage {
   }
 
   async expectPageTitleVisible() {
-    await expect(this.page.locator(this.pageTitle)).toContainText('Alert history');
+    await expect(this.page.locator(this.pageTitle)).toContainText('Alert History');
   }
 
   async selectAlert(alertName) {

@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OEmptyState
       v-if="streamMissing"
+      size="inline"
       :title="t('billing.usageTrends.waitingTitle')"
       :text="t('billing.usageTrends.waitingForData')"
       data-test="billings-usagemeterbreakdown-stream-missing"
@@ -85,13 +86,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #error>
-          <OEmptyState kind="error" data-test="billings-usagemeterbreakdown-error">
-            <template #actions>
-              <OButton data-test="billings-usagemeterbreakdown-retry" @click="retry">
-                {{ t("billing.usageV2.retry") }}
-              </OButton>
-            </template>
-          </OEmptyState>
+          <div class="flex flex-col items-center gap-2 p-4">
+            <span class="text-text-secondary text-sm">
+              {{ t("billing.usageV2.drilldownFailed") }}
+            </span>
+            <OButton
+              variant="secondary"
+              data-test="billings-usagemeterbreakdown-retry"
+              @click="retry"
+            >
+              {{ t("billing.usageV2.retry") }}
+            </OButton>
+          </div>
         </template>
       </OTable>
     </div>

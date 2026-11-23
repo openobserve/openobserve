@@ -40,7 +40,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
 
     testLogger.debug("Creating custom variable as parent");
     await scopedVars.addCustomVariable(customVar, ["ziox", "kube-system"], {
-      label: "Stream name",
+      label: "Stream Name",
       scope: "global"
     });
 

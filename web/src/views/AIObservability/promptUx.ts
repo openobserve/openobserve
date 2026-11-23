@@ -1,6 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
 import { raw, type I18nText } from "@/types/i18n";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 
 export function promptErrorText(error: unknown, fallback: I18nText): I18nText {
   if (error && typeof error === "object" && "response" in error) {
@@ -11,5 +10,5 @@ export function promptErrorText(error: unknown, fallback: I18nText): I18nText {
         return raw(data.message);
     }
   }
-  return error instanceof Error && !isRawHttpText(error.message) ? raw(error.message) : fallback;
+  return error instanceof Error ? raw(error.message) : fallback;
 }

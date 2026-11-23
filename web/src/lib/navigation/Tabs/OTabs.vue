@@ -172,7 +172,7 @@ function playFlip(): void {
   void tablistRef.value?.offsetWidth;
   requestAnimationFrame(() => {
     for (const el of moved) {
-      el.style.transition = "transform var(--duration-indicator) var(--ease-control)";
+      el.style.transition = "transform 250ms cubic-bezier(0.2, 0, 0, 1)";
       el.style.transform = "";
     }
   });
@@ -493,11 +493,7 @@ const TabStrip = (): VNode[] => {
               aria-hidden="true"
               data-test="otabs-active-indicator"
               class="bg-tabs-indicator pointer-events-none absolute bottom-0 left-0 z-10 h-0.5 rounded-full"
-              :class="
-                indicatorReady
-                  ? 'transition-[transform,width] duration-(--duration-indicator) ease-(--ease-control)'
-                  : ''
-              "
+              :class="indicatorReady ? 'transition-[transform,width] duration-300 ease-out' : ''"
               :style="{
                 transform: `translateX(${indicator.left}px)`,
                 width: `${indicator.width}px`,

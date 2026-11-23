@@ -192,13 +192,13 @@ const trailingPadding = computed(() =>
 );
 
 const wrapperClasses = computed(() => [
-  "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)",
+  "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
   "bg-input-bg",
   SIZE_CLASSES[props.size ?? "md"],
-  // The accent edge carries the 3:1 focus indicator, so the halo outside it can stay soft.
+  // The focus ring is opaque: at 25% alpha it measured 1.38:1 against the 3:1 floor of SC 1.4.11.
   hasError.value
-    ? "border-input-border-error focus-within:ring-3 focus-within:ring-control-error-halo"
-    : "border-input-border hover:not-focus-within:border-input-border-hover focus-within:border-control-border-focus focus-within:ring-3 focus-within:ring-control-focus-halo",
+    ? "border-input-border-error focus-within:ring-[0.125rem] focus-within:ring-input-border-error/30"
+    : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
   isDisabled.value
     ? "bg-input-disabled-bg border-input-disabled-border cursor-not-allowed border-dashed"
     : "",
@@ -355,12 +355,12 @@ const WIDTH_CLASSES: Record<FieldWidth, string> = {
         :id="errorId"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
         :data-test-error-text="effectiveError"
-        class="text-input-error-text text-xs leading-4"
+        class="text-input-error-text text-xs leading-snug"
         role="alert"
       >
         {{ effectiveError }}
       </span>
-      <span v-else-if="helpText" class="text-input-hint text-xs leading-4">
+      <span v-else-if="helpText" class="text-input-hint text-xs leading-snug">
         {{ helpText }}
       </span>
       <span v-else class="flex-1" />

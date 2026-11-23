@@ -498,14 +498,14 @@ describe("ImportDestination", () => {
       expect(wrapper.vm.destinationCreators[0].message).toContain("Already exists");
     });
 
-    it("falls back to 'Unknown error' when response has no message", async () => {
+    it("falls back to 'Unknown Error' when response has no message", async () => {
       const destService = await import("@/services/alert_destination");
       vi.mocked(destService.default.create).mockRejectedValueOnce(new Error("net error"));
 
       const result = await wrapper.vm.createDestination({ name: "d1" }, 1);
 
       expect(result).toBe(false);
-      expect(wrapper.vm.destinationCreators[0].message).toContain("Unknown error");
+      expect(wrapper.vm.destinationCreators[0].message).toContain("Unknown Error");
     });
   });
 

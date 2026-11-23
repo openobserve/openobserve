@@ -23,7 +23,7 @@ const actionDataTest = computed(() =>
     :data-highlighted="highlighted ? '' : undefined"
   >
     <span class="flex min-w-0 items-center gap-1">
-      <OTruncatedText class="font-semibold">{{ label }}</OTruncatedText>
+      <OTruncatedText class="font-bold">{{ label }}</OTruncatedText>
       <span v-if="count" class="text-select-header-count-text shrink-0 whitespace-nowrap">
         <span aria-hidden="true">·</span>
         {{ count }}

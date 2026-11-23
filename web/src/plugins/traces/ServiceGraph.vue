@@ -1,6 +1,7 @@
 ﻿<template>
   <OCard flush class="h-full">
     <div class="flex h-full flex-col">
+      <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
       <div class="flex flex-wrap items-center gap-2 gap-y-1 p-1.5 pb-0">
         <!-- Stream selector (hidden when a parent drives selection, e.g. the
            Agent Graph page which selects by agent). -->
@@ -34,112 +35,9 @@
             @update:model-value="applyFilters"
           />
         </div>
+        <!-- Spacer -->
         <div class="flex-1" />
-        <!-- Inventory chip: total entity count. Click to expand the per-kind
-           distribution (read-only; the show/hide toggles live in "Show types"). -->
-        <ODropdown side="bottom" align="start">
-          <template #trigger>
-            <OButton data-test="service-graph-entity-count" variant="ghost" icon-end="expand-more">
-              <span v-if="lastRunAt !== null" class="text-text-secondary font-semibold">{{
-                totalEntities
-              }}</span>
-              <span class="text-text-body ms-1">{{ t("traces.serviceGraph.entities") }}</span>
-            </OButton>
-          </template>
-          <div class="min-w-48" data-test="service-graph-entity-distribution">
-            <ODropdownGroup :label="t('traces.serviceGraph.distribution')">
-              <ODropdownItem
-                v-for="row in kindRows"
-                :key="row.key"
-                :data-test="`service-graph-distribution-${row.key}`"
-              >
-                {{ row.label }}
-                <span class="ms-auto ps-4 tabular-nums opacity-70">{{ row.count }}</span>
-              </ODropdownItem>
-            </ODropdownGroup>
-            <ODropdownSeparator />
-            <ODropdownItem data-test="service-graph-distribution-total">
-              <span class="font-semibold">{{ t("traces.serviceGraph.total") }}</span>
-              <span class="ms-auto ps-4 font-semibold tabular-nums">{{ totalEntities }}</span>
-            </ODropdownItem>
-          </div>
-        </ODropdown>
-        <!-- "Show types": unifies the kind inventory (each kind's count) with
-           the kind filter (show/hide) and the layout mode. -->
-        <ODropdown side="bottom" align="end">
-          <template #trigger>
-            <OButton
-              data-test="service-graph-density-btn"
-              variant="secondary"
-              icon="filter-list"
-              :pressed="activeFilterCount > 0"
-            >
-              {{ t("traces.serviceGraph.showTypes") }}
-              <!-- Filter-active dot: signals the graph is filtered (some types
-                 hidden), not simply empty. Per-type detail lives in the
-                 dropdown below. -->
-              <span
-                v-if="activeFilterCount > 0"
-                class="ms-1.5 inline-block h-1.5 w-1.5 rounded-full bg-white"
-                data-test="service-graph-active-filter-indicator"
-              />
-              <OTooltip
-                v-if="activeFilterCount > 0"
-                :content="t('traces.serviceGraph.typesFiltered')"
-              />
-            </OButton>
-          </template>
-          <div class="flex min-w-52 flex-col gap-2 p-2" data-test="service-graph-collapse-mode">
-            <div class="text-2xs font-semibold uppercase opacity-60">
-              {{ t("traces.serviceGraph.layout") }}
-            </div>
-            <OToggleGroup
-              size="sm"
-              :model-value="collapseMode"
-              class="w-full"
-              @update:model-value="(v) => setCollapseMode(v as 'auto' | 'expanded' | 'collapsed')"
-            >
-              <OToggleGroupItem
-                v-for="m in ['auto', 'expanded', 'collapsed'] as const"
-                :key="m"
-                :value="m"
-                class="flex-1"
-                :data-test="`service-graph-collapse-${m}`"
-              >
-                {{ t(`traces.serviceGraph.mode.${m}`) }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <div class="text-2xs mt-1 font-semibold uppercase opacity-60">
-              {{ t("traces.serviceGraph.types") }}
-            </div>
-            <!-- Each row: type name + live count, with a checkbox to show/hide.
-               Services are always shown, so their row is count-only
-               (non-toggleable). -->
-            <div
-              v-for="row in kindRows"
-              :key="row.key"
-              :data-test="
-                row.toggleable
-                  ? `service-graph-kind-toggle-${row.key}`
-                  : `service-graph-kind-count-${row.key}`
-              "
-              class="flex items-center gap-2 text-xs"
-            >
-              <OCheckbox
-                v-if="row.toggleable"
-                :model-value="!hiddenKinds.has(row.key)"
-                @update:model-value="toggleKindVisibility(row.key)"
-              />
-              <!-- Spacer aligning the always-on Services row with the checkboxes -->
-              <span v-else class="inline-block w-3.5 shrink-0" />
-              <span class="flex-1">{{ row.label }}</span>
-              <span class="tabular-nums opacity-70">{{ row.count }}</span>
-            </div>
-          </div>
-        </ODropdown>
-      </div>
-      <!-- A key, not a control: its own row keeps the toolbar on one line. -->
-      <div class="flex px-1.5 pt-1">
+        <!-- Legends (horizontal) -->
         <div
           data-test="service-graph-legends"
           class="rounded-default border-card-glass-border! flex max-w-full flex-row flex-wrap items-center gap-3 gap-y-1.5 border p-[0.325rem]"
@@ -153,9 +51,7 @@
                 : undefined
             "
           >
-            <div
-              class="text-text-label! mb-0! text-xs font-semibold whitespace-nowrap max-md:hidden"
-            >
+            <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap max-md:hidden">
               {{ t("traces.serviceGraph.borderColor") }}
               <span class="font-normal opacity-55"
                 >| {{ t("traces.serviceGraph.borderColorMetric") }}</span
@@ -182,7 +78,7 @@
                   <div class="text-text-secondary! text-left text-xs font-semibold">
                     {{ level.label }}
                   </div>
-                  <div class="text-2xs text-left opacity-55 max-md:hidden">{{ level.range }}</div>
+                  <div class="text-3xs text-left opacity-55 max-md:hidden">{{ level.range }}</div>
                 </div>
               </div>
             </div>
@@ -199,6 +95,116 @@
               {{ t("traces.serviceGraph.dashedRingInferred") }}
             </div>
           </div>
+          <OSeparator vertical class="mx-1 self-stretch max-md:hidden" />
+          <!-- Inventory chip: total entity count. Click to expand the per-kind
+             distribution (read-only; the show/hide toggles live in "Show types"). -->
+          <ODropdown side="bottom" align="start">
+            <template #trigger>
+              <OButton
+                data-test="service-graph-entity-count"
+                variant="ghost"
+                size="sm"
+                icon-end="expand-more"
+              >
+                <span v-if="lastRunAt !== null" class="text-text-secondary font-bold">{{
+                  totalEntities
+                }}</span>
+                <span class="text-text-body ms-1">{{ t("traces.serviceGraph.entities") }}</span>
+              </OButton>
+            </template>
+            <div class="min-w-48" data-test="service-graph-entity-distribution">
+              <ODropdownGroup :label="t('traces.serviceGraph.distribution')">
+                <ODropdownItem
+                  v-for="row in kindRows"
+                  :key="row.key"
+                  :data-test="`service-graph-distribution-${row.key}`"
+                >
+                  {{ row.label }}
+                  <span class="ms-auto ps-4 tabular-nums opacity-70">{{ row.count }}</span>
+                </ODropdownItem>
+              </ODropdownGroup>
+              <ODropdownSeparator />
+              <ODropdownItem data-test="service-graph-distribution-total">
+                <span class="font-semibold">{{ t("traces.serviceGraph.total") }}</span>
+                <span class="ms-auto ps-4 font-semibold tabular-nums">{{ totalEntities }}</span>
+              </ODropdownItem>
+            </div>
+          </ODropdown>
+          <OSeparator vertical class="mx-1 self-stretch" />
+          <!-- "Show types": unifies the kind inventory (each kind's count) with
+             the kind filter (show/hide) and the layout mode. -->
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                data-test="service-graph-density-btn"
+                variant="secondary"
+                size="sm"
+                icon="filter-list"
+                :pressed="activeFilterCount > 0"
+              >
+                {{ t("traces.serviceGraph.showTypes") }}
+                <!-- Filter-active dot: signals the graph is filtered (some types
+                   hidden), not simply empty. Per-type detail lives in the
+                   dropdown below. -->
+                <span
+                  v-if="activeFilterCount > 0"
+                  class="ms-1.5 inline-block h-1.5 w-1.5 rounded-full bg-white"
+                  data-test="service-graph-active-filter-indicator"
+                />
+                <OTooltip
+                  v-if="activeFilterCount > 0"
+                  :content="t('traces.serviceGraph.typesFiltered')"
+                />
+              </OButton>
+            </template>
+            <div class="flex min-w-52 flex-col gap-2 p-2" data-test="service-graph-collapse-mode">
+              <div class="text-3xs font-bold uppercase opacity-60">
+                {{ t("traces.serviceGraph.layout") }}
+              </div>
+              <OToggleGroup
+                size="sm"
+                :model-value="collapseMode"
+                class="w-full"
+                @update:model-value="(v) => setCollapseMode(v as 'auto' | 'expanded' | 'collapsed')"
+              >
+                <OToggleGroupItem
+                  v-for="m in ['auto', 'expanded', 'collapsed'] as const"
+                  :key="m"
+                  :value="m"
+                  class="flex-1"
+                  :data-test="`service-graph-collapse-${m}`"
+                >
+                  {{ t(`traces.serviceGraph.mode.${m}`) }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+              <div class="text-3xs mt-1 font-bold uppercase opacity-60">
+                {{ t("traces.serviceGraph.types") }}
+              </div>
+              <!-- Each row: type name + live count, with a checkbox to show/hide.
+                 Services are always shown, so their row is count-only
+                 (non-toggleable). -->
+              <div
+                v-for="row in kindRows"
+                :key="row.key"
+                :data-test="
+                  row.toggleable
+                    ? `service-graph-kind-toggle-${row.key}`
+                    : `service-graph-kind-count-${row.key}`
+                "
+                class="flex items-center gap-2 text-xs"
+              >
+                <OCheckbox
+                  v-if="row.toggleable"
+                  :model-value="!hiddenKinds.has(row.key)"
+                  @update:model-value="toggleKindVisibility(row.key)"
+                />
+                <!-- Spacer aligning the always-on Services row with the checkboxes -->
+                <span v-else class="inline-block w-3.5 shrink-0" />
+                <span class="flex-1">{{ row.label }}</span>
+                <span class="tabular-nums opacity-70">{{ row.count }}</span>
+              </div>
+            </div>
+          </ODropdown>
           <OSeparator vertical v-if="resolvedVizType === 'graph'" class="mx-1 self-stretch" />
           <div
             v-if="resolvedVizType === 'graph'"
@@ -206,7 +212,7 @@
             class="flex min-w-0 flex-row items-center gap-2"
           >
             <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
-            <div class="text-text-label! mb-0! text-xs font-semibold whitespace-nowrap">
+            <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap">
               {{ t("traces.serviceGraph.nodeSize") }}
               <span class="font-normal opacity-55"
                 >| {{ t("traces.serviceGraph.nodeSizeMetric") }}</span
@@ -221,7 +227,7 @@
                   t("traces.serviceGraph.sizeLow")
                 }}</span>
               </div>
-              <div class="mb-0 text-sm tracking-[0.125rem] opacity-35">···</div>
+              <div class="mb-0 text-base tracking-[0.125rem] opacity-35">···</div>
               <div class="flex flex-row items-center gap-1.5">
                 <span
                   class="border-service-health-healthy h-7 w-7 shrink-0 rounded-full border-2 bg-transparent"
@@ -243,25 +249,30 @@
           class="graph-container rounded-default bg-surface-subtle relative h-full w-full overflow-hidden"
         >
           <!-- Before the first load settles an empty graph means "not fetched yet", not "no data". -->
-          <OSkeleton
+          <div
             v-if="loading || lastRunAt === null"
-            shape="block"
-            class="h-full"
+            class="flex h-full items-center justify-center"
             data-test="service-graph-loading"
-          />
-          <OEmptyState
-            v-else-if="error"
-            kind="error"
-            :text="raw(error)"
-            data-test="service-graph-error"
           >
-            <template #actions>
-              <OButton @click="loadServiceGraph">
+            <div class="flex flex-col items-center text-center">
+              <OSpinner size="lg" />
+              <div class="text-text-secondary mt-3 text-sm">
+                {{ t("traces.serviceGraph.loading") }}
+              </div>
+            </div>
+          </div>
+          <div v-else-if="error" class="flex h-full items-center justify-center p-[0.675rem]">
+            <div>
+              <OIcon name="error-outline" style="width: 4em; height: 4em" />
+              <div class="text-text-heading mt-3 text-xl font-semibold">
+                {{ error }}
+              </div>
+              <OButton variant="secondary" @click="loadServiceGraph" class="mt-4" icon="refresh">
                 {{ t("traces.serviceGraph.retry") }}
               </OButton>
-            </template>
-          </OEmptyState>
-          <div v-else-if="!graphData.nodes.length" class="flex h-full flex-col">
+            </div>
+          </div>
+          <div v-else-if="!graphData.nodes.length" class="flex h-full items-center justify-center">
             <ServiceGraphNoDataState
               @jump-to-stream-data="(from, to) => $emit('jump-to-stream-data', from, to)"
             />
@@ -338,7 +349,6 @@ import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { getFontSans } from "@/utils/fonts";
 import serviceGraphService from "@/services/service_graph";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
@@ -356,10 +366,9 @@ import {
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
@@ -388,11 +397,11 @@ export default defineComponent({
     ServiceGraphSidePanel,
     OButton,
     ODialog,
-    OSkeleton,
-    OEmptyState,
+    OSpinner,
     OTooltip,
     OSelect,
     OSearchInput,
+    OIcon,
     OCard,
     ODropdown,
     ODropdownItem,
@@ -1253,8 +1262,8 @@ export default defineComponent({
         tooltipEl.style.height = "";
         tooltipEl.style.padding = "0.5625rem 0.8125rem";
         tooltipEl.style.fontSize = "0.75rem";
-        tooltipEl.style.lineHeight = "1rem";
-        tooltipEl.style.fontFamily = getFontSans();
+        tooltipEl.style.lineHeight = "1.5";
+        tooltipEl.style.fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
         tooltipEl.style.letterSpacing = "0.01em";
         tooltipEl.style.whiteSpace = "nowrap";
         tooltipEl.style.color = isDark.value ? "rgba(255,255,255,0.88)" : "rgba(0,0,0,0.82)";
@@ -1685,10 +1694,7 @@ export default defineComponent({
           error.value = t("traces.serviceGraph.errorNetwork");
         } else {
           error.value =
-            err.response?.data?.message ||
-            (err.message && !isRawHttpText(err.message)
-              ? err.message
-              : t("traces.serviceGraph.errorLoadFailed"));
+            err.response?.data?.message || err.message || t("traces.serviceGraph.errorLoadFailed");
         }
       } finally {
         loading.value = false;

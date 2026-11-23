@@ -177,12 +177,12 @@ describe("OnCallScheduleTimeline", () => {
   });
 
   /// One "Cover a shift" lives in the team header, and templates replace a schedule, so neither sits in the toolbar.
-  it("labels Add rotation with text only", () => {
+  it("labels Add rotation with a leading icon", () => {
     const wrapper = render();
 
     const add = wrapper.find('[data-test="oncall-timeline-add"]');
     expect(add.text()).toBe("Add rotation");
-    expect(add.attributes("data-icon")).toBeUndefined();
+    expect(add.attributes("data-icon")).toBe("add");
   });
 
   // A staffed team still finds the templates where it adds a rotation, not only in the first lane's menu.

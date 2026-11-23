@@ -310,7 +310,7 @@ describe("AlertTargetsSelect", () => {
 
     it("enterprise: says no destinations OR workflows are available", () => {
       const wrapper = createWrapper({ workflowsEnabled: true });
-      expect(wrapper.find(".o-select-empty").text()).toBe("No destinations or workflows available");
+      expect(wrapper.find(".o-select-empty").text()).toBe("No Destinations Or Workflows Available");
     });
   });
 

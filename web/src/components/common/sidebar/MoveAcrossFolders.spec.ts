@@ -60,7 +60,6 @@ const ODialogStub = {
     "</div>",
   props: [
     "open",
-    "dirty",
     "side",
     "persistent",
     "size",
@@ -195,7 +194,7 @@ describe("MoveAcrossFolders.vue", () => {
 
     const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.exists()).toBe(true);
-    expect(drawer.props("title")).toBe("Move Pipelines to another folder");
+    expect(drawer.props("title")).toBe("Move Pipelines To Another Folder");
   });
 
   // Test 4: Current folder name displayed via OInput modelValue
@@ -255,21 +254,6 @@ describe("MoveAcrossFolders.vue", () => {
     expect(drawer.props("primary")?.disabled).toBeFalsy();
   });
 
-  it("asks before closing only after the user picked a folder, not when the picker settles", async () => {
-    wrapper = createWrapper({ activeFolderId: "folder1", type: "alerts" });
-    const selectDropdown = wrapper.findComponent({ name: "SelectFolderDropDown" });
-    const dialog = () => wrapper.findComponent(ODialogStub);
-
-    await selectDropdown.vm.$emit("folder-selected", { value: "default", label: "Default Folder" });
-    await nextTick();
-    expect(dialog().props("dirty")).toBe(false);
-
-    window.dispatchEvent(new Event("pointerdown"));
-    await selectDropdown.vm.$emit("folder-selected", { value: "folder2", label: "Test Folder 2" });
-    await nextTick();
-    expect(dialog().props("dirty")).toBe(true);
-  });
-
   // Test 8: getModuleName function for alerts
   it("should return correct module name for alerts type", () => {
     wrapper = createWrapper({ type: "alerts" });
@@ -290,8 +274,8 @@ describe("MoveAcrossFolders.vue", () => {
 
   it("keeps the folder wording for alerts", async () => {
     wrapper = createWrapper({ activeFolderId: "folder1", moduleId: ["a1"], type: "alerts" });
-    expect(wrapper.findComponent(ODialogStub).props("title")).toBe("Move Alerts to another folder");
-    expect(wrapper.text()).toContain("Current folder");
+    expect(wrapper.findComponent(ODialogStub).props("title")).toBe("Move Alerts To Another Folder");
+    expect(wrapper.text()).toContain("Current Folder");
     wrapper.vm.selectedFolder = { label: "Folder 2", value: "folder2" };
     mockMoveModuleToAnotherFolder.mockResolvedValue(true);
 
@@ -782,7 +766,7 @@ describe("MoveAcrossFolders.vue", () => {
     });
 
     const initialFolder = wrapper.vm.selectedFolder;
-    const newFolder = { value: "folder2", label: "New folder" };
+    const newFolder = { value: "folder2", label: "New Folder" };
 
     const selectComponent = wrapper.findComponent({ name: "SelectFolderDropDown" });
     await selectComponent.vm.$emit("folder-selected", newFolder);

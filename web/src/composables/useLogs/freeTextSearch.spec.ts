@@ -17,7 +17,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   FREE_TEXT_SCHEMA_MAX_AGE_MS,
   buildFilterContext,
-  callsMatchAll,
   filterForParsing,
   freeTextDecorations,
   freeTextHighlight,
@@ -25,7 +24,6 @@ import {
   freeTextWhereByStream,
   isFilterHeld,
   loadPendingFreeTextSchemas,
-  matchAllBlocked,
   noFtsStreams,
   noFtsRecoveryTerm,
   noFtsRecoveryStreams,
@@ -372,31 +370,6 @@ describe("noFtsStreams", () => {
       { name: "raw", hasTextFields: true },
       { name: "metrics_only", hasTextFields: false },
     ]);
-  });
-});
-
-describe("typed match_all on a stream without full-text keys", () => {
-  it.each([
-    ["match_all('timeout')", true],
-    ["status = 500 AND fuzzy_match_all('timeot', 1)", true],
-    ["MATCH_ALL ( 'x' )", true],
-    ["message = 'match_all(x)'", false],
-    ["my_match_all('x')", false],
-    ["timeout", false],
-  ])("callsMatchAll(%s) is %s", (filter, expected) => {
-    expect(callsMatchAll(filter)).toBe(expected);
-  });
-
-  it("blocks it only where the stream has no full-text keys", () => {
-    const ctx = buildFilterContext(makeSearchObj("", [fts("app"), noFts("raw")]), zoConfig);
-    expect(matchAllBlocked("match_all('x')", ctx.targets.raw)).toBe(true);
-    expect(matchAllBlocked("match_all('x')", ctx.targets.app)).toBe(false);
-    expect(matchAllBlocked("match_all('x')", undefined)).toBe(false);
-  });
-
-  it("prefills the recovery term from the typed call", () => {
-    const obj = makeSearchObj("match_all('it''s down')", [noFts("raw")]);
-    expect(noFtsRecoveryTerm(obj, zoConfig)).toBe("it's down");
   });
 });
 

@@ -36,7 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="listRef"
           :variables="scope.variables"
           :loading="loading"
-          :last-run-at="lastUpdatedAt"
           :forbidden="forbidden"
           :environment="scope.isGlobal ? null : (scope.environment?.name ?? null)"
           :environments="overridingEnvironments"
@@ -120,7 +119,6 @@ const deleteShown = ref({ name: "", variables: 0 });
 const environments = ref<SyntheticsEnvironment[]>([]);
 const globals = ref<SyntheticsVariable[]>([]);
 const loading = ref(false);
-const lastUpdatedAt = ref<number | null>(null);
 const forbidden = ref<ForbiddenState>(false);
 const selectedScope = ref<string>("");
 const environmentDrawer = ref({
@@ -156,7 +154,6 @@ async function refresh() {
     ]);
     environments.value = envRes.data ?? [];
     globals.value = globalRes.data ?? [];
-    lastUpdatedAt.value = Date.now();
   } catch (error) {
     forbidden.value = forbiddenState(error);
     toast({

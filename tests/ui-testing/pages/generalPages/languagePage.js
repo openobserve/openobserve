@@ -36,7 +36,7 @@ class LanguagePage {
   // PO can resolve the locator through a constructor factory (POM strict).
   SUB_PAGES = {
     Logs: [
-      { name: 'SQL mode', action: 'toggleSqlMode' },
+      { name: 'SQL Mode', action: 'toggleSqlMode' },
     ],
     RUM: [
       { name: 'Sessions', path: '/rum/sessions' },
@@ -46,20 +46,20 @@ class LanguagePage {
     ],
     Pipelines: [
       { name: 'Functions', path: '/pipeline/functions' },
-      { name: 'Enrichment tables', path: '/pipeline/enrichment-tables' },
+      { name: 'Enrichment Tables', path: '/pipeline/enrichment-tables' },
       { name: 'Pipelines List', path: '/pipeline/pipelines' },
     ],
     Streams: [
       { name: 'Stream Explorer', path: '/streams/stream-explore' },
     ],
     Reports: [
-      { name: 'Create report', path: '/reports/create' },
+      { name: 'Create Report', path: '/reports/create' },
     ],
     Alerts: [
       { name: 'Alerts Tab', tabDataTest: 'alerts-alerts-tab' },
       { name: 'Destinations Tab', tabDataTest: 'alerts-destinations-tab' },
       { name: 'Templates Tab', tabDataTest: 'alerts-templates-tab' },
-      { name: 'Alert history', path: '/alerts/history' },
+      { name: 'Alert History', path: '/alerts/history' },
     ],
     'Data Sources': [
       { name: 'Logs Ingestion', path: '/ingestion/custom/logs' },
@@ -94,20 +94,20 @@ class LanguagePage {
     'Search', 'Refresh', 'Back', 'Next', 'Previous', 'Confirm', 'Submit',
     'Home', 'Logs', 'Metrics', 'Traces', 'Dashboards', 'Streams', 'Alerts',
     'Data sources', 'Ingestion', 'Settings', 'Management', 'Help', 'About',
-    'Sign out', 'Language', 'Reports', 'IAM', 'Functions', 'Pipelines',
+    'Sign Out', 'Language', 'Reports', 'IAM', 'Functions', 'Pipelines',
     'Query', 'Fields', 'Results', 'Filter', 'Filters', 'Name', 'Type', 'Value',
     'Description', 'Status', 'Actions', 'Duration', 'Date', 'Time',
     'Start time', 'End time', 'Timestamp', 'Source', 'Details',
     'Search Results', 'No results found', 'Records per page', 'Showing',
-    'SQL mode', 'Quick mode', 'Syntax guide', 'Run query', 'Export logs',
-    'Histogram', 'Editors', 'Patterns', 'Search stream', 'Select stream',
+    'SQL Mode', 'Quick Mode', 'Syntax guide', 'Run query', 'Export logs',
+    'Histogram', 'Editors', 'Patterns', 'Search Stream', 'Select Stream',
     'Select metric', 'Add metric', 'Aggregation', 'Group by', 'Legend',
-    'Add Dashboard', 'Add panel', 'Dashboard', 'Panel', 'Variables',
+    'Add Dashboard', 'Add Panel', 'Dashboard', 'Panel', 'Variables',
     'Import', 'Export', 'Clone', 'Folder', 'Add Folder',
     'Stream', 'Schema', 'Settings', 'Retention', 'Storage', 'Index',
-    'Add Stream', 'Delete stream', 'Partition',
+    'Add Stream', 'Delete Stream', 'Partition',
     'Alert', 'Destination', 'Template', 'Trigger', 'Condition', 'Threshold',
-    'Create Alert', 'Edit alert', 'Add Destination', 'Add Template',
+    'Create Alert', 'Edit Alert', 'Add Destination', 'Add Template',
     'Real Time', 'Scheduled', 'Enabled', 'Disabled',
     'Data Sources', 'Custom', 'Recommended', 'Logs', 'Metrics', 'Traces',
     'FluentBit', 'Fluentd', 'Vector', 'OTEL', 'Prometheus', 'Kubernetes',
@@ -199,7 +199,7 @@ class LanguagePage {
     this.alertsTemplatesTab = page.locator('[data-test="alerts-templates-tab"]');
 
     // Logs page
-    this.sqlModeToggle = page.locator('[data-test="logs-search-bar-query-mode-sql"]');
+    this.sqlModeToggle = page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
 
     // Dashboard
     this.addDashboardBtn = page.locator('[data-test="dashboard-new"]');
@@ -615,20 +615,33 @@ class LanguagePage {
     for (const subPage of subPages) {
       try {
         if (subPage.action === 'toggleSqlMode') {
-          // Special action: switch the toolbar's Filter | SQL tray to SQL, scrape, then switch back.
-          const sqlSegment = this.page.locator('[data-test="logs-search-bar-query-mode-sql"]');
-          const filterSegment = this.page.locator('[data-test="logs-search-bar-query-mode-filter"]');
-          const segmentVisible = await sqlSegment.isVisible({ timeout: 3000 }).catch(() => false);
-          if (segmentVisible) {
-            await sqlSegment.click();
-            // Wait for the SQL editor surface (Monaco) to mount before scraping.
-            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-            const texts = await this._extractAllVisibleText();
-            results.push({
-              name: subPage.name,
-              analysis: this._analyzeTranslation(texts, langCode),
-            });
-            await filterSegment.click();
+          // Special action: toggle SQL mode.
+          // Use [data-test="logs-search-bar-menu-sql-mode-btn"] (the ODropdownItem) — the legacy
+          // data-test="logs-search-bar-sql-mode-toggle-btn" is on an unrelated syntax-guide component.
+          const utilitiesBtn = this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+          const sqlModeMenuItem = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]');
+          const utilitiesBtnVisible = await utilitiesBtn.isVisible({ timeout: 2000 }).catch(() => false);
+          if (utilitiesBtnVisible) {
+            await utilitiesBtn.click();
+            const menuItemVisible = await sqlModeMenuItem.isVisible({ timeout: 3000 }).catch(() => false);
+            if (menuItemVisible) {
+              await sqlModeMenuItem.click();
+              await this.page.keyboard.press('Escape');
+              // Wait for the SQL editor surface (Monaco) to mount before scraping.
+              await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+              const texts = await this._extractAllVisibleText();
+              results.push({
+                name: subPage.name,
+                analysis: this._analyzeTranslation(texts, langCode),
+              });
+              // Toggle back: reopen the menu and click again
+              await utilitiesBtn.click();
+              await sqlModeMenuItem.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+              await sqlModeMenuItem.click();
+              await this.page.keyboard.press('Escape');
+            } else {
+              await this.page.keyboard.press('Escape');
+            }
           }
         } else if (subPage.path) {
           // Navigate to sub-page URL

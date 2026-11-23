@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="canManualEvaluate"
               icon-only
               data-test="trace-details-evaluate-trace-btn"
-              variant="ghost"
+              variant="secondary"
               :aria-label="t('onlineEvals.manualEvaluation.titles.trace')"
               @click="openTraceEvaluation"
             >
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-else
                 icon-only
-                variant="ghost"
+                variant="secondary"
                 :aria-label="t('aiObservability.traceActions.annotate.button')"
                 data-test="trace-details-annotate-trace-btn"
                 @click="openUpgradeDialog"
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="canAnnotateContext"
               icon-only
               data-test="trace-details-dataset-trace-btn"
-              variant="ghost"
+              variant="secondary"
               :aria-label="t('aiObservability.traceActions.dataset.button')"
               @click="openTraceDataset"
             >
@@ -163,6 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="showShareButton"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
+              variant="secondary"
             />
 
             <!-- Close button -->
@@ -170,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="showCloseButton"
               icon-only
               data-test="trace-details-close-btn"
-              variant="ghost"
+              variant="secondary"
               @click="handleBackOrClose"
             >
               <OIcon name="close" size="sm" />
@@ -191,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTruncatedText
                 as="div"
                 data-test="trace-details-operation-name"
-                class="text-text-heading text-title max-w-96! leading-tight font-semibold"
+                class="text-text-heading max-w-96! text-base leading-tight font-semibold"
               >
                 {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
               </OTruncatedText>
@@ -324,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="mode === 'embedded' && showExpandButton"
               icon-only
               data-test="trace-details-expand-btn"
-              variant="ghost"
+              variant="secondary"
               @click="handleExpandToFullView"
             >
               <OIcon name="open-in-new" size="sm" />
@@ -336,6 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isStandaloneMode && showShareButton"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
+              variant="secondary"
               buttonClass="me-1!"
             />
 
@@ -344,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isStandaloneMode && showCloseButton"
               icon-only
               data-test="trace-details-close-btn"
-              variant="ghost"
+              variant="secondary"
               class="me-1!"
               @click="handleBackOrClose"
             >
@@ -731,7 +733,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="border-s-solid border-s-card-glass-border min-h-0 shrink-0 overflow-x-hidden overflow-y-auto border-s"
+                class="border-s-solid border-s-card-glass-border min-h-0 shrink-0 overflow-x-hidden overflow-y-auto border-s transition-all duration-300"
                 :class="isTimelineExpanded ? '' : 'full'"
                 :style="{
                   width: `calc(100% - ${leftWidth}px)`,
@@ -925,7 +927,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="p-10 text-center" style="color: var(--color-text-secondary)">
                 <OIcon name="table-chart" class="mb-4" style="width: 3rem; height: 3rem" />
-                <div class="mb-2 font-semibold" style="font-size: var(--text-sm)">
+                <div class="mb-2 font-semibold" style="font-size: var(--text-base)">
                   {{ t("traces.spansTableView") }}
                 </div>
                 <div style="font-size: var(--text-sm)">{{ t("traces.comingSoon") }}</div>
@@ -986,11 +988,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         (searchObj.data.traceDetails.isLoadingTraceDetails ||
           searchObj.data.traceDetails.isLoadingTraceMeta)
       "
-      class="flex h-full flex-col gap-3 p-3"
-      data-test="trace-details-loading"
+      class="flex h-full flex-col items-center justify-center"
     >
-      <OSkeleton class="h-6 w-1/3" />
-      <OSkeleton preset="tableRows" :rows="10" />
+      <OSpinner data-test="trace-details-loading-spinner" size="lg" />
+      <div data-test="trace-details-loading-text" class="pt-2">
+        {{ t("traces.fetchingTrace") }}
+      </div>
     </div>
     <div
       v-else-if="licenseLockedView"
@@ -1009,32 +1012,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </FeatureLockExempt>
       <LicenseDeniedState :features="['traces']" />
-    </div>
-    <div v-else-if="traceMissing" class="flex min-h-0 flex-1 flex-col">
-      <OPageHeader
-        :title="t('routeTitles.traceDetails')"
-        :back="
-          showBackButton
-            ? {
-                label: t('menu.traces'),
-                to: tracesListRoute(),
-                onClick: handleBackOrClose,
-                dataTest: 'trace-details-back-btn',
-              }
-            : undefined
-        "
-      />
-      <TraceMissingState
-        :kind="traceMissing.kind"
-        :trace-id="effectiveTraceId"
-        :stream="traceMissing.stream"
-        :from="traceMissing.from"
-        :to="traceMissing.to"
-        :can-widen="!!widerTraceRange"
-        @widen="searchWiderTraceRange"
-        @search-range="searchSpansInTraceRange"
-        @retry="openTraceLink"
-      />
     </div>
 
     <!-- Filters Sidebar -->
@@ -1146,13 +1123,7 @@ import {
   filterTraceTree,
 } from "@/utils/traces/traceServiceGraph";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
-import {
-  resolveReplaySpan,
-  resolveSessionId,
-  resolveUrlTimeRange,
-  widerTraceWindow,
-} from "./traceDetails.utils";
-import TraceMissingState from "./TraceMissingState.vue";
+import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
 import {
   buildFilterTerm,
   applyFilterTerm,
@@ -1209,7 +1180,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -1449,7 +1420,6 @@ export default defineComponent({
   },
   components: {
     ShareButton,
-    TraceMissingState,
     OPageHeader,
     FeatureLockExempt,
     LicenseDeniedState,
@@ -1473,7 +1443,7 @@ export default defineComponent({
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
     CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
-    OSkeleton,
+    OSpinner,
     OTooltip,
     OTruncatedText,
     OSearchInput,
@@ -2453,17 +2423,8 @@ export default defineComponent({
       }, 300);
     };
 
-    // Standalone only: the page states a missing or unloadable trace in place of the waterfall.
-    const traceMissing = ref<{
-      kind: "not-found" | "error";
-      stream: string;
-      from: number;
-      to: number;
-    } | null>(null);
-
     const resetTraceDetails = () => {
       resetPaging();
-      traceMissing.value = null;
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = "";
       // Selection is being cleared — cancel any live scroll targeting it.
@@ -2840,7 +2801,7 @@ export default defineComponent({
         if ((error as { response?: { status?: number } })?.response?.status !== 401) {
           console.error("Error fetching trace details:", error);
         }
-        showTraceDetailsError("error");
+        showTraceDetailsError();
       } finally {
         if (generation === loadGeneration) {
           searchObj.data.traceDetails.isLoadingTraceDetails = false;
@@ -2900,7 +2861,7 @@ export default defineComponent({
       });
     };
 
-    const showTraceDetailsError = (kind: "not-found" | "error" = "not-found") => {
+    const showTraceDetailsError = () => {
       if (props.mode === "embedded") {
         // The host page stays put; the notice is enough.
         showErrorNotification(
@@ -2908,13 +2869,20 @@ export default defineComponent({
         );
         return;
       }
-      const range = effectiveTimeRange.value;
-      traceMissing.value = {
-        kind,
-        stream: effectiveStreamName.value,
-        from: pagedTrace?.from ?? range.from,
-        to: pagedTrace?.to ?? range.to,
-      };
+      showErrorNotification(
+        t("traces.traceDetails.traceNotFound", {
+          traceId: router.currentRoute.value.query.trace_id,
+        }),
+      );
+      const query = cloneDeep(router.currentRoute.value.query);
+      delete query.trace_id;
+      router.push({
+        name: "traces",
+        query: {
+          ...query,
+        },
+      });
+      return;
     };
 
     function generateNewColor() {
@@ -3687,40 +3655,6 @@ export default defineComponent({
       backToTracesList();
     };
 
-    const openTraceLink = async () => {
-      resetTraceDetails();
-      await setupTraceDetails();
-    };
-
-    const widerTraceRange = computed(() =>
-      traceMissing.value?.kind === "not-found"
-        ? widerTraceWindow(traceMissing.value.from, traceMissing.value.to, Date.now() * 1000)
-        : null,
-    );
-
-    const searchWiderTraceRange = async () => {
-      const range = widerTraceRange.value;
-      if (!range) return;
-      await router.replace({
-        query: { ...router.currentRoute.value.query, from: range.from, to: range.to },
-      });
-      await openTraceLink();
-    };
-
-    const searchSpansInTraceRange = () => {
-      const missing = traceMissing.value;
-      if (!missing) return;
-      router.push({
-        name: "traces",
-        query: {
-          stream: missing.stream,
-          from: missing.from,
-          to: missing.to,
-          org_identifier: effectiveOrgIdentifier.value,
-        },
-      });
-    };
-
     // ── Keyboard shortcuts — span navigation ─────────────────────────────
     const spanNavAnnouncement = ref("");
     const announceSpanNav = (message: string) => announceInto(spanNavAnnouncement, message);
@@ -3769,11 +3703,6 @@ export default defineComponent({
       router,
       t,
       raw,
-      traceMissing,
-      openTraceLink,
-      widerTraceRange,
-      searchWiderTraceRange,
-      searchSpansInTraceRange,
       showCriticalPath,
       setShowCriticalPath,
       aiIconSrc,

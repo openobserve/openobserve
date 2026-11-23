@@ -85,8 +85,8 @@ export async function deleteDashboard(page, dashboardName) {
   .locator('//tr[.//div[@title="' + dashboardName + '"]]')
   .nth(0);
 
-  await dashboardRow.locator('[data-test="dashboard-row-more-actions"]').click();
-  await page.locator('[data-test="dashboard-delete-menu"]').click();
+  const deleteButton = dashboardRow.locator('[data-test="dashboard-delete"]');
+  await deleteButton.click();
 
   // Wait for the confirm button to be visible (dialog teleports content to body; text element
   // may be in DOM but hidden during animation — confirm button visibility is more reliable)

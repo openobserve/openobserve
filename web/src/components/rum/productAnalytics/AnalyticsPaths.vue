@@ -246,6 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="def.cohort"
                 variant="secondary"
+                icon="arrow-back"
                 data-test="rum-analytics-paths-empty-back-btn"
                 @click="backToFunnel"
                 >{{ t("rum.analytics.pathsView.backToFunnel") }}</OButton

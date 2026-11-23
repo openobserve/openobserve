@@ -52,7 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("workflow.http.rejectionsCaption", { count: total }, total) }}
       </OText>
       <ORefreshButton
-        :last-run-at="lastRunAt"
         :loading="loading"
         data-test="workflow-http-rejections-refresh"
         @click="emit('refresh')"
@@ -68,24 +67,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="workflow-http-rejections-skeleton"
       />
     </div>
-    <OEmptyState
-      v-else-if="error"
-      kind="error"
-      size="compact"
-      class="px-3"
-      :title="t('workflow.http.rejectionsLoadError')"
-    >
-      <template #actions>
-        <OButton
-          variant="secondary"
-          size="sm"
-          data-test="workflow-http-rejections-retry"
-          @click="emit('refresh')"
-        >
-          {{ t("common.retry") }}
-        </OButton>
-      </template>
-    </OEmptyState>
+    <div v-else-if="error" class="flex items-center gap-3 px-3 pb-3">
+      <OText variant="meta" class="text-status-negative min-w-0 flex-1">
+        {{ t("workflow.http.rejectionsLoadError") }}
+      </OText>
+      <OButton
+        variant="secondary"
+        size="sm"
+        data-test="workflow-http-rejections-retry"
+        @click="emit('refresh')"
+      >
+        {{ t("common.retry") }}
+      </OButton>
+    </div>
     <ul v-else class="divide-border-default flex flex-col divide-y px-3">
       <li
         v-for="row in rows"
@@ -142,9 +136,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
-import { useLoadedAt } from "@/composables/useLoadedAt";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { httpStatusBucket } from "@/lib/core/Badge/badgeGroups";
 import { formatTimestampInTimezone } from "@/utils/date";
 import type { HookReasonCode, HttpRejection } from "@/services/workflows";
@@ -174,8 +166,6 @@ const props = defineProps<{
   canRaise: boolean;
   canRotate: boolean;
 }>();
-
-const lastRunAt = useLoadedAt(() => props.loading);
 
 const emit = defineEmits<{
   (e: "rotate"): void;

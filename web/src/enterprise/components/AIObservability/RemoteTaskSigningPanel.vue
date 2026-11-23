@@ -12,7 +12,7 @@
 <template>
   <section class="flex flex-col gap-3" data-test="ai-remote-task-signing-panel">
     <div class="flex flex-col gap-1">
-      <h3 class="text-text-heading m-0 text-sm font-semibold">
+      <h3 class="text-text-heading m-0 text-sm font-bold">
         {{ t("aiObservability.remoteTasks.signingPanel.title") }}
       </h3>
       <p class="text-text-secondary m-0 text-xs leading-relaxed">

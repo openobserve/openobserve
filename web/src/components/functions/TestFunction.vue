@@ -113,7 +113,7 @@
             class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start p-[0.1875rem_0.5rem_0_2.15rem] select-none"
           >
             <span
-              class="query-editor-placeholder-typewriter text-text-placeholder text-compact overflow-hidden font-mono leading-5 text-ellipsis whitespace-nowrap"
+              class="query-editor-placeholder-typewriter text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
               >{{ queryEditorPlaceholder }}</span
             >
           </div>
@@ -138,7 +138,7 @@
         <template #left>
           <div
             v-if="loading.events"
-            class="text-text-secondary text-compact ms-2 flex items-center font-semibold"
+            class="text-text-secondary text-compact ms-2 flex items-center font-bold"
           >
             <OSpinner />
             <div class="relative top-0.5">
@@ -194,7 +194,7 @@
         <template #left>
           <div
             v-if="loading.output"
-            class="text-text-secondary text-compact ms-2 flex items-center text-sm font-semibold"
+            class="text-text-secondary text-compact ms-2 flex items-center text-sm font-bold font-medium"
           >
             <OSpinner />
             <div class="relative top-0.5">

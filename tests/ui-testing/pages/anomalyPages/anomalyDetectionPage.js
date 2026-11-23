@@ -84,7 +84,7 @@ class AnomalyDetectionPage {
             // the label and take the cursor-pointer icon span — the OTooltip's hidden anchor span
             // (also aria-hidden) has no cursor-pointer class and is excluded.
             detectionFunctionInfo:
-              'div.font-semibold:has-text("Detection function") span[aria-hidden="true"].cursor-pointer',
+              'div.font-semibold:has-text("Detection Function") span[aria-hidden="true"].cursor-pointer',
             detectionFunctionField: '[data-test="anomaly-detection-function-field"]',
             histogramIntervalValue: '[data-test="anomaly-histogram-interval-value"]',
             histogramIntervalUnit: '[data-test="anomaly-histogram-interval-unit"]',
@@ -411,7 +411,7 @@ class AnomalyDetectionPage {
         await this.selectOptionByValue(this.selectors.detectionFunctionField, field);
     }
 
-    /** The info icon beside the "Detection function" label (its explainer tooltip). */
+    /** The info icon beside the "Detection Function" label (its explainer tooltip). */
     getDetectionFunctionInfoLocator() {
         return this.page.locator(this.selectors.detectionFunctionInfo);
     }

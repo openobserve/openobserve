@@ -241,7 +241,7 @@ test.describe('Logs bare-word search (item 1)', () => {
 
     await expect(page.locator(panel)).toContainText(`Full-text search fields are not configured for ${NOFTS}`, { timeout: 30000 });
     expect(searches.hits()).toHaveLength(0);
-    await page.locator('[data-test="logs-search-bar-utilities-menu-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
     const alertItem = page.locator('[data-test="logs-create-alert-btn"]');
     await expect(alertItem).toBeDisabled();
     await page.keyboard.press('Escape');
@@ -333,14 +333,14 @@ test.describe('Logs bare-word search (item 1)', () => {
     const logsPage = new PageManager(page).logsPage;
     await open(page, FTS, 'timeout');
     await logsPage.expectFieldListItemVisible('body');
-    await page.locator(logsPage.sqlModeToggle).click();
+    await logsPage._setSqlModeViaVue(true);
     await expect
       .poll(() => editorText(page), { timeout: 15000 })
       .toBe(`SELECT * FROM "${FTS}" WHERE match_all('timeout')`);
 
     await open(page, NOFTS, 'timeout');
     await logsPage.expectFieldListItemVisible('msg_text');
-    await page.locator(logsPage.sqlModeToggle).click();
+    await logsPage._setSqlModeViaVue(true);
     await expect(page.locator(panel)).toBeVisible({ timeout: 15000 });
     await expect.poll(() => logsPage._isSqlModeEnabledViaVue()).toBe(false);
     expect(await editorText(page)).toBe('timeout');
@@ -356,7 +356,7 @@ test.describe('Logs bare-word search (item 1)', () => {
       await route.continue();
     });
     await open(page, NOFTS, 'timeout');
-    await page.locator(logsPage.sqlModeToggle).click();
+    await logsPage._setSqlModeViaVue(true);
     await expect(page.locator(panel)).toBeVisible({ timeout: 20000 });
     await expect.poll(() => logsPage._isSqlModeEnabledViaVue()).toBe(false);
     expect(await editorText(page)).toBe('timeout');
@@ -372,7 +372,7 @@ test.describe('Logs bare-word search (item 1)', () => {
       await route.continue();
     });
     await open(page, FTS, 'timeout');
-    await page.locator(logsPage.sqlModeToggle).click();
+    await logsPage._setSqlModeViaVue(true);
     await expect
       .poll(() => editorText(page), { timeout: 20000 })
       .toBe(`SELECT * FROM "${FTS}" WHERE match_all('timeout')`);

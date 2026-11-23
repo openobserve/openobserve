@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="absolute inset-y-0 start-0 w-1" :class="TUNING_LOOK.accent" aria-hidden="true" />
       <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
         <h3
-          class="text-text-heading min-w-0 text-sm leading-5 font-semibold text-pretty"
+          class="text-text-heading min-w-0 text-base leading-snug font-semibold text-pretty"
           :data-test="`autoobserve2-change-${change.id}-headline`"
         >
           {{ headline }}

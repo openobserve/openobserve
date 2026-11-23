@@ -38,10 +38,10 @@
   --text-2xs: 0.6875rem; /* 11px — key chips, chart axes, micro captions */
   --text-xs: 0.75rem; /* 12px — meta, helper text, chips, badges, column headers */
   --text-compact: 0.8125rem; /* 13px — UI text: controls, menus, table cells, labels */
-  --text-sm: 0.875rem; /* 14px — reading text; semibold, the section, card and panel titles */
-  --text-title: 0.9375rem; /* 15px — dialog and drawer titles */
-  --text-base: 1rem; /* 16px — outside the v2 type table (guideline T1) */
-  --text-lg: 1.125rem; /* 18px — the page title (OPageHeader), never larger */
+  --text-sm: 0.875rem; /* 14px — reading text: descriptions, dialog bodies, empty states */
+  --text-title: 0.9375rem; /* 15px — dialog, drawer and section titles */
+  --text-base: 1rem; /* 16px — page title, never larger */
+  --text-lg: 1.125rem; /* 18px — outside the v2 type table (guideline T1) */
   --text-xl: 1.25rem; /* 20px — small KPI values */
   --text-2xl: 1.5rem; /* 24px — KPI values */
   --text-3xl: 1.875rem; /* 30px — hero numbers / large display */
@@ -69,8 +69,6 @@
   --font-normal: normal;
   --font-medium: 500;
   --font-semibold: 550; /* Geist is variable, so 550 renders between medium and bold */
-  /* The 18px page title alone takes 600, so it outranks the 14px semibold section titles. */
-  --font-title: 600;
   --font-bold: 700;
   /* --- Primary palette — blue-teal #3F7994 ---
      The runtime theme engine is the AUTHORITY for brand colour. `constants/themes.ts`
@@ -97,23 +95,21 @@
      "gray" has a cool/blue tint that makes inputs / selects / dropdowns / dialogs
      read as dark blue in dark mode; neutral reads as "dark grey, not blue". */
   --color-grey-0: #ffffff;
-  --color-grey-50: #fafafc;
-  --color-grey-100: #f5f6f9;
-  --color-grey-150: #eceef2; /* soft divider step (between 100 and 200) */
-  --color-grey-200: #e3e5eb;
-  --color-grey-300: #d0d5e1;
-  --color-grey-350: #c5cad6; /* resting control edge (between 300 and 400) */
-  --color-grey-400: #9ea4b4;
+  --color-grey-50: #fafafa;
+  --color-grey-100: #f5f5f5;
+  --color-grey-150: #ededed; /* soft divider step (between 100 and 200) */
+  --color-grey-200: #e5e5e5;
+  --color-grey-300: #d4d4d4;
+  --color-grey-400: #a3a3a3;
   /* The lightest grey that clears 3:1 on white and on grey-100. */
-  --color-grey-450: #848b9c;
-  /* Darker than a luminance match so tertiary text clears 4.5:1 on subtle and chrome surfaces. */
-  --color-grey-500: #62687b;
-  --color-grey-600: #4b5163;
-  --color-grey-700: #3b3f4f;
-  --color-grey-800: #222534;
-  --color-grey-850: #1b1e2d;
-  --color-grey-900: #141620;
-  --color-grey-950: #070913;
+  --color-grey-450: #8a8a8a;
+  --color-grey-500: #737373;
+  --color-grey-600: #525252;
+  --color-grey-700: #404040;
+  --color-grey-800: #262626;
+  --color-grey-850: #1f1f1f;
+  --color-grey-900: #171717;
+  --color-grey-950: #0a0a0a;
 
   /* --- Error palette --- */
   --color-error-50: #fef2f2;
@@ -363,13 +359,13 @@
   /* --- Shadow scale — hairline-border philosophy ---
      Only sm/md/lg render real elevation (overlays: dialogs, menus). Cards use a
      1px border, not a drop shadow — a flat surface needs NO shadow class. */
-  --shadow-xs-c: rgb(19 21 31 / 0.08);
-  --shadow-sm-c1: rgb(19 21 31 / 0.1);
-  --shadow-sm-c2: rgb(19 21 31 / 0.06);
-  --shadow-md-c1: rgb(19 21 31 / 0.08);
-  --shadow-md-c2: rgb(19 21 31 / 0.06);
-  --shadow-lg-c1: rgb(19 21 31 / 0.1);
-  --shadow-lg-c2: rgb(19 21 31 / 0.06);
+  --shadow-xs-c: rgb(0 0 0 / 0.08);
+  --shadow-sm-c1: rgb(0 0 0 / 0.1);
+  --shadow-sm-c2: rgb(0 0 0 / 0.06);
+  --shadow-md-c1: rgb(0 0 0 / 0.08);
+  --shadow-md-c2: rgb(0 0 0 / 0.06);
+  --shadow-lg-c1: rgb(0 0 0 / 0.1);
+  --shadow-lg-c2: rgb(0 0 0 / 0.06);
   --shadow-scroll-c: rgb(0 0 0 / 0.1);
   --shadow-glow-c: rgb(0 0 0 / 0.6);
 }

@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="notifications" size="sm" class="mt-0.5" :class="TONE_INK[summary.tone]" />
           <OTruncatedText
             :lines="2"
-            class="text-text-heading text-sm font-semibold break-words"
+            class="text-text-heading text-base font-semibold break-words"
             data-test="incident-alert-panel-name"
             ><template v-for="(part, i) in identifierBreaks(summary.name)" :key="i"
               ><wbr v-if="i" />{{ part }}</template
@@ -329,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OCollapsible>
             <OButton
               icon-only
-              variant="ghost"
+              variant="secondary"
               icon="content-copy"
               :aria-label="t('alerts.incidents.panel.copyQuery')"
               data-test="incident-alert-panel-query-copy"

@@ -58,11 +58,6 @@ import { isGuardActive } from "@/composables/useLogs/useAutoRun";
 import { pickLatestStream, type StreamStatsEntry } from "@/utils/logs/estimateScanMb";
 import { restoreLogsSelectedStreams } from "@/utils/streamPersist";
 import { sqlSources } from "@/utils/logs/sqlSources";
-import {
-  aggregateResultColumns,
-  isAggregateQuery,
-  numericResultColumns,
-} from "@/utils/logs/sqlResultShape";
 
 /** How long a cold load keeps the field list loading for the semantic groups before showing it ungrouped. */
 export const FIELD_GROUPS_WAIT_MS = 1000;
@@ -1174,69 +1169,6 @@ export const useStreamFields = () => {
     if (kept.length !== fields.length) searchObj.data.stream.selectedFields = kept;
   };
 
-  // An aggregate's rows are groups, so they read as columns, never as one raw source blob.
-  const sqlAggregateColumns = (parsedSQL: any): string[] => {
-    const hits = searchObj.data.queryResults?.hits;
-    if (!hits?.length || !isAggregateQuery(parsedSQL, searchObj.data.query ?? "")) return [];
-    return aggregateResultColumns(hits, store.state.zoConfig.timestamp_column);
-  };
-
-  // A query's own columns are not a user pick, so they cannot be closed off the table; their
-  // keys are flat result names such as "avg(a.b)", so they are read as-is, never as a path.
-  const pushFieldColumns = (fields: string[], fromQuery: boolean) => {
-    const streamKey = searchObj.data.stream.selectedStream.join(",");
-    const colSizes = searchObj.data.resultGrid.colSizes;
-    const sizes: any =
-      colSizes && Object.prototype.hasOwnProperty.call(colSizes, streamKey)
-        ? colSizes[streamKey]
-        : undefined;
-    const context = document.createElement("canvas").getContext("2d");
-    const numeric = fromQuery
-      ? numericResultColumns(searchObj.data.queryResults?.hits, fields)
-      : new Set<string>();
-
-    for (const field of fields) {
-      if (field == store.state.zoConfig.timestamp_column) continue;
-      let foundValue;
-      if (sizes?.length > 0) {
-        Object.keys(sizes[0]).forEach((key) => {
-          const trimmedKey = key.replace(/^--(header|col)-/, "").replace(/-size$/, "");
-          if (trimmedKey === field) foundValue = sizes[0][key];
-        });
-      }
-      searchObj.data.resultGrid.columns.push({
-        name: field,
-        id: field,
-        accessorFn: (row: { [x: string]: any; source: any }) =>
-          fromQuery ? row[field] : byString(row, field),
-        header: field,
-        sortable: true,
-        enableResizing: true,
-        meta: {
-          closable: !fromQuery,
-          showWrap: true,
-          wrapContent: false,
-          ...(numeric.has(field) ? { align: "right", cellClass: "tabular-nums" } : {}),
-        },
-        size: foundValue ? foundValue : getColumnWidth(context, field),
-        maxSize: window.innerWidth,
-      });
-    }
-
-    // The last column absorbs the leftover width, or the auto layout spreads it over every column and the timestamp stretches.
-    interface GridColumn {
-      id: string;
-      size?: number;
-      minSize?: number;
-      meta?: Record<string, unknown>;
-    }
-    const lastColumn = searchObj.data.resultGrid.columns.at(-1) as GridColumn | undefined;
-    if (lastColumn && lastColumn.id !== store.state.zoConfig.timestamp_column) {
-      lastColumn.minSize = lastColumn.size;
-      lastColumn.meta = { ...lastColumn.meta, autoWidth: true, fillRemaining: true };
-    }
-  };
-
   const updateGridColumns = () => {
     try {
       searchObj.data.resultGrid.columns = [];
@@ -1358,13 +1290,7 @@ export const useStreamFields = () => {
           searchObj.data.resultGrid.columns.push(buildStreamNameColumn());
         }
 
-        const aggregateColumns =
-          selectedFields.length == 0 && searchObj.meta.sqlMode
-            ? sqlAggregateColumns(parsedSQL)
-            : [];
-        if (aggregateColumns.length) {
-          pushFieldColumns(aggregateColumns, true);
-        } else if (selectedFields.length == 0) {
+        if (selectedFields.length == 0) {
           searchObj.data.resultGrid.columns.push({
             name: "source",
             id: "source",
@@ -1430,7 +1356,72 @@ export const useStreamFields = () => {
           searchObj.data.resultGrid.columns.push(buildStreamNameColumn());
         }
 
-        pushFieldColumns(selectedFields, false);
+        let sizes: any;
+        // selectedStream array is coerced to its comma-joined string form as key
+        if (
+          searchObj.data.resultGrid.colSizes &&
+          Object.prototype.hasOwnProperty.call(
+            searchObj.data.resultGrid.colSizes,
+            searchObj.data.stream.selectedStream.join(","),
+          )
+        ) {
+          sizes =
+            searchObj.data.resultGrid.colSizes[searchObj.data.stream.selectedStream.join(",")];
+        }
+
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+
+        for (const field of selectedFields) {
+          if (field != store.state.zoConfig.timestamp_column) {
+            let foundValue;
+
+            if (sizes?.length > 0) {
+              Object.keys(sizes[0]).forEach((key) => {
+                const trimmedKey = key.replace(/^--(header|col)-/, "").replace(/-size$/, "");
+                if (trimmedKey === field) {
+                  foundValue = sizes[0][key];
+                }
+              });
+            }
+
+            searchObj.data.resultGrid.columns.push({
+              name: field,
+              id: field,
+              accessorFn: (row: { [x: string]: any; source: any }) => {
+                return byString(row, field);
+              },
+              header: field,
+              sortable: true,
+              enableResizing: true,
+              meta: {
+                closable: true,
+                showWrap: true,
+                wrapContent: false,
+              },
+              size: foundValue ? foundValue : getColumnWidth(context, field),
+              maxSize: window.innerWidth,
+            });
+          }
+        }
+
+        // The last column absorbs the leftover width; without it the auto layout
+        // spreads the surplus across EVERY column and the timestamp stretches.
+        // `fillRemaining`, not a plain `autoWidth`, so it truncates at the
+        // viewport instead of growing to a long `body` value.
+        // `resultGrid.columns` is untyped, so `.at()` widens to `{}` — name the
+        // few fields we touch rather than reaching through `any`.
+        interface GridColumn {
+          id: string;
+          size?: number;
+          minSize?: number;
+          meta?: Record<string, unknown>;
+        }
+        const lastColumn = searchObj.data.resultGrid.columns.at(-1) as GridColumn | undefined;
+        if (lastColumn && lastColumn.id !== store.state.zoConfig.timestamp_column) {
+          lastColumn.minSize = lastColumn.size;
+          lastColumn.meta = { ...lastColumn.meta, autoWidth: true, fillRemaining: true };
+        }
       }
 
       extractFTSFields();

@@ -263,7 +263,7 @@ test.describe("Share Link Test Cases", () => {
     testLogger.info('Complete state preservation test completed successfully');
   });
 
-  test("P1: Share link copies only once the short URL lands", {
+  test("P1: Share link button shows loading state while generating", {
     tag: ['@shareLink', '@functional', '@P1']
   }, async ({ page }) => {
 
@@ -272,7 +272,7 @@ test.describe("Share Link Test Cases", () => {
     await pm.logsPage.selectStream(TEST_STREAM);
     await pm.logsPage.clickRefresh();
 
-    const shareButton = await pm.logsPage.openShareLinkMenuItem();
+    const shareButton = pm.logsPage.getShareLinkButtonLocator();
     // Share stays disabled until a run has produced results, so a fixed sleep can click a still-disabled button.
     await expect(shareButton).toBeEnabled({ timeout: 60000 });
 
@@ -284,10 +284,8 @@ test.describe("Share Link Test Cases", () => {
     });
 
     await shareButton.click();
-    // The ⋯ item closes on select, so the copy toast is the only result; the held short URL keeps it away.
-    const copied = page.locator(`[data-test-variant="success"][data-test-message*="${pm.logsPage.linkCopiedSuccessText}"]`);
-    await expect(shareButton).toHaveCount(0);
-    await expect(copied).toHaveCount(0);
+    // ShareButton sets isLoading before awaiting the short-URL POST and OButton renders that as aria-busy; the held response is what makes the state observable.
+    await expect(shareButton).toHaveAttribute('aria-busy', 'true');
     release();
 
     await pm.logsPage.expectShareLinkSuccessNotification();
@@ -306,13 +304,13 @@ test.describe("Share Link Test Cases", () => {
 
     testLogger.info('Testing share link before any run (G1)');
 
-    const share = await pm.logsPage.openShareLinkMenuItem();
+    const share = page.locator('[data-test="logs-search-bar-share-link-btn"]');
+    await pm.logsPage.expectShareLinkButtonVisible();
     await expect(share).toBeDisabled();
-    // A disabled ⋯ item states its reason under its label.
-    await expect(page.locator('[id="logs-search-bar-share-link-btn-reason"]')).toContainText(
+    await share.hover({ force: true });
+    await expect(page.locator('[data-test="o-tooltip-content"]:visible')).toContainText(
       'Run the query first: this action saves or shares what you ran',
     );
-    await page.keyboard.press('Escape');
 
     await pm.logsPage.selectStream(TEST_STREAM);
     await pm.logsPage.clickRefresh();
@@ -371,8 +369,7 @@ test.describe("Share Link Test Cases", () => {
     await expect(page.locator('[data-test="logs-search-result-logs-table"] [data-test="o2-table-row-0"]')).toBeAttached({
       timeout: 60000,
     });
-    await expect(await pm.logsPage.openShareLinkMenuItem()).toBeEnabled({ timeout: 30000 });
-    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-test="logs-search-bar-share-link-btn"]')).toBeEnabled({ timeout: 30000 });
 
     const originalUrl = await pm.logsPage.getCurrentUrl();
     testLogger.info('Original URL with query', { url: originalUrl });

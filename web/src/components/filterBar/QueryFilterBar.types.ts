@@ -80,8 +80,6 @@ export interface QueryFilterBarProps {
   appearance?: "field" | "plain";
   /** Lines of chips shown before the bar scrolls inside itself; it grows freely when unset. */
   maxRows?: number;
-  /** An Enter that completes a condition closes the list and emits `submit`, for bars that run a query. */
-  submitOnEnter?: boolean;
   dataTest?: string;
 }
 

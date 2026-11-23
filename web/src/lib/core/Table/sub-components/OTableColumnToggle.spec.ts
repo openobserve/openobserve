@@ -48,12 +48,6 @@ function mountToggle(
 }
 
 describe("OTableColumnToggle", () => {
-  it("is a bordered secondary icon button, like the refresh beside it", () => {
-    const trigger = mountToggle().get('[data-test="o2-table-column-toggle-btn"]');
-    expect(trigger.attributes("data-o2-variant")).toBe("secondary");
-    expect(trigger.classes()).toContain("size-control-md");
-  });
-
   it("resets to the table's defaults, keeping hidden-by-default columns hidden", async () => {
     const wrapper = mountToggle({ arch: false, from: false });
     await wrapper.find('[data-test="o2-table-column-toggle-reset-btn"]').trigger("click");

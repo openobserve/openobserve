@@ -31,7 +31,7 @@ export default class DashboardAutoRun {
   constructor(page) {
     this.page = page;
     this.refreshBtn = page.locator('[data-test="dashboard-refresh-btn"]');
-    this.refreshOptionsBtn = page.locator('[data-test="dashboard-refresh-btn-auto-menu"]');
+    this.refreshOptionsBtn = page.locator('[data-test="dashboard-refresh-options-btn"]');
     this.refreshWithoutCacheItem = page.locator('[data-test="dashboard-refresh-without-cache-btn"]');
     this.autoRunToggle = page.locator('[data-test="dashboard-auto-run-toggle-btn"]');
     this.cancelBtn = page.locator('[data-test="dashboard-cancel-btn"]');

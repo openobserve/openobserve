@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col gap-3" data-test="fleet-version-bars">
     <OEmptyState
       v-if="!rows.length"
-      size="compact"
+      size="inline"
       :title="t('fleet.upgrades.noVersions')"
       data-test="fleet-version-bars-empty"
     />

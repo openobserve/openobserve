@@ -166,20 +166,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <OSkeleton
+        <div
           v-else-if="planLoading"
-          preset="tableRows"
-          :rows="6"
+          class="flex h-full flex-col items-center justify-center gap-3 p-6"
           data-test="query-plan-loading"
-        />
+        >
+          <OSpinner size="lg" />
+          <div class="text-text-secondary text-sm">{{ t("search.loadingPlan") }}</div>
+        </div>
 
-        <OEmptyState
-          v-else-if="planError"
-          kind="error"
-          :text="isRawHttpText(planError) ? undefined : raw(planError)"
-          data-test="query-plan-error"
-          @action="fetchExplainPlan"
-        />
+        <div v-else-if="planError" class="p-4" data-test="query-plan-error">
+          <OInlineNotice tone="err" :message="raw(planError)" />
+        </div>
 
         <QueryPlanView
           v-else-if="mode === 'plan' && planModel"
@@ -194,12 +192,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :analyze-rows="analyzeRows"
         />
 
-        <OEmptyState
+        <div
           v-else
-          icon="account-tree"
-          :title="t('search.noPhysicalPlan')"
+          class="text-text-secondary px-4 py-6 text-center text-sm"
           data-test="query-plan-empty"
-        />
+        >
+          {{ t("search.noPhysicalPlan") }}
+        </div>
       </div>
     </div>
   </ODialog>
@@ -211,13 +210,10 @@ import { isAxiosError } from "axios";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";

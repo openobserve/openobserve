@@ -56,7 +56,7 @@ export class IamPage {
         this.tokenCopyButton = page.locator('[data-test="service-accounts-list-token-copy-btn"]');
         this.tokenTabCurl = this.tokenDialog.locator('[data-test="o-tab"]', { hasText: 'cURL' });
         this.tokenTabHeader = this.tokenDialog.locator('[data-test="o-tab"]', { hasText: 'Header' });
-        this.tokenTabEnv = this.tokenDialog.locator('[data-test="o-tab"]', { hasText: 'Environment variable' });
+        this.tokenTabEnv = this.tokenDialog.locator('[data-test="o-tab"]', { hasText: 'Environment Variable' });
         this.tokenDialogCloseButton = this.tokenDialog.locator('[data-test="o-dialog-close-btn"]');
 
         // Confirmation dialog (delete + refresh share the same ODialog primary / secondary buttons)
@@ -389,7 +389,7 @@ export class IamPage {
         await updateButtonLocator.click({ force: true });
         // The edit ODrawer for service accounts has data-test="add-service-account-dialog"
         // and its title switches to the update copy when editing an existing account.
-        await expect(this.addServiceAccountDialog).toContainText('Update service account');
+        await expect(this.addServiceAccountDialog).toContainText('Update Service Account');
     }
 
     async refreshServiceAccount(emailName) {

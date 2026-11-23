@@ -207,7 +207,7 @@ describe("LiveSuggestions rail (OSS-11, OSS-9)", () => {
     );
     const error = wrapper.find('[data-test="autoobserve2-suggestions-error"]');
     expect(error.find('[data-test="o2-empty-state-icon"]').classes()).toContain(
-      "text-status-error-text",
+      "bg-status-error-bg",
     );
     const details = wrapper.find('[data-test="autoobserve2-suggestions-error-details"]');
     expect(details.exists()).toBe(true);

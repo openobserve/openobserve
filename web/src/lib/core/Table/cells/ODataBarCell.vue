@@ -75,7 +75,7 @@ const barClass = computed(
     >
       <div
         v-if="widthPct > 0"
-        class="rounded-default h-full transition-[width] duration-(--duration-expand) ease-(--ease-control)"
+        class="rounded-default h-full transition-[width] duration-300"
         :class="barClass"
         :style="{ width: widthPct + '%', ...(color ? { backgroundColor: color } : {}) }"
         data-test="o2-data-bar-cell-fill"
@@ -98,7 +98,7 @@ const barClass = computed(
     >
     <div
       v-if="widthPct > 0"
-      class="pointer-events-none h-0.75 rounded-full opacity-80 transition-[width] duration-(--duration-expand) ease-(--ease-control)"
+      class="pointer-events-none h-0.75 rounded-full opacity-80 transition-[width] duration-300"
       :class="barClass"
       :style="{ width: widthPct + '%', ...(color ? { backgroundColor: color } : {}) }"
       aria-hidden="true"

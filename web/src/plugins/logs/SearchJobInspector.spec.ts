@@ -631,7 +631,7 @@ describe("SearchJobInspector — ODrawer (SQL) & ODialog (Trace ID) migration", 
     expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(false);
   });
 
-  it("renders the SQL ODrawer with title 'SQL query' once showSqlDialog flips true", async () => {
+  it("renders the SQL ODrawer with title 'SQL Query' once showSqlDialog flips true", async () => {
     const wrapper = await mountWithStubs();
     setProfileData(wrapper);
     wrapper.vm.showSqlDialog = true;
@@ -639,7 +639,7 @@ describe("SearchJobInspector — ODrawer (SQL) & ODialog (Trace ID) migration", 
 
     const drawer = wrapper.find('[data-test="o-drawer"]');
     expect(drawer.exists()).toBe(true);
-    expect(wrapper.find('[data-test="o-drawer-title"]').text()).toBe("SQL query");
+    expect(wrapper.find('[data-test="o-drawer-title"]').text()).toBe("SQL Query");
   });
 
   it("renders the SQL content inside the ODrawer body slot", async () => {
@@ -698,14 +698,14 @@ describe("SearchJobInspector — ODrawer (SQL) & ODialog (Trace ID) migration", 
     expect(wrapper.find('[data-test="o-drawer"]').exists()).toBe(false);
   });
 
-  it("renders the Trace ID ODialog with title 'Full trace ID' once showTraceIdDialog flips true", async () => {
+  it("renders the Trace ID ODialog with title 'Full Trace ID' once showTraceIdDialog flips true", async () => {
     const wrapper = await mountWithStubs();
     wrapper.vm.showTraceIdDialog = true;
     await flushPromises();
 
     const dialog = wrapper.find('[data-test="o-dialog"]');
     expect(dialog.exists()).toBe(true);
-    expect(wrapper.find('[data-test="o-dialog-title"]').text()).toBe("Full trace ID");
+    expect(wrapper.find('[data-test="o-dialog-title"]').text()).toBe("Full Trace ID");
   });
 
   it("renders the traceId from the route inside the ODialog body", async () => {

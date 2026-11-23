@@ -158,7 +158,8 @@ export const TRACES_TOOLBAR_WIDTHS = {
   toggle: { enterprise: { text: 422, icon: 150 }, oss: { text: 298, icon: 114 } },
   drillDown: { text: 97, icon: 36 },
   reset: { text: 72, icon: 36 },
-  metricsPinned: 32,
+  more: 70,
+  metricsPinned: 78,
   savedViewsPinned: 93,
 };
 
@@ -176,13 +177,16 @@ function tracesToolbarBaseWidth(input: TracesToolbarInput, stage: TracesToolbarS
   const w = TRACES_TOOLBAR_WIDTHS;
   const toggle = input.serviceGraph ? w.toggle.enterprise : w.toggle.oss;
   const label = stage === "full" ? "text" : "icon";
-  const widths = [stage === "full" || stage === "compactButtons" ? toggle.text : toggle.icon];
+  const widths = [
+    stage === "full" || stage === "compactButtons" ? toggle.text : toggle.icon,
+    w.more,
+  ];
   if (input.drillDown) widths.push(w.drillDown[label]);
   if (input.reset && stage !== "resetInMenu") widths.push(w.reset[label]);
   return widths.reduce((sum, x) => sum + x, 0) + (widths.length - 1) * w.gap;
 }
 
-/** Picks the collapse stage for a left-section width; labels shrink before a pinned group drops into ⋯. */
+/** Picks the collapse stage for a left-section width; labels shrink before a pinned group drops into More. */
 export function tracesToolbarLayout(input: TracesToolbarInput): {
   stage: TracesToolbarStage;
   pinnedBudget: number;

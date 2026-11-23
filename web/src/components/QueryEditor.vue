@@ -126,7 +126,7 @@
         variant="ghost"
         :disabled="props.disableAi"
         @click="onAiToggleClick"
-        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-1 z-100 [transition:background_var(--duration-control)_var(--ease-control),box-shadow_var(--duration-control)_var(--ease-control)]! hover:shadow-md"
+        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-1 z-100 [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
         <img

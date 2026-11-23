@@ -12,10 +12,6 @@ import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
-import SecurityTimeRange from "@/components/security/SecurityTimeRange.vue";
-import { useSecurityRange } from "@/composables/security/useSecurityRange";
-import type { DateTimeRangeChange } from "@/lib/forms/DateTimeRange/ODateTimeRange.types";
-import SecurityLoadError from "@/components/security/SecurityLoadError.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -30,9 +26,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -70,29 +65,39 @@ const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
+const RANGES = [
+  { value: "1h", minutes: 60 },
+  { value: "24h", minutes: 1440 },
+  { value: "7d", minutes: 10080 },
+] as const;
+type RangeKey = (typeof RANGES)[number]["value"];
+
 const q = route.query;
 const kind = ref<EntityKind>(
   ENTITY_KINDS.includes(q.kind as EntityKind) ? (q.kind as EntityKind) : "user",
 );
-const range = useSecurityRange(q);
+const range = ref<RangeKey>(
+  RANGES.some((r) => r.value === q.period) ? (q.period as RangeKey) : "24h",
+);
 const search = ref(q.q ? String(q.q) : "");
 const signalFilters = ref<EntitySignal[]>([]);
 const pendingEntity = ref<string | null>(q.entity ? String(q.entity) : null);
 
-const windowEndUs = range.endUs;
-const windowStartUs = range.startUs;
+const windowEndUs = ref(Date.now() * 1000);
+const windowUs = computed(() => RANGES.find((r) => r.value === range.value)!.minutes * 60_000_000);
 
 const view = ref<"table" | "graph">("table");
 const VIEWS = [
   { value: "table" as const, icon: "list" },
   { value: "graph" as const, icon: "share" },
 ];
+const windowStartUs = computed(() => windowEndUs.value - windowUs.value);
 
 function syncUrl() {
   const query: Record<string, string> = {
     org_identifier: orgId.value,
     kind: kind.value,
-    ...range.linkQuery.value,
+    period: range.value,
   };
   if (search.value.trim()) query.q = search.value.trim();
   if (selected.value) query.entity = selected.value.value;
@@ -198,7 +203,7 @@ async function refresh() {
   controller?.abort();
   const ctrl = new AbortController();
   controller = ctrl;
-  range.touch();
+  windowEndUs.value = Date.now() * 1000;
   answered.value = false;
   running.value = true;
   runFailure.value = null;
@@ -265,7 +270,7 @@ const notices = computed<SecurityNotice[]>(() => {
   }
   const limited = limitedStreams.value;
   if (limited.length) {
-    const vars = { window: range.text.value, slice: t("siem.range.1h") };
+    const vars = { window: t(`siem.range.${range.value}`), slice: t("siem.range.1h") };
     out.push({
       key: "limited",
       tone: "info",
@@ -325,9 +330,10 @@ watch(orgId, () => {
   void refresh();
 });
 
-function onRange(change: DateTimeRangeChange) {
-  if (!range.apply(change)) return;
-  analytics.track("security_time_range_changed", { view: "entities", range: range.text.value });
+function onRange(value: unknown) {
+  if (!value || value === range.value) return;
+  range.value = value as RangeKey;
+  analytics.track("security_time_range_changed", { view: "entities", range: range.value });
   fullWindow.clear();
   syncUrl();
   void refresh();
@@ -436,21 +442,12 @@ const counts = computed(() => {
   for (const r of allRows.value) for (const s of r.signals) c[s] += 1;
   return c;
 });
-// A failed load reads "—" and one error with Retry, never zero counts (R8).
-const failed = computed(() => !!(plansError.value || runError.value));
-// A server sentence stays; raw transport text becomes the plain hint.
-const failedHint = computed(() => {
-  const message = String(runError.value || plansError.value || "");
-  return message && !isRawHttpText(message) ? message : t("siem.entities.loadFailedHint");
-});
-const dashIfFailed = (n: number) => (failed.value ? "—" : n);
-
 const stats = computed<StatItem[]>(() => {
   const items: StatItem[] = [
     {
       key: "failures",
       label: t("siem.entities.signal.failures"),
-      value: dashIfFailed(counts.value.failures),
+      value: counts.value.failures,
       icon: "error-outline",
       tone: "orange",
       max: allRows.value.length || undefined,
@@ -459,7 +456,7 @@ const stats = computed<StatItem[]>(() => {
     {
       key: "spread",
       label: t(`siem.entities.signal.spread.${kind.value}`),
-      value: dashIfFailed(counts.value.spread),
+      value: counts.value.spread,
       icon: "hub",
       tone: "warning",
       max: allRows.value.length || undefined,
@@ -470,7 +467,7 @@ const stats = computed<StatItem[]>(() => {
     items.push({
       key: "external",
       label: t("siem.entities.signal.external"),
-      value: dashIfFailed(counts.value.external),
+      value: counts.value.external,
       icon: "language",
       tone: "blue",
       max: allRows.value.length || undefined,
@@ -480,7 +477,7 @@ const stats = computed<StatItem[]>(() => {
   items.push({
     key: "all",
     label: t(`siem.entities.all.${kind.value}`),
-    value: dashIfFailed(allRows.value.length),
+    value: allRows.value.length,
     icon: KIND_ICON[kind.value],
     tone: "neutral",
     dataTest: "security-entities-stat-all",
@@ -574,7 +571,7 @@ const shareUrl = computed(() => {
   const query: Record<string, string> = {
     org_identifier: orgId.value,
     kind: kind.value,
-    ...range.linkQuery.value,
+    period: range.value,
     entity: selected.value.value,
   };
   return new URL(
@@ -709,7 +706,7 @@ function huntLink() {
     path: "/security/events",
     query: {
       org_identifier: orgId.value,
-      ...range.linkQuery.value,
+      period: range.value,
       ...huntLinkQuery({
         kind: kind.value,
         value: selected.value.value,
@@ -731,7 +728,7 @@ function eventsLink(stream: string) {
     query: {
       org_identifier: orgId.value,
       stream,
-      ...range.linkQuery.value,
+      period: range.value,
       filters:
         b64EncodeUnicode(
           JSON.stringify([
@@ -791,11 +788,25 @@ const noSources = computed(
   >
     <template #actions>
       <div class="flex items-center gap-2">
-        <SecurityTimeRange
-          :picker-props="range.pickerProps.value"
+        <OToggleGroup
+          :model-value="range"
           data-test="security-entities-range"
-          @change="onRange"
-        />
+          @update:model-value="onRange"
+        >
+          <OToggleGroupItem v-for="r in RANGES" :key="r.value" :value="r.value">
+            {{ t(`siem.range.${r.value}`) }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+        <OToggleGroup
+          :model-value="view"
+          data-test="security-entities-view"
+          @update:model-value="view = $event as 'table' | 'graph'"
+        >
+          <OToggleGroupItem v-for="v in VIEWS" :key="v.value" :value="v.value">
+            <OIcon :name="v.icon" size="sm" />
+            {{ t(`siem.entities.view.${v.value}`) }}
+          </OToggleGroupItem>
+        </OToggleGroup>
         <ORefreshButton
           :last-run-at="lastRunAt"
           :loading="loading"
@@ -817,7 +828,6 @@ const noSources = computed(
             <OIcon :name="KIND_ICON[k]" size="sm" />
             {{ t(`siem.entities.kinds.${k}`) }}
             <span
-              v-if="!failed"
               class="bg-surface-subtle text-text-secondary text-2xs rounded-full px-1.5 font-semibold tabular-nums"
               >{{ rowsByKind[k].length }}{{ cappedKinds.has(k) ? "+" : "" }}</span
             >
@@ -857,39 +867,19 @@ const noSources = computed(
         :reason="raw(forbiddenReason(refusal))"
         data-test="security-entities-access-lock"
       />
-      <SecurityLoadError
-        v-else-if="failed"
-        :what="t('siem.entities.whatEntities')"
-        :hint="failedHint"
-        data-test="security-entities-load-error"
-        @retry="refresh"
-      />
       <OEmptyState
         v-else-if="noSources"
         icon="database"
         :title="t('siem.entities.noSources')"
         :text="t('siem.entities.noSourcesHint')"
       />
-      <template v-else-if="view === 'graph'">
-        <div class="px-page-edge border-table-row-divider flex items-center gap-2 border-b py-2">
-          <OToggleGroup
-            :model-value="view"
-            data-test="security-entities-view-graph"
-            @update:model-value="view = $event as 'table' | 'graph'"
-          >
-            <OToggleGroupItem v-for="v in VIEWS" :key="v.value" :value="v.value">
-              <OIcon :name="v.icon" size="sm" />
-              {{ t(`siem.entities.view.${v.value}`) }}
-            </OToggleGroupItem>
-          </OToggleGroup>
-        </div>
-        <SecurityRiskGraph
-          :graph="riskGraph"
-          :loading="graphLoading || loading"
-          data-test="security-entities-risk-graph"
-          @node-select="onGraphNodeSelect"
-        />
-      </template>
+      <SecurityRiskGraph
+        v-else-if="view === 'graph'"
+        :graph="riskGraph"
+        :loading="graphLoading || loading"
+        data-test="security-entities-risk-graph"
+        @node-select="onGraphNodeSelect"
+      />
       <OTable
         v-else
         ref="tableRef"
@@ -912,16 +902,6 @@ const noSources = computed(
       >
         <template #toolbar>
           <div class="contents">
-            <OToggleGroup
-              :model-value="view"
-              data-test="security-entities-view"
-              @update:model-value="view = $event as 'table' | 'graph'"
-            >
-              <OToggleGroupItem v-for="v in VIEWS" :key="v.value" :value="v.value">
-                <OIcon :name="v.icon" size="sm" />
-                {{ t(`siem.entities.view.${v.value}`) }}
-              </OToggleGroupItem>
-            </OToggleGroup>
             <OSearchInput
               v-model="search"
               :placeholder="t(`siem.entities.search.${kind}`)"
@@ -1018,11 +998,24 @@ const noSources = computed(
           <OTimeCell :value="row.lastSeen" unit="us" />
         </template>
 
+        <template #toolbar-trailing>
+          <OButton
+            icon-only
+            variant="secondary"
+            icon="refresh"
+            :loading="loading"
+            data-test="security-entities-refresh-table"
+            @click="refresh"
+          >
+            <OTooltip side="bottom" :content="t('siem.entities.refresh')" />
+          </OButton>
+        </template>
+
         <template #error="{ message }">
           <OEmptyState
             kind="error"
             :title="t('siem.entities.loadError')"
-            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
+            :text="raw(message)"
             @action="refresh"
           />
         </template>
@@ -1045,7 +1038,7 @@ const noSources = computed(
       v-model:tab="drawerTab"
       :title="selected.value"
       :eyebrow="t(`siem.entities.kind.${kind}`)"
-      :subtitle="t('siem.entities.drawerSubtitle', { window: range.text.value })"
+      :subtitle="t('siem.entities.drawerSubtitle', { window: t(`siem.range.${range}`) })"
       :icon="KIND_ICON[kind]"
       :tone="selected.tone"
       :facts="facts"
@@ -1116,9 +1109,7 @@ const noSources = computed(
       </template>
 
       <template #tab-related>
-        <div v-if="detailLoading" class="flex flex-col gap-2">
-          <OSkeleton v-for="row in 5" :key="row" class="h-8" />
-        </div>
+        <div v-if="detailLoading" class="flex justify-center py-8"><OSpinner size="lg" /></div>
         <template v-else>
           <div
             v-for="other in relatedKinds"
@@ -1168,15 +1159,15 @@ const noSources = computed(
                 />
               </div>
             </div>
-            <OEmptyState v-else size="compact" :title="t('siem.entities.noRelated')" />
+            <span v-else class="text-text-secondary text-xs">{{
+              t("siem.entities.noRelated")
+            }}</span>
           </div>
         </template>
       </template>
 
       <template #tab-cases>
-        <div v-if="detailLoading" class="flex flex-col gap-2">
-          <OSkeleton v-for="row in 4" :key="row" class="h-10" />
-        </div>
+        <div v-if="detailLoading" class="flex justify-center py-8"><OSpinner size="lg" /></div>
         <div
           v-else-if="cases.length"
           class="border-border-default rounded-surface overflow-hidden border"
@@ -1207,12 +1198,12 @@ const noSources = computed(
             />
           </div>
         </div>
-        <OEmptyState
+        <span
           v-else
-          icon="assignment"
-          :title="t('siem.entities.noCases')"
+          class="text-text-secondary text-xs"
           data-test="security-entity-drawer-no-cases"
-        />
+          >{{ t("siem.entities.noCases") }}</span
+        >
       </template>
 
       <template #tab-sources>

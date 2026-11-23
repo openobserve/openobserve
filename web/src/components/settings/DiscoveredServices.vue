@@ -16,23 +16,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="bg-card-glass-bg discovered-services flex h-full w-full flex-col">
-    <div v-if="loading" class="px-page-edge pt-3" data-test="discovered-services-loading-indicator">
-      <OSkeleton preset="tableRows" :rows="8" />
+    <!-- Loading State -->
+    <div v-if="loading" class="flex flex-1 items-center justify-center">
+      <OSpinner size="lg" data-test="discovered-services-loading-indicator" />
     </div>
 
-    <OEmptyState v-else-if="error" kind="error">
-      <template #actions>
-        <OButton
-          data-test="retry-discovered-services-btn"
-          variant="secondary"
-          @click="() => loadServices()"
-        >
-          {{ t("settings.correlation.retry") }}
-        </OButton>
-      </template>
-    </OEmptyState>
+    <div v-else-if="error" class="flex flex-1 items-center justify-center">
+      <OEmptyState kind="error" :title="t('emptyState.loadError.title')" :text="raw(error)">
+        <template #actions>
+          <OButton
+            data-test="retry-discovered-services-btn"
+            variant="secondary"
+            icon="refresh"
+            @click="() => loadServices()"
+          >
+            {{ t("settings.correlation.retry") }}
+          </OButton>
+        </template>
+      </OEmptyState>
+    </div>
 
-    <template v-else-if="forbidden">
+    <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
       <LicenseDeniedState
         v-if="Array.isArray(forbidden)"
         :features="forbidden"
@@ -45,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :text="t('emptyState.noAccess.description')"
         data-test="discovered-services-forbidden"
       />
-    </template>
+    </div>
 
     <div v-else class="flex min-h-0 flex-1 flex-col">
       <div
@@ -162,13 +166,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :can-edit="canEdit"
         @changed="loadServices(true)"
       />
-      <OEmptyState
-        v-else-if="services.length === 0"
-        icon="timeline"
-        :title="t('settings.correlation.noServicesYet')"
-        :text="t('settings.correlation.noServicesDescription')"
-        data-test="discovered-services-empty-state"
-      />
+      <div v-else-if="services.length === 0" class="flex flex-1 items-center justify-center">
+        <OEmptyState
+          icon="timeline"
+          :title="t('settings.correlation.noServicesYet')"
+          :text="t('settings.correlation.noServicesDescription')"
+          data-test="discovered-services-empty-state"
+        />
+      </div>
       <template v-else>
         <OBanner
           v-if="!versionsEnabled"
@@ -738,7 +743,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";

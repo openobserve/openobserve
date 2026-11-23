@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #trigger>
               <OButton
                 icon-only
-                variant="ghost"
+                variant="secondary"
                 icon="filter-list"
                 :pressed="narrowed"
                 :aria-label="t('oncall.filters')"

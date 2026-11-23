@@ -205,7 +205,7 @@ describe("IncidentRCAAnalysis", () => {
   });
 
   describe("no new run can start", () => {
-    const LOCK = "Locked: needs AI assistant";
+    const LOCK = "Locked: needs AI Assistant";
     const failedRun = (overrides: Record<string, unknown> = {}) => ({
       rca: rcaSummary({
         state: "failed",
@@ -226,7 +226,7 @@ describe("IncidentRCAAnalysis", () => {
     beforeEach(() => {
       store.state.zoConfig.incidents_rca_enabled = false;
       store.state.zoConfig.features = { ai_assistant: "locked" };
-      store.state.zoConfig.feature_names = { ai_assistant: "AI assistant" };
+      store.state.zoConfig.feature_names = { ai_assistant: "AI Assistant" };
     });
 
     afterEach(() => {
@@ -1299,7 +1299,7 @@ describe("IncidentRCAAnalysis", () => {
 
       expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Blocked");
       expect(byTest(wrapper, "rca-verdict-below").text()).toBe("Needs: Change history");
-      expect(byTest(wrapper, "rca-blind-spot-action").text()).toBe("Connect AI toolset");
+      expect(byTest(wrapper, "rca-blind-spot-action").text()).toBe("Connect AI Toolset");
     });
 
     it("E cancelled with a partial record: no timeline, hypotheses, the run_end blind spot with no button", async () => {

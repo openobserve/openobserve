@@ -30,10 +30,13 @@ defineSlots<{
   <!-- Sticky to the pane's start: the scroll container is as wide as the pane, the table can be wider. -->
   <div
     data-test="o2-table-empty"
-    :class="['sticky start-0 flex flex-1 flex-col items-center', floor ? 'min-h-75' : '']"
+    :class="[
+      'sticky start-0 flex flex-1 flex-col items-center justify-center',
+      floor ? 'min-h-75' : '',
+    ]"
   >
     <slot>
-      <OEmptyState :title="message ?? t('search.noData')" />
+      <OEmptyState size="inline" :title="message ?? t('search.noData')" />
     </slot>
   </div>
 </template>

@@ -619,7 +619,7 @@ describe("SessionViewer.vue", () => {
 
       const summary = wrapper.find('[data-test="session-viewer-frustration-summary"]');
       expect(summary.exists()).toBe(true);
-      expect(summary.text()).toBe("1 frustration");
+      expect(summary.text()).toBe("1 Frustration");
     });
 
     it('should display plural "Frustrations" when frustration count is greater than 1', async () => {
@@ -641,7 +641,7 @@ describe("SessionViewer.vue", () => {
 
       const summary = wrapper.find('[data-test="session-viewer-frustration-summary"]');
       expect(summary.exists()).toBe(true);
-      expect(summary.text()).toBe("2 frustrations");
+      expect(summary.text()).toBe("2 Frustrations");
     });
 
     it("should display singular tooltip when frustration count is 1", async () => {

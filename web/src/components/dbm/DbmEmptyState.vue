@@ -47,7 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @action="emit('action', 'filtered')"
   />
 
-  <!-- The checklist is the only DBM-specific part, so it rides in #extra below the standard state. -->
+  <!-- The diagnostic case, built ON OEmptyState rather than beside it: DBM then
+       inherits the app's illustration, heading scale, dot-grid backdrop and
+       spacing, and the checklist — the only genuinely DBM-specific part — rides
+       in #extra. A hand-rolled stack here would read as a different product
+       from Traces and Metrics, which share this chrome. -->
   <OEmptyState
     v-else
     :size="size"
@@ -57,23 +61,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dbm-empty-state-diagnostic"
   >
     <template #actions>
-      <OButton
-        :variant="primaryCause === 'not-counted' ? 'secondary' : 'primary'"
-        :size="size === 'compact' ? 'sm' : undefined"
+      <EmptyStateActionCard
+        :icon="primaryCause === 'not-counted' ? 'refresh' : 'menu-book'"
+        :label="primaryActionLabel"
         data-test="dbm-empty-state-instrument"
         @click="emit('action', primaryCause)"
-      >
-        {{ primaryActionLabel }}
-      </OButton>
-      <OButton
-        v-if="traceCount && size !== 'compact'"
+      />
+      <EmptyStateActionCard
+        v-if="traceCount"
+        icon="account-tree"
+        :label="t('dbm.empty.checkTrace')"
         data-test="dbm-empty-state-check-trace"
         @click="emit('action', 'check-trace')"
-      >
-        {{ t("dbm.empty.checkTrace") }}
-      </OButton>
+      />
     </template>
 
+    <!-- The checklist grammar is shared with DbmLockEmptyState via DbmCheckList,
+         so all of DBM's empty states read as one system. -->
     <template #extra>
       <DbmCheckList
         :title="t('dbm.empty.checklistTitle')"
@@ -90,7 +94,7 @@ import { computed, inject } from "vue";
 import type { Store } from "vuex";
 
 import DbmCheckList, { type DbmCheckRow, type DbmCheckStatus } from "./DbmCheckList.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { EmptyStateSize } from "@/lib/core/EmptyState/OEmptyState.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -143,7 +147,7 @@ const props = withDefaults(
     traceCount: null,
     neverAggregated: false,
     filtered: false,
-    size: "region",
+    size: "page",
   },
 );
 const store = inject<Store<any> | null>("store", null);

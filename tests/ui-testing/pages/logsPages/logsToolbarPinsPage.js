@@ -17,7 +17,6 @@ export class LogsToolbarPinsPage {
     this.tracesPinsKey = 'traces_toolbar_pinned_items';
 
     // ===== LOCATORS =====
-    // The toolbar ⋯, which holds the pin toggles.
     this.moreMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
     // The bar clips its overflow, so its box is what decides "clipped" below.
     this.searchBar = '#searchBarComponent';
@@ -33,12 +32,13 @@ export class LogsToolbarPinsPage {
     };
     this.tracesMetricsPinnedControl = '[data-test="traces-search-bar-metrics-pinned-btn"]';
 
-    // The pin button's accessible name (also its tooltip) names the next action, so it carries pin state.
+    // The pin button's title is the only rendered signal of pin state.
     this.pinTitle = { pinned: 'Unpin from toolbar', unpinned: 'Pin to toolbar' };
 
     // Pin toggles, inside the More menu.
     this.pinToggle = {
       histogram: '[data-test="logs-search-bar-menu-pin-histogram-btn"]',
+      sqlMode: '[data-test="logs-search-bar-menu-pin-sql-mode-btn"]',
       quickMode: '[data-test="logs-search-bar-menu-pin-quick-mode-btn"]',
       functionEditor: '[data-test="logs-search-bar-menu-pin-function-editor-btn"]',
       savedViews: '[data-test="logs-search-bar-menu-pin-saved-views-btn"]',
@@ -48,6 +48,7 @@ export class LogsToolbarPinsPage {
     // Where each control renders once pinned out onto the toolbar.
     this.pinnedControl = {
       histogram: '[data-test="logs-search-bar-histogram-btn"]',
+      sqlMode: '[data-test="logs-search-bar-sql-mode-pinned-btn"]',
       quickMode: '[data-test="logs-search-bar-quick-mode-pinned-btn"]',
       savedViews: '[data-test="logs-search-bar-saved-views-pinned"]',
       // No syntaxGuide entry on purpose — see assertablePinOrder below.
@@ -57,7 +58,7 @@ export class LogsToolbarPinsPage {
     };
 
     // Fit priority, and the canonical render order: histogram is kept longest.
-    this.leftSectionOrder = ['histogram', 'quickMode', 'savedViews', 'syntaxGuide'];
+    this.leftSectionOrder = ['histogram', 'sqlMode', 'quickMode', 'savedViews', 'syntaxGuide'];
 
     // The syntax guide is pinnable but not assertable: SearchBar.vue hands its
     // data-test to the SyntaxGuide component, whose ODropdown root drops it, so it
@@ -220,6 +221,10 @@ export class LogsToolbarPinsPage {
     }, this.pinsKey);
   }
 
+  async readHistogramDecidedFlag() {
+    return this.page.evaluate((key) => localStorage.getItem(key), this.histogramDecidedKey);
+  }
+
   async readTracesPins() {
     return this.page.evaluate((key) => localStorage.getItem(key), this.tracesPinsKey);
   }
@@ -272,24 +277,24 @@ export class LogsToolbarPinsPage {
   async expectCollapsedButStillPinned(key) {
     await this.expectPinnedHidden(key);
     await this.openMoreMenu();
-    // The toggle in the menu is "still reachable"; its label, "still pinned".
+    // The toggle in the menu is "still reachable"; its title, "still pinned".
     await expect(this.page.locator(this.pinToggle[key])).toHaveAttribute(
-      'aria-label',
+      'title',
       this.pinTitle.pinned,
     );
     await this.closeMoreMenu();
   }
 
-  /** Asserts a pin toggle's label while the More menu is open — the only rendered
+  /** Asserts a pin toggle's title while the More menu is open — the only rendered
    * pin-state signal for controls whose pinned button never reaches the DOM. */
   async expectPinToggleTitle(key, title) {
-    await expect(this.page.locator(this.pinToggle[key])).toHaveAttribute('aria-label', title);
+    await expect(this.page.locator(this.pinToggle[key])).toHaveAttribute('title', title);
   }
 
   async expectTracesPinState(key, pinned) {
     await this.openTracesMoreMenu();
     await expect(this.page.locator(this.tracesPinToggle[key])).toHaveAttribute(
-      'aria-label',
+      'title',
       pinned ? this.pinTitle.pinned : this.pinTitle.unpinned,
     );
     await this.page.keyboard.press('Escape');

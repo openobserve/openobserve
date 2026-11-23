@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- chart region: y-axis labels + bars, sharing the grown height -->
       <div class="flex min-h-0 flex-1 gap-2">
         <div
-          class="text-2xs text-text-muted flex h-full w-11 flex-shrink-0 flex-col items-end justify-between tabular-nums"
+          class="text-3xs text-text-muted flex h-full w-11 flex-shrink-0 flex-col items-end justify-between tabular-nums"
         >
           <span>{{ maxLabel }}</span>
           <span>{{ midLabel }}</span>
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-for="bar in detailBars"
               :key="bar.index"
-              class="text-2xs text-text-muted min-w-0 flex-1 text-center tabular-nums"
+              class="text-3xs text-text-muted min-w-0 flex-1 text-center tabular-nums"
             >
               {{ detailLabeled.has(bar.index + 1) ? bar.index + turnOffset + 1 : "" }}
             </span>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- x-axis title — matches the dashboard axis name (nameLocation
                "middle" + nameTextStyle bold/14px). -->
-          <div class="text-text-heading mt-1 text-center text-sm font-semibold">
+          <div class="text-text-heading mt-1 text-center text-sm font-bold">
             {{ t("traces.sessionDetail.turnLabel") }}
           </div>
         </div>

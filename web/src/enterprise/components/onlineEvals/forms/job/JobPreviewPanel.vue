@@ -28,9 +28,7 @@
         {{ t("onlineEvals.job.preview.matchedError") }}
       </div>
       <div v-else class="flex items-baseline gap-1.5">
-        <span class="text-text-heading text-2xl font-semibold tabular-nums">{{
-          formattedCount
-        }}</span>
+        <span class="text-text-heading text-2xl font-bold tabular-nums">{{ formattedCount }}</span>
         <span class="text-text-secondary text-xs">
           {{ t(`onlineEvals.job.preview.scopes.${targetScope}.matchedSuffix`) }}
         </span>

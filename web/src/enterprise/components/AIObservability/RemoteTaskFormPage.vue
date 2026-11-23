@@ -27,18 +27,19 @@
       <div
         class="grid min-h-0 flex-1 grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.9fr)] gap-0 overflow-hidden max-[68.75rem]:grid-cols-1"
       >
-        <div class="px-page-edge flex min-h-0 min-w-0 flex-col gap-3 overflow-auto py-3">
+        <div class="flex min-h-0 min-w-0 flex-col gap-2 overflow-auto p-2">
           <!-- Identity -->
           <section
             class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
             data-test="ai-remote-task-form-identity-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.identitySection") }}
               </span>
             </div>
-            <div class="flex flex-col gap-4 px-4 py-3.5">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
               <OFormInput
                 name="name"
                 :label="t('aiObservability.remoteTasks.form.nameLabel')"
@@ -62,6 +63,7 @@
             data-test="ai-remote-task-form-endpoint-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.endpointSection") }}
               </span>
@@ -98,11 +100,12 @@
             data-test="ai-remote-task-form-auth-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.authSection") }}
               </span>
             </div>
-            <div class="flex flex-col gap-4 px-4 py-3.5">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
               <OFormSelect
                 name="authType"
                 :label="t('aiObservability.remoteTasks.form.authTypeLabel')"
@@ -165,6 +168,7 @@
             data-test="ai-remote-task-form-contract-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.contractSection") }}
               </span>
@@ -212,6 +216,7 @@
                 </div>
                 <OButton
                   variant="secondary"
+                  icon="add"
                   class="self-start"
                   data-test="ai-remote-task-form-header-add"
                   @click="addHeader"
@@ -268,6 +273,7 @@
               class="border-border-default flex items-center justify-between border-b px-3 py-2.5"
             >
               <div class="flex items-center">
+                <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
                 <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                   {{ t("aiObservability.remoteTasks.form.limitsSection") }}
                 </span>
@@ -316,11 +322,12 @@
             data-test="ai-remote-task-form-signing-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.signingSection") }}
               </span>
             </div>
-            <div class="flex flex-col gap-4 px-4 py-3.5">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
               <OFormSwitch
                 name="signingEnabled"
                 :label="t('aiObservability.remoteTasks.form.signingToggle')"

@@ -6,21 +6,21 @@
   >
     <!-- Same configs as the profiles docs (OTLP page), so the snippet runs on its own. -->
     <div class="flex flex-col gap-2">
-      <div class="text-sm font-semibold">{{ t("ingestion.otlpHttp") }}</div>
+      <div class="text-base font-semibold">{{ t("ingestion.otlpHttp") }}</div>
       <CredentialCodeBlock slug="profiles-otel" :content="httpConfig" />
       <div class="text-text-secondary text-xs">
         {{ t("ingestion.profilesServiceNameNote", { attr: raw("service.name") }) }}
       </div>
     </div>
     <div class="flex flex-col gap-2">
-      <div class="text-sm font-semibold">{{ t("ingestion.profilesStartCollector") }}</div>
+      <div class="text-base font-semibold">{{ t("ingestion.profilesStartCollector") }}</div>
       <CredentialCodeBlock slug="profiles-otel-start" :content="startCommand" />
       <div class="text-text-secondary text-xs">
         {{ t("ingestion.profilesAlphaNote", { version: raw("otelcol-contrib 0.153.0") }) }}
       </div>
     </div>
     <div v-if="showOtlpGrpc" class="flex flex-col gap-2">
-      <div class="text-sm font-semibold">{{ t("ingestion.otlpGrpc") }}</div>
+      <div class="text-base font-semibold">{{ t("ingestion.otlpGrpc") }}</div>
       <CredentialCodeBlock slug="profiles-otel-grpc" :content="grpcConfig" />
     </div>
     <IngestionDocLink href="https://openobserve.ai/docs/ingestion/profiles/">

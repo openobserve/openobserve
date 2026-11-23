@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :total-length="0"
       :nav-disabled-reason="searchObj.loading ? 'loading' : 'notInPage'"
       :highlight-query="searchObj.data.highlightQuery"
+      class="rounded-default"
       @add:searchterm="onAddSearchTerm"
       @search:timeboxed="onSearchAround"
       @close="clearPermalink"

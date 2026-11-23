@@ -85,7 +85,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #toolbar-trailing>
           <ORefreshButton
-            :last-run-at="lastRunAt"
             :loading="loading"
             data-test="rum-analytics-named-events-refresh-btn"
             @click="refresh"
@@ -328,7 +327,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
-import { useLoadedAt } from "@/composables/useLoadedAt";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import useNamedEvents, {
   namedEventDraftVariant,
@@ -363,7 +361,6 @@ const ne = useNamedEvents();
 const savedFunnels = useSavedFunnels();
 const { confirm } = useConfirmDialog();
 const { events, permission, invalidCount, loading } = ne;
-const lastRunAt = useLoadedAt(loading);
 const eventDrafts = useEditorDraftIds("rum_named_event");
 
 const viewState = useListViewState("rumNamedEvents", {

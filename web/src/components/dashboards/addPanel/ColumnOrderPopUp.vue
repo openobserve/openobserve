@@ -36,14 +36,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("dashboard.columnOrderDescription") }}
       </div>
 
-      <OEmptyState
+      <!-- Empty state -->
+      <div
         v-if="!editColumnOrder || editColumnOrder.length === 0"
-        size="compact"
-        icon="view-column"
-        :title="t('dashboard.noColumnsOrdered')"
-        :text="t('dashboard.columnsDefaultOrder')"
+        class="text-text-muted p-6 text-center"
         data-test="dashboard-column-order-empty-state"
-      />
+      >
+        <OIcon name="view-column" class="mb-3 h-12 w-12" />
+        <div class="text-base">{{ t("dashboard.noColumnsOrdered") }}</div>
+        <div class="text-xs">
+          {{ t("dashboard.columnsDefaultOrder") }}
+        </div>
+      </div>
 
       <!-- Draggable list -->
       <draggable
@@ -124,7 +128,6 @@ import { defineComponent, ref, onMounted, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { VueDraggableNext } from "vue-draggable-next";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -133,7 +136,6 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 export default defineComponent({
   name: "ColumnOrderPopUp",
   components: {
-    OEmptyState,
     OTruncatedText,
     draggable: VueDraggableNext as any,
     OButton,

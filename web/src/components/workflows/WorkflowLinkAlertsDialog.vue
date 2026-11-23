@@ -53,18 +53,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("workflow.linkAlerts.intro", { name: workflowName }) }}
       </OText>
 
-      <OEmptyState
-        v-if="loadError"
-        kind="error"
-        size="compact"
-        :title="t('workflow.linkAlerts.loadError')"
-      />
+      <div v-if="loadError" class="py-6 text-center">
+        <OText variant="meta" as="p" class="text-input-error-text">
+          {{ t("workflow.linkAlerts.loadError") }}
+        </OText>
+      </div>
 
-      <OEmptyState
-        v-else-if="!loading && !alerts.length"
-        size="compact"
-        :title="t('workflow.linkAlerts.empty')"
-      />
+      <div v-else-if="!loading && !alerts.length" class="py-6 text-center">
+        <OText variant="meta" as="p">
+          {{ t("workflow.linkAlerts.empty") }}
+        </OText>
+      </div>
 
       <template v-else>
         <!-- Two dropdowns: folder → alerts -->
@@ -143,7 +142,6 @@ import { useStore } from "vuex";
 
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

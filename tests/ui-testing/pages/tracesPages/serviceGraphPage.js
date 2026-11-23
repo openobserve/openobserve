@@ -30,7 +30,7 @@ export class ServiceGraphPage {
     this.treeViewTab = '[data-test="service-graph-tree-view-btn"]';
 
     // ===== SEARCH =====
-    this.searchInput = 'input[placeholder="Search services"]';
+    this.searchInput = 'input[placeholder="Search Services"]';
 
     // ===== NODE DETAIL PANEL (ServiceGraphNodeSidePanel.vue) =====
     // ODrawer forwards data-test to <DialogContent> — panel root is [data-test="service-graph-side-panel"].
@@ -206,11 +206,11 @@ export class ServiceGraphPage {
     // OToggleGroupItem: data-test and data-state are on the same element — use compound selector.
     const treeSelected = await this.page.locator(`${this.treeViewTab}[data-state="on"]`)
       .isVisible({ timeout: 1000 }).catch(() => false);
-    if (treeSelected) return 'Tree view';
+    if (treeSelected) return 'Tree View';
 
     const graphSelected = await this.page.locator(`${this.graphViewTab}[data-state="on"]`)
       .isVisible({ timeout: 1000 }).catch(() => false);
-    if (graphSelected) return 'Graph view';
+    if (graphSelected) return 'Graph View';
 
     return 'Unknown';
   }
@@ -591,7 +591,7 @@ export class ServiceGraphPage {
   }
 
   /**
-   * Click "View related" dropdown and select an option (Logs or Traces).
+   * Click "View Related" dropdown and select an option (Logs or Traces).
    * @param {'logs'|'traces'} type - Which related telemetry to view
    */
   async clickViewRelated(type = 'traces') {

@@ -363,7 +363,7 @@ describe("ApiDashboard", () => {
       await nextTick();
 
       // Assert
-      expect(wrapper.text()).toContain("Loading dashboard");
+      expect(wrapper.text()).toContain("Loading Dashboard");
     });
   });
 

@@ -22,7 +22,7 @@
         {{ t("dashboard.drilldownUserGuide.intro") }}
       </p>
 
-      <div class="font-semibold">
+      <div class="font-bold">
         {{ t("dashboard.drilldownUserGuide.useCurrentDashboardVariable") }}
       </div>
       <p>{{ t("dashboard.drilldownUserGuide.referenceVariableFormat") }}</p>
@@ -38,7 +38,7 @@
 
       <br />
 
-      <div class="font-semibold">{{ t("dashboard.drilldownUserGuide.useCurrentQuery") }}</div>
+      <div class="font-bold">{{ t("dashboard.drilldownUserGuide.useCurrentQuery") }}</div>
       <p>{{ t("dashboard.drilldownUserGuide.referenceCurrentQueryFormat") }}</p>
       <ul>
         <li>
@@ -50,7 +50,7 @@
       </ul>
       <br />
 
-      <div class="font-semibold">
+      <div class="font-bold">
         {{ t("dashboard.drilldownUserGuide.useCurrentSelectedTimePeriod") }}
       </div>
       <p>
@@ -67,7 +67,7 @@
       {{ t("dashboard.drilldownUserGuide.forExample") }}
       <span class="bg-highlight-bg px-1.25">{{ raw("from=${start_time}&to=${end_time}") }}</span>
       <br />
-      <span class="font-semibold">{{ t("dashboard.drilldownUserGuide.note") }}</span>
+      <span class="font-bold">{{ t("dashboard.drilldownUserGuide.note") }}</span>
       <span
         >{{ t("dashboard.drilldownUserGuide.relativeTimeNote") }}
         <span class="bg-highlight-bg px-1.25">{{ raw("start_time") }}</span>
@@ -77,7 +77,7 @@
       >
       <br />
       <br />
-      <div class="font-semibold">
+      <div class="font-bold">
         {{ t("dashboard.drilldownUserGuide.useSeriesNameAndValue") }}
       </div>
       <p>{{ t("dashboard.drilldownUserGuide.referenceChartDataFormat") }}</p>
@@ -99,7 +99,7 @@
 
       <br />
 
-      <div class="font-semibold">
+      <div class="font-bold">
         {{ t("dashboard.drilldownUserGuide.forTableChartDrilldown") }}
       </div>
       <p>
@@ -124,7 +124,7 @@
 
       <br />
 
-      <div class="font-semibold">
+      <div class="font-bold">
         {{ t("dashboard.drilldownUserGuide.forPieDonutChartDrilldown") }}
       </div>
       <p>{{ t("dashboard.drilldownUserGuide.referenceSeriesValue") }}</p>
@@ -139,14 +139,14 @@
 
       <br />
 
-      <div class="font-semibold">
+      <div class="font-bold">
         {{ t("dashboard.drilldownUserGuide.forSankeyChartDrilldown") }}
       </div>
       <p>
         {{ t("dashboard.drilldownUserGuide.referenceSankey") }}
       </p>
       <ul>
-        <li class="font-semibold">{{ t("dashboard.drilldownUserGuide.edge") }}</li>
+        <li class="font-bold">{{ t("dashboard.drilldownUserGuide.edge") }}</li>
         <ul>
           <li>
             <span class="bg-highlight-bg px-1.25">{{ raw("${edge.__source}") }}</span>
@@ -158,7 +158,7 @@
             <span class="bg-highlight-bg px-1.25">{{ raw("${edge.__value}") }}</span>
           </li>
         </ul>
-        <li class="font-semibold">{{ t("dashboard.drilldownUserGuide.node") }}</li>
+        <li class="font-bold">{{ t("dashboard.drilldownUserGuide.node") }}</li>
         <ul>
           <li>
             <span class="bg-highlight-bg px-1.25">{{ raw("${node.__name}") }}</span>

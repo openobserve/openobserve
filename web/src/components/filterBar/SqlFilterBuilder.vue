@@ -123,7 +123,6 @@ defineExpose<SqlFilterBuilderExpose>({ activate: () => barRef.value?.activate() 
         size="sm"
         appearance="plain"
         :max-rows="maxRows"
-        submit-on-enter
         :data-test="`${dataTest}-bar`"
         @update:model-value="onTreeChange"
         @submit="emit('submit')"

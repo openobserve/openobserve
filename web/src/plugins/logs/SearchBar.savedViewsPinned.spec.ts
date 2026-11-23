@@ -254,15 +254,14 @@ describe("SearchBar — pinned saved views", () => {
   });
 
   // 93px = 1px border + 58px list trigger + 1px separator + 32px create button + 1px border.
-  // The Filter | SQL tray takes its 101px + gap ahead of the pins.
   it.each([
-    [391, false],
-    [392, true],
+    [405, false],
+    [406, true],
   ])(
     "budgets the group at its rendered 93px width (toolbar %ipx → shown: %s)",
     async (width, shown) => {
-      const otherPins = (["histogram", "quickMode", "syntaxGuide"] as const).filter((key) =>
-        isPinned(key),
+      const otherPins = (["histogram", "sqlMode", "quickMode", "syntaxGuide"] as const).filter(
+        (key) => isPinned(key),
       );
       otherPins.forEach((key) => togglePin(key));
       try {

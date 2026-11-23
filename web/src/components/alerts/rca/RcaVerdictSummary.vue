@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p
         ref="headlineEl"
         data-test="rca-verdict-headline"
-        class="text-text-heading m-0 text-sm leading-5 [text-wrap:pretty]"
+        class="text-text-heading m-0 text-base leading-normal [text-wrap:pretty]"
         :class="{ 'line-clamp-2': !headlineOpen }"
       >
         <RcaInlineText :text="headline" />

@@ -314,7 +314,7 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     await pm.dashboardSetting.addVariable(
-      "Query values",
+      "Query Values",
       variableName,
       "logs",
       "e2e_automate",
@@ -522,7 +522,7 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     await pm.dashboardSetting.addVariable(
-      "Query values",
+      "Query Values",
       variableName,
       "logs",
       "e2e_automate",

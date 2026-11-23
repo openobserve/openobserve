@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- eslint-enable local/no-hardcoded-px -->
               <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
               <div
-                class="message-role p-2 text-xs font-semibold capitalize"
+                class="message-role p-2 text-xs font-bold capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
                   borderBottom: '1px solid var(--color-border-default)',
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- eslint-enable local/no-hardcoded-px -->
               <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
               <div
-                class="message-role p-2 text-xs font-semibold capitalize"
+                class="message-role p-2 text-xs font-bold capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
                   borderBottom: '1px solid var(--color-border-default)',
@@ -795,11 +795,11 @@ const renderMarkdown = (content: string): string => {
 }
 
 .messages-view .message-item .message-content :deep(h2) {
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
 }
 
 .messages-view .message-item .message-content :deep(h3) {
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
 }
 
 .messages-view .message-item .message-content :deep(h4) {

@@ -22,7 +22,7 @@
   <div class="bg-surface-base flex h-screen flex-col">
     <div
       v-if="errorMessage"
-      class="flex min-h-0 flex-1 flex-col"
+      class="flex min-h-[60vh] flex-col items-center justify-center px-4"
       data-test="dashboards-public-dashboard-error"
     >
       <OEmptyState :kind="errorLook.kind" :icon="errorLook.icon" :title="errorMessage" />
@@ -30,12 +30,12 @@
 
     <div
       v-else-if="!configLoaded"
-      class="flex min-h-0 flex-1 flex-col gap-3 p-4"
+      class="flex min-h-[60vh] flex-col items-center justify-center gap-3"
       data-test="dashboards-public-dashboard-loading"
     >
-      <OSkeleton class="h-6 w-64" />
-      <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <OSkeleton v-for="panel in 4" :key="panel" shape="block" class="h-60" />
+      <OSpinner size="lg" />
+      <div class="text-text-secondary text-sm">
+        {{ t("dashboard.publicDashboard.loading") }}
       </div>
     </div>
 
@@ -158,15 +158,18 @@
 
       <div
         v-if="state === 'loading' || state === 'building'"
-        class="grid min-h-0 flex-1 grid-cols-1 content-start gap-3 p-4 md:grid-cols-2"
+        class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3"
         data-test="dashboards-public-dashboard-loading"
       >
-        <OSkeleton v-for="panel in 4" :key="panel" shape="block" class="h-60" />
+        <OSpinner size="lg" />
+        <div class="text-text-secondary text-sm">
+          {{ t("dashboard.publicDashboard.loading") }}
+        </div>
       </div>
 
       <div
         v-else-if="state === 'cooldown'"
-        class="flex min-h-0 flex-1 flex-col"
+        class="flex min-h-0 flex-1 flex-col items-center justify-center px-4"
         data-test="dashboards-public-dashboard-cooldown"
       >
         <OEmptyState icon="schedule" :title="cooldownMessage" />
@@ -218,7 +221,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { useLocalTimezone } from "@/utils/storage";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { EmptyStateKind } from "@/lib/core/EmptyState/OEmptyState.types";

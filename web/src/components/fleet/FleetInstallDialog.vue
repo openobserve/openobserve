@@ -28,11 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-col gap-4">
       <div
         v-if="tokensLoading"
-        class="flex flex-col gap-4"
+        class="flex justify-center py-6"
         data-test="fleet-install-dialog-tokens-loading"
       >
-        <OSkeleton shape="block" class="h-8" />
-        <OSkeleton shape="block" class="h-24" />
+        <OSpinner size="lg" />
       </div>
       <div v-else-if="tokensForbidden" data-test="fleet-install-dialog-tokens-forbidden">
         <OEmptyState
@@ -51,11 +50,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else-if="pendingTokenId && !selectedId"
-        class="flex flex-col gap-4"
+        class="flex justify-center py-6"
         data-test="fleet-install-dialog-token-pending"
       >
-        <OSkeleton shape="block" class="h-8" />
-        <OSkeleton shape="block" class="h-24" />
+        <OSpinner size="lg" />
       </div>
       <div
         v-else-if="!activeTokens.length"
@@ -123,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div aria-live="polite" data-test="fleet-install-dialog-status">
           <OEmptyState
             v-if="collectorsForbidden"
-            size="compact"
+            size="inline"
             kind="denied"
             :title="t('emptyState.noAccess.title')"
             :text="t('emptyState.noAccess.description')"
@@ -131,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OEmptyState
             v-else-if="collectors.error.value"
-            size="compact"
+            size="inline"
             kind="error"
             :title="t('emptyState.loadError.title')"
             :text="t('emptyState.loadError.description')"
@@ -172,7 +170,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { fleetCollectorsQuery } from "@/services/fleet.queries";

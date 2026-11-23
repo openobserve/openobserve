@@ -115,7 +115,7 @@ test.describe('Dashboard variables Auto Run', { tag: ['@dashboards', '@dashboard
     await autoRun.toggleAutoRun();
     expect(await autoRun.getStoredAutoRun()).toBe('false');
     await autoRun.openRefreshOptions();
-    await autoRun.expectAutoRunToggleLabel('Turn on auto run');
+    await autoRun.expectAutoRunToggleLabel('Turn on Auto Run');
     await autoRun.closeMenu();
 
     await autoRun.selectVariableValue('ns', first);
@@ -128,7 +128,7 @@ test.describe('Dashboard variables Auto Run', { tag: ['@dashboards', '@dashboard
 
     await autoRun.reloadDashboard('p_var');
     await autoRun.openRefreshOptions();
-    await autoRun.expectAutoRunToggleLabel('Turn on auto run');
+    await autoRun.expectAutoRunToggleLabel('Turn on Auto Run');
     await autoRun.closeMenu();
 
     await autoRun.toggleAutoRun();

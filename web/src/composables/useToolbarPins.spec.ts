@@ -27,12 +27,12 @@ describe("useToolbarPins defaults", () => {
     window.localStorage.clear();
   });
 
-  it("pins nothing by default on a pristine profile", async () => {
+  it("pins ONLY histogram by default on a pristine profile", async () => {
     const { useToolbarPins } = await importFresh();
-    const { isPinned, pinnedItems } = useToolbarPins();
-    expect(isPinned("histogram")).toBe(false);
+    const { isPinned } = useToolbarPins();
+    expect(isPinned("histogram")).toBe(true);
     expect(isPinned("savedViews")).toBe(false);
-    expect(pinnedItems.value).toEqual([]);
+    expect(isPinned("sqlMode")).toBe(false);
   });
 
   it("keeps savedViews pinned for a user who pinned it explicitly", async () => {
@@ -44,29 +44,20 @@ describe("useToolbarPins defaults", () => {
     expect(useToolbarPins().isPinned("savedViews")).toBe(true);
   });
 
-  it("keeps a histogram the user pinned across a module reload", async () => {
+  it("keeps the histogram decided-flag behavior intact", async () => {
     const { useToolbarPins } = await importFresh();
     useToolbarPins().togglePin("histogram");
+    expect(window.localStorage.getItem("logs_toolbar_histogram_pin_decided")).toBe("true");
     const fresh = await importFresh();
-    expect(fresh.useToolbarPins().isPinned("histogram")).toBe(true);
+    expect(fresh.useToolbarPins().isPinned("histogram")).toBe(false);
   });
 
   it("orders pinned items canonically regardless of pin order", async () => {
     const { useToolbarPins } = await importFresh();
     const { togglePin, pinnedItems } = useToolbarPins();
     togglePin("syntaxGuide");
-    togglePin("quickMode");
-    togglePin("histogram");
-    expect(pinnedItems.value).toEqual(["histogram", "quickMode", "syntaxGuide"]);
-  });
-
-  it("ignores a stored sqlMode pin, which is no longer pinnable", async () => {
-    window.localStorage.setItem(
-      "logs_toolbar_pinned_items",
-      JSON.stringify(["sqlMode", "quickMode"]),
-    );
-    const { useToolbarPins } = await importFresh();
-    expect(useToolbarPins().pinnedItems.value).toEqual(["quickMode"]);
+    togglePin("sqlMode");
+    expect(pinnedItems.value).toEqual(["histogram", "sqlMode", "syntaxGuide"]);
   });
 });
 
@@ -75,13 +66,14 @@ describe("useToolbarPins scopes", () => {
     window.localStorage.clear();
   });
 
-  it("keeps the logs storage key unchanged", async () => {
+  it("keeps the logs storage key and defaults unchanged", async () => {
     const { useToolbarPins } = await importFresh();
     const { togglePin, pinnedItems } = useToolbarPins();
-    expect(pinnedItems.value).toEqual([]);
-    togglePin("quickMode");
+    expect(pinnedItems.value).toEqual(["histogram"]);
+    togglePin("sqlMode");
     expect(JSON.parse(window.localStorage.getItem("logs_toolbar_pinned_items")!)).toEqual([
-      "quickMode",
+      "histogram",
+      "sqlMode",
     ]);
     expect(window.localStorage.getItem("traces_toolbar_pinned_items")).toBeNull();
   });
@@ -113,11 +105,11 @@ describe("useToolbarPins scopes", () => {
     useToolbarPins("traces").togglePin("histogram");
     expect(useToolbarPins("traces").isPinned("histogram")).toBe(true);
     useToolbarPins().togglePin("histogram");
-    expect(useToolbarPins().isPinned("histogram")).toBe(true);
+    expect(useToolbarPins().isPinned("histogram")).toBe(false);
     expect(useToolbarPins("traces").isPinned("histogram")).toBe(true);
     useToolbarPins("traces").togglePin("histogram");
     expect(useToolbarPins("traces").isPinned("histogram")).toBe(false);
-    expect(useToolbarPins().isPinned("histogram")).toBe(true);
+    expect(useToolbarPins().isPinned("histogram")).toBe(false);
   });
 
   it("isolates scopes from each other", async () => {
@@ -129,6 +121,7 @@ describe("useToolbarPins scopes", () => {
     useToolbarPins("traces").togglePin("savedViews");
     expect(useToolbarPins().isPinned("savedViews")).toBe(true);
     expect(useToolbarPins("traces").isPinned("savedViews")).toBe(false);
+    expect(window.localStorage.getItem("logs_toolbar_histogram_pin_decided")).toBeNull();
   });
 
   it("keeps instances of one scope in sync", async () => {
@@ -146,11 +139,11 @@ describe("useToolbarPins scopes", () => {
     expect(fresh.useToolbarPins("traces").isPinned("savedViews")).toBe(true);
   });
 
-  it("pins nothing when stored pins are corrupt", async () => {
+  it("keeps the logs histogram decided flag when stored pins are corrupt", async () => {
     window.localStorage.setItem("logs_toolbar_pinned_items", "{not json");
     window.localStorage.setItem("traces_toolbar_pinned_items", "{not json");
     const { useToolbarPins } = await importFresh();
     expect(useToolbarPins("traces").isPinned("savedViews")).toBe(false);
-    expect(useToolbarPins().isPinned("histogram")).toBe(false);
+    expect(useToolbarPins().isPinned("histogram")).toBe(true);
   });
 });

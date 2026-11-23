@@ -303,7 +303,7 @@ describe("Profiles page", () => {
 
     const error = wrapper.find('[data-test="profiles-error"]');
     expect(error.attributes("data-kind")).toBe("error");
-    expect(error.text()).not.toContain("stream list down");
+    expect(error.text()).toContain("stream list down");
     expect(wrapper.find('[data-test="profiles-no-stream"]').exists()).toBe(false);
 
     await error.find('[data-test="empty-state-action"]').trigger("click");

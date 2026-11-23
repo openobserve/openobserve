@@ -62,7 +62,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(interpolationDropdown);
     await expect(interpolationDropdown).toBeVisible();
 
-    for (const mode of ["Smooth", "Linear", "Step after"]) {
+    for (const mode of ["Smooth", "Linear", "Step After"]) {
       await pm.dashboardPanelConfigs.selectLineInterpolation(mode);
       await pm.dashboardPanelActions.applyDashboardBtn();
       testLogger.info(`Line interpolation set to ${mode}`);

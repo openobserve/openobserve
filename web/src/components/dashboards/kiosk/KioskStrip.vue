@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OButton
         icon-only
-        variant="ghost"
+        variant="secondary"
         icon="close"
         :aria-label="t('dashboard.kiosk.exit')"
         data-test="dashboard-kiosk-exit-btn"

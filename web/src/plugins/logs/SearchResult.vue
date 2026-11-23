@@ -26,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
           icon-only
-          variant="ghost"
-          size="sm"
-          class="ms-1 shrink-0"
+          variant="secondary"
+          size="xs"
+          class="ms-1.5 shrink-0"
           data-test="logs-search-field-list-collapse-btn"
           @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
         >
@@ -135,11 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !searchObj.loadingCounter &&
               searchObj.meta.showHistogram
             "
-            class="text-text-secondary inline-flex shrink-0"
-            tabindex="0"
-            role="img"
-            :aria-label="raw(searchObj.data.histogram.errorMsg)"
-            data-test="logs-search-histogram-unavailable-info"
+            class="text-warning shrink-0 cursor-pointer"
           >
             <OIcon name="info-outline" size="sm"> </OIcon>
             <OTooltip :content="raw(searchObj.data.histogram.errorMsg)" side="top" />
@@ -147,30 +143,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="flex flex-none items-center justify-end gap-1 pe-2 max-md:ms-auto">
-          <!-- Narrow results: the bar's actions fold into one ⋯; refresh lives in the toolbar. -->
-          <ODropdown
-            v-if="shouldMoveActionsToMenu && (showWrapBtn || showInspectBtn)"
-            side="bottom"
-            align="end"
-          >
+          <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
+          <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
               <OButton
                 icon-only
-                icon="more-horiz"
-                variant="ghost"
-                size="sm"
-                :label="t('search.moreActions')"
+                variant="secondary"
+                size="xs"
                 data-test="logs-result-actions-menu-btn"
-              />
+              >
+                <OIcon name="more-horiz" size="sm" />
+                <OTooltip :content="t('search.moreActions')" />
+              </OButton>
             </template>
+            <ODropdownItem
+              icon="refresh"
+              data-test="logs-result-refresh-menu-item"
+              @select="$emit('run-query')"
+            >
+              {{ t("common.refresh") }}
+            </ODropdownItem>
             <ODropdownItem
               icon="wrap-text"
               v-if="showWrapBtn"
               data-test="logs-result-wrap-menu-item"
-              :checked="!!searchObj.meta.toggleSourceWrap"
               @select="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
             >
               {{ t("search.messageWrapContent") }}
+              <template v-if="searchObj.meta.toggleSourceWrap" #end>
+                <OIcon name="check" size="sm" />
+              </template>
             </ODropdownItem>
             <ODropdownItem
               icon="troubleshoot"
@@ -182,12 +184,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
           </ODropdown>
 
-          <template v-else-if="!shouldMoveActionsToMenu">
-            <div v-if="inspectAvailable || showWrapBtn" class="inline-flex items-center gap-1">
+          <!-- INLINE BUTTONS (wider container) -->
+          <template v-else>
+            <!-- Refresh in bordered wrapper -->
+            <div
+              class="border-card-glass-border rounded-default inline-flex h-6 items-center border px-1"
+            >
+              <ORefreshButton
+                size="sm"
+                :last-run-at="searchObj.meta.lastRunAt"
+                :loading="searchObj.loading || histogramSettling"
+                :disabled="searchObj.loading || histogramSettling"
+                @click="$emit('run-query')"
+              />
+            </div>
+            <!-- Action buttons -->
+            <div v-if="inspectAvailable || showWrapBtn" class="inline-flex items-center gap-0.5">
               <OButton
                 v-if="inspectAvailable"
                 :icon-only="!showActionLabels"
-                size="sm"
+                variant="secondary"
+                size="xs"
                 :disabled="!showInspectBtn"
                 @click="openSearchJobInspector"
                 data-test="logs-inspect-button"
@@ -205,8 +222,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="showWrapBtn"
                 icon-only
                 variant="secondary"
-                size="sm"
-                :pressed="!!searchObj.meta.toggleSourceWrap"
+                size="xs"
+                :pressed="searchObj.meta.toggleSourceWrap"
                 @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
                 data-test="logs-search-result-wrap-table-content-btn"
               >
@@ -233,7 +250,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-result-records-per-page"
               v-model="searchObj.meta.resultGrid.rowsPerPage"
               :options="rowsPerPageOptions"
-              size="sm"
               class="select-pagination min-w-[4.5rem]"
               :searchable="false"
               :disabled="searchObj.loading || !!gridLockReason"
@@ -383,14 +399,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Same no-data treatment as dashboard panels (PanelSchemaRenderer). -->
+          <!-- Same no-data treatment as dashboard panels (PanelSchemaRenderer);
+               inline min-height/padding overridden to fit the 6.25rem strip. -->
           <OEmptyState
             v-else-if="histogramView.phase === 'empty'"
-            size="compact"
+            size="inline"
             icon="bar-chart"
             :title="t('logs.searchResult.noData')"
             data-test="logs-search-no-data-histogram"
-            class="histogram-empty px-3"
+            class="histogram-empty !min-h-0 !p-2"
           />
         </div>
         <div
@@ -812,6 +829,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :correlation-loading="correlationLoading"
           :correlation-error="correlationError ?? undefined"
           :initial-tab="detailTableInitialTab"
+          class="rounded-default"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex ?? -1"
           :totalLength="searchObj.data.queryResults?.hits?.length || 0"
           :has-prev-page="hasPrevPage"
@@ -974,6 +992,7 @@ import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { extractSeverity } from "@/utils/sourceEventSeverity";
 import config from "@/aws-exports";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { quickModeHiddenFieldCount } from "@/utils/query/quickModeFieldList";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1028,6 +1047,7 @@ export default defineComponent({
   name: "SearchResult",
   components: {
     LogLineLinkPopover,
+    ORefreshButton,
     OButton,
     ODrawer,
     OSpinner,
@@ -1314,16 +1334,12 @@ export default defineComponent({
       const parts = summaryView.value.parts;
       if (!parts) return null;
 
-      // An aggregate returns every row at once, so its chip is a plain row count.
-      const records = parts.rows
-        ? t("search.recordsChipRows", { total: parts.total }, parts.end)
-        : t(isMobile.value ? "search.recordsChipShort" : "search.recordsChip", {
-            start: parts.start,
-            end: parts.end,
-            total: parts.total,
-          });
       return {
-        records,
+        records: t(isMobile.value ? "search.recordsChipShort" : "search.recordsChip", {
+          start: parts.start,
+          end: parts.end,
+          total: parts.total,
+        }),
         time: t("search.tookChip", { took: parts.took }),
         // Label is already translated, the size is data — joined so the pair reads like the title.
         scan: parts.scanLabel != null ? raw(`${parts.scanLabel}: ${parts.scanSize}`) : null,
@@ -3481,7 +3497,7 @@ export default defineComponent({
   border-radius: var(--radius-default);
   cursor: pointer;
   font-size: var(--text-compact);
-  font-weight: var(--font-semibold);
+  font-weight: 700;
   line-height: 1;
 }
 
@@ -3535,10 +3551,13 @@ export default defineComponent({
 .select-pagination {
   position: relative;
   width: 4rem !important;
+  height: 1.5rem !important;
   margin-top: 0;
 }
 
 .select-pagination :deep(button) {
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
   font-size: var(--text-xs) !important;
   padding-inline: 0.5rem !important;
 }

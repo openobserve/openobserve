@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex h-full min-h-0 flex-col" data-test="workflow-runs-panel">
     <!-- Compact header: title + datetime range picker + refresh -->
     <div
-      class="border-border-default px-page-edge flex shrink-0 items-center justify-between gap-2 border-b py-2"
+      class="border-border-default flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2"
     >
       <div class="min-w-0">
         <div class="text-text-body text-sm leading-tight font-semibold">
@@ -76,10 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- The gutter goes on the rows above the table, so the table keeps its own edge inset (L3). -->
-    <div class="flex min-h-0 flex-1 flex-col gap-2 py-2">
+    <div class="flex min-h-0 flex-1 flex-col gap-2 p-2">
       <!-- Offered only once the workflow has or had an endpoint; every other workflow keeps today's list. -->
-      <div v-if="showTriggerFilter" class="px-page-edge flex shrink-0 flex-wrap items-center gap-2">
+      <div v-if="showTriggerFilter" class="flex shrink-0 flex-wrap items-center gap-2">
         <OToggleGroup
           :model-value="activeFilter"
           mobile-dropdown
@@ -105,15 +104,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- The timeline insets its own label by 0.5rem; this tops it up to the page edge. -->
-      <div class="px-2">
-        <WorkflowRunsTimeline
-          :runs="timelineRuns"
-          :start="dateTimeValues.startTime"
-          :end="dateTimeValues.endTime"
-          :timezone="store.state.timezone"
-        />
-      </div>
+      <WorkflowRunsTimeline
+        :runs="timelineRuns"
+        :start="dateTimeValues.startTime"
+        :end="dateTimeValues.endTime"
+        :timezone="store.state.timezone"
+      />
 
       <div class="alert-history-table min-h-0 flex-1">
         <OTable
@@ -134,35 +130,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @row-click="openRun"
         >
           <template #empty>
-            <OEmptyState
-              v-if="loadError"
-              kind="error"
-              data-test="workflow-runs-load-error"
-              @action="fetchHistory(true)"
-            />
-            <OEmptyState
-              v-else-if="!search.trim() && activeFilter !== 'all'"
-              kind="filtered"
-              :icon="filterEmpty.icon"
-              :title="filterEmpty.title"
-              :text="filterEmpty.description"
-              :action-label="t('workflow.http.runsEmptyAction')"
-              :data-test="
-                activeFilter === 'http_request'
-                  ? 'workflow-runs-http-empty'
-                  : 'workflow-runs-filter-empty'
-              "
-              @action="onFilterChange('all')"
-            />
-            <OEmptyState
-              v-else-if="search.trim()"
-              kind="filtered"
-              :title="t('workflow.history.searchEmptyTitle')"
-              :action-label="t('workflow.history.searchEmptyAction')"
-              data-test="workflow-runs-search-empty"
-              @action="search = ''"
-            />
-            <NoData v-else />
+            <div class="py-10">
+              <OEmptyState
+                v-if="loadError"
+                kind="error"
+                :title="t('emptyState.loadError.title')"
+                :text="t('emptyState.loadError.description')"
+                data-test="workflow-runs-load-error"
+                @action="fetchHistory(true)"
+              />
+              <OEmptyState
+                v-else-if="!search.trim() && activeFilter !== 'all'"
+                size="inline"
+                kind="filtered"
+                :icon="filterEmpty.icon"
+                :title="filterEmpty.title"
+                :text="filterEmpty.description"
+                :action-label="t('workflow.http.runsEmptyAction')"
+                :data-test="
+                  activeFilter === 'http_request'
+                    ? 'workflow-runs-http-empty'
+                    : 'workflow-runs-filter-empty'
+                "
+                @action="onFilterChange('all')"
+              />
+              <OEmptyState
+                v-else-if="search.trim()"
+                size="inline"
+                kind="filtered"
+                :title="t('workflow.history.searchEmptyTitle')"
+                :action-label="t('workflow.history.searchEmptyAction')"
+                data-test="workflow-runs-search-empty"
+                @action="search = ''"
+              />
+              <NoData v-else />
+            </div>
           </template>
 
           <template #cell-start_time="{ value }">

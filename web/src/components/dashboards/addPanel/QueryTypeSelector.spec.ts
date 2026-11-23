@@ -422,7 +422,7 @@ describe("QueryTypeSelector", () => {
 
       const dialog = wrapper.find('[data-test="confirm-dialog"]');
       expect(dialog.exists()).toBeTruthy();
-      expect(dialog.find('[data-test="dialog-title"]').text()).toBe("Change query mode");
+      expect(dialog.find('[data-test="dialog-title"]').text()).toBe("Change Query Mode");
     });
 
     it("should handle confirmation dialog OK", async () => {

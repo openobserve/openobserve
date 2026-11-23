@@ -102,7 +102,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- Add Variable Button -->
     <div v-if="showAddVariableButton">
-      <OButton variant="secondary" @click="openAddVariable" data-test="dashboard-add-variable-btn">
+      <OButton
+        variant="secondary"
+        @click="openAddVariable"
+        data-test="dashboard-add-variable-btn"
+        icon="add"
+      >
         {{ t("dashboard.newVariable") }}
       </OButton>
     </div>

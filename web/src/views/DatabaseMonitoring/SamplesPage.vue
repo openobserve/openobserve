@@ -54,8 +54,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            toolbar: both tables below own a toolbar and only one of them is
            mounted at a time, so a control in either would vanish with it.
            One row, above both, serving whichever table is showing. -->
-      <div class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-2">
-        <div class="w-70 min-w-0 max-lg:order-last max-lg:w-full">
+      <div class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-1.5">
+        <DbmScopeFilters
+          class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-1/4"
+          :filters="dimensionFilters"
+          @clear="clearScope"
+        />
+        <div class="min-w-48 flex-1 max-lg:order-last max-lg:w-full">
           <OSearchInput
             :model-value="search"
             :placeholder="t('dbm.samples.searchPlaceholder')"
@@ -64,11 +69,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="(v: unknown) => (search = typeof v === 'string' ? v : '')"
           />
         </div>
-        <DbmScopeFilters
-          class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-1/4"
-          :filters="dimensionFilters"
-          @clear="clearScope"
-        />
         <DbmToolbarNote
           v-if="!serverListShown"
           class="ms-auto"
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState
             kind="error"
             :title="t('emptyState.loadError.title')"
-            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
+            :text="raw(message)"
             data-test="dbm-samples-error"
             @action="onRefresh()"
           />
@@ -386,7 +386,6 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";

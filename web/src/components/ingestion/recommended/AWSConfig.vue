@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="mt-8">
       <div class="mb-3">
-        <div class="text-text-heading m-0 text-sm font-semibold">
+        <div class="text-text-heading m-0 text-base font-semibold">
           {{ t("ingestion.awsSetup.manualTitle") }}
         </div>
         <div class="text-text-secondary m-0 text-sm">

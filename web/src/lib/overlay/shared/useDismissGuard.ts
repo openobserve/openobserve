@@ -39,17 +39,6 @@ export function useDismissGuard(options: DismissGuardOptions) {
   return { asking, requestDismiss, keepEditing, discard };
 }
 
-/** What reka's outside interaction asks of a modal overlay: a press outside dismisses it. */
-export function outsideInteraction(e: Event): "dismiss" | "refocus" | "ignore" {
-  const target = (e as CustomEvent<{ originalEvent?: Event }>).detail?.originalEvent?.target;
-  // A portaled popup opened from inside the overlay sits outside its DOM but belongs to it.
-  if (target instanceof Element && target.closest("[data-reka-popper-content-wrapper]")) {
-    return "ignore";
-  }
-  // A menu that opened the overlay hands focus back to its trigger as it closes; that is no request to leave.
-  return e.type === "dismissableLayer.focusOutside" ? "refocus" : "dismiss";
-}
-
 const FIELD_SELECTOR = [
   'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="file"]):not([type="range"]):not([type="color"]):not([disabled])',
   "textarea:not([disabled])",

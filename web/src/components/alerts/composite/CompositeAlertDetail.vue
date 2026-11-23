@@ -105,7 +105,7 @@ const childReason = (
           <template v-if="readable(child)">
             <div class="flex items-center gap-2">
               <span
-                class="bg-theme-accent-soft text-theme-accent rounded-default flex h-6 w-6 shrink-0 items-center justify-center text-xs font-semibold"
+                class="bg-theme-accent-soft text-theme-accent rounded-default flex h-6 w-6 shrink-0 items-center justify-center text-xs font-bold"
               >
                 {{ raw(letterFor(index)) }}
               </span>

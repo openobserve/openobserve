@@ -50,7 +50,7 @@ describe("OnboardingStepWhich", () => {
     const firstGroup = w.findAll('[data-test="onboarding-step-which-group"]')[0];
     expect(firstGroup.findAll('[data-test^="onboarding-step-which-guide-"]')).toHaveLength(8);
     expect(firstGroup.find('[data-test="onboarding-step-which-show-more"]').text()).toBe(
-      `Show ${size - 8} more`,
+      `Show ${size - 8} More`,
     );
   });
 

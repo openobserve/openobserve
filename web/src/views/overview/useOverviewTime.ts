@@ -16,9 +16,6 @@
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { elapsedParts } from "./overviewFormat";
 
-const HOUR_S = 3600;
-const DAY_S = 86_400;
-
 export function useOverviewTime() {
   const { t } = useI18nTyped();
 
@@ -33,13 +30,5 @@ export function useOverviewTime() {
   const formatCountdown = (resetsAtMicros: number, nowMs: number): I18nText =>
     formatElapsed(Math.floor(resetsAtMicros / 1000) - nowMs);
 
-  // "24 hours", not "1 day": a range under two days is read in hours, as the picker names it
-  const formatRangeWords = (seconds: number): I18nText => {
-    const unit = seconds >= 2 * DAY_S ? "days" : seconds >= HOUR_S ? "hours" : "minutes";
-    const size = { days: DAY_S, hours: HOUR_S, minutes: 60 }[unit];
-    const count = Math.round((seconds / size) * 10) / 10;
-    return t(`regionStatus.rangeLengthSpoken.${unit}`, { count: count.toLocaleString() }, count);
-  };
-
-  return { formatElapsed, formatCountdown, formatRangeWords };
+  return { formatElapsed, formatCountdown };
 }

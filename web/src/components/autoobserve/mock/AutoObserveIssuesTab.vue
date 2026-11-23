@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</span>
         </div>
         <OToggleGroup
+          size="sm"
           :model-value="priority"
           :aria-label="t('autoobserve2.recent.priorityLabel')"
           data-test="autoobserve-issues-priority"

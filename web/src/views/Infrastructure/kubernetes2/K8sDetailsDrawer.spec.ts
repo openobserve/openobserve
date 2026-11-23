@@ -668,7 +668,7 @@ describe("K8sDetailsDrawer events", () => {
 });
 
 describe("K8sDetailsDrawer loading", () => {
-  it("shows a skeleton while pending, then not found when the row is still missing", async () => {
+  it("shows a spinner while pending, then not found when the row is still missing", async () => {
     const ref = refOf("node", "missing");
     const wrapper = mountDrawer(ref, { pending: true });
     expect(wrapper.find('[data-test="k8s2-drawer-pending"]').exists()).toBe(true);

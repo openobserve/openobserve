@@ -6,8 +6,7 @@ import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { formatEventCount } from "@/utils/formatters";
 
@@ -29,15 +28,12 @@ const total = computed(() => props.values.reduce((sum, v) => sum + v.count, 0));
     <span v-if="wholeStream" class="text-text-secondary text-2xs px-1">
       {{ t("siem.events.topValuesWholeStream") }}
     </span>
-    <div v-if="loading" class="flex flex-col gap-2 px-1 py-1">
-      <OSkeleton v-for="n in 3" :key="n" />
+    <div v-if="loading" class="flex justify-center py-2">
+      <OSpinner size="lg" />
     </div>
-    <OEmptyState
-      v-else-if="!values.length"
-      size="compact"
-      class="px-1"
-      :title="t('siem.events.noValues')"
-    />
+    <span v-else-if="!values.length" class="text-text-secondary px-1 py-1 text-xs">
+      {{ t("siem.events.noValues") }}
+    </span>
     <template v-else>
       <div
         v-for="v in values"

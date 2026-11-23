@@ -272,7 +272,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-if="live" #empty>
           <AppliedChangesList>
-            <LiveSurfaceEmpty surface="changes" @action="allOpen = true" />
+            <div class="bg-surface-base border-border-subtle rounded-surface border py-6 shadow-xs">
+              <LiveSurfaceEmpty surface="changes" @action="allOpen = true" />
+            </div>
           </AppliedChangesList>
         </template>
       </ChangesPage>

@@ -23,15 +23,13 @@ Where an older house rule in this skill disagrees with a rule here, this file wi
 | Radius 10: dialogs, drawers, cards, panels, the content frame (L1) | `rounded-surface` | `--radius-surface` |
 | Pills, avatars, dots | `rounded-full` | `--radius-full` |
 | Text 11 · 12 · 13 · 14 (T1) | `text-2xs` · `text-xs` · `text-compact` · `text-sm` | `--text-*` in `base.css` |
-| Text 15 (dialog and drawer titles) · 18 (page title) | `text-title` · `text-lg leading-6` | `--text-*` in `base.css` |
-| Text 20 · 24 (KPI values) | `text-xl` · `text-2xl` | `--text-*` in `base.css` |
+| Text 16 (page title) · 20 · 24 (KPI values) | `text-base` · `text-xl` · `text-2xl` | `--text-*` in `base.css` |
 | Text colour strong · default · secondary · tertiary · disabled (T3) | `text-text-heading` · `text-text-body` · `text-text-secondary` · `text-text-muted` · `text-text-disabled` | `--color-text-*` in `semantic.css` |
 | Spacing 4 · 8 · 12 · 16 · 24 · 32 (L4) | `*-1` · `*-2` · `*-3` · `*-4` · `*-6` · `*-8` | Tailwind's rem scale |
 
 The component sets its own height, radius and text size from its `size` prop. A call site
-never overrides them (`local/o2-control-height`). The title sizes are owned too: `OPageHeader` sets
-the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSection` and `OCard` the
-14 px semibold section titles, so a call site never sets a title size.
+never overrides them (`local/o2-control-height`). Text 15 (dialog, drawer and section titles)
+is `text-title`; `ODialog`, `ODrawer` and `OFormSection` set it, so a call site does not.
 
 ## Quick answers
 
@@ -86,17 +84,17 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
 | --- | --- | --- | --- |
 | 11 | 16 | Key chips, chart axes, micro captions | p95 latency · 10:42 |
 | 12 | 16 | Meta, helper text, chips, badges, column headers | Updated 2 min ago |
-| 13 | 20 | All UI: controls, menus, tables, labels; setting-row labels (medium) and their help; section descriptions | payments-api returned 503 for /checkout |
-| 14 | 20 | Reading text: descriptions, empty states, dialog body. Semibold: section, card and panel titles | Alerts notify your team when a condition is met. |
-| 15 | 22 | Dialog and drawer titles (semibold) | Notification settings |
-| 18 | 24 | Page title (semibold 600, never larger) | Checkout service health |
+| 13 | 20 | All UI: controls, menus, tables, labels | payments-api returned 503 for /checkout |
+| 14 | 20 | Reading text: descriptions, empty states, dialog body | Alerts notify your team when a condition is met. |
+| 15 | 22 | Dialog, drawer and section titles | Notification settings |
+| 16 | 24 | Page title (never larger) | Checkout service health |
 | 20 · 24 | 28 · 32 | KPI values only | 1,284 |
 
 - **T1** (must) Use only the sizes in the table above, by role.
   - Today: In-page section headings come in about 9 size and weight pairs, from 13/550 to 30/400. Custom headers use 7 title styles; AutoObserve titles are 24–30 px. _(screens-settings-iam.md §4 · screens-ai-infra-security.md §6)_
   - Why: Changes the house rule's 14 px default to 13 px for UI text, matching the density of the data it sits beside; 14 stays for text people read.
-- **T2** (must) The page title is 18 px at weight 600 in the strong text colour, on the 24 px title line — never larger, never pure black. It is the strongest text on the page: section, card and panel titles are 14 px semibold, dialog and drawer titles 15 px, and no section heading sits on a tinted band.
-  - Today: The review found the 16 px page title read as weak as, or weaker than, the 15 px section titles on their grey header bands (Settings › General: "Theme", "Query defaults"). _(lib/core/PageHeader/OPageHeader.vue · lib/core/FormSection/OFormSection.vue)_
+- **T2** (must) The page title is 16 px semibold in the strong text colour — never larger, never pure black. The context line and the title identify the page together, not size.
+  - Today: OPageHeader titles are already 16 px semibold: keep them. The custom headers are the outliers. _(lib/core/PageHeader/OPageHeader.vue:135)_
 - **T3** (must) Four text colours, chosen by role: strong (titles, values), default (body), secondary (labels, column headers, metadata), tertiary (timestamps, hints, placeholders). Plus disabled. Never dim text with opacity.
 - **T4** (must) Machine values are mono: timestamps, IDs, queries, durations, field keys, code. Every number uses tabular figures; a unit is separated by a space ("158 ms").
   - Today: Nine timestamp formats in Observe alone; "1162 ms" next to "158.00ms"; "0.30spans/s". _(screens-observe.md §9)_
@@ -117,20 +115,17 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
 - **C7** (must) Charts use the validated series palette in a fixed order; series that mean status (5xx, errors) use status colours.
 - **C8** (new) The chrome (rail and top bar) is tinted with the accent hue; the content surface stays white in light mode. Three themes ship: Indigo (default), Ocean and Ink rail.
   - Why: An all-grey frame with a white page read as "black and white". A tinted frame gives identity without competing with the data.
-- **C9** (must) Red means destructive or critical, nothing else. Pause, mute, disable, field keys and counts are never red; a failed delivery is a warning, not an error, unless data was lost.
-  - Today: The pause action is a red icon on Alerts and Pipelines, log detail keys render red, and the always-visible trash is the reddest thing on the Dashboards list. _(persona walkthroughs, polish iteration 1)_
-  - Why: When red is everywhere, the one critical alert stops standing out (P7).
 
 ## 5. Page header
 
-- **H1** (must) Every page has one header band, 56 px, with two stacked lines on the left: a context line (12 px, secondary) and the title (18 px, weight 600). Page actions sit on the right. The title is at the same x and y on every page, and the band never wraps.
+- **H1** (must) Every page has one header band, 56 px, with two stacked lines on the left: a context line (12 px, secondary) and the title (16 px semibold). Page actions sit on the right. The title is at the same x and y on every page, and the band never wraps.
   - Today: The header is 60 px, or 96 px with tabs; Respond alone has five header layouts; the Logs, Metrics and Traces explorers have no header at all. _(screens-respond.md · screens-observe.md §9)_
 - **H2** (must) No icon tile and no subtitle paragraph; the rail already shows the area's icon. Explanations open from an About (ⓘ) button beside the title.
   - Today: Icon tile, title and subtitle on 46 screens in AI, Infra and Security, and on 18 in Respond. _(screens-ai-infra-security.md §6 · screens-respond.md)_
   - Why: The tile repeats the rail and the subtitle is read once, then costs 20 px forever. This changes house rule 1, which asks for a header icon that matches the nav icon.
 - **H3** (must) Header actions, left to right: up to two secondary actions, one primary, then ⋯ More for everything else. External links (Terraform, community dashboards) go in More with an ↗ mark.
   - Today: Up to five header buttons (Alerts); Model pricing has five plus an info icon, Playground four, Threat intel three plus a segmented control, none with an overflow menu. External links are outline buttons, one of four marked ↗. _(screens-respond.md · screens-ai-infra-security.md §6)_
-- **H4** (must) The context line names the page's container: the rail group on pages inside a module rail ("General", "Access & security"; the rail's heading already names the module, and its 56 px heading row shares the header band's bottom hairline), "Security" for the Security solution, the rail group on grouped pages ("Reliability"), and a "‹ Parent" link on detail, editor and import pages ("‹ Alerts"). That link is the Back affordance. It never shows the org, which the top bar's org switcher already names: on the other pages the 16 px slot stays empty and `aria-hidden`, so the title does not move. No single-line breadcrumb trails and no separate boxed back button.
+- **H4** (must) The context line names the page's container: the module on pages inside a module rail ("Settings", "IAM"; "Security" for the Security solution), the rail group on grouped pages ("Reliability"), the org on the others ("acme-prod"), and a "‹ Parent" link on detail, editor and import pages ("‹ Alerts"). That link is the Back affordance. No single-line breadcrumb trails and no separate boxed back button.
   - Today: Back is built 12 ways in code, a 38 px boxed back button sits on 27+ screens, AutoObserve uses a "← Back" text link, and no breadcrumb component exists. _(composition.md key findings · screens-*.md)_
 - **H5** (should) A status chip or count may follow the title when it is the page's key fact ("3 firing", "Paused").
 - **H6** (must) The create action is "New <object>", label only, sentence case, with the same words in the header and in the empty state.
@@ -143,7 +138,7 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
 
 ## 6. Toolbar, search and filters
 
-- **F1** (must) Toolbar order, left to right: mode switch (F6, if the page has modes) → search → filters → (spacer) → at most two secondary text actions → time range → Run (explorers only) → refresh → one ghost ⋯ for everything else. Every visible control except ⋯ is a bordered 32 px control. A list page's primary action lives in the header, not the toolbar; an explorer's Run is the one primary in its toolbar.
+- **F1** (must) Toolbar order, left to right: search → filters → (spacer) → view controls (columns, density, wrap) → time range → refresh. The page's primary action lives in the header, not the toolbar.
   - Today: Seven toolbar orders in Respond. On the explorers, Share sits after Run, last, or before Run depending on the page. The time range sits in the header on 11 screens and in the toolbar on 8. _(screens-respond.md · screens-observe.md §9 · screens-ai-infra-security.md §6)_
 - **F2** (must) Search is the first control, on the left. List pages use a 280 px field (up to 360 px with an in-field scope toggle such as "This folder | All folders"). Explorers replace it with the query bar, which spans the toolbar, starts with the source chip and ends with Run.
   - Today: Search stretches across the row on 16 screens, is a fixed field on 4, sits alone on its own row on 4, and appears twice on Data sources (and neither box says when nothing matches). _(screens-ai-infra-security.md §6 · screens-data.md)_
@@ -153,11 +148,11 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
 - **F4** (must) Explorers (logs, traces, metrics) filter with facets in a collapsible left panel — field, top values, counts, checkbox — and with the query bar. Facet panels hold nothing else.
 - **F5** (must) Every applied filter shows as a chip in one row under the toolbar ("service is payments-api ×"), with Clear all at the end. Chips and the query are two views of one state, so editing either updates both.
   - Today: No list shows its applied filters. Clear all exists in four forms ("×" at the bar end, a "Clear filters" link, "1 selected ×", Reset) and is often offered only from the empty state. _(screens-observe.md §9 · screens-data.md · screens-ai-infra-security.md §6)_
-- **F6** (must) A segmented control switches a view or an object type ("Alerts | Anomalies"). Tabs switch peer pages. Narrowing by state ("Firing", "Paused") is a filter: a filter select, a KPI tile or a chip. A mode the user must know they are in (Builder | SQL, Table | Graph) is a labelled segmented control in the toolbar, never only an icon toggle or a ⋯ item.
+- **F6** (must) A segmented control switches a view or an object type ("Alerts | Anomalies"). Tabs switch peer pages. Narrowing by state ("Firing", "Paused") is a filter: a filter select, a KPI tile or a chip.
   - Today: Segmented controls narrow by state on 26 screens: 12 in Respond, 6 in AI and Security, 5 in Observe, 3 in Data. _(screens-*.md filter styles)_
 - **F7** (must) A stat strip may filter the list: `OStatStrip selectable` renders filter chips (icon, label, count badge, 32 px) in the `#toolbar` right after the search, with `:row="false"`. The chips stay on the search row only while every one fits, else they take their own full-width toolbar line; overflow scrolls sideways, never wraps. Chips count the rows below. The reset chip ("All", the `default-key`) comes first, carries the total and reads as quietly selected while nothing is picked; then attention-first order. Chips are `multiple` (OR'ed) unless the backend takes one value; the reset chip and Esc clear, there is no Clear button. Selected is an accent border plus soft fill. Read-only counts are not chips: an `inline` KPI line in the toolbar, or a `row` strip above the table header. A tile earns its place only if its number varies, someone acts on it, and it is not already on screen.
   - Today: KPI strips filter on 25+ screens and are the most consistent filter in the app. Keep them. A tile row with nothing to act on (Dashboards, Roles) is noise. _(ui-architect calm-signal.md · screens-ai-infra-security.md §6)_
-- **F8** (must) One time-range control, `ODateTimeRange` (presets, relative, absolute, time zone), in the toolbar or, when the whole page shares one range, the header actions. Its preset list is the only one: no page builds its own preset tray. Defaults: explorers and dashboards 15 minutes, overviews and summaries 24 hours. A page that does not filter by time has no time control.
+- **F8** (must) One time-range control (presets, relative, absolute, time zone) in the toolbar. Defaults: explorers and dashboards 15 minutes, overviews and summaries 24 hours.
   - Today: The time range is a header picker (11 screens), a toolbar picker (8), a segmented control (6) or a read-only pill (2); defaults are 15 m, 24 h, 1 h, 3 h and 7 d. _(screens-ai-infra-security.md §6)_
 - **F9** (must) Refresh is one control, last in the toolbar: a button showing the data age ("↻ 2 min ago") with auto-refresh in its menu.
   - Today: Refresh is drawn five ways: ORefreshButton with data age (29 screens), icon-only (19), primary "Refresh" (8), ghost with a dot (4), a split "Refresh ▾" (1). Auto-refresh is an icon popover, "Auto: Off ▾", or missing. _(screens-respond.md · screens-ai-infra-security.md §6 · screens-observe.md §9)_
@@ -254,8 +249,6 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
   - Today: Four chains: New dashboard → Add folder, Move dashboard → Add folder, Dashboard settings drawer → Add tab, Settings drawer → leave dialog. _(screens-respond.md)_
 - **O9** (must) Escape closes the top overlay. Clicking outside closes popovers and menus. A dialog or drawer with edits asks before closing (V5).
   - Today: Dialogs throw typed input away on Escape or an outside click; the Condition drawer ignores Escape. _(screens-respond.md · screens-data.md)_
-- **O10** (must) A menu never runs off the screen: it caps at the viewport height minus 64 px and scrolls inside. Past about ten items, group them under headings ("View options", "Export") and move toggles into one group of checkable items.
-  - Today: The Logs ⋯ menu has 18+ items, is taller than a 900 px window and clips "Add alert" and "Explain". _(persona walkthroughs, polish iteration 1)_
 
 ## 10. Forms and saving
 
@@ -267,7 +260,7 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
 | Settings page | Sticky bar while dirty: "Unsaved changes · Discard · Save" | "Discard changes?" — Keep editing · Discard |
 | Explorer (logs, metrics, traces) | "Save view" in the saved views menu; a modified view shows a dot | No guard; the edited query stays until Run |
 
-- **V1** (must) Forms are one column of titled sections: 16 px between fields, 24 px between sections. A section is a 14 px semibold title with an optional 13 px secondary description over one hairline, never on a tinted band; Settings and IAM sections (`OFormSection variant="plain"`) draw no box. Its rows carry a 13 px medium label and 13 px secondary help.
+- **V1** (must) Forms are one column of titled sections (15 px semibold): 16 px between fields, 24 px between sections.
 - **V2** (must) Save lives where the eye ends, as in the table above. Never inline in the middle of the content, never twice on one page.
   - Today: Code puts Save in 8 kinds of place (dialog footer 58, inline in a page or panel 51, inline in a form 33, sticky bar 21, drawer footer 21, pinned footer 20, header 20, table slot 19); Settings alone has 10. New destination's Save jumps from y = 318 to 836 with the chosen type. _(composition.md key findings · screens-settings-iam.md §0 · screens-respond.md)_
 - **V3** (must) Settings pages show the sticky "Unsaved changes · Discard · Save" bar only while there are changes. A switch that applies immediately needs no Save and confirms with a toast.
@@ -324,8 +317,6 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
   - Today: The stream detail drawer is not in the URL, while Prompts and AutoObserve drawers are. `meta.keepAlive` is set on 32 routes but nothing reads it. _(screens-data.md §9 · composition.md key findings)_
 - **N7** (must) One name means one feature.
   - Today: "Drill down" names three features: Logs dimension insights, the Metrics detail page and the Traces selection comparison. _(screens-observe.md §9)_
-- **N8** (must) Evidence travels with the link. A link from one area into another (alert → logs, log → trace, Home → alert, dashboard panel → logs) carries the stream, the filter and the time window in the URL, so the target opens on the same evidence. Switching solution lands on the matching page when one exists.
-  - Today: From an alert, reaching its logs took eight or more clicks and retyping the SQL; Logs then opened on "Past 15 minutes" with no stream. A log's trace_id was not a link. _(persona walkthroughs, polish iteration 1)_
 
 ## 13. Feedback
 
@@ -343,7 +334,7 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
 - **K3** (must) A banner states a lasting condition of the page (quota, partial data, read-only): one line, directly under the header.
 - **K4** (must) Loading shows a skeleton of the final layout after 150 ms, never a "0". A refresh keeps the current rows visible with a thin progress bar.
   - Today: Logs keeps stale rows during a run, which is right; the Product analytics "Create named event" spinner never ends. _(screens-observe.md §9)_
-- **K5** (must) Empty states come in the four kinds above, in one component. A failed load never shows the first-run state, and every count it would have filled shows "—", never 0 (C4). A strip or panel that fails keeps its final height. When every panel on a page fails for one reason, the page shows one error, not one per panel.
+- **K5** (must) Empty states come in the four kinds above, in one component. A failed load never shows the first-run state.
   - Today: Seven empty-state looks in Data and eight in AI and Infra. Synthetics shows its first-run state on a 404; escalation policies says "No on-call teams yet" after the load failed. _(screens-data.md · screens-ai-infra-security.md §6 · screens-respond.md)_
 - **K6** (must) Error messages say what failed and what to do. Never raw HTTP text, never blame the user for a disabled feature.
   - Today: "Request failed with status code 404" on four Security screens; a solid red banner on Fleet; External alert sources blames the user's role for a feature that is switched off. _(screens-ai-infra-security.md §6 · screens-respond.md)_
@@ -386,16 +377,15 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
 ## 18. Checklist for AI agents
 
 - [L2] Bands in order: header, tabs, toolbar, strip, chips, content, footer.
-- [H1] Header is a context line above an 18 px title, actions right.
+- [H1] Header is a context line above a 16 px title, actions right.
 - [H8] Nothing in the header moves on tab switch or navigation.
 - [H3] At most two secondary, one primary, then ⋯ More.
 - [H6] Create button: "New <object>", label only.
-- [F1] Toolbar order: mode, search, filters, spacer, ≤2 secondary, time, Run, refresh, one ghost ⋯.
+- [F1] Toolbar order: search, filters, spacer, view, time, refresh.
 - [F2] Search first, 280 px on lists.
 - [F3] Filter selects carry their label inside.
 - [F5] Applied filters show as chips with Clear all.
-- [F6] No segmented control or tab used as a state filter; a mode is a labelled segmented control.
-- [F8] One time control, ODateTimeRange; no local preset trays.
+- [F6] No segmented control or tab used as a state filter.
 - [F10] Toolbar never wraps; overflow folds into More.
 - [F11] Filters, sort, page and time range are in the URL.
 - [S1] Heights only 24, 28, 32, 36.
@@ -410,7 +400,6 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
 - [O3] Overlay width from the fixed sizes.
 - [O4] Overlay never resizes or moves while open.
 - [O8] No dialog opens from a dialog.
-- [O10] Menus cap at the viewport height and scroll; long ones are grouped.
 - [V2] Save where the eye ends, once per page.
 - [V4] Editors use the shared leave dialog.
 - [V5] Dirty dialogs and settings ask before discarding.
@@ -418,11 +407,9 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
 - [V7] Enter never saves a multi-field form.
 - [V8] Destructive confirm names the object.
 - [N3] Back via useSmartBack; never raw router.back().
-- [N8] Cross-area links carry stream, filter and time window.
-- [K5] Empty state of the right kind; never first-run or 0 on error.
+- [K5] Empty state of the right kind; never first-run on error.
 - [K6] No raw HTTP errors in the UI.
 - [C3] Colour the exception, not the norm.
 - [C4] Unknown is "—", zero is a muted 0.
-- [C9] Red only for destructive actions and critical state.
 - [T5] Sentence case, no uppercase labels.
 - [W4] One time format: relative with absolute tooltip.

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @submit.prevent="submit"
   >
     <div class="flex items-baseline gap-2">
-      <label :for="textareaId" class="text-text-heading text-compact font-semibold">
+      <label :for="textareaId" class="text-text-heading text-compact font-bold">
         {{
           waitingInput
             ? t("alerts.incidents.rcaSteer.composerTitlePaused")

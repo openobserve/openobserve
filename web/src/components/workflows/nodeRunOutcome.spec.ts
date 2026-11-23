@@ -102,7 +102,7 @@ describe("branchPathCounts", () => {
       { handle: "else", count: 0 },
     ]);
     expect(String(paths[0].label)).toBe("Payments");
-    expect(String(paths[1].label)).toBe("Everything else");
+    expect(String(paths[1].label)).toBe("Everything Else");
   });
 
   it("counts 0 for a declared handle with no outgoing edge (dead end)", () => {

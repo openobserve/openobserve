@@ -551,7 +551,7 @@ describe("useChatHistory", () => {
       expect(entry!.messages).toHaveLength(2);
     });
 
-    it("should use 'New chat' as title when no user message exists", async () => {
+    it("should use 'New Chat' as title when no user message exists", async () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
         () => ORG1,
@@ -562,7 +562,7 @@ describe("useChatHistory", () => {
       expect(chatId).not.toBeNull();
       const entry = await loadChat(chatId!);
       expect(entry).not.toBeNull();
-      expect(entry!.title).toBe("New chat");
+      expect(entry!.title).toBe("New Chat");
     });
   });
 

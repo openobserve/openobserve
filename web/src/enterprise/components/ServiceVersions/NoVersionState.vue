@@ -5,7 +5,7 @@
       class="flex flex-wrap items-center gap-2"
       data-test="svcver-no-version-header"
     >
-      <span class="text-text-heading text-sm font-semibold whitespace-nowrap">{{ service }}</span>
+      <span class="text-text-heading text-base font-semibold whitespace-nowrap">{{ service }}</span>
       <ServiceEnvChip v-if="identity" :identity="identity" :service="service" />
       <ServiceScopeChip v-if="where" facet="where" :where-key="where" :value="whereLabel" />
     </div>

@@ -127,10 +127,10 @@ describe("BackfillJobDetails – mount", () => {
     expect(wrapper.find('[data-test="backfill-job-details-dialog"]').exists()).toBe(true);
   });
 
-  it("passes title 'Backfill job details' to ODrawer", () => {
+  it("passes title 'Backfill Job Details' to ODrawer", () => {
     const wrapper = createWrapper();
     const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-    expect(drawer.attributes("data-title")).toBe("Backfill job details");
+    expect(drawer.attributes("data-title")).toBe("Backfill Job Details");
   });
 
   it("opens the ODrawer at the fixed md 640 size", () => {
@@ -298,11 +298,11 @@ describe("BackfillJobDetails – getStatusLabel", () => {
     expect((wrapper.vm as any).getStatusLabel("completed")).toBe("Completed");
   });
 
-  it("returns 'Deletion failed' when deletionStatus has failed key", () => {
+  it("returns 'Deletion Failed' when deletionStatus has failed key", () => {
     const result = (wrapper.vm as any).getStatusLabel("running", {
       failed: "error details",
     });
-    expect(result).toBe("Deletion failed");
+    expect(result).toBe("Deletion Failed");
   });
 });
 
@@ -315,24 +315,24 @@ describe("BackfillJobDetails – getDeletionStatusLabel", () => {
     await flushPromises();
   });
 
-  it("returns 'Not required' for undefined status", () => {
-    expect((wrapper.vm as any).getDeletionStatusLabel(undefined)).toBe("Not required");
+  it("returns 'Not Required' for undefined status", () => {
+    expect((wrapper.vm as any).getDeletionStatusLabel(undefined)).toBe("Not Required");
   });
 
-  it("returns 'Not required' for null status", () => {
-    expect((wrapper.vm as any).getDeletionStatusLabel(null)).toBe("Not required");
+  it("returns 'Not Required' for null status", () => {
+    expect((wrapper.vm as any).getDeletionStatusLabel(null)).toBe("Not Required");
   });
 
-  it("returns 'Not required' for 'not_required' status", () => {
-    expect((wrapper.vm as any).getDeletionStatusLabel("not_required")).toBe("Not required");
+  it("returns 'Not Required' for 'not_required' status", () => {
+    expect((wrapper.vm as any).getDeletionStatusLabel("not_required")).toBe("Not Required");
   });
 
   it("returns 'Completed' for 'completed' status", () => {
     expect((wrapper.vm as any).getDeletionStatusLabel("completed")).toBe("Completed");
   });
 
-  it("returns 'In progress' for 'in_progress' status", () => {
-    expect((wrapper.vm as any).getDeletionStatusLabel("in_progress")).toBe("In progress");
+  it("returns 'In Progress' for 'in_progress' status", () => {
+    expect((wrapper.vm as any).getDeletionStatusLabel("in_progress")).toBe("In Progress");
   });
 
   it("returns 'Pending' for 'pending' status", () => {
@@ -384,49 +384,49 @@ describe("BackfillJobDetails – formatTimestamp / formatTimestampFull", () => {
 describe("BackfillJobDetails – getCurrentPhase computed", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("returns 'Deleting data' when deletion_status is 'in_progress'", async () => {
+  it("returns 'Deleting Data' when deletion_status is 'in_progress'", async () => {
     vi.mocked(backfillService.getBackfillJob).mockResolvedValue(
       makeJob({ deletion_status: "in_progress" }),
     );
     const wrapper = createWrapper({ modelValue: true });
     await flushPromises();
-    expect((wrapper.vm as any).getCurrentPhase).toBe("Deleting data");
+    expect((wrapper.vm as any).getCurrentPhase).toBe("Deleting Data");
   });
 
-  it("returns 'Deleting data' when deletion_status is 'pending'", async () => {
+  it("returns 'Deleting Data' when deletion_status is 'pending'", async () => {
     vi.mocked(backfillService.getBackfillJob).mockResolvedValue(
       makeJob({ deletion_status: "pending" }),
     );
     const wrapper = createWrapper({ modelValue: true });
     await flushPromises();
-    expect((wrapper.vm as any).getCurrentPhase).toBe("Deleting data");
+    expect((wrapper.vm as any).getCurrentPhase).toBe("Deleting Data");
   });
 
-  it("returns 'Backfilling data' when deletion_status is 'completed'", async () => {
+  it("returns 'Backfilling Data' when deletion_status is 'completed'", async () => {
     vi.mocked(backfillService.getBackfillJob).mockResolvedValue(
       makeJob({ deletion_status: "completed" }),
     );
     const wrapper = createWrapper({ modelValue: true });
     await flushPromises();
-    expect((wrapper.vm as any).getCurrentPhase).toBe("Backfilling data");
+    expect((wrapper.vm as any).getCurrentPhase).toBe("Backfilling Data");
   });
 
-  it("returns 'Deletion failed' when deletion_status is an object with failed key", async () => {
+  it("returns 'Deletion Failed' when deletion_status is an object with failed key", async () => {
     vi.mocked(backfillService.getBackfillJob).mockResolvedValue(
       makeJob({ deletion_status: { failed: "some error" } }),
     );
     const wrapper = createWrapper({ modelValue: true });
     await flushPromises();
-    expect((wrapper.vm as any).getCurrentPhase).toBe("Deletion failed");
+    expect((wrapper.vm as any).getCurrentPhase).toBe("Deletion Failed");
   });
 
-  it("returns 'Backfilling data' when no deletion_status but progress > 20", async () => {
+  it("returns 'Backfilling Data' when no deletion_status but progress > 20", async () => {
     vi.mocked(backfillService.getBackfillJob).mockResolvedValue(
       makeJob({ progress_percent: 50, deletion_status: undefined }),
     );
     const wrapper = createWrapper({ modelValue: true });
     await flushPromises();
-    expect((wrapper.vm as any).getCurrentPhase).toBe("Backfilling data");
+    expect((wrapper.vm as any).getCurrentPhase).toBe("Backfilling Data");
   });
 
   it("returns 'Initializing' when progress <= 20 and no deletion_status", async () => {
@@ -510,7 +510,7 @@ describe("BackfillJobDetails – confirmCancelJob", () => {
     await flushPromises();
     await (wrapper.vm as any).confirmCancelJob();
     expect(mockConfirm).toHaveBeenCalledWith({
-      title: "Cancel backfill job",
+      title: "Cancel Backfill Job",
       message: "Are you sure you want to cancel this backfill job?",
     });
   });

@@ -993,10 +993,7 @@ export default defineComponent({
         // falls back to its built-in Menlo/Monaco/Courier New stack, which differs
         // per OS and from the rest of the app.
         fontFamily: getFontMono(),
-        // Pinned to the 13/20 UI step: Monaco's own default is 14 px on Windows and Linux but 12 px on macOS,
-        // and the query placeholder overlays (tailwind.css) mirror these two values.
-        fontSize: 13,
-        lineHeight: 20,
+        // Pinned so the suggest rows do not change size between operating systems; the editor text keeps its default.
         suggestFontSize: 12,
         suggestLineHeight: 24,
         theme: isDark.value ? "myCustomDarkTheme" : "myCustomTheme",

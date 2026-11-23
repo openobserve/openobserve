@@ -86,7 +86,6 @@ function onKeydown(event: KeyboardEvent) {
       :class="[menuItemClasses('default', false, !!description), 'text-start']"
     >
       <OMenuItemContent :icon="icon" :note="description" :note-id="descriptionDomId">
-        <template v-if="$slots.icon" #icon><slot name="icon" /></template>
         {{ label }}
         <template #end>
           <slot name="end" />

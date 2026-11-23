@@ -55,11 +55,6 @@ vi.mock("@/composables/useStreams", () => ({
 let builderPayload = null;
 // reactive so the stub's computed re-evaluates when a test mutates it
 const builderGroup = ref({ filterType: "group", conditions: [] });
-// A rule only changes after the user acts in the builder, which comes before the new value.
-const userEdits = (group) => {
-  window.dispatchEvent(new Event("pointerdown"));
-  builderGroup.value = group;
-};
 
 const ConditionBuilderStub = {
   name: "ConditionBuilder",
@@ -87,10 +82,6 @@ const ODrawerStub = {
   `,
 };
 
-// A drawer left mounted keeps reacting to the shared builder stub, so each test unmounts its own.
-const stubbedWrappers = [];
-afterEach(() => stubbedWrappers.splice(0).forEach((w) => w.unmount()));
-
 function createWrapper(pipelineObjOverrides = {}, { realDrawer = false } = {}) {
   const mockPipelineObj = {
     currentSelectedNodeData: { data: {}, type: "condition" },
@@ -108,7 +99,7 @@ function createWrapper(pipelineObjOverrides = {}, { realDrawer = false } = {}) {
     deletePipelineNode: mockDeletePipelineNode,
   }));
 
-  const wrapper = mount(Condition, {
+  return mount(Condition, {
     props: { open: true },
     attachTo: realDrawer ? document.body : undefined,
     global: {
@@ -120,8 +111,6 @@ function createWrapper(pipelineObjOverrides = {}, { realDrawer = false } = {}) {
       },
     },
   });
-  if (!realDrawer) stubbedWrappers.push(wrapper);
-  return wrapper;
 }
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
@@ -214,7 +203,7 @@ describe("Condition.vue (drawer chrome)", () => {
   it("prompts to discard when the rule was edited", async () => {
     const wrapper = createWrapper();
     await tick();
-    userEdits({ filterType: "group", conditions: [{ column: "changed" }] });
+    builderGroup.value = { filterType: "group", conditions: [{ column: "changed" }] };
     await wrapper.find('[data-test="cancel-btn"]').trigger("click");
     expect(wrapper.vm.dialog.show).toBe(true);
     expect(wrapper.vm.dialog.title).toBe("Discard changes");
@@ -231,7 +220,7 @@ describe("Condition.vue (drawer chrome)", () => {
     it("asks in the footer before Escape drops an edited rule", async () => {
       wrapper = createWrapper({}, { realDrawer: true });
       await flushPromises();
-      userEdits({ filterType: "group", conditions: [{ column: "changed" }] });
+      builderGroup.value = { filterType: "group", conditions: [{ column: "changed" }] };
       await flushPromises();
 
       pressEscape();
@@ -246,7 +235,7 @@ describe("Condition.vue (drawer chrome)", () => {
     it("asks in the footer before the ✕ drops an edited rule", async () => {
       wrapper = createWrapper({}, { realDrawer: true });
       await flushPromises();
-      userEdits({ filterType: "group", conditions: [{ column: "changed" }] });
+      builderGroup.value = { filterType: "group", conditions: [{ column: "changed" }] };
       await flushPromises();
 
       click("o-drawer-close-btn");
@@ -258,19 +247,6 @@ describe("Condition.vue (drawer chrome)", () => {
 
     it("closes on Escape when the rule is unchanged", async () => {
       wrapper = createWrapper({}, { realDrawer: true });
-      await flushPromises();
-
-      pressEscape();
-      await flushPromises();
-
-      expect(byTest("o-drawer-discard-row")).toBeNull();
-      expect(wrapper.vm.internalOpen).toBe(false);
-    });
-
-    it("closes on Escape when the builder settled the rule after it mounted", async () => {
-      wrapper = createWrapper({}, { realDrawer: true });
-      await flushPromises();
-      builderGroup.value = { filterType: "group", conditions: [{ column: "", id: "c1" }] };
       await flushPromises();
 
       pressEscape();
@@ -293,7 +269,7 @@ describe("Condition.vue (drawer chrome)", () => {
     const wrapper = createWrapper({ isEditNode: true });
     await wrapper.find('[data-test="delete-btn"]').trigger("click");
     expect(wrapper.vm.dialog.show).toBe(true);
-    expect(wrapper.vm.dialog.title).toBe("Delete node");
+    expect(wrapper.vm.dialog.title).toBe("Delete Node");
     expect(typeof wrapper.vm.dialog.okCallback).toBe("function");
   });
 

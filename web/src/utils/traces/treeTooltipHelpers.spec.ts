@@ -344,7 +344,7 @@ describe("treeTooltipHelpers", () => {
     it("should handle missing or invalid metadata gracefully", () => {
       const result = generateTracePatternTooltipContent({});
 
-      expect(result).toContain("Unknown pattern");
+      expect(result).toContain("Unknown Pattern");
       expect(result).toContain("Calls:");
       expect(result).toContain(">1</span>");
       expect(result).toContain("Average:");
@@ -355,8 +355,8 @@ describe("treeTooltipHelpers", () => {
       const resultNull = generateTracePatternTooltipContent(null);
       const resultUndefined = generateTracePatternTooltipContent(undefined);
 
-      expect(resultNull).toContain("Unknown pattern");
-      expect(resultUndefined).toContain("Unknown pattern");
+      expect(resultNull).toContain("Unknown Pattern");
+      expect(resultUndefined).toContain("Unknown Pattern");
     });
 
     it("should format percentile values with single decimal place", () => {

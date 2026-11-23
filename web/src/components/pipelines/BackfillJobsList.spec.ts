@@ -524,12 +524,12 @@ describe("BackfillJobsList – Error ODialog migration", () => {
     expect((wrapper.vm as any).errorDialogData).toEqual(job);
   });
 
-  it("forwards size 'md' and title 'Backfill job error' to ODialog", async () => {
+  it("forwards size 'md' and title 'Backfill Job Error' to ODialog", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     const dialog = wrapper.find('[data-test="o-dialog-stub"]');
     expect(dialog.attributes("data-size")).toBe("md");
-    expect(dialog.attributes("data-title")).toBe("Backfill job error");
+    expect(dialog.attributes("data-title")).toBe("Backfill Job Error");
   });
 
   it("forwards primary-button-label 'Close' to ODialog", async () => {

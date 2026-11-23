@@ -11,23 +11,18 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import SecurityMoreMenu from "@/components/security/SecurityMoreMenu.vue";
-import SecurityTimeRange from "@/components/security/SecurityTimeRange.vue";
-import { useSecurityRange } from "@/composables/security/useSecurityRange";
-import type { DateTimeRangeChange } from "@/lib/forms/DateTimeRange/ODateTimeRange.types";
-import SecurityLoadError from "@/components/security/SecurityLoadError.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -94,6 +89,14 @@ const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
+const RANGES = [
+  { value: "1h", minutes: 60 },
+  { value: "6h", minutes: 360 },
+  { value: "24h", minutes: 1440 },
+  { value: "7d", minutes: 10080 },
+  { value: "30d", minutes: 43200 },
+] as const;
+type RangeKey = (typeof RANGES)[number]["value"];
 type Facet = SeverityTone | "error" | "silenced";
 
 const FACETS: Facet[] = ["critical", "high", "medium", "low", "error", "silenced"];
@@ -106,7 +109,17 @@ const FACET_TONES: Partial<Record<Facet, SeverityTone[]>> = {
 };
 
 const q = route.query as Record<string, string | undefined>;
-const range = useSecurityRange(q);
+const range = ref<RangeKey>(
+  RANGES.some((r) => r.value === q.period) ? (q.period as RangeKey) : "24h",
+);
+// A fixed window (µs) from a link does not slide on refresh; picking a range replaces it.
+const parsedFrom = Number(q.from);
+const parsedTo = Number(q.to);
+const customWindow = ref<{ startMs: number; endMs: number } | null>(
+  Number.isFinite(parsedFrom) && Number.isFinite(parsedTo) && parsedTo > parsedFrom
+    ? { startMs: Math.floor(parsedFrom / 1000), endMs: Math.ceil(parsedTo / 1000) }
+    : null,
+);
 const showEvaluations = ref(q.evals === "1");
 const isFacet = (key: string): key is Facet => FACETS.includes(key as Facet);
 const facets = ref<Facet[]>(readFilterKeys(q.facet, isFacet));
@@ -115,7 +128,12 @@ const selectedKey = ref<string | null>(q.firing ?? null);
 
 function syncUrl() {
   const query: Record<string, string> = { org_identifier: orgId.value };
-  Object.assign(query, range.linkQuery.value);
+  if (customWindow.value) {
+    query.from = String(customWindow.value.startMs * 1000);
+    query.to = String(customWindow.value.endMs * 1000);
+  } else {
+    query.period = range.value;
+  }
   if (showEvaluations.value) query.evals = "1";
   if (facets.value.length) query.facet = facets.value.join(",");
   if (search.value.trim()) query.q = search.value.trim();
@@ -124,13 +142,19 @@ function syncUrl() {
 }
 watch([showEvaluations, facets, search, selectedKey], syncUrl);
 
-const windowMs = range.windowMs;
-const windowEndMs = range.endMs;
-const windowStartMs = range.startMs;
+const windowEndMs = ref(customWindow.value?.endMs ?? Date.now());
+const windowMs = computed(() =>
+  customWindow.value
+    ? customWindow.value.endMs - customWindow.value.startMs
+    : RANGES.find((r) => r.value === range.value)!.minutes * 60_000,
+);
+const windowStartMs = computed(() => windowEndMs.value - windowMs.value);
 
-function onRange(change: DateTimeRangeChange) {
-  if (!range.apply(change)) return;
-  analytics.track("security_time_range_changed", { view: "alerts", range: range.text.value });
+function onRange(value: unknown) {
+  if (!value || (value === range.value && !customWindow.value)) return;
+  range.value = value as RangeKey;
+  analytics.track("security_time_range_changed", { view: "alerts", range: range.value });
+  customWindow.value = null;
   syncUrl();
   void fetchAll();
 }
@@ -199,7 +223,7 @@ async function fetchAll() {
   if (!orgId.value) return;
   inFlight.value += 1;
   try {
-    range.touch();
+    windowEndMs.value = customWindow.value?.endMs ?? Date.now();
     // Both fetches filter on detection ids, so they need the list first.
     await loadDetections(orgId.value);
     await Promise.all([fetchRows(), fetchSummary()]);
@@ -323,8 +347,6 @@ const FACET_TILES: { key: Facet; icon: StatItem["icon"]; tone: StatItem["tone"] 
   { key: "error", icon: "error-outline", tone: "warning" },
   { key: "silenced", icon: "volume-off", tone: "neutral" },
 ];
-// A failed load reads "—" in the chips, never a zero count (R8).
-const failed = computed(() => !!error.value && !history.value.length);
 const stats = computed<StatItem[]>(() =>
   FACET_TILES.map((tile) => ({
     key: tile.key,
@@ -332,7 +354,7 @@ const stats = computed<StatItem[]>(() =>
       tile.key === "error" || tile.key === "silenced" || tile.key === "low"
         ? t(`siem.alerts.stat.${tile.key}`)
         : t("siem.alerts.stat.firings", { severity: t(toneLabelKey(tile.key as SeverityTone)) }),
-    value: failed.value ? "—" : counts.value[tile.key],
+    value: counts.value[tile.key],
     icon: tile.icon,
     tone: tile.tone,
     dataTest: `security-alerts-stat-${tile.key}`,
@@ -442,16 +464,6 @@ const columns = computed<OTableColumnDef<Firing>[]>(() => [
 const rowRail = (f: Firing) => severityRailColor(f.tone);
 const rowClass = (f: Firing) => (f.id === selectedKey.value ? "!bg-table-row-selected-bg" : "");
 
-// No detections at all is a first-run state: the empty state alone, without chart or table header.
-const noDetections = computed(
-  () =>
-    !loading.value &&
-    !rulesLoading.value &&
-    !error.value &&
-    !denials.value.length &&
-    !siemRows.value.length &&
-    !history.value.length,
-);
 const filtersActive = computed(() => facets.value.length > 0 || !!search.value.trim());
 function onEmptyAction() {
   facets.value = [];
@@ -513,6 +525,20 @@ const notices = computed<SecurityNotice[]>(() => {
       tone: "warning",
       text: t("siem.alerts.summaryPartial"),
       dataTest: "security-alerts-summary-partial",
+    });
+  }
+  const custom = customWindow.value;
+  if (custom) {
+    out.push({
+      key: "custom-window",
+      tone: "info",
+      text: t("siem.alerts.customWindow", {
+        from: securityTime(custom.startMs),
+        to: securityTime(custom.endMs),
+      }),
+      actionLabel: t("siem.alerts.backToRange", { range: t(`siem.alerts.range.${range.value}`) }),
+      onAction: () => onRange(range.value),
+      dataTest: "security-alerts-custom-window",
     });
   }
   if (selectedMissing.value) {
@@ -837,7 +863,8 @@ async function loadEvidence() {
     evidenceError.value =
       e?.response?.data?.message ??
       e?.response?.data?.error ??
-      (e?.message && !isRawHttpText(e.message) ? e.message : t("siem.alerts.evidenceError"));
+      e?.message ??
+      t("siem.alerts.evidenceError");
   } finally {
     if (mine === evidenceSeq) evidenceLoading.value = false;
   }
@@ -994,28 +1021,20 @@ onUnmounted(() => {
     title-data-test="security-alerts-title"
   >
     <template #actions>
-      <div class="flex items-center gap-2">
-        <SecurityTimeRange
-          :picker-props="range.pickerProps.value"
-          data-test="security-alerts-range"
-          @change="onRange"
-        />
-        <ORefreshButton
-          :last-run-at="lastRunAt"
-          :loading="inFlight > 0"
-          data-test="security-alerts-refresh"
-          @click="refresh"
-        />
-        <SecurityMoreMenu data-test="security-alerts-more">
-          <ODropdownItem
-            :checked="showEvaluations"
-            data-test="security-alerts-evaluations"
-            @select="showEvaluations = !showEvaluations"
-          >
-            {{ t("siem.alerts.showEvaluations") }}
-          </ODropdownItem>
-        </SecurityMoreMenu>
-      </div>
+      <OToggleGroup
+        :model-value="customWindow ? null : range"
+        data-test="security-alerts-range"
+        @update:model-value="onRange"
+      >
+        <OToggleGroupItem
+          v-for="r in RANGES"
+          :key="r.value"
+          :value="r.value"
+          :data-test="`security-alerts-range-${r.value}`"
+        >
+          {{ t(`siem.alerts.range.${r.value}`) }}
+        </OToggleGroupItem>
+      </OToggleGroup>
     </template>
 
     <div class="flex min-h-0 flex-1 flex-col">
@@ -1025,22 +1044,7 @@ onUnmounted(() => {
         data-test="security-alerts-notices"
       />
 
-      <OEmptyState
-        v-if="noDetections"
-        icon="task-alt"
-        :title="t('siem.alerts.noDetections')"
-        :text="t('siem.alerts.noDetectionsHint')"
-        :action-label="t('siem.overview.browseDetections')"
-        data-test="security-alerts-first-run"
-        @action="openDetection"
-      />
-      <SecurityLoadError
-        v-else-if="failed"
-        :what="t('siem.alerts.whatAlerts')"
-        :hint="t('siem.alerts.loadFailedHint')"
-        @retry="refresh"
-      />
-      <div v-else class="border-border-default px-page-edge shrink-0 border-b py-3">
+      <div class="border-border-default px-page-edge shrink-0 border-b py-3">
         <div class="h-28">
           <SecuritySeverityChart
             :buckets="chartBuckets"
@@ -1055,7 +1059,6 @@ onUnmounted(() => {
       </div>
 
       <OTable
-        v-if="!noDetections && !failed"
         ref="tableRef"
         :data="filtered"
         :columns="columns"
@@ -1071,10 +1074,8 @@ onUnmounted(() => {
         :column-visibility="{ window: false }"
         :row-class="rowClass"
         :get-row-status-color="rowRail"
-        :error="failed ? error : null"
         class="min-h-0 flex-1"
         data-test="security-alerts-table"
-        @retry="refresh"
         @row-click="open"
         @sort-change="sortTick++"
       >
@@ -1098,6 +1099,11 @@ onUnmounted(() => {
                 data-test="security-alerts-search"
               />
             </div>
+            <OSwitch
+              v-model="showEvaluations"
+              :label="t('siem.alerts.showEvaluations')"
+              data-test="security-alerts-evaluations"
+            />
             <OStatStrip
               compact-values
               :items="stats"
@@ -1116,6 +1122,18 @@ onUnmounted(() => {
               }}
             </span>
           </div>
+        </template>
+        <template #toolbar-trailing>
+          <OButton
+            icon-only
+            variant="secondary"
+            icon="refresh"
+            :loading="inFlight > 0"
+            data-test="security-alerts-refresh"
+            @click="refresh"
+          >
+            <OTooltip side="bottom" :content="t('siem.alerts.refresh')" />
+          </OButton>
         </template>
 
         <template #cell-severity="{ row }">
@@ -1168,14 +1186,6 @@ onUnmounted(() => {
         </template>
         <template #cell-timestamp="{ row }">
           <OTimeCell :value="row.row.timestamp" unit="us" />
-        </template>
-
-        <template #error>
-          <SecurityLoadError
-            :what="t('siem.alerts.whatAlerts')"
-            :hint="t('siem.alerts.loadFailedHint')"
-            @retry="refresh"
-          />
         </template>
 
         <template #empty>
@@ -1317,6 +1327,7 @@ onUnmounted(() => {
       <template #tab-evidence>
         <OEmptyState
           v-if="!evidenceSql"
+          size="inline"
           icon="info-outline"
           :title="t('siem.alerts.noEvidence')"
           :text="t('siem.alerts.noEvidenceHint')"
@@ -1421,6 +1432,7 @@ onUnmounted(() => {
       <template #tab-detection>
         <OEmptyState
           v-if="!selected.detection"
+          size="inline"
           icon="info-outline"
           :title="t('siem.alerts.notSiemTitle')"
           :text="t('siem.alerts.notSiemHint')"

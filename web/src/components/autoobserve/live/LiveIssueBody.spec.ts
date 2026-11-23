@@ -561,7 +561,7 @@ describe("LiveIssueBody", () => {
       );
       expect(reason({ alert_kind: "internal", correlation_reason: "alert_id" })).toBeNull();
       expect(reason({ alert_kind: "internal", correlation_reason: "service_discovery" })).toBe(
-        "Service discovery",
+        "Service Discovery",
       );
     });
 

@@ -26,32 +26,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #actions>
-      <OButton
-        variant="primary"
+      <!-- Select a stream card -->
+      <EmptyStateIngestionCard
+        icon="storage"
+        :label="t('logs.noStream.selectStream')"
+        :sublabel="t('logs.noStream.selectStreamDesc')"
         data-test="logs-no-stream-select-stream-card"
         @click="emit('select-stream')"
-      >
-        {{ t("logs.noStream.selectStream") }}
-      </OButton>
-      <OButton
-        icon-end="open-in-new"
+      />
+
+      <!-- Read the query guide card -->
+      <EmptyStateIngestionCard
+        icon="menu-book"
+        :label="t('logs.noStream.queryGuide')"
+        :sublabel="t('logs.noStream.queryGuideDesc')"
         data-test="logs-no-stream-query-guide-card"
         @click="openQueryGuide"
-      >
-        {{ t("logs.noStream.queryGuide") }}
-      </OButton>
+      />
     </template>
 
     <template v-if="recentStreams.length" #extra>
-      <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-        <span class="text-text-secondary text-compact">{{ t("logs.noStream.recent") }}</span>
-        <OButton
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <span class="text-text-secondary text-sm font-semibold">
+          {{ t("logs.noStream.recent") }}
+        </span>
+        <EmptyStateIngestionChip
           v-for="stream in recentStreams"
           :key="stream"
-          variant="link"
+          icon="storage"
           :data-test="`logs-no-stream-recent-${stream}`"
           @click="emit('pick-stream', stream)"
-          ><OTruncatedText class="max-w-40">{{ stream }}</OTruncatedText></OButton
+          ><OTruncatedText class="max-w-40">{{ stream }}</OTruncatedText></EmptyStateIngestionChip
         >
       </div>
     </template>
@@ -62,7 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
+import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { restoreLogsSelectedStreams } from "@/utils/streamPersist";
 import DOMPurify from "dompurify";
@@ -71,8 +77,9 @@ const props = withDefaults(
   defineProps<{
     orgId: string;
     streamType?: string;
+    autoRun?: boolean;
   }>(),
-  { streamType: "logs" },
+  { streamType: "logs", autoRun: false },
 );
 
 const emit = defineEmits<{
@@ -87,8 +94,12 @@ const recentStreams = computed<string[]>(() => {
   return restoreLogsSelectedStreams(props.orgId, props.streamType).slice(0, 3);
 });
 
-// Picking a stream runs it, so the copy never sends the user to Run query.
-const description = computed(() => DOMPurify.sanitize(t("logs.noStream.descriptionAutoRun")));
+// Uses v-html — content is fully i18n-controlled, no user input.
+const description = computed(() =>
+  DOMPurify.sanitize(
+    t(props.autoRun ? "logs.noStream.descriptionAutoRun" : "logs.noStream.description"),
+  ),
+);
 
 const openQueryGuide = () => {
   window.open("https://openobserve.ai/docs/example-queries/", "_blank", "noopener,noreferrer");

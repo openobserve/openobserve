@@ -192,7 +192,7 @@ test.describe("Pipeline History Tests", { tag: ['@all', '@pipelines', '@history'
 
     // Expected columns based on feature doc
     const expectedColumns = [
-      'Pipeline name',
+      'Pipeline Name',
       'Type',
       'Status',
       'Timestamp',

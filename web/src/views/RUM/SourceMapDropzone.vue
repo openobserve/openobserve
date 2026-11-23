@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <div
           data-test="rum-upload-source-maps-file-dropzone"
-          class="border-card-glass-border rounded-default bg-surface-base hover:border-theme-accent dark:hover:bg-theme-accent/5 cursor-pointer border-2 border-dashed p-8 text-center transition-colors dark:border-white/10"
+          class="border-card-glass-border rounded-default bg-surface-base hover:border-theme-accent dark:hover:bg-theme-accent/5 cursor-pointer border-2 border-dashed p-8 text-center transition-all duration-300 dark:border-white/10"
           :class="[
             isDragging
               ? 'border-theme-accent! bg-theme-accent/5! dark:bg-theme-accent/10! border-solid!'

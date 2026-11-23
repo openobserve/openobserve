@@ -31,11 +31,11 @@ export class CorrelationSettingsPage {
         // Visible tab labels (post-revamp): the tab `name` attrs are
         // services / discovery / field-aliases, rendered as
         // these i18n labels.
-        this.servicesTabName = 'Discovered services';
-        this.serviceDiscoveryTabName = 'Detection rules';
-        this.fieldAliasesTabName = 'Field mappings';
+        this.servicesTabName = 'Discovered Services';
+        this.serviceDiscoveryTabName = 'Detection Rules';
+        this.fieldAliasesTabName = 'Field Mappings';
         // Detection Rules view (the "Distinguish Services By" configuration tab)
-        this.detectionRulesTabName = 'Detection rules';
+        this.detectionRulesTabName = 'Detection Rules';
         // "+ Add field" button that reveals the "Select a field" OSelect
         this.addFieldButtonName = 'Add field';
 

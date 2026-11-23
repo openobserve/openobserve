@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="show && visible"
     icon-only
     variant="accent-ghost"
-    :size="size"
     :aria-label="askLabel"
     :data-test="`overview-ask-ai-${kind}-${itemKey}`"
     @click.stop="emit('ask')"
@@ -38,14 +37,8 @@ import { computed } from "vue";
 import { useOverviewAskAi } from "./useOverviewAskAi";
 
 const props = withDefaults(
-  defineProps<{
-    kind: string;
-    itemKey: string;
-    label?: string;
-    show?: boolean;
-    size?: "sm" | "md";
-  }>(),
-  { show: true, size: "md" },
+  defineProps<{ kind: string; itemKey: string; label?: string; show?: boolean }>(),
+  { show: true },
 );
 
 const emit = defineEmits<{ ask: [] }>();

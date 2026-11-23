@@ -252,6 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="canConfigure"
                 variant="secondary"
+                icon="add"
                 data-test="oncall-ladder-add-rung"
                 @click="emit('edit')"
               >

@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="services-catalog-status-legend"
       >
         <span
-          class="text-2xs font-semibold text-text-heading whitespace-nowrap"
+          class="text-2xs font-bold text-text-heading whitespace-nowrap"
         >
           {{ t("traces.servicesCatalog.legend.title") }}
         </span>
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.healthy") }}</span
             >
             <span
-              class="text-2xs opacity-55 text-text-label"
+              class="text-3xs opacity-55 text-text-label"
               >&lt;&nbsp;1%</span
             >
           </div>
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.degraded") }}</span
             >
             <span
-              class="text-2xs opacity-55 text-text-label"
+              class="text-3xs opacity-55 text-text-label"
               >1&nbsp;–&nbsp;5%</span
             >
           </div>
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.warning") }}</span
             >
             <span
-              class="text-2xs opacity-55 text-text-label"
+              class="text-3xs opacity-55 text-text-label"
               >5&nbsp;–&nbsp;10%</span
             >
           </div>
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.critical") }}</span
             >
             <span
-              class="text-2xs opacity-55 text-text-label"
+              class="text-3xs opacity-55 text-text-label"
               >&gt;&nbsp;10%</span
             >
           </div>
@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OButton
           icon-only
-          variant="ghost"
+          variant="secondary"
           icon="refresh"
           :loading="isLoading || isSearching"
           data-test="services-catalog-refresh-btn"
@@ -378,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        plain total to its left. Hover explains it. -->
                   <span
                     v-if="categoryUnhealthyCounts[cat] > 0"
-                    class="text-2xs inline-flex h-[1.05rem] min-w-[1.05rem] items-center justify-center rounded-full px-1 leading-none font-semibold text-white"
+                    class="text-3xs inline-flex h-[1.05rem] min-w-[1.05rem] items-center justify-center rounded-full px-1 leading-none font-semibold text-white"
                     :style="{ backgroundColor: tabStatusColorVar(cat) }"
                     :data-test="`services-catalog-type-unhealthy-${cat}`"
                   >
@@ -401,13 +401,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-if="!isLoading && loadError !== null"
-        class="flex flex-1 flex-col"
+        class="flex flex-1 items-center justify-center"
         data-test="services-catalog-error"
       >
         <OEmptyState
           kind="error"
           :title="t('emptyState.loadError.title')"
-          :text="isRawHttpText(loadError) ? t('emptyState.loadError.description') : loadError"
+          :text="loadError"
           @action="loadServicesCatalog"
         />
       </div>
@@ -428,7 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Empty state (shown when not loading and no data) -->
       <div
         v-else-if="!isLoading && services.length === 0"
-        class="flex flex-1 flex-col"
+        class="flex flex-1 flex-col items-center justify-center"
         data-test="services-catalog-empty"
       >
         <ServicesCatalogNoDataState
@@ -816,7 +816,6 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";

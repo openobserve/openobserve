@@ -143,41 +143,11 @@ with a class: `local/o2-control-height` flags `h-*`, `!h-*`, `size-*` and
 `[&_…]:h-*` on O* controls and buttons. Bespoke chrome that must line up with a
 control uses `h-control-*`, never a raw step such as `h-8`.
 
-## Control edge and focus (S2)
-
-Every bordered control in a row shares one edge, so a toolbar reads as one set: inputs,
-search, selects, textareas, the date-range group, `OFile`'s box, `secondary` buttons
-(refresh, column toggle, any bordered icon button), the `OToggleGroup` tray and the
-`OStatCard` filter chip. The component tokens (`--color-input-border`,
-`--color-select-border`, `--color-button-outline-border`, `--color-toggle-border`, …)
-all resolve to these semantic tokens, registered in `semantic.css`:
-
-| Utility                                 | Token                             | Light / dark               | Use for                                    |
-| --------------------------------------- | --------------------------------- | -------------------------- | ------------------------------------------ |
-| `border-control-border`                 | `--color-control-border`          | grey-350 `#c5cad6` (1.6:1) / `--d-border` (2:1) | every bordered control at rest             |
-| `hover:border-control-border-hover`     | `--color-control-border-hover`    | the 3:1 `--color-border-control` | the same edge under the pointer       |
-| `border-control-border-selected`        | `--color-control-border-selected` | primary-300 / primary-700  | a pressed `secondary` (with the accent fill) |
-| `focus-within:border-control-border-focus` | `--color-control-border-focus` | primary-500                | an input-like control's focused edge       |
-| `focus-within:ring-3 focus-within:ring-control-focus-halo` | `--color-control-focus-halo` | primary-500 at 18% | the 3 px outer halo outside that edge |
-| `ring-3 ring-control-error-halo`        | `--color-control-error-halo`      | error-500 at 16%           | the same halo on an invalid field          |
-
-Focus on an input-like control is the canvas `.input:focus-within`: a 1 px accent-500 edge
-plus a 3 px outer halo, never an opaque or inset ring. An invalid field keeps its red edge
-and takes the red halo. Hover is gated with `hover:not-focus-within:` so the pointer never
-greys a focused edge. Ghost buttons stay borderless in `text-text-secondary`.
-
-The resting edge is deliberately below the 3:1 of SC 1.4.11: the review found grey-400 too
-heavy for a toolbar of inputs. It is an accepted exemption, recorded in
-`contrast-manifest.ts`, because the edge is never the only cue: every control carries its
-label, value or placeholder at 4.5:1, hover lifts the edge to the 3:1 `--color-border-control`
-and focus adds the accent edge and halo. Do not darken it back without a review.
-
 ## Type roles (T1)
 
 `text-compact` (13) is the UI text of every O* control, menu, table cell and label.
 `text-sm` (14) is reading text only: descriptions, dialog bodies, empty-state text,
-notices; semibold, it is the section, card and panel title. Titles rank 18 (page,
-`text-lg`, OPageHeader) › 15 (dialog, drawer, `text-title`) › 14 (section). The full role table is in [SKILL.md § rule 3](../SKILL.md) and
+notices. The full role table is in [SKILL.md § rule 3](../SKILL.md) and
 [guidelines § 3](guidelines.md#3-type-and-text-colour).
 
 ## Enforced by CI (it will fail the build)

@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <OForm id="general-settings-form" :form="form">
-      <div class="flex flex-col gap-6">
+      <div class="flex flex-col gap-4">
         <template v-if="!trialExpired">
           <OFormSection
             variant="plain"
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="general-settings-query-defaults-section"
           >
             <OSettingRow
-              control-at="below"
+              control-at="end"
               name="scrape_interval"
               error-data-test="general-settings-scrape-interval-error"
               :label="t('settings.general.scrapeIntervalLabel')"
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OSettingRow>
 
             <OSettingRow
-              control-at="below"
+              control-at="end"
               name="max_series_per_query"
               :label="t('settings.general.maxSeriesLabel')"
               :description="t('settings.general.maxSeriesHelp', { n: defaultMaxSeries })"
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="general-settings-branding-section"
         >
           <OSettingRow
-            control-at="below"
+            control-at="end"
             name="custom_logo_text"
             error-data-test="settings_ent_logo_custom_text_error"
             :label="t('settings.customLogoText')"
@@ -312,17 +312,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             data-test="general-settings-delete-org-facts"
-            class="divide-border-subtle grid grid-cols-4 divide-x max-md:grid-cols-1 max-md:divide-x-0"
+            class="divide-border-default grid grid-cols-4 divide-x max-md:grid-cols-1 max-md:divide-x-0"
           >
             <div
               v-for="fact in deleteOrgFacts"
               :key="fact.key"
               :data-test="`general-settings-delete-org-fact-${fact.key}`"
-              class="flex flex-col gap-1 px-4 py-3 first:ps-0 max-md:px-0"
+              class="flex flex-col gap-1 px-4 py-3"
             >
               <div class="flex items-center gap-2">
                 <OIcon :name="fact.icon" size="sm" class="text-text-muted shrink-0" />
-                <span class="text-text-heading text-compact font-medium">{{ fact.title }}</span>
+                <span class="text-text-heading text-sm font-semibold">{{ fact.title }}</span>
               </div>
               <span class="text-text-secondary text-xs">{{ fact.detail }}</span>
             </div>

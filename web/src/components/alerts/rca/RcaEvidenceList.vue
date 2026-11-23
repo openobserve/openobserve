@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <section data-test="rca-evidence-list" :aria-labelledby="headingId" class="flex flex-col">
     <div class="mb-2.5 flex flex-wrap items-center gap-2">
-      <h3 :id="headingId" class="text-text-heading m-0 text-sm font-semibold">
+      <h3 :id="headingId" class="text-text-heading m-0 text-base font-bold">
         {{ t("alerts.incidents.rcaSummary.evidence") }}
       </h3>
       <span class="text-text-secondary text-xs">
@@ -51,13 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OToggleGroup>
     </div>
 
-    <OEmptyState
+    <p
       v-if="evidence.length === 0"
-      size="compact"
-      icon="fact-check"
-      :title="t('alerts.incidents.rcaSummary.noEvidence')"
       data-test="rca-evidence-empty"
-    />
+      class="text-text-muted text-compact m-0"
+    >
+      {{ t("alerts.incidents.rcaSummary.noEvidence") }}
+    </p>
     <ul
       v-else
       class="rounded-default border-border-default bg-surface-base divide-border-default m-0 list-none divide-y overflow-hidden border p-0"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #lead>
           <span
-            class="rounded-default border-border-control text-2xs inline-grid h-5 min-w-5.5 shrink-0 place-items-center border font-mono font-semibold"
+            class="rounded-default border-border-control text-3xs inline-grid h-5 min-w-5.5 shrink-0 place-items-center border font-mono font-semibold"
           >
             {{ entry.number }}
           </span>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mt-4 flex flex-col"
       tabindex="-1"
     >
-      <h4 class="text-text-heading m-0 mb-2 text-sm font-semibold">
+      <h4 class="text-text-heading m-0 mb-2 text-sm font-bold">
         {{ t("alerts.incidents.rcaSummary.citedNotVerified") }}
         <span class="text-text-secondary text-xs font-normal">{{ unverified.length }}</span>
       </h4>
@@ -146,7 +146,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, type ComponentPublicInstance } from "vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { useI18nTyped } from "@/types/i18n";

@@ -36,11 +36,10 @@ const THEMES = resolveTokens(
 const MAIN: Record<string, [string, string]> = {
   "--color-focus-ring-accent": ["#3f7994", "#79a1b4"],
   "--color-tabs-active-text": ["#326176", "#ffffff"],
-  "--color-tabs-disabled-text": ["#9ea4b4", "#4b5163"],
-  "--color-tabs-hover-text": ["#222534", "#e3e5eb"],
+  "--color-tabs-disabled-text": ["#a3a3a3", "#525252"],
+  "--color-tabs-hover-text": ["#262626", "#e5e5e5"],
+  "--color-tabs-inactive-text": ["#262626", "#e5e5e5"],
   "--color-tabs-indicator": ["#3f7994", "#3f7994"],
-  "--color-text-heading": ["#222534", "#e3e5eb"],
-  "--color-text-secondary": ["#4b5163", "#9ea4b4"],
 };
 
 const UTILITY = /^(?:[a-z-]+:)*(?:text|bg|border(?:-[se])?|outline)-([a-z][a-z0-9-]+)$/;
@@ -76,22 +75,22 @@ function colourTokens(classes: string[]): string[] {
   return [...names].sort();
 }
 
-describe("horizontal tabs keep their pinned colours", () => {
-  it("colours the active tab in strong ink and the others in secondary ink with a strong hover", () => {
+describe("horizontal tabs keep main's colours", () => {
+  it("colours the active tab in brand ink and the others in main's inactive ink and hover", () => {
     const [active, inactive, disabled, slot] = mountStrip().findAll('[role="tab"]');
-    expect(active.classes()).toContain("text-text-heading");
-    expect(active.classes()).not.toContain("text-tabs-active-text");
+    expect(active.classes()).toContain("text-tabs-active-text");
+    expect(active.classes()).not.toContain("text-text-heading");
     for (const tab of [inactive, slot]) {
       expect(tab.classes()).toEqual(
-        expect.arrayContaining(["text-text-secondary", "enabled:hover:text-tabs-hover-text"]),
+        expect.arrayContaining(["text-tabs-inactive-text", "enabled:hover:text-tabs-hover-text"]),
       );
     }
     expect(disabled.classes()).toContain("text-tabs-disabled-text");
   });
 
-  it("keeps a locked active tab in strong ink", () => {
+  it("keeps a locked active tab in brand ink", () => {
     const [active] = mountStrip(true).findAll('[role="tab"]');
-    expect(active.classes()).toContain("text-text-heading");
+    expect(active.classes()).toContain("text-tabs-active-text");
   });
 
   it("draws the sliding underline in main's indicator colour", () => {
@@ -101,7 +100,7 @@ describe("horizontal tabs keep their pinned colours", () => {
   it.each([
     ["light", 0],
     ["dark", 1],
-  ] as const)("resolves every strip colour to its pinned value in %s", (theme, index) => {
+  ] as const)("resolves every strip colour to main's value in %s", (theme, index) => {
     const classes = [mountStrip(), mountStrip(true)].flatMap((wrapper) =>
       wrapper.findAll("*").flatMap((el) => el.classes()),
     );

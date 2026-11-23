@@ -353,7 +353,7 @@ function formatToolPayload(value: unknown): string {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
 }
 
 .thread-tool-row__name {
@@ -388,7 +388,7 @@ function formatToolPayload(value: unknown): string {
   gap: 0.25rem;
   padding: 0.1rem 0.5rem;
   border-radius: var(--radius-full);
-  font-size: var(--text-2xs);
+  font-size: var(--text-3xs);
   font-weight: 600;
   letter-spacing: 0.03rem;
   font-family: var(--font-mono);
@@ -421,8 +421,8 @@ function formatToolPayload(value: unknown): string {
 }
 
 .thread-tool-body__label {
-  font-size: var(--text-2xs);
-  font-weight: var(--font-semibold);
+  font-size: var(--text-3xs);
+  font-weight: 700;
   letter-spacing: 0.06rem;
 }
 

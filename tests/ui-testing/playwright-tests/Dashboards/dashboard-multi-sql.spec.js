@@ -446,7 +446,7 @@ test.describe("Multi-SQL Query Support", () => {
       await pm.dashboardPanelActions.applyDashboardBtn();
 
       await expect(msql.warningBanner).toBeVisible();
-      await expect(msql.warningBanner).toContainText("Pivot table");
+      await expect(msql.warningBanner).toContainText("Pivot Table");
 
       await msql.applyAndSave(pm);
       await cleanupTestDashboard(page, pm, dashboardName);

@@ -36,12 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center gap-1">
         <span
           v-if="selectedValues.length > 0"
-          class="selection-count text-3! text-2xs text-accent font-medium"
+          class="selection-count text-3! text-3xs text-accent font-medium"
           data-test="field-values-panel-selection-count"
         >
           {{ selectedValues.length }} {{ t("search.selectedLabel") }}
         </span>
-        <span v-else class="selection-hint text-3! text-2xs text-text-secondary">{{
+        <span v-else class="selection-hint text-3! text-3xs text-text-secondary">{{
           t("search.selectToFilter")
         }}</span>
         <OButton
@@ -110,22 +110,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- No values found -->
       <div
         v-show="!displayValues.length && !fieldValues?.isLoading"
-        class="px-3"
+        class="text-o2-text-secondary py-1 ps-3 text-sm"
         data-test="field-values-panel-no-values-msg"
       >
-        <OEmptyState
-          v-if="fieldValues?.errMsg"
-          size="compact"
-          kind="error"
-          :title="raw(fieldValues.errMsg)"
-        />
-        <OEmptyState
-          v-else
-          size="compact"
-          icon="search-off"
-          :title="t('search.fieldValuesEmpty')"
-          :text="t('search.fieldValuesEmptyHint')"
-        />
+        <template v-if="fieldValues?.errMsg">{{ fieldValues.errMsg }}</template>
+        <template v-else>
+          {{ t("search.fieldValuesEmpty") }}
+          <span class="text-o2-text-muted mt-0.5 block text-xs">
+            {{ t("search.fieldValuesEmptyHint") }}
+          </span>
+        </template>
       </div>
 
       <!-- Selected values with no count data available (synthetic fallback) -->
@@ -204,13 +198,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useDebounceFn, watchDebounced } from "@vueuse/core";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { formatLargeNumber } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";

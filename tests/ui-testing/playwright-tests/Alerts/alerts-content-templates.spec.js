@@ -226,7 +226,7 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     // Save the template.
     await pm.alertsPage.getAddTemplateSubmitBtn().click();
     await page.waitForTimeout(2000);
-    await expect(pm.alertsPage.getElementByText('Template saved successfully.')).toBeVisible({ timeout: 15000 }).catch(() => {
+    await expect(pm.alertsPage.getElementByText('Template Saved Successfully.')).toBeVisible({ timeout: 15000 }).catch(() => {
       testLogger.warn('Save success toast not observed via getByText — verifying via API instead');
     });
 

@@ -68,8 +68,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @secondary-action="onEmptyAction('request')"
         />
       </template>
-      <template #error>
-        <OEmptyState kind="error" @action="refresh" />
+      <template #error="{ message }">
+        <OEmptyState
+          kind="error"
+          :title="t('emptyState.loadError.title')"
+          :text="raw(message)"
+          @action="refresh"
+        />
       </template>
 
       <template #cell-state="{ row }">

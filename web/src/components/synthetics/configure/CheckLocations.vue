@@ -344,7 +344,7 @@ const selectedLocations = computed({
   <div class="rounded-default border-border-default mb-4 border">
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
       <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
-      <h3 class="text-text-heading text-sm font-semibold">
+      <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.locations.title") }}
       </h3>
     </div>
@@ -392,7 +392,7 @@ const selectedLocations = computed({
         <!-- ── Search matched nothing anywhere ──────────────────────────────── -->
         <OEmptyState
           v-if="allNoMatches"
-          size="compact"
+          size="inline"
           icon="search-off"
           :title="t('synthetics.locations.noSearchResults')"
           :action-label="allowPrivate ? t('synthetics.locations.newPrivateLocation') : undefined"
@@ -444,7 +444,7 @@ const selectedLocations = computed({
           <!-- ── Search matched no public locations (private still has hits) ── -->
           <OEmptyState
             v-if="publicNoMatches"
-            size="compact"
+            size="inline"
             icon="search-off"
             :title="t('synthetics.locations.noPublicMatches')"
             data-test="synthetics-check-locations-public-no-results"
@@ -560,7 +560,7 @@ const selectedLocations = computed({
             <!-- ── Search matched no private locations (public still has hits) ── -->
             <OEmptyState
               v-else-if="privateNoMatches"
-              size="compact"
+              size="inline"
               icon="search-off"
               :title="t('synthetics.locations.noPrivateMatches')"
               data-test="synthetics-check-locations-private-no-results"
@@ -576,6 +576,7 @@ const selectedLocations = computed({
               <span>{{ t("synthetics.locations.privateEmptyBody") }}</span>
               <OButton
                 variant="secondary"
+                icon="add"
                 data-test="synthetics-check-locations-private-empty-cta"
                 @click="emit('new-location')"
               >
@@ -586,13 +587,13 @@ const selectedLocations = computed({
         </OCheckboxGroup>
 
         <!-- ── No locations at all ──────────────────────────────────────────── -->
-        <OEmptyState
+        <div
           v-else
-          size="compact"
-          icon="location-on"
-          :title="t('synthetics.locations.empty')"
+          class="rounded-default border-border-default text-text-secondary flex items-center justify-center border border-dashed px-3 py-3 text-sm"
           data-test="synthetics-check-locations-empty"
-        />
+        >
+          {{ t("synthetics.locations.empty") }}
+        </div>
 
         <p
           v-if="prefillView?.unconfirmed.locations"

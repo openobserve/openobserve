@@ -559,16 +559,19 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
   ],
 };
 
-/** A nav entry whose pages carry their own section rail, so their header names the rail group (H4). */
+/** A nav entry whose pages carry their own section rail, so their header names the module (H4). */
 export interface ModuleRailDef {
   /** The nav entry's route name; every page under its path belongs to the module. */
   name: string;
+  /** The label the nav shows for the entry. */
+  titleKey: I18nKey;
 }
 
+// Same names and keys as the Settings tile, its IAM child and the AI Observability tile.
 export const MODULE_RAILS: ModuleRailDef[] = [
-  { name: "settings" },
-  { name: "iam" },
-  { name: "aiObservability" },
+  { name: "settings", titleKey: "menu.settings" },
+  { name: "iam", titleKey: "menu.iam" },
+  { name: "aiObservability", titleKey: "menu.aiObservability" },
 ];
 
 /**

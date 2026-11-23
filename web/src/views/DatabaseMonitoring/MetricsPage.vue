@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- Above the rail and the charts, so it stays put while they scroll, as on every other tab. -->
       <div
-        class="px-page-edge border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b py-2"
+        class="px-page-edge border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b py-1.5"
         data-test="dbm-metrics-toolbar"
       >
         <DbmScopeFilters class="min-w-0 flex-1" :filters="dimensionFilters" @clear="clearScope" />
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </aside>
         <div ref="scrollEl" class="min-w-0 flex-1 overflow-y-auto" data-test="dbm-metrics-body">
-          <OContent class="flex flex-col gap-6 py-4">
+          <OContent class="flex flex-col gap-2.5 py-2.5">
             <DbmSection
               :ref="(el: unknown) => setSectionRef('load', el)"
               :title="t('dbm.metrics.load.title')"
@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSelect
                   v-model="loadBreakdown"
                   :options="breakdownOptions"
+                  size="sm"
                   width="s"
                   :searchable="false"
                   class="shrink-0"
@@ -100,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #trigger>
                     <OButton
                       variant="ghost"
+                      size="sm"
                       icon="info-outline"
                       data-test="dbm-metrics-load-hint-trigger"
                     >
@@ -121,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("dbm.metrics.load.viewActivity") }}
                 </OButton>
               </template>
-              <div class="relative h-64 w-full" data-test="dbm-metrics-load-chart">
+              <div class="relative h-64 w-full px-3 pb-3" data-test="dbm-metrics-load-chart">
                 <PanelSchemaRenderer
                   class="h-full w-full"
                   :panel-schema="loadPanelSchema"
@@ -137,20 +139,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-if="loadNoAccess"
-                  class="bg-surface-base absolute inset-0 flex flex-col"
+                  class="bg-surface-base absolute inset-0 flex flex-col items-center justify-center gap-2"
                   data-test="dbm-metrics-load-no-access"
                 >
-                  <OEmptyState
-                    kind="denied"
-                    :text="t('dbm.metrics.noAccess', { stream: raw('_o2_dbm_server') })"
-                  />
+                  <OIcon name="lock" class="text-text-muted size-5" />
+                  <span class="text-text-secondary text-xs">
+                    {{ t("dbm.metrics.noAccess", { stream: raw("_o2_dbm_server") }) }}
+                  </span>
                 </div>
                 <div
                   v-else-if="loadNotCollecting"
-                  class="bg-surface-base absolute inset-0 flex flex-col"
+                  class="bg-surface-base absolute inset-0 flex items-center justify-center"
                   data-test="dbm-metrics-load-not-collecting"
                 >
                   <OEmptyState
+                    size="inline"
                     icon="database"
                     :title="t('dbm.metrics.serverStreamMissing.title')"
                     :text="
@@ -193,14 +196,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  charts would read as a broken pipeline; the fact reads better. -->
               <div
                 v-if="section.key === 'host' && hostScopeState === 'managed'"
-                class="text-text-secondary text-xs"
+                class="text-text-secondary p-3 pt-1 text-xs"
                 data-test="dbm-metrics-host-managed"
               >
                 {{ t("dbm.metrics.catalog.host.managedNote") }}
               </div>
               <div
                 v-else
-                class="grid grid-cols-1 gap-3"
+                class="grid grid-cols-1 gap-2.5 p-3 pt-1"
                 :class="sectionGridClass((catalogPanelsBySection[section.key] ?? []).length)"
               >
                 <DbmMetricPanel
@@ -225,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template v-if="loading && !hasMetricStreams">
               <div
-                class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+                class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3"
                 data-test="dbm-metrics-skeleton"
               >
                 <OSkeleton v-for="n in 6" :key="n" shape="block" class="h-55 w-full" />
@@ -267,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- auto-fit: one panel owns the whole line, several wrap into
                  columns — a fixed column count strands a lone card beside a
                  row of empty space. -->
-                <div class="grid grid-cols-[repeat(auto-fit,minmax(22rem,1fr))] gap-3">
+                <div class="grid grid-cols-[repeat(auto-fit,minmax(22rem,1fr))] gap-2.5 p-3 pt-1">
                   <DbmMetricPanel
                     v-for="entry in sections.featured"
                     :key="`${entry.key}::${chartEpoch}`"
@@ -303,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #hint>
                   <span class="text-text-label text-2xs">{{ t("dbm.metrics.triageOrder") }}</span>
                 </template>
-                <div class="grid grid-cols-[repeat(auto-fit,minmax(22rem,1fr))] gap-3">
+                <div class="grid grid-cols-[repeat(auto-fit,minmax(22rem,1fr))] gap-2.5 p-3 pt-1">
                   <DbmMetricPanel
                     v-for="entry in group.panels"
                     :key="`${entry.key}::${chartEpoch}`"
@@ -347,6 +350,7 @@ import useStreams from "@/composables/useStreams";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";

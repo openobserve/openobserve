@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSkeleton v-if="loading" class="h-6 w-16" />
                   <template v-else>
                     <span
-                      class="text-2xl leading-none font-semibold tabular-nums"
+                      class="text-2xl leading-none font-bold tabular-nums"
                       :class="tile.tone || 'text-text-heading'"
                       >{{ tile.num }}</span
                     >
@@ -739,7 +739,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}
               </span>
             </template>
-            <div class="flex flex-col gap-1.5 pt-1">
+            <div class="flex flex-col gap-1.5 p-3 pt-1">
               <div
                 v-for="entry in errorClasses"
                 :key="entry.status_code"
@@ -833,7 +833,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("dbm.detail.plans.stableCaveat") }}
               </p>
 
-              <div class="flex flex-col gap-3">
+              <div class="flex flex-col gap-3 p-3 pt-0">
                 <article
                   v-for="plan in plans"
                   :key="plan.rowKey"
@@ -1100,7 +1100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-secondary text-xs">{{ t("dbm.detail.samplesHint") }}</span>
             </template>
 
-            <div v-if="samples.length" class="h-50 w-full">
+            <div v-if="samples.length" class="h-50 w-full px-3">
               <ChartRenderer
                 :data="scatterData"
                 v-on="tracesLock.locked.value ? {} : { click: onSampleClick }"
@@ -2373,6 +2373,7 @@ const endpointColumns = computed<OTableColumnDef<EndpointCallerRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
+      headerSubLabel: raw("p95"),
       headerTooltip: t("dbm.queries.columnHints.p95"),
     },
   },

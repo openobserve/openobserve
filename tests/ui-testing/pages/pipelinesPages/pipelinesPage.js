@@ -223,7 +223,7 @@ export class PipelinesPage {
         // OToggleGroup under the Functions section).
         this.enrichmentTableTabLocator = page.locator('[data-test="pipeline-section-tab-enrichmentTables"]');
         this.editButton = page.locator("button").filter({ hasText: "edit" });
-        this.remoteDestinationIcon = page.getByRole("img", { name: "Remote destination" });
+        this.remoteDestinationIcon = page.getByRole("img", { name: "Remote Destination" });
         this.nameInput = page.getByLabel("Name *");
         this.saveButton = page.getByRole("button", { name: "Save" }).last();
         this.urlInput = page.locator('[data-test="add-destination-url-input"]');
@@ -240,7 +240,7 @@ export class PipelinesPage {
         this.streamTypeLabel = page.getByLabel(/Stream Type/i);
         this.streamNameLabel = page.getByLabel(/Stream Name/i);
         this.monacoEditorViewLines = page.locator('.monaco-editor .view-lines');
-        this.searchStreamInput = page.getByPlaceholder('Search stream');
+        this.searchStreamInput = page.getByPlaceholder('Search Stream');
         this.exploreButton = page.getByRole('button', { name: 'Explore' });
         this.timestampColumnMenu = page.locator('[data-test="o2-table-expand-1"]');
         this.nameCell = page.getByRole('cell', { name: 'Name' });
@@ -298,7 +298,7 @@ export class PipelinesPage {
         this.streamTypeDropdown = page.locator('[data-test="scheduled-pipeline-stream-type-select"]');
         this.streamTypeDropdownTrigger = page.locator('[data-test="scheduled-pipeline-stream-type-select-trigger"]');
         this.streamTypeDropdownPopover = page.locator('[data-test="scheduled-pipeline-stream-type-select-popover"]');
-        this.streamTypeLabel = page.getByLabel('Stream type *');
+        this.streamTypeLabel = page.getByLabel('Stream Type *');
         // Scheduled-pipeline stream-name OSelect — searchable=true (default),
         // so auto-derived `-trigger`, `-popover`, `-search`, and `-option`
         // data-tests are available alongside the wrapper.
@@ -340,7 +340,7 @@ export class PipelinesPage {
 
         // Bug #11498 - Run Query button (in scheduled pipeline dialog)
         // Use text filter to distinguish from the SearchBar's identical data-test selector
-        this.runQueryButton = page.locator('[data-test="logs-search-bar-refresh-btn"]').filter({ hasText: 'Run query' });
+        this.runQueryButton = page.locator('[data-test="logs-search-bar-refresh-btn"]').filter({ hasText: 'Run Query' });
     }
 
     // Methods from original PipelinesPage

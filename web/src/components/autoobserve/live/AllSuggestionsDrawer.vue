@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <LiveNoticeState
         v-if="notice"
         :notice="notice"
-        size="region"
+        size="page"
         :detail="state.detail"
         :busy="state.busy"
         data-test="autoobserve2-suggestions-drawer-error"
@@ -155,7 +155,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OEmptyState
             v-else-if="kindLabel && othersOpen"
-            kind="filtered"
+            size="inline"
+            icon="filter-alt"
             :title="t('autoobserveLive.suggestions.kindEmptyTitle', { kind: kindLabel })"
             :text="
               t('autoobserveLive.suggestions.kindEmptyDesc', { count: othersOpen }, othersOpen)
@@ -166,6 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OEmptyState
             v-else
+            size="inline"
             icon="task-alt"
             :title="t('autoobserveLive.notice.suggestions.emptyTitle')"
             :text="t('autoobserveLive.notice.suggestions.emptyDesc')"

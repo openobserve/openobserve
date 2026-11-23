@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 }</pre>
     </template>
     <template v-else-if="column.type === 'resource' && column.resource_type === 'xhr'">
-      <span class="pe-2 text-xs font-semibold">{{ column.resource_method }}</span>
+      <span class="pe-2 text-xs font-bold">{{ column.resource_method }}</span>
       <a
         :href="column.resource_url"
         target="_blank"

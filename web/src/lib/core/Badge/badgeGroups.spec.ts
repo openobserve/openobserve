@@ -246,9 +246,9 @@ describe("badgeGroups", () => {
     expect(r.labelKey).toBe("components.badge.alertState.firing");
   });
 
-  it("alert 'notify_failed' is a delivery warning, not red (R9)", () => {
+  it("alert 'notify_failed' renders as a firing state", () => {
     const r = resolveBadge("alertState", "notify_failed");
-    expect(r.tone).toBe("warn");
+    expect(r.tone).toBe("err");
     expect(r.labelKey).toBe("components.badge.alertState.notifyfailed");
   });
 
@@ -285,11 +285,11 @@ describe("badgeGroups", () => {
       expect(resolveBadge("pipelineRunOutcome", value).tone, value).toBe("ok");
     }
 
-    for (const value of ["error", "failed"]) {
+    for (const value of ["error", "notify_failed", "failed"]) {
       expect(resolveBadge("pipelineRunOutcome", value).tone, value).toBe("err");
     }
 
-    for (const value of ["skipped", "warning", "notify_failed"]) {
+    for (const value of ["skipped", "warning"]) {
       expect(resolveBadge("pipelineRunOutcome", value).tone, value).toBe("warn");
     }
   });

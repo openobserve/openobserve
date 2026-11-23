@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="ready && tab === 'rules' && canConfigure"
         variant="primary"
+        icon="add"
         data-test="oncall-routing-add-rule"
         @click="openAdd"
       >

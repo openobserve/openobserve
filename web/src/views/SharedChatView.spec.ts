@@ -214,8 +214,7 @@ describe("SharedChatView", () => {
     await flushPromises();
     expect(wrapper.text()).toContain("Still generating. This page updates on its own.");
     expect(wrapper.find('[data-test="o2-ai-chat-running-stop"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="shared-chat-view-refresh-age"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="shared-chat-view-updated"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="shared-chat-view-updated"]').exists()).toBe(true);
   });
 
   it("polls fast while a turn runs, slowly for a live share, never for a snapshot", () => {

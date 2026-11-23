@@ -132,7 +132,7 @@ describe("SummaryList.vue", () => {
   // Test 7: Test deleteDialog initial state
   it("should initialize deleteDialog with correct default values", () => {
     expect(wrapper.vm.deleteDialog.show).toBe(false);
-    expect(wrapper.vm.deleteDialog.title).toBe("Delete running query");
+    expect(wrapper.vm.deleteDialog.title).toBe("Delete Running Query");
     expect(wrapper.vm.deleteDialog.message).toBe(
       "Are you sure you want to delete this running query?",
     );

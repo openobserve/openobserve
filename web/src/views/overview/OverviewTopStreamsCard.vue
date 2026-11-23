@@ -26,46 +26,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #empty>
       <OEmptyState
-        size="compact"
+        size="inline"
         :title="t('overview.streams.emptyTitle')"
         :text="t('overview.streams.emptyDesc')"
         data-test="overview-streams-empty"
       />
     </template>
-    <ul class="divide-border-subtle flex flex-col divide-y" data-test="overview-streams-top">
-      <li v-for="row in rows" :key="`${row.stream_type}-${row.name}`" class="py-0.5">
-        <div class="-mx-3">
-          <OverviewRowButton
-            :data-test="`overview-streams-top-${row.stream_type}-${row.name}`"
-            @click="emit('open')"
+    <ul class="flex flex-col" data-test="overview-streams-top">
+      <li
+        v-for="row in rows"
+        :key="`${row.stream_type}-${row.name}`"
+        class="border-border-default border-t"
+      >
+        <OverviewRowButton
+          :data-test="`overview-streams-top-${row.stream_type}-${row.name}`"
+          @click="emit('open')"
+        >
+          <span
+            class="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,15rem)_5rem] items-center gap-4 max-sm:grid-cols-[minmax(0,1fr)_auto]"
           >
-            <span
-              class="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,12rem)_5rem] items-center gap-4 max-sm:grid-cols-[minmax(0,1fr)_auto]"
-            >
-              <span class="flex min-w-0 items-baseline gap-2 text-start">
-                <OTruncatedText class="text-text-body text-compact min-w-0 font-medium">{{
-                  raw(row.name)
-                }}</OTruncatedText>
-                <span
-                  class="text-text-secondary shrink-0 text-xs font-normal max-sm:hidden"
-                  :data-test="`overview-streams-top-share-${row.stream_type}-${row.name}`"
-                  >{{ row.sub }}</span
-                >
-              </span>
-              <OSegmentedBar
-                size="md"
-                class="max-sm:hidden"
-                :segments="[{ id: 'share', pct: row.barPct, variant: row.variant }]"
-                :data-test="`overview-streams-top-bar-${row.stream_type}-${row.name}`"
-              />
+            <span class="flex min-w-0 flex-col text-start">
+              <OTruncatedText class="text-text-body text-sm font-medium">{{
+                raw(row.name)
+              }}</OTruncatedText>
               <span
-                class="text-text-heading text-compact text-end font-semibold tabular-nums"
-                :data-test="`overview-streams-top-size-${row.stream_type}-${row.name}`"
-                >{{ raw(formatSizeFromMB(row.storage_size_mb)) }}</span
+                class="text-text-secondary text-xs"
+                :data-test="`overview-streams-top-share-${row.stream_type}-${row.name}`"
+                >{{ row.sub }}</span
               >
             </span>
-          </OverviewRowButton>
-        </div>
+            <OSegmentedBar
+              size="md"
+              class="max-sm:hidden"
+              :segments="[{ id: 'share', pct: row.barPct, variant: row.variant }]"
+              :data-test="`overview-streams-top-bar-${row.stream_type}-${row.name}`"
+            />
+            <span
+              class="text-text-heading text-end text-sm font-semibold tabular-nums"
+              :data-test="`overview-streams-top-size-${row.stream_type}-${row.name}`"
+              >{{ raw(formatSizeFromMB(row.storage_size_mb)) }}</span
+            >
+          </span>
+        </OverviewRowButton>
       </li>
     </ul>
   </OverviewSectionCard>

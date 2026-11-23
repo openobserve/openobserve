@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary && !summaryFailed"
-      class="px-page-edge flex h-full w-full flex-col overflow-y-auto pt-2 pb-4"
+      class="px-page-edge flex h-full w-full flex-col overflow-y-auto pt-2 pb-1"
     >
       <!-- Banners — each component renders nothing when inactive, so this whole
            block collapses to zero height (no reserved margin) when idle; the
@@ -30,8 +30,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DatabaseDeprecationBanner></DatabaseDeprecationBanner>
       </div>
 
-      <div class="flex min-h-8 items-center justify-between">
-        <h2 class="text-text-heading text-sm font-semibold">{{ t("home.streams") }}</h2>
+      <!-- Streams — data-volume metrics. Uniform, non-clickable stat tiles; the
+           list is reached from the section header so the row stays consistent. -->
+      <div class="mb-2 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span
+            class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+            aria-hidden="true"
+          >
+            <OIcon name="window" size="sm" />
+          </span>
+          <span class="text-text-heading text-base font-semibold">{{ t("home.streams") }}</span>
+        </div>
         <OButton
           v-if="canView('logstreams')"
           icon-only
@@ -53,12 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></router-link>
         </OButton>
       </div>
-      <div class="flex shrink-0 flex-wrap gap-x-8 gap-y-3 pb-6" data-test="home-usage-tab-kpis">
+      <OStatStrip class="mb-4 shrink-0">
         <!-- Streams -->
         <OStatCard
-          variant="kpi"
-          stacked
           :label="t('home.streams')"
+          icon="window"
           :value="animatedStreamsCount || summary.streams_count"
         >
           <template #value>
@@ -70,9 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Events -->
         <OStatCard
-          variant="kpi"
-          stacked
           :label="t('home.docsCountLbl')"
+          icon="bar-chart"
           :value="formattedAnimatedEventsCount"
         >
           <template #value>
@@ -84,9 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Ingested size -->
         <OStatCard
-          variant="kpi"
-          stacked
           :label="t('home.totalDataIngested')"
+          icon="download"
           :value="formattedAnimatedIngestedSize"
         >
           <template #value>
@@ -98,10 +105,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Compressed size (self-hosted only) -->
         <OStatCard
-          variant="kpi"
-          stacked
           v-if="config.isCloud == 'false'"
           :label="t('home.totalDataCompressed')"
+          icon="compress"
           :value="formattedAnimatedCompressedSize"
         >
           <template #value>
@@ -113,10 +119,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Index size (self-hosted only) -->
         <OStatCard
-          variant="kpi"
-          stacked
           v-if="config.isCloud == 'false'"
           :label="t('home.indexSizeLbl')"
+          icon="save"
           :value="formattedAnimatedIndexSize"
         >
           <template #value>
@@ -125,39 +130,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span>
           </template>
         </OStatCard>
-      </div>
+      </OStatStrip>
 
       <!-- Main region — a filled resources rail beside the two status charts, so
            Functions/Dashboards live somewhere purposeful and the vertical space
            is actually used. Rail carries counts + one-click access to every area. -->
       <!-- < lg the region must scroll, or the fixed-height grid compresses its auto rows and cards overlap. -->
       <div
-        class="border-border-default grid min-h-0 flex-1 grid-cols-1 gap-x-8 gap-y-6 border-t pt-6 max-lg:auto-rows-min max-lg:overflow-y-auto lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)]"
+        class="grid min-h-0 flex-1 grid-cols-1 gap-3 max-lg:auto-rows-min max-lg:overflow-y-auto lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)]"
       >
         <!-- Resources rail -->
-        <aside class="flex min-h-0 flex-col overflow-y-auto" :aria-label="t('common.resources')">
+        <aside
+          class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col overflow-y-auto border p-4"
+          :aria-label="t('common.resources')"
+        >
           <!-- Resources — owned assets with live counts. Each row is gated to the
                same route the left nav uses, so it hides when access is missing. -->
           <template v-if="showResources">
-            <h2 class="text-text-heading mb-1 flex min-h-8 items-center text-sm font-semibold">
+            <div class="text-text-heading mb-1 text-sm font-semibold">
               {{ t("home.resources") }}
-            </h2>
+            </div>
             <nav class="flex flex-col">
               <router-link
                 v-if="canView('functionList')"
-                class="group rounded-default hover:bg-table-row-hover-bg text-compact h-control-md -mx-2 flex items-center gap-2.5 px-2 text-inherit no-underline transition-colors"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
                 :to="{
                   name: 'functionList',
                   query: { org_identifier: store.state.selectedOrganization?.identifier },
                 }"
                 data-test="home-usage-tab-functions-card"
               >
-                <OIcon name="function" size="sm" class="text-text-secondary shrink-0" />
-                <OTruncatedText class="text-text-body flex-1 font-medium">{{
+                <span
+                  class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <OIcon name="function" size="sm" />
+                </span>
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                   t("home.functionTitle")
                 }}</OTruncatedText>
                 <span
-                  class="text-text-heading font-semibold tabular-nums"
+                  class="text-text-heading text-sm font-semibold tabular-nums"
                   data-test="home-usage-tab-functions-count"
                   >{{ animatedFunctionCount || summary.function_count }}</span
                 >
@@ -173,19 +186,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="!isLocked('dashboards')"
               >
                 <router-link
-                  class="group rounded-default hover:bg-table-row-hover-bg text-compact h-control-md -mx-2 flex items-center gap-2.5 px-2 text-inherit no-underline transition-colors"
+                  class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
                   :to="{
                     name: 'dashboards',
                     query: { org_identifier: store.state.selectedOrganization?.identifier },
                   }"
                   data-test="home-usage-tab-dashboards-card"
                 >
-                  <OIcon name="dashboard" size="sm" class="text-text-secondary shrink-0" />
-                  <OTruncatedText class="text-text-body flex-1 font-medium">{{
+                  <span
+                    class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                    aria-hidden="true"
+                  >
+                    <OIcon name="dashboard" size="sm" />
+                  </span>
+                  <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                     t("home.dashboardTitle")
                   }}</OTruncatedText>
                   <span
-                    class="text-text-heading font-semibold tabular-nums"
+                    class="text-text-heading text-sm font-semibold tabular-nums"
                     data-test="home-usage-tab-dashboards-count"
                     >{{ animatedDashboardCount || summary.dashboard_count }}</span
                   >
@@ -217,9 +235,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Explore — data surfaces. Same per-route gating as above. -->
           <template v-if="showExplore">
-            <h3 class="text-text-secondary mb-1 text-xs font-medium">
+            <div class="text-text-secondary mb-1 text-xs font-semibold">
               {{ t("home.explore") }}
-            </h3>
+            </div>
             <nav class="flex flex-col">
               <OTooltip
                 v-for="row in exploreRows"
@@ -228,15 +246,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="!isLocked(row.feature)"
               >
                 <router-link
-                  class="group rounded-default hover:bg-table-row-hover-bg text-compact h-control-md -mx-2 flex items-center gap-2.5 px-2 text-inherit no-underline transition-colors"
+                  class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
                   :to="{
                     name: row.name,
                     query: { org_identifier: store.state.selectedOrganization?.identifier },
                   }"
                   :data-test="`home-usage-tab-explore-${row.test}`"
                 >
-                  <OIcon :name="row.icon" size="sm" class="text-text-secondary shrink-0" />
-                  <OTruncatedText class="text-text-body flex-1 font-medium">{{
+                  <span
+                    class="rounded-default inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                    :class="row.chip"
+                    aria-hidden="true"
+                  >
+                    <OIcon :name="row.icon" size="sm" />
+                  </span>
+                  <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                     row.label
                   }}</OTruncatedText>
                   <template v-if="isLocked(row.feature)">
@@ -261,11 +285,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </aside>
 
         <!-- Alerts -->
-        <section class="flex min-h-0 flex-col" :aria-label="t('home.alertsOverviewSection')">
+        <section
+          class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col border p-4"
+          :aria-label="t('home.alertsOverviewSection')"
+        >
           <div class="flex items-center justify-between gap-2">
-            <h2 class="text-text-heading text-sm font-semibold">
+            <span class="text-text-heading flex items-center gap-2 text-sm font-semibold">
+              <span
+                class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text inline-flex h-10 w-10 shrink-0 items-center justify-center"
+                aria-hidden="true"
+              >
+                <OIcon name="shield-alert-outline" size="md" />
+              </span>
               {{ t("home.alertTitle") }}
-            </h2>
+            </span>
             <OButton
               v-if="canView('alertList')"
               icon-only
@@ -295,31 +328,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ></router-link>
             </OButton>
           </div>
-          <div class="flex gap-x-6 pt-2">
-            <OStatCard
-              variant="kpi"
-              stacked
-              :label="t('home.scheduledAlert')"
-              :value="animatedScheduledAlerts || summary.scheduled_alerts"
-            >
-              <template #value>
-                <span aria-live="polite" data-test="home-usage-tab-scheduled-alerts-count">{{
-                  animatedScheduledAlerts || summary.scheduled_alerts
-                }}</span>
-              </template>
-            </OStatCard>
-            <OStatCard
-              variant="kpi"
-              stacked
-              :label="t('home.rtAlert')"
-              :value="animatedRtAlerts || summary.rt_alerts"
-            >
-              <template #value>
-                <span aria-live="polite" data-test="home-usage-tab-rt-alerts-count">{{
-                  animatedRtAlerts || summary.rt_alerts
-                }}</span>
-              </template>
-            </OStatCard>
+          <div class="flex gap-4 pt-3">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-text-secondary text-xs">{{ t("home.scheduledAlert") }}</span>
+              <span
+                class="text-text-heading text-lg leading-tight font-semibold tabular-nums"
+                aria-live="polite"
+                data-test="home-usage-tab-scheduled-alerts-count"
+                >{{ animatedScheduledAlerts || summary.scheduled_alerts }}</span
+              >
+            </div>
+            <OSeparator :vertical="true" />
+            <div class="flex flex-col gap-0.5">
+              <span class="text-text-secondary text-xs">{{ t("home.rtAlert") }}</span>
+              <span
+                class="text-text-heading text-lg leading-tight font-semibold tabular-nums"
+                aria-live="polite"
+                data-test="home-usage-tab-rt-alerts-count"
+                >{{ animatedRtAlerts || summary.rt_alerts }}</span
+              >
+            </div>
           </div>
           <div class="mt-3 min-h-50 w-full flex-1">
             <CustomChartRenderer
@@ -331,11 +359,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </section>
 
         <!-- Pipelines -->
-        <section class="flex min-h-0 flex-col" :aria-label="t('home.pipelinesOverviewSection')">
+        <section
+          class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col border p-4"
+          :aria-label="t('home.pipelinesOverviewSection')"
+        >
           <div class="flex items-center justify-between gap-2">
-            <h2 class="text-text-heading text-sm font-semibold">
+            <span class="text-text-heading flex items-center gap-2 text-sm font-semibold">
+              <span
+                class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-10 w-10 shrink-0 items-center justify-center"
+                aria-hidden="true"
+              >
+                <OIcon name="lan" size="md" />
+              </span>
               {{ t("home.pipelineTitle") }}
-            </h2>
+            </span>
             <OButton
               v-if="canView('pipelines')"
               icon-only
@@ -361,31 +398,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ></router-link>
             </OButton>
           </div>
-          <div class="flex gap-x-6 pt-2">
-            <OStatCard
-              variant="kpi"
-              stacked
-              :label="t('home.schedulePipelineTitle')"
-              :value="animatedScheduledPipelines || summary.scheduled_pipelines"
-            >
-              <template #value>
-                <span aria-live="polite" data-test="home-usage-tab-scheduled-pipelines-count">{{
-                  animatedScheduledPipelines || summary.scheduled_pipelines
-                }}</span>
-              </template>
-            </OStatCard>
-            <OStatCard
-              variant="kpi"
-              stacked
-              :label="t('home.rtPipelineTitle')"
-              :value="animatedRtPipelines || summary.rt_pipelines"
-            >
-              <template #value>
-                <span aria-live="polite" data-test="home-usage-tab-rt-pipelines-count">{{
-                  animatedRtPipelines || summary.rt_pipelines
-                }}</span>
-              </template>
-            </OStatCard>
+          <div class="flex gap-4 pt-3">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-text-secondary text-xs">{{ t("home.schedulePipelineTitle") }}</span>
+              <span
+                class="text-text-heading text-lg leading-tight font-semibold tabular-nums"
+                aria-live="polite"
+                data-test="home-usage-tab-scheduled-pipelines-count"
+                >{{ animatedScheduledPipelines || summary.scheduled_pipelines }}</span
+              >
+            </div>
+            <OSeparator :vertical="true" />
+            <div class="flex flex-col gap-0.5">
+              <span class="text-text-secondary text-xs">{{ t("home.rtPipelineTitle") }}</span>
+              <span
+                class="text-text-heading text-lg leading-tight font-semibold tabular-nums"
+                aria-live="polite"
+                data-test="home-usage-tab-rt-pipelines-count"
+                >{{ animatedRtPipelines || summary.rt_pipelines }}</span
+              >
+            </div>
           </div>
           <div class="mt-3 min-h-50 w-full flex-1">
             <CustomChartRenderer
@@ -410,7 +442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="summaryFailed && !isLoadingSummary"
-      class="flex h-full flex-col"
+      class="px-page-edge flex h-full flex-col pt-2"
       data-test="home-usage-tab-load-error"
     >
       <OEmptyState
@@ -441,7 +473,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { formatSizeFromMB } from "@/utils/zincutils";
-import { formatCompactCount } from "@/utils/formatters";
+import { formatEventCount } from "@/utils/formatters";
 import { summaryHasUserData } from "@/utils/internalStreams";
 import { ALERT_LIST_ALL_FOLDERS, ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import { chartColor } from "@/utils/chartTheme";
@@ -454,7 +486,9 @@ import UsageReportBanner from "@/enterprise/components/billings/UsageReportBanne
 import DatabaseDeprecationBanner from "@/components/DatabaseDeprecationBanner.vue";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OStatCard from "@/lib/data/StatStrip/OStatCard.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -477,6 +511,7 @@ interface ExploreRow {
   test: string;
   feature: string;
   icon: IconName;
+  chip: string;
   label: I18nText;
 }
 
@@ -488,6 +523,7 @@ const exploreRows = computed(() =>
         test: "logs",
         feature: "logs",
         icon: "search",
+        chip: "bg-icon-chip-success-bg text-icon-chip-success-text",
         label: t("menu.search"),
       },
       {
@@ -495,6 +531,7 @@ const exploreRows = computed(() =>
         test: "traces",
         feature: "traces",
         icon: "account-tree",
+        chip: "bg-icon-chip-primary-bg text-icon-chip-primary-text",
         label: t("menu.traces"),
       },
       {
@@ -502,6 +539,7 @@ const exploreRows = computed(() =>
         test: "metrics",
         feature: "metrics",
         icon: "bar-chart",
+        chip: "bg-icon-chip-success-bg text-icon-chip-success-text",
         label: t("menu.metrics"),
       },
       {
@@ -509,6 +547,7 @@ const exploreRows = computed(() =>
         test: "rum",
         feature: "rum",
         icon: "devices",
+        chip: "bg-icon-chip-primary-bg text-icon-chip-primary-text",
         label: raw("RUM"),
       },
       {
@@ -516,6 +555,7 @@ const exploreRows = computed(() =>
         test: "incidents",
         feature: "incidents",
         icon: "notifications-active",
+        chip: "bg-icon-chip-warning-bg text-icon-chip-warning-text",
         label: t("menu.incidents"),
       },
       {
@@ -523,6 +563,7 @@ const exploreRows = computed(() =>
         test: "reports",
         feature: "reports",
         icon: "description",
+        chip: "bg-icon-chip-warning-bg text-icon-chip-warning-text",
         label: t("menu.report"),
       },
     ] as ExploreRow[]
@@ -620,7 +661,7 @@ const getSummary = (org_id: any) => {
         streams_count: res.data.streams?.num_streams ?? 0,
         ingested_data: formatSizeFromMB(rawIngestedSize),
         compressed_data: formatSizeFromMB(rawCompressedSize),
-        doc_count: formatCompactCount(rawDocCount),
+        doc_count: formatEventCount(rawDocCount),
         doc_count_raw: rawDocCount,
         compressed_size_raw: rawCompressedSize,
         ingested_size_raw: rawIngestedSize,
@@ -862,7 +903,7 @@ const pipelinesPanelData = computed(() => {
 
 const formattedAnimatedEventsCount = computed(() => {
   return animatedEventsCount.value > 0
-    ? formatCompactCount(animatedEventsCount.value)
+    ? formatEventCount(animatedEventsCount.value)
     : summary.value.doc_count;
 });
 

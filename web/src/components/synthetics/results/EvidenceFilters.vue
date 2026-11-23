@@ -111,7 +111,7 @@ const stepFilter = computed({
     />
     <OButton
       icon-only
-      variant="ghost"
+      variant="secondary"
       size="xs"
       class="ms-auto"
       :pressed="wrap"

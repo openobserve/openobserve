@@ -332,8 +332,9 @@ onBeforeUnmount(() => {
           MENU_SURFACE,
           'max-lg:max-w-[calc(100vw-1rem)]',
           'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
-          // A long menu scrolls inside the window instead of running past its bottom edge (R11).
-          'lg:max-h-[min(calc(var(--reka-popper-available-height,100vh)_-_0.5rem),calc(100vh_-_4rem))] lg:overflow-y-auto',
+          // Animation — clip-path reveal: the menu is unveiled at full size from
+          // its trigger edge (no scale/squish). Wipes down by default; top-placed
+          // menus wipe up. Soft ease-out-expo in, quick wipe out.
           'data-[state=open]:animate-[o2-reveal-down-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
           'data-[state=closed]:animate-[o2-reveal-down-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
           'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_var(--duration-overlay-in)_var(--ease-out-expo)]',

@@ -7,7 +7,6 @@
     :search="search"
     :search-class="searchClass"
     :search-placeholder="searchPlaceholder ?? t('search.searchField')"
-    :search-shortcut="searchShortcut"
     :current-page="currentPage"
     :page-size="pageSize"
     :page-size-options="[pageSize]"
@@ -59,7 +58,10 @@
     <!-- Empty state -->
     <template #empty>
       <slot name="empty">
-        <OEmptyState size="compact" icon="info" :title="t('search.noFieldFound')" />
+        <div class="flex items-center justify-center py-[0.725rem] text-center">
+          <OIcon name="info" size="xs" />
+          <span class="ps-1.5">{{ t("search.noFieldFound") }}</span>
+        </div>
       </slot>
     </template>
 
@@ -84,7 +86,6 @@
 import { computed, ref, watch } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 
@@ -101,8 +102,6 @@ interface Props {
   pageSize?: number;
   showPagination?: boolean;
   searchPlaceholder?: I18nText;
-  /** Off where the page sends "/" to its own query. */
-  searchShortcut?: boolean;
   /** Field that keys each row; set it when two rows can share a `name`. */
   rowKey?: string;
 }
@@ -116,7 +115,6 @@ const props = withDefaults(defineProps<Props>(), {
   pageSize: 50,
   showPagination: false,
   rowKey: "name",
-  searchShortcut: undefined,
 });
 
 defineEmits<{

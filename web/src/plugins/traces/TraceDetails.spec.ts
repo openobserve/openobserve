@@ -1214,10 +1214,10 @@ describe("TraceDetails", () => {
         expect(closeBtn.exists()).toBe(true);
       });
 
-      it("renders the close button as a ghost icon with a Close tooltip", () => {
+      it("renders the close button as outline with a Close tooltip", () => {
         const closeBtn = wrapper.findComponent('[data-test="trace-details-close-btn"]');
         expect(closeBtn.exists()).toBe(true);
-        expect(closeBtn.attributes("data-o2-variant")).toBe("ghost");
+        expect(closeBtn.attributes("data-o2-variant")).toBe("secondary");
         const tooltip = closeBtn.findComponent({ name: "OTooltip" });
         expect(tooltip.props("content")).toBe(i18n.global.t("common.close"));
       });
@@ -2642,7 +2642,7 @@ describe("TraceDetails", () => {
 
       const result = wrapper.vm.formatRumEventsAsSpans([event], [], [], [event]);
 
-      expect(result[0].operation_name).toBe("Unknown RUM event");
+      expect(result[0].operation_name).toBe("Unknown RUM Event");
     });
   });
 

@@ -18,8 +18,8 @@ export interface SettingRowProps {
   name?: string;
   /** An error to print where the description sits, for pages without OForm. Wins over `name`. */
   error?: I18nText;
-  /** `"end"` pins a fixed control column to the row's end; `"below"` stacks the control under its label, as dialogs do. Default `"label"`. */
-  controlAt?: "label" | "end" | "below";
+  /** `"end"` pins a fixed control column to the row's end and lets the label grow. Default `"label"`. */
+  controlAt?: "label" | "end";
 }
 
 export interface SettingRowSlots {

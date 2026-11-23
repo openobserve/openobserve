@@ -106,7 +106,7 @@ describe("OverrideConfig in chart mode with the real dialog", () => {
   it("opens Series Formatting with the panel's legend series", async () => {
     mountConfig(makePanel("line"));
     await openDialog();
-    expect(document.body.textContent).toContain("Series formatting");
+    expect(document.body.textContent).toContain("Series Formatting");
     expect(wrapper.findComponent({ name: "OverrideConfigPopup" }).props("seriesNames")).toEqual([
       "checkout",
       "cart",
@@ -148,7 +148,7 @@ describe("OverrideConfig in chart mode with the real dialog", () => {
     const panel = makePanel("table", { override_config: [tableEntry(), series] });
     mountConfig(panel, { mode: "table", panelData: {} });
     await openDialog();
-    expect(document.body.textContent).toContain("Column formatting");
+    expect(document.body.textContent).toContain("Column Formatting");
     expect(document.querySelectorAll('[data-test^="override-config-row-"]')).toHaveLength(1);
     await click("override-config-popup-save");
     expect(panel.data.config.override_config).toEqual([tableEntry(), series]);
@@ -180,7 +180,7 @@ describe("OverrideConfig in chart mode with the real dialog", () => {
     await flushPromises();
     expect(panel.data.config.override_config).toEqual([]);
     await openDialog();
-    expect(document.body.textContent).toContain("Column formatting");
+    expect(document.body.textContent).toContain("Column Formatting");
     await click("override-config-popup-save");
     expect(panel.data.config.override_config).toEqual([]);
   });

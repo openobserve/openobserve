@@ -16,17 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <h2 class="text-text-heading text-sm font-semibold">{{ t("rum.overviewPage.diffTitle") }}</h2>
+    <h2 class="text-text-heading text-base font-bold">{{ t("rum.overviewPage.diffTitle") }}</h2>
     <div
       class="bg-surface-tint-neutral rounded-surface mt-3 p-3"
       :class="difference ? 'border-border-default border' : ''"
       data-test="rum-overview-difference"
     >
       <template v-if="difference">
-        <div
-          class="text-text-heading text-sm font-semibold"
-          data-test="rum-overview-difference-title"
-        >
+        <div class="text-text-heading text-sm font-bold" data-test="rum-overview-difference-title">
           {{
             t("rum.overviewPage.diffSegment", {
               dim: t(LABEL[difference.dim]),
@@ -44,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <router-link
           :to="sessionsLink(difference.filter)"
-          class="text-text-link mt-2 inline-block text-sm font-semibold"
+          class="text-text-link mt-2 inline-block text-sm font-bold"
           data-test="rum-overview-difference-link"
         >
           {{ t("rum.overviewPage.diffLink") }} →
@@ -77,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <li v-for="(s, i) in segments[d] ?? []" :key="s.label + i">
             <div class="flex justify-between text-sm">
               <span class="text-text-body">{{ s.label }}</span>
-              <span class="font-semibold" :class="BAND_TEXT[bandOf('inp', s.inp) ?? 'good']">
+              <span class="font-bold" :class="BAND_TEXT[bandOf('inp', s.inp) ?? 'good']">
                 <MarkedValue
                   :band="bandOf('inp', s.inp)"
                   :text="t('rum.overviewPage.segInp', { v: formatVital('inp', s.inp) })"

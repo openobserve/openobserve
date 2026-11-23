@@ -137,7 +137,7 @@ describe("AWSIndividualServices.vue", () => {
 
     it("should render All Services tab", () => {
       wrapper = createWrapper();
-      expect(wrapper.text()).toContain("All services");
+      expect(wrapper.text()).toContain("All Services");
     });
 
     it("should render integration tiles", () => {

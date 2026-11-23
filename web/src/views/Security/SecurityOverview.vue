@@ -11,12 +11,8 @@ import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import SecurityMoreMenu from "@/components/security/SecurityMoreMenu.vue";
-import SecurityTimeRange from "@/components/security/SecurityTimeRange.vue";
-import SecurityLoadError from "@/components/security/SecurityLoadError.vue";
-import { useSecurityRange } from "@/composables/security/useSecurityRange";
-import type { DateTimeRangeChange } from "@/lib/forms/DateTimeRange/ODateTimeRange.types";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -41,7 +37,6 @@ import {
   countsByAlert,
   useAlertHistorySummary,
 } from "@/composables/security/useAlertHistorySummary";
-import { toneOfPriority } from "@/utils/security/cases";
 import { useSiemDetections, type DetectionRow } from "@/composables/security/useSiemDetections";
 import { bucketMsFor, bucketize, isFiring, type HistoryRow } from "@/utils/security/history";
 import { isFiringOutcome } from "@/utils/alerts/runOutcome";
@@ -66,16 +61,26 @@ const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
-const range = useSecurityRange(route.query);
-const windowMs = range.windowMs;
-const windowEndMs = range.endMs;
-const windowStartMs = range.startMs;
+const RANGES = [
+  { value: "1h", minutes: 60 },
+  { value: "24h", minutes: 1440 },
+  { value: "7d", minutes: 10080 },
+  { value: "30d", minutes: 43200 },
+] as const;
+type RangeKey = (typeof RANGES)[number]["value"];
 
-function onRangeChange(change: DateTimeRangeChange) {
-  if (!range.apply(change)) return;
-  analytics.track("security_time_range_changed", { view: "overview", range: range.text.value });
-  const { period: _p, from: _f, to: _t, ...rest } = route.query;
-  router.replace({ query: { ...rest, ...range.linkQuery.value } });
+const range = ref<RangeKey>(
+  RANGES.some((r) => r.value === route.query.period) ? (route.query.period as RangeKey) : "24h",
+);
+const windowMs = computed(() => RANGES.find((r) => r.value === range.value)!.minutes * 60_000);
+const windowEndMs = ref(Date.now());
+const windowStartMs = computed(() => windowEndMs.value - windowMs.value);
+
+function onRangeChange(value: unknown) {
+  if (!value || value === range.value) return;
+  range.value = value as RangeKey;
+  analytics.track("security_time_range_changed", { view: "overview", range: range.value });
+  router.replace({ query: { ...route.query, period: range.value } });
   void refresh();
 }
 
@@ -122,7 +127,6 @@ const summaryLoading = computed(() => awaitingRules.value || summary.loading.val
 /** Set once the first summary lands, so later refreshes keep the tiles instead of a skeleton. */
 const summaryLanded = ref(false);
 const triageLoading = computed(() => awaitingRules.value || historyWindow.loading.value);
-const rulesSettled = computed(() => !awaitingRules.value && !rulesLoading.value);
 const loading = computed(
   () =>
     summaryLoading.value ||
@@ -195,7 +199,7 @@ async function refresh() {
   if (!orgId.value) return;
   const seq = ++refreshSeq;
   refreshing += 1;
-  range.touch();
+  windowEndMs.value = Date.now();
   try {
     await Promise.all([
       fetchHistory(seq, windowStartMs.value, windowEndMs.value),
@@ -418,13 +422,11 @@ function tacticClass(entry: { rules: number; firings: number }) {
 const enabledRules = computed(() => siemRows.value.filter((r) => r.alert.enabled).length);
 const firingDetections = computed(() => firedDetections.value.length);
 
-const countOrDash = (n: number) => (historyFailed.value || rulesFailed.value ? "—" : n);
-
 const stats = computed<StatItem[]>(() => [
   {
     key: "critical",
     label: t("siem.overview.stat.critical"),
-    value: countOrDash(toneCounts.value.critical),
+    value: toneCounts.value.critical,
     icon: "emergency",
     tone: "error",
     dataTest: "security-overview-stat-critical",
@@ -432,7 +434,7 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "high",
     label: t("siem.overview.stat.high"),
-    value: countOrDash(toneCounts.value.high),
+    value: toneCounts.value.high,
     icon: "warning",
     tone: "orange",
     dataTest: "security-overview-stat-high",
@@ -448,7 +450,7 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "firing",
     label: t("siem.overview.stat.firingDetections"),
-    value: countOrDash(firingDetections.value),
+    value: firingDetections.value,
     icon: "notifications-active",
     tone: "primary",
     dataTest: "security-overview-stat-firing",
@@ -456,7 +458,7 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "quiet",
     label: t("siem.overview.stat.quietSources"),
-    value: sourcesFailed.value ? "—" : quietSources.value,
+    value: quietSources.value,
     icon: "sync-problem",
     tone: "warning",
     dataTest: "security-overview-stat-quiet",
@@ -464,11 +466,7 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "rules",
     label: t("siem.overview.stat.activeRules"),
-    value: rulesFailed.value
-      ? "—"
-      : siemRows.value.length
-        ? `${enabledRules.value} / ${siemRows.value.length}`
-        : 0,
+    value: siemRows.value.length ? `${enabledRules.value} / ${siemRows.value.length}` : 0,
     icon: "verified-user",
     tone: "success",
     dataTest: "security-overview-stat-rules",
@@ -485,7 +483,7 @@ const STAT_ROUTES: Record<string, string> = {
 
 /** Alerts over this page's window, so the numbers on both pages agree. */
 function openAlerts(extra: Record<string, string> = {}) {
-  nav("/security/alerts", { ...range.linkQuery.value, ...extra });
+  nav("/security/alerts", { period: range.value, ...extra });
 }
 
 function onStat(key: string) {
@@ -501,7 +499,7 @@ function onStat(key: string) {
 
 /** Opens a source on Events over this page's window, not Events' 15m default. */
 function openSource(name?: string) {
-  nav("/security/events", { ...(name ? { stream: name } : {}), ...range.linkQuery.value });
+  nav("/security/events", { ...(name ? { stream: name } : {}), period: range.value });
 }
 
 // Only claimed once the list has actually loaded; a failed load is reported, not read as empty.
@@ -514,17 +512,34 @@ const noDetections = computed(
     siemRows.value.length === 0,
 );
 
-// A failed load reads "—" and one error with Retry, never zero counts or first-run copy (R8).
-const rulesFailed = computed(() => !!rulesError.value && !rulesForbidden.value);
-const historyFailed = computed(() => !!historyError.value);
-const sourcesFailed = computed(() => !!securitySources.error.value);
-const emptyOrg = computed(
-  () =>
-    noDetections.value && !openCasesTotal.value && !casesLoading.value && !incidents.value.length,
-);
-
 const notices = computed<SecurityNotice[]>(() => {
   const out: SecurityNotice[] = [];
+  if (noDetections.value) {
+    out.push({
+      key: "no-detections",
+      tone: "info",
+      text: t("siem.overview.noDetections"),
+      actionLabel: t("siem.overview.browseDetections"),
+      onAction: () => nav("/security/detections"),
+      dataTest: "security-overview-no-detections",
+    });
+  }
+  if (rulesError.value) {
+    out.push({
+      key: "rules-error",
+      tone: "error",
+      text: t("siem.overview.rulesError", { reason: rulesError.value }),
+      dataTest: "security-overview-rules-error",
+    });
+  }
+  if (historyError.value) {
+    out.push({
+      key: "history-error",
+      tone: "error",
+      text: t("siem.overview.historyError", { reason: historyError.value }),
+      dataTest: "security-overview-history-error",
+    });
+  }
   if (historyWindow.effectiveStartMs.value) {
     out.push({
       key: "history-narrowed",
@@ -561,49 +576,44 @@ function nav(path: string, query: Record<string, string> = {}) {
   >
     <template #actions>
       <div class="flex items-center gap-2">
-        <SecurityTimeRange
-          :picker-props="range.pickerProps.value"
+        <OToggleGroup
+          :model-value="range"
           data-test="security-overview-range"
-          @change="onRangeChange"
-        />
+          @update:model-value="onRangeChange"
+        >
+          <OToggleGroupItem
+            v-for="r in RANGES"
+            :key="r.value"
+            :value="r.value"
+            :data-test="`security-overview-range-${r.value}`"
+          >
+            {{ t(`siem.range.${r.value}`) }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+        <OButton
+          icon-only
+          variant="ghost"
+          :icon="autoRefresh ? 'sync' : 'sync-disabled'"
+          :pressed="autoRefresh"
+          data-test="security-overview-auto-refresh"
+          @click="toggleAutoRefresh"
+        >
+          <OTooltip
+            :content="
+              autoRefresh ? t('siem.overview.autoRefreshOn') : t('siem.overview.autoRefreshOff')
+            "
+          />
+        </OButton>
         <ORefreshButton
           :last-run-at="lastRunAt"
           :loading="loading"
           data-test="security-overview-refresh"
           @click="refresh"
         />
-        <SecurityMoreMenu data-test="security-overview-more">
-          <ODropdownItem
-            :checked="autoRefresh"
-            data-test="security-overview-auto-refresh"
-            @select="toggleAutoRefresh"
-          >
-            {{ t("siem.overview.autoRefresh") }}
-          </ODropdownItem>
-        </SecurityMoreMenu>
       </div>
     </template>
 
-    <!-- The notices above the tiles depend on the rules list, so the body waits for it rather than move down. -->
-    <SecurityLoadError
-      v-if="rulesSettled && rulesFailed"
-      :what="t('siem.overview.whatDetections')"
-      :hint="t('siem.overview.rulesFailedHint')"
-      data-test="security-overview-rules-error"
-      @retry="reloadAll"
-    />
-    <OEmptyState
-      v-else-if="rulesSettled && emptyOrg"
-      icon="verified-user"
-      :title="t('siem.overview.emptyTitle')"
-      :text="t('siem.overview.emptyHint')"
-      :action-label="t('siem.overview.browseDetections')"
-      :secondary-action-label="t('siem.overview.openSources')"
-      data-test="security-overview-no-detections"
-      @action="nav('/security/detections')"
-      @secondary-action="nav('/security/sources')"
-    />
-    <div v-else-if="rulesSettled" class="flex flex-col gap-4 pb-4">
+    <div class="flex flex-col gap-4 pb-4">
       <SecurityNotices :notices="notices" data-test="security-overview-notices" />
       <SecurityAccessLock
         v-if="denials.length"
@@ -625,7 +635,7 @@ function nav(path: string, query: Record<string, string> = {}) {
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <SecurityPanel
           :title="t('siem.overview.activity')"
-          :hint="historyFailed ? undefined : t('siem.overview.activityHint', totalFirings)"
+          :hint="t('siem.overview.activityHint', totalFirings)"
           icon="stacked-line-chart"
           class="h-80 xl:col-span-2"
           data-test="security-overview-activity"
@@ -643,16 +653,8 @@ function nav(path: string, query: Record<string, string> = {}) {
             </OTag>
           </template>
           <div class="min-h-0 flex-1 px-2 pb-2">
-            <SecurityLoadError
-              v-if="historyFailed"
-              size="compact"
-              :what="t('siem.overview.whatFirings')"
-              :hint="t('siem.overview.historyFailedHint')"
-              data-test="security-overview-activity-error"
-              @retry="refresh"
-            />
             <SecuritySeverityChart
-              v-else-if="totalFirings || summaryLoading"
+              v-if="totalFirings || summaryLoading"
               :buckets="chartBuckets"
               :series="chartSeries"
               :loading="summaryLoading"
@@ -662,6 +664,7 @@ function nav(path: string, query: Record<string, string> = {}) {
             />
             <OEmptyState
               v-else
+              size="inline"
               icon="task-alt"
               :title="t('siem.overview.quiet')"
               :text="t('siem.overview.quietHint')"
@@ -697,11 +700,13 @@ function nav(path: string, query: Record<string, string> = {}) {
           />
           <OEmptyState
             v-else-if="casesUnsupported"
+            size="inline"
             icon="info-outline"
             :title="t('siem.overview.casesUnsupported')"
           />
           <OEmptyState
             v-else-if="!openCases.length"
+            size="inline"
             icon="task-alt"
             :title="t('siem.overview.noOpenCases')"
           />
@@ -717,12 +722,7 @@ function nav(path: string, query: Record<string, string> = {}) {
               @keydown.enter="nav('/security/cases')"
               @keydown.space.prevent="nav('/security/cases')"
             >
-              <OTag
-                type="severity"
-                :value="c.severity.toLowerCase()"
-                :label="t(toneLabelKey(toneOfPriority(c.severity)))"
-                size="sm"
-              />
+              <OTag type="severity" :value="c.severity.toLowerCase()" size="sm" />
               <div class="flex min-w-0 flex-1 flex-col">
                 <span class="text-text-heading truncate text-sm font-medium">
                   {{ c.title || t("siem.overview.untitledCase") }}
@@ -742,7 +742,7 @@ function nav(path: string, query: Record<string, string> = {}) {
         <SecurityPanel
           :title="t('siem.overview.triage')"
           :hint="t('siem.overview.triageHint')"
-          :count="historyFailed ? null : totalFirings"
+          :count="totalFirings"
           icon="inbox"
           tone="error"
           class="h-96 xl:col-span-2"
@@ -815,15 +815,8 @@ function nav(path: string, query: Record<string, string> = {}) {
               <OTimeCell :value="row.timestamp" unit="us" />
             </template>
             <template #empty>
-              <SecurityLoadError
-                v-if="historyFailed"
-                size="compact"
-                :what="t('siem.overview.whatFirings')"
-                :hint="t('siem.overview.historyFailedHint')"
-                @retry="refresh"
-              />
               <OEmptyState
-                v-else
+                size="inline"
                 icon="task-alt"
                 :title="t('siem.overview.queueClear')"
                 :text="t('siem.overview.quietHint')"
@@ -840,15 +833,9 @@ function nav(path: string, query: Record<string, string> = {}) {
           class="h-96"
           data-test="security-overview-top-detections"
         >
-          <SecurityLoadError
-            v-if="historyFailed"
-            size="compact"
-            :what="t('siem.overview.whatFirings')"
-            :hint="t('siem.overview.historyFailedHint')"
-            @retry="refresh"
-          />
           <OEmptyState
-            v-else-if="!topDetections.length && !summaryLoading"
+            v-if="!topDetections.length && !summaryLoading"
+            size="inline"
             icon="task-alt"
             :title="t('siem.overview.quiet')"
           />
@@ -956,6 +943,7 @@ function nav(path: string, query: Record<string, string> = {}) {
           </div>
           <OEmptyState
             v-else-if="!sources.length"
+            size="inline"
             icon="cloud-upload"
             :title="t('siem.overview.noSources')"
             :text="t('siem.overview.noSourcesHint')"
@@ -994,11 +982,5 @@ function nav(path: string, query: Record<string, string> = {}) {
 
       <SecurityAuditPanel />
     </div>
-    <OSkeleton
-      v-else
-      preset="statStrip"
-      :count="stats.length"
-      data-test="security-overview-pending"
-    />
   </OPageLayout>
 </template>

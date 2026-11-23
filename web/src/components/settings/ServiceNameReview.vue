@@ -92,14 +92,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :text="t('serviceVersions.nameReview.states.denied')"
       data-test="svcver-name-review-denied"
     />
-    <OEmptyState
+    <div
       v-else-if="list.isError.value"
-      kind="error"
-      :title="t('emptyState.loadError.title')"
-      :text="loadError"
+      class="mx-page-edge rounded-default border-border-default text-text-secondary flex items-center gap-2 border px-4 py-3 text-sm"
       data-test="svcver-name-review-error"
-      @action="list.refetch()"
-    />
+    >
+      <OIcon name="error-outline" size="sm" class="text-status-error-text" />
+      <span>{{ loadError }}</span>
+      <OButton variant="accent-ghost" size="sm" @click="list.refetch()">{{
+        t("serviceVersions.actions.retry")
+      }}</OButton>
+    </div>
     <!-- Shares min-h-64 with the loading skeleton and is taller than the empty state's content, so Unresolved stays put. -->
     <div v-else-if="!rows.length && page === 1" class="flex min-h-64 shrink-0 flex-col">
       <OEmptyState
@@ -591,6 +594,7 @@ import {
 } from "@/services/service_versions.queries";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import InfoNotice from "@/components/shared/InfoNotice.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";

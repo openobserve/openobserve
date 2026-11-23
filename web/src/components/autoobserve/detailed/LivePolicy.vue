@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`autoobserve-policy-section-${section}`"
     >
       <header class="flex flex-col gap-1">
-        <h2 class="text-text-heading text-sm font-semibold">{{ t(SECTION_TITLE[section]) }}</h2>
+        <h2 class="text-text-heading text-base font-semibold">{{ t(SECTION_TITLE[section]) }}</h2>
         <p class="text-text-secondary text-sm leading-relaxed">{{ t(SECTION_LEAD[section]) }}</p>
       </header>
       <PolicyModes v-if="section === 'coverage'" :actions="COVERAGE_ACTIONS" />

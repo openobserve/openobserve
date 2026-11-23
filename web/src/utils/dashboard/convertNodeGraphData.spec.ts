@@ -444,7 +444,7 @@ describe("node graph", () => {
     for (const label of [series.label, series.edgeLabel]) {
       expect(label.backgroundColor).toBe("rgba(255,255,255,0.85)");
       expect(label.padding).toEqual([2, 4]);
-      expect(label.color).toBe("#3b3f4f");
+      expect(label.color).toBe("#404040");
     }
   });
 

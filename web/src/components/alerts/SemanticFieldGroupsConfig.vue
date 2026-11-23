@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <slot name="header-actions" />
       </template>
-      <div class="rounded-surface border-border-default overflow-hidden border">
+      <div class="-mx-4 -my-3">
         <!-- Category strip + global search -->
         <div
           v-if="categoryOptions.length > 0"
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OEmptyState
           v-else
           :kind="searchActive ? 'filtered' : 'first-run'"
-          size="compact"
+          size="inline"
           icon="search"
           :title="
             searchActive
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="localGroups.length > 0 && showFingerprintFields"
       class="border-separator mt-4 border-t pt-4"
     >
-      <div class="mb-2 text-sm font-medium">
+      <div class="mb-2 text-base font-medium">
         {{ t("correlation.deduplicateFields") }} *
         <OTooltip :content="t('correlation.deduplicateFieldTooltip')" />
       </div>

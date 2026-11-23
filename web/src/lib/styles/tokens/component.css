@@ -38,16 +38,15 @@
 
   /* Button — outline */
   --color-button-outline-text: var(--color-text-heading);
-  --color-button-outline-border: var(--color-control-border);
-  --color-button-outline-hover-bg: var(--color-surface-subtle);
+  --color-button-outline-border: var(--color-border-control);
+  --color-button-outline-hover-bg: var(--color-interactive-hover-bg);
   --color-button-outline-hover-border: var(--color-primary-300);
-  --color-button-outline-active-bg: var(--color-surface-subtle-hover);
+  --color-button-outline-active-bg: var(--color-surface-accent-active);
 
   /* Button — ghost */
-  --color-button-ghost-text: var(--color-text-secondary);
-  /* Hover is neutral: the accent marks selection only (C1), and a pressed ghost takes the accent tint. */
-  --color-button-ghost-hover-bg: var(--color-grey-150);
-  --color-button-ghost-active-bg: var(--color-surface-subtle-hover);
+  --color-button-ghost-text: var(--color-text-heading);
+  --color-button-ghost-hover-bg: var(--color-surface-accent-hover);
+  --color-button-ghost-active-bg: var(--color-surface-accent-active);
   --color-button-ghost-hover-ring: var(--color-primary-300);
   --color-button-ghost-focus-ring: var(--color-focus-ring-accent);
 
@@ -138,17 +137,18 @@
   --color-button-destructive-foreground: var(--color-white);
 
   /* ButtonGroup */
-  --color-button-group-divider: var(--color-control-border);
+  --color-button-group-divider: var(--color-border-default);
 
-  /* ToggleGroup: a filled tray with no edge; the selected segment is the raised surface. */
+  /* ToggleGroup */
   --color-toggle-track-bg: var(--color-surface-subtle);
   --color-toggle-item-bg: transparent;
   --color-toggle-item-text: var(--color-text-body);
   --color-toggle-item-hover-bg: var(--color-grey-150);
-  --color-toggle-item-active-bg: var(--color-surface-base);
-  --color-toggle-item-active-text: var(--color-text-heading);
-  --color-toggle-item-active-border: var(--color-border-default);
+  --color-toggle-item-active-bg: var(--color-surface-accent-active);
+  --color-toggle-item-active-text: var(--color-primary-700);
+  --color-toggle-item-active-border: var(--color-primary-600);
   --color-toggle-item-disabled: var(--color-text-disabled);
+  --color-toggle-border: var(--color-border-subtle);
   --color-toggle-focus-ring: var(--color-focus-ring-accent);
   /* Insertion line shown while dragging to reorder (reorderable groups) */
   --color-toggle-drop-indicator: var(--color-primary-600);
@@ -260,9 +260,8 @@
 
   /* Panel */
   --color-dialog-bg: var(--color-surface-overlay);
-  --color-dialog-border: var(--color-border-subtle);
-  /* eslint-disable-next-line local/no-hardcoded-px -- optical shadow geometry, not layout */
-  --shadow-dialog: 0 0 0 1px rgb(19 21 31 / 0.06), 0 20px 48px -12px rgb(19 21 31 / 0.28);
+  --color-dialog-border: var(--color-border-default);
+  --shadow-dialog: var(--shadow-lg);
 
   /* Header */
   --color-dialog-header-bg: var(--color-surface-panel);
@@ -352,40 +351,39 @@
   --color-kbd-text: var(--color-text-secondary);
 
   /* Badge — success */
-  --color-badge-success-solid-bg: #2e8b4a;
+  --color-badge-success-solid-bg: var(--color-success-500);
   --color-badge-success-solid-text: var(--color-white);
-  --color-badge-success-ol-border: #2e8b4a;
+  --color-badge-success-ol-border: var(--color-success-500);
   --color-badge-success-ol-text: var(--color-success-700);
-  --color-badge-success-soft-bg: #eaf6ee;
-  --color-badge-success-soft-text: #1e7a3c;
+  --color-badge-success-soft-bg: var(--color-success-50);
+  --color-badge-success-soft-text: var(--color-success-700);
 
   /* Badge — warning (dark text on yellow — never white) */
-  /* Mockup amber #d98a16 is 2.76:1 on white; #c47a0e keeps the mark at 3:1. */
-  --color-badge-warning-solid-bg: #c47a0e;
+  --color-badge-warning-solid-bg: var(--color-warning-400);
   --color-badge-warning-solid-text: var(--color-grey-900);
-  --color-badge-warning-ol-border: #c47a0e;
+  --color-badge-warning-ol-border: var(--color-warning-600);
   --color-badge-warning-ol-text: var(--color-warning-700);
-  --color-badge-warning-soft-bg: #fff4e2;
-  --color-badge-warning-soft-text: #9a5507;
+  --color-badge-warning-soft-bg: var(--color-warning-50);
+  --color-badge-warning-soft-text: var(--color-warning-700);
   /* warning-quiet in LIGHT is the soft treatment: pale wash, deep text. */
   --color-badge-warning-quiet-bg: var(--color-warning-50);
   --color-badge-warning-quiet-text: var(--color-warning-700);
   --color-badge-warning-quiet-border: var(--color-warning-600);
 
   /* Badge — error */
-  --color-badge-error-solid-bg: #d63a40;
+  --color-badge-error-solid-bg: var(--color-error-600);
   --color-badge-error-solid-text: var(--color-white);
-  --color-badge-error-ol-border: #d63a40;
+  --color-badge-error-ol-border: var(--color-error-500);
   --color-badge-error-ol-text: var(--color-error-600);
-  --color-badge-error-soft-bg: #fdeeee;
-  --color-badge-error-soft-text: #c0272d;
+  --color-badge-error-soft-bg: var(--color-error-50);
+  --color-badge-error-soft-text: var(--color-error-700);
 
   /* Badge — info (blue, for logs stream type) */
   --color-badge-info-ol-border: var(--color-blue-700);
   --color-badge-info-ol-text: var(--color-blue-700);
 
   /* Badge — purple (for metrics stream type) */
-  --color-badge-purple-ol-border: #9b3fd1;
+  --color-badge-purple-ol-border: var(--color-purple-600);
   --color-badge-purple-ol-text: var(--color-purple-700);
 
   /* Badge — magenta: matches the SQL query editor's function-name colour
@@ -439,12 +437,12 @@
   --color-badge-cyan-soft-text: var(--color-cyan-700);
 
   /* Badge — blue */
-  --color-badge-blue-solid-bg: #2a6fdb;
+  --color-badge-blue-solid-bg: var(--color-blue-600);
   --color-badge-blue-solid-text: var(--color-white);
-  --color-badge-blue-ol-border: #2a6fdb;
+  --color-badge-blue-ol-border: var(--color-blue-500);
   --color-badge-blue-ol-text: var(--color-blue-700);
-  --color-badge-blue-soft-bg: #eaf2fd;
-  --color-badge-blue-soft-text: #1f5fbf;
+  --color-badge-blue-soft-bg: var(--color-blue-50);
+  --color-badge-blue-soft-text: var(--color-blue-700);
 
   /* Trace span-event markers.
 
@@ -476,10 +474,10 @@
   --color-bracket-3: #7b3814;
 
   /* Badge — purple (solid/soft variants for correlation) */
-  --color-badge-purple-solid-bg: #9b3fd1;
+  --color-badge-purple-solid-bg: var(--color-purple-600);
   --color-badge-purple-solid-text: var(--color-white);
-  --color-badge-purple-soft-bg: #f6edfb;
-  --color-badge-purple-soft-text: #8a2fb3;
+  --color-badge-purple-soft-bg: var(--color-purple-50);
+  --color-badge-purple-soft-text: var(--color-purple-700);
 
   /* Badge — indigo */
   --color-badge-indigo-solid-bg: var(--color-indigo-600);
@@ -588,16 +586,15 @@
 
   /* Input (OInput, OTextarea) */
   --color-input-bg: var(--color-surface-base);
-  --color-input-border: var(--color-control-border);
-  --color-input-border-hover: var(--color-control-border-hover);
+  --color-input-border: var(--color-border-control);
+  --color-input-border-hover: var(--color-accent);
   --color-input-border-focus: var(--color-accent);
   --color-input-border-error: var(--color-error-500);
   /* Disabled-bg uses grey-200 (#e5e5e5) — `surface-subtle` (grey-100 #f5f5f5)
      was almost identical to the enabled white bg in light mode, making
      disabled fields visually indistinguishable from enabled ones. */
   --color-input-disabled-bg: var(--color-grey-200);
-  /* The control's own edge: disabled reads from the dashes and the fill, not a lighter border. */
-  --color-input-disabled-border: var(--color-control-border);
+  --color-input-disabled-border: var(--color-border-default);
   --color-input-disabled-text: var(--color-text-secondary);
   --color-input-focus-ring: var(--color-focus-ring-accent);
   --color-input-text: var(--color-text-heading);
@@ -614,9 +611,9 @@
 
   /* Select (OSelect) */
   --color-select-bg: var(--color-surface-base);
-  --color-select-border: var(--color-control-border);
-  --color-select-disabled-border: var(--color-control-border);
-  --color-select-border-hover: var(--color-control-border-hover);
+  --color-select-border: var(--color-border-control);
+  --color-select-disabled-border: var(--color-border-default);
+  --color-select-border-hover: var(--color-accent);
   --color-select-border-focus: var(--color-accent);
   --color-select-border-error: var(--color-error-500);
   /* Same rationale as input-disabled-bg. */
@@ -732,9 +729,9 @@
 
   /* Date / Time / Color (ODate, OTime, OColor) — share input surface */
   --color-datepicker-bg: var(--color-surface-base);
-  --color-datepicker-border: var(--color-control-border);
-  --color-datepicker-hover-border: var(--color-control-border-hover);
-  --color-datepicker-focus-border: var(--color-control-border-focus);
+  --color-datepicker-border: var(--color-border-default);
+  --color-datepicker-hover-border: var(--color-primary-300);
+  --color-datepicker-focus-border: var(--color-primary-300);
   --color-datepicker-focus-ring: var(--color-focus-ring-accent);
   --color-datepicker-disabled-bg: var(--color-surface-subtle);
   --color-datepicker-disabled-border: var(--color-border-default);
@@ -963,7 +960,7 @@
   --color-glyph-plate: transparent;
 }
 
-/* Ingestion path accents.
+/* Ingestion empty-state card icon accents (EmptyStateIngestionCard `iconVariant`).
    Same five palette values the card used to read from its own style block, named
    so a utility can reach them. Fixed in both themes on purpose — they distinguish
    ingestion paths, and hover repaints them with --color-primary-600 anyway. */
@@ -1295,6 +1292,7 @@
    killing dark mode on primary toggle groups. The pair must stay together. */
 [data-variant="primary"] {
   --color-toggle-track-bg: var(--color-primary-200);
+  --color-toggle-border: var(--color-primary-300);
   --color-toggle-item-hover-bg: var(--color-primary-100);
   --color-toggle-item-active-bg: var(--color-surface-base);
   --color-toggle-item-active-text: var(--color-primary-700);
@@ -1501,6 +1499,7 @@
   --color-toggle-item-active-text: var(--color-toggle-item-active-text);
   --color-toggle-item-active-border: var(--color-toggle-item-active-border);
   --color-toggle-item-disabled: var(--color-toggle-item-disabled);
+  --color-toggle-border: var(--color-toggle-border);
   --color-toggle-focus-ring: var(--color-toggle-focus-ring);
   --color-toggle-drop-indicator: var(--color-toggle-drop-indicator);
 
@@ -1587,7 +1586,6 @@
   --color-select-border-focus: var(--color-select-border-focus);
   --color-select-border-error: var(--color-select-border-error);
   --color-select-disabled-bg: var(--color-select-disabled-bg);
-  --color-select-disabled-border: var(--color-select-disabled-border);
   --color-select-disabled-text: var(--color-select-disabled-text);
   --color-select-text: var(--color-select-text);
   --color-select-placeholder: var(--color-select-placeholder);
@@ -2353,7 +2351,6 @@
   --font-weight-normal: var(--font-normal);
   --font-weight-medium: var(--font-medium);
   --font-weight-semibold: var(--font-semibold);
-  --font-weight-title: var(--font-title);
   --font-weight-bold: var(--font-bold);
   --tracking-tight: var(--tracking-tight);
   --tracking-normal: var(--tracking-normal);

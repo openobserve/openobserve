@@ -225,7 +225,7 @@ export class UserPage {
 
 
     async addNewPassword(password) {
-        // Ensure the "Change password" toggle is checked.
+        // Ensure the "Change Password" toggle is checked.
         // AddUser.vue initialises `change_password = false` whenever the drawer
         // opens (lines 252 + 352), so we know the switch is OFF on entry.
         // Click once to enable; the new-password OInput is mounted under

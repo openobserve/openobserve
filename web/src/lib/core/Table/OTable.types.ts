@@ -221,15 +221,6 @@ export const TABLE_CELL_CLIP_ATTR = "data-o2-cell-clip";
  * style), the same edge line the first data column and toolbar search bar use.
  */
 export const TABLE_CHECKBOX_COL_SIZE = 44;
-/** Fixed width (px) of the expand-chevron column: the table edge inset plus the 1.5rem button. */
-export const TABLE_EXPAND_COL_SIZE = 42;
-/** The expand column's cell style: its chevron starts on the table edge line, as the checkbox does. */
-export const TABLE_EXPAND_COL_STYLE = {
-  width: "calc(var(--spacing-table-edge) + 1.5rem)",
-  minWidth: "calc(var(--spacing-table-edge) + 1.5rem)",
-  maxWidth: "calc(var(--spacing-table-edge) + 1.5rem)",
-  paddingLeft: "var(--spacing-table-edge)",
-} as const;
 export const COL = {
   name: 200,
   firstName: 130,

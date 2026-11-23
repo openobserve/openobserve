@@ -345,7 +345,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="mb-2.5 p-2.5" v-if="pipelineCreators.length > 0">
-            <div class="text-primary mb-2.5 text-sm" data-test="pipeline-import-creation-title">
+            <div
+              class="text-primary mb-2.5 text-base uppercase"
+              data-test="pipeline-import-creation-title"
+            >
               {{ t("pipeline.pipelineCreation") }}
             </div>
             <div
@@ -355,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :class="{
-                  'py-1.25 text-sm font-semibold': true,
+                  'py-1.25 text-sm font-bold': true,
                   'text-status-success-text': val.success && !val.warning,
                   'text-status-warning-text': val.warning,
                   'text-status-negative': !val.success,

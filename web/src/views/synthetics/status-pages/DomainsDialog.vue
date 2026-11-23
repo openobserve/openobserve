@@ -47,14 +47,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
-      <div v-if="loading" class="flex flex-col gap-2">
-        <OSkeleton v-for="row in 2" :key="row" shape="block" class="h-20" />
+      <div v-if="loading" class="flex justify-center py-8">
+        <OSpinner size="lg" />
       </div>
-      <OEmptyState
-        v-else-if="domains.length === 0"
-        size="compact"
-        :title="t('statusPages.domains.empty')"
-      />
+      <p v-else-if="domains.length === 0" class="text-text-secondary py-8 text-center text-sm">
+        {{ t("statusPages.domains.empty") }}
+      </p>
       <div
         v-for="d in domains"
         v-else
@@ -188,8 +186,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";

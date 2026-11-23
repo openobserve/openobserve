@@ -173,12 +173,11 @@ describe("OTable kept rows while refetching", () => {
     expect(body.attributes("inert")).toBeUndefined();
   });
 
-  it("shows the progress line at the loader delay, not before", async () => {
+  it("shows the progress line at the loader delay, not at the dim", async () => {
     mountTable();
-    await wrapper.setProps({ loading: true });
-    await advance(LOADER_DELAY_MS - 1);
+    await startRefetch();
     expect(wrapper.find(BAR).exists()).toBe(false);
-    await advance(1);
+    await advance(LOADER_DELAY_MS - STALE_DIM_DELAY_MS);
     expect(wrapper.find(BAR).exists()).toBe(true);
   });
 
@@ -444,12 +443,11 @@ describe("OTable progress line placement", () => {
     expect(bar.classes().some((c) => c.startsWith("bottom-"))).toBe(false);
   });
 
-  it("keeps the loader delay and the 4x slower pulse under reduced motion at its new place", async () => {
+  it("keeps the 300 ms delay and the 4x slower pulse under reduced motion at its new place", async () => {
     mountTable();
-    await wrapper.setProps({ loading: true });
-    await advance(LOADER_DELAY_MS - 1);
+    await startRefetch();
     expect(wrapper.find(BAR).exists()).toBe(false);
-    await advance(1);
+    await advance(LOADER_DELAY_MS - STALE_DIM_DELAY_MS);
     const bar = wrapper.find(BAR);
     expect(bar.classes()).toContain("motion-safe:animate-pulse");
     expect(bar.classes()).toContain(

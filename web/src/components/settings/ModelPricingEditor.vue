@@ -28,14 +28,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Form Body -->
     <OForm :form="form" v-slot="{ isSubmitting }" class="flex min-h-0 flex-1 flex-col">
       <ConstrainedPage size="md" align="left" :padded="false" class="min-h-0 flex-1">
-        <div class="px-page-edge flex flex-col gap-6 py-4">
-          <OFormSection
-            variant="plain"
-            :title="t('modelPricing.modelDetails')"
-            :description="t('modelPricing.modelDetailsDesc')"
-            data-test="model-pricing-details-section"
-          >
-            <div class="flex flex-row gap-4 pb-2 max-md:flex-col max-md:gap-2">
+        <div class="flex flex-col gap-6 px-3 py-3">
+          <!-- ── Model Details Card ── -->
+          <div class="border-card-glass-border rounded-default border">
+            <div
+              class="bg-surface-panel border-card-glass-border rounded-t-default flex flex-row items-center justify-between gap-3 border-b px-4 py-2.5"
+            >
+              <div>
+                <OText variant="panel-title" class="text-compact font-semibold">
+                  {{ t("modelPricing.modelDetails") }}
+                </OText>
+                <OText variant="meta" class="text-2xs mt-px block">
+                  {{ t("modelPricing.modelDetailsDesc") }}
+                </OText>
+              </div>
+            </div>
+            <div class="flex flex-row gap-4 px-4 pt-2.5 pb-2 max-md:flex-col max-md:gap-2">
               <div class="flex-1">
                 <OFormInput
                   name="name"
@@ -79,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Known models the pattern would price if saved -->
             <div
               v-if="capturedPreview.pattern"
-              class="flex flex-col gap-2 pt-1"
+              class="flex flex-col gap-2 px-4 pb-3"
               data-test="model-pricing-captured-models"
             >
               <OText variant="meta" class="text-2xs block">
@@ -114,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               />
             </div>
-          </OFormSection>
+          </div>
 
           <!-- Pattern Examples Dialog -->
           <ODialog
@@ -128,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="examples-table border-card-glass-border rounded-default overflow-hidden border"
             >
               <div
-                class="bg-surface-subtle border-card-glass-border text-2xs text-text-secondary grid grid-cols-[11.25rem_1fr_auto] gap-3 border-b px-3 py-1.5 font-semibold tracking-[0.06em] uppercase"
+                class="bg-surface-subtle border-card-glass-border text-2xs text-text-secondary grid grid-cols-[11.25rem_1fr_auto] gap-3 border-b px-3 py-1.5 font-bold tracking-[0.06em] uppercase"
               >
                 <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
                 <span>{{ t("modelPricing.patternExamplesPatternCol") }}</span>
@@ -169,36 +177,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODialog>
 
-          <OFormSection
-            variant="plain"
-            :title="t('modelPricing.pricingTiers')"
-            data-test="model-pricing-tiers-section"
-          >
-            <template #actions>
-              <OPopover
-                size="lg"
-                v-model:open="tiersHintOpen"
-                side="bottom"
-                align="end"
-                :aria-label="t('modelPricing.aboutPricingTiers')"
-              >
-                <template #trigger>
-                  <OButton
-                    variant="ghost"
-                    size="sm"
-                    icon="info-outline"
-                    data-test="model-pricing-tiers-hint-trigger"
-                  >
-                    <span class="max-md:sr-only">{{ t("modelPricing.aboutPricingTiers") }}</span>
-                  </OButton>
-                </template>
-                <p class="p-3 leading-5" data-test="model-pricing-tiers-hint">
-                  <OText variant="meta">{{ t("modelPricing.pricingTiersDesc") }}</OText>
-                </p>
-              </OPopover>
-            </template>
+          <!-- ── Pricing Tiers ── -->
+          <div class="border-card-glass-border rounded-default border">
+            <div
+              class="bg-surface-panel border-card-glass-border rounded-t-default flex flex-row items-center justify-between gap-3 border-b px-4 py-2.5"
+            >
+              <div class="flex items-center gap-1">
+                <OText variant="panel-title" class="text-compact font-semibold">
+                  {{ t("modelPricing.pricingTiers") }}
+                </OText>
+                <OPopover
+                  size="lg"
+                  v-model:open="tiersHintOpen"
+                  side="bottom"
+                  align="start"
+                  :aria-label="t('modelPricing.aboutPricingTiers')"
+                >
+                  <template #trigger>
+                    <OButton
+                      variant="ghost"
+                      size="sm"
+                      icon="info-outline"
+                      data-test="model-pricing-tiers-hint-trigger"
+                    >
+                      <span class="max-md:sr-only">{{ t("modelPricing.aboutPricingTiers") }}</span>
+                    </OButton>
+                  </template>
+                  <p class="p-3 leading-5" data-test="model-pricing-tiers-hint">
+                    <OText variant="meta">{{ t("modelPricing.pricingTiersDesc") }}</OText>
+                  </p>
+                </OPopover>
+              </div>
+            </div>
 
-            <div class="flex flex-col gap-3">
+            <div class="flex flex-col gap-3 px-4 pt-2.5 pb-2">
               <div
                 v-for="(tier, idx) in formTiers"
                 :key="idx"
@@ -494,7 +506,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Empty state -->
                       <OEmptyState
                         v-if="!tier.prices.length"
-                        size="compact"
+                        size="inline"
                         :title="t('modelPricing.noPricesDefined')"
                         :text="t('modelPricing.noPricesDesc')"
                       />
@@ -591,7 +603,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("modelPricing.addTier") }}
               </OButton>
             </div>
-          </OFormSection>
+          </div>
         </div>
       </ConstrainedPage>
 
@@ -645,7 +657,6 @@ import modelPricingService from "@/services/model_pricing";
 import { saveModelPricingMutation } from "@/services/model_pricing.queries";
 import { useMutation } from "@tanstack/vue-query";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";

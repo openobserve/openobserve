@@ -447,7 +447,7 @@ describe("Server: Get started pick", () => {
     const wrapper = mountRail();
     expect(wrapper.find('[data-test="ingestion-servers-pick-group"]').text()).toBe("Your pick");
     expect(wrapper.find('[data-test="ingestion-servers-pick-tab-nginx"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="ingestion-servers-rest-group"]').text()).toBe("Web servers");
+    expect(wrapper.find('[data-test="ingestion-servers-rest-group"]').text()).toBe("Web Servers");
     const names = wrapper.findAllComponents({ name: "OTab" }).map((c) => c.props("name"));
     expect(names).toEqual(["nginx", "iis"]);
     wrapper.unmount();

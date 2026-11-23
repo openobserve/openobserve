@@ -39,10 +39,6 @@ import {
 
 export const FREE_TEXT_SCHEMA_MAX_AGE_MS = 10 * 60 * 1000;
 
-const SQL_STRING_LITERAL = /'(?:[^']|'')*'/g;
-const MATCH_ALL_CALL = /\b(?:fuzzy_)?match_all\s*\(/i;
-const MATCH_ALL_TERM = /\bmatch_all\s*\(\s*'((?:[^']|'')*)'\s*\)/i;
-
 const BLOCKED_TARGET: TextSearchTarget = { mode: "blocked", candidates: [] };
 
 const freshSchemas = new Map<string, { at: number; stream: StreamWithSchema }>();
@@ -188,16 +184,6 @@ function rewritesInput(plan: FilterPlan, raw: string): boolean {
   return plan.kind === "freeText" || (plan.kind === "sql" && plan.filter !== raw);
 }
 
-/** A typed match_all() needs full-text keys: on a stream without them the server rejects the query. */
-export function callsMatchAll(filter: string): boolean {
-  return MATCH_ALL_CALL.test(filter.replace(SQL_STRING_LITERAL, "''"));
-}
-
-/** Whether a SQL-shaped filter searches all text on a stream that has no full-text keys. */
-export function matchAllBlocked(filter: string, target: TextSearchTarget | undefined): boolean {
-  return target?.mode === "blocked" && callsMatchAll(filter);
-}
-
 export function markFreeTextBlocked(
   searchObj: FreeTextSearchObj,
   streams: string[],
@@ -337,10 +323,7 @@ export function noFtsRecoveryTerm(
     allTargetsFts: false,
     tokenLimits: tokenLimitsFromConfig(zoConfig),
   });
-  if (plan.kind !== "freeText") {
-    const typed = MATCH_ALL_TERM.exec(searchObj.data.query);
-    return typed ? typed[1].replace(/''/g, "'") : "";
-  }
+  if (plan.kind !== "freeText") return "";
   function firstPositive(node: PlanNode, excluded = false): string | null {
     if (node.k === "text") return excluded ? null : node.value;
     if (node.k === "sql") return null;

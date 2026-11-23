@@ -11,6 +11,7 @@
       <OButton
         data-test="add-stream-add-field-btn"
         variant="secondary"
+        icon="add"
         class="mt-2"
         @click="addRow"
       >

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="mb-2.5 flex items-center justify-between">
               <div class="flex w-full items-center">
                 <div
-                  class="rounded-default text-2xs me-1.5 px-1.5 py-0.5 font-semibold uppercase"
+                  class="rounded-default text-3xs me-1.5 px-1.5 py-0.5 font-semibold uppercase"
                   :class="getEventTypeClass(event.type)"
                 >
                   {{ event.type }}
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="event && Object.keys(event).length">
           <!-- Error Details -->
           <div v-if="event.type === 'error'" class="mb-3" data-test="error-details">
-            <div class="mb-1 text-sm font-semibold">{{ t("common.errorDetails") }}</div>
+            <div class="mb-1 text-sm font-bold">{{ t("common.errorDetails") }}</div>
             <div>
               <div
                 v-if="rawEvent?.error_type"
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="flex-1 break-words">
                   <span
-                    class="rounded-default text-2xs px-1 py-0.5"
+                    class="rounded-default text-3xs px-1 py-0.5"
                     :class="
                       rawEvent.error_handling === 'unhandled'
                         ? 'text-status-error-text border-status-negative border border-solid'
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("common.errorIdLabel") }}
                 </div>
                 <div class="flex-1 break-words">
-                  <code class="text-2xs bg-surface-accent rounded-default px-1 py-0.5 font-mono">
+                  <code class="text-3xs bg-surface-accent rounded-default px-1 py-0.5 font-mono">
                     {{ formatId(rawEvent.error_id) }}
                   </code>
                 </div>
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- View Details -->
           <div v-if="event.type === 'view'" class="mb-3" data-test="view-details">
-            <div class="mb-1 text-sm font-semibold">{{ t("common.viewDetails") }}</div>
+            <div class="mb-1 text-sm font-bold">{{ t("common.viewDetails") }}</div>
             <div>
               <div
                 v-if="rawEvent?.view_loading_type"
@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("common.viewIdLabel") }}
                 </div>
                 <div class="flex-1 break-words">
-                  <code class="text-2xs bg-surface-accent rounded-default px-1 py-0.5 font-mono">
+                  <code class="text-3xs bg-surface-accent rounded-default px-1 py-0.5 font-mono">
                     {{ formatId(rawEvent.view_id) }}
                   </code>
                 </div>
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mb-3"
             data-test="failed-request-details"
           >
-            <div class="mb-1 text-sm font-semibold">
+            <div class="mb-1 text-sm font-bold">
               {{ t("rum.playerEvents.failedRequestDetails") }}
             </div>
             <div>
@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template v-else-if="relatedResources.length > 0">
-              <div class="mb-1 text-sm font-semibold">
+              <div class="mb-1 text-sm font-bold">
                 {{ t("common.relatedEvents") }} ({{ relatedResources.length }})
               </div>
               <div>
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Event Type Badge -->
                   <div class="mb-0.5 flex items-center">
                     <div
-                      class="rounded-default text-2xs me-1.5 px-1 py-0.5 font-semibold uppercase"
+                      class="rounded-default text-3xs me-1.5 px-1 py-0.5 font-semibold uppercase"
                       :class="getEventTypeClass(item.type)"
                     >
                       {{ item.type }}
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Resource -->
                     <template v-if="item.type === 'resource'">
-                      <span class="text-2xs text-button-primary me-1 font-semibold">
+                      <span class="text-3xs text-button-primary me-1 font-bold">
                         {{ item.resource_method || "GET" }}
                       </span>
                       <OTruncatedText class="text-xs">
@@ -349,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Event Details Row -->
-                  <div class="text-text-secondary text-2xs flex items-center">
+                  <div class="text-text-secondary text-3xs flex items-center">
                     <OIcon name="schedule" size="xs" class="me-1" />
                     <span class="me-2">{{ formatTimestamp(item.date) }}</span>
 
@@ -414,7 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Network Tab -->
       <OTabPanel name="network" padding="sm" data-test="network-tab">
         <template v-if="networkResources.length > 0">
-          <div class="mb-2 text-sm font-semibold">
+          <div class="mb-2 text-sm font-bold">
             {{ t("common.networkRequests") }} ({{ networkResources.length }})
           </div>
           <div>
@@ -428,7 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="mb-1 flex items-center">
                 <span
-                  class="rounded-default text-2xs bg-badge-blue-soft-bg text-badge-blue-soft-text me-2 px-1.5 py-0.5 font-semibold"
+                  class="rounded-default text-3xs bg-badge-blue-soft-bg text-badge-blue-soft-text me-2 px-1.5 py-0.5 font-bold"
                 >
                   {{ resource.resource_method || "GET" }}
                 </span>
@@ -436,7 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ resource.resource_url }}
                 </span>
               </div>
-              <div class="text-2xs text-text-secondary flex items-center gap-x-3">
+              <div class="text-3xs text-text-secondary flex items-center gap-x-3">
                 <div class="flex items-center">
                   <OIcon name="access-time" size="xs" class="me-1" />
                   {{ formatDuration(resource.resource_duration / 1000000) }}
@@ -457,12 +457,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </template>
-        <OEmptyState
+        <div
           v-else
-          size="compact"
-          :title="t('common.noNetworkRequestsFound')"
+          class="text-text-muted py-8 text-center text-sm"
           data-test="network-empty-state"
-        />
+        >
+          {{ t("common.noNetworkRequestsFound") }}
+        </div>
       </OTabPanel>
 
       <!-- Console Tab -->
@@ -493,7 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
         <div
-          class="rounded-default text-2xs overflow-x-auto p-2 font-mono"
+          class="rounded-default text-3xs overflow-x-auto p-2 font-mono"
           data-test="raw-event-json"
         >
           <div>
@@ -538,7 +539,6 @@ import { sqlEquals, sqlLike } from "@/utils/query/sqlFilterBuilder";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";

@@ -276,7 +276,7 @@ describe("SecurityIntel authoring access", () => {
     const w = await mountView();
     const lock = w.find('[data-test="security-intel-access-lock"]');
     expect(lock.exists()).toBe(true);
-    expect(lock.text()).toContain("SOC analyst");
+    expect(lock.text()).toContain("SOC Analyst");
     expect(w.text()).not.toContain("Request failed with status code 403");
     expect(w.find('[data-test="security-intel-tabs"]').exists()).toBe(false);
   });

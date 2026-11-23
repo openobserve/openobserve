@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #separator>
         <div class="group flex h-full w-8 cursor-col-resize justify-center">
           <div
-            class="bg-border-default group-hover:bg-splitter-hover h-full w-px transition-colors group-hover:w-0.5"
+            class="bg-border-default group-hover:bg-splitter-hover h-full w-px transition-colors duration-300 group-hover:w-0.5"
           />
         </div>
       </template>

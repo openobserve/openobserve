@@ -144,25 +144,22 @@
           ></OSelectItem
         ></OSelect
       >
-      <OEmptyState
+      <section
         v-if="versions.isError.value || scopes.isError.value"
-        size="compact"
-        kind="error"
-        :title="t('serviceVersions.compare.error')"
+        class="flex items-center gap-2"
         data-test="svcver-identity-error"
       >
-        <template #actions>
-          <OButton
-            size="sm"
-            data-test="svcver-identity-retry"
-            @click="
-              versions.refetch();
-              scopes.refetch();
-            "
-            >{{ t("serviceVersions.actions.retry") }}</OButton
-          >
-        </template>
-      </OEmptyState>
+        <p class="text-text-body text-compact">{{ t("serviceVersions.compare.error") }}</p>
+        <OButton
+          variant="secondary"
+          data-test="svcver-identity-retry"
+          @click="
+            versions.refetch();
+            scopes.refetch();
+          "
+          >{{ t("serviceVersions.actions.retry") }}</OButton
+        >
+      </section>
       <p
         v-if="state.ambiguous"
         class="text-text-secondary text-compact"
@@ -190,19 +187,16 @@
         class="h-32 w-full"
         data-test="svcver-loading"
       />
-      <OEmptyState
+      <section
         v-if="comparison.isError.value && denied"
-        size="compact"
-        kind="denied"
-        :title="t('serviceVersions.compare.denied')"
+        class="flex flex-wrap items-center gap-2"
         data-test="svcver-denied"
       >
-        <template #actions>
-          <OButton size="sm" data-test="svcver-retry" @click="comparison.refetch()">{{
-            t("serviceVersions.actions.retry")
-          }}</OButton>
-        </template>
-      </OEmptyState>
+        <p class="text-text-body text-compact">{{ t("serviceVersions.compare.denied") }}</p>
+        <OButton variant="secondary" data-test="svcver-retry" @click="comparison.refetch()">{{
+          t("serviceVersions.actions.retry")
+        }}</OButton>
+      </section>
       <template v-else-if="comparison.isError.value"
         ><section
           v-if="stored && !result"
@@ -251,12 +245,13 @@
           ></ErrorPanel
         ></template
       >
-      <OEmptyState
+      <p
         v-if="!enabled && !state.ambiguous"
-        size="compact"
-        :title="t('serviceVersions.compare.empty')"
+        class="text-text-secondary text-compact"
         data-test="svcver-empty"
-      />
+      >
+        {{ t("serviceVersions.compare.empty") }}
+      </p>
       <template v-if="result"
         ><NoVerdictNotice
           v-if="missing"
@@ -388,19 +383,15 @@
           :result="result"
           :metric="chartMetric"
         />
-        <OEmptyState
-          v-if="sectionError"
-          size="compact"
-          kind="error"
-          :title="t('serviceVersions.compare.error')"
-          data-test="svcver-section-error"
-        >
-          <template #actions>
-            <OButton size="sm" data-test="svcver-section-retry" @click="comparison.refetch()">{{
-              t("serviceVersions.actions.retry")
-            }}</OButton>
-          </template>
-        </OEmptyState>
+        <div v-if="sectionError" class="flex items-center gap-2" data-test="svcver-section-error">
+          <p class="text-text-body text-compact">{{ t("serviceVersions.compare.error") }}</p>
+          <OButton
+            variant="secondary"
+            data-test="svcver-section-retry"
+            @click="comparison.refetch()"
+            >{{ t("serviceVersions.actions.retry") }}</OButton
+          >
+        </div>
         <section
           v-if="
             !restricted &&
@@ -460,27 +451,28 @@
             data-test="svcver-overlay-loading"
             class="h-40 w-full"
           />
-          <OEmptyState
+          <div
             v-else-if="overlay.isError.value"
-            size="compact"
-            kind="error"
-            :title="t('serviceVersions.compare.error')"
+            class="flex items-center gap-2"
             data-test="svcver-overlay-error"
           >
-            <template #actions>
-              <OButton size="sm" data-test="svcver-overlay-retry" @click="overlay.refetch()">{{
-                t("serviceVersions.actions.retry")
-              }}</OButton>
-            </template>
-          </OEmptyState>
-          <OEmptyState
+            <p class="text-text-body text-compact">{{ t("serviceVersions.compare.error") }}</p>
+            <OButton
+              variant="secondary"
+              data-test="svcver-overlay-retry"
+              @click="overlay.refetch()"
+              >{{ t("serviceVersions.actions.retry") }}</OButton
+            >
+          </div>
+          <p
             v-else-if="
               overlay.data.value && !overlay.data.value.a.length && !overlay.data.value.b.length
             "
-            size="compact"
-            :title="t('serviceVersions.compare.empty')"
+            class="text-text-secondary text-compact"
             data-test="svcver-overlay-empty"
-          />
+          >
+            {{ t("serviceVersions.compare.empty") }}
+          </p>
           <VersionOverlayChart
             v-else-if="overlay.data.value"
             :series-a="overlaySeriesA"
@@ -546,7 +538,6 @@ import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSelectItem from "@/lib/forms/Select/OSelectItem.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";

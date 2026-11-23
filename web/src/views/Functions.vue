@@ -98,11 +98,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown v-if="shouldCollapseActions" align="end">
               <template #trigger>
                 <OButton
-                  icon-only
-                  variant="ghost"
+                  variant="secondary"
                   data-test="pipeline-list-overflow-menu-btn"
-                  :label="t('common.more')"
-                  icon="more-horiz"
+                  :aria-label="t('dashboard.moreActions')"
+                  icon="menu"
                 />
               </template>
               <ODropdownItem

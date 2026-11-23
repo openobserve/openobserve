@@ -1219,7 +1219,7 @@ describe("useTraces", () => {
         expect.any(String),
         expect.any(Function),
         expect.objectContaining({
-          successMessage: "Link copied",
+          successMessage: "Link Copied Successfully!",
           timeout: 5000,
         }),
       );

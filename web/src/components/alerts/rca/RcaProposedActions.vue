@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <section data-test="rca-proposed-actions" :aria-labelledby="headingId" class="flex flex-col">
     <div class="mb-2.5 flex flex-wrap items-baseline gap-2">
-      <h3 :id="headingId" class="text-text-heading m-0 text-sm font-semibold">
+      <h3 :id="headingId" class="text-text-heading m-0 text-base font-bold">
         {{ t("alerts.incidents.rcaSummary.proposedActions") }}
       </h3>
       <span class="text-text-secondary text-xs">

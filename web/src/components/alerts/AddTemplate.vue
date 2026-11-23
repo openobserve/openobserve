@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="w-full py-3">
                 <div
-                  class="flex items-center gap-0.5 font-semibold"
+                  class="flex items-center gap-0.5 font-bold"
                   data-test="add-template-body-input-title"
                 >
                   <span>{{ t("alert_templates.body") }}</span>
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="px-1 pt-3"
               :data-test="`add-template-variable-group-${group.name}`"
             >
-              <div class="font-semibold">{{ variableGroupLabel(group.name) }}</div>
+              <div class="font-bold">{{ variableGroupLabel(group.name) }}</div>
               <div class="break-words">{{ raw(group.variables.join(", ")) }}</div>
             </div>
             <div class="px-1 py-3">
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>{{ t("alert_templates.variableTimezoneNote") }}</div>
             </div>
             <div class="px-1 pb-3">
-              <div class="text-body-1 pb-2 font-semibold">
+              <div class="text-body-1 pb-2 font-bold">
                 {{ t("alert_templates.variable_usage_examples") }}:
               </div>
               <div
@@ -360,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-template-sample-template-text"
                   class="rounded-default bg-black/[0.07] px-2"
                 >
-                  <pre class="text-2xs my-0">
+                  <pre class="text-3xs my-0">
                     {{ template.body }}
                   </pre>
                 </div>

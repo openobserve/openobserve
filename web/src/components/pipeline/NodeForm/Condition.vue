@@ -39,10 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="rounded-default stream-routing-container w-full">
         <div>
-          <div
-            class="showLabelOnTop text-h7 font-semibold"
-            data-test="add-condition-query-input-title"
-          >
+          <div class="showLabelOnTop text-h7 font-bold" data-test="add-condition-query-input-title">
             <div></div>
             <ConditionBuilder
               ref="builder"
@@ -74,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <span>
                         {{ t("pipeline.customColumnGuideline") }}
-                        <span class="highlight text-text-link font-semibold">{{
+                        <span class="highlight text-text-link font-bold">{{
                           t("pipeline.enterKey")
                         }}</span
                         >.
@@ -118,7 +115,6 @@ import { computed, onMounted, ref, type Ref, onBeforeMount, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
-import { useUnsavedChanges } from "@/lib/forms/Form/unsavedEdits";
 import { streamValuesLoader } from "@/components/filterBar/streamValues";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -216,11 +212,27 @@ const importSqlParser = async () => {
 // Held for submit() and the cancel dirty-check.
 const builder = ref<any>(null);
 
-// The rule as the user first sees it, after the builder in the drawer's portal has mounted and settled.
-const { dirty: isRuleChanged, rebase: rebaseRule } = useUnsavedChanges(
-  () => builder.value?.conditionGroup ?? null,
-  () => internalOpen.value,
+// The rule as the builder first renders it; the builder mounts in the drawer's portal, after this component.
+const originalConditionGroup = ref<any>(null);
+watch(
+  builder,
+  (mounted) => {
+    originalConditionGroup.value = JSON.parse(JSON.stringify(mounted?.conditionGroup ?? null));
+  },
+  { once: true },
 );
+// A rule that cannot be compared counts as changed, so the prompt errs on keeping the edit.
+const isRuleChanged = computed(() => {
+  if (!builder.value) return false;
+  try {
+    return (
+      JSON.stringify(originalConditionGroup.value) !==
+      JSON.stringify(builder.value.conditionGroup ?? null)
+    );
+  } catch {
+    return true;
+  }
+});
 
 const updateStreamFields = async (streamName: any, streamType: any) => {
   let streamCols: any = [];
@@ -373,7 +385,7 @@ const saveCondition = async () => {
 
     addNode(conditionData);
     // Snapshot the newly saved state for the discard-changes comparison.
-    rebaseRule();
+    originalConditionGroup.value = JSON.parse(JSON.stringify(payload.conditions));
     emit("cancel:hideform");
   } catch (error) {
     console.error("Error saving condition:", error);

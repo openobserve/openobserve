@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <LiveNoticeState
       v-else-if="live.notice.value"
       :notice="live.notice.value"
-      size="region"
+      size="page"
       :busy="live.busy.value"
       data-test="autoobserve2-activity-error"
       retry-test="autoobserve2-activity-retry"
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ stat.label }}
             </dt>
             <dd
-              class="text-text-heading text-2xl leading-none font-semibold tracking-tight tabular-nums"
+              class="text-text-heading text-3xl leading-none font-semibold tracking-tight tabular-nums"
             >
               {{ stat.value }}
             </dd>
@@ -124,14 +124,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("autoobserve.activityLive.showMore", { count: capped.more }, capped.more) }}
         </OButton>
       </div>
-      <OEmptyState
+      <p
         v-else
-        kind="filtered"
+        class="text-text-secondary py-6 text-center text-sm"
         data-test="autoobserve2-activity-filter-empty"
-        @action="filter = 'all'"
-      />
+      >
+        {{ t("autoobserve2.activityPage.empty.filter") }}
+      </p>
     </template>
-    <div v-else-if="!live.pending.value" data-test="autoobserve2-activity-empty">
+    <div
+      v-else-if="!live.pending.value"
+      class="bg-surface-base border-border-subtle rounded-surface border py-6 shadow-xs"
+      data-test="autoobserve2-activity-empty"
+    >
       <LiveSurfaceEmpty surface="changes" @action="emit('see-suggestions')" />
     </div>
   </div>
@@ -142,7 +147,6 @@ import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";

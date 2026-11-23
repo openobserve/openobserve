@@ -300,7 +300,7 @@ describe("PredefinedThemes", () => {
     it("should display custom color option", () => {
       const wrapper = createWrapper();
 
-      expect(wrapper.text()).toContain("Custom color");
+      expect(wrapper.text()).toContain("Custom Color");
     });
 
     it("should use the default theme (O2 Signature) colors as defaults", () => {
@@ -1301,12 +1301,12 @@ describe("PredefinedThemes", () => {
       expect(drawer.attributes("data-title")).toBe("Theme");
     });
 
-    it("should pass title 'Pick custom color' to inner ODialog", () => {
+    it("should pass title 'Pick Custom Color' to inner ODialog", () => {
       const wrapper = createWrapper();
 
       const dialog = wrapper.find('[data-test-stub="o-dialog"]');
       expect(dialog.exists()).toBe(true);
-      expect(dialog.attributes("data-title")).toBe("Pick custom color");
+      expect(dialog.attributes("data-title")).toBe("Pick Custom Color");
     });
 
     it("should close color picker when ODialog emits click:primary", async () => {

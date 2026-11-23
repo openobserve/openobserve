@@ -4,17 +4,14 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
-import SecurityTimeRange from "@/components/security/SecurityTimeRange.vue";
-import { useSecurityRange } from "@/composables/security/useSecurityRange";
-import type { DateTimeRangeChange } from "@/lib/forms/DateTimeRange/ODateTimeRange.types";
-import SecurityLoadError from "@/components/security/SecurityLoadError.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -60,33 +57,27 @@ const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
 const HOUR_US = 3_600_000_000;
-// The window is scored against the baseline of the nearest supported size, so any range maps to one.
-const BASELINES = [
-  { current: 0.25, baseline: 24, baselineLabel: "24h" },
-  { current: 1, baseline: 24, baselineLabel: "24h" },
-  { current: 6, baseline: 24 * 3, baselineLabel: "3d" },
-  { current: 24, baseline: 24 * 7, baselineLabel: "7d" },
-  { current: 24 * 7, baseline: 24 * 30, baselineLabel: "30d" },
-  { current: 24 * 30, baseline: 24 * 90, baselineLabel: "90d" },
+const WINDOWS = [
+  { value: "1h", current: 1, baseline: 24, baselineLabel: "24h" },
+  { value: "24h", current: 24, baseline: 24 * 7, baselineLabel: "7d" },
+  { value: "7d", current: 24 * 7, baseline: 24 * 30, baselineLabel: "30d" },
 ] as const;
+type WindowKey = (typeof WINDOWS)[number]["value"];
 
-const range = useSecurityRange(route.query);
-const windowDef = computed(() => {
-  const hours = range.windowMs.value / 3_600_000;
-  const distance = (b: { current: number }) => Math.abs(Math.log(hours / b.current));
-  const nearest = BASELINES.reduce((best, b) => (distance(b) < distance(best) ? b : best));
-  return { ...nearest, current: hours };
-});
+const win = ref<WindowKey>(
+  WINDOWS.some((w) => w.value === route.query.period) ? (route.query.period as WindowKey) : "24h",
+);
+const windowDef = computed(() => WINDOWS.find((w) => w.value === win.value)!);
 const search = ref(route.query.q ? String(route.query.q) : "");
 const toneFilters = ref<SeverityTone[]>([]);
 const pendingUser = ref<string | null>(route.query.user ? String(route.query.user) : null);
 
-const nowUs = range.endUs;
-const currentStart = range.startUs;
+const nowUs = ref(Date.now() * 1000);
+const currentStart = computed(() => nowUs.value - windowDef.value.current * HOUR_US);
 const baselineStart = computed(() => currentStart.value - windowDef.value.baseline * HOUR_US);
 
 function syncUrl() {
-  const query: Record<string, string> = { org_identifier: orgId.value, ...range.linkQuery.value };
+  const query: Record<string, string> = { org_identifier: orgId.value, period: win.value };
   if (search.value.trim()) query.q = search.value.trim();
   if (selected.value) query.user = selected.value.user;
   router.replace({ query });
@@ -188,7 +179,7 @@ async function refresh() {
   controller?.abort();
   const ctrl = new AbortController();
   controller = ctrl;
-  range.touch();
+  nowUs.value = Date.now() * 1000;
   answered.value = false;
   running.value = true;
   runFailure.value = null;
@@ -238,9 +229,10 @@ watch(orgId, () => {
 });
 watch(search, () => syncUrl());
 
-function onWindow(change: DateTimeRangeChange) {
-  if (!range.apply(change)) return;
-  analytics.track("security_time_range_changed", { view: "ueba", range: range.text.value });
+function onWindow(value: unknown) {
+  if (!value || value === win.value) return;
+  win.value = value as WindowKey;
+  analytics.track("security_time_range_changed", { view: "ueba", range: win.value });
   fullWindow.clear();
   closeDrawer();
   syncUrl();
@@ -399,16 +391,8 @@ const RISK_TEXT: Record<SeverityTone, string> = {
   unknown: "text-text-secondary",
 };
 
-// A failed load reads "—" and one error with Retry, never zero counts (R8).
-const failed = computed(() => !!(plansError.value || runError.value));
-const failedHint = computed(() => {
-  const message = String(runError.value || plansError.value || "");
-  return message && !isRawHttpText(message) ? message : t("siem.ueba.loadFailedHint");
-});
-
 const stats = computed<StatItem[]>(() => {
-  const count = (tone: SeverityTone) =>
-    failed.value ? "—" : risks.value.filter((r) => r.tone === tone).length;
+  const count = (tone: SeverityTone) => risks.value.filter((r) => r.tone === tone).length;
   const n = risks.value.length || undefined;
   return [
     {
@@ -441,7 +425,7 @@ const stats = computed<StatItem[]>(() => {
     {
       key: "all",
       label: t("common.all"),
-      value: failed.value ? "—" : risks.value.length,
+      value: risks.value.length,
       icon: "groups",
       tone: "neutral",
       dataTest: "security-ueba-stat-all",
@@ -451,7 +435,7 @@ const stats = computed<StatItem[]>(() => {
 
 const notices = computed<SecurityNotice[]>(() => {
   const baseline = windowDef.value.baselineLabel;
-  const current = range.text.value;
+  const current = t(`siem.range.${win.value}`);
   const out: SecurityNotice[] = [
     {
       key: "method",
@@ -550,11 +534,7 @@ function step(delta: number) {
 // Built from the intended query: window.location may not have caught up with router.replace.
 const shareUrl = computed(() => {
   if (!selected.value || typeof window === "undefined") return "";
-  const query = {
-    org_identifier: orgId.value,
-    ...range.linkQuery.value,
-    user: selected.value.user,
-  };
+  const query = { org_identifier: orgId.value, period: win.value, user: selected.value.user };
   return new URL(
     router.resolve({ path: route.path, query }).href,
     window.location.origin,
@@ -658,7 +638,7 @@ function openEntity() {
     query: {
       org_identifier: orgId.value,
       kind: "user",
-      ...range.linkQuery.value,
+      period: win.value,
       entity: selected.value.user,
     },
   });
@@ -666,7 +646,7 @@ function openEntity() {
 function openIp(ip: string) {
   router.push({
     path: "/security/entities",
-    query: { org_identifier: orgId.value, kind: "ip", ...range.linkQuery.value, entity: ip },
+    query: { org_identifier: orgId.value, kind: "ip", period: win.value, entity: ip },
   });
 }
 // Every source and spelling at once: a user's events rarely sit in one stream.
@@ -677,7 +657,7 @@ function openEvents() {
     path: "/security/events",
     query: {
       org_identifier: orgId.value,
-      ...range.linkQuery.value,
+      period: win.value,
       ...huntLinkQuery({ kind: "user", value: r.user, aliases: r.current.aliases }),
     },
   });
@@ -705,11 +685,25 @@ const noUserSources = computed(
   >
     <template #actions>
       <div class="flex items-center gap-2">
-        <SecurityTimeRange
-          :picker-props="range.pickerProps.value"
+        <OToggleGroup
+          :model-value="win"
           data-test="security-ueba-window"
-          @change="onWindow"
-        />
+          @update:model-value="onWindow"
+        >
+          <OToggleGroupItem
+            v-for="w in WINDOWS"
+            :key="w.value"
+            :value="w.value"
+            :tooltip="
+              t('siem.ueba.windowHint', {
+                current: t(`siem.range.${w.value}`),
+                baseline: w.baselineLabel,
+              })
+            "
+          >
+            {{ t(`siem.range.${w.value}`) }}
+          </OToggleGroupItem>
+        </OToggleGroup>
         <ORefreshButton
           :last-run-at="lastRunAt"
           :loading="loading"
@@ -721,7 +715,6 @@ const noUserSources = computed(
 
     <div class="flex min-h-0 flex-1 flex-col">
       <SecurityNotices
-        v-if="!failed"
         :notices="notices"
         class="mx-page-edge mt-2"
         data-test="security-ueba-notices"
@@ -750,13 +743,6 @@ const noUserSources = computed(
         :denials="accessDenials"
         :reason="raw(forbiddenReason(refusal))"
         data-test="security-ueba-access-lock"
-      />
-      <SecurityLoadError
-        v-else-if="failed"
-        :what="t('siem.ueba.whatUsers')"
-        :hint="failedHint"
-        data-test="security-ueba-load-error"
-        @retry="refresh"
       />
       <OEmptyState
         v-else-if="noUserSources"
@@ -803,6 +789,18 @@ const noUserSources = computed(
             data-test="security-ueba-stats"
             @update:selected-keys="toneFilters = $event as SeverityTone[]"
           />
+        </template>
+        <template #toolbar-trailing>
+          <OButton
+            icon-only
+            variant="secondary"
+            icon="refresh"
+            :loading="loading"
+            data-test="security-ueba-refresh-table"
+            @click="refresh"
+          >
+            <OTooltip side="bottom" :content="t('siem.entities.refresh')" />
+          </OButton>
         </template>
 
         <template #cell-user="{ row }">
@@ -893,7 +891,7 @@ const noUserSources = computed(
           <OEmptyState
             kind="error"
             :title="t('siem.ueba.loadError')"
-            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
+            :text="raw(message)"
             @action="refresh"
           />
         </template>
@@ -919,7 +917,7 @@ const noUserSources = computed(
       :eyebrow="t('siem.ueba.eyebrow')"
       :subtitle="
         t('siem.ueba.windowHint', {
-          current: range.text.value,
+          current: t(`siem.range.${win}`),
           baseline: windowDef.baselineLabel,
         })
       "
@@ -995,7 +993,7 @@ const noUserSources = computed(
         </OInlineNotice>
         <OEmptyState
           v-if="!selected.signals.length"
-          size="compact"
+          size="inline"
           icon="task-alt"
           :title="t('siem.ueba.noSignals')"
           :text="t('siem.ueba.noSignalsHint')"
@@ -1046,7 +1044,7 @@ const noUserSources = computed(
               },
               {
                 key: 'now',
-                label: t('siem.ueba.nowRow', { w: range.text.value }),
+                label: t('siem.ueba.nowRow', { w: t(`siem.range.${win}`) }),
                 map: selected.current.hours,
                 now: true,
               },
@@ -1071,7 +1069,7 @@ const noUserSources = computed(
               /></span>
             </div>
           </div>
-          <div class="text-text-secondary text-2xs grid grid-cols-24 gap-0.5 ps-30">
+          <div class="text-text-secondary text-3xs grid grid-cols-24 gap-0.5 ps-30">
             <span v-for="h in HOURS" :key="h" class="text-center">{{
               h % 6 === 0 ? String(h).padStart(2, "0") : ""
             }}</span>
@@ -1126,8 +1124,7 @@ const noUserSources = computed(
           </div>
           <OEmptyState
             v-if="!ipRows.length"
-            size="compact"
-            class="px-3"
+            size="inline"
             icon="lan"
             :title="t('siem.ueba.noIps')"
           />

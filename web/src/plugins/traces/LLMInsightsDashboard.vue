@@ -20,11 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        another bg-card-glass-bg would render same-bg-on-same-bg and the
        inner cards would visually disappear (no border contrast). -->
   <div class="flex h-full flex-col bg-transparent">
-    <!-- Directly under the header (K3), and only with the first view, so it never pushes the page down. -->
-    <AiNoAgentIdentityBanner v-if="showNoAgentIdentity" data-test="llm-insights" />
     <!-- Page filter: a WHERE clause over the spans, kept in the URL. -->
     <LLMInsightsSearchBar
-      v-if="availableStreams.length > 0 && firstViewReady && !compareMode && !emptyOrg"
+      v-if="availableStreams.length > 0 && scopeReady && !compareMode && !emptyOrg"
       :stream="effectiveStream"
       :applied="searchQuery"
       :start-time="startTime"
@@ -43,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          holds a picker-shaped skeleton until the agents list first lands;
          solidAgentTrigger keeps the "All Agents" empty state in solid text. -->
     <AiScopeBar
-      v-if="availableStreams.length > 0 && firstViewReady"
+      v-if="availableStreams.length > 0 && scopeReady"
       :filter-mode="filterMode"
       v-model:active-stream="activeStream"
       v-model:selected-env="selectedEnv"
@@ -140,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="!compareMode"
           icon-only
-          variant="ghost"
+          variant="secondary"
           class="ms-auto"
           :aria-label="t('aiAlertPack.open')"
           data-test="llm-insights-install-ai-alerts"
@@ -151,6 +149,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AiScopeBar>
+
+    <!-- Stream mode because these LLM spans carry no agent identity: say so and
+         link to GenAI Agent Mapping. Not over the first-run empty state, which
+         already says what is missing. -->
+    <AiNoAgentIdentityBanner
+      v-if="noAgentIdentity && scopeReady && !isEmpty"
+      data-test="llm-insights"
+    />
 
     <VersionCompareView
       v-if="genAiAgentMappingAccess.allowed && compareMode"
@@ -183,8 +189,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          Mounting them earlier meant a mode or agent flip remounted them and
          cancelled their in-flight queries. -->
       <LLMInsightsSkeleton
-        v-if="!streamsLoaded || !firstViewReady || switching"
-        :hide-toolbar="streamsLoaded && firstViewReady"
+        v-if="!streamsLoaded || !scopeReady || switching"
+        :hide-toolbar="streamsLoaded && scopeReady"
         class="px-page-edge flex-1"
       />
 
@@ -194,12 +200,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         kind="error"
         data-test="llm-insights-empty-error"
         :title="t('traces.lLMInsightsDashboard.failedToLoad')"
-        :text="error && !isRawHttpText(error) ? raw(error) : t('emptyState.loadError.description')"
+        :text="raw(error || '')"
         @action="loadInsights()"
       />
 
       <!-- Agent tab whose agents list failed to load: not "no agents". -->
-      <div v-else-if="agentsLoadFailed" class="flex min-h-0 flex-1 flex-col">
+      <div
+        v-else-if="agentsLoadFailed"
+        class="px-page-edge flex min-h-0 flex-1 items-center justify-center"
+      >
         <AiAgentsLoadError
           :error="agentsError ?? 'failed'"
           data-test="llm-insights"
@@ -207,9 +216,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <!-- One state for no LLM streams, no gen_ai_* fields and an empty window;
-         the page has no filters, so it is never `filtered`. -->
-      <div v-else-if="isEmpty" class="flex min-h-0 flex-1 flex-col" data-test="llm-insights-empty">
+      <!-- Consolidated empty state — single OEmptyState covers all three
+         "no data" shapes (no LLM streams in the org, the active stream has
+         no gen_ai_* fields, or the time window returned nothing). The page
+         doesn't expose a search/filter widget, so we never set `:filtered`.
+         Its actions open a specific integration guide: the one whose docs
+         page the user came from (first), the coding-agent setup, then all
+         integrations, with the most-read guides as chips underneath. -->
+      <div
+        v-else-if="isEmpty"
+        class="px-page-edge flex min-h-0 flex-1 items-center justify-center"
+        data-test="llm-insights-empty"
+      >
         <OEmptyState
           :title="t('emptyState.noLLMInsights.title')"
           :text="t('emptyState.noLLMInsights.description')"
@@ -221,32 +239,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #extra>
             <div
-              class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1"
+              class="flex flex-wrap items-center justify-center gap-2"
               data-test="llm-insights-empty-integrations"
             >
               <span class="text-text-secondary text-compact">
                 {{ t("emptyState.noLLMInsights.startFrom") }}
               </span>
-              <OButton
+              <EmptyStateIngestionChip
                 v-for="integration in popularIntegrations"
                 :key="integration.routeName"
-                variant="link"
-                size="sm"
                 :data-test="`o2-empty-state-action-integration-${integration.slug}`"
                 :data-empty-state-action="`integration-${integration.slug}`"
                 @click="onEmptyAction(`integration-${integration.slug}`)"
               >
+                <img
+                  v-if="integration.logo"
+                  :src="integration.logo"
+                  alt=""
+                  class="size-3.5 shrink-0 object-contain"
+                />
                 {{ integration.name }}
-              </OButton>
+              </EmptyStateIngestionChip>
             </div>
           </template>
         </OEmptyState>
       </div>
 
-      <!-- Agent tab with no agents in the window, with a way back to the Stream tab. -->
+      <!-- Agent tab with no agents in the window — its own empty state (reuses
+         the same constellation illustration) rather than bare text, with a way
+         back to the Stream tab. -->
       <div
         v-else-if="agentEmpty"
-        class="flex min-h-0 flex-1 flex-col"
+        class="px-page-edge flex min-h-0 flex-1 items-center justify-center"
         data-test="llm-insights-agent-empty"
       >
         <OEmptyState
@@ -330,12 +354,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-baseline gap-[0.2rem]" data-test="llm-insights-kpi-value">
                   <span
                     v-if="card.prefix"
-                    class="text-text-secondary text-lg leading-none font-semibold max-lg:text-base"
+                    class="text-text-secondary text-lg leading-none font-bold max-lg:text-base"
                     >{{ card.prefix }}</span
                   >
-                  <span
-                    class="text-text-secondary text-2xl leading-none font-semibold max-lg:text-lg"
-                  >
+                  <span class="text-text-secondary text-2xl leading-none font-bold max-lg:text-lg">
                     {{ card.value }}
                   </span>
                   <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
@@ -482,7 +504,6 @@ import LLMFailingToolsTable from "./LLMFailingToolsTable.vue";
 import AiAlertPackDialog from "@/components/alerts/AiAlertPackDialog.vue";
 import ReleaseWatchCard from "@/enterprise/components/AIObservability/ReleaseWatchCard.vue";
 import LLMInsightsSearchBar from "./LLMInsightsSearchBar.vue";
-import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";
 import {
   addSearchClause,
   equalsClause,
@@ -502,7 +523,8 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
+import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
+import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";
 import AiAgentsLoadError from "@/enterprise/components/AIObservability/AiAgentsLoadError.vue";
 import { readPrefill } from "@/components/login/firstSourceOptions";
 import {
@@ -649,8 +671,6 @@ const agentsLoaded = ref(false);
 // `loading`, so without this the page would show stale stream data during that
 // gap. We show the full skeleton instead so the switch feels immediate.
 const switching = ref(false);
-// Set when the first load after the scope settles has its tiles (or knows there are none).
-const firstLoadSettled = ref(false);
 
 // Filter mode: "stream" = view a whole stream; "agent" = view a single agent,
 // whose source stream + trace filter both come from the agents API.
@@ -1556,10 +1576,7 @@ async function loadInsights(
   } finally {
     // The switch is resolved (data ready, or we bailed early) — drop the switch
     // skeleton. Any in-flight KPI/panel fetch keeps its own skeleton from here.
-    if (mine === loadSeq) {
-      switching.value = false;
-      if (scopeReady.value) firstLoadSettled.value = true;
-    }
+    if (mine === loadSeq) switching.value = false;
   }
 }
 
@@ -1624,29 +1641,6 @@ watch(
     if (wasLoading && !isLoading) lastRunAt.value = Date.now();
   },
   { flush: "sync" },
-);
-
-// The first view waits for its first answers (tiles, data health, agents), so tiles, the health strip
-// and the banner are decided before they render and nothing appears and then moves or vanishes.
-const firstViewReady = ref(false);
-watch(
-  () =>
-    scopeReady.value &&
-    firstLoadSettled.value &&
-    !dataHealthLoading.value &&
-    (agentsLoaded.value ||
-      !!agentsError.value ||
-      !genAiAgentMappingAccess.allowed ||
-      !availableStreams.value.length),
-  (ready) => {
-    if (ready) firstViewReady.value = true;
-  },
-  { immediate: true },
-);
-
-// Not over the first-run empty state, which already says what is missing.
-const showNoAgentIdentity = computed(
-  () => noAgentIdentity.value && firstViewReady.value && !isEmpty.value,
 );
 
 defineExpose({

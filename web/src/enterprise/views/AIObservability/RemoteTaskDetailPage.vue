@@ -51,12 +51,16 @@
           :content="t('aiObservability.remoteTasks.statusHint.retired')"
         />
       </OButton>
-      <ORefreshButton
-        :last-run-at="loadedAt"
+      <OButton
+        icon-only
+        variant="secondary"
+        icon="refresh"
         :loading="loading"
         data-test="ai-remote-task-detail-refresh-btn"
         @click="refresh(true)"
-      />
+      >
+        <OTooltip side="bottom" :content="t('common.refresh')" />
+      </OButton>
     </template>
 
     <!-- A full-width strip under the header, like every other detail page in
@@ -334,11 +338,13 @@
         </template>
 
         <template v-else-if="currentTab === 'usedBy'">
-          <OEmptyState
+          <p
             v-if="!usedBy.length"
-            :title="t('aiObservability.remoteTasks.detail.usedByEmpty')"
+            class="text-text-secondary border-border-default rounded-default bg-surface-base m-0 border px-4 py-3 text-xs"
             data-test="ai-remote-task-detail-used-by-empty"
-          />
+          >
+            {{ t("aiObservability.remoteTasks.detail.usedByEmpty") }}
+          </p>
           <div v-else class="card-container flex min-h-0 flex-1 flex-col overflow-hidden">
             <OTable
               :data="usedBy"
@@ -385,8 +391,6 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -440,7 +444,6 @@ const entityId = computed<string>(() => String(route.params.id ?? ""));
 const task = ref<RemoteTask | null>(null);
 const versions = ref<RemoteTask[]>([]);
 const loading = ref(false);
-const loadedAt = ref<number | null>(null);
 const refCopied = ref(false);
 const currentTab = ref<"configuration" | "versions" | "usedBy" | "signing">("configuration");
 
@@ -655,7 +658,6 @@ async function refresh(force = false) {
     ]);
     task.value = head;
     versions.value = allVersions;
-    loadedAt.value = Date.now();
     void loadUsedBy(head.name, force);
   } catch (error: any) {
     toast({

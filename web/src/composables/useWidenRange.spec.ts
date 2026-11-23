@@ -29,7 +29,7 @@ describe("useWidenRange", () => {
   });
 
   it("labels rolling periods as before", () => {
-    expect(periodToLabel("15m")).toBe("Past 15 minutes");
+    expect(periodToLabel("15m")).toBe("Past 15 Minutes");
     expect(periodToLabel("absolute")).toBe("");
   });
 

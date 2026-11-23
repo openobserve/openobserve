@@ -90,7 +90,7 @@ describe("RemoteTaskFormPage — registering", () => {
     });
     await flushPromises();
     expect(errors).toEqual([]);
-    expect(wrapper.get('[data-test="ai-remote-task-form-title"]').text()).toBe("New remote task");
+    expect(wrapper.get('[data-test="ai-remote-task-form-title"]').text()).toBe("New Remote Task");
   });
 
   // Registering is two calls: POST /tasks produces an unverified draft, and only
@@ -325,7 +325,7 @@ describe("RemoteTaskFormPage — editing", () => {
     const wrapper = mountForm();
     await flushPromises();
 
-    expect(wrapper.get('[data-test="ai-remote-task-form-title"]').text()).toBe("Edit remote task");
+    expect(wrapper.get('[data-test="ai-remote-task-form-title"]').text()).toBe("Edit Remote Task");
     expect((wrapper.vm as any).form.state.values.responseSchema).toBe("$.answer");
     expect((wrapper.vm as any).form.state.values.timeoutSeconds).toBe("90");
     expect((wrapper.vm as any).draftFromVersion).toBe(3);
@@ -381,7 +381,7 @@ describe("RemoteTaskFormPage — editing", () => {
   });
 });
 
-// A button labelled "Test connection" used to register the task, publish a
+// A button labelled "Test Connection" used to register the task, publish a
 // version and navigate away. It now tests the candidate and nothing else.
 describe("RemoteTaskFormPage — test connection", () => {
   async function runTest(wrapper: any) {

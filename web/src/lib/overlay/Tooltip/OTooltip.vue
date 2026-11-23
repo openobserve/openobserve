@@ -446,17 +446,15 @@ const SIDE_OFFSET = 4;
 
 const contentClasses = computed(() => [
   "z-10100 max-w-70 px-2.5 py-1.5",
-  "bg-surface-overlay rounded-menu border border-transparent shadow-overlay",
-  "text-xs text-text-body font-medium leading-4",
+  "bg-surface-overlay rounded-menu border border-tooltip-border shadow-md",
+  "text-xs text-text-body font-medium leading-snug",
   // Force long unbreakable tokens (file paths, hashes, URLs) to wrap inside the
   // max-width box instead of overflowing onto the content behind the tooltip.
   // overflow-wrap is inherited, so nested content (e.g. pre-wrap divs) wraps too.
   "break-words",
-  "data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0",
+  "data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95",
   "data-[state=instant-open]:animate-in data-[state=instant-open]:fade-in-0",
-  "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
-  "animation-duration-(--duration-overlay-in) ease-(--ease-control)",
-  "data-[state=closed]:animation-duration-(--duration-overlay-out) data-[state=closed]:ease-(--ease-overlay-out)",
+  "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
   "data-[side=top]:slide-in-from-bottom-1",
   "data-[side=bottom]:slide-in-from-top-1",
   "data-[side=left]:slide-in-from-right-1",

@@ -157,16 +157,16 @@ describe("EditBackfillJobDialog", () => {
       expect(wrapper.find('[data-test="edit-backfill-job-dialog"]').exists()).toBe(true);
     });
 
-    it("passes title 'Edit backfill job' to ODrawer", () => {
+    it("passes title 'Edit Backfill Job' to ODrawer", () => {
       const wrapper = createWrapper();
       const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-title")).toBe("Edit backfill job");
+      expect(drawer.attributes("data-title")).toBe("Edit Backfill Job");
     });
 
-    it("passes primary button label 'Update job' to ODrawer", () => {
+    it("passes primary button label 'Update Job' to ODrawer", () => {
       const wrapper = createWrapper();
       const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-primary-label")).toBe("Update job");
+      expect(drawer.attributes("data-primary-label")).toBe("Update Job");
     });
 
     it("passes secondary button label 'Cancel' to ODrawer", () => {

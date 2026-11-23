@@ -15,46 +15,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OEmptyState
-    icon="lock"
-    :title="t('rum.analytics.retention.unlockTitle')"
-    :text="t('rum.analytics.retention.unlockDescription', { reason })"
-    data-test="rum-analytics-retention-unlock"
-  >
-    <template #actions>
-      <OButton
-        variant="secondary"
-        icon="open-in-new"
-        data-test="rum-analytics-retention-unlock-docs-link"
-        @click="openDocs"
-        >{{ t("rum.analytics.retention.docs") }}</OButton
-      >
-    </template>
-    <template #extra>
-      <div class="flex w-full max-w-xl flex-col gap-3 text-start">
-        <OCodeBlock
-          :code="snippet"
-          lang="javascript"
-          copyable
-          data-test="rum-analytics-retention-unlock-snippet"
-        />
-        <span
-          class="text-text-secondary text-xs"
-          data-test="rum-analytics-retention-unlock-unidentified"
-          >{{
-            t(
-              "rum.analytics.retention.unidentified",
-              { count: addCommasToNumber(unidentifiedSessions) },
-              unidentifiedSessions,
-            )
-          }}</span
-        >
-      </div>
-    </template>
-  </OEmptyState>
+  <OCard data-test="rum-analytics-retention-unlock">
+    <OEmptyState
+      icon="lock"
+      :title="t('rum.analytics.retention.unlockTitle')"
+      :text="t('rum.analytics.retention.unlockDescription', { reason })"
+    >
+      <template #actions>
+        <div class="flex w-full max-w-xl flex-col gap-3 text-start">
+          <OCodeBlock
+            :code="snippet"
+            lang="javascript"
+            copyable
+            data-test="rum-analytics-retention-unlock-snippet"
+          />
+          <span
+            class="text-text-secondary text-xs"
+            data-test="rum-analytics-retention-unlock-unidentified"
+            >{{
+              t(
+                "rum.analytics.retention.unidentified",
+                { count: addCommasToNumber(unidentifiedSessions) },
+                unidentifiedSessions,
+              )
+            }}</span
+          >
+          <OButton
+            variant="secondary"
+            icon="open-in-new"
+            class="self-start"
+            data-test="rum-analytics-retention-unlock-docs-link"
+            @click="openDocs"
+            >{{ t("rum.analytics.retention.docs") }}</OButton
+          >
+        </div>
+      </template>
+    </OEmptyState>
+  </OCard>
 </template>
 
 <script setup lang="ts">
+import OCard from "@/lib/core/Card/OCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

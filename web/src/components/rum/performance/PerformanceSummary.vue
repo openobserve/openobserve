@@ -31,32 +31,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- The schema read was refused, which a retry cannot change -->
-    <OEmptyState
-      v-else-if="schemaForbidden"
-      kind="denied"
-      data-test="performance-summary-schema-forbidden"
-      :title="t('rum.overviewPage.pageForbiddenTitle')"
-      :text="t('rum.overviewPage.forbiddenBody')"
-    />
+    <div v-else-if="schemaForbidden" class="p-4">
+      <OEmptyState
+        kind="denied"
+        data-test="performance-summary-schema-forbidden"
+        :title="t('rum.overviewPage.pageForbiddenTitle')"
+        :text="t('rum.overviewPage.forbiddenBody')"
+      />
+    </div>
 
     <!-- The schema read failed, so which panels apply is unknown -->
-    <OEmptyState
-      v-else-if="schemaError"
-      kind="error"
-      data-test="performance-summary-schema-error"
-      :title="t('rum.overviewPage.schemaErrorTitle')"
-      :text="t('rum.overviewPage.schemaErrorBody')"
-    >
-      <template #actions>
-        <OButton
-          variant="secondary"
-          data-test="performance-summary-schema-retry"
-          @click="retrySchema"
-        >
-          {{ t("rum.overviewPage.retry") }}
-        </OButton>
-      </template>
-    </OEmptyState>
+    <div v-else-if="schemaError" class="p-4">
+      <OEmptyState
+        kind="error"
+        data-test="performance-summary-schema-error"
+        :title="t('rum.overviewPage.schemaErrorTitle')"
+        :text="t('rum.overviewPage.schemaErrorBody')"
+      >
+        <template #actions>
+          <OButton
+            variant="secondary"
+            icon="refresh"
+            data-test="performance-summary-schema-retry"
+            @click="retrySchema"
+          >
+            {{ t("rum.overviewPage.retry") }}
+          </OButton>
+        </template>
+      </OEmptyState>
+    </div>
 
     <!-- Stream has no metrics this view can render (e.g. no recognised RUM fields) -->
     <OEmptyState

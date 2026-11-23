@@ -18,7 +18,7 @@
 // and must never be derived from translated text.
 
 import { getAICardRaw } from "@/components/ingestion/ai/content";
-import { aiCategoriesWithLogos as aiCategories } from "@/components/ingestion/ai/cardLogos";
+import { aiCategories } from "@/components/ingestion/ai/data";
 import { LANGUAGES as K8S_TRACE_LANGUAGES } from "@/components/ingestion/setupCard/content/kubernetes";
 import type { SetupCardPresets } from "@/components/ingestion/setupCard/types";
 import type { FirstSourceId } from "@/components/login/firstSourceOptions";

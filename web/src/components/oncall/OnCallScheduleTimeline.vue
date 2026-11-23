@@ -103,7 +103,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Both items add a rotation; replacing an existing one's rules lives on its lane. -->
         <ODropdown align="end">
           <template #trigger>
-            <OButton variant="secondary" icon-end="arrow-drop-down" data-test="oncall-timeline-add">
+            <OButton
+              variant="secondary"
+              icon="add"
+              icon-end="arrow-drop-down"
+              data-test="oncall-timeline-add"
+            >
               {{ t("oncall.addRotation") }}
             </OButton>
           </template>

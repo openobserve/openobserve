@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mt-2.5 rotate-90 text-xl"
             data-test="panel-editor-field-list-collapsed-icon"
           />
-          <div class="text-sm font-semibold [text-orientation:mixed] [writing-mode:vertical-rl]">
+          <div class="text-base font-bold [text-orientation:mixed] [writing-mode:vertical-rl]">
             {{ t("panel.fields") }}
           </div>
         </div>
@@ -103,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OButton
                       variant="secondary"
+                      icon="add"
                       data-test="panel-editor-mobile-fields-btn"
                       @click="mobileFieldsOpen = true"
                     >
@@ -203,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       class="border-banner-warning-border bg-banner-warning-bg rounded-default border p-[1%]"
                     >
-                      <div class="font-semibold">
+                      <div class="font-bold">
                         {{ t("panel.chartNotUpToDate") }}
                       </div>
                       <div>
@@ -545,7 +546,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mt-2.5 rotate-90 text-xl"
             data-test="panel-editor-field-list-collapsed-icon"
           />
-          <div class="text-sm font-semibold [text-orientation:mixed] [writing-mode:vertical-rl]">
+          <div class="text-base font-bold [text-orientation:mixed] [writing-mode:vertical-rl]">
             {{ t("panel.fields") }}
           </div>
         </div>
@@ -607,6 +608,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OButton
                     variant="secondary"
+                    icon="add"
                     data-test="panel-editor-mobile-fields-btn"
                     @click="mobileFieldsOpen = true"
                   >
@@ -661,7 +663,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Splitter separator -->
                     <template #separator>
                       <div
-                        class="hover:bg-table-resize-handle h-full w-1 bg-transparent transition-colors"
+                        class="hover:bg-table-resize-handle h-full w-1 bg-transparent transition-colors duration-300"
                       ></div>
                     </template>
 

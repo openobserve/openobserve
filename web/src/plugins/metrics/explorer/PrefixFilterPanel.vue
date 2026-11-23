@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OEmptyState
         v-else-if="!visibleFacets.length"
-        size="compact"
+        size="inline"
         icon="search-off"
         :title="emptyLabel"
         :data-test="`metrics-explorer-${mode}-empty`"

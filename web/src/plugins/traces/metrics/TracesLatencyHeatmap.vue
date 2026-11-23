@@ -64,29 +64,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="status === 'loading'"
         data-test="traces-latency-heatmap-loading"
       />
-      <OEmptyState
-        v-else-if="status === 'error'"
-        size="compact"
-        kind="error"
-        class="px-3"
-        :title="t('traces.latencyHeatmap.loadFailed')"
-        data-test="traces-latency-heatmap-error"
-      />
-      <OEmptyState
-        v-else-if="status === 'unavailable'"
-        size="compact"
-        icon="info-outline"
-        class="px-3"
-        :title="t('traces.latencyHeatmap.unavailable')"
-        data-test="traces-latency-heatmap-unavailable"
-      />
+      <div
+        v-else-if="status === 'error' || status === 'unavailable'"
+        class="text-status-error-text flex h-full items-center justify-center px-2 text-center text-sm"
+        :data-test="`traces-latency-heatmap-${status}`"
+      >
+        {{
+          status === "error"
+            ? t("traces.latencyHeatmap.loadFailed")
+            : t("traces.latencyHeatmap.unavailable")
+        }}
+      </div>
       <OEmptyState
         v-else-if="status === 'empty'"
-        size="compact"
+        size="inline"
         icon="bar-chart"
-        class="px-3"
         :title="t('traces.latencyHeatmap.noData')"
         data-test="traces-latency-heatmap-no-data"
+        class="h-full"
       />
       <!-- ChartRenderer escape hatch (ui-architect "Charts / graphs", fixed-grid case): empty cells kept and index → bucket box mapping, which the heatmap converter cannot do -->
       <ChartRenderer
@@ -113,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               icon-only
-              variant="ghost"
+              variant="secondary"
               size="sm"
               icon="more-horiz"
               class="pointer-events-auto absolute top-0.5 right-0.5"

@@ -498,7 +498,7 @@ function onAlertsTile() {
               />
               <OEmptyState
                 v-else
-                size="compact"
+                size="inline"
                 :text="t('emptyState.noData.description')"
                 :title="t('infra.k8s2.overviewMetricsUnavailable')"
               />
@@ -528,11 +528,11 @@ function onAlertsTile() {
           </template>
           <section
             v-else-if="!hasNodes"
-            class="bg-surface-panel border-border-default rounded-surface flex min-w-0 border p-3"
+            class="bg-surface-panel border-border-default rounded-surface flex min-w-0 items-center justify-center border p-3"
             data-test="k8s2-overview-no-nodes"
           >
             <OEmptyState
-              size="compact"
+              size="inline"
               :text="t('emptyState.noData.description')"
               :title="t('infra.k8s2.overviewNoNodes')"
             />
@@ -655,6 +655,7 @@ function onAlertsTile() {
           </template>
           <template #empty>
             <OEmptyState
+              size="inline"
               :title="t('infra.k8s2.overviewNoIssues')"
               :text="t('infra.k8s2.overviewNoIssuesDesc')"
             />

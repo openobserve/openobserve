@@ -748,7 +748,7 @@ describe("FirstDataPanel — first data arrived strip (e5)", () => {
     });
     expect(q("first-data-panel-arrived-summary").text()).toBe("1,204 records in stream default");
     const open = q("first-data-panel-arrived-open-btn");
-    expect(open.text()).toBe("Open in logs");
+    expect(open.text()).toBe("Open in Logs");
     await open.trigger("click");
     expect(wrapper.emitted("open")).toHaveLength(1);
   });

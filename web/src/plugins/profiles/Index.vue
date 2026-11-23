@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <ShareButton
         :url="shareUrl"
+        variant="secondary"
         :disabled="!hasProfileData"
         class="h-8"
         data-test="profiles-share-btn"
@@ -112,9 +113,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #subnav>
-      <OContent class="flex flex-nowrap items-center gap-2 py-2 max-lg:flex-wrap">
+      <OContent class="flex flex-nowrap items-center gap-1.5 py-1.5 max-lg:flex-wrap">
         <div
-          class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.25rem)]"
+          class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
         >
           <OSelect
             width="full"
@@ -129,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div
-          class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.25rem)]"
+          class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
         >
           <OSelect
             width="full"
@@ -143,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div
-          class="max-w-44 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.25rem)]"
+          class="max-w-44 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
         >
           <OSelect
             width="full"
@@ -174,41 +175,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="!hasProfileData && streamOptions.length ? 'flex flex-col' : ''"
     >
       <!-- Same states as the Metrics explorer: a load error with Retry, and a no-data state that links to setup. -->
-      <OEmptyState
+      <div
         v-if="errorMessage && !hasProfileData"
-        kind="error"
-        data-test="profiles-error"
-        @action="retry"
-      />
+        class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
+      >
+        <OEmptyState
+          kind="error"
+          :title="t('emptyState.loadError.title')"
+          :text="raw(errorMessage)"
+          data-test="profiles-error"
+          @action="retry"
+        />
+      </div>
 
-      <OEmptyState
+      <div
         v-else-if="streamsLoaded && !streamOptions.length"
-        :text="t('emptyState.noStreams.description')"
-        icon="link"
-        :title="t('profiles.noStreams')"
-        :action-label="t('profiles.setupIngestion')"
-        data-test="profiles-no-stream"
-        @action="openProfilesIngestion"
-      />
+        class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
+      >
+        <OEmptyState
+          :text="t('emptyState.noStreams.description')"
+          icon="link"
+          :title="t('profiles.noStreams')"
+          :action-label="t('profiles.setupIngestion')"
+          data-test="profiles-no-stream"
+          @action="openProfilesIngestion"
+        />
+      </div>
 
       <!-- As on Logs: a cancelled query with nothing on screen is not "no data". -->
-      <OEmptyState
+      <div
         v-else-if="!hasProfileData && !showSkeleton && queryCancelled"
-        kind="filtered"
-        :title="t('emptyState.searchCancelled.title')"
-        :text="t('emptyState.searchCancelled.description')"
-        :action-label="t('emptyState.searchCancelled.action')"
+        class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
         data-test="profiles-search-cancelled"
-        @action="runQuery(true)"
-      />
+      >
+        <OEmptyState
+          kind="filtered"
+          :title="t('emptyState.searchCancelled.title')"
+          :text="t('emptyState.searchCancelled.description')"
+          :action-label="t('emptyState.searchCancelled.action')"
+          @action="runQuery(true)"
+        />
+      </div>
 
-      <OEmptyState
+      <div
         v-else-if="!hasProfileData && !showSkeleton"
-        kind="filtered"
-        :title="t('emptyState.noProfiles.title')"
-        :text="t('emptyState.noProfiles.description')"
+        class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
         data-test="profiles-no-results"
-      />
+      >
+        <OEmptyState
+          kind="filtered"
+          :title="t('emptyState.noProfiles.title')"
+          :text="t('emptyState.noProfiles.description')"
+        />
+      </div>
 
       <OContent v-else class="flex flex-col gap-2.5 py-2.5 md:min-h-0 md:flex-1">
         <!-- A failed re-run keeps the last results and says so. -->

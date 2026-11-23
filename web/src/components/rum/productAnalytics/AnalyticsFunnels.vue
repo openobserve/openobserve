@@ -127,25 +127,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OInlineNotice>
 
-      <OEmptyState
-        v-if="!def.steps.length"
-        :title="t('rum.analytics.funnel.coldTitle')"
-        :text="t('rum.analytics.funnel.coldDescription')"
-        data-test="rum-analytics-funnel-cold"
-      >
-        <template #extra>
-          <FunnelQuickStarts
-            :entries="entries"
-            :entries-loading="entriesLoading"
-            :entries-failed="entriesFailed"
-            :recent="recent"
-            :events="events"
-            @start="setSteps"
-            @open="(r) => funnelDraft.startNew(r)"
-            @retry="loadEntries"
-          />
-        </template>
-      </OEmptyState>
+      <OCard v-if="!def.steps.length" data-test="rum-analytics-funnel-cold">
+        <OEmptyState
+          kind="filtered"
+          :title="t('rum.analytics.funnel.coldTitle')"
+          :text="t('rum.analytics.funnel.coldDescription')"
+        >
+          <template #actions>
+            <FunnelQuickStarts
+              :entries="entries"
+              :entries-loading="entriesLoading"
+              :entries-failed="entriesFailed"
+              :recent="recent"
+              :events="events"
+              @start="setSteps"
+              @open="(r) => funnelDraft.startNew(r)"
+              @retry="loadEntries"
+            />
+          </template>
+        </OEmptyState>
+      </OCard>
 
       <FunnelLayoutRail
         v-else
@@ -562,6 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   v-if="pa.canWidenRange.value"
                   variant="secondary"
+                  icon="schedule"
                   data-test="rum-analytics-funnel-widen-range-btn"
                   @click="widenRange"
                   >{{ t("rum.analytics.overview.widenRange") }}</OButton
@@ -662,6 +664,7 @@ import {
 } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import OCard from "@/lib/core/Card/OCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { ChipTone } from "@/lib/core/Badge/OBadge.types";

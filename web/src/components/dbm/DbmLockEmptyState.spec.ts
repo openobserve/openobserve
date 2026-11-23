@@ -69,13 +69,13 @@ describe("DbmLockEmptyState", () => {
       }
     });
 
-    it("marks each verdict with its own status", () => {
+    it("marks each verdict with its own glyph", () => {
       const wrapper = mountWith({});
-      const status = (id: string) =>
-        wrapper.find(`[data-test='dbm-lock-empty-state-check-${id}']`).attributes("data-status");
-      expect(status("reading")).toBe("ok");
-      expect(status("log")).toBe("fail");
-      expect(status("note")).toBe("note");
+      const glyph = (id: string) =>
+        wrapper.find(`[data-test='dbm-lock-empty-state-check-${id}'] span`).text().trim();
+      expect(glyph("reading")).toBe("✓");
+      expect(glyph("log")).toBe("✕");
+      expect(glyph("note")).toBe("!");
     });
 
     it("shows each check's detail — the specific fix, not a generic link", () => {

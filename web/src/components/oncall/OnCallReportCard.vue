@@ -77,7 +77,7 @@ const rendered = computed(() => (props.report?.report ? renderRcaReport(props.re
 /* Capped at the page title's own 16px: a heading ramp taller than the page title
    reads as a different application embedded in the card. */
 .report-body :deep(.rca-h1) {
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
 }
 .report-body :deep(.rca-h2) {
   font-size: var(--text-sm);

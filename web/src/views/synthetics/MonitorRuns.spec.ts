@@ -274,6 +274,11 @@ const baseStubs = {
     props: ["size", "kind", "icon", "title", "text"],
     inheritAttrs: true,
   },
+  EmptyStateActionCard: {
+    template: "<div :data-test=\"$attrs['data-test']\"><slot /></div>",
+    props: ["icon", "label", "sublabel"],
+    inheritAttrs: true,
+  },
   OTable: {
     name: "OTable",
     template: '<table data-test="monitor-runs-runs-table" />',

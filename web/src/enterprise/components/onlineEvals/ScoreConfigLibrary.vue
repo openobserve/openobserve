@@ -9,19 +9,23 @@ the Free Software Foundation, either version 3 of the License, or
   <div class="flex h-full min-h-0 flex-col p-4" data-test="score-config-library">
     <div
       v-if="isLoadingCatalog"
-      class="flex flex-1 flex-col gap-2"
+      class="flex flex-1 flex-col items-center justify-center p-8"
       data-test="score-config-library-loading"
     >
-      <OSkeleton class="h-control-md mb-2 w-full" />
-      <OSkeleton v-for="row in 6" :key="row" class="h-8 w-full" />
+      <OSpinner size="lg" />
     </div>
 
-    <OEmptyState
+    <div
       v-else-if="loadError"
-      kind="error"
+      class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
       data-test="score-config-library-error"
-      @action="loadCatalog"
-    />
+    >
+      <OIcon name="error-outline" class="mb-2 !h-[3em] !w-[3em]" />
+      <div class="text-status-error-text">{{ loadError }}</div>
+      <OButton variant="primary" class="mt-4" @click="loadCatalog">
+        {{ t("common.retry") }}
+      </OButton>
+    </div>
 
     <div v-else class="flex min-h-0 flex-1 flex-col">
       <OSearchInput
@@ -55,7 +59,7 @@ the Free Software Foundation, either version 3 of the License, or
           :data-test="`score-config-library-section-${group.dataType}`"
         >
           <div
-            class="text-text-heading mx-0 mt-0 mb-1.5 flex items-baseline gap-1.5 text-xs font-semibold tracking-[0.04em] uppercase"
+            class="text-text-heading mx-0 mt-0 mb-1.5 flex items-baseline gap-1.5 text-xs font-bold tracking-[0.04em] uppercase"
           >
             <span class="text-text-heading">{{ group.label }}</span>
             <span class="text-text-secondary font-medium">({{ group.entries.length }})</span>
@@ -98,10 +102,11 @@ the Free Software Foundation, either version 3 of the License, or
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { saveScoreConfigMutation } from "@/services/online-evals.service.queries";
 import { useMutation } from "@tanstack/vue-query";

@@ -5,7 +5,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 import { ref } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -32,8 +31,6 @@ defineProps<{
   rows: EventRow[];
   columns: OTableColumnDef<EventRow>[];
   loading: boolean;
-  /** Epoch-ms of the last finished search, shown as the refresh age. */
-  lastRunAt?: number | null;
   error: string;
   page: number;
   pageSize: number;
@@ -225,12 +222,16 @@ function fmtTs(ms: number | null): string {
     </template>
 
     <template #toolbar-trailing>
-      <ORefreshButton
-        :last-run-at="lastRunAt"
+      <OButton
+        icon-only
+        variant="secondary"
+        icon="refresh"
         :loading="loading"
         data-test="security-events-refresh"
         @click="emit('refresh')"
-      />
+      >
+        <OTooltip side="bottom" :content="t('siem.events.refresh')" />
+      </OButton>
     </template>
 
     <template #empty>

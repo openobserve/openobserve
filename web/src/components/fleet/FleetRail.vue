@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         icon-only
         class="md:hidden"
-        variant="ghost"
+        variant="secondary"
         icon="add"
         :aria-label="t('fleet.fleets.newFleet')"
         data-test="fleet-rail-mobile-add"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="min-h-0 flex-1 overflow-y-auto px-1 max-md:hidden">
       <OEmptyState
         v-if="forbidden"
-        size="compact"
+        size="inline"
         kind="denied"
         :title="t('emptyState.noAccess.title')"
         :text="t('emptyState.noAccess.description')"
@@ -70,15 +70,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OEmptyState
         v-else-if="error && !rows.length"
-        size="compact"
+        size="inline"
         kind="error"
         :title="t('emptyState.loadError.title')"
         :text="t('emptyState.loadError.description')"
         data-test="fleet-rail-error"
         @action="emit('retry')"
       />
-      <div v-else-if="loading" class="flex flex-col gap-1 py-1" data-test="fleet-rail-loading">
-        <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-7" />
+      <div v-else-if="loading" class="flex justify-center py-4" data-test="fleet-rail-loading">
+        <OSpinner size="lg" />
       </div>
       <OTabs
         v-else
@@ -191,7 +191,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useOrgId } from "@/composables/query/useOrgId";

@@ -17,9 +17,7 @@ export class MetricsPage {
         // Main metrics controls
         this.applyButton = '[data-test="metrics-explorer-run"]';
         this.datePicker = '[data-test="metrics-date-picker"]';
-        // Auto-refresh is the refresh button's menu; the button shows "Auto · 30s" while it runs.
-        this.autoRefresh = '[data-test="metrics-explorer-refresh-auto-menu"]';
-        this.autoRefreshLabel = '[data-test="metrics-explorer-refresh"]';
+        this.autoRefresh = '[data-test="metrics-auto-refresh"]';
 
         // Field list management
         this.fieldListCollapseIcon = '[data-test="metrics-field-list-collapsed-icon"]';
@@ -62,12 +60,10 @@ export class MetricsPage {
         this.dateTimeRelativeTab = page.locator('[data-test="date-time-relative-tab"]');
         // Datetime start/end input (absolute mode)
         this.dateTimeStartInput = page.locator('[data-test="datetime-start-time"]');
-        // Auto-refresh menu trigger on the refresh button
-        this.refreshIntervalButton = page.locator('[data-test="metrics-explorer-refresh-auto-menu"]');
-        // Refresh interval options, Off excluded; each item's data-test ends in its seconds
-        this.refreshIntervalOptions = page.locator(
-            '[data-test^="metrics-explorer-refresh-auto-"]:not([data-test$="-menu"]):not([data-test$="-note"]):not([data-test$="-auto-0"])'
-        );
+        // Auto-refresh button (toggles dropdown)
+        this.refreshIntervalButton = page.locator('[data-test="metrics-auto-refresh"]');
+        // Refresh interval options (data-test prefix shared with logs search bar)
+        this.refreshIntervalOptions = page.locator('[data-test^="logs-search-bar-refresh-time-"]');
         // Panel-display/axis/threshold/export controls (not implemented on metrics page).
         // Kept as data-test placeholders so spec defensive `if visible` checks resolve to false
         // without violating §2 (no .class / text= / button:has-text selectors).
@@ -152,12 +148,10 @@ export class MetricsPage {
         this.configYAxisMaxField = page.locator('[data-test="dashboard-config-y_axis_max-field"]').first();
 
         // ===== Metrics Share & Deep-Link locators =====
-        // Share and Recent searches are menu items inside the toolbar ⋯.
         this.shareButton = '[data-test="metrics-explorer-share-btn"]';
-        this.moreMenuButton = '[data-test="metrics-explorer-more-btn"]';
         this.metricsPageContainer = '[data-test="metrics-explorer-visualize"]';
         // Scoped success toast for the share-link "Link Copied" message as in dashboard-share-export
-        this.shareSuccessToast = page.locator('[data-test-variant="success"][data-test-message*="Link copied"]');
+        this.shareSuccessToast = page.locator('[data-test-variant="success"][data-test-message*="Link Copied"]');
         this.shareErrorToast = page.locator('[data-test-variant="error"][data-test-message*="Error shortening link"]');
         this.toastMessage = page.locator('[data-test="o-toast-message"]');
 
@@ -2532,58 +2526,29 @@ export class MetricsPage {
         return this.page.locator(this.shareButton);
     }
 
-    /** Opens the toolbar ⋯ unless it is already open; Share and Recent searches live there. */
-    async openMoreMenu() {
-        const trigger = this.page.locator(this.moreMenuButton);
-        await trigger.waitFor({ state: 'visible', timeout: 10000 });
-        if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
-        await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 5000 });
-    }
-
-    /** Closes ⋯ so an inspection leaves no menu over the page. */
-    async closeMoreMenu() {
-        const trigger = this.page.locator(this.moreMenuButton);
-        if ((await trigger.getAttribute('aria-expanded').catch(() => null)) === 'true') {
-            await this.page.keyboard.press('Escape');
-        }
-    }
-
-    /** Opens ⋯ and returns the Share link item. */
-    async openShareMenuItem() {
-        await this.openMoreMenu();
-        return this.page.locator(this.shareButton);
-    }
-
     /**
-     * Returns true if the share item is in ⋯ and visible.
+     * Returns true if the share button is in the DOM and visible.
      */
     async isShareButtonVisible() {
-        await this.openMoreMenu();
         const btn = this.getShareButton();
-        const visible = (await btn.count()) > 0 && (await btn.isVisible({ timeout: 2000 }).catch(() => false));
-        await this.closeMoreMenu();
-        return visible;
+        if (await btn.count() === 0) return false;
+        return await btn.isVisible({ timeout: 2000 }).catch(() => false);
     }
 
     /**
-     * Returns true if the share item is enabled (not disabled).
+     * Returns true if the share button is enabled (not disabled).
      */
     async isShareButtonEnabled() {
-        await this.openMoreMenu();
         const btn = this.getShareButton();
-        const enabled = (await btn.count()) > 0 && (await btn.isEnabled({ timeout: 2000 }).catch(() => false));
-        await this.closeMoreMenu();
-        return enabled;
+        if (await btn.count() === 0) return false;
+        return await btn.isEnabled({ timeout: 2000 }).catch(() => false);
     }
 
     /**
-     * Returns true if the share item is present in ⋯ regardless of visibility.
+     * Returns true if the share button element is present in DOM regardless of visibility.
      */
     async isShareButtonInDom() {
-        await this.openMoreMenu();
-        const count = await this.page.locator(this.shareButton).count();
-        await this.closeMoreMenu();
-        return count > 0;
+        return await this.page.locator(this.shareButton).count() > 0;
     }
 
     /**
@@ -2598,8 +2563,12 @@ export class MetricsPage {
      * Returns false if button is not visible or is disabled.
      */
     async clickShareButton() {
-        if (!(await this.isShareButtonEnabled())) return false;
-        await (await this.openShareMenuItem()).click();
+        const btn = this.getShareButton();
+        const cnt = await btn.count();
+        if (cnt === 0) return false;
+        const enabled = await this.isShareButtonEnabled();
+        if (!enabled) return false;
+        await btn.click();
         return true;
     }
 
@@ -2802,7 +2771,7 @@ export class MetricsPage {
      * Returns the auto-refresh button's currently displayed label text.
      */
     async getAutoRefreshLabelText() {
-        const btn = this.page.locator(this.autoRefreshLabel);
+        const btn = this.page.locator(this.autoRefresh);
         if (await btn.count() === 0) return null;
         return (await btn.textContent()) || '';
     }
@@ -2812,16 +2781,12 @@ export class MetricsPage {
      * @returns {Promise<boolean>}
      */
     async isShareButtonDisabled() {
-        await this.openMoreMenu();
         const btn = this.getShareButton();
-        let disabled = false;
-        if ((await btn.count()) > 0) {
-            disabled =
-                (await btn.getAttribute('disabled').catch(() => null)) !== null ||
-                (await btn.getAttribute('aria-disabled').catch(() => null)) === 'true';
-        }
-        await this.closeMoreMenu();
-        return disabled;
+        if (await btn.count() === 0) return false;
+        const disabled = await btn.getAttribute('disabled').catch(() => null);
+        if (disabled !== null) return true;
+        const ariaDisabled = await btn.getAttribute('aria-disabled').catch(() => null);
+        return ariaDisabled === 'true';
     }
 
     /**
@@ -2839,7 +2804,6 @@ export class MetricsPage {
 
 
     async openQueryHistory() {
-        await this.openMoreMenu();
         await this.historyButton.click();
         await this.historyDrawer.waitFor({ state: 'visible', timeout: 15000 });
     }

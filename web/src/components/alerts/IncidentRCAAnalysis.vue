@@ -39,20 +39,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @retry="$emit('trigger-rca', { buildOnPrevious: false })"
       @open-analysis="$emit('open-analysis')"
     />
-    <OEmptyState
+    <section
       v-else
-      icon="auto-awesome"
-      :title="t('alerts.incidents.rcaRun.noAnalysisTitle')"
-      :text="t('alerts.incidents.rcaRun.noAnalysisText')"
       data-test="rca-trigger-section"
+      class="rounded-default border-border-default bg-surface-base flex max-w-215 flex-col items-start gap-2 border p-6"
     >
-      <template #actions>
+      <h2 class="text-text-heading m-0 text-base font-bold">
+        {{ t("alerts.incidents.rcaRun.noAnalysisTitle") }}
+      </h2>
+      <p class="text-text-body text-compact m-0">
+        {{ t("alerts.incidents.rcaRun.noAnalysisText") }}
+      </p>
+      <div class="flex flex-wrap items-center gap-2">
         <OTooltip :content="startLockedReason" :disabled="canStart" side="right">
           <span class="inline-flex">
             <OButton
               data-test="trigger-rca-btn"
               variant="primary"
-              :icon="canStart ? undefined : 'lock'"
+              :icon="canStart ? 'auto-awesome' : 'lock'"
               :disabled="!canStart"
               :loading="triggering"
               @click="$emit('trigger-rca', { buildOnPrevious: false })"
@@ -61,13 +65,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </span>
         </OTooltip>
-      </template>
-      <template v-if="analyzeCreditCost && canStart" #extra>
-        <span data-test="rca-credit-cost" class="text-text-secondary text-xs">
+        <span
+          v-if="analyzeCreditCost && canStart"
+          data-test="rca-credit-cost"
+          class="text-text-secondary text-xs"
+        >
           {{ t("alerts.incidents.rcaCreditCost", { cost: analyzeCreditCost }, analyzeCreditCost) }}
         </span>
-      </template>
-    </OEmptyState>
+      </div>
+    </section>
   </div>
 
   <div
@@ -135,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : t("alerts.incidents.rcaRun.state.investigating")
         }}
       </RcaPill>
-      <h2 class="text-text-heading m-0 text-sm font-semibold">
+      <h2 class="text-text-heading m-0 text-base font-bold">
         {{
           cardState === "investigating"
             ? t("alerts.incidents.rcaRun.reportAfterRun")
@@ -397,7 +403,6 @@ import { computed, nextTick, onUnmounted, ref, toRef, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

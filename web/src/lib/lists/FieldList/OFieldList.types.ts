@@ -16,8 +16,6 @@ export interface OFieldListProps {
   fields: FieldItem[];
   search?: string;
   searchPlaceholder?: I18nText;
-  /** Off where the page sends "/" to its own query, so the search shows no key hint it would not answer. */
-  searchShortcut?: boolean;
   loading?: boolean;
   currentPage?: number;
   pageSize?: number;

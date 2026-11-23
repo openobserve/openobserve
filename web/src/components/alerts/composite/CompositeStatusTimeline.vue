@@ -5,7 +5,6 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import alertsService from "@/services/alerts";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -30,7 +29,6 @@ const WINDOWS = [
 const timeRange = ref("4h");
 const data = ref<CompositeTimelineResponse | null>(null);
 const loading = ref(false);
-const failed = ref(false);
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
 const lanes = computed<CompositeTimelineLane[]>(() => {
@@ -50,7 +48,6 @@ const LEVEL_BG: Record<string, string> = {
 const fetch = async (): Promise<void> => {
   if (!orgId.value || !props.alertId) return;
   loading.value = true;
-  failed.value = false;
   const micros = WINDOWS.find((w) => w.value === timeRange.value)?.micros ?? WINDOWS[1].micros;
   const to = Date.now() * 1000;
   const from = to - micros;
@@ -59,7 +56,6 @@ const fetch = async (): Promise<void> => {
     data.value = response.data;
   } catch {
     data.value = null;
-    failed.value = true;
   } finally {
     loading.value = false;
   }
@@ -133,7 +129,7 @@ onMounted(fetch);
         <div class="flex min-w-0 items-center gap-2">
           <span
             v-if="!isResult(lane)"
-            class="bg-theme-accent-soft text-theme-accent rounded-default flex h-6 w-6 shrink-0 items-center justify-center text-xs font-semibold"
+            class="bg-theme-accent-soft text-theme-accent rounded-default flex h-6 w-6 shrink-0 items-center justify-center text-xs font-bold"
           >
             {{ raw(letterFor(lane.slot ?? index)) }}
           </span>
@@ -162,20 +158,13 @@ onMounted(fetch);
       </template>
     </div>
 
-    <OEmptyState
-      v-else-if="failed"
-      size="compact"
-      kind="error"
-      data-test="alerts-composite-timeline-error"
-      @action="fetch"
-    />
-    <OEmptyState
+    <div
       v-else
-      size="compact"
-      icon="timeline"
-      :title="t('alerts.composite.timelineEmpty')"
+      class="text-text-secondary py-6 text-center text-sm"
       data-test="alerts-composite-timeline-empty"
-    />
+    >
+      {{ t("alerts.composite.timelineEmpty") }}
+    </div>
 
     <div class="text-text-secondary flex flex-wrap gap-x-4 gap-y-1 text-xs">
       <span class="flex items-center gap-1.5">

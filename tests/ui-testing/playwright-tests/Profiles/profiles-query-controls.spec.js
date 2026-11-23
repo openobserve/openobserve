@@ -139,7 +139,7 @@ test.describe('Profiles query controls', () => {
     await pm.profilesPage.clickAutoRunToggle();
     expect(await pm.profilesPage.autoRunStorageValue()).toBe('false');
     await pm.profilesPage.openRunOptions();
-    await pm.profilesPage.expectAutoRunToggleText('Turn on auto run');
+    await pm.profilesPage.expectAutoRunToggleText('Turn on Auto Run');
     await pm.profilesPage.pressEscape();
     const offCalls = pm.profilesPage.trackRequests();
     await pm.profilesPage.selectService('checkout');

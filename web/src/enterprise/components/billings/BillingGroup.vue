@@ -16,9 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex h-full flex-col overflow-hidden px-6 pt-4" data-test="organization-group-page">
-    <div v-if="loading" class="flex flex-col gap-5" data-test="org-group-loading">
-      <OSkeleton preset="statStrip" :count="3" />
-      <OSkeleton preset="tableRows" />
+    <div v-if="loading" class="flex justify-center py-10">
+      <OSpinner size="lg" />
     </div>
 
     <template v-else>
@@ -92,11 +91,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #empty>
-              <OEmptyState
-                :kind="memberSearch ? 'filtered' : 'first-run'"
-                :title="memberSearch ? undefined : t('billing.billingGroup.noMembers')"
-                @action="memberSearch = ''"
-              />
+              <div class="py-4 text-center">
+                {{ t("billing.billingGroup.noMembers") }}
+              </div>
             </template>
             <template #cell-status="{ row }">
               <OTag type="billingGroupMemberStatus" :value="row.status" />
@@ -165,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="verified" size="xs" />
               {{ t("billing.billingGroup.statusActive") }}
             </div>
-            <div class="mb-4 text-2xl leading-[1.2] font-semibold tracking-[-0.0375rem]">
+            <div class="mb-4 text-4xl leading-[1.2] font-bold tracking-[-0.0375rem]">
               {{ t("billing.billingGroup.childHeadline") }}
               <span
                 class="text-tabs-active-text inline-block max-w-full cursor-pointer overflow-hidden align-bottom text-ellipsis whitespace-nowrap"
@@ -183,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
               </span>
             </div>
-            <div class="mb-8 max-w-105 text-sm leading-[1.7] opacity-70">
+            <div class="mb-8 max-w-105 text-base leading-[1.7] opacity-70">
               {{ t("billing.billingGroup.childHeroSub") }}
             </div>
             <div class="flex flex-wrap items-center gap-3">
@@ -223,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mb-1 text-xs font-semibold opacity-60">
                   {{ t("billing.billingGroup.invitedBy") }}
                 </div>
-                <OTruncatedText as="div" class="text-sm font-semibold">
+                <OTruncatedText as="div" class="text-base font-semibold">
                   {{ membership?.created_by }}
                 </OTruncatedText>
               </div>
@@ -240,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mb-1 text-xs font-semibold opacity-60">
                   {{ t("billing.billingGroup.acceptedBy") }}
                 </div>
-                <OTruncatedText as="div" class="text-sm font-semibold">
+                <OTruncatedText as="div" class="text-base font-semibold">
                   {{ membership?.accepted_by || t("billing.billingGroup.addedOnCreation") }}
                 </OTruncatedText>
               </div>
@@ -257,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mb-1 text-xs font-semibold opacity-60">
                   {{ t("billing.billingGroup.memberSince") }}
                 </div>
-                <div class="text-sm font-semibold">
+                <div class="text-base font-semibold">
                   {{ formatDate(membership?.created_at) }}
                 </div>
               </div>
@@ -366,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="mb-2.5 text-xl font-semibold tracking-[-0.0125rem]">
+          <div class="mb-2.5 text-xl font-bold tracking-[-0.0125rem]">
             {{
               allowedForBillingGroup
                 ? t("billing.billingGroup.emptyTitle")
@@ -501,8 +498,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -555,8 +551,7 @@ export default defineComponent({
     OIcon,
     OForm,
     OFormInput,
-    OSkeleton,
-    OEmptyState,
+    OSpinner,
     OTable,
     OSearchInput,
     OUserCell,

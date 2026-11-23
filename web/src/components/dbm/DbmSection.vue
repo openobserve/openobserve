@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  DbmSection — a page section: a 14 px heading row over its content, no box (R4).
+  DbmSection — the bordered card and its heading row.
 
   The query detail page stacks six of these, and every one of them hand-wrote
   the same section shell plus the same `<h3>`. What genuinely differed was the
@@ -33,9 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   the trend charts, the summary — reads as one family of panels.
 -->
 <template>
-  <section class="flex flex-col gap-2">
+  <section
+    class="bg-card-glass-bg border-border-default rounded-default flex flex-col overflow-hidden border"
+  >
     <div :class="headerClass">
-      <h3 class="text-text-heading text-sm font-semibold">{{ title }}</h3>
+      <h3 class="text-compact text-text-heading font-medium">{{ title }}</h3>
       <slot name="hint" />
       <slot name="actions" />
     </div>
@@ -55,7 +57,7 @@ const props = withDefaults(
      * How the heading row lays its children out. Three real variants, not a
      * free-form class: `baseline` sits the trailing note on the heading's
      * baseline, `center` centres a row that carries a control, `between`
-     * pushes a single trailing note to the section's far edge.
+     * pushes a single trailing note to the card's far edge.
      */
     headerAlign?: "baseline" | "center" | "between";
   }>(),
@@ -65,9 +67,9 @@ const props = withDefaults(
 const headerClass = computed(
   () =>
     ({
-      baseline: "flex min-h-control-md flex-wrap items-baseline gap-2",
-      center: "flex min-h-control-md flex-wrap items-center gap-2",
-      between: "flex min-h-control-md items-center justify-between gap-2",
+      baseline: "border-border-default flex flex-wrap items-baseline gap-2 border-b px-3 py-2",
+      center: "border-border-default flex flex-wrap items-center gap-2 border-b px-3 py-2",
+      between: "border-border-default flex items-center justify-between gap-2 border-b px-3 py-2",
     })[props.headerAlign],
 );
 </script>

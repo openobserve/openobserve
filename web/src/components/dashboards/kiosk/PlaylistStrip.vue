@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="flex shrink-0 items-center gap-1.5" data-test="dashboard-playlist-controls">
         <OButton
           icon-only
-          variant="ghost"
+          variant="secondary"
           icon="navigate-before"
           :aria-label="t('dashboard.playlist.previous')"
           data-test="dashboard-playlist-prev"
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           icon-only
-          variant="ghost"
+          variant="secondary"
           :icon="paused ? 'play-arrow' : 'pause'"
           :aria-label="paused ? t('dashboard.playlist.resume') : t('dashboard.playlist.pause')"
           data-test="dashboard-playlist-pause"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           icon-only
-          variant="ghost"
+          variant="secondary"
           icon="navigate-next"
           :aria-label="t('dashboard.playlist.next')"
           data-test="dashboard-playlist-next"
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <OButton
         icon-only
-        variant="ghost"
+        variant="secondary"
         icon="close"
         :aria-label="t('dashboard.playlist.exit')"
         data-test="dashboard-playlist-exit"

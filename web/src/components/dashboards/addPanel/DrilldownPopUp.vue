@@ -172,6 +172,7 @@
                 variant="primary"
                 @click="addVariableRow"
                 data-test="dashboard-drilldown-add-variable"
+                icon="add"
               >
                 {{ t("common.add") }}
               </OButton>

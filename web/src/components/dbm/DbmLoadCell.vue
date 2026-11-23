@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              divide the engine's own total by a traced subtotal, a ratio of two
              different populations that routinely exceeds 100%. So it is
              withheld, and the qualifier takes its place. -->
-        <span v-if="showsShare" class="text-text-secondary text-2xs font-mono tabular-nums">
+        <span v-if="showsShare" class="text-text-secondary text-3xs font-mono tabular-nums">
           {{ formatPercent(share, 0) }}
         </span>
       </span>
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DbmAppSourceMarker v-if="fromApp" />
         <span
           v-else-if="qualifier"
-          class="text-text-secondary text-2xs"
+          class="text-text-secondary text-3xs"
           data-test="dbm-overlap-qualifier"
         >
           <OTooltip v-if="qualifierTitle" :content="qualifierTitle" />

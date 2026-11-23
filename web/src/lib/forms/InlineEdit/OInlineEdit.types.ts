@@ -11,7 +11,7 @@ import type { TemplateDelimiter, TemplateSuggestion } from "../TemplateInput/OTe
 /**
  * Text scale of the edited value. The control is a TITLE affordance, so the
  * sizes map to the title end of the type scale — pick the one that matches the
- * heading it replaces (`lg` matches OPageHeader's <h1>).
+ * heading it replaces (`md` matches OPageHeader's <h1>).
  */
 export type InlineEditSize = "sm" | "md" | "lg";
 
@@ -38,8 +38,6 @@ export interface InlineEditProps {
   tone?: InlineEditTone;
   maxlength?: number;
   disabled?: boolean;
-  /** Draws a bordered, full-width field at control height, for a form body rather than a header. */
-  field?: boolean;
   /** Renders the value as plain text with no edit affordance at all. */
   readonly?: boolean;
   /** Invalid state — red border while editing, red value in display mode. */

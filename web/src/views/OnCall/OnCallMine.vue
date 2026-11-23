@@ -99,21 +99,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OEmptyState
             v-if="loadError !== null"
-            size="compact"
-            class="px-4"
+            size="inline"
             kind="error"
             :title="t('oncall.mineTeamsLoadFailed')"
-            :text="
-              isRawHttpText(loadError) ? t('emptyState.loadError.description') : raw(loadError)
-            "
+            :text="raw(loadError)"
             data-test="oncall-mine-teams-error"
             @action="refreshPage"
           />
 
           <OEmptyState
             v-else-if="loaded && !shiftRows.length"
-            size="compact"
-            class="px-4"
+            size="inline"
             icon="group"
             :title="t('oncall.mineNoTeams')"
             :action-label="t('oncall.mineOpenTeams')"
@@ -497,7 +493,6 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";

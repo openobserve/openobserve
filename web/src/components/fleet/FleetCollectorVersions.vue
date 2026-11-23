@@ -22,17 +22,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         v-if="summaryLoading"
-        class="flex flex-col gap-3"
+        class="flex justify-center py-4"
         data-test="fleet-collector-versions-distribution-loading"
       >
-        <OSkeleton v-for="n in 3" :key="n" shape="block" class="h-4" />
+        <OSpinner size="lg" />
       </div>
       <div
         v-else-if="summaryError && !summary"
         data-test="fleet-collector-versions-distribution-error"
       >
         <OEmptyState
-          size="compact"
+          size="inline"
           kind="error"
           :title="t('emptyState.loadError.title')"
           :text="t('emptyState.loadError.description')"
@@ -117,7 +117,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import FleetVersionBars from "./FleetVersionBars.vue";
 import {

@@ -250,8 +250,8 @@ describe("SetupCardRenderer — key-as-data copy", () => {
     expect(text).toContain("Configure the OpenTelemetry Collector");
     // inlineMd turns the `config.yaml` backticks into <code>, so match the prose.
     expect(text).toContain("set the host/port below");
-    expect(text).toContain("JMX host");
-    expect(text).toContain("JMX port");
+    expect(text).toContain("JMX Host");
+    expect(text).toContain("JMX Port");
     expect(text).not.toContain("ingestion.setupCard.");
   });
 });
@@ -264,7 +264,7 @@ describe("SetupCardRenderer — uninstall section", () => {
     extras: {
       ...CONTENT.extras,
       uninstall: {
-        label: "Uninstall the agent",
+        label: "Uninstall the Agent",
         description: "Removes it.",
         code: { lang: "bash", raw: "sudo ./uninstall.sh" },
       },
@@ -279,7 +279,7 @@ describe("SetupCardRenderer — uninstall section", () => {
     wrapper = mountCard(withUninstall());
     const acc = wrapper.find('[data-test="ai-uninstall-accordion"]');
     expect(acc.exists()).toBe(true);
-    expect(acc.text()).toContain("Uninstall the agent");
+    expect(acc.text()).toContain("Uninstall the Agent");
     expect(acc.classes()).toContain("acc-item");
     // Collapsed → the destructive command is not sitting open on the page.
     expect(wrapper.find('[data-test="ai-uninstall-code"]').exists()).toBe(false);
@@ -304,7 +304,7 @@ describe("SetupCardRenderer — uninstall section", () => {
       ...CONTENT,
       extras: {
         uninstall: {
-          label: "Uninstall the agent",
+          label: "Uninstall the Agent",
           code: { lang: "bash", raw: "sudo ./uninstall.sh" },
         },
       },
@@ -1306,7 +1306,7 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
 
   it("keeps the verify step, with its data check, as Check Your Data", () => {
     mountOnboarding({ traces: "off", languages: [] });
-    expect(titles()).toContain("Check your data");
+    expect(titles()).toContain("Check Your Data");
     expect(wrapper.text()).not.toContain("Verify data in OpenObserve");
     expect(find("ai-step-verify").text()).toContain("Give the collector a few seconds to start");
     expect(find("ai-step-verify").findComponent(FirstEventStatusStub).exists()).toBe(true);
@@ -1317,7 +1317,7 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
     expect(titles()).toEqual([
       "Quick install (recommended)",
       "See which workloads talk to each other: eBPF network flows",
-      "Check your data",
+      "Check Your Data",
     ]);
     expect(find("ai-step-instrument").exists()).toBe(false);
   });
@@ -1328,7 +1328,7 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
       "Quick install (recommended)",
       "Trace your apps",
       "See which workloads talk to each other: eBPF network flows",
-      "Check your data",
+      "Check Your Data",
     ]);
     expect(find("ai-step-fold-instrument").exists()).toBe(false);
     expect(find("ai-step-instrument").find('[data-test="ai-variant-tabs"]').exists()).toBe(false);
@@ -1347,7 +1347,7 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
       "Quick install (recommended)",
       "Trace your apps",
       "See which workloads talk to each other: eBPF network flows",
-      "Check your data",
+      "Check Your Data",
     ]);
     expect(find("ai-step-instrument").find('[data-test="ai-variant-tabs"]').exists()).toBe(false);
     expect(find("ai-step-instrument").find('[data-test^="ai-input-"]').exists()).toBe(false);
@@ -1375,7 +1375,7 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
       "Quick install (recommended)",
       "Trace your applications: language libraries or eBPF",
       "See which workloads talk to each other: eBPF network flows",
-      "Check your data",
+      "Check Your Data",
     ]);
     expect(find("ai-step-fold-instrument").exists()).toBe(true);
     expect(find("ai-step-fold-network").exists()).toBe(true);
@@ -1487,7 +1487,7 @@ describe("SetupCardRenderer — steps host", () => {
       "Quick install (recommended)",
       "Trace your applications: language libraries or eBPF",
       "See which workloads talk to each other: eBPF network flows",
-      "Check your data",
+      "Check Your Data",
     ]);
   });
 });

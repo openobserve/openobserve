@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <LiveNoticeState
         v-else-if="notice"
         :notice="notice"
-        size="compact"
+        size="inline"
         :detail="state.detail"
         :busy="state.busy"
         :data-test="NOTICE_TEST[notice.failure]"
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OEmptyState
         v-else-if="settled && !rows.length && waiting"
-        size="compact"
+        size="inline"
         icon="hourglass-empty"
         :title="waiting.title"
         :text="waiting.desc"
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OEmptyState
         v-else-if="settled && !rows.length && !paging"
-        size="compact"
+        size="inline"
         icon="toggle-off"
         :title="copy.offTitle"
         :text="copy.offDesc"
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OEmptyState
         v-else-if="settled && !rows.length"
-        size="compact"
+        size="inline"
         icon="task-alt"
         :title="copy.emptyTitle"
         :text="copy.emptyDesc"

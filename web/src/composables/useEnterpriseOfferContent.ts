@@ -19,7 +19,7 @@ import { useRouter } from "vue-router";
 import { useTheme } from "@/composables/useTheme";
 import { licenseQuery } from "@/services/license_server.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { effectiveLimitGb } from "@/utils/featureGate";
@@ -283,8 +283,8 @@ export function useEnterpriseOfferContent(options?: { onBeforeNavigateAway?: () 
 
   // Enterprise features list - all 21 features
   const enterpriseFeatures: {
-    name: I18nText;
-    note: I18nText;
+    name: string;
+    note: string;
     icon: string;
     link?: string;
     requiresHA?: boolean;

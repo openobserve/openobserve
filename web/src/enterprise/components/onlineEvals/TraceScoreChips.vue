@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OIcon name="task-alt" size="xs" class="text-status-success-text" />
         <span
-          class="text-text-heading text-xs font-semibold"
+          class="text-text-heading text-xs font-bold"
           data-test="trace-score-chips-overflow-title"
         >
           {{ t("onlineEvals.traceScoreChip.allScores", { count: chips.length }) }}

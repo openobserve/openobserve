@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="nav-menu-item-avatar flex w-full flex-col items-center gap-0.5 max-md:flex-row max-md:items-center max-md:gap-3 max-md:px-1"
       >
         <div
-          class="icon-wrapper rounded-default relative inline-flex items-center justify-center p-0.5 transition-colors"
+          class="icon-wrapper rounded-default relative inline-flex items-center justify-center p-0.5 transition-colors duration-250"
           :class="iconClass"
         >
           <!-- Rail icons are a hair smaller than the md (24px) default. -->
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div
             v-if="badge && badge > 0"
-            class="menu-badge text-2xs text-text-inverse shadow-error-500/50 border-menu-badge-ring bg-gradient-notification absolute -top-1 -right-2 z-1 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full border-2 px-1 leading-none font-semibold shadow-md [animation-iteration-count:3]"
+            class="menu-badge text-3xs text-text-inverse shadow-error-500/50 border-menu-badge-ring bg-gradient-notification absolute -top-1 -right-2 z-1 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full border-2 px-1 leading-none font-bold shadow-md [animation-iteration-count:3]"
             aria-live="polite"
             :aria-label="t('common.notificationsCount', { count: badge })"
           >
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           ref="labelRef"
-          class="nav-menu-item-label line-clamp-2 w-full text-center text-xs leading-tight tracking-normal break-normal wrap-normal text-ellipsis [hyphens:none] transition-colors max-md:text-start max-md:text-sm max-md:leading-snug"
+          class="nav-menu-item-label line-clamp-2 w-full text-center text-xs leading-tight tracking-normal break-normal wrap-normal text-ellipsis [hyphens:none] transition-colors duration-250 max-md:text-start max-md:text-sm max-md:leading-snug"
           :class="labelClass"
         >
           {{ title }}
@@ -395,7 +395,7 @@ export default defineComponent({
 
     const rootClass = computed(() => [
       "nav-menu-item",
-      "group relative block [text-decoration:none]! text-inherit shrink-0 mx-1 px-0 py-1 min-h-0 rounded-surface transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-surface-chrome-deeper",
+      "group relative block [text-decoration:none]! text-inherit shrink-0 mx-1 px-0 py-1 min-h-0 rounded-surface transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-surface-chrome-deeper",
       // Drawer rows are tap targets, so they clear the 44px touch-target minimum.
       "max-md:flex max-md:min-h-11 max-md:items-center max-md:px-2 max-md:py-2",
       // Sit above the rail's sliding pill so icon/label stay readable.

@@ -11,11 +11,7 @@
     "bannerMessage": "Diese Funktion ist gesperrt. Sie setzt die Funktion {feature} in Ihrer Lizenz voraus.",
     "bannerMessageGeneric": "Diese Seite benötigt eine Funktion, die nicht in Ihrer Lizenz enthalten ist.",
     "headerLocked": "Gesperrt: {feature} erforderlich",
-    "availableInEnterprise": "In OpenObserve Enterprise verfügbar: {feature}",
-    "turnedOffTitle": "Für diese Organisation deaktiviert",
-    "enterpriseTitle": "In Enterprise verfügbar",
-    "readDocs": "Dokumentation lesen",
-    "rbacOff": "RBAC ist für diese Organisation deaktiviert. Ein Administrator aktiviert es, indem er {env} in der Serverkonfiguration auf true setzt."
+    "availableInEnterprise": "In OpenObserve Enterprise verfügbar: {feature}"
   },
   "emptyState": {
     "illustrations": {
@@ -84,6 +80,10 @@
       "title": "Keine Muster gefunden",
       "description": "Versuchen Sie, den Zeitbereich zu vergrößern oder einen anderen Stream mit mehr Logdaten auszuwählen. Die Musterextraktion funktioniert am besten mit mindestens 1.000 Logs.",
       "logsAnalyzed": "Nur {count} Logs wurden analysiert."
+    },
+    "noStreamSelected": {
+      "title": "Wählen Sie einen Stream aus, um loszulegen",
+      "description": "Wählen Sie einen Stream aus und führen Sie dann Ihre Abfrage aus, um seine Daten zu untersuchen. Verfeinern Sie die Ergebnisse mit Filtern und einem benutzerdefinierten Zeitraum."
     },
     "noQueryApplied": {
       "title": "Führen Sie eine Abfrage aus, um Ergebnisse anzuzeigen",
@@ -330,6 +330,7 @@
     "noStreams": {
       "title": "Verbinden Sie eine Quelle, um Ihren ersten Stream zu erstellen",
       "description": "Streams werden automatisch erstellt, sobald Daten eintreffen. Richten Sie die Aufnahme von Ihrer App, Ihrem Agenten oder Collector ein, um loszulegen.",
+      "action": "Einnahme einrichten",
       "actionDesc": "Eine Datenquelle verbinden",
       "createAction": "Neuer Stream",
       "createActionDesc": "Manuelles Definieren eines Stream-Schemas"
@@ -392,10 +393,6 @@
       "description": "Wir konnten diese Daten nicht laden. Es ist normalerweise vorübergehend — versuchen Sie es gleich noch einmal.",
       "action": "Erneut versuchen",
       "actionDesc": "Versuchen Sie erneut, die Daten zu laden"
-    },
-    "pageError": {
-      "title": "Diese Seite konnte nicht geladen werden",
-      "description": "Keine Daten dieser Seite wurden geladen. Versuchen Sie es jetzt erneut oder in einer Minute noch einmal."
     },
     "noData": {
       "title": "Hier ist noch nichts",
@@ -473,9 +470,7 @@
       "description": "Kein {noun} entspricht Ihren aktuellen Filtern oder Ihrer Suche. Versuchen Sie, sie anzupassen oder zu löschen.",
       "action": "Filter löschen",
       "actionDesc": "Alle Filter zurücksetzen und suchen",
-      "fallbackNoun": "Ergebnisse",
-      "noMatches": "Keine Treffer",
-      "noMatchesText": "Nichts entspricht der aktuellen Suche oder den Filtern."
+      "fallbackNoun": "Ergebnisse"
     },
     "nouns": {
       "logs": "aufzeichnen",
@@ -1323,8 +1318,8 @@
     "toggleConnector": "Zwischen AND und OR wechseln",
     "selectedCount": "Keine Werte ausgewählt | {count} Wert ausgewählt | {count} Werte ausgewählt",
     "query": "Abfrage",
-    "builderTooltip": "Filter im Builder bearbeiten",
-    "queryTooltip": "Filter als Text bearbeiten",
+    "builderTooltip": "Filter erstellen, indem Sie Felder, Bedingungen und Werte auswählen",
+    "queryTooltip": "Abfrage selbst schreiben",
     "queryNotParsableShort": "Der Builder kann diese Abfrage nicht anzeigen:",
     "clearAndBuild": "Leeren und erstellen",
     "clearQueryTitle": "Abfrage löschen?",
@@ -1391,10 +1386,7 @@
       "isEmpty": "ist leer oder hat keinen Wert",
       "isNotEmpty": "hat einen Wert, der nicht leer ist",
       "matchAll": "stimmt mit Text überein"
-    },
-    "editorModeLabel": "Filter-Editor",
-    "modeBuilder": "Builder",
-    "modeText": "Text"
+    }
   },
   "flow": {
     "stepPicker": {
@@ -1503,9 +1495,11 @@
     "patternNavPrevious": "Bisherige",
     "patternNavNext": "Weiter",
     "patternNoValuesAvailable": "Keine Werte verfügbar",
+    "sqlModeLabel": "SQL-Modus",
     "nlpModeLabel": "Modus für natürliche Sprache",
     "quickModeLabel": "Schneller Modus",
     "menuMore": "Mehr",
+    "menuGroupSetOnce": "Einmal einstellen",
     "menuGroupHistory": "Geschichte",
     "menuGroupDownloads": "herunterladbare",
     "menuGroupSchedule": "Zeitplan",
@@ -1879,6 +1873,7 @@
     "viewDeletedSuccessfully": "Die Ansicht wurde erfolgreich gelöscht.",
     "viewCreatedSuccessfully": "Die Ansicht wurde erfolgreich erstellt.",
     "viewUpdatedSuccessfully": "Die Ansicht wurde erfolgreich aktualisiert.",
+    "linkCopiedSuccessfully": "Link wurde erfolgreich kopiert!",
     "errorCopyingLink": "Fehler beim Kopieren des Links.",
     "errorShorteningLink": "Fehler beim Kürzen des Links.",
     "webUrlNotConfigured": "URL teilen ist deaktiviert, bis ZO_WEB_URL von Ihrem Administrator konfiguriert wurde.",
@@ -2080,24 +2075,7 @@
     "freeTextNoTextFields": "Dieser Stream hat keine Textfelder zum Durchsuchen.",
     "freeTextNoTextFieldsNamed": "Nicht durchsucht: {streams} (keine Textfelder).",
     "freeTextBuildNotice": "Dieser Filter enthält eine Textsuche; bearbeiten Sie ihn in SQL.",
-    "filterNotChartableNotice": "Dieser Filter kann im Builder nicht als Diagramm dargestellt werden. Ihr Suchfilter bleibt unverändert; wechseln Sie zu {custom}, um ihn darzustellen.",
-    "queryModeLabel": "Abfragesprache",
-    "queryModeFilter": "Filter",
-    "queryModeSql": "SQL",
-    "queryModeFilterTooltip": "Logs nach Feld und Wert eingrenzen",
-    "queryModeSqlTooltip": "Eine vollständige SQL-Abfrage mit Aggregationen und Joins schreiben",
-    "sqlModeNeedsOneStream": "SQL in dieser Ansicht braucht genau einen Stream",
-    "menuGroupViewOptions": "Ansichtsoptionen",
-    "histogramHiddenForAggregates": "Diese Abfrage liefert Gruppen statt Ereignissen über die Zeit, daher gibt es kein Histogramm. Visualisieren stellt das Ergebnis als Diagramm dar.",
-    "linkCopied": "Link kopiert",
-    "linkCopiedFixedTime": "Link kopiert · feste Zeit {from} – {to}",
-    "linkCopiedRelativeTime": "Link kopiert · {period}, ab dem Öffnen gerechnet",
-    "recordsChipRows": "{total} Zeile | {total} Zeilen",
-    "histogramTitleRows": "{total} Zeile in {took} ms. | {total} Zeilen in {took} ms.",
-    "histogramTitleRowsWithScan": "{total} Zeile in {took} ms. ({scanLabel}: {scanSize}) | {total} Zeilen in {took} ms. ({scanLabel}: {scanSize})",
-    "pickStreamFirst": "Zuerst einen Stream auswählen",
-    "autoRefreshPausedInVisualize": "Die automatische Aktualisierung aktualisiert die Suchergebnisse. Sie pausiert, solange Sie visualisieren.",
-    "histogramNoTimeAxis": "Gruppierte Ergebnisse haben keine Zeitachse"
+    "filterNotChartableNotice": "Dieser Filter kann im Builder nicht als Diagramm dargestellt werden. Ihr Suchfilter bleibt unverändert; wechseln Sie zu {custom}, um ihn darzustellen."
   },
   "menu": {
     "alertCalibration": "Alarmkalibrierung",
@@ -2131,14 +2109,6 @@
     "workflows": "Workflows",
     "language": "Sprache",
     "keyboardShortcuts": "Tastenkürzel",
-    "searchOrJumpTo": "Suchen oder springen zu…",
-    "jumpToTitle": "Springen zu",
-    "addData": "Daten hinzufügen",
-    "jumpToPlaceholder": "Seiten, Alarme, Dashboards und Streams durchsuchen",
-    "jumpToPlaceholderPages": "Seiten und Aktionen durchsuchen",
-    "jumpToPages": "Seiten",
-    "jumpToShowAll": "Alle in {page} anzeigen",
-    "jumpToSearchLogs": "Logs nach \"{text}\" durchsuchen",
     "synthetic": "Synthetics",
     "experience": "Erfahrung",
     "slos": "SLOs",
@@ -4219,8 +4189,7 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "Sie sind nicht berechtigt, die Lizenz zu verwalten."
-      },
-      "usageTitle": "Tägliche Aufnahme"
+      }
     },
     "value_sso_requires_ha": "✅ Erfordert den HA-Modus",
     "value_rbac_requires_ha": "✅ Erfordert den HA-Modus",
@@ -4389,9 +4358,7 @@
     "revokeInvitationMsg": "Sind Sie sicher, dass Sie die Einladung für {email} widerrufen möchten?",
     "deleteUsersTitle": "Benutzer löschen",
     "deleteUsersMsg": "Möchten Sie wirklich {count} Benutzer löschen? | Möchten Sie wirklich {count} Benutzer löschen?",
-    "deleteUsersBlockNote": "{count} von ihnen sind über Ihre verifizierte Domain beigetreten und werden blockiert statt gelöscht.",
-    "roleHint": "Admin verwaltet die Organisation, Editor ändert Daten und Einstellungen, Viewer kann nur lesen.",
-    "customRolesNeedRbac": "Benutzerdefinierte Rollen benötigen RBAC, das für diese Organisation deaktiviert ist."
+    "deleteUsersBlockNote": "{count} von ihnen sind über Ihre verifizierte Domain beigetreten und werden blockiert statt gelöscht."
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -5244,7 +5211,6 @@
   },
   "organization": {
     "searchByNameOrId": "Nach Name oder ID suchen",
-    "currentLabel": "Organisation: {name}",
     "noOrganizationsFound": "Keine Organisationen gefunden",
     "header": "Organisationen",
     "orgBeingDeletedSwitching": "Diese Organisation wird gelöscht. Sie werden zu einer anderen Organisation umgeleitet.",
@@ -5353,7 +5319,6 @@
     "timezone": "Zeitzone",
     "deleteActionMessage": "Möchten Sie {count} Feld wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden. | Möchten Sie {count} Felder wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
     "deleteDatesMessage": "Möchten Sie {count} Datumsbereich wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden. | Möchten Sie {count} Datumsbereiche wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
-    "summaryAllTypes": "Streams (alle Typen)",
     "labelLogs": "Logs",
     "labelMetrics": "Metriken",
     "labelTraces": "Traces",
@@ -7965,17 +7930,7 @@
       "metricsSketch": "Verteilungen werden als Histogramm-Buckets gespeichert, und Perzentile werden aus diesen Buckets geschätzt. Ein höherer ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA liefert feinere Buckets und präzisere Perzentile – auf Kosten von mehr gespeicherten Zeilen."
     },
     "gpu": "GPU",
-    "gpuExporter": "GPU-Exporter",
-    "rotationNote": "Tokens werden nicht an Ort und Stelle rotiert. Zum Rotieren erstellen Sie ein neues Token, stellen Ihre Quellen darauf um und deaktivieren dann das alte.",
-    "rotateAction": "Rotieren…",
-    "rotateTitle": "{name} rotieren",
-    "rotateStep1": "Erstellen Sie ein neues Token.",
-    "rotateStep2": "Stellen Sie Ihre Quellen auf das neue Token um.",
-    "rotateStep3": "Sobald {name} nicht mehr verwendet wird, deaktivieren Sie es im Zeilenmenü.",
-    "rotateNever": "Es wird nichts automatisch deaktiviert. Das alte Token funktioniert weiter, bis Sie es deaktivieren.",
-    "rotateCreateNew": "Neues Token erstellen",
-    "rotateNewName": "{name}-neu",
-    "rotateDescription": "Ersetzt {name}"
+    "gpuExporter": "GPU-Exporter"
   },
   "dashboard": {
     "panelDraft": {
@@ -9615,9 +9570,6 @@
       "addClause": "Klausel hinzufügen"
     },
     "viewDashboard": {
-      "apply": "Anwenden",
-      "lastDataSeen": "Letzte Daten {when}",
-      "jumpToLatest": "Zu den neuesten springen",
       "refreshToApplyVariables": "Aktualisieren, um die neuesten Variablenänderungen zu übernehmen",
       "refresh": "Aktualisieren",
       "refreshCacheReload": "Cache aktualisieren & neu laden",
@@ -10366,7 +10318,6 @@
     }
   },
   "panel": {
-    "noDataInRange": "Keine Daten im Zeitraum",
     "saveAndStay": "Speichern und weiter bearbeiten",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10647,32 +10598,12 @@
     "hoursAgo": "{count}h her",
     "daysAgo": "{count}d her",
     "cards": {
-      "firingAlerts": "Ausgelöste Alarme",
-      "failingRules": "Fehlerhafte Regeln",
-      "openIncidents": "Offene Vorfälle",
-      "pipelineErrors": "Pipeline-Fehler",
-      "pipelinesOf": "von {enabled} aktiviert",
-      "quietStreams": "Inaktive Streams",
-      "firingNone": "Keine ausgelöst",
-      "noAlertRules": "Keine Alarmregeln",
-      "noEnabledRules": "Keine aktivierten Regeln",
-      "failingNone": "Keine fehlerhaft",
-      "failingNote": "Letzte Auswertung fehlgeschlagen",
-      "incidentsNone": "Keine offen",
-      "noPipelines": "Keine Pipelines",
-      "noStreams": "Keine Streams",
-      "quietNote": "Keine Schreibvorgänge in den letzten 7 Tagen",
-      "criticalUnit": "{count} auf kritischer Stufe",
-      "deliveryFailures": "Fehler bei der Alarmzustellung",
-      "deliveryCount": "{count} Alarm-Zustellung fehlgeschlagen | {count} Alarm-Zustellungen fehlgeschlagen",
-      "deliveryNote": "Alarme, die ausgelöst wurden, aber nicht benachrichtigen konnten",
-      "oldestFiring": "Ältester ausgelöst seit {age}"
+      "openIncidents": "Offene Vorfälle"
     },
     "state": {
       "tileForbidden": "Kein Zugriff",
       "tileLocked": "Gesperrt",
       "tileError": "Laden fehlgeschlagen",
-      "tileUnavailable": "Nicht verfügbar",
       "sectionLocked": "Verfügbar mit einer Enterprise-Lizenz",
       "sectionForbidden": "Ihre Rolle kann diese Daten nicht sehen. Bitten Sie einen Organisations-Administrator um Zugriff."
     },
@@ -10796,39 +10727,6 @@
     "dataAsOf": "Datenstand: {time}",
     "timeRange": {
       "heading": "Im ausgewählten Zeitraum"
-    },
-    "firingNow": {
-      "title": "Jetzt ausgelöst",
-      "byLevel": "{critical} kritisch · {warning} Warnung",
-      "allQuiet": "Alles ruhig",
-      "watching": "{count} Alarmregel aktiv, keine ausgelöst | {count} Alarmregeln aktiv, keine ausgelöst",
-      "noRules": "Noch keine Alarmregeln",
-      "browseLibrary": "Alarmbibliothek durchsuchen",
-      "notifyFailed": "Benachrichtigung fehlgeschlagen",
-      "loadError": "Ausgelöste Alarme konnten nicht geladen werden",
-      "unavailable": "Alarmzustände können gerade nicht gelesen werden"
-    },
-    "health": {
-      "subtitle": "Zuletzt empfangene Daten, nach Typ",
-      "lastData": "Letzte Daten vor {age}",
-      "justNow": "Letzte Daten gerade eben",
-      "noDataIn": "Keine Daten in den letzten {range}",
-      "noRecords": "Noch keine Datensätze",
-      "loadError": "Ihre Streams konnten nicht gelesen werden"
-    },
-    "start": {
-      "text": "Es sind noch keine Daten eingegangen. Senden Sie Daten, sehen Sie sich vorhandene an oder richten Sie einen Alarm ein.",
-      "addData": "Daten hinzufügen",
-      "createAlert": "Alarm erstellen"
-    },
-    "summary": {
-      "loadError": "Die Org-Übersicht konnte nicht geladen werden",
-      "loadErrorRest": "Der Rest der Übersicht konnte nicht geladen werden",
-      "denied": "Kein Zugriff auf die Org-Übersicht. Fragen Sie einen Org-Admin."
-    },
-    "events": {
-      "runFailed": "Ausführung fehlgeschlagen",
-      "timesInRange": "{count}-mal im ausgewählten Zeitraum | {count}-mal im ausgewählten Zeitraum"
     }
   },
   "chatHistory": {
@@ -11009,8 +10907,7 @@
       "taglineAnd": "und führe Sie durch Ihre Logs, Traces, Metriken und Vorfälle.",
       "signedInAs": "Angemeldet als",
       "role": "Rolle",
-      "tryOneOfThese": "Oder probieren Sie eines davon aus",
-      "panelText": "Fragen Sie zu Ihren Logs, Traces, Metriken und Vorfällen oder lassen Sie sich beim Schreiben einer Abfrage helfen."
+      "tryOneOfThese": "Oder probieren Sie eines davon aus"
     },
     "capabilities": {
       "query": {
@@ -12120,21 +12017,7 @@
     }
   },
   "alerts": {
-    "detail": {
-      "openInLogs": "In Logs öffnen",
-      "openInTraces": "In Traces öffnen",
-      "openInMetrics": "In Metriken öffnen",
-      "evidenceFiringTip": "Öffnet {stream} mit dem Filter dieses Alarms, vom Beginn dieser Auslösung bis jetzt",
-      "evidenceWindowTip": "Öffnet {stream} mit dem Filter dieses Alarms für die letzten {window}",
-      "threshold": "Schwellenwert",
-      "noIncident": "Noch kein Vorfall",
-      "conditionLabel": "Alarmbedingung",
-      "allRows": "Jede Zeile",
-      "viewIncidents": "Vorfälle anzeigen"
-    },
-    "summaryTrainingFailed": "Training fehlgeschlagen",
     "columnState": "Status",
-    "startFromTemplate": "Mit einer Vorlage beginnen",
     "rowAction": {
       "leftFilter": "Entspricht nicht mehr dem Filter",
       "pausedLeftFilter": "{name} pausiert. Entspricht nicht mehr dem Filter | {count} Alarme pausiert. Entsprechen nicht mehr dem Filter",
@@ -13577,8 +13460,7 @@
       "condition": "Bedingung",
       "result": "Ergebnis",
       "anomalies": "Anomalien",
-      "forGroup": "für {group}",
-      "errorFrom": "{status} von {destination}"
+      "forGroup": "für {group}"
     },
     "continue": "Weiter",
     "wouldTrigger": "WÜRDE AUSLÖSEN",
@@ -15201,9 +15083,7 @@
     "siemDetection": {
       "notice": "Dieser Alert ist eine Security-Erkennung. Seine Abfrage wird aus der Sigma-Regel kompiliert, daher werden Regel, Stream und Zeitplan in Security bearbeitet, damit Regel und Abfrage übereinstimmen.",
       "open": "In Security bearbeiten"
-    },
-    "newAlertTitle": "Neuer Alarm",
-    "newAnomalyTitle": "Neue Anomalieerkennung"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Öffnen",
@@ -18073,13 +17953,7 @@
       "partial": "Einige Spans dieses Traces konnten nicht gelesen werden. Das Wasserfalldiagramm ist möglicherweise unvollständig.",
       "truncated": "Zeigt den ersten Span dieses Traces in Startzeit-Reihenfolge an. Spätere Spans sind noch nicht geladen. | Zeigt die ersten {count} Spans dieses Traces in Startzeit-Reihenfolge an. Spätere Spans sind noch nicht geladen.",
       "loadMore": "Nächsten Span laden | Nächste {size} Spans laden",
-      "loadMoreFailed": "Weitere Spans dieses Traces konnten nicht geladen werden",
-      "notFoundTitle": "Kein Trace mit dieser ID zwischen {from} und {to}",
-      "notFoundText": "Trace {traceId} hat in diesem Zeitraum keine Spans im Stream {stream}. Er kann älter oder neuer sein, in einem anderen Stream liegen oder nicht erfasst worden sein.",
-      "searchWiderRange": "Größeren Zeitraum durchsuchen",
-      "searchSpansInRange": "Spans in diesem Zeitraum suchen",
-      "loadFailedTitle": "Dieser Trace konnte nicht geladen werden",
-      "loadFailedText": "Trace {traceId} konnte nicht gelesen werden. Versuchen Sie es gleich noch einmal."
+      "loadMoreFailed": "Weitere Spans dieses Traces konnten nicht geladen werden"
     },
     "traceTree": {
       "clickToExpand": "Zum Erweitern klicken",
@@ -20007,7 +19881,7 @@
       "streamHint": "Diese Agent-Version sendet Traces an {count} Streams. Angezeigt wird der Stream, der am längsten genutzt wird, sofern Sie keinen anderen auswählen.",
       "agentIdHint": "Agent-ID: {ids}",
       "noAgentIdentity": "Keine Agent-Identität gefunden",
-      "noAgentIdentityDescription": "Diese LLM-Spans enthalten keinen Agent-Namen, daher werden sie nach Stream angezeigt.",
+      "noAgentIdentityDescription": "Diese LLM-Spans enthalten keinen Agent-Namen, daher werden sie nach Stream angezeigt. Ordnen Sie das Attribut zu, das Ihren Agent benennt, um sie nach Agent anzuzeigen.",
       "noAgentIdentityAction": "Agent-Mapping öffnen"
     },
     "agentGraph": {
@@ -21681,6 +21555,7 @@
     },
     "noStream": {
       "title": "Wählen Sie einen Stream aus, um mit der Erkundung zu beginnen",
+      "description": "Wählen Sie einen Stream aus und klicken Sie dann auf <strong>Abfrage ausführen</strong>. Sobald die Ergebnisse vorliegen, können Sie sie mit Filtern, einer VRL-Funktion und einem benutzerdefinierten Zeitraum verfeinern.",
       "selectStream": "Stream auswählen",
       "selectStreamDesc": "Durchsuchen Sie Logs, Traces, Metriken & RUM-Streams",
       "queryGuide": "Lesen Sie den Query Guide",
@@ -21732,18 +21607,7 @@
     "detailTable": {
       "noDataAvailable": "Keine Daten verfügbar.",
       "addIcon": "Symbol hinzufügen",
-      "sendToAiChat": "An KI-Chat senden",
-      "openTrace": "Trace öffnen",
-      "noTraceTitle": "Kein Trace mit diesem Log verknüpft",
-      "noRelatedLogsTitle": "Keine zugehörigen Logs gefunden",
-      "noRelatedMetricsTitle": "Keine zugehörigen Metriken gefunden",
-      "noServiceText": "Diesem Log konnte kein Dienst zugeordnet werden, daher lassen sich zugehörige Daten nicht automatisch finden.",
-      "searchTracesAround": "Traces um diesen Zeitpunkt suchen",
-      "searchAroundTip": "Die Ereignisse laden, die direkt vor und nach diesem protokolliert wurden.",
-      "noOfEventsTip": "Wie viele Ereignisse um dieses herum geladen werden.",
-      "severityTip": "Erkannte Log-Ebene. Auswählen, um zu sehen, wie sie ermittelt wurde.",
-      "traceId": "Trace ID",
-      "spanId": "Span ID"
+      "sendToAiChat": "An KI-Chat senden"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "SELECT *-Abfrage wird für die Visualisierung nicht unterstützt.",
@@ -22035,7 +21899,6 @@
     "showDetail": "Details anzeigen",
     "hideDetail": "Details ausblenden",
     "runAs": "Ausführen als",
-    "runSuggestion": "{query} ausführen",
     "searchTextFor": "Text für \"{text}\" suchen",
     "searchTextDesc": "Die gesamte Eingabe als eine Phrase suchen",
     "explain": {
@@ -22109,10 +21972,7 @@
       "1m": "1 Min.",
       "5m": "5 Min.",
       "15m": "15 Min."
-    },
-    "dataFresh": "Die Daten sind frisch",
-    "dataGettingStale": "Daten werden veraltet",
-    "dataStale": "Daten sind veraltet"
+    }
   },
   "copyButton": {
     "copy": "Kopieren",
@@ -24015,7 +23875,6 @@
     },
     "actions": {
       "openCheatsheet": "Cheatsheet mit Tastenkombinationen öffnen",
-      "searchOrJumpTo": "Suchen oder zu einer Seite springen",
       "closeDialog": "Dialog, Seitenleiste oder Modal schließen",
       "focusSearch": "Fokus-Suchleiste",
       "focusQuery": "Fokusabfrage-Editor",
@@ -24286,9 +24145,7 @@
       "urlPlaceholder": "Datei-URL",
       "urlHelp": "Wir rufen sie einmalig beim Import ab.",
       "textPlaceholder": "Inhalt hier einfügen",
-      "invalidJson": "Kein gültiges JSON: {detail}",
-      "removeFile": "Datei entfernen",
-      "clearAll": "Alle löschen"
+      "invalidJson": "Kein gültiges JSON: {detail}"
     },
     "date": {
       "openCalendar": "Kalender öffnen",
@@ -24518,7 +24375,7 @@
         "ok": "OK",
         "normal": "Normal",
         "firing": "Ausgelöst",
-        "notifyfailed": "Zustellung fehlgeschlagen",
+        "notifyfailed": "Benachrichtigung fehlgeschlagen",
         "flapping": "Flatternd",
         "anomaly": "Anomalie",
         "succeeded": "Erfolgreich",
@@ -26053,7 +25910,6 @@
       "packUnavailableHint": "Kuratierte Inhalte für diese Workload gibt es noch nicht. Erstellen Sie in der Zwischenzeit ein Dashboard, um sie darzustellen.",
       "partialTelemetryKubernetes": "Wir haben Kubernetes-Streams gefunden, aber nicht die Metriken, die diese Seite benötigt (kubeletstats oder Cluster-Receiver). Prüfen Sie die Receiver Ihres Collectors.",
       "partialTelemetryHosts": "Wir haben Host-Streams gefunden, aber nicht die Metriken, die diese Seite benötigt. Prüfen Sie den hostmetrics-Receiver Ihres Collectors.",
-      "hostMetricsMissingTitle": "Keine Host-Metriken gefunden",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first} und {count} weitere",
       "hiddenFootnote": "Datenquellen, auf die Sie keinen Zugriff haben, erscheinen hier ebenfalls.",
@@ -26838,8 +26694,7 @@
         "p95": "Der langsame Ausläufer – 1 von 20 Aufrufen dauerte mindestens so lange. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
         "p99": "Die schlechtesten 1 % der Aufrufe dauerten mindestens so lange. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
         "load": "Gesamtzeit, die Ihre Apps für Aufrufe an diese Datenbank aufgewendet haben, gemessen an den Traces Ihrer Anwendung. Sie zeigt, wie viel Verkehr diese Datenbank für Ihre Apps abgewickelt hat.",
-        "attention": "Wie nah diese Instanz an einem Limit ist, das ihre eigene Engine veröffentlicht — heute Verbindungen gegen max_connections. Das schlechteste Verhältnis, kein Mischwert. Absteigend sortiert, wobei Instanzen, deren Zustand nicht lesbar ist, oben stehen, denn eine, die man nicht sehen kann, ist keine, von der man weiß, dass sie gesund ist. Auf dem Datenbankserver gemessen, daher nicht vergleichbar mit der Datenbankzeit daneben.",
-        "calls": "Wie oft Ihre Apps diese Datenbank aufgerufen haben, gemessen an den Traces Ihrer Anwendung."
+        "attention": "Wie nah diese Instanz an einem Limit ist, das ihre eigene Engine veröffentlicht — heute Verbindungen gegen max_connections. Das schlechteste Verhältnis, kein Mischwert. Absteigend sortiert, wobei Instanzen, deren Zustand nicht lesbar ist, oben stehen, denn eine, die man nicht sehen kann, ist keine, von der man weiß, dass sie gesund ist. Auf dem Datenbankserver gemessen, daher nicht vergleichbar mit der Datenbankzeit daneben."
       },
       "failedChip": "{count} fehlgeschlagen",
       "columnSubLabels": {
@@ -27280,8 +27135,7 @@
         "tableHealthHint": "Tabellengröße, Bloat und Vakuumzustand. Bloat und Vakuum gelten nur für PostgreSQL.",
         "deadlocksLocked": "Deadlocks ist eine Enterprise-Funktion. Führen Sie ein Upgrade durch, um zu sehen, welche Abfragen sich gegenseitig blockiert haben und warum. Die anderen Datenbank-Registerkarten funktionieren in jedem Plan.",
         "blockedLocked": "Blockierte Abfragen ist eine Enterprise-Funktion. Führen Sie ein Upgrade durch, um zu sehen, welche Sitzungen auf eine Sperre warten und was sie hält. Die anderen Datenbank-Registerkarten funktionieren in jedem Plan.",
-        "tableHealthLocked": "Tabellenzustand ist eine Enterprise-Funktion. Führen Sie ein Upgrade durch, um Tabellengröße, Bloat und Vakuumzustand zu verfolgen. Die anderen Datenbank-Registerkarten funktionieren in jedem Plan.",
-        "queriesHintServer": "Abfragearten, die Ihre Datenbanken in diesem Zeitraum gemeldet haben, gezählt innerhalb der Datenbank."
+        "tableHealthLocked": "Tabellenzustand ist eine Enterprise-Funktion. Führen Sie ein Upgrade durch, um Tabellengröße, Bloat und Vakuumzustand zu verfolgen. Die anderen Datenbank-Registerkarten funktionieren in jedem Plan."
       }
     },
     "metrics": {

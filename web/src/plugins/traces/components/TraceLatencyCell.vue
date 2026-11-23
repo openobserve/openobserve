@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="[s, sv] in serviceEntries"
             :key="s"
             class="grid grid-cols-[0.5rem_1fr_auto_auto] items-center gap-x-2 py-[0.1rem]"
-            :class="s === service ? 'font-semibold' : 'font-normal opacity-75'"
+            :class="s === service ? 'font-bold' : 'font-normal opacity-75'"
           >
             <span class="inline-block h-2 w-2 shrink-0 rounded-full" :style="serviceDotStyle(s)" />
             <span class="truncate">{{ s }}</span>

@@ -176,11 +176,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <!-- shrink-0 + a cap, not plain shrink: flex shrinks in proportion to width, so a long operation name would eat a short service name first. -->
                       <OTruncatedText
-                        class="me-2 max-w-[50%] shrink-0 text-sm font-semibold"
+                        class="me-2 max-w-[50%] shrink-0 text-sm font-bold font-medium"
                         :class="{
-                          'bg-table-highlight-bg text-table-highlight-text font-semibold':
+                          'bg-table-highlight-bg text-table-highlight-text font-bold':
                             isHighlighted((spans as any[])[virtualRow.index].spanId),
-                          'bg-table-highlight-bg text-status-error-text font-semibold':
+                          'bg-table-highlight-bg text-status-error-text font-bold':
                             currentSelectedValue === (spans as any[])[virtualRow.index].spanId,
                         }"
                         :data-test="`trace-tree-span-service-name-${(spans as any[])[virtualRow.index].spanId}`"
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span v-if="logsLocked" class="inline-flex">
                         <OButton
                           icon-only
-                          variant="ghost"
+                          variant="secondary"
                           size="xs"
                           disabled
                           :aria-label="t('traces.viewLogs')"
@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         v-else
                         icon-only
-                        variant="ghost"
+                        variant="secondary"
                         size="xs"
                         :title="t('traces.viewLogs')"
                         @click.stop="viewSpanLogs((spans as any[])[virtualRow.index])"

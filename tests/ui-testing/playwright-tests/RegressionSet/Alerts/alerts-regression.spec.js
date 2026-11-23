@@ -476,14 +476,14 @@ test.describe("Alerts Regression Bugs", () => {
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     testLogger.info('✓ Navigated to alerts list');
 
-    // Check for "Last triggered" column (closest proxy to firing count tracking)
+    // Check for "Last Triggered" column (closest proxy to firing count tracking)
     // NOTE: firing_count field exists in data but no dedicated column displays it yet
     const lastTriggeredColumn = pm.alertsPage.getFiringCountElements();
     const columnExists = await lastTriggeredColumn.count() > 0;
 
     // STRONG ASSERTION: Last Triggered column must exist (Bug #10472 relates to alert state visibility)
-    expect(columnExists, 'Bug #10472: Alert list should show "Last triggered" column for tracking alert firing').toBe(true);
-    testLogger.info('✓ "Last triggered" column is visible in alerts table');
+    expect(columnExists, 'Bug #10472: Alert list should show "Last Triggered" column for tracking alert firing').toBe(true);
+    testLogger.info('✓ "Last Triggered" column is visible in alerts table');
 
     if (columnExists) {
       const columnHeader = lastTriggeredColumn.first();

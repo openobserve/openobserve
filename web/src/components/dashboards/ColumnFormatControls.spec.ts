@@ -47,7 +47,7 @@ describe("ColumnFormatControls – Locale Format in the Unit dropdown", () => {
     mountWith({ unit: null });
     const options = unitSelect().props("options");
     expect(options).toContainEqual(
-      expect.objectContaining({ label: "Other locale", value: "other-locale", expandable: true }),
+      expect.objectContaining({ label: "Other Locale", value: "other-locale", expandable: true }),
     );
     expect(options).toContainEqual(
       expect.objectContaining({

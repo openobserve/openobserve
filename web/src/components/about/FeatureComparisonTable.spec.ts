@@ -173,7 +173,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("Feature comparison");
+    expect(wrapper.text()).toContain("Feature Comparison");
   });
 
   it("should display icon in header", () => {
@@ -198,7 +198,7 @@ describe("FeatureComparisonTable", () => {
 
     const badge = wrapper.find('[data-test="feature-comparison-table-your-plan-badge"]');
     expect(badge.exists()).toBe(true);
-    expect(badge.text()).toContain("Your plan");
+    expect(badge.text()).toContain("Your Plan");
   });
 
   it("should render feature list items inside each edition card", () => {

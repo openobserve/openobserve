@@ -25,17 +25,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <OPageLayout
       bleed
-      :title="isAnomalyMode ? t('alerts.newAnomalyTitle') : t('alerts.newAlertTitle')"
       :back="{ label: t('alerts.header'), to: alertListRoute, dataTest: 'add-alert-back-btn' }"
     >
-      <!-- An existing name is the read-only title; a new one is a labelled field in the form body. -->
-      <template v-if="beingUpdated || anomalyEditMode" #title>
+      <!-- The name is the title in both modes; edit mode renders it read-only. Anomaly and alert
+           names bind the same `name` field, which useAlertForm mirrors into anomalyConfig.name. -->
+      <template #title>
         <OFormInlineEdit
-          size="lg"
+          ref="step1Ref"
           name="name"
-          readonly
+          :readonly="beingUpdated || anomalyEditMode"
           :data-test="isAnomalyMode ? 'add-anomaly-name-input' : 'add-alert-name-input'"
+          :placeholder="
+            isAnomalyMode ? t('alerts.anomalyNamePlaceholder') : t('alerts.alertNamePlaceholder')
+          "
           :aria-label="isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName')"
+          :edit-hint="
+            alertAutoName.isAuto.value ? t('common.inlineEdit.autoHint') : t('alerts.renameHint')
+          "
+          @update:model-value="alertAutoName.markManual"
+          @commit="alertAutoName.onCommit"
+          @cancel="alertAutoName.onCommit"
         />
       </template>
 
@@ -62,16 +71,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alerts.lastRun", { time: anomalyFormatTs(anomalyConfig.last_detection_run) }) }}
           </span>
         </template>
-      </template>
-
-      <template v-if="showTemplateLink" #actions-overflow>
-        <OButton
-          variant="secondary"
-          :to="alertLibraryRoute"
-          data-test="add-alert-start-from-template"
-        >
-          {{ t("alerts.startFromTemplate") }}
-        </OButton>
       </template>
 
       <template #actions>
@@ -152,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- LEFT column wrapper (flex: 6.5) -->
         <div
           :class="[
-            'flex min-h-0 min-w-0 flex-col gap-2 pb-2 max-lg:flex-none',
+            'flex min-h-0 min-w-0 flex-col gap-2 py-2 max-lg:flex-none',
             isCompositeMode ? 'flex-1' : 'flex-[6.5]',
           ]"
         >
@@ -160,39 +159,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="bg-card-glass-bg stream-config-card [container-type:inline-size] shrink-0 [container-name:stream-config]"
           >
-            <div
-              v-if="!(beingUpdated || anomalyEditMode)"
-              class="border-border-default px-page-edge flex items-center gap-3 border-b py-2.5"
-            >
-              <span class="text-text-heading text-xs font-semibold whitespace-nowrap">
-                {{ isAnomalyMode ? t("alerts.anomalyName") : t("alerts.alertName") }}
-                <span class="text-text-body">*</span>
-              </span>
-              <OFormInlineEdit
-                ref="step1Ref"
-                field
-                name="name"
-                class="max-w-120"
-                :data-test="isAnomalyMode ? 'add-anomaly-name-input' : 'add-alert-name-input'"
-                :placeholder="
-                  isAnomalyMode
-                    ? t('alerts.anomalyNamePlaceholder')
-                    : t('alerts.alertNamePlaceholder')
-                "
-                :aria-label="
-                  isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName')
-                "
-                :edit-hint="
-                  alertAutoName.isAuto.value
-                    ? t('common.inlineEdit.autoHint')
-                    : t('alerts.renameHint')
-                "
-                @update:model-value="alertAutoName.markManual"
-                @commit="alertAutoName.onCommit"
-                @cancel="alertAutoName.onCommit"
-              />
-            </div>
-            <div class="border-border-default px-page-edge flex items-center gap-0 border-b py-2.5">
+            <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact me-3 font-semibold tracking-[0.01em]">{{
                 t("alerts.alertType")
               }}</span>
@@ -246,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="!isCompositeMode"
-              class="px-page-edge flex items-center gap-4 py-2 max-md:flex-wrap max-md:gap-2"
+              class="flex items-center gap-4 px-3 py-2 max-md:flex-wrap max-md:gap-2"
             >
               <!-- Stream Type -->
               <div v-if="!isCompositeMode" class="flex items-center gap-1.5">
@@ -297,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- TIER 3: Configuration Tabs -->
           <div
-            class="alert-v3-tabs bg-card-glass-bg mx-page-edge flex min-h-0 flex-1 flex-col max-lg:flex-none"
+            class="alert-v3-tabs bg-card-glass-bg mx-2 flex min-h-0 flex-1 flex-col max-lg:flex-none"
           >
             <!-- Tab Headers -->
             <OToggleGroup
@@ -477,7 +445,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Footer: Cancel / Save (left column, separate card) -->
           <div
-            class="bg-card-glass-bg border-border-default px-page-edge flex shrink-0 items-center justify-end gap-2 border-t py-2.5"
+            class="bg-card-glass-bg border-border-default flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2.5"
             data-toast-avoid
           >
             <p
@@ -540,12 +508,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- border-s: full-height vertical divider flush against the Preview/Summary pane -->
         <div
           v-if="!isCompositeMode"
-          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-s pb-2 max-lg:h-160 max-lg:flex-none max-lg:border-s-0 max-lg:border-t"
+          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-s pt-2 pb-2 max-lg:h-160 max-lg:flex-none max-lg:border-s-0 max-lg:border-t"
         >
           <!-- Preview Card -->
           <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
             <div
-              class="border-border-default px-page-edge flex shrink-0 items-center gap-2 border-b py-2.5 select-none"
+              class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2.5 select-none"
             >
               <span class="text-sm font-medium">{{ t("alerts.preview") }}</span>
               <template v-if="!isAnomalyMode && activeEvaluationStatus">
@@ -606,7 +574,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Summary Card -->
           <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
             <div
-              class="border-border-default px-page-edge flex shrink-0 items-center border-b py-2.5 select-none"
+              class="border-border-default flex shrink-0 items-center border-b px-3 py-2.5 select-none"
             >
               <span class="text-sm font-medium">{{ t("alerts.summary.title") }}</span>
             </div>
@@ -1015,20 +983,6 @@ export default defineComponent({
       },
     }));
 
-    // Only a new scheduled or real-time alert can start from the library, which holds no other kind.
-    const showTemplateLink = computed(
-      () =>
-        !alertForm.beingUpdated.value &&
-        !alertForm.anomalyEditMode.value &&
-        !alertForm.isAnomalyMode.value &&
-        !isCompositeMode.value &&
-        !(store.state.zoConfig?.custom_hide_menus ?? "").split(",").includes("alertLibrary"),
-    );
-    const alertLibraryRoute = computed(() => ({
-      name: "alertLibrary",
-      query: { org_identifier: store.state.selectedOrganization.identifier },
-    }));
-
     const {
       openSetup: openOncallSetup,
       checkAgain: checkOncallAgain,
@@ -1178,8 +1132,6 @@ export default defineComponent({
       saveModeNote,
       activeEvaluationStatus,
       isCompositeMode,
-      showTemplateLink,
-      alertLibraryRoute,
       availableCompositeChildren,
       updateCompositeDraft,
       compositeSaveDisabled,

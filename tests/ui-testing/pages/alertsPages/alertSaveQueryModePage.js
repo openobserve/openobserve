@@ -6,7 +6,7 @@ const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js
 const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 
 /**
- * AlertSaveQueryModePage — the "Choose query mode" dialog Save opens when more
+ * AlertSaveQueryModePage — the "Choose Query Mode" dialog Save opens when more
  * than one query mode is in play, plus the bits of the alert editor those tests
  * drive (the mode toggle, the SQL editor, the stream/destination selects).
  *

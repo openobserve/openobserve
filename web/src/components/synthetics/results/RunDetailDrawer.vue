@@ -22,7 +22,6 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import {
@@ -187,19 +186,29 @@ function toggleSteps(executionId: string) {
         </div>
       </div>
 
-      <OEmptyState
+      <!-- ── Query error ── -->
+      <div
         v-else-if="queryError"
-        kind="error"
-        :title="t('synthetics.runDetail.loadFailed')"
-        :text="t('emptyState.loadError.description')"
-      />
+        class="text-text-muted flex flex-col items-center gap-3 px-5 py-16"
+      >
+        <OIcon name="error_outline" size="xl" class="text-status-error-text" />
+        <p class="text-status-error-text text-sm font-medium">
+          {{ t("synthetics.runDetail.loadFailed") }}
+        </p>
+        <p class="text-text-secondary max-w-sm text-center font-mono text-xs">{{ queryError }}</p>
+      </div>
 
-      <OEmptyState
+      <!-- ── No data ── -->
+      <div
         v-else-if="!locations.length"
-        icon="hourglass-empty"
-        :title="t('synthetics.runDetail.noExecutionData')"
-        :text="t('synthetics.runDetail.noExecutionDataDesc', { runId: runId })"
-      />
+        class="text-text-muted flex flex-col items-center gap-3 px-5 py-16"
+      >
+        <OIcon name="hourglass_empty" size="xl" />
+        <p class="text-sm font-medium">{{ t("synthetics.runDetail.noExecutionData") }}</p>
+        <p class="text-text-secondary text-center text-xs">
+          {{ t("synthetics.runDetail.noExecutionDataDesc", { runId: runId }) }}
+        </p>
+      </div>
 
       <!-- ── Data ── -->
       <template v-else>
@@ -209,7 +218,7 @@ function toggleSteps(executionId: string) {
         >
           <div>
             <p
-              class="text-2xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
+              class="text-3xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
             >
               {{ t("synthetics.runDetail.maxDuration") }}
             </p>
@@ -217,7 +226,7 @@ function toggleSteps(executionId: string) {
           </div>
           <div>
             <p
-              class="text-2xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
+              class="text-3xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
             >
               {{ t("synthetics.runDetail.locations") }}
             </p>
@@ -225,7 +234,7 @@ function toggleSteps(executionId: string) {
           </div>
           <div>
             <p
-              class="text-2xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
+              class="text-3xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
             >
               {{ t("synthetics.runDetail.runId") }}
             </p>
@@ -340,7 +349,7 @@ function toggleSteps(executionId: string) {
                     class="flex items-start gap-2.5 py-1.5 text-xs"
                   >
                     <span
-                      class="text-2xs mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-semibold text-white"
+                      class="text-3xs mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-bold text-white"
                       :class="step.status === 'ok' ? 'bg-success-600' : 'bg-error-500'"
                       >{{ idx + 1 }}</span
                     >
@@ -381,7 +390,7 @@ function toggleSteps(executionId: string) {
                         class="h-2 w-2 shrink-0 rounded-full"
                         :class="step.status === 'ok' ? 'bg-success-500' : 'bg-error-500'"
                       />
-                      <span class="text-2xs text-text-muted truncate font-mono">{{
+                      <span class="text-3xs text-text-muted truncate font-mono">{{
                         step.stepId
                       }}</span>
                     </div>

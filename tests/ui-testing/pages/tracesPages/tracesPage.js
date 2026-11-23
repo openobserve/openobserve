@@ -91,7 +91,6 @@ export class TracesPage {
     this.sqlModeToggle = '[data-cy="syntax-guide-button"]';
     this.dateTimeDropdown = '[data-test="logs-search-bar-date-time-dropdown"]';
     this.refreshButton = '[data-test="logs-search-bar-refresh-btn"]';
-    // A menu item inside the toolbar ⋯ (openMoreActionsMenu).
     this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
 
     // Main Components
@@ -340,7 +339,7 @@ export class TracesPage {
 
   async validateTracesPage() {
 
-    await expect(this.page.locator('[data-test="traces-search-bar-filter-editor-mode"]')).toBeDefined();
+    await expect(this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]')).toBeDefined();
     await expect(this.page.locator('[data-test="logs-search-bar"]')).toBeDefined();
 
   }
@@ -385,7 +384,7 @@ export class TracesPage {
     // The wrapper renders immediately, but its options arrive with the async
     // stream-list fetch. Opening the popover before then finds an empty list,
     // every retry below misses, and selection silently no-ops — which surfaces
-    // later as "Select stream first" and zero query results. Wait for the
+    // later as "Select Stream First" and zero query results. Wait for the
     // option to exist in the DOM first.
     const optionReady = `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`;
     await this.page
@@ -1744,7 +1743,6 @@ export class TracesPage {
    * without it (components/common/ShareButton.vue).
    */
   async clickShareLinkAndGetUrl(buttonSelector = this.shareLinkButton) {
-    if (buttonSelector === this.shareLinkButton) await this.openMoreActionsMenu();
     const shareBtn = this.page.locator(buttonSelector);
     await expect(shareBtn, 'Share button must be enabled — needs web_url configured').toBeEnabled({ timeout: 10000 });
     await shareBtn.click();
@@ -1781,7 +1779,6 @@ export class TracesPage {
   }
 
   async clickShareLinkButton() {
-    await this.openMoreActionsMenu();
     await this.page.locator(this.shareLinkButton).click();
     await this.page.waitForTimeout(1000);
   }
@@ -2765,7 +2762,7 @@ export class TracesPage {
   getLogsQueryModeToggles() {
     return {
       quickMode: this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]'),
-      sqlMode: this.page.locator('[data-test="logs-search-bar-query-mode-sql"]'),
+      sqlMode: this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]'),
     };
   }
 
@@ -3055,7 +3052,7 @@ export class TracesPage {
   }
 
   /**
-   * Locate the "System instructions" collapsible trigger (rendered above the
+   * Locate the "System Instructions" collapsible trigger (rendered above the
    * Input pane when `gen_ai_system_instructions` is present).
    */
   getSystemInstructionsTrigger() {
@@ -3063,21 +3060,21 @@ export class TracesPage {
   }
 
   /**
-   * Assert the "System instructions" collapsible is present.
+   * Assert the "System Instructions" collapsible is present.
    */
   async expectSystemInstructionsVisible() {
     await expect(this.getSystemInstructionsTrigger()).toBeVisible({ timeout: 15000 });
   }
 
   /**
-   * Expand the "System instructions" collapsible.
+   * Expand the "System Instructions" collapsible.
    */
   async expandSystemInstructions() {
     await this.getSystemInstructionsTrigger().click();
   }
 
   /**
-   * Assert the expanded "System instructions" body shows `text` (visible, not
+   * Assert the expanded "System Instructions" body shows `text` (visible, not
    * merely present in the DOM).
    */
   async expectSystemInstructionsContains(text) {
@@ -3481,12 +3478,8 @@ export class TracesPage {
   // Source: web/src/plugins/traces/SearchBar.vue, PanelContainer.vue, metrics/TracesLatencyHeatmap.vue
   // ============================================
 
-  /** Opens the toolbar ⋯ unless it is already open: share, export, alerts and RED charts live there. */
   async openMoreActionsMenu() {
-    const trigger = this.page.locator('[data-test="traces-search-bar-more-menu-btn"]');
-    await trigger.waitFor({ state: 'visible', timeout: 10000 });
-    if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
-    await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 5000 });
+    await this.page.locator('[data-test="traces-search-bar-more-actions-btn"]').click();
   }
 
   async clickAddRedChartsToDashboard() {

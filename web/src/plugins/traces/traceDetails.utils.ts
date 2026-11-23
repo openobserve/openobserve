@@ -72,19 +72,3 @@ export function resolveUrlTimeRange(from: unknown, to: unknown): { from: number;
     Number.isFinite(start) && Number.isFinite(end) && start > 0 && end > 0 && start <= end;
   return usable ? { from: start, to: end } : { from: 0, to: 0 };
 }
-
-const HOUR_US = 3_600_000_000;
-// Each "Search a wider range" step; past the last one the page stops offering it.
-const WIDER_TRACE_WINDOWS_US = [24 * HOUR_US, 7 * 24 * HOUR_US, 30 * 24 * HOUR_US];
-
-/** The next wider window around a trace search, never past `nowUs`; null once the widest was searched. */
-export function widerTraceWindow(
-  from: number,
-  to: number,
-  nowUs: number,
-): { from: number; to: number } | null {
-  const width = WIDER_TRACE_WINDOWS_US.find((step) => step > to - from);
-  if (!width || !(from > 0 && to >= from)) return null;
-  const end = Math.min(Math.floor((from + to) / 2) + width / 2, nowUs);
-  return { from: end - width, to: end };
-}

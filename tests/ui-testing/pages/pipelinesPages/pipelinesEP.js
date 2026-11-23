@@ -354,7 +354,7 @@ export class PipelinesEP {
         await this.selectImportOrgIdIfAsked();
         await this.selectImportOption(this.destinationFunctionNameDataTest, functionName);
         // This data-test is shared by the stream-type, remote-destination and timezone pickers, so pick by label.
-        await this.selectImportOption(this.remoteDestinationDataTest, remoteDestination, 0, 'Remote destination');
+        await this.selectImportOption(this.remoteDestinationDataTest, remoteDestination, 0, 'Remote Destination');
     }
 
     async waitForImportEditorToContain(text, timeout = 15000) {

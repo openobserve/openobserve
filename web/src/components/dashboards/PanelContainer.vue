@@ -323,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
           :isPartialData="isPartialData"
           :isPanelLoading="isPanelLoading"
-          :lastTriggeredAt="panelIsEmpty ? null : lastTriggeredAt"
+          :lastTriggeredAt="lastTriggeredAt"
           :viewOnly="viewOnly"
           :exemplarError="exemplarErrorMessage"
           :canEdit="canEditFromNotice"
@@ -340,7 +340,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :stale="variablesDataUpdated || isTimeRangeWaiting"
           variant="ghost"
           size="xs"
-          :class="restActionClass"
           @click="() => onRefreshPanel(false)"
           :aria-label="t('panel.refreshPanel')"
           data-test="dashboard-panel-refresh-panel-btn"
@@ -403,7 +402,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               variant="ghost"
               size="xs"
-              :class="restActionClass"
               :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
             >
               <OIcon name="more-vert" size="sm" />
@@ -723,10 +721,6 @@ import {
   inject,
 } from "vue";
 import { KIOSK_PANEL_HEALTH_KEY } from "@/composables/dashboard/useKioskRefresh";
-import {
-  PANEL_EMPTY_REGISTRY_KEY,
-  type PanelDataState,
-} from "@/composables/dashboard/usePanelEmptyRegistry";
 import { summarizePanelError } from "@/utils/dashboard/kiosk";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
@@ -990,7 +984,7 @@ export default defineComponent({
       // Read AFTER the renderer's own conversion settled — the emit is that signal.
       const verdict = PanleSchemaRendererRef.value?.noData;
       if (verdict === undefined) return;
-      curatedSeriesEmpty.value = verdict === "No data";
+      curatedSeriesEmpty.value = verdict === "No Data";
     };
     /** Only ever claimed after a load actually settled — never while pending. */
     /**
@@ -1046,10 +1040,6 @@ export default defineComponent({
 
     // to store and show when the panel was last loaded
     const lastTriggeredAt = ref(null);
-    // An empty panel has no data to age, so it carries no freshness badge.
-    const panelIsEmpty = computed(
-      () => !!PanleSchemaRendererRef.value?.noData || !!PanleSchemaRendererRef.value?.statHasNoData,
-    );
     const handleLastTriggeredAtUpdate = (data: any) => {
       lastTriggeredAt.value = data;
     };
@@ -1149,19 +1139,6 @@ export default defineComponent({
       if (isCurrentlyHoveredPanel.value || isMobile.value) return narrowHide;
       return `invisible pointer-events-none ${narrowHide}`.trim();
     });
-
-    // Opacity, not visibility, so a keyboard user can still tab to them; errors, warnings and pending changes keep them shown.
-    const restActionClass = computed(() =>
-      isCurrentlyHoveredPanel.value ||
-      isMobile.value ||
-      hasNoticeChips.value ||
-      !!errorData.value ||
-      variablesDataUpdated.value ||
-      props.isTimeRangeWaiting ||
-      showDraftDot.value
-        ? ""
-        : "opacity-0 focus-visible:opacity-100 data-[state=open]:opacity-100",
-    );
 
     //for edit panel
     const onEditPanel = (data: any, focus?: PanelEditorFocusTarget) => {
@@ -1529,32 +1506,6 @@ export default defineComponent({
       if (props.data?.id) kioskHealth?.unregister(props.data.id);
     });
 
-    const emptyRegistry = inject(PANEL_EMPTY_REGISTRY_KEY, null);
-    // Text panels never hold data, so they stay out of the "every panel is empty" verdict.
-    const reportsData = () => !["html", "markdown", "alert-list"].includes(props.data?.type);
-    const panelDataState = (): PanelDataState => {
-      if (errorData.value) return "error";
-      if (isPanelLoading.value) return "pending";
-      const renderer = PanleSchemaRendererRef.value;
-      return renderer?.noData === "No data" || renderer?.statHasNoData ? "empty" : "data";
-    };
-    watch(
-      () => [
-        props.data?.id,
-        errorData.value,
-        isPanelLoading.value,
-        PanleSchemaRendererRef.value?.noData,
-        PanleSchemaRendererRef.value?.statHasNoData,
-      ],
-      () => {
-        if (props.data?.id && reportsData()) emptyRegistry?.report(props.data.id, panelDataState());
-      },
-      { immediate: true },
-    );
-    onBeforeUnmount(() => {
-      if (props.data?.id) emptyRegistry?.unregister(props.data.id);
-    });
-
     const isPartialData = ref(false);
 
     const handleIsPartialDataUpdate = (isPartial: boolean) => {
@@ -1697,7 +1648,6 @@ export default defineComponent({
       isCurrentlyHoveredPanel,
       isLayoutEditing,
       hoverRevealClass,
-      restActionClass,
       previewView,
       showDataViewToggle,
       isDataView,
@@ -1743,7 +1693,6 @@ export default defineComponent({
       isCachedDataDifferWithCurrentTimeRange,
       handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
       lastTriggeredAt,
-      panelIsEmpty,
       maxQueryRangeWarning,
       metaData,
       panelDiagnostics,

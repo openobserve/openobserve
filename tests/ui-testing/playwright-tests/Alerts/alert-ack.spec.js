@@ -219,7 +219,7 @@ test.describe('Alert acknowledge and mute — alert screens', { tag: ['@alerts',
     expect((groups.list || []).filter((g) => isFiringOutcome(g.last_outcome)).length).toBeGreaterThanOrEqual(2);
   });
 
-  test('detail: the condition line names the firing incident and opens it (MK-1)', async ({ page }) => {
+  test('detail: the Incident tile names the firing incident and opens it (MK-1)', async ({ page }) => {
     test.skip(!(await incidentsEnabled(page)), 'incidents_enabled is false, so no firing joins an incident');
     const alert = await createFiringSingle(page, 'ack_incident', created, { creates_incident: true });
     names.push(alert.name);
@@ -227,11 +227,11 @@ test.describe('Alert acknowledge and mute — alert screens', { tag: ['@alerts',
     const item = await pollUntil(page, () => listItem(page, alert.name), (a) => !!a?.incident?.id,
       { timeoutMs: 180_000, onTick: alert.feed });
     await ack.openDetail(alert.id);
-    const slot = page.locator('[data-test="alerts-alertdetail-condition-incident"]');
-    await expect(slot).toContainText('Incident');
-    await expect(slot).toContainText(item.incident.title || item.incident.id);
+    const tile = page.locator('[data-test="alerts-alertdetail-tile-incident"]');
+    await expect(tile).toContainText('Incident');
+    await expect(tile).toContainText(item.incident.title || item.incident.id);
     await shoot(page, 'mk1-detail-incident');
-    await slot.locator('[data-test="alerts-alertdetail-incident-link"]').click();
+    await tile.click();
     await expect(page).toHaveURL(new RegExp(`/incidents/${item.incident.id}`));
   });
 });

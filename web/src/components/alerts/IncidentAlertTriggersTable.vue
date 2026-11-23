@@ -39,7 +39,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:column-sizes="refitLabels"
     >
       <template #empty>
-        <OEmptyState :title="t('alerts.noTriggersLoaded')" data-test="no-triggers-message" />
+        <div data-test="no-triggers-message" class="py-8 text-center">
+          <span class="text-text-secondary text-sm">
+            {{ t("alerts.noTriggersLoaded") }}
+          </span>
+        </div>
       </template>
 
       <template #cell-alert_name="{ row }">
@@ -195,7 +199,6 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -230,7 +233,6 @@ export default defineComponent({
     OButton,
     ODialog,
     OTruncatedText,
-    OEmptyState,
     OTimeCell,
   },
   props: {

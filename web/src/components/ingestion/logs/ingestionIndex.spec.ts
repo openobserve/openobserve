@@ -52,7 +52,7 @@ vi.mock("@/utils/clipboard", () => ({
 }));
 
 const mockCopyToClipboardOptions = {
-  successMessage: "Content copied successfully!",
+  successMessage: "Content Copied Successfully!",
   errorMessage: "Error while copy content.",
   timeout: 5000,
 };

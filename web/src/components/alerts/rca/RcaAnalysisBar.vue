@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :description="item.description"
           @select="$emit('select-run', item.isLatest ? null : item.runId)"
         >
-          <span :class="item.selected ? 'font-semibold' : 'font-semibold'">{{ item.label }}</span>
+          <span :class="item.selected ? 'font-bold' : 'font-semibold'">{{ item.label }}</span>
         </ODropdownItem>
       </ODropdownGroup>
     </ODropdown>
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             icon-only
             data-test="rca-more-btn"
-            variant="ghost"
+            variant="secondary"
             class="shrink-0"
             :aria-label="t('alerts.incidents.rcaRun.more')"
           >

@@ -299,8 +299,23 @@ const loadDashboard = async () => {
         panel: { title?: string; config: Record<string, unknown>; queries: { query: string }[] },
         index: number,
       ) => {
-        // Errors counts with its own FILTER, so a window with spans but no errors plots zeros, not "No data".
-        const whereClause = baseFilters.length ? "WHERE " + baseFilters.join(" AND ") : "";
+        // Build WHERE clause based on filters
+        let whereClause = "";
+
+        // Special handling for "Errors" panel - always filter by error status
+        if (panel.title === "Errors") {
+          const errorFilters = ["span_status = 'ERROR'"];
+          const parsedFilter = parseEffectiveFilter();
+          if (parsedFilter) errorFilters.push(parsedFilter);
+
+          if (baseFilters.length) {
+            errorFilters.push(...baseFilters);
+          }
+
+          whereClause = errorFilters.length ? "WHERE " + errorFilters.join(" AND ") : "";
+        } else {
+          whereClause = baseFilters.length ? "WHERE " + baseFilters.join(" AND ") : "";
+        }
 
         // Build the final query: substitute placeholders then apply mode transforms
         let query = panel["queries"][0].query

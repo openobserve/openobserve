@@ -591,7 +591,7 @@ describe("DateTimePickerDashboard", () => {
       expect(gate.picked.value.relativeTimePeriod).toBe("1h");
       expect(gate.applied.value.relativeTimePeriod).toBe("15m");
       expect(gate.needsRefresh.value).toBe(true);
-      expect(wrapper.find('[data-test="date-time-btn"]').text()).toContain("Past 1 hour");
+      expect(wrapper.find('[data-test="date-time-btn"]').text()).toContain("Past 1 Hour");
     });
 
     it("shows the applied range again after closing on a range that ends before it starts", async () => {

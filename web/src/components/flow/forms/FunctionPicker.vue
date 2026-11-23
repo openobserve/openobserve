@@ -67,10 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       createNewFunction ? 'h-full min-h-0 gap-0' : createButton ? 'h-full min-h-0 gap-2' : 'gap-4'
     "
   >
-    <div v-if="loading" class="flex flex-col gap-2">
-      <OSkeleton shape="block" class="h-8" />
-      <OSkeleton shape="block" class="h-40" />
-    </div>
+    <OSpinner v-if="loading" size="lg" class="mx-auto my-8" />
 
     <template v-else>
       <!-- create / pick MODE SWITCH (pipelines). Single-screen hosts (workflows) use a
@@ -180,14 +177,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-start gap-2">
                 <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                 <span>
-                  <span class="text-text-link font-semibold">{{ t("flow.function.rbf") }}</span>
+                  <span class="text-text-link font-bold">{{ t("flow.function.rbf") }}</span>
                   {{ t("flow.function.rbfDesc") }}
                 </span>
               </div>
               <div class="flex items-start gap-2">
                 <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                 <span>
-                  <span class="text-text-link font-semibold">{{ t("flow.function.raf") }}</span>
+                  <span class="text-text-link font-bold">{{ t("flow.function.raf") }}</span>
                   {{ t("flow.function.rafDesc") }}
                 </span>
               </div>
@@ -332,7 +329,7 @@ import {
   type SavedFunctionForm,
 } from "@/plugins/logs/SearchBar.SavedFunction.schema";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

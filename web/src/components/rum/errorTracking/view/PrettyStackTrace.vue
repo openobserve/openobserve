@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- eslint-enable local/no-hardcoded-px -->
       <OIcon name="code-off" size="lg" class="mb-2" />
-      <div class="text-text-secondary mb-1 text-sm font-medium">
+      <div class="text-text-secondary mb-1 text-base font-medium">
         {{ t("rum.sourceMapsNotAvailable") }}
       </div>
       <div
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Error message -->
         <div
           v-if="stackTrace.error"
-          class="error-header rounded-t-default -mb-px border border-solid !px-4 px-3 !py-2.5 py-2 text-sm font-semibold [letter-spacing:0.01em] shadow-sm"
+          class="error-header rounded-t-default -mb-px border border-solid !px-4 px-3 !py-2.5 py-2 text-sm font-bold font-semibold [letter-spacing:0.01em] shadow-sm"
           :style="{
             'background-color': errorHeaderBackground,
             color: errorHeaderColor,

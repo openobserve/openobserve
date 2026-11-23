@@ -25,10 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @date-change="onDateChange"
     @refresh="refresh"
   >
-    <!-- The banner (K3) and the scope bar wait for the scope together, so neither pushes the graph
-         down. Same Stream/Agent bar as LLM Insights; the graph follows the agent's source_stream. -->
-    <template v-if="scopeReady">
-      <AiNoAgentIdentityBanner v-if="noAgentIdentity" data-test="agent-graph" />
+    <!-- Scope control — same Stream/Agent pattern as LLM Insights, so the two
+         AI pages read as one product. Stream tab picks a trace stream; Agent
+         tab picks a discovered agent and the graph follows its source_stream.
+         Lives in OPageLayout's #subnav (which draws the full-bleed divider). -->
+    <template #subnav>
+      <!-- Shared scope control. #subnav already draws the full-bleed divider
+           (bordered:false). allAgents:false → agent picker falls back to the
+           plain agent label. Graph's version-agnostic hint rides in the #badges
+           slot; its viz-type + layout controls ride in #trailing. -->
       <AiScopeBar
         v-model:filter-mode="filterMode"
         v-model:active-stream="activeStream"
@@ -36,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model:selected-agent-name="selectedAgentName"
         v-model:selected-version="selectedVersion"
         data-test="agent-graph"
-        bordered
+        :bordered="false"
         :stream-option-tooltip="true"
         :show-version="false"
         :labels="{
@@ -112,6 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </AiScopeBar>
     </template>
 
+    <!-- Stream mode because these LLM spans carry no agent identity: the graph
+         shows the stream's services; the banner says why there is no agent. -->
+    <AiNoAgentIdentityBanner v-if="noAgentIdentity && scopeReady" data-test="agent-graph" />
+
     <!-- Gate the graph until the effective stream is genuinely resolved.
          ServiceGraph loads unconditionally in its own onMounted, so mounting it
          before loadAgents() resolves would fire an initial query against the
@@ -135,7 +144,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="min-h-0 flex-1"
     />
     <!-- Agent mode whose agents list failed to load: not "no agents". -->
-    <div v-else-if="scopeReady && agentsLoadFailed" class="flex min-h-0 flex-1 flex-col">
+    <div
+      v-else-if="scopeReady && agentsLoadFailed"
+      class="flex min-h-0 flex-1 items-center justify-center"
+    >
       <AiAgentsLoadError
         :error="agentsError ?? 'failed'"
         data-test="agent-graph"
@@ -148,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else-if="hasNoAgents"
       data-test="agent-graph-no-agents"
-      class="flex min-h-0 flex-1 flex-col"
+      class="flex min-h-0 flex-1 items-center justify-center"
     >
       <OEmptyState
         icon="hub"
@@ -157,7 +169,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <!-- Agents / stream still resolving. -->
-    <OSkeleton v-else shape="block" class="min-h-0 flex-1" data-test="agent-graph-loading" />
+    <div
+      v-else
+      data-test="agent-graph-loading"
+      class="flex min-h-0 flex-1 items-center justify-center"
+    >
+      <OSpinner size="lg" />
+    </div>
   </AiPageShell>
 </template>
 
@@ -175,7 +193,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";

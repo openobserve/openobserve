@@ -27,7 +27,7 @@ export class IngestionTokensPage {
         this.dialogCloseBtn = page.locator('[data-test="o-dialog-close-btn"]');
         this.nameInputError = page.locator('[data-test="ingestion-token-name-input-error"]');
 
-        // "Manage tokens" entry point (rendered on the Ingestion page)
+        // "Manage Tokens" entry point (rendered on the Ingestion page)
         this.manageTokensButton = page.getByRole('button', { name: /Manage Tokens/i });
 
         // ============================================================

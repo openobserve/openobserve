@@ -140,7 +140,7 @@ class FunctionsImportExportPage {
     await this.importSqlEditor.waitFor({ state: 'visible', timeout: 15000 });
   }
 
-  /** Switch to the "URL import" source tab and wait for the editor to remount. */
+  /** Switch to the "URL Import" source tab and wait for the editor to remount. */
   async switchToUrlTab() {
     await this.urlImportTab.click();
     await this.importUrlInput.waitFor({ state: 'visible', timeout: 15000 });

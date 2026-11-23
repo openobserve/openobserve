@@ -108,9 +108,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <div class="flex min-h-0 flex-1 max-lg:flex-col max-lg:overflow-y-auto">
-        <div class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 pb-2 max-lg:flex-none">
-          <div class="bg-card-glass-bg border-border-default px-page-edge shrink-0 border-b py-2.5">
+        <div class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 py-2 max-lg:flex-none">
+          <div class="bg-card-glass-bg border-border-default shrink-0 border-b px-3 py-2.5">
             <div class="flex items-center gap-3 max-md:flex-col max-md:items-start">
+              <div class="rounded-default bg-theme-accent h-4 w-0.75 shrink-0 max-md:hidden" />
               <span class="text-compact font-semibold">
                 {{ t("alerts.downtimes.form.appliesTo") }}
               </span>
@@ -174,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="bg-card-glass-bg mx-page-edge flex min-h-0 flex-1 flex-col max-lg:flex-none">
+          <div class="bg-card-glass-bg mx-2 flex min-h-0 flex-1 flex-col max-lg:flex-none">
             <OToggleGroup
               :model-value="activeTab"
               class="shrink-0"
@@ -287,18 +288,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-s pb-2 max-lg:h-auto max-lg:flex-none max-lg:border-s-0 max-lg:border-t"
+          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-s py-2 max-lg:h-auto max-lg:flex-none max-lg:border-s-0 max-lg:border-t"
         >
           <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
             <div
-              class="border-border-default px-page-edge flex shrink-0 items-center border-b py-2.5 select-none"
+              class="border-border-default flex shrink-0 items-center border-b px-3 py-2.5 select-none"
             >
               <span class="text-sm font-medium">{{ t("alerts.downtimes.preview.title") }}</span>
             </div>
             <div class="min-h-0 flex-1 overflow-auto">
               <p
                 v-if="conditionIncomplete"
-                class="text-text-secondary px-page-edge pt-2 text-xs"
+                class="text-text-secondary px-3 pt-2 text-xs"
                 data-test="add-downtime-preview-incomplete"
               >
                 {{ t("alerts.downtimes.preview.finishCondition") }}
@@ -313,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
             <div
-              class="border-border-default px-page-edge flex shrink-0 items-center border-b py-2.5 select-none"
+              class="border-border-default flex shrink-0 items-center border-b px-3 py-2.5 select-none"
             >
               <span class="text-sm font-medium">
                 {{ t("alerts.downtimes.summaryPane.title") }}

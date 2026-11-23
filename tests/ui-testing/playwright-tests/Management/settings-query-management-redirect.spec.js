@@ -2,7 +2,7 @@
 //
 // Settings Query Management Redirect — navigation/gating E2E tests.
 //
-// Query Management ("Running queries") is an enterprise-only, meta-org-only
+// Query Management ("Running Queries") is an enterprise-only, meta-org-only
 // settings section. On an OSS build the observable behavior is: (1) the Query
 // Management tab is absent from the Settings rail, and (2) a direct URL to
 // /settings/query_management redirects to the enterprise-locked page. The runtime
@@ -39,7 +39,7 @@ test.describe("Settings Query Management Redirect testcases", () => {
     testLogger.info('Query Management tab correctly absent from the OSS Settings rail');
   });
 
-  test("should show the Query Management lock in place when navigating directly to /settings/query_management on OSS", {
+  test("should redirect to the enterprise-locked page when navigating directly to /settings/query_management on OSS", {
     tag: ['@query-management-redirect', '@all', '@oss', '@P0']
   }, async ({ page }) => {
     const edition = await pm.editionFeaturesPage.detectEdition();
@@ -48,7 +48,7 @@ test.describe("Settings Query Management Redirect testcases", () => {
     await pm.queryManagementPage.navigateToQueryManagement(orgId);
     await pm.queryManagementPage.expectEnterpriseLockedPage();
 
-    testLogger.info('Direct Query Management URL correctly shows the lock in place on OSS');
+    testLogger.info('Direct Query Management URL correctly redirects to the enterprise-locked page on OSS');
   });
 
   test("redirects Query Management back to General Settings outside the meta org (enterprise)", {

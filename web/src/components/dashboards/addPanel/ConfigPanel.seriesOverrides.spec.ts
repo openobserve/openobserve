@@ -138,7 +138,7 @@ describe("ConfigPanel Series Overrides section", { timeout: 30_000 }, () => {
     mountPanel(type);
     await flushPromises();
     expect(section().exists()).toBe(true);
-    expect(section().text()).toContain("Series overrides");
+    expect(section().text()).toContain("Series Overrides");
     expect(addButton().text()).toBe("Add series override");
     expect(fieldOverridesButton().exists()).toBe(false);
   });

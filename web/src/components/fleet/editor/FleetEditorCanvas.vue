@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="pointer-events-auto flex flex-1 items-center justify-end gap-1">
         <OButton
           variant="secondary"
+          icon="add"
           data-test="fleet-editor-canvas-add-pipeline"
           @click="emit('add-pipeline')"
         >
@@ -46,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           icon-only
-          variant="ghost"
+          variant="secondary"
           icon="account-tree"
           data-test="fleet-editor-canvas-auto-layout"
           @click="autoLayout"
@@ -55,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           icon-only
-          variant="ghost"
+          variant="secondary"
           icon="fullscreen"
           data-test="fleet-editor-canvas-fit"
           @click="fit"
@@ -64,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           icon-only
-          variant="ghost"
+          variant="secondary"
           icon="delete-sweep"
           :aria-label="t('fleet.editor.clear')"
           data-test="fleet-editor-canvas-clear"

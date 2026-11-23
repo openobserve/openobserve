@@ -93,7 +93,7 @@ export default {
         <!-- section label (Source / Transform / Destination). Same mb-3 outer
              gap as the node cards (matching the original NodeSidebar). -->
         <div v-if="node.isSectionHeader" class="rounded-default mb-3">
-          <div class="np-section text-sm font-medium">{{ node.label }}</div>
+          <div class="np-section text-base font-medium">{{ node.label }}</div>
         </div>
 
         <!-- draggable / clickable node card -->
@@ -114,7 +114,7 @@ export default {
               <template #content>
                 <div class="px-2.5 py-1.5">
                   <div class="text-2xs mb-0.5 font-medium capitalize">{{ node.label }}</div>
-                  <div v-if="node.tooltip" class="text-2xs leading-[1.3] capitalize">
+                  <div v-if="node.tooltip" class="text-3xs leading-[1.3] capitalize">
                     {{ node.tooltip }}
                   </div>
                 </div>

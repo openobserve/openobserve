@@ -255,12 +255,6 @@ export default defineComponent({
       autoRun: () => isAutoRunOn.value,
     });
     const isRunQueryPending = computed(() => livePreview.isPending.value);
-    // The explorer's refresh button shows the chart's age, stamped when a run settles.
-    const isLoading = computed<boolean>(() => !!panelEditorRef.value?.isLoading);
-    const lastRunAt = ref<number | null>(null);
-    watch(isLoading, (loading, wasLoading) => {
-      if (wasLoading && !loading) lastRunAt.value = Date.now();
-    });
 
     // A seeded panel's load-time normalisation is not an edit, so live preview starts with the user's first input.
     const armOnFirstInput = () => livePreview.arm();
@@ -345,8 +339,6 @@ export default defineComponent({
       onUserRun,
       applyPanelData,
       isRunQueryPending,
-      isLoading,
-      lastRunAt,
     };
   },
 });

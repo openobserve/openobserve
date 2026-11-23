@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="button"
               class="o2-hub-card group rounded-default border-border-default bg-surface-panel hover:border-accent hover:bg-surface-subtle focus-visible:ring-accent flex items-start gap-3 border p-4 text-left transition-colors outline-none focus-visible:ring-2"
               :data-test="item.dataTest || `section-hub-card-${item.key}`"
-              @click="router.push(item.to)"
+              @click="item.locked ? openUpgradeDialog() : router.push(item.to)"
             >
               <span
                 class="rounded-default bg-surface-subtle text-text-secondary group-hover:bg-tabs-hover-bg group-hover:text-accent mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center transition-colors"
@@ -100,8 +100,10 @@ import { computed } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 const router = useRouter();
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
 export interface SectionHubItem {
   key: string;

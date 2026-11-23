@@ -242,11 +242,8 @@ const rowOf = (wrapper: any, alertId: string) =>
  *  events, so the explanatory tooltip is anchored on a wrapper rather than on
  *  the button — asserting on the rendered set keeps the test honest about the
  *  string without pinning that plumbing. */
-const cloneReasons = (wrapper: any): string[] =>
-  wrapper
-    .findAllComponents({ name: "ODropdownItem" })
-    .filter((item: any) => String(item.attributes("data-test") ?? "").endsWith("-clone-alert"))
-    .map((item: any) => item.props("disabledReason") ?? item.attributes("disabled-reason"));
+const tooltipContents = (wrapper: any): string[] =>
+  wrapper.findAllComponents({ name: "OTooltip" }).map((tt: any) => tt.props("content"));
 
 /** The row's NAME CELL. Every labelling assertion is scoped through this:
  *  a page-wide `find` would be satisfied by markup parked anywhere on the page
@@ -659,8 +656,7 @@ describe("AlertList — SLO alert rows", () => {
     // A missing i18n key makes t() echo the key back, so pin that the key is
     // really translated before comparing against it.
     expect(i18n.global.t("alerts.sloCloneDisabled")).not.toBe("alerts.sloCloneDisabled");
-    // Clone lives in the row menu; its item carries the reason it is unavailable.
-    expect(cloneReasons(wrapper)).toContain(i18n.global.t("alerts.sloCloneDisabled"));
+    expect(tooltipContents(wrapper)).toContain(i18n.global.t("alerts.sloCloneDisabled"));
   });
 
   it("leaves Clone enabled on a normal alert row", async () => {
@@ -668,7 +664,7 @@ describe("AlertList — SLO alert rows", () => {
 
     const cloneBtn = wrapper.find('[data-test="alert-list-plain-alert-clone-alert"]');
     expect(cloneBtn.attributes("disabled")).toBeUndefined();
-    expect(cloneReasons(wrapper)).not.toContain(i18n.global.t("alerts.sloCloneDisabled"));
+    expect(tooltipContents(wrapper)).not.toContain(i18n.global.t("alerts.sloCloneDisabled"));
   });
 
   // Defence in depth: the disabled attribute is a UI affordance, the guard is
@@ -791,40 +787,5 @@ describe("AlertList — SLO alert rows", () => {
     expect(wrapper.find('[data-test="alert-list-slo-burn-alert-slo-link"]').text()).toContain(
       "checkout-availability",
     );
-  });
-
-  it("keeps the previous entry's search when a folder is clicked, and restores it on Back", async () => {
-    (store.state as any).organizationData.foldersByType = {
-      alerts: [
-        { folderId: "default", name: "Default" },
-        { folderId: "other", name: "Other" },
-      ],
-    };
-    await router.push({
-      name: "alertList",
-      query: { folder: "default", "v.search": "cpu", "v.all": "true" },
-    });
-    wrapper = await mountBare([]);
-    await settle();
-    expect(wrapper.vm.searchQuery).toBe("cpu");
-    // The stubbed FolderList would emit the URL's folder on mount, which ends the restore.
-    await (wrapper.vm as any).updateActiveFolderId("default");
-    await settle();
-    expect(wrapper.vm.searchQuery).toBe("cpu");
-
-    await (wrapper.vm as any).updateActiveFolderId("other");
-    await settle();
-    expect(router.currentRoute.value.query.folder).toBe("other");
-    expect(router.currentRoute.value.query["v.search"]).toBeUndefined();
-
-    router.back();
-    await settle();
-    expect(router.currentRoute.value.query).toMatchObject({
-      folder: "default",
-      "v.search": "cpu",
-      "v.all": "true",
-    });
-    expect(wrapper.vm.searchQuery).toBe("cpu");
-    expect(wrapper.vm.searchAcrossFolders).toBe(true);
   });
 });

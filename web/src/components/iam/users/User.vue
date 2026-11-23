@@ -49,7 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-menu-data-test="user-list-row-more-actions"
           :loading="loading"
           :forbidden="forbidden"
-          :error="loadError"
           forbidden-resource="users"
           :selected-ids="selectedUserIds"
           v-model:global-filter="filterQuery"
@@ -65,7 +64,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :persist-columns="true"
           table-id="iam-users-list"
           @update:selected-ids="handleSelectedIdsUpdate"
-          @retry="refreshUsers"
         >
           <template #toolbar>
             <div class="contents">
@@ -121,20 +119,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @action="filterQuery || roleFilters.length ? clearFilters() : openAddFlow()"
             >
               <template v-if="searchInviteEmail" #actions>
-                <OButton
-                  variant="primary"
+                <EmptyStateActionCard
+                  icon="person-add"
+                  :label="t('user.inviteSearchedEmail', { email: searchInviteEmail })"
+                  :sublabel="t('user.inviteSearchedEmailDesc')"
                   data-test="user-list-invite-searched-email"
                   @click="openInviteDialog(searchInviteEmail)"
-                >
-                  {{ t("user.inviteSearchedEmail", { email: searchInviteEmail }) }}
-                </OButton>
-                <OButton
-                  variant="secondary"
+                />
+                <EmptyStateActionCard
+                  icon="filter-list"
+                  :label="t('emptyState.filtered.action')"
+                  :sublabel="t('emptyState.filtered.actionDesc')"
                   data-test="user-list-clear-filters"
                   @click="clearFilters()"
-                >
-                  {{ t("emptyState.filtered.action") }}
-                </OButton>
+                />
               </template>
             </OEmptyState>
           </template>
@@ -290,7 +288,7 @@ import { blockEmailsInConfig } from "@/components/settings/orgDomainRestrictions
 import { queryClient } from "@/composables/query/queryClient";
 import { useMutation } from "@tanstack/vue-query";
 import { defineComponent, ref, toRef, onActivated, onBeforeMount, watch, computed } from "vue";
-import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
+import { useListViewState } from "@/composables/useListViewState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -319,17 +317,13 @@ import InviteMembersDialog from "@/components/iam/users/InviteMembersDialog.vue"
 import { splitInviteEmails } from "@/components/iam/users/MemberInvitation.schema";
 import { getImageURL, verifyOrganizationStatus, maskText, validateEmail } from "@/utils/zincutils";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import {
-  featureState,
-  forbiddenState,
-  loadErrorText,
-  type ForbiddenState,
-} from "@/utils/featureGate";
+import { featureState, forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -350,6 +344,7 @@ export default defineComponent({
     ODialog,
     ConfirmDialog,
     OEmptyState,
+    EmptyStateActionCard,
     OSearchInput,
   },
   emits: ["updated:fields", "deleted:fields", "updated:dates"],
@@ -373,10 +368,7 @@ export default defineComponent({
     const { usersState } = usePermissions();
     const isEnterprise = ref(false);
     const isCurrentUserInternal = ref(false);
-    const filterQuery = toRef(
-      useListViewState("iam-users", { filterQuery: "" }, { url: LIST_URL_PARAMS }),
-      "filterQuery",
-    );
+    const filterQuery = toRef(useListViewState("iam-users", { filterQuery: "" }), "filterQuery");
 
     const toCamelCase = (str: string) => {
       return str.charAt(0).toUpperCase() + str.slice(1);
@@ -843,8 +835,6 @@ export default defineComponent({
     const fetching = ref(false);
     const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref<ForbiddenState>(false);
-    // A failed read with no rows on screen is the table's error state, never the first-run one (K5).
-    const loadError = ref<string | null>(null);
     // The ?email= deep link opens the edit dialog, so it is latched — the
     // cached paint and the fresh one must not open it twice.
     let deepLinkOpened = false;
@@ -933,7 +923,6 @@ export default defineComponent({
       loading.value = !warm;
       fetching.value = true;
       forbidden.value = false;
-      loadError.value = null;
       return new Promise((resolve, reject) => {
         (force
           ? queryClient
@@ -1001,9 +990,7 @@ export default defineComponent({
             console.error("Failed to fetch org members:", err);
             dismiss();
             forbidden.value = forbiddenState(err);
-            if (!rows.value.length) {
-              loadError.value = loadErrorText(err, t("emptyState.loadError.description"));
-            } else if (!forbidden.value) {
+            if (!forbidden.value) {
               toast({
                 variant: "error",
                 message: t("iam.user.failedToLoadUsers", {
@@ -1674,7 +1661,6 @@ export default defineComponent({
       usersState,
       columns,
       loading,
-      loadError,
       fetching,
       lastUpdatedAt,
       forbidden,

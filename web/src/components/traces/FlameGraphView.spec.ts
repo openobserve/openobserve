@@ -1225,7 +1225,7 @@ describe("FlameGraphView", () => {
       });
 
       expect(result).toContain("<div");
-      expect(result).toContain("font-weight: var(--font-semibold)");
+      expect(result).toContain("font-weight: bold");
       expect(result).toContain("font-size: var(--text-2xs)");
       expect(result).toContain("display: flex");
       expect(result).toContain("justify-content: space-between");

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <section data-test="rca-what-happened" :aria-labelledby="headingId" class="flex flex-col">
     <div class="mb-3 flex flex-wrap items-baseline gap-2">
-      <h3 :id="headingId" class="text-text-heading m-0 text-sm font-semibold">
+      <h3 :id="headingId" class="text-text-heading m-0 text-base font-bold">
         {{ t("alerts.incidents.rcaSummary.whatHappened") }}
       </h3>
       <span v-if="!live" class="text-text-secondary text-xs">
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-if="statusOf(idx) !== 'confirmed'"
               data-test="rca-timeline-marker"
-              class="text-2xs shrink-0 font-semibold"
+              class="text-3xs shrink-0 font-bold"
               :class="MARKER[statusOf(idx)].tag"
             >
               {{ markerLabel(statusOf(idx)) }}
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="number"
                   type="button"
                   data-test="rca-timeline-chip"
-                  class="rounded-default text-2xs inline-grid h-5 min-w-5.5 cursor-pointer place-items-center border px-1.5 font-mono font-semibold"
+                  class="rounded-default text-3xs inline-grid h-5 min-w-5.5 cursor-pointer place-items-center border px-1.5 font-mono font-semibold"
                   :class="
                     isOpen(idx, number)
                       ? 'bg-accent text-text-inverse border-transparent'

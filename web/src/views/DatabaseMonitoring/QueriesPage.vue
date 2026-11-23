@@ -80,7 +80,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            toolbar: both tables below own a toolbar and only one of them is
            mounted at a time, so a control in either would vanish with it.
            One row, above both, serving whichever table is showing. -->
-      <div class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-2">
+      <div class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-1.5">
+        <DbmScopeFilters
+          class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-1/4"
+          :filters="dimensionFilters"
+          :insight-chip="activeInsightChip"
+          @clear="clearScope"
+          @clear-insight="activeInsightId = null"
+        />
+        <div class="min-w-48 flex-1 max-lg:order-last max-lg:w-full">
+          <OSearchInput
+            :model-value="search"
+            :placeholder="t('dbm.queries.searchPlaceholder')"
+            :debounce="400"
+            data-test="dbm-queries-search"
+            @update:model-value="onSearchInput"
+          />
+        </div>
+        <!-- Off = real SQL only; on also includes the driver's connection bookkeeping. -->
+        <span
+          class="border-border-default rounded-default inline-flex shrink-0 items-center border px-2.5 py-2"
+          data-test="dbm-queries-stmt-class"
+        >
+          <OCheckbox
+            :model-value="stmtClass"
+            true-value="all"
+            false-value="query"
+            data-test="dbm-queries-stmt-class-checkbox"
+            :label="t('dbm.queries.stmtClass.overheadLabel')"
+            @update:model-value="onStmtClassChange"
+          />
+          <OTooltip side="bottom" :content="t('dbm.queries.stmtClass.allHint')" />
+        </span>
+
         <!-- What every Δ and every insight is measured AGAINST (W5). Each rule
              line names the choice, so a number can always be traced to the
              comparison that produced it. -->
@@ -100,23 +132,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip side="bottom" :content="t('dbm.insights.baseline.yesterdayHint')" />
           </OToggleGroupItem>
         </OToggleGroup>
-        <div class="w-70 min-w-0 max-lg:order-last max-lg:w-full">
-          <OSearchInput
-            :model-value="search"
-            :placeholder="t('dbm.queries.searchPlaceholder')"
-            :debounce="400"
-            data-test="dbm-queries-search"
-            @update:model-value="onSearchInput"
-          />
-        </div>
-        <DbmScopeFilters
-          class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-1/4"
-          :filters="dimensionFilters"
-          :insight-chip="activeInsightChip"
-          @clear="clearScope"
-          @clear-insight="activeInsightId = null"
-        />
-        <div class="flex-1 max-lg:hidden" aria-hidden="true" />
 
         <!-- Icons only: at 1280 any text here would take the filter chips' last room. Each follows the list on screen. -->
         <DbmCoverageLine
@@ -173,26 +188,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dbm-queries-refresh"
           @click="onRefresh()"
         />
-        <ODropdown side="bottom" align="end">
-          <template #trigger>
-            <OButton
-              icon-only
-              variant="ghost"
-              icon="more-horiz"
-              :label="t('common.more')"
-              data-test="dbm-queries-more"
-            />
-          </template>
-          <!-- Off = real SQL only; on also includes the driver's connection bookkeeping. -->
-          <ODropdownItem
-            :checked="stmtClass === 'all'"
-            :description="t('dbm.queries.stmtClass.allHint')"
-            data-test="dbm-queries-stmt-class"
-            @select="onStmtClassChange(stmtClass === 'all' ? 'query' : 'all')"
-          >
-            {{ t("dbm.queries.stmtClass.overheadLabel") }}
-          </ODropdownItem>
-        </ODropdown>
       </div>
 
       <!-- In fallback mode the client table UNMOUNTS: its tall empty-state
@@ -226,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState
             kind="error"
             :title="t('emptyState.loadError.title')"
-            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
+            :text="raw(message)"
             data-test="dbm-queries-error"
             @action="onRefresh()"
           />
@@ -277,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-body text-xs font-medium">
               {{ t("dbm.queries.foldRowText", { count: row.foldCount ?? 0 }) }}
             </span>
-            <OTruncatedText class="text-text-secondary text-2xs">
+            <OTruncatedText class="text-text-secondary text-3xs">
               {{
                 tailExpanded
                   ? t("dbm.queries.foldRowDetailOpen", { share: formatPercent(row.share, 0) })
@@ -298,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <div
               v-if="!row.isOther"
-              class="text-text-secondary text-2xs flex min-w-0 items-center gap-1"
+              class="text-text-secondary text-3xs flex min-w-0 items-center gap-1"
               :class="row.isTail ? 'ps-4' : ''"
             >
               <OTag type="dbSystem" :value="row.db_system" size="sm" />
@@ -317,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Every remainder states its own call count; only the first
                  explains what a remainder is, because three copies of the same
                  sentence is what made this block unreadable. -->
-            <span v-else class="text-text-secondary text-2xs">
+            <span v-else class="text-text-secondary text-3xs">
               {{
                 row.otherRowExplained
                   ? t("dbm.queries.otherRowDetail", { calls: formatCount(row.calls) })
@@ -607,7 +602,6 @@ import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { copyToClipboard } from "@/utils/clipboard";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -618,9 +612,7 @@ import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
@@ -1946,7 +1938,7 @@ const errorLabel = (row: QueryRow): I18nText =>
 
 const errorClass = (row: QueryRow) => {
   if ((row.errors ?? 0) <= 0) return "text-text-secondary";
-  return row.critical ? "text-status-error-text font-semibold" : "text-status-error-text";
+  return row.critical ? "text-status-error-text font-bold" : "text-status-error-text";
 };
 
 /**
@@ -2093,6 +2085,7 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     sortable: false,
     meta: {
       align: "right",
+      headerSubLabel: t("dbm.queries.columnSubLabels.calls"),
       headerTooltip: t("dbm.queries.columnHints.calls"),
     },
   },
@@ -2100,10 +2093,11 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     id: "p95_ns",
     header: t("dbm.queries.columns.p95"),
     accessorKey: "p95_ns",
-    size: 108,
+    size: 104,
     sortable: true,
     meta: {
       align: "right",
+      headerSubLabel: raw("p95"),
       headerTooltip: t("dbm.queries.columnHints.p95"),
     },
   },
@@ -2141,6 +2135,7 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     sortable: false,
     meta: {
       align: "right",
+      headerSubLabel: t("dbm.queries.columnSubLabels.load"),
       headerTooltip: t("dbm.queries.columnHints.load"),
     },
   },
@@ -2155,11 +2150,12 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     id: "p99_ns",
     header: t("dbm.queries.columns.p99"),
     accessorKey: "p99_ns",
-    size: 116,
+    size: 95,
     sortable: true,
     hideable: true,
     meta: {
       align: "right",
+      headerSubLabel: raw("p99"),
       headerTooltip: t("dbm.queries.columnHints.p99"),
     },
   },
@@ -2167,11 +2163,12 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     id: "max_ns",
     header: t("dbm.queries.columns.max"),
     accessorKey: "max_ns",
-    size: 112,
+    size: 95,
     sortable: true,
     hideable: true,
     meta: {
       align: "right",
+      headerSubLabel: raw("max"),
       headerTooltip: t("dbm.queries.columnHints.max"),
     },
   },

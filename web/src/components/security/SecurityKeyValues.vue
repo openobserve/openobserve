@@ -126,7 +126,7 @@ const pivotField = (row: KeyValueRow) => (row.field === undefined ? row.key : ro
       </div>
       <OEmptyState
         v-if="!shown.length"
-        size="compact"
+        size="inline"
         icon="search-off"
         :title="t('siem.record.noFields')"
       />

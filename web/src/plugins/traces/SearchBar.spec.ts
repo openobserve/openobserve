@@ -717,19 +717,6 @@ describe("SearchBar", () => {
 
       expect(wrapper.emitted("service-graph-refresh")).toBeTruthy();
     });
-
-    it("draws the graph refresh as the shared bordered refresh button with the graph's age", async () => {
-      searchObjInstance.meta.searchMode = "service-graph";
-      const loadedAt = Date.now() - 60_000;
-      wrapper = mountSearchBar({ serviceGraphLastRunAt: loadedAt, serviceGraphLoading: false });
-      await flushPromises();
-
-      const refresh = wrapper
-        .findAllComponents({ name: "ORefreshButton" })
-        .find((c) => c.props("dataTest") === "service-graph-refresh-btn");
-      expect(refresh?.props("lastRunAt")).toBe(loadedAt);
-      expect(refresh?.props("loading")).toBe(false);
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -905,7 +892,7 @@ describe("SearchBar", () => {
       await flushPromises();
 
       expect(pinBtn().exists()).toBe(true);
-      expect(pinBtn().attributes("aria-label")).toBe("search.pinToToolbar");
+      expect(pinBtn().attributes("title")).toBe("search.pinToToolbar");
       expect(pinBtn().findComponent({ name: "OIcon" }).props("name")).toBe("keep-outline");
       expect(pinnedBtn().exists()).toBe(false);
     });
@@ -924,7 +911,7 @@ describe("SearchBar", () => {
       expect(item.emitted("select")).toBeUndefined();
       expect(searchObjInstance.meta.showHistogram).toBe(true);
       expect(pinnedBtn().exists()).toBe(true);
-      expect(pinBtn().attributes("aria-label")).toBe("search.unpinFromToolbar");
+      expect(pinBtn().attributes("title")).toBe("search.unpinFromToolbar");
       expect(pinBtn().findComponent({ name: "OIcon" }).props("name")).toBe("keep");
       expect(menuItem().exists()).toBe(true);
 
@@ -933,20 +920,17 @@ describe("SearchBar", () => {
       expect(pinnedBtn().exists()).toBe(false);
     });
 
-    it("flips showHistogram from the pinned toggle, which carries its state and no switch", async () => {
+    it("flips showHistogram from the pinned button and its switch exactly once", async () => {
       searchObjInstance.meta.showHistogram = true;
       togglePin("histogram");
       wrapper = mountSearchBar();
       await flushPromises();
 
-      expect(pinnedBtn().attributes("aria-pressed")).toBe("true");
-      expect(pinnedBtn().find('[role="switch"]').exists()).toBe(false);
       await pinnedBtn().trigger("click");
       await flushPromises();
       expect(searchObjInstance.meta.showHistogram).toBe(false);
-      expect(pinnedBtn().attributes("aria-pressed")).toBe("false");
 
-      await pinnedBtn().trigger("click");
+      await pinnedBtn().find('[role="switch"]').trigger("click");
       await flushPromises();
       expect(searchObjInstance.meta.showHistogram).toBe(true);
     });
@@ -986,7 +970,7 @@ describe("SearchBar", () => {
     });
 
     it("falls back to More at a narrow lg width", async () => {
-      useWidth(190);
+      useWidth(300);
       togglePin("histogram");
       wrapper = mountSearchBar();
       await flushPromises();
@@ -996,8 +980,8 @@ describe("SearchBar", () => {
     });
 
     it.each([
-      [195, false],
-      [196, true],
+      [359, false],
+      [360, true],
     ])(
       "admits the pinned copy at width %i only when its full width fits: %s",
       async (width, shown) => {
@@ -1013,7 +997,7 @@ describe("SearchBar", () => {
     );
 
     it("keeps RED Metrics before Saved Views when only one fits", async () => {
-      useWidth(314);
+      useWidth(400);
       wrapper = mountSearchBar();
       await flushPromises();
       expect(savedViewsGroup().exists()).toBe(true);
@@ -1030,7 +1014,7 @@ describe("SearchBar", () => {
     it("shrinks the toggle labels for the pinned RED Metrics width", async () => {
       togglePin("savedViews");
       togglePin("histogram");
-      useWidth(554);
+      useWidth(660);
       wrapper = mountSearchBar();
       await flushPromises();
 
@@ -1342,49 +1326,6 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
-  describe("data-age refresh", () => {
-    const refresh = () => wrapper.find('[data-test="traces-search-bar-data-age-refresh"]');
-
-    afterEach(() => {
-      (searchObjInstance.meta as any).lastRunAt = null;
-      (searchObjInstance.meta as any).refreshFailedAt = null;
-    });
-
-    it("sits after Run query with the data age inside, and re-runs the search", async () => {
-      (searchObjInstance.meta as any).lastRunAt = Date.now();
-      searchObjInstance.loading = false;
-      wrapper = mountSearchBar({ isLoading: false });
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="traces-search-bar-data-age-refresh-age"]').text()).toBe(
-        "refreshButton.justNow",
-      );
-      await refresh().trigger("click");
-      expect(wrapper.emitted("searchdata")).toHaveLength(1);
-    });
-
-    it("shows a failed refresh and keeps the old age", async () => {
-      (searchObjInstance.meta as any).lastRunAt = Date.UTC(2026, 10, 1, 10, 42);
-      (searchObjInstance.meta as any).refreshFailedAt = Date.UTC(2026, 10, 1, 10, 47);
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      expect(refresh().attributes("data-state")).toBe("failed");
-      expect(wrapper.find('[data-test="traces-search-bar-data-age-refresh-failed"]').exists()).toBe(
-        true,
-      );
-    });
-
-    it("spins while the search runs", async () => {
-      (searchObjInstance.meta as any).lastRunAt = Date.now();
-      wrapper = mountSearchBar({ isLoading: true });
-      await flushPromises();
-
-      expect(refresh().attributes("aria-busy")).toBe("true");
-    });
-  });
-
-  // -------------------------------------------------------------------------
   describe("run query button", () => {
     it("should render the run query button", async () => {
       wrapper = mountSearchBar();
@@ -1606,7 +1547,7 @@ describe("SearchBar", () => {
       mount(SearchBar, {
         attachTo: "#app",
         props: { fieldValues: {}, isLoading: false },
-        global: { plugins: [store, router], stubs: sharedStubs },
+        global: { plugins: [store, router], stubs: { ...sharedStubs, ShareButton: false } },
       });
 
     beforeEach(() => {
@@ -1621,27 +1562,27 @@ describe("SearchBar", () => {
       markRun();
       wrapper = mountWithShare();
       await flushPromises();
-      expect(shareBtn().attributes("disabled")).toBe("false");
+      expect(shareBtn().attributes("aria-disabled")).toBeUndefined();
 
       expect((wrapper.vm as any).onFilterBuilderQuery("operation_name = 'POST /checkout'")).toBe(
         false,
       );
       await flushPromises();
 
-      expect(shareBtn().attributes("disabled")).toBe("true");
-      expect(shareBtn().attributes("disabled-reason")).toBe("search.autoRunPersistNeedsRun");
+      expect(shareBtn().attributes("aria-disabled")).toBe("true");
+      expect(shareBtn().text()).toContain("search.autoRunPersistNeedsRun");
 
       markRun();
       await flushPromises();
 
-      expect(shareBtn().attributes("disabled")).toBe("false");
+      expect(shareBtn().attributes("aria-disabled")).toBeUndefined();
     });
 
     it("disables Share before the first run", async () => {
       wrapper = mountWithShare();
       await flushPromises();
 
-      expect(shareBtn().attributes("disabled")).toBe("true");
+      expect(shareBtn().attributes("aria-disabled")).toBe("true");
     });
   });
 
@@ -1682,7 +1623,7 @@ describe("SearchBar", () => {
     });
 
     it("drops the button labels first and keeps the view toggle labels", async () => {
-      await mountAt(600);
+      await mountAt(700);
       expect(spansBtn().text()).toContain("traces.spansTab");
       expect(drillDown().text()).not.toContain("traces.drillDown");
       expect(resetBtn().text()).not.toContain("common.reset");
@@ -1696,7 +1637,7 @@ describe("SearchBar", () => {
 
     it("finally moves Reset into More, where it still resets", async () => {
       searchObjInstance.data.editorValue = "service_name = 'a'";
-      await mountAt(250);
+      await mountAt(300);
       expect(resetBtn().exists()).toBe(false);
 
       await menuReset().trigger("click");
@@ -1807,7 +1748,7 @@ describe("SearchBar", () => {
 
   // -------------------------------------------------------------------------
   describe("more actions menu", () => {
-    const moreBtn = () => wrapper.find('[data-test="traces-search-bar-more-menu-btn"]');
+    const moreBtn = () => wrapper.find('[data-test="traces-search-bar-more-actions-btn"]');
     const alertItem = () => wrapper.find('[data-test="traces-create-alert-btn"]');
     const redItem = () => wrapper.find('[data-test="traces-add-red-to-dashboard-btn"]');
 
@@ -1835,14 +1776,11 @@ describe("SearchBar", () => {
       expect(downloadFileMock).toHaveBeenCalledTimes(1);
     });
 
-    it("keeps ⋯ but drops the search actions outside the spans and traces views", async () => {
+    it("hides the menu outside the spans and traces views", async () => {
       searchObjInstance.meta.searchMode = "service-graph";
       wrapper = mountSearchBar();
       await flushPromises();
-      expect(moreBtn().exists()).toBe(true);
-      expect(wrapper.find('[data-test="traces-search-bar-export-btn"]').exists()).toBe(false);
-      expect(alertItem().exists()).toBe(false);
-      expect(wrapper.find('[data-test="logs-search-bar-share-link-btn"]').exists()).toBe(false);
+      expect(moreBtn().exists()).toBe(false);
     });
 
     it("creates a matches alert on select", async () => {
@@ -1971,7 +1909,7 @@ describe("SearchBar", () => {
 
       // Three 1.875rem lines measure 84px; one line is the pane's own height.
       expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([54]);
-      await wrapper.find('[data-test="traces-search-bar-filter-mode-text"]').trigger("click");
+      await wrapper.find('[data-test="traces-search-bar-filter-builder-toggle"]').trigger("click");
       await flushPromises();
       expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([null]);
     });
@@ -2045,10 +1983,10 @@ describe("SearchBar", () => {
       try {
         wrapper = mountSearchBar();
         await flushPromises();
-        const toggle = () => wrapper.find('[data-test="traces-search-bar-filter-editor-mode"]');
+        const toggle = () => wrapper.find('[data-test="traces-search-bar-filter-builder-toggle"]');
         expect(toggle().attributes("style")).toContain("right: 2.375rem");
 
-        await wrapper.find('[data-test="traces-search-bar-filter-mode-builder"]').trigger("click");
+        await toggle().trigger("click");
         await flushPromises();
         expect(toggle().attributes("style")).toContain("right: 2.375rem");
         expect(wrapper.find('[data-test="traces-search-bar-filter-builder-ai-btn"]').exists()).toBe(
@@ -3206,7 +3144,7 @@ describe("SearchBar", () => {
 
       it("shrinks the toggle labels before the pinned group falls back", async () => {
         widthSpy.mockRestore();
-        widthSpy = mockToolbarWidth(600);
+        widthSpy = mockToolbarWidth(660);
         wrapper = mountSearchBar();
         await flushPromises();
 
@@ -3224,7 +3162,7 @@ describe("SearchBar", () => {
 
       it("falls back to More at desktop width when the toolbar has no room", async () => {
         widthSpy.mockRestore();
-        widthSpy = mockToolbarWidth(280);
+        widthSpy = mockToolbarWidth(360);
         wrapper = mountSearchBar();
         await flushPromises();
 

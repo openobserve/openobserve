@@ -372,6 +372,7 @@ function rowTitle(e: EvidenceEvent): string {
 
     <template #empty>
       <OEmptyState
+        size="inline"
         icon="search"
         :kind="filtered ? 'filtered' : 'first-run'"
         :text="

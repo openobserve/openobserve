@@ -35,12 +35,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-insights-datetime"
       />
 
-      <ORefreshButton
-        :last-run-at="lastRunAt"
-        :loading="isLoading"
-        data-test="alert-insights-refresh-btn"
+      <OButton
+        icon-only
         @click="refreshDashboard"
-      />
+        :loading="isLoading"
+        variant="ghost"
+        data-test="alert-insights-refresh-btn"
+      >
+        <OIcon name="refresh" size="sm" />
+        <OTooltip :content="t('common.refresh')" />
+      </OButton>
     </template>
 
     <template #header-tabs>
@@ -186,8 +190,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="min-h-0 flex-1 px-2.5 pb-2.5 max-lg:overflow-y-auto">
       <div class="bg-card-glass-bg mb-2.5 h-[calc(100vh-13rem)] max-md:h-auto">
         <div @contextmenu="handleNativeContextMenu">
-          <div v-show="isLoading" class="grid h-100 grid-cols-2 gap-3 p-3">
-            <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-full" />
+          <div v-show="isLoading" class="flex h-100 items-center justify-center">
+            <OSpinner size="lg" />
+            <div class="ms-3">{{ t("alerts.insights.loading.insights") }}</div>
           </div>
 
           <div :class="isLoading ? 'invisible' : 'visible'">
@@ -234,8 +239,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
-import { useLoadedAt } from "@/composables/useLoadedAt";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vue";
 import { useRouter, useRoute } from "vue-router";
@@ -249,7 +252,7 @@ import { useAlertInsights } from "@/composables/useAlertInsights";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import insightsConfig from "@/utils/alerts/insights-metrics.json";
 import alertsService from "@/services/alerts";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -286,7 +289,6 @@ const {
 // State
 const show = ref(true);
 const isLoading = ref(false);
-const lastRunAt = useLoadedAt(isLoading);
 const dashboardRef = ref(null);
 const dateTimeRef = ref(null);
 const currentTab = ref("overview");

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The body is display:contents so its sections stay rows of the shared subgrid across plans. -->
     <div class="flex items-start justify-between gap-3 px-4 py-3">
       <div>
-        <h3 class="text-text-heading m-0 text-sm leading-5 font-semibold">
+        <h3 class="text-text-heading m-0 text-base leading-6 font-semibold">
           {{ t("billing.enterpriseLabel") }}
         </h3>
         <p class="text-text-secondary m-0 text-xs leading-4 font-normal">

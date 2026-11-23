@@ -313,6 +313,7 @@ const hasIssue = (group: FilterGroup) =>
         <OButton
           variant="ghost"
           size="sm"
+          icon="add"
           :disabled="disabled || Boolean(limitReason)"
           :data-test="`${dataTest}-add-condition${suffix(path)}`"
           @mousedown.prevent
@@ -325,6 +326,7 @@ const hasIssue = (group: FilterGroup) =>
         <OButton
           variant="ghost"
           size="sm"
+          icon="add"
           :disabled="disabled || Boolean(limitReason)"
           :data-test="`${dataTest}-add-group${suffix(path)}`"
           @mousedown.prevent

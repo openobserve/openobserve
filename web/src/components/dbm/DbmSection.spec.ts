@@ -29,19 +29,28 @@ describe("DbmSection", () => {
    * because this component exists to keep those six cards identical — a class
    * dropped here silently restyles every section on the page at once.
    */
-  // R4: a section is a heading plus content on the page surface, never a card.
-  it("renders an unboxed section shell", () => {
+  it("renders the bordered card shell", () => {
     const wrapper = mountSection();
 
     expect(wrapper.element.tagName).toBe("SECTION");
-    expect(wrapper.classes()).toEqual(["flex", "flex-col", "gap-2"]);
+    expect(wrapper.classes()).toEqual(
+      expect.arrayContaining([
+        "bg-card-glass-bg",
+        "border-border-default",
+        "rounded-default",
+        "flex",
+        "flex-col",
+        "overflow-hidden",
+        "border",
+      ]),
+    );
   });
 
   it("renders the title as the card's heading", () => {
     const heading = mountSection().get("h3");
     expect(heading.text()).toBe("Query plans");
     expect(heading.classes()).toEqual(
-      expect.arrayContaining(["text-text-heading", "text-sm", "font-semibold"]),
+      expect.arrayContaining(["text-text-heading", "text-compact", "font-medium"]),
     );
   });
 
@@ -52,9 +61,9 @@ describe("DbmSection", () => {
    * actually uses, and nothing else.
    */
   it.each([
-    ["baseline", "flex min-h-control-md flex-wrap items-baseline gap-2"],
-    ["center", "flex min-h-control-md flex-wrap items-center gap-2"],
-    ["between", "flex min-h-control-md items-center justify-between gap-2"],
+    ["baseline", "border-border-default flex flex-wrap items-baseline gap-2 border-b px-3 py-2"],
+    ["center", "border-border-default flex flex-wrap items-center gap-2 border-b px-3 py-2"],
+    ["between", "border-border-default flex items-center justify-between gap-2 border-b px-3 py-2"],
   ])("lays the header out for headerAlign=%s", (headerAlign, expected) => {
     const header = mountSection({ headerAlign }).get("h3").element.parentElement;
     expect(header?.getAttribute("class")).toBe(expected);
@@ -64,7 +73,7 @@ describe("DbmSection", () => {
   it("defaults to the baseline header", () => {
     const header = mountSection().get("h3").element.parentElement;
     expect(header?.getAttribute("class")).toBe(
-      "flex min-h-control-md flex-wrap items-baseline gap-2",
+      "border-border-default flex flex-wrap items-baseline gap-2 border-b px-3 py-2",
     );
   });
 

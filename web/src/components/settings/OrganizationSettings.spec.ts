@@ -163,14 +163,14 @@ describe("OrganizationSettings", () => {
       expect(wrapper.find('[data-test="add-toggle-usage-stream-btn"]').exists()).toBe(true);
     });
 
-    it("shows no saved value and no save bar until the settings exist", async () => {
+    it("shows no saved value and a loading bar until the settings exist", async () => {
       mockStore.state.organizationData.organizationSettings = undefined;
       const wrapper = createWrapper();
       // Looked up per read: the teleport stub re-creates its content when the page re-renders.
-      const bar = () => wrapper.find('[data-test="organization-settings-save-bar"]');
+      const bar = () => wrapper.get('[data-test="organization-settings-save-bar"]');
 
       expect(wrapper.find('[data-test="settings-org-trace-id-input-field"]').exists()).toBe(false);
-      expect(bar().exists()).toBe(false);
+      expect(bar().attributes("data-state")).toBe("loading");
 
       mockStore.state.organizationData.organizationSettings = {
         trace_id_field_name: "tid",
@@ -180,14 +180,14 @@ describe("OrganizationSettings", () => {
 
       const input = wrapper.get('[data-test="settings-org-trace-id-input-field"]');
       expect((input.element as HTMLInputElement).value).toBe("tid");
-      expect(bar().exists()).toBe(false);
+      expect(bar().attributes("data-state")).toBe("clean");
     });
 
     it("counts a field edit and a cross-link edit, and Discard restores both", async () => {
       mockStore.state.zoConfig.enable_cross_linking = true;
       const wrapper = createWrapper();
       // Looked up per read: the teleport stub re-creates its content when the page re-renders.
-      const bar = () => wrapper.find('[data-test="organization-settings-save-bar"]');
+      const bar = () => wrapper.get('[data-test="organization-settings-save-bar"]');
       const input = wrapper.get('[data-test="settings-org-trace-id-input-field"]');
 
       await input.setValue("other_trace");
@@ -201,14 +201,14 @@ describe("OrganizationSettings", () => {
 
       expect((input.element as HTMLInputElement).value).toBe("trace_id");
       expect(wrapper.vm.crossLinks).toEqual([]);
-      expect(bar().exists()).toBe(false);
+      expect(bar().attributes("data-state")).toBe("clean");
       mockStore.state.zoConfig.enable_cross_linking = undefined;
     });
 
     it("saves from the bar and returns to clean on the saved values", async () => {
       const wrapper = createWrapper();
       // Looked up per read: the teleport stub re-creates its content when the page re-renders.
-      const bar = () => wrapper.find('[data-test="organization-settings-save-bar"]');
+      const bar = () => wrapper.get('[data-test="organization-settings-save-bar"]');
 
       await wrapper.get('[data-test="settings-org-trace-id-input-field"]').setValue("other_trace");
       await wrapper.get('[data-test="add-alert-submit-btn"]').trigger("click");
@@ -216,7 +216,7 @@ describe("OrganizationSettings", () => {
       await flushPromises();
 
       expect(mockPostOrganizationSettings.mock.calls[0][1].trace_id_field_name).toBe("other_trace");
-      expect(bar().exists()).toBe(false);
+      expect(bar().attributes("data-state")).toBe("clean");
     });
 
     it("a save that completes late keeps later edits and never writes into another organization", async () => {

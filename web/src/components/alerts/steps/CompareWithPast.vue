@@ -25,6 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="section-header border-border-default flex items-center gap-0 border-b px-3 py-2.5"
       >
+        <div
+          class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
+        />
         <span class="section-header-title text-compact text-text-heading font-semibold">{{
           t("alerts.steps.compareWithPast")
         }}</span>
@@ -32,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="px-3 pb-2">
         <!-- Alert set for header -->
         <div
-          class="multi-window-text text-text-body mt-3 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-semibold"
+          class="multi-window-text text-text-body mt-3 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
         >
           <span>{{ t("alerts.compareWithPast.alertSetFor") }}</span>
           <div class="border-line h-px flex-1"></div>
@@ -43,14 +46,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="bg-card-glass-bg border-border-default flex min-h-27.5 flex-row items-start justify-between border px-3 py-2"
         >
           <div
-            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-semibold"
+            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
           >
             {{ t("alerts.compareWithPast.currentWindow") }}
           </div>
 
           <div class="flex flex-col items-start gap-2">
             <div
-              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-semibold"
+              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
             >
               {{ t("alerts.compareWithPast.cycle") }}
               <span class="cursor-pointer">
@@ -98,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Comparing with header -->
         <div
           v-if="localMultiTimeRange.length > 0"
-          class="multi-window-text text-text-body mt-2 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-semibold"
+          class="multi-window-text text-text-body mt-2 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
         >
           <span>{{ t("alerts.compareWithPast.comparingWith") }}</span>
           <div class="border-line h-px flex-1"></div>
@@ -116,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="reference-window-container bg-card-glass-bg border-border-default mt-2 flex min-h-27.5 flex-row items-start justify-between border px-3 py-2"
         >
           <div
-            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-semibold"
+            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
           >
             {{ t("alerts.compareWithPast.referenceWindow") }} {{ index + 1 }}
           </div>
@@ -150,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Cycle Info -->
           <div class="flex flex-col items-start gap-2">
             <div
-              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-semibold"
+              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
             >
               {{ t("alerts.compareWithPast.cycle") }}
               <span class="cursor-pointer">
@@ -333,7 +336,7 @@ export default defineComponent({
     };
 
     // Offset code ("15m") → counted noun. Shares the *Count plural keys with
-    // convertMinutesToDisplayValue so "1m" reads "1 minute", not "1 minutes".
+    // convertMinutesToDisplayValue so "1m" reads "1 Minute", not "1 Minutes".
     const UNIT_COUNT_KEYS: Record<string, I18nKey> = {
       s: "alerts.compareWithPast.secondCount",
       m: "alerts.compareWithPast.minuteCount",
@@ -359,8 +362,9 @@ export default defineComponent({
       return value;
     };
 
-    // Counted nouns use vue-i18n plural forms via t(key, n), which picks the
-    // singular only for n === 1, so 0 reads "0 minutes".
+    // Counted nouns → vue-i18n plural forms ("{n} Minute | {n} Minutes"),
+    // called as t(key, n). vue-i18n picks the singular form only for n === 1
+    // (n === 0 → "0 Minutes").
     const convertMinutesToDisplayValue = (minutes: number) => {
       if (minutes < 60) {
         return t("alerts.compareWithPast.minuteCount", minutes);

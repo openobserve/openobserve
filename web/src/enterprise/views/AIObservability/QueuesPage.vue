@@ -70,25 +70,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <OEmptyState
-            :kind="search ? 'filtered' : 'first-run'"
-            :title="
-              search
-                ? t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })
-                : t('emptyState.noQueues.title')
-            "
-            :text="
-              search
-                ? t('emptyState.filtered.description', {
-                    noun: t('emptyState.filtered.fallbackNoun'),
-                  })
-                : t('emptyState.noQueues.description')
-            "
-            :icon="search ? undefined : 'database'"
-            data-test="ai-queues-empty-state"
-            :action-label="search ? undefined : t('emptyState.noQueues.action')"
-            @action="search ? (search = '') : openCreate()"
-          />
+          <div class="flex items-center justify-center py-8">
+            <OEmptyState
+              :kind="search ? 'filtered' : 'first-run'"
+              :title="
+                search
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })
+                  : t('emptyState.noQueues.title')
+              "
+              :text="
+                search
+                  ? t('emptyState.filtered.description', {
+                      noun: t('emptyState.filtered.fallbackNoun'),
+                    })
+                  : t('emptyState.noQueues.description')
+              "
+              :icon="search ? undefined : 'database'"
+              data-test="ai-queues-empty-state"
+              :action-label="search ? undefined : t('emptyState.noQueues.action')"
+              @action="search ? (search = '') : openCreate()"
+            />
+          </div>
         </template>
 
         <template #cell-description="{ row }">

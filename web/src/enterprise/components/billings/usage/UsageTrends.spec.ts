@@ -162,7 +162,7 @@ describe("UsageTrends cost and volume", () => {
     await flushPromises();
 
     const header = wrapper.find('[data-test="billings-usagetrends-chart-pane"]');
-    expect(header.text()).toContain("Volume over time");
+    expect(header.text()).toContain("Volume Over Time");
     // The forecast is money, so it has no place on a volume chart.
     expect(wrapper.find('[data-test="billings-usagetrends-forecast-toggle"]').exists()).toBe(false);
     // Volume came back with the cost rows, so switching sends nothing.
@@ -310,7 +310,7 @@ describe("UsageTrends projected total", () => {
 
     // Read from usage records, not the bill, so it does not take the bill's name.
     const total = wrapper.find('[data-test="billings-usagetrends-kpi-total"]').text();
-    expect(total).toContain("Estimated cost so far");
+    expect(total).toContain("Estimated Cost So Far");
   });
 
   it("names the cost an estimate on a cycle's first day, before there is a pace", async () => {
@@ -329,6 +329,6 @@ describe("UsageTrends projected total", () => {
 
     expect(wrapper.find('[data-test="billings-usagetrends-kpi-projected"]').exists()).toBe(false);
     const total = wrapper.find('[data-test="billings-usagetrends-kpi-total"]').text();
-    expect(total).toContain("Estimated cost so far");
+    expect(total).toContain("Estimated Cost So Far");
   });
 });

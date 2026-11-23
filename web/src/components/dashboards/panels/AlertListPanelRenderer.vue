@@ -21,12 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       kind="denied"
       :title="t('emptyState.noAccess.title')"
       :text="t('emptyState.noAccess.description')"
-      size="compact"
+      size="inline"
       data-test="dashboard-alert-list-panel-forbidden"
     />
     <OEmptyState
       v-else-if="query.isError.value"
-      size="compact"
+      size="inline"
       kind="error"
       :title="t('common.errorLoadingData')"
       data-test="dashboard-alert-list-panel-error"
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #empty>
         <OEmptyState
-          size="compact"
+          size="inline"
           icon="notifications"
           :title="t('dashboard.alertListEmpty')"
           data-test="dashboard-alert-list-panel-empty"

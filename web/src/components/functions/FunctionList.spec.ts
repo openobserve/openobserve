@@ -898,7 +898,7 @@ describe("FunctionList", () => {
       await flushPromises();
 
       const dialog = wrapper.find('[data-test-stub="o-dialog"]');
-      expect(dialog.attributes("data-title")).toBe("Pipelines associated with func1");
+      expect(dialog.attributes("data-title")).toBe("Pipelines Associated with func1");
     });
 
     it("should set ODialog size=md and leave it dismissable (no persistent)", async () => {

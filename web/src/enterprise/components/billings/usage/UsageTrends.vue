@@ -119,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </UsagePaneHeader>
             <OEmptyState
               v-if="streamMissing"
+              size="inline"
               :title="t('billing.usageTrends.waitingTitle')"
               :text="t('billing.usageTrends.waitingForData')"
               data-test="billings-usagetrends-empty"
@@ -172,12 +173,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #error>
-                <OEmptyState
-                  kind="error"
-                  :text="t('billing.usageV2.trendsLoadFailed')"
-                  data-test="billings-usagetrends-meters-error"
-                  @action="loadCosts"
-                />
+                <span class="text-text-secondary p-4 text-sm">
+                  {{ t("billing.usageV2.trendsLoadFailed") }}
+                </span>
               </template>
             </OTable>
           </aside>

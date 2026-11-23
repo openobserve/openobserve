@@ -44,7 +44,7 @@ describe("useMetricsCorrelationDashboard", () => {
       const dashboard = composable.generateDashboard(metricStreams, config);
 
       expect(dashboard).toBeDefined();
-      expect(dashboard.title).toBe("Correlated streams - api-server");
+      expect(dashboard.title).toBe("Correlated Streams - api-server");
       expect(dashboard.tabs).toHaveLength(1);
       expect(dashboard.tabs[0].panels).toHaveLength(2);
       expect(dashboard.tabs[0].panels[0].title).toBe("cpu_usage");
@@ -257,10 +257,10 @@ describe("useMetricsCorrelationDashboard", () => {
       const shown = composable.generateDashboard(streams, config(row.display_name));
       const keyed = composable.generateDashboard(streams, config());
 
-      expect(shown.title).toBe(`Correlated streams - ${row.display_name}`);
+      expect(shown.title).toBe(`Correlated Streams - ${row.display_name}`);
       expect(shown.description).toContain(row.display_name);
       expect(shown.description).not.toContain(row.service_name);
-      expect(keyed.title).toBe(`Correlated streams - ${row.service_name}`);
+      expect(keyed.title).toBe(`Correlated Streams - ${row.service_name}`);
       expect(queriesOf(shown)).toEqual(queriesOf(keyed));
     });
   });
@@ -288,7 +288,7 @@ describe("useMetricsCorrelationDashboard", () => {
       const dashboard = composable.generateLogsDashboard(logStreams, config);
 
       expect(dashboard).toBeDefined();
-      expect(dashboard!.title).toBe("Correlated streams - api-server");
+      expect(dashboard!.title).toBe("Correlated Streams - api-server");
       expect(dashboard!.tabs[0].panels).toHaveLength(1);
       expect(dashboard!.tabs[0].panels[0].type).toBe("table");
     });

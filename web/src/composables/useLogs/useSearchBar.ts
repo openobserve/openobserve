@@ -66,8 +66,6 @@ export const streamSwitchPending = ref(false);
 
 export interface StreamChangeOptions {
   origin?: "editor" | "selector";
-  /** The first pick on an empty page: run at once, since there is nothing on screen to refine. */
-  runNow?: boolean;
 }
 
 export interface QueryDataOptions {
@@ -439,7 +437,7 @@ export const useSearchBar = (t: TranslateFn) => {
         });
         if (stale()) return;
         searchObj.loading = false;
-        if (!editorOrigin) autoRun.request(options.runNow ? "run" : "stream");
+        if (!editorOrigin) autoRun.request("stream");
       }
     } catch (e: any) {
       console.info("Error while getting stream data:", e);

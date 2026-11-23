@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <IngestionContent>
     <div class="flex flex-col gap-2">
-      <div class="text-sm font-semibold">{{ t("ingestion.vmagent.singleTargetTitle") }}</div>
+      <div class="text-base font-semibold">{{ t("ingestion.vmagent.singleTargetTitle") }}</div>
       <CredentialCodeBlock slug="vmagent-single-target" :content="singleTargetContent" />
     </div>
 
     <div class="flex flex-col gap-2">
-      <div class="text-sm font-semibold">{{ t("ingestion.vmagent.fanoutTitle") }}</div>
+      <div class="text-base font-semibold">{{ t("ingestion.vmagent.fanoutTitle") }}</div>
       <CredentialCodeBlock slug="vmagent-fanout" :content="fanoutContent" />
       <div class="italic">
         {{ t("ingestion.vmagent.tipPrefix") }}

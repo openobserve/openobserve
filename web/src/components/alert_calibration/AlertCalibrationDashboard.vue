@@ -25,13 +25,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-tabs><AlertCalibrationTabs /></template>
 
     <template #actions>
-      <AlertCalibrationActions :config="config" part="run" />
-      <ORefreshButton
-        :last-run-at="data.loadedAt.value"
+      <OButton
+        icon-only
+        variant="secondary"
+        icon="refresh"
+        :aria-label="t('alertCalibration.refresh')"
         :loading="data.loading.value"
         data-test="alert-calibration-dashboard-refresh"
         @click="refresh"
-      />
+      >
+        <OTooltip side="bottom" :content="t('alertCalibration.refresh')" />
+      </OButton>
+      <AlertCalibrationActions :config="config" part="run" />
     </template>
 
     <template #actions-overflow>
@@ -77,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <LiveNoticeState
         v-else-if="forbidden || data.error.value"
-        size="region"
+        size="page"
         :notice="boardNotice"
         :detail="readFailedDetail(data.error.value)"
         :busy="data.loading.value"
@@ -406,11 +411,11 @@ import { formatDistanceToNowStrict } from "date-fns";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";

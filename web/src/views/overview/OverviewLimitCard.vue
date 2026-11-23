@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :view="cardView"
     @retry="emit('retry')"
   >
-    <div class="flex flex-1 flex-col gap-3">
+    <div class="border-border-default flex flex-1 flex-col gap-3 border-t p-3">
       <p
         v-if="limitView === 'unavailable'"
         class="text-text-secondary text-xs"
@@ -65,7 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ resetsLabel }}
           </p>
         </div>
-        <div class="flex flex-col gap-0.5" data-test="overview-limit-days-box">
+        <div
+          class="border-border-default rounded-default flex flex-col gap-0.5 border px-3.5 py-2.5"
+          data-test="overview-limit-days-box"
+        >
           <div class="flex items-baseline justify-between gap-3">
             <span class="text-text-label text-xs">{{ t("overview.limit.daysOver") }}</span>
             <span
@@ -129,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <OEmptyState
           v-else
-          size="compact"
+          size="inline"
           :title="t('overview.storage.emptyTitle')"
           data-test="overview-storage-empty"
         />

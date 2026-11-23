@@ -97,20 +97,4 @@ describe("OPageLayout entrance", () => {
     expect(bodyOf(wrapper).className).not.toContain(SLIDE);
     wrapper.unmount();
   });
-
-  it("marks the header band as the shell the route fade leaves still", () => {
-    const wrapper = mountLayout();
-    expect(wrapper.find("[data-o2-page-shell]").exists()).toBe(true);
-    expect(wrapper.find("[data-o2-page-frame]").exists()).toBe(false);
-  });
-
-  it("keeps a sidebar shell still, so only its routed child's body enters", () => {
-    const wrapper = mount(OPageLayout, {
-      slots: { sidebar: "<nav />", default: '<div data-test="page-body-content" />' },
-      global: { plugins: [i18n] },
-    });
-    expect(wrapper.find("[data-o2-page-frame]").exists()).toBe(true);
-    expect(wrapper.find("[data-o2-page-shell]").exists()).toBe(false);
-    expect(wrapper.html()).not.toContain(SLIDE);
-  });
 });

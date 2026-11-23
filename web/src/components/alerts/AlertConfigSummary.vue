@@ -88,7 +88,6 @@ import {
   alertConditionIsQuery,
   alertConditionText,
   alertWarningConditionText,
-  formatAlertMinutes,
 } from "@/utils/alerts/alertCondition";
 import {
   buildAnomalyFilterExpression,
@@ -157,8 +156,21 @@ const fieldSpan = (field: SummaryField): string => {
 const idPrefix = useId();
 const labelId = (key: string) => `${idPrefix}-${key}-label`;
 
-const formatMinutesDuration = (minutes: number | null | undefined) =>
-  formatAlertMinutes(minutes, t);
+/** Renders a minutes-granularity duration with its unit — minutes normally,
+ *  hours when the value is a whole multiple of 60. `period` / `frequency` /
+ *  `silence` / the pending-period-in-minutes are all whole minutes on the
+ *  wire, so the sub-minute branch never actually fires today; it stays for
+ *  correctness if that ever changes, rather than silently dropping to "0 min". */
+const formatMinutesDuration = (minutes: number | null | undefined): string => {
+  if (minutes == null || Number.isNaN(minutes)) return EMPTY;
+  if (minutes > 0 && minutes < 1) {
+    return t("common.secShort", { count: Math.round(minutes * 60) });
+  }
+  if (minutes >= 60 && minutes % 60 === 0) {
+    return t("common.hrShort", { count: minutes / 60 });
+  }
+  return t("common.minShort", { count: minutes });
+};
 
 // Shared with the on-call page detail, which asks the same "what fired"
 // question of the same alert.

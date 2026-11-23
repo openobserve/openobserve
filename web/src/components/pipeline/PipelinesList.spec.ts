@@ -591,8 +591,8 @@ describe("PipelinesList", () => {
         const p = wrapper.vm.pipelines[0];
         expect(p.type).toBe("realtime");
         expect(p.stream_name).toBe("rt_stream");
-        expect(p.frequency).toBe("—");
-        expect(p.sql_query).toBe("—");
+        expect(p.frequency).toBe("--");
+        expect(p.sql_query).toBe("--");
       }
     });
 
@@ -622,9 +622,9 @@ describe("PipelinesList", () => {
       if (wrapper.vm.pipelines.length > 0) {
         const p = wrapper.vm.pipelines[0];
         expect(p.type).toBe("scheduled");
-        expect(p.frequency).toBe("15 min");
-        expect(p.period).toBe("10 min");
-        expect(p.cron).toBe("No");
+        expect(p.frequency).toBe("15 Mins");
+        expect(p.period).toBe("10 Mins");
+        expect(p.cron).toBe("False");
         expect(p.sql_query).toBe("SELECT * FROM metrics");
       }
     });
@@ -654,7 +654,7 @@ describe("PipelinesList", () => {
 
       if (wrapper.vm.pipelines.length > 0) {
         const p = wrapper.vm.pipelines[0];
-        expect(p.cron).toBe("Yes");
+        expect(p.cron).toBe("True");
       }
     });
 

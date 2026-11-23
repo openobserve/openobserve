@@ -4,12 +4,7 @@
 // session ID to display in the trace-details header.
 
 import { describe, it, expect } from "vitest";
-import {
-  resolveReplaySpan,
-  resolveSessionId,
-  resolveUrlTimeRange,
-  widerTraceWindow,
-} from "./traceDetails.utils";
+import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
 
 describe("resolveSessionId", () => {
   // Empty / null / undefined inputs → "" so the header template hides
@@ -186,33 +181,5 @@ describe("resolveReplaySpan", () => {
       { span_id: "a1b2c3d4e5f60718", rum_session_id: "sess-1", rum_session_has_replay: "false" },
     ];
     expect(resolveReplaySpan(spans)).toBeNull();
-  });
-});
-
-describe("widerTraceWindow", () => {
-  const HOUR = 3_600_000_000;
-  const mid = 1_794_603_352_751_000;
-  const now = mid + 48 * HOUR;
-
-  it("widens a 30 min window to one day centred on it", () => {
-    expect(widerTraceWindow(mid - HOUR / 4, mid + HOUR / 4, now)).toEqual({
-      from: mid - 12 * HOUR,
-      to: mid + 12 * HOUR,
-    });
-  });
-
-  it("steps from one day to seven days and keeps the end at now", () => {
-    expect(widerTraceWindow(mid - 12 * HOUR, mid + 12 * HOUR, now)).toEqual({
-      from: now - 7 * 24 * HOUR,
-      to: now,
-    });
-  });
-
-  it("offers nothing once 30 days were searched", () => {
-    expect(widerTraceWindow(now - 30 * 24 * HOUR, now, now)).toBeNull();
-  });
-
-  it("offers nothing for an unknown window", () => {
-    expect(widerTraceWindow(0, 0, now)).toBeNull();
   });
 });

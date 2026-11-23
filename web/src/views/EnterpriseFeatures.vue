@@ -23,66 +23,130 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('enterpriseFeature.featuresPageTitle')"
-    :about="dialogConfig.offerText"
     data-test="enterprise-features-page"
   >
-    <template #status>
-      <OSkeleton v-if="isLoadingLicense" shape="block" class="h-5 w-32" />
-      <OTag v-else tone="accent" :label="dialogConfig.badgeText" />
-    </template>
-    <template #actions-overflow>
-      <OButton
-        v-if="dialogConfig.showContactSales"
-        variant="secondary"
-        @click="trackCta('contact_sales', contactSales)"
+    <div class="flex flex-col gap-8 pt-6 pb-4">
+      <div
+        data-test="enterprise-features-banner"
+        class="rounded-surface flex flex-wrap items-center justify-between gap-4 bg-[linear-gradient(135deg,var(--color-theme-accent)_0%,color-mix(in_srgb,var(--color-theme-accent)_85%,black_15%)_100%)] px-8 py-6 text-white"
       >
-        {{ t("about.enterprise_offer.buttons.contact_sales") }}
-      </OButton>
-      <OButton v-else variant="secondary" @click="trackCta('learn_more', openDocsLink)">
-        {{ t("about.enterprise_offer.buttons.learn_more") }}
-      </OButton>
-    </template>
-    <template #actions>
-      <OButton
-        v-if="dialogConfig.showPrimaryButton"
-        variant="primary"
-        data-test="enterprise-features-primary-btn"
-        @click="trackCta('primary', handlePrimaryButtonClick)"
-      >
-        {{ dialogConfig.primaryButtonText }}
-      </OButton>
-    </template>
+        <div class="flex flex-col gap-1">
+          <div class="text-2xl font-bold">{{ dialogConfig.heroTitle }}</div>
+          <div class="text-sm italic opacity-90">{{ dialogConfig.offerText }}</div>
+        </div>
+        <div class="flex flex-wrap items-center gap-4">
+          <div
+            v-if="!isLoadingLicense"
+            class="rounded-default bg-success-500 px-4 py-2 text-base font-bold text-white"
+          >
+            {{ dialogConfig.badgeText }}
+          </div>
+          <OButton
+            v-if="dialogConfig.showPrimaryButton"
+            variant="secondary"
+            size="lg"
+            data-test="enterprise-features-primary-btn"
+            class="text-theme-accent! bg-white!"
+            @click="trackCta('primary', handlePrimaryButtonClick)"
+          >
+            {{ dialogConfig.primaryButtonText }}
+            <template v-if="dialogConfig.primaryButtonIcon" #icon-end>
+              <OIcon :name="dialogConfig.primaryButtonIcon" size="sm" />
+            </template>
+          </OButton>
+          <OButton
+            v-if="dialogConfig.showContactSales"
+            variant="secondary"
+            size="lg"
+            @click="trackCta('contact_sales', contactSales)"
+          >
+            {{ t("about.enterprise_offer.buttons.contact_sales") }}
+          </OButton>
+          <OButton
+            v-else
+            variant="secondary"
+            size="lg"
+            @click="trackCta('learn_more', openDocsLink)"
+          >
+            {{ t("about.enterprise_offer.buttons.learn_more") }}
+          </OButton>
+        </div>
+      </div>
 
-    <div class="flex flex-col gap-6 py-4" data-test="enterprise-features-columns">
-      <section
-        v-for="column in columns"
-        :key="column.category"
-        class="flex flex-col gap-2"
-        data-test="enterprise-features-category"
+      <div class="flex flex-wrap items-end justify-between gap-4">
+        <div class="flex flex-col gap-1">
+          <div data-test="enterprise-features-title" class="text-text-heading text-xl font-bold">
+            {{ dialogConfig.featuresTitle }}
+          </div>
+          <div class="text-text-secondary text-sm italic">
+            {{ dialogConfig.featuresSubtitle }}
+          </div>
+        </div>
+        <div class="text-text-secondary flex items-center gap-4 text-xs italic">
+          <span class="flex items-center gap-2">
+            <OTag type="featureFlag" value="beta" />
+            {{ t("enterpriseFeature.legendBeta") }}
+          </span>
+          <span class="flex items-center gap-2">
+            <OTag type="featureFlag" value="ha" />
+            {{ t("enterpriseFeature.legendHa") }}
+          </span>
+        </div>
+      </div>
+
+      <div
+        data-test="enterprise-features-columns"
+        class="grid grid-cols-1 gap-x-6 gap-y-8 md:grid-cols-2 xl:grid-cols-4"
       >
-        <h2 class="text-text-heading text-sm font-semibold">
-          {{ t(`enterpriseFeature.category.${column.category}`) }}
-        </h2>
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          <EnterpriseFeatureCard
+        <section v-for="column in columns" :key="column.category" class="flex flex-col gap-2">
+          <div
+            class="border-border-default text-text-secondary border-b px-4 pb-3 text-sm font-semibold tracking-wider uppercase"
+          >
+            {{ t(`enterpriseFeature.category.${column.category}`) }}
+          </div>
+          <div
             v-for="feature in column.features"
             :key="feature.name"
-            :feature="feature"
             data-test="enterprise-features-item"
-          />
-        </div>
-      </section>
+            class="rounded-default hover:bg-surface-hover flex gap-3 p-3 transition-colors"
+            :class="feature.link ? 'cursor-pointer' : ''"
+            @click="feature.link && openFeatureLink(feature.link)"
+          >
+            <div
+              class="rounded-default bg-theme-accent/10 text-theme-accent flex h-9 w-9 shrink-0 items-center justify-center"
+            >
+              <OIcon :name="feature.icon" size="sm" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <div
+                class="text-text-heading flex flex-wrap items-center gap-1.5 text-base leading-tight font-semibold"
+              >
+                {{ feature.name }}
+                <OTag v-if="feature.beta" type="featureFlag" value="beta" />
+                <span v-if="feature.requiresHA" class="inline-flex">
+                  <OTag type="featureFlag" value="ha" />
+                  <OTooltip
+                    side="top"
+                    :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')"
+                  />
+                </span>
+              </div>
+              <div class="text-text-secondary mt-1 text-sm italic">{{ feature.note }}</div>
+            </div>
+          </div>
+        </section>
+      </div>
 
-      <p class="text-text-secondary text-compact">
+      <div class="text-text-secondary text-sm italic">
         {{ t("enterpriseFeature.docsFooter") }}
-        <OButton
-          variant="link"
+        <a
+          class="text-theme-accent cursor-pointer not-italic hover:underline"
           data-test="enterprise-features-docs-link"
           @click="openFeatureLink(DOCS_URL)"
         >
-          {{ t("enterpriseFeature.viewAllDocs") }}
-        </OButton>
-      </p>
+          {{ t("enterpriseFeature.viewAllDocs") }} →
+        </a>
+      </div>
     </div>
   </OPageLayout>
 </template>
@@ -91,9 +155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import EnterpriseFeatureCard from "@/components/EnterpriseFeatureCard.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
 import {
   useEnterpriseOfferContent,

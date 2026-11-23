@@ -71,8 +71,6 @@ describe("SearchBar — Run button ignores natural-language detection (#15049)",
     });
     wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
     wrapper.vm.searchObj.meta.nlpMode = false;
-    // With no stream Run is disabled with its reason, which is not what this test is about.
-    wrapper.vm.searchObj.data.stream.selectedStream = ["app_logs"];
     await nextTick();
 
     wrapper.findComponent({ name: "UnifiedQueryEditor" }).vm.$emit("nlp-detected", true);

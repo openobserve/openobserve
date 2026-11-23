@@ -44,7 +44,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="rows"
           :loading="loading"
           :forbidden="forbidden"
-          :error="loadError"
           :counts-unavailable="!countsAvailable"
           forbidden-resource="roles"
           :action-loading="bulkDeleteLoading"
@@ -64,7 +63,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @bulk-delete="openBulkDeleteDialog"
           @create="addRole"
           @assign="assignMemberToRole"
-          @retry="refreshRoles"
         >
           <template #toolbar-trailing>
             <ORefreshButton
@@ -130,7 +128,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { forbiddenState, loadErrorText } from "@/utils/featureGate";
+import { forbiddenState } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
 
 const { t } = useI18nTyped();
@@ -320,16 +318,9 @@ const rolesList = useQuery(() =>
   Object.assign(rolesQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
 );
 
-// A failed read with no rows on screen is the error state, never the first-run one (K5).
-const loadError = computed(() =>
-  rows.value.length
-    ? null
-    : loadErrorText(rolesList.error.value, t("emptyState.loadError.description")),
-);
-// `isPending` is the cold read; a retry from the error state shows the skeleton again.
-const loading = computed(
-  () => rolesList.isPending.value || (!!loadError.value && rolesList.isFetching.value),
-);
+// Bound to the query rather than hand-managed: `isPending` is the cold read,
+// `isFetching` is any request in flight.
+const loading = rolesList.isPending;
 // setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
 watch(
   loading,

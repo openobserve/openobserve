@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      first-record preview and the test-or-real outcome; this links to it instead of repeating it. -->
 <template>
   <div
-    class="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:animation-duration-(--duration-page-in) flex flex-col gap-4 p-5 max-md:p-4"
+    class="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 flex flex-col gap-4 p-5 motion-safe:duration-300 max-md:p-4"
     data-test="onboarding-first-data"
   >
     <div class="flex items-center gap-3.5">

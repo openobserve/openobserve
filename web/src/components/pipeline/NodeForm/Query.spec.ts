@@ -408,7 +408,7 @@ describe("Query Component", () => {
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
       expect(wrapper.vm.isValidSqlQuery).toBe(false);
-      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: "Invalid SQL query" }));
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: "Invalid SQL Query" }));
     });
 
     it("skips search call entirely for promql query type", async () => {
@@ -517,7 +517,7 @@ describe("Query Component", () => {
       await flushPromises();
       wrapper.vm.openDeleteDialog();
       expect(wrapper.vm.dialog.show).toBe(true);
-      expect(wrapper.vm.dialog.title).toBe("Delete node");
+      expect(wrapper.vm.dialog.title).toBe("Delete Node");
       expect(wrapper.vm.dialog.message).toBe("Are you sure you want to delete stream routing?");
     });
 

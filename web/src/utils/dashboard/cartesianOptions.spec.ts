@@ -442,7 +442,7 @@ describe("y_axis_label", () => {
 
   it("paints SQL and PromQL x and y tick labels in the body text colour", async () => {
     const color = chartAxisTextColor();
-    expect(color).toBe("#3b3f4f");
+    expect(color).toBe("#404040");
     const charts = [
       await viaPanel(sqlPanel("line", {}, { x: [timeX], y: [yField()] }), [
         TIMES.map((t, i) => ({ x_axis_1: t, y_axis_1: i })),

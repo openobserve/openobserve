@@ -16,9 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <h2 class="text-text-heading text-sm font-semibold">
-      {{ t("rum.overviewPage.releaseTitle") }}
-    </h2>
+    <h2 class="text-text-heading text-base font-bold">{{ t("rum.overviewPage.releaseTitle") }}</h2>
     <p class="text-text-secondary mt-1 text-sm">
       {{
         t("rum.overviewPage.releaseHint", {
@@ -48,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-overview-release-table"
       >
         <template #cell-cur="{ row }">
-          <span class="text-text-heading font-semibold">{{ row.cur }}</span>
+          <span class="text-text-heading font-bold">{{ row.cur }}</span>
           <span
             v-if="row.tone !== 'same'"
             class="ms-1 text-xs font-semibold"
@@ -63,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="mt-3 flex flex-wrap items-center gap-x-2">
       <router-link
         :to="errorsLink(versionFilter(release.cur.version))"
-        class="text-text-link text-sm font-semibold"
+        class="text-text-link text-sm font-bold"
         data-test="rum-overview-release-errors-link"
       >
         {{ t("rum.overviewPage.releaseLink", { version: raw(release.cur.version) }) }}

@@ -28,18 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selectedChartType === item.id ? 'bg-label-chip-url-bg' : '',
             isChartDisabled(item) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
           ]"
-          role="button"
-          :tabindex="isChartDisabled(item) ? -1 : 0"
-          :aria-label="item.title"
-          :aria-pressed="selectedChartType === item.id"
-          :aria-disabled="isChartDisabled(item)"
           @click="!isChartDisabled(item) && $emit('update:selectedChartType', item.id)"
-          @keydown.enter.prevent="
-            !isChartDisabled(item) && $emit('update:selectedChartType', item.id)
-          "
-          @keydown.space.prevent="
-            !isChartDisabled(item) && $emit('update:selectedChartType', item.id)
-          "
           data-test="dashboard-addpanel-chart-selection-item"
           :data-test-selected="selectedChartType === item.id ? item.id : undefined"
         >

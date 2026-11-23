@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-start gap-3">
           <OIcon name="rocket-launch" size="xl" class="text-text-link" />
           <div>
-            <h6 class="m-0 mb-2! text-xl! font-semibold">
+            <h6 class="m-0 mb-2! text-xl! font-bold">
               {{ t("ingestion.completeAwsIntegration") }}
             </h6>
             <p class="mt-0 mb-0 text-sm" :class="descriptionClass">
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="grid transition-[grid-template-rows] duration-(--duration-expand) ease-(--ease-control)"
+          class="grid transition-[grid-template-rows] duration-300 ease-in-out"
           :class="showServices ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
         >
           <div class="min-h-0 overflow-hidden">
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div
-            class="grid transition-[grid-template-rows] duration-(--duration-expand) ease-(--ease-control)"
+            class="grid transition-[grid-template-rows] duration-300 ease-in-out"
             :class="showTargetRegions ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
           >
             <div class="min-h-0 overflow-hidden">
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- StackSets Parameter Helper -->
       <div
-        class="grid transition-[grid-template-rows] duration-(--duration-expand) ease-(--ease-control)"
+        class="grid transition-[grid-template-rows] duration-300 ease-in-out"
         :class="
           showParamHelper && deploymentMode === 'stackset' ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
         "

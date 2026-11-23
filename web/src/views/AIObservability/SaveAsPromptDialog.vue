@@ -35,7 +35,6 @@
       <template v-else>
         <OEmptyState
           v-if="promptQuery.isError.value"
-          size="compact"
           kind="error"
           :title="t('emptyState.loadError.title')"
           :text="t('aiObservability.promptManagement.loadError')"

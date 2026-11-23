@@ -28,7 +28,8 @@ const openGroupKey = moduleRef<string | null>(null);
  *
  *  • Link + subnav (`parentItem` provided) — the tile IS a navigating MenuLink
  *    (e.g. Data → /streams). Hovering reveals its sub-pages; clicking lands on
- *    the main page and closes the flyout until the pointer leaves the tile. No pinning.
+ *    the main page while the flyout stays open under the pointer (it closes on
+ *    mouse-leave / outside click / Escape). No pinning.
  *
  *  • Pure group (no `parentItem`) — the tile is a non-navigating MenuLink
  *    trigger. Hover opens; clicking pins the flyout open until an outside
@@ -52,7 +53,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import MenuLink from "@/components/MenuLink.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
-import { useNavGateContext, visibleSubnavChildren } from "./useNavGateContext";
+import { isGateOpen, useNavGateContext } from "./useNavGateContext";
 import { RailNavigationMarkKey, type SubnavChild } from "./ONavbar.types";
 import {
   AIM_IDLE,
@@ -72,6 +73,7 @@ import { resolveActiveChild } from "./navGroups";
 import { useTrialPaywall } from "@/composables/useTrialPaywall";
 import { useFeatureNames } from "@/composables/useFeatureLock";
 import {
+  checkFeatureAccess,
   buildFeatureGateContext,
   featureGateLabelKey,
   isFeatureKey,
@@ -124,11 +126,29 @@ const { featureName, featureNames } = useFeatureNames();
 const licenseState = (c: SubnavChild) =>
   c.feature ? featureState(gateContext.value.features, c.feature) : "enabled";
 
-// Shared with the Jump to palette, so both list exactly the same destinations.
+// A child shows when its route is registered and custom_hide_menus doesn't
+// name it. A FeatureKey `gate` then decides locked vs. unlocked instead of
+// show vs. hide (dropped only if `checkFeatureAccess` says not `visible` at
+// all); a non-FeatureKey gate (plain on/off flag) keeps the old hide-on-fail
+// behavior, which also still applies on top once a FeatureKey's edition
+// check passes (e.g. On-Call hides when the admin flag is off, not just the
+// edition).
 const visibleChildren = computed<SubnavChild[]>(() =>
-  visibleSubnavChildren(props.children, gateContext.value, store.state.zoConfig, (name) =>
-    router.hasRoute(name),
-  ),
+  props.children
+    .filter((c) => router.hasRoute(c.name) && !gateContext.value.hiddenMenus.has(c.name))
+    .flatMap((c): SubnavChild[] => {
+      if (c.gate && isFeatureKey(c.gate)) {
+        const access = checkFeatureAccess(c.gate, buildFeatureGateContext(store.state.zoConfig));
+        if (!access.visible) return [];
+        if (!access.allowed) return [{ ...c, locked: true, lockedMessage: access.message }];
+      }
+      // The license applies once the edition allows the feature; a locked license also turns its runtime flag off.
+      const license = licenseState(c);
+      if (license === "hidden") return [];
+      if (license === "locked") return [{ ...c, locked: false, licenseLocked: true }];
+      if (!c.gate) return [{ ...c, locked: false }];
+      return isGateOpen(gateContext.value, c.gate) ? [{ ...c, locked: false }] : [];
+    }),
 );
 
 // A group with no surviving child is not a group — it is an empty tile that
@@ -436,12 +456,9 @@ function close() {
 // Where the pointer last came to rest on the tile; the open timer counts from here.
 let restAnchor: Point | null = null;
 
-// Set by a tile click: the page under the pointer is the one just chosen, so hover waits until the pointer leaves.
-let hoverOpenSuppressed = false;
-
 function scheduleOpen(event?: MouseEvent) {
   // Some touch browsers emit a synthetic mouseenter, which would open a group the user only scrolled past.
-  if (isMobile.value || hoverOpenSuppressed) return;
+  if (isMobile.value) return;
   restAnchor = event ? { x: event.clientX, y: event.clientY } : null;
   clearTimers();
   // A neighbour whose flyout the pointer is still travelling towards keeps its turn.
@@ -484,11 +501,6 @@ function scheduleClose(event?: MouseEvent) {
   closeTimer = setTimeout(tryClose, CLOSE_DELAY);
 }
 
-function onTileMouseleave(event: MouseEvent) {
-  hoverOpenSuppressed = false;
-  scheduleClose(event);
-}
-
 // Firefox reports Enter on a link as a click with detail 1, so the keydown is the reliable signal.
 let activatedByKey = false;
 let activationKeyTimer: ReturnType<typeof setTimeout> | undefined;
@@ -521,6 +533,7 @@ function isKeyboardActivation(event?: MouseEvent): boolean {
   clearActivationKey();
   return byKey;
 }
+
 function onTriggerClick() {
   clearActivationKey();
   if (isPinned.value) {
@@ -531,10 +544,13 @@ function onTriggerClick() {
   }
 }
 
-// A click navigates to the group's page, so the flyout must not stay open over it (N1); a keyboard activation leaves no pointer to wait on.
+// A keyboard activation navigates, so nothing should stay open.
 function onLinkClick(event?: MouseEvent) {
-  hoverOpenSuppressed = !isKeyboardActivation(event);
-  close();
+  if (isKeyboardActivation(event)) {
+    close();
+    return;
+  }
+  open();
 }
 
 function isRtl(): boolean {
@@ -565,14 +581,6 @@ function onTileKeydown(event: KeyboardEvent) {
 watch(openGroupKey, (key) => {
   if (key !== props.groupKey && isOpen.value) close();
 });
-
-// Path, not query: a list page rewriting its own query must not shut a flyout the pointer is on.
-watch(
-  () => router.currentRoute.value.path,
-  () => {
-    if (isOpen.value && !isMobile.value) close();
-  },
-);
 
 function onDocumentPointerDown(event: PointerEvent) {
   clearActivationKey();
@@ -713,7 +721,7 @@ function onChildMouseenter(event: MouseEvent) {
     :data-test="`nav-group-${groupKey}`"
     class="nav-group relative shrink-0"
     @mouseenter="scheduleOpen"
-    @mouseleave="onTileMouseleave"
+    @mouseleave="scheduleClose"
     @mousemove="onTileMousemove"
     @keydown="noteActivationKey"
     @pointerdown="clearActivationKey"
@@ -793,7 +801,7 @@ function onChildMouseenter(event: MouseEvent) {
               role="menuitem"
               :to="child.locked ? undefined : childTo(child)"
               :tabindex="child.locked ? 0 : undefined"
-              class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none [text-decoration:none]!"
+              class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
               :class="[
                 flyoutTextClass,
                 isChildActive(child) ? 'bg-nav-flyout-item-selected-bg font-medium' : '',
@@ -841,7 +849,7 @@ function onChildMouseenter(event: MouseEvent) {
             role="menuitem"
             :to="block.child.locked ? undefined : childTo(block.child)"
             :tabindex="block.child.locked ? 0 : undefined"
-            class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none [text-decoration:none]!"
+            class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
             :class="[
               flyoutTextClass,
               block.spaced ? 'mt-2' : '',
@@ -907,7 +915,7 @@ function onChildMouseenter(event: MouseEvent) {
         :aria-label="title"
         :aria-describedby="showTrialNote ? trialNoteId : undefined"
         :data-layout="useColumns ? 'columns' : 'single'"
-        class="nav-group-flyout rounded-default bg-dropdown-bg shadow-overlay border-border-default min-w-52 overflow-y-auto overscroll-contain border p-1"
+        class="nav-group-flyout rounded-default bg-dropdown-bg shadow-overlay min-w-52 overflow-y-auto overscroll-contain border border-transparent p-1"
         :style="flyoutStyle"
         @mouseenter="clearTimers"
         @mouseleave="scheduleClose"
@@ -971,7 +979,7 @@ function onChildMouseenter(event: MouseEvent) {
                     role="menuitem"
                     :to="child.locked ? undefined : childTo(child)"
                     :tabindex="child.locked ? 0 : undefined"
-                    class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
+                    class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
                     :class="[
                       flyoutTextClass,
                       childIndex > 0 ? 'mt-0.5' : '',
@@ -1033,7 +1041,7 @@ function onChildMouseenter(event: MouseEvent) {
                   role="menuitem"
                   :to="block.child.locked ? undefined : childTo(block.child)"
                   :tabindex="block.child.locked ? 0 : undefined"
-                  class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
+                  class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
                   :class="[
                     flyoutTextClass,
                     // Matches the pt-4 a header gets, so leaving a run and starting

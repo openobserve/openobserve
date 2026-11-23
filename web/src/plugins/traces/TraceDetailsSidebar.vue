@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="showAskAi"
               icon-only
-              variant="ghost"
+              variant="secondary"
               :aria-label="t('traces.askAi.askAboutSpan')"
               data-test="trace-span-ask-ai-btn"
               @click.stop="askAiAboutSpan"
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="showEvaluateButton && canPreviewSpan"
               icon-only
-              variant="ghost"
+              variant="secondary"
               :aria-label="t('onlineEvals.manualEvaluation.titles.span')"
               data-test="trace-details-sidebar-evaluate-span-btn"
               @click.stop="evaluateSpan"
@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="showAnnotateButtons"
               icon-only
-              variant="ghost"
+              variant="secondary"
               :aria-label="t('aiObservability.traceActions.dataset.button')"
               data-test="trace-details-sidebar-dataset-span-btn"
               @click.stop="addSpanToDataset"
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="canOpenPlayground"
               icon-only
-              variant="ghost"
+              variant="secondary"
               :aria-label="t('aiObservability.traceActions.playground.button')"
               data-test="trace-details-sidebar-playground-span-btn"
               @click.stop="openInPlayground"
@@ -414,7 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="isLLMSpan && (config.isEnterprise === 'true' || config.isCloud === 'true')"
           >
             <OSeparator vertical class="mx-1.5 h-3.5" />
-            <span class="text-2xs text-text-secondary me-1 shrink-0 font-medium">{{
+            <span class="text-3xs text-text-secondary me-1 shrink-0 font-medium">{{
               t("traces.traceDetailsSidebar.scores")
             }}</span>
             <TraceScoreChips
@@ -580,14 +580,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col pe-2"
               >
                 <div
-                  class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-semibold"
+                  class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
                   :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.input") }}</div>
                   <div class="flex items-center gap-1">
                     <OButton
                       icon-only
-                      variant="ghost"
+                      variant="secondary"
                       size="xs"
                       :title="
                         isFullscreen
@@ -600,7 +600,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       icon-only
-                      variant="ghost"
+                      variant="secondary"
                       size="xs"
                       :title="t('traces.traceDetailsSidebar.copyInput')"
                       @click="copyContent(previewInput, 'input')"
@@ -631,11 +631,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </OCollapsible>
                   </div>
-                  <OEmptyState
+                  <div
                     v-if="!hasContent(previewInput) && !parsedSystemInstructions"
-                    size="compact"
-                    :title="t('traces.traceDetailsSidebar.noDataAvailable')"
-                  />
+                    class="text-text-secondary p-8 text-center text-sm italic"
+                  >
+                    {{ t("traces.traceDetailsSidebar.noDataAvailable") }}
+                  </div>
                   <LLMContentRenderer
                     v-if="hasContent(previewInput)"
                     :content="previewInput"
@@ -653,14 +654,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col"
               >
                 <div
-                  class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-semibold"
+                  class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
                   :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.output") }}</div>
                   <div class="flex items-center gap-1">
                     <OButton
                       icon-only
-                      variant="ghost"
+                      variant="secondary"
                       size="xs"
                       :title="
                         isFullscreen
@@ -673,7 +674,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       icon-only
-                      variant="ghost"
+                      variant="secondary"
                       size="xs"
                       :title="t('traces.traceDetailsSidebar.copyOutput')"
                       @click="copyContent(previewOutput, 'output')"
@@ -686,11 +687,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="llm-content-box border-card-glass-border rounded-default bg-code-bg h-full max-h-[calc(100%-1.625rem)] flex-1 overflow-x-hidden overflow-y-auto border border-solid p-3"
                 >
-                  <OEmptyState
+                  <div
                     v-if="!hasContent(previewOutput)"
-                    size="compact"
-                    :title="t('traces.traceDetailsSidebar.noDataAvailable')"
-                  />
+                    class="text-text-secondary p-8 text-center text-sm italic"
+                  >
+                    {{ t("traces.traceDetailsSidebar.noDataAvailable") }}
+                  </div>
                   <LLMContentRenderer
                     v-else
                     :content="previewOutput"
@@ -857,7 +859,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="shrink-0 ps-1 pe-1 pb-[0.325rem]"
               data-test="trace-details-sidebar-events-timeline"
             >
-              <div class="text-2xs text-text-muted flex items-center justify-between pb-1">
+              <div class="text-3xs text-text-muted flex items-center justify-between pb-1">
                 <span>{{ t("traces.spanEventTimeline") }}</span>
                 <span>{{ getDuration }}</span>
               </div>
@@ -929,6 +931,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <OEmptyState
             v-else
+            size="inline"
+            kind="filtered"
             :title="t('traces.noEventsPresent')"
             data-test="trace-details-sidebar-no-events"
           />
@@ -989,6 +993,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OEmptyState
             v-else
+            size="inline"
+            kind="filtered"
             :title="t('traces.noLinksPresent')"
             data-test="trace-details-sidebar-no-links"
           />
@@ -1025,15 +1031,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :hide-reset-filters-button="true"
           />
           <!-- Loading/Empty state when no data -->
-          <div v-else class="flex h-full flex-col">
-            <OSkeleton v-if="correlationLoading" preset="tableRows" :rows="8" />
-            <OEmptyState
-              v-else-if="correlationError"
-              :kind="correlationFailed ? 'error' : 'first-run'"
-              :title="correlationFailed ? undefined : correlationNotice"
-              :text="correlationFailed ? correlationNotice : undefined"
-            />
-            <OEmptyState v-else :title="t('correlation.clickToLoadLogs')" />
+          <div v-else class="flex h-full items-center justify-center py-20">
+            <div class="text-center">
+              <OSpinner v-if="correlationLoading" size="lg" class="mb-4" />
+              <div v-else-if="correlationError" class="text-sm font-bold">
+                {{ correlationError }}
+              </div>
+              <div v-else class="text-text-muted text-base">
+                {{ t("correlation.clickToLoadLogs") }}
+              </div>
+            </div>
           </div>
         </OTabPanel>
 
@@ -1074,17 +1081,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @close="$emit('update:activeTab', 'attributes')"
           />
           <!-- Loading/Empty state when no data -->
-          <div v-else class="flex h-full flex-col">
-            <div v-if="correlationLoading" class="grid grid-cols-1 gap-3 p-3">
-              <OSkeleton v-for="panel in 3" :key="panel" shape="block" class="h-40" />
+          <div v-else class="flex h-full items-center justify-center py-20">
+            <div class="text-center">
+              <OSpinner v-if="correlationLoading" size="lg" class="mb-4" />
+              <div v-else-if="correlationError" class="text-sm font-bold">
+                {{ correlationError }}
+              </div>
+              <div v-else class="text-text-muted text-base">
+                {{ t("correlation.clickToLoadMetrics") }}
+              </div>
             </div>
-            <OEmptyState
-              v-else-if="correlationError"
-              :kind="correlationFailed ? 'error' : 'first-run'"
-              :title="correlationFailed ? undefined : correlationNotice"
-              :text="correlationFailed ? correlationNotice : undefined"
-            />
-            <OEmptyState v-else :title="t('correlation.clickToLoadMetrics')" />
           </div>
         </OTabPanel>
       </OTabPanels>
@@ -1182,8 +1188,7 @@ import AttributeValueCell from "@/components/AttributeValueCell.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import DbSpanDetails from "./DbSpanDetails.vue";
 import TraceErrorTab from "./components/TraceErrorTab.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -1363,7 +1368,7 @@ export default defineComponent({
     DeployedCode,
     DbSpanDetails,
     TraceErrorTab,
-    OSkeleton,
+    OSpinner,
     OSwitch,
     OTag,
   },
@@ -2523,12 +2528,6 @@ export default defineComponent({
     // True when the lookup itself failed (request error, missing span/stream) as
     // opposed to succeeding with nothing correlated — the two need different wording.
     const correlationFailed = ref(false);
-    // Axios status text is not a reason a reader can act on (K6).
-    const correlationNotice = computed(() =>
-      correlationError.value && !isRawHttpText(correlationError.value)
-        ? raw(correlationError.value)
-        : t("emptyState.loadError.description"),
-    );
     const correlationProps = ref<any>(null);
     const { findRelatedTelemetry, loadSemanticGroups, semanticGroups } = useServiceCorrelation();
 
@@ -3056,8 +3055,6 @@ export default defineComponent({
       // Correlation
       correlationLoading,
       correlationError,
-      correlationFailed,
-      correlationNotice,
       correlationProps,
       metricGroupResources,
       config,

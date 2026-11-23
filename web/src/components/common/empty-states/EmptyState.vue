@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </h2>
         <p
           v-if="description || $slots.description"
-          class="text-text-secondary text-sm leading-relaxed"
+          class="text-text-secondary text-base leading-relaxed"
         >
           <slot name="description">{{ description }}</slot>
         </p>

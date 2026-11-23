@@ -213,7 +213,9 @@ function handleUpdate(value: BrowserCheck) {
       </div>
     </template>
     <template #separator>
-      <div class="hover:bg-table-resize-handle h-full w-1 bg-transparent transition-colors" />
+      <div
+        class="hover:bg-table-resize-handle h-full w-1 bg-transparent transition-colors duration-300"
+      />
     </template>
     <template #after>
       <CheckVariablesPanel

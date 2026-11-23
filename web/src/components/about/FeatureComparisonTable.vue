@@ -25,10 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="compare-arrows" size="md" />
       </div>
       <div>
-        <div class="text-accent m-0 mb-0.5 text-xs font-semibold tracking-[0.1em] uppercase">
+        <div
+          class="text-accent m-0 mb-0.5 text-[length:var(--text-xs)] font-semibold tracking-[0.1em] uppercase"
+        >
           {{ t("about.editionsLabel") }}
         </div>
-        <div class="text-text-heading m-0 text-xl font-semibold tracking-[-0.015em]">
+        <div
+          class="text-text-heading m-0 text-[length:var(--text-xl)] font-semibold tracking-[-0.015em]"
+        >
           {{ t("about.feature_comparison_lbl") }}
         </div>
       </div>
@@ -61,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="buildType === ed.id"
           data-test="feature-comparison-table-your-plan-badge"
-          class="text-2xs bg-accent text-button-primary-foreground absolute top-[-0.875rem] left-1/2 inline-flex -translate-x-1/2 items-center rounded-full px-3.5 py-1 font-semibold tracking-[0.08em] whitespace-nowrap uppercase"
+          class="text-3xs bg-accent text-button-primary-foreground absolute top-[-0.875rem] left-1/2 inline-flex -translate-x-1/2 items-center rounded-full px-3.5 py-1 font-bold tracking-[0.08em] whitespace-nowrap uppercase"
         >
           <OIcon name="arrow-upward" size="sm" class="me-1" />
           {{ t("about.yourPlan") }}
@@ -69,9 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Edition name + hosting + price ────────────────────────────── -->
         <div class="mb-5">
-          <div class="text-text-heading m-0 mb-0.5 text-sm font-semibold">{{ ed.shortName }}</div>
+          <div class="text-text-heading m-0 mb-0.5 text-base font-bold">{{ ed.shortName }}</div>
           <div class="text-compact text-text-secondary m-0 mb-3.5">{{ ed.hosting }}</div>
-          <div class="text-accent m-0 mb-1 text-2xl leading-[1.1] font-semibold tracking-[-0.03em]">
+          <div class="text-accent m-0 mb-1 text-3xl leading-[1.1] font-bold tracking-[-0.03em]">
             {{ ed.price }}
           </div>
           <div class="text-compact text-text-secondary m-0 leading-[1.4]">{{ ed.priceSub }}</div>
@@ -79,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- All Five Pillars chips ────────────────────────────────────── -->
         <div class="rounded-default border-accent/15 bg-card-glass-tint-subtle mb-4 border p-3">
-          <div class="text-2xs text-text-label m-0 mb-2 font-semibold tracking-[0.12em] uppercase">
+          <div class="text-3xs text-text-label m-0 mb-2 font-bold tracking-[0.12em] uppercase">
             {{ t("about.allFivePillars") }}
           </div>
           <div class="mb-1.5 flex flex-wrap gap-1.5">

@@ -73,17 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Destination Type and Name Display for Edit Mode -->
             <div v-if="isAlerts && destination && dtVal" class="w-full pb-3">
-              <div class="flex w-1/2 flex-col gap-3">
-                <OFormInput
-                  data-test="add-destination-name-input"
-                  name="name"
-                  :label="t('alerts.name')"
-                  required
-                  readonly
-                  disabled
-                  tabindex="0"
-                />
-                <div>
+              <div class="flex gap-3">
+                <!-- Destination Type (Read-only) -->
+                <div class="w-1/2">
                   <div class="mb-1 text-sm leading-tight font-medium">
                     {{ t("alert_destinations.destination_type") }}
                   </div>
@@ -92,11 +84,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="destination-type-readonly"
                   >
                     <OIcon :name="getDestinationTypeIcon(dtVal)" size="md" class="me-2" />
-                    <span class="text-compact">{{ readonlyTypeLabel }}</span>
+                    <span class="text-sm">{{ getDestinationTypeName(dtVal) }}</span>
                     <OTag type="readonlyFlag" value="readonly" class="ms-2">{{
                       t("alert_destinations.readonly")
                     }}</OTag>
                   </div>
+                </div>
+                <!-- Destination Name (Read-only) -->
+                <div class="w-1/2">
+                  <OFormInput
+                    data-test="add-destination-name-input"
+                    name="name"
+                    :label="t('alerts.name')"
+                    required
+                    readonly
+                    disabled
+                    tabindex="0"
+                  />
                 </div>
               </div>
             </div>
@@ -143,12 +147,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :hide-actions="true"
                 data-test="prebuilt-form"
               />
-              <OSkeleton
-                v-else-if="isUpdatingDestination"
-                preset="tableRows"
-                :rows="4"
-                data-test="add-destination-loading-indicator"
-              />
+              <div v-else-if="isUpdatingDestination" class="p-3 text-center">
+                <OSpinner size="lg" data-test="add-destination-loading-indicator" />
+                <div class="text-text-muted mt-2">{{ t("alert_destinations.loadingData") }}</div>
+              </div>
 
               <!-- Template selector for prebuilt destinations -->
               <div
@@ -182,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mt-3 w-full"
                 data-test="prebuilt-additional-settings"
               >
-                <div class="py-1 font-semibold">
+                <div class="py-1 font-bold">
                   {{ t("alert_destinations.additional_settings") }}
                 </div>
 
@@ -260,11 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Tabs for non-alert destinations OR custom alert destinations -->
-            <!-- An existing destination keeps its type, which the read-only label above already names. -->
-            <div
-              v-if="!isAlerts || (isAlerts && dtVal === 'custom' && !destination)"
-              class="w-full pb-3"
-            >
+            <div v-if="!isAlerts || (isAlerts && dtVal === 'custom')" class="w-full pb-3">
               <div class="app-tabs-container me-2 h-9 w-fit">
                 <AppTabs
                   data-test="add-destination-tabs"
@@ -291,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- Name + Template row for custom alert destinations -->
             <div v-if="isAlerts && dtVal === 'custom'" class="flex w-full gap-3">
-              <div v-if="!destination" class="w-1/2 py-1">
+              <div class="w-1/2 py-1">
                 <OFormInput
                   data-test="add-destination-name-input"
                   name="name"
@@ -362,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="w-full py-2">
-                <div class="py-1 font-semibold">{{ t("alert_destinations.headers") }}</div>
+                <div class="py-1 font-bold">{{ t("alert_destinations.headers") }}</div>
                 <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-2 pb-2">
                   <div class="ms-0 w-5/12">
                     <OFormInput
@@ -519,8 +517,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="primary"
               type="submit"
               form="add-destination-form"
-              :disabled="saveWaitsForEdits"
-              :disabled-reason="t('common.saveBar.noChanges')"
               @click="onSaveClick"
               >{{ t("alerts.save") }}</OButton
             >
@@ -602,7 +598,7 @@ import {
   switchToSlackApp,
   type SlackAppDestination,
 } from "@/utils/slackAppDestination";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import {
@@ -1011,14 +1007,6 @@ const tabs = computed(() => {
 // Check if current destination type is prebuilt
 const isPrebuiltDestination = computed(() => {
   return !!(dtVal.value && dtVal.value !== "custom");
-});
-
-// The list's wording, so an existing custom destination reads "Custom (Webhook)" on both screens.
-const readonlyTypeLabel = computed(() => {
-  if (dtVal.value !== "custom") return getDestinationTypeName(dtVal.value);
-  if (typeVal.value === "http") return t("alert_destinations.customWebhook");
-  if (typeVal.value === "email") return t("alert_destinations.customEmail");
-  return t("alert_destinations.custom");
 });
 
 // Helper methods for displaying destination type in edit mode
@@ -1788,12 +1776,6 @@ const destinationDraft = useEditorDraft<AddDestinationForm>({
     to.path !== from.path ||
     to.query.action !== from.query.action ||
     to.query.name !== from.query.name,
-});
-
-// Only the tracked editor knows its baseline; reading the values makes this recompute on each edit.
-const saveWaitsForEdits = computed(() => {
-  void formValues.value;
-  return isUpdatingDestination.value && draftsActive && !destinationDraft.hasUnsavedChanges();
 });
 
 onMounted(async () => {

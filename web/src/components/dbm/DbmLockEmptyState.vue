@@ -48,18 +48,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #icon><OIcon name="check-circle" size="xs" /></template>
         {{ collectionHealthyLabel }}
       </OTag>
-      <OButton
-        v-for="(action, i) in actions.slice(0, size === 'compact' ? 1 : 2)"
+      <EmptyStateActionCard
+        v-for="action in actions"
         :key="action.id"
-        :variant="i === 0 && action.primary ? 'primary' : 'secondary'"
-        :size="size === 'compact' ? 'sm' : undefined"
+        :icon="action.icon ?? 'arrow-forward'"
+        :label="action.label"
         :data-test="`${dataTest}-action-${action.id}`"
         @click="emit('action', action.id)"
-      >
-        {{ action.label }}
-      </OButton>
+      />
     </template>
 
+    <!-- The checklist grammar is shared with DbmEmptyState via DbmCheckList, so
+         all of DBM's empty states read as one system. -->
     <template #extra>
       <DbmCheckList
         :title="checklistTitle"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import DbmCheckList, { type DbmCheckRow } from "./DbmCheckList.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { EmptyStateSize } from "@/lib/core/EmptyState/OEmptyState.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -112,7 +112,7 @@ withDefaults(
     actions: () => [],
     collectionHealthyLabel: () => raw(""),
     dataTest: "dbm-lock-empty-state",
-    size: "region",
+    size: "page",
   },
 );
 

@@ -292,7 +292,7 @@ describe("OperationsList", () => {
       const dialog = wrapper.findComponent(oDialogStub);
       expect(dialog.exists()).toBe(true);
       expect(dialog.props("size")).toBe("sm");
-      expect(dialog.props("title")).toBe("Add operation");
+      expect(dialog.props("title")).toBe("Add Operation");
       expect(dialog.props("primary")?.label).toBe("Close");
     });
 

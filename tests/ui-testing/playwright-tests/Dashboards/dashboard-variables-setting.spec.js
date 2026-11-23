@@ -36,7 +36,7 @@ test.describe("dashboard variables settings", () => {
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     await pm.dashboardSetting.addVariable(
-      "Query values",
+      "Query Values",
       variableName,
       "logs",
       "e2e_automate",
@@ -75,7 +75,7 @@ test.describe("dashboard variables settings", () => {
 
     // Add a query values variable
     await pm.dashboardSetting.addVariable(
-      "Query values",
+      "Query Values",
       variableName,
       "logs",
       "e2e_automate",
@@ -112,7 +112,7 @@ test.describe("dashboard variables settings", () => {
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     await pm.dashboardSetting.addVariable(
-      "Query values",
+      "Query Values",
       variableName,
       "logs",
       "e2e_automate",
@@ -153,7 +153,7 @@ test.describe("dashboard variables settings", () => {
 
     // Add a query values variable
     await pm.dashboardSetting.addVariable(
-      "Query values",
+      "Query Values",
       variableName,
       "logs",
       "e2e_automate",
@@ -196,7 +196,7 @@ test.describe("dashboard variables settings", () => {
 
     // Add a query values variable
     await pm.dashboardSetting.addVariable(
-      "Query values",
+      "Query Values",
       variableName,
       "logs",
       "e2e_automate",

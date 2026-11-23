@@ -160,20 +160,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="border-card-glass-border rounded-default flex min-h-40 flex-col gap-3 border p-3"
           >
-            <OEmptyState
+            <div
               v-if="detailQuery.isError.value"
-              size="compact"
-              kind="error"
               role="alert"
-              :title="t('autoobserve.issueLive.triggersFailed')"
+              class="text-status-error-text flex items-center gap-2 text-sm"
               data-test="autoobserve-issue-triggers-error"
             >
-              <template #actions>
-                <OButton variant="secondary" size="sm" @click="detailQuery.refetch()">{{
-                  t("autoobserve.issueLive.spark.retry")
-                }}</OButton>
-              </template>
-            </OEmptyState>
+              <OIcon name="error-outline" size="sm" />
+              {{ t("autoobserve.issueLive.triggersFailed") }}
+              <OButton variant="accent-ghost" size="sm" @click="detailQuery.refetch()">{{
+                t("autoobserve.issueLive.spark.retry")
+              }}</OButton>
+            </div>
             <template v-else>
               <OSkeleton
                 shape="block"
@@ -254,7 +252,7 @@ import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useIncidentRca } from "@/composables/useIncidentRca";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";

@@ -42,7 +42,7 @@
   animation: none;
 }
 ::view-transition-new(root) {
-  animation: o2-theme-sweep 220ms ease-in-out both;
+  animation: o2-theme-sweep 0.45s ease-in-out both;
   mask-image: linear-gradient(to bottom, black 0%, black 40%, transparent 60%);
   mask-size: 100% 250%;
   mask-repeat: no-repeat;
@@ -75,10 +75,10 @@ html.theme-switching *::after {
  * doesn't suppress it — it plays live inside the theme sweep.
  */
 .theme-icon-enter-active {
-  animation: theme-icon-in 200ms ease-out;
+  animation: theme-icon-in 0.3s ease-out;
 }
 .theme-icon-leave-active {
-  animation: theme-icon-out 120ms ease-in forwards;
+  animation: theme-icon-out 0.15s ease-in forwards;
 }
 @keyframes theme-icon-in {
   from {
@@ -119,8 +119,8 @@ html.theme-switching *::after {
  */
 .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
   font-family: var(--font-mono);
-  font-size: var(--text-compact);
-  line-height: var(--leading-base);
+  font-size: var(--text-sm);
+  line-height: 1.3125rem;
   color: var(--color-text-placeholder);
   white-space: nowrap;
   overflow: hidden;
@@ -173,29 +173,51 @@ html.theme-switching *::after {
   }
 }
 
-/* Popup entrance: a fade plus a 4px slide from the trigger side; `-up-*` serves top-placed menus.
-   `translate`, not `transform`, so a transform the popup already carries still applies. */
+/*
+ * Clip-path "reveal" for popups (dropdown / select / combobox).
+ * The menu renders at full size and is progressively unveiled with a
+ * `clip-path` wipe — content never scales or squishes, it just gets
+ * revealed from the trigger edge. `-down-*` wipes top→bottom (bottom-placed
+ * menus), `-up-*` wipes bottom→top (top-placed menus, via `data-[side=top]`).
+ * `round 0.5rem` keeps the corners rounded throughout the wipe.
+ */
 @keyframes o2-reveal-down-in {
   from {
     opacity: 0;
-    translate: 0 -0.25rem;
+    clip-path: inset(0 0 100% 0 round 0.5rem);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 0.5rem);
   }
 }
 @keyframes o2-reveal-down-out {
+  from {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 0.5rem);
+  }
   to {
     opacity: 0;
-    translate: 0 -0.25rem;
+    clip-path: inset(0 0 100% 0 round 0.5rem);
   }
 }
 @keyframes o2-reveal-up-in {
   from {
     opacity: 0;
-    translate: 0 0.25rem;
+    clip-path: inset(100% 0 0 0 round 0.5rem);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 0.5rem);
   }
 }
 @keyframes o2-reveal-up-out {
+  from {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 0.5rem);
+  }
   to {
     opacity: 0;
-    translate: 0 0.25rem;
+    clip-path: inset(100% 0 0 0 round 0.5rem);
   }
 }

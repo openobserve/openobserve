@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             kind="filtered"
             :title="t('emptyState.noSearchResults.title')"
             :text="t('emptyState.noSearchResults.description')"
+            size="inline"
           />
         </slot>
       </template>

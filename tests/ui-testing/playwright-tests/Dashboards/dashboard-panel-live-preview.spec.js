@@ -137,7 +137,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
     await lp.expectAutoRunToggleLabel('Turn off Auto Run');
     await lp.toggleAutoRun();
     expect(await lp.getStoredAutoRun()).toBe('false');
-    await lp.expectAutoRunToggleLabel('Turn on auto run');
+    await lp.expectAutoRunToggleLabel('Turn on Auto Run');
 
     await pm.chartTypeSelector.searchAndAddField(NAMESPACE_FIELD, 'b');
     await lp.expectApplyVariant('pending');

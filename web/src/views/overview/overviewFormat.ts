@@ -19,6 +19,10 @@ import type {
   SegmentedBarVariant,
 } from "@/lib/data/SegmentedBar/OSegmentedBar.types";
 import type {
+  OrgOverview,
+  OverviewAlertLevel,
+  OverviewAlertsData,
+  OverviewFiringAlert,
   OverviewSection,
   OverviewStreamTypeSummary,
   OverviewTopStream,
@@ -26,7 +30,11 @@ import type {
 
 export type OverviewView = "loading" | "error" | "forbidden" | "locked" | "empty" | "ok";
 
+export type OverviewDestination = "failing" | "delivery" | "pipelines" | "streams";
+
 export const TOP_STREAMS_LIMIT = 6;
+
+export const FIRING_ROWS_LIMIT = 5;
 
 export function sectionView(
   section: OverviewSection<unknown> | null | undefined,
@@ -55,6 +63,11 @@ export function limitBarVariant(percent: number): ProgressBarTone {
   const status = limitStatus(percent);
   if (status === "over") return "err";
   return status === "approaching" ? "warn" : "accent";
+}
+
+// a rule whose notification failed still fired
+export function firingCount(alerts: OverviewAlertsData | undefined): number {
+  return (alerts?.by_state.firing ?? 0) + (alerts?.by_state.notify_failed ?? 0);
 }
 
 export function percentToFraction(percent: number): number {
@@ -167,3 +180,46 @@ export function elapsedParts(ms: number): Elapsed {
     minutes: total % 60,
   };
 }
+
+export function microsToMs(micros: number): number {
+  return Math.floor(micros / 1000);
+}
+
+// the server sends 0 when it does not know when a rule started firing
+export function hasKnownSince(since: number): boolean {
+  return since > 0;
+}
+
+export const ALERT_LEVELS: OverviewAlertLevel[] = [
+  "critical",
+  "warning",
+  "ok",
+  "no_data",
+  "unclassified",
+];
+
+export function levelCount(
+  alerts: OverviewAlertsData | undefined,
+  level: OverviewAlertLevel,
+): number {
+  return alerts?.firing_by_level?.[level] ?? 0;
+}
+
+export function firingRows(alerts: OverviewAlertsData | undefined): OverviewFiringAlert[] {
+  return alerts?.firing ?? [];
+}
+
+// firing_by_level counts every firing rule, so it is the total the capped list is cut from
+export function firingTotal(alerts: OverviewAlertsData | undefined): number {
+  if (!alerts?.firing_by_level) return firingCount(alerts);
+  return ALERT_LEVELS.reduce((sum, level) => sum + levelCount(alerts, level), 0);
+}
+
+export function levelTone(level: OverviewAlertLevel): "error" | "warning" | "success" | "neutral" {
+  if (level === "critical") return "error";
+  if (level === "warning") return "warning";
+  if (level === "ok") return "success";
+  return "neutral";
+}
+
+export type HealthTone = "error" | "warning" | "info" | "neutral" | "success";

@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #more="{ count }">
             <span
-              class="rounded-default bg-surface-subtle px-1 py-0.5 text-xs font-semibold whitespace-nowrap"
+              class="rounded-default bg-surface-subtle px-1 py-0.5 text-xs font-bold whitespace-nowrap"
               >+{{ count }}</span
             >
           </template>
@@ -448,11 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : t('emptyState.noMonitors.title')
         "
         :icon="props.hasFilters ? undefined : 'web'"
-        :text="
-          props.hasFilters
-            ? t('synthetics.table.noResults')
-            : t('emptyState.noMonitors.description')
-        "
+        :text="t('synthetics.table.noResults')"
         :data-test="`${dataTest}-empty-state`"
         :action-label="props.hasFilters ? undefined : t('synthetics.newCheck.browser')"
         :secondary-action-label="props.hasFilters ? undefined : t('synthetics.newCheck.http')"

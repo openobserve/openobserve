@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else-if="!secondary && rotationCount === 1"
         variant="secondary"
+        icon="add"
         data-test="oncall-answer-assign-secondary"
         @click="emit('assign-secondary')"
       >

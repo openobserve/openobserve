@@ -33,24 +33,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Stacks when the rails squeeze the overview, which a viewport breakpoint cannot see. -->
     <div class="relative flex min-h-0 flex-1 @max-[38rem]/role-overview:flex-col">
       <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
-        <OContent v-if="loading" class="py-4" data-test="edit-role-summary-loading">
-          <div class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,17rem),17rem))] gap-3">
-            <OSkeleton v-for="n in 6" :key="n" shape="block" class="h-32" />
-          </div>
-        </OContent>
+        <div v-if="loading" class="flex flex-1 items-center justify-center p-6">
+          <OSpinner size="lg" data-test="edit-role-summary-loading" />
+        </div>
 
-        <LicenseDeniedState
-          v-else-if="licenseDenied"
-          :features="licenseDenied"
-          data-test="edit-role-summary-license-denied"
-        />
+        <div v-else-if="licenseDenied" class="flex flex-1 items-center justify-center p-6">
+          <LicenseDeniedState
+            :features="licenseDenied"
+            data-test="edit-role-summary-license-denied"
+          />
+        </div>
 
-        <OEmptyState
-          v-else-if="!modules.length"
-          :title="t('iam.editRole.summaryEmptyTitle')"
-          :text="t('iam.editRole.summaryEmptyDescription')"
-          data-test="edit-role-summary-empty"
-        />
+        <div v-else-if="!modules.length" class="flex flex-1 items-center justify-center p-6">
+          <OEmptyState
+            :title="t('iam.editRole.summaryEmptyTitle')"
+            :text="t('iam.editRole.summaryEmptyDescription')"
+            data-test="edit-role-summary-empty"
+          />
+        </div>
 
         <OContent v-else class="flex flex-col gap-3 py-4">
           <!-- Fixed-width columns keep cards still when the Presets panel opens or closes; the end gutter keeps the top card clear of the floating Show Presets button. -->
@@ -172,7 +172,7 @@ import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";

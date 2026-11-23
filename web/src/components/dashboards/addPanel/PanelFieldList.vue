@@ -6,10 +6,10 @@
     :class="frameless ? '' : 'border-border-default border-e'"
   >
     <div v-if="!frameless" class="px-page-edge my-3 flex shrink-0 items-center justify-between">
-      <span class="text-sm font-semibold">{{ t("panel.fields") }}</span>
+      <span class="text-base font-bold">{{ t("panel.fields") }}</span>
       <OButton
         icon-only
-        variant="ghost"
+        variant="secondary"
         size="sm"
         class="rotate-90"
         icon="unfold-less"
@@ -346,8 +346,12 @@
         </div>
       </template>
 
+      <!-- Empty state -->
       <template #empty>
-        <OEmptyState size="compact" icon="info" :title="t('search.noFieldFound')" />
+        <div class="flex items-center justify-center py-[0.725rem] text-center">
+          <OIcon name="info" size="xs" />
+          <span class="ps-1.5">{{ t("search.noFieldFound") }}</span>
+        </div>
       </template>
 
       <!-- After list: pagination -->
@@ -415,7 +419,6 @@ import { BADGE_LABEL_KEYS, getBadgeStyle } from "@/utils/metrics/metricPalette";
 import useNotifications from "@/composables/useNotifications";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

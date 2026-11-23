@@ -54,7 +54,7 @@ test.describe(
       await expect(page.locator(http.nodeBadge)).toHaveCount(0);
 
       await http.openFromEditor();
-      await expect(page.locator(http.kindNote)).toContainText('Alert fired');
+      await expect(page.locator(http.kindNote)).toContainText('Alert Fired');
       expect(await http.panelText()).toContain(wf.name);
 
       await http.turnOn();
@@ -92,7 +92,7 @@ test.describe(
       await expect(page.locator(http.listHttpTag)).toHaveCount(0);
 
       await http.openFromList(wf.name);
-      await expect(page.locator(http.kindNote)).toContainText('Incident event');
+      await expect(page.locator(http.kindNote)).toContainText('Incident Event');
       expect(await http.panelText()).toContain('Incident Event workflow');
       await http.turnOn();
       await http.finishReveal();

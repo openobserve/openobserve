@@ -389,7 +389,7 @@ describe("WebVitalsDashboard", () => {
       await nextTick();
 
       // Assert
-      expect(wrapper.text()).toContain("Loading dashboard");
+      expect(wrapper.text()).toContain("Loading Dashboard");
     });
   });
 
@@ -697,7 +697,7 @@ describe("WebVitalsDashboard", () => {
 
       // Assert
       expect(wrapper.find('[data-test="web-vitals-dashboard-schema-loading"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("Loading dashboard");
+      expect(wrapper.text()).toContain("Loading Dashboard");
       expect(wrapper.find('[data-test="learn-web-vitals-link"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]').exists()).toBe(

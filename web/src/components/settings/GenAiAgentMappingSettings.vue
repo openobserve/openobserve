@@ -19,38 +19,33 @@
       </OButton>
     </template>
 
-    <ConstrainedPage
-      v-if="loading"
-      size="lg"
-      align="left"
-      :padded="false"
-      class="min-h-0 flex-1 px-4 py-3"
-    >
-      <div class="flex flex-col gap-6">
-        <OSkeleton shape="block" class="h-56" />
-        <OSkeleton shape="block" class="h-56" />
-      </div>
-    </ConstrainedPage>
+    <div v-if="loading" class="flex flex-1 items-center justify-center">
+      <OSpinner size="lg" />
+    </div>
 
-    <OEmptyState
-      v-else-if="forbidden"
-      kind="denied"
-      :title="t('emptyState.noAccess.title')"
-      :text="t('emptyState.noAccess.description')"
-      data-test="gen-ai-agent-mapping-forbidden"
-    />
+    <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
+      <OEmptyState
+        kind="denied"
+        :title="t('emptyState.noAccess.title')"
+        :text="t('emptyState.noAccess.description')"
+        data-test="gen-ai-agent-mapping-forbidden"
+      />
+    </div>
 
     <!-- No form on a failed load: saving what an empty form holds would wipe the stored mapping. -->
-    <OEmptyState
-      v-else-if="loadError"
-      kind="error"
-      data-test="gen-ai-agent-mapping-load-error"
-      @action="loadConfig()"
-    />
+    <div v-else-if="loadError" class="flex flex-1 items-center justify-center">
+      <OEmptyState
+        kind="error"
+        :title="t('emptyState.loadError.title')"
+        :text="t('emptyState.loadError.description')"
+        data-test="gen-ai-agent-mapping-load-error"
+        @action="loadConfig()"
+      />
+    </div>
 
     <template v-else>
       <ConstrainedPage size="lg" align="left" :padded="false" class="min-h-0 flex-1 px-4 py-3">
-        <div class="flex flex-col gap-6">
+        <div class="flex flex-col gap-4">
           <!-- Standard attribute is read first, then each fallback in order. -->
           <OFormSection
             variant="plain"
@@ -82,7 +77,7 @@
                 @blur="markLeft(f.key)"
               />
             </OSettingRow>
-            <p class="text-text-secondary py-3 text-xs">
+            <p class="text-text-secondary px-4 py-3 text-xs">
               {{ t("genAiAgentMapping.fallbacksNote") }}
             </p>
           </OFormSection>
@@ -129,7 +124,7 @@
                   @blur="markLeft(d)"
                 />
               </OSettingRow>
-              <p class="text-text-secondary py-3 text-xs">
+              <p class="text-text-secondary px-4 py-3 text-xs">
                 {{ t("genAiAgentMapping.fallbacksNote") }}
                 {{ t("llmAttribution.settings.note") }}
               </p>
@@ -164,6 +159,7 @@
             >
               <OButton
                 variant="secondary"
+                icon="add"
                 data-test="gen-ai-harness-add-agent"
                 @click="addHarnessRule"
               >
@@ -171,14 +167,14 @@
               </OButton>
             </OSettingRow>
 
-            <div class="flex flex-col gap-3 py-3">
-              <OEmptyState
+            <div class="flex flex-col gap-3 px-4 py-3">
+              <p
                 v-if="harnessRules.length === 0"
-                size="compact"
-                icon="smart-toy"
-                :title="t('genAiAgentMapping.sessions.noAgents')"
+                class="text-text-secondary text-xs"
                 data-test="gen-ai-harness-empty"
-              />
+              >
+                {{ t("genAiAgentMapping.sessions.noAgents") }}
+              </p>
               <div
                 v-for="(rule, i) in harnessRules"
                 :key="rule.id"
@@ -329,7 +325,7 @@ import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

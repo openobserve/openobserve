@@ -39,41 +39,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-html="DOMPurify.sanitize(t('traces.noEvents.descWithFilters'))"
       />
       <!-- We know where the stream's last data is: offer to jump to it. -->
-      <span v-else-if="jumpTarget"
-        >{{ t("traces.noEvents.descOutOfRange") }} {{ jumpTargetSublabel }}</span
-      >
+      <span v-else-if="jumpTarget">{{ t("traces.noEvents.descOutOfRange") }}</span>
       <!-- No stream stats: generic fallback. -->
       <span v-else>{{ t("traces.noEvents.descNoFilters", { range: currentPeriodLabel }) }}</span>
     </template>
 
     <template #actions>
-      <OButton
+      <!-- The selected range has no data but the stream does (out of range, or a
+           no-filter window in a gap): offer a precise jump to the latest data. -->
+      <EmptyStateActionCard
         v-if="jumpTarget"
-        variant="primary"
+        icon="schedule"
+        :label="t('traces.noEvents.jumpToData')"
+        :sublabel="raw(jumpTargetSublabel)"
         data-test="traces-no-events-jump-to-data-card"
         @click="emit('jump-to-stream-data', jumpTarget.from, jumpTarget.to)"
-      >
-        {{ t("traces.noEvents.jumpToData") }}
-      </OButton>
+      />
+      <!-- Filter excluded everything within an overlapping window: no action
+           card — the user is guided to relax the query themselves (and Ask AI). -->
     </template>
 
-    <template v-if="aiEnabled && windowHasStreamData && !jumpTarget" #extra>
-      <OButton variant="link" data-test="traces-no-events-ask-ai-btn" @click="emit('ask-ai')">
-        {{ t("traces.noEvents.askAi") }}
-      </OButton>
+    <template #extra>
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <OButton
+          v-if="aiEnabled && windowHasStreamData && !jumpTarget"
+          variant="ghost"
+          data-test="traces-no-events-ask-ai-btn"
+          @click="emit('ask-ai')"
+        >
+          <template #icon>
+            <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
+          </template>
+          {{ t("traces.noEvents.askAi") }}
+        </OButton>
+      </div>
     </template>
   </OEmptyState>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { DateTime } from "luxon";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useTraces from "@/composables/useTraces";
 import useWidenRange from "@/composables/useWidenRange";
+import { useAiIcon } from "@/composables/useAiIcon";
 import { getConsumableRelativeTime } from "@/utils/date";
 import DOMPurify from "dompurify";
 
@@ -95,6 +109,7 @@ const props = defineProps<{
 
 const { t } = useI18nTyped();
 const store = useStore();
+const { aiIconSrc } = useAiIcon();
 const emit = defineEmits<{
   "jump-to-stream-data": [fromUs: number, toUs: number];
   "ask-ai": [];

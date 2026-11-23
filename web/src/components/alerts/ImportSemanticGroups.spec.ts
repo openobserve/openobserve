@@ -436,7 +436,7 @@ describe("ImportSemanticGroups - ODialog integration", () => {
     const dialogs = w.findAll('[data-test="o-dialog-stub"]');
     expect(dialogs.length).toBe(1);
     expect(dialogs[0].attributes("data-title")).toBe("Updated Group");
-    expect(dialogs[0].attributes("data-sub-title")).toBe("Compare changes");
+    expect(dialogs[0].attributes("data-sub-title")).toBe("Compare Changes");
     expect(dialogs[0].attributes("data-size")).toBe("lg");
   });
 

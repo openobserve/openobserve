@@ -20,7 +20,7 @@ or a bespoke `q-toolbar`. The header is the one described in
 [header-spec.md](header-spec.md):
 
 - one 56 px band; on the left a **context line** (12 px, secondary) above the
-  **title** (18 px, weight 600); page actions on the right (H1);
+  **title** (16 px semibold); page actions on the right (H1);
 - the context line names the container: the rail group on grouped pages, the org
   on the others, and a "‹ Parent" link on detail, editor and import pages. That
   link is the Back affordance (H4);
@@ -62,7 +62,7 @@ placement and the tab underline, and drifts.
   The stacked anatomy is [header-spec.md](header-spec.md) (H1–H8).
 - **There is no `icon` and no `subtitle`** (H2). Real help goes in `about` (an ⓘ
   "About this page" popover beside the title); filler is dropped.
-- The context line is derived from the route (the rail group, else an empty slot; never the org);
+- The context line is derived from the route (the rail group, else the org);
   `context` overrides it only where the derivation is wrong. `back`
   (`{ label, to | onClick, dataTest }`) turns it into the "‹ Parent" link (H4):
   `label` is the parent's own name, `to` is its route (the href, and where Back

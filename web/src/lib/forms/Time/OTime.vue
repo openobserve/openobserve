@@ -324,11 +324,14 @@ const heightClasses: Record<NonNullable<TimeProps["size"]>, string> = {
 };
 
 const fieldClasses = computed(() => [
-  "flex items-center w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)",
+  "flex items-center w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
+  "ring-offset-1 ring-offset-surface-base",
   "bg-datepicker-bg",
   hasError.value
-    ? "border-datepicker-error-border focus-within:ring-3 focus-within:ring-control-error-halo"
-    : "border-datepicker-border hover:not-focus-within:border-datepicker-hover-border focus-within:border-datepicker-focus-border focus-within:ring-3 focus-within:ring-control-focus-halo",
+    ? "border-datepicker-error-border"
+    : "border-datepicker-border hover:border-datepicker-hover-border",
+  "focus-within:border-datepicker-focus-border",
+  "focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
   isDisabled.value
     ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60 cursor-not-allowed"
     : "",
@@ -452,7 +455,7 @@ const fieldClasses = computed(() => [
           :side-offset="4"
           align="start"
           :class="[
-            'rounded-default bg-datepicker-popup-bg shadow-overlay border-border-default z-10001 overflow-hidden border outline-none',
+            'rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-10001 overflow-hidden border shadow-md outline-none',
             'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
             withSeconds ? 'w-64' : 'w-56',
           ]"
@@ -465,7 +468,7 @@ const fieldClasses = computed(() => [
               <button
                 type="button"
                 :class="[
-                  'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none focus-visible:ring-2',
+                  'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
                   clockMode === 'hour'
                     ? 'text-datepicker-accent-text border-datepicker-day-selected-bg'
                     : 'text-datepicker-heading-text hover:text-datepicker-accent-text border-transparent',
@@ -481,7 +484,7 @@ const fieldClasses = computed(() => [
               <button
                 type="button"
                 :class="[
-                  'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none focus-visible:ring-2',
+                  'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
                   clockMode === 'minute'
                     ? 'text-datepicker-accent-text border-datepicker-day-selected-bg'
                     : 'text-datepicker-heading-text hover:text-datepicker-accent-text border-transparent',
@@ -498,7 +501,7 @@ const fieldClasses = computed(() => [
                 <button
                   type="button"
                   :class="[
-                    'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none focus-visible:ring-2',
+                    'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
                     clockMode === 'second'
                       ? 'text-datepicker-accent-text border-datepicker-day-selected-bg'
                       : 'text-datepicker-heading-text hover:text-datepicker-accent-text border-transparent',
@@ -519,7 +522,7 @@ const fieldClasses = computed(() => [
               <button
                 type="button"
                 :class="[
-                  'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring px-2.5 py-1 text-xs font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none focus-visible:ring-2',
+                  'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring px-2.5 py-1 text-xs font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
                   isAM
                     ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
                     : 'text-datepicker-weekday-text hover:bg-datepicker-clock-hover-bg',
@@ -533,7 +536,7 @@ const fieldClasses = computed(() => [
               <button
                 type="button"
                 :class="[
-                  'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring px-2.5 py-1 text-xs font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none focus-visible:ring-2',
+                  'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring px-2.5 py-1 text-xs font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
                   !isAM
                     ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
                     : 'text-datepicker-weekday-text hover:bg-datepicker-clock-hover-bg',
@@ -626,7 +629,7 @@ const fieldClasses = computed(() => [
               <button
                 type="button"
                 :class="[
-                  'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-full ring-offset-1 transition-[background-color,width,height,box-shadow] outline-none focus-visible:ring-2',
+                  'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-full ring-offset-1 transition-all outline-none focus-visible:ring-2',
                   clockMode === 'hour'
                     ? 'bg-datepicker-day-selected-bg h-2 w-4'
                     : 'bg-datepicker-border hover:bg-datepicker-weekday-text size-2',
@@ -637,7 +640,7 @@ const fieldClasses = computed(() => [
               <button
                 type="button"
                 :class="[
-                  'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-full ring-offset-1 transition-[background-color,width,height,box-shadow] outline-none focus-visible:ring-2',
+                  'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-full ring-offset-1 transition-all outline-none focus-visible:ring-2',
                   clockMode === 'minute'
                     ? 'bg-datepicker-day-selected-bg h-2 w-4'
                     : 'bg-datepicker-border hover:bg-datepicker-weekday-text size-2',
@@ -649,7 +652,7 @@ const fieldClasses = computed(() => [
                 v-if="withSeconds"
                 type="button"
                 :class="[
-                  'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-full ring-offset-1 transition-[background-color,width,height,box-shadow] outline-none focus-visible:ring-2',
+                  'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-full ring-offset-1 transition-all outline-none focus-visible:ring-2',
                   clockMode === 'second'
                     ? 'bg-datepicker-day-selected-bg h-2 w-4'
                     : 'bg-datepicker-border hover:bg-datepicker-weekday-text size-2',
@@ -660,7 +663,7 @@ const fieldClasses = computed(() => [
             </div>
             <button
               type="button"
-              class="text-datepicker-accent-text ring-offset-surface-base focus-visible:ring-datepicker-focus-ring text-xs font-medium ring-offset-1 transition-[box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none hover:opacity-80 focus-visible:ring-2"
+              class="text-datepicker-accent-text ring-offset-surface-base focus-visible:ring-datepicker-focus-ring text-xs font-medium ring-offset-1 transition-[box-shadow] duration-150 outline-none hover:opacity-80 focus-visible:ring-2"
               data-test="otime-close"
               @click="popoverOpen = false"
             >
@@ -675,12 +678,12 @@ const fieldClasses = computed(() => [
       <span
         v-if="effectiveError && effectiveError.trim()"
         :id="messageId"
-        class="text-datepicker-error-text text-xs leading-4"
+        class="text-datepicker-error-text text-xs leading-snug"
         role="alert"
       >
         {{ effectiveError }}
       </span>
-      <span v-else-if="helpText" :id="messageId" class="text-datepicker-label text-xs leading-4">
+      <span v-else-if="helpText" :id="messageId" class="text-datepicker-label text-xs leading-snug">
         {{ helpText }}
       </span>
     </div>

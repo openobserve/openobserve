@@ -108,7 +108,6 @@ import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { providePageRailGroup } from "@/lib/core/PageHeader/pageContext";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -363,12 +362,4 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
     .sort((a, b) => rank(a) - rank(b))
     .map((key) => ({ label: groupLabels.value[key] ?? raw(key), items: buckets.get(key)! }));
 });
-
-// The Tools menu's Configure pages name their group too; Playground, pinned to the foot, has none.
-providePageRailGroup(
-  computed(() => {
-    const section = AI_OBSERVABILITY_SECTIONS.find((entry) => entry.key === activeTab.value);
-    return section && !section.footer ? groupLabels.value[section.group] : null;
-  }),
-);
 </script>

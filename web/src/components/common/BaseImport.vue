@@ -155,7 +155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <OSeparator class="mt-1 shrink-0" />
                   <div class="error-report-container min-h-0 flex-1 resize-none overflow-auto">
-                    <OEmptyState icon="article" :title="t('dashboard.noMessagesToDisplay')" />
+                    <div class="text-text-muted p-3 text-center">
+                      {{ t("dashboard.noMessagesToDisplay") }}
+                    </div>
                   </div>
                 </slot>
               </slot>
@@ -188,7 +190,6 @@ import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import type { PageHeaderBack } from "@/lib/core/PageHeader/OPageHeader.types";
 import { usePageContextLabel } from "@/lib/core/PageHeader/pageContext";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { createJsonFileValidator } from "@/lib/forms/File/validateJsonFile";
@@ -206,7 +207,6 @@ export default defineComponent({
     AppTabs,
     OPageHeader,
     OButton,
-    OEmptyState,
     OInput,
     OFile,
   },
@@ -360,7 +360,7 @@ export default defineComponent({
     const pageContext = usePageContextLabel();
     const headerBack = computed<PageHeaderBack>(() => ({
       dataTest: `${props.testPrefix}-import-back-btn`,
-      ...(props.back ?? { label: pageContext.value || t("common.back"), onClick: handleBack }),
+      ...(props.back ?? { label: pageContext.value, onClick: handleBack }),
     }));
 
     const handleCancel = () => {

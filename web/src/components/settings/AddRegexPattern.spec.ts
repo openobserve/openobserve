@@ -283,7 +283,7 @@ describe("AddRegexPattern", () => {
       });
       const drawer = wrapper.find('[data-test="o-drawer-stub"]');
       expect(drawer.exists()).toBe(true);
-      expect(drawer.attributes("data-title")).toBe("Edit pattern");
+      expect(drawer.attributes("data-title")).toBe("Edit Pattern");
       wrapper.unmount();
     });
   });
@@ -307,7 +307,7 @@ describe("AddRegexPattern", () => {
 
     it("should prefill the form via :default-values when editing", () => {
       const testData = {
-        name: "Test pattern",
+        name: "Test Pattern",
         pattern: "\\d+",
         description: "Test Description",
       };
@@ -315,7 +315,7 @@ describe("AddRegexPattern", () => {
 
       // name/pattern/description are all form-owned → seeded by the typed defaults computed.
       expect(wrapper.vm.addRegexPatternDefaults).toEqual({
-        name: "Test pattern",
+        name: "Test Pattern",
         pattern: "\\d+",
         description: "Test Description",
         testString: "",
@@ -422,7 +422,7 @@ describe("AddRegexPattern", () => {
 
       // @submit payload is the source of truth for name/pattern/description.
       await wrapper.vm.saveRegexPattern({
-        name: "Test pattern",
+        name: "Test Pattern",
         pattern: "\\d+",
         description: "Test Description",
       });
@@ -431,7 +431,7 @@ describe("AddRegexPattern", () => {
       expect(createSpy).toHaveBeenCalledWith(
         "default",
         expect.objectContaining({
-          name: "Test pattern",
+          name: "Test Pattern",
           pattern: "\\d+",
           description: "Test Description",
         }),
@@ -444,14 +444,14 @@ describe("AddRegexPattern", () => {
       const updateSpy = vi.spyOn(regexPatternService, "update");
       const testData = {
         id: "test-id",
-        name: "Test pattern",
+        name: "Test Pattern",
         pattern: "\\d+",
         description: "Test Description",
       };
 
       const wrapper = createWrapper({ isEdit: true, data: testData });
       await wrapper.vm.saveRegexPattern({
-        name: "Test pattern",
+        name: "Test Pattern",
         pattern: "\\d+",
         description: "Test Description",
       });
@@ -460,7 +460,7 @@ describe("AddRegexPattern", () => {
       expect(updateSpy).toHaveBeenCalledWith(
         "default",
         "test-id",
-        expect.objectContaining({ name: "Test pattern", pattern: "\\d+" }),
+        expect.objectContaining({ name: "Test Pattern", pattern: "\\d+" }),
       );
     });
 
@@ -473,7 +473,7 @@ describe("AddRegexPattern", () => {
       );
 
       const wrapper = createWrapper();
-      await wrapper.vm.saveRegexPattern({ name: "Test pattern", pattern: "\\d+" });
+      await wrapper.vm.saveRegexPattern({ name: "Test Pattern", pattern: "\\d+" });
       await flushPromises();
 
       // Error path: no success emits.
@@ -629,7 +629,7 @@ describe("AddRegexPattern", () => {
 
     it("should handle empty description in edit mode", () => {
       const testData = {
-        name: "Test pattern",
+        name: "Test Pattern",
         pattern: "\\d+",
         description: undefined,
       };

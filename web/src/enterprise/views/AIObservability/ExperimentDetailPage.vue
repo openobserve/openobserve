@@ -176,7 +176,7 @@
           @click="handleMetricCardClick(card)"
         >
           <template #value>
-            <span class="text-text-secondary text-2xl leading-none font-semibold">
+            <span class="text-text-secondary text-2xl leading-none font-bold">
               {{ raw(card.value) }}
             </span>
             <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
@@ -184,7 +184,7 @@
             </span>
           </template>
           <template v-if="card.footer" #footer>
-            <span class="text-2xs text-text-secondary font-medium">{{ raw(card.footer) }}</span>
+            <span class="text-3xs text-text-secondary font-medium">{{ raw(card.footer) }}</span>
           </template>
         </KpiCard>
       </KpiCardRow>
@@ -246,12 +246,16 @@
           </template>
 
           <template #toolbar-trailing>
-            <ORefreshButton
-              :last-run-at="loadedAt"
+            <OButton
+              icon-only
+              variant="secondary"
+              icon="refresh"
               :loading="loading"
               data-test="ai-experiment-detail-refresh"
               @click="refresh"
-            />
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" />
+            </OButton>
           </template>
 
           <template #cell-slotStatus="{ row }: { row: any }">
@@ -322,11 +326,13 @@
           </template>
 
           <template #empty>
-            <OEmptyState
-              :title="t('emptyState.noExperiments.title')"
-              :text="t('emptyState.noExperiments.description')"
-              icon="query-stats"
-            />
+            <div class="flex items-center justify-center py-8">
+              <OEmptyState
+                :title="t('emptyState.noExperiments.title')"
+                :text="t('emptyState.noExperiments.description')"
+                icon="query-stats"
+              />
+            </div>
           </template>
         </OTable>
       </div>
@@ -371,7 +377,7 @@ import { useStore } from "vuex";
 import { gt, raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -437,7 +443,6 @@ const orgId = computed<string>(() => store.state.selectedOrganization?.identifie
 const experimentId = computed<string>(() => String(route.params.id ?? ""));
 const detail = ref<ExperimentDetail | null>(null);
 const loading = ref(false);
-const loadedAt = ref<number | null>(null);
 const rowsLoading = ref(false);
 const acting = ref(false);
 const comparePickerOpen = ref(false);
@@ -990,7 +995,6 @@ async function refresh() {
     ]);
     detail.value = nextDetail;
     resultRows.value = rows;
-    loadedAt.value = Date.now();
   } catch (error: any) {
     showLoadError(error);
   } finally {
@@ -1108,7 +1112,6 @@ async function pollSlotRetry(rowId: string, generation: number) {
 
     detail.value = nextDetail;
     resultRows.value = rows;
-    loadedAt.value = Date.now();
     if (nextRowDetail && selectedRowDetail.value?.rowId === rowId) {
       selectedRowDetail.value = nextRowDetail;
     }

@@ -365,7 +365,7 @@ describe("SourceMaps.vue", () => {
   // -------------------------------------------------------------------------
   // Apply filters / fetch with params
   // -------------------------------------------------------------------------
-  describe("Apply filters", () => {
+  describe("Apply Filters", () => {
     it("re-fetches source maps with all selected filters as params", async () => {
       wrapper = await mountComponent();
       listSourceMapsMock.mockClear();
@@ -479,7 +479,7 @@ describe("SourceMaps.vue", () => {
 
       const dialog = wrapper.findComponent({ name: "ODialog" });
       expect(dialog.props("open")).toBe(true);
-      expect(dialog.props("title")).toBe("Delete source maps");
+      expect(dialog.props("title")).toBe("Delete Source Maps");
       expect(dialog.props("primary")?.variant).toBe("danger");
       const name = dialog.find('[data-test="delete-source-maps-dialog-name"]');
       expect(name.text()).toBe("svc-a");

@@ -124,7 +124,7 @@
     <!-- A failed load must not fall through to the page below: with nothing
          fetched it renders a team with no members, no schedule and no policy —
          the exact look of a team somebody forgot to configure. -->
-    <OContent v-if="oncallUnavailable">
+    <OContent v-if="oncallUnavailable" y>
       <OEmptyState
         icon="cloud-off"
         :title="t('oncall.notAvailableTitle')"
@@ -139,7 +139,7 @@
       data-test="oncall-team-detail-license-denied"
     />
 
-    <OContent v-else-if="teamNotFound">
+    <OContent v-else-if="teamNotFound" y>
       <OEmptyState
         :title="t('oncall.teamNotFoundTitle')"
         :text="t('oncall.teamNotFoundDescription')"
@@ -147,11 +147,11 @@
       />
     </OContent>
 
-    <OContent v-else-if="loadError">
+    <OContent v-else-if="loadError" y>
       <OEmptyState
         kind="error"
         :title="t('oncall.loadTeamFailed')"
-        :text="isRawHttpText(loadError) ? t('emptyState.loadError.description') : raw(loadError)"
+        :text="raw(loadError)"
         data-test="oncall-team-detail-error"
         @action="refreshPage"
       />
@@ -524,7 +524,6 @@ import {
   swappableRuns,
 } from "@/components/oncall/resolvedShifts";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";

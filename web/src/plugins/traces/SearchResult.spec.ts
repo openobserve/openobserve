@@ -78,8 +78,8 @@ const mockSearchObj = reactive({
     },
     resultGrid: {
       columns: [
-        { name: "service_name", label: "Service name" },
-        { name: "operation_name", label: "Operation name" },
+        { name: "service_name", label: "Service Name" },
+        { name: "operation_name", label: "Operation Name" },
       ],
       currentPage: 1,
     },
@@ -232,7 +232,7 @@ describe("SearchResult", () => {
     it("keeps the spans wording in the Spans view", async () => {
       (mockSearchObj.meta as any).searchMode = "spans";
       await flushPromises();
-      expect(countText()).toContain("Spans found");
+      expect(countText()).toContain("Spans Found");
     });
   });
 
@@ -512,6 +512,7 @@ describe("SearchResult", () => {
         "get:traceDetails",
         "metrics:editor-filter-set",
         "metrics:editor-filter-run",
+        "run-query",
         "remove-filter",
         "jump-to-stream-data",
         "error-only-toggled",
@@ -763,7 +764,7 @@ describe("SearchResult header through a re-run (T-3)", () => {
     await flushPromises();
     await startRerun();
 
-    expect(badge().text()).toBe("1.3K Spans found");
+    expect(badge().text()).toBe("1.3K Spans Found");
     expect(errorChip().exists()).toBe(true);
     expect(errorChip().text()).toContain("38");
     expect(pagerGroup().exists()).toBe(true);
@@ -795,11 +796,11 @@ describe("SearchResult header through a re-run (T-3)", () => {
     vi.advanceTimersByTime(200);
     mockSearchObj.loading = false;
     await wrapper.vm.$nextTick();
-    expect(badge().text()).toBe("1.3K Spans found");
+    expect(badge().text()).toBe("1.3K Spans Found");
 
     settle(2500, 41);
     await wrapper.vm.$nextTick();
-    expect(badge().text()).toBe("2.5K Spans found");
+    expect(badge().text()).toBe("2.5K Spans Found");
     expect(badge().find(".opacity-60").exists()).toBe(false);
     expect(errorChip().text()).toContain("41");
   });
@@ -826,13 +827,37 @@ describe("SearchResult header through a re-run (T-3)", () => {
     expect(errorChip().exists()).toBe(false);
   });
 
-  it("leaves refresh to the toolbar, so the results header carries no second one", async () => {
+  it("wraps the refresh control's data age in its own test id, keeping the control's id", async () => {
     (mockSearchObj.meta as any).lastRunAt = Date.UTC(2026, 10, 1, 10, 42);
     wrapper = mount(SearchResult, { global: globalOptions });
     await flushPromises();
 
-    expect(wrapper.find('[data-test="traces-search-result-data-age"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="traces-search-result-refresh"]').exists()).toBe(false);
+    const dataAge = wrapper.find('[data-test="traces-search-result-data-age"]');
+    expect(dataAge.exists()).toBe(true);
+    expect(dataAge.find('[data-test="traces-search-result-refresh"]').exists()).toBe(true);
+    expect(dataAge.find('[data-test="traces-search-result-refresh-age"]').text()).toMatch(
+      /ago|just now/,
+    );
+  });
+
+  it("keeps the control focusable through a run and swaps its glyph for a spinner", async () => {
+    (mockSearchObj.meta as any).lastRunAt = Date.UTC(2026, 10, 1, 10, 42);
+    wrapper = mount(SearchResult, { global: globalOptions, attachTo: document.body });
+    await flushPromises();
+    const control = () => wrapper.find('[data-test="traces-search-result-refresh"]');
+    (control().element as HTMLElement).focus();
+    await startRerun();
+    vi.advanceTimersByTime(1000);
+    await wrapper.vm.$nextTick();
+
+    expect(control().attributes("aria-busy")).toBe("true");
+    expect(control().attributes("disabled")).toBeUndefined();
+    expect(document.activeElement).toBe(control().element);
+    expect(control().find(".animate-spin").exists()).toBe(true);
+    expect(control().find(".text-transparent").exists()).toBe(false);
+    expect(wrapper.find('[data-test="traces-search-result-refresh-age"]').text()).toBe(
+      "Refreshing",
+    );
   });
 
   it("dims the kept values with the auto-run toggle on, as the rows do", async () => {
@@ -852,13 +877,13 @@ describe("SearchResult header through a re-run (T-3)", () => {
     }
   });
 
-  it("moves the wrap toggle and pager to a second header row by the results' width, not by state", async () => {
+  it("moves the data age, failure and pager to a second header row by the results' width, not by state", async () => {
     (mockSearchObj.meta as any).lastRunAt = Date.UTC(2026, 10, 1, 10, 42);
     wrapper = mount(SearchResult, { global: globalOptions });
     await flushPromises();
     const header = wrapper.find('[data-test="traces-section-header"]');
     const rowBreak = wrapper.find('[data-test="traces-search-result-header-break"]');
-    const wrapToggle = wrapper.find('[data-test="traces-search-result-wrap-btn"]');
+    const dataAge = wrapper.find('[data-test="traces-search-result-data-age"]');
 
     expect(header.element.parentElement?.classList).toContain("@container/results");
     expect(header.classes()).toContain("@max-[58rem]/results:flex-wrap");
@@ -868,7 +893,9 @@ describe("SearchResult header through a re-run (T-3)", () => {
     expect(rowBreak.element.nextElementSibling?.classList).toContain(
       "@max-[58rem]/results:flex-none",
     );
-    expect(wrapToggle.classes()).toContain("@max-[58rem]/results:ms-auto");
+    expect(dataAge.classes()).toEqual(
+      expect.arrayContaining(["min-w-0", "@max-[58rem]/results:flex-1"]),
+    );
 
     (mockSearchObj.meta as any).refreshFailedAt = Date.UTC(2026, 10, 1, 10, 47);
     await flushPromises();
@@ -892,8 +919,9 @@ describe("SearchResult header through a re-run (T-3)", () => {
     mockSearchObj.loading = false;
     await wrapper.vm.$nextTick();
 
+    expect(wrapper.find('[data-test="traces-search-result-refresh-failed"]').exists()).toBe(true);
     expect(badge().find(".opacity-60").exists()).toBe(false);
-    expect(badge().text()).toBe("1.3K Spans found");
+    expect(badge().text()).toBe("1.3K Spans Found");
     expect(errorChip().classes()).not.toContain("opacity-60");
     expect(errorChip().attributes("aria-disabled")).toBeUndefined();
     expect(pagerGroup().classes()).not.toContain("opacity-60");
@@ -949,6 +977,26 @@ describe("SearchResult header through a re-run (T-3)", () => {
     await startRerun();
     await errorChip().trigger("click");
     expect(wrapper.emitted("error-only-toggled")).toBeUndefined();
+  });
+
+  it("marks the refresh as failed, says when in its description, and keeps the old age", async () => {
+    (mockSearchObj.meta as any).lastRunAt = Date.UTC(2026, 10, 1, 10, 42);
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+    mockSearchObj.loading = true;
+    await wrapper.vm.$nextTick();
+    (mockSearchObj.meta as any).refreshFailedAt = Date.UTC(2026, 10, 1, 10, 47);
+    mockSearchObj.loading = false;
+    await wrapper.vm.$nextTick();
+
+    const dataAge = wrapper.find('[data-test="traces-search-result-data-age"]');
+    expect(dataAge.find('[data-test="traces-search-result-refresh-failed"]').text()).toBe("Failed");
+    const button = dataAge.find('[data-test="traces-search-result-refresh"]');
+    expect(dataAge.find(`[id="${button.attributes("aria-describedby")}"]`).text()).toContain(
+      "Refresh failed at",
+    );
+    expect((mockSearchObj.meta as any).lastRunAt).toBe(Date.UTC(2026, 10, 1, 10, 42));
+    (mockSearchObj.meta as any).refreshFailedAt = null;
   });
 });
 
@@ -1035,6 +1083,9 @@ describe("SearchResult header holds still as the first data lands", () => {
     wrapper = mount(SearchResult, { global: globalOptions });
     // Wide enough for all four buttons, so First and Last arriving past ten pages move nothing.
     const pager = () => wrapper.findComponent({ name: "OPagination" });
+    expect(wrapper.find('[data-test="traces-search-result-data-age"]').classes()).toContain(
+      "@min-[58rem]/results:min-w-33",
+    );
     expect(pager().classes()).toEqual(expect.arrayContaining(["min-w-31", "justify-end"]));
     Object.assign(mockSearchObj.data.queryResults, { total: 1284 });
     await flushPromises();

@@ -200,10 +200,10 @@ describe("CreateBackfillJobDialog – mount and structure", () => {
     expect(drawer.text()).toContain("My Pipe");
   });
 
-  it("forwards the static title 'Create backfill job for' to ODrawer", () => {
+  it("forwards the static title 'Create Backfill Job for' to ODrawer", () => {
     const wrapper = createWrapper();
     const drawer = wrapper.findComponent(ODrawerStub);
-    expect(drawer.props("title")).toBe("Create backfill job for");
+    expect(drawer.props("title")).toBe("Create Backfill Job for");
   });
 
   it("forwards 'Cancel' as the secondary button label", () => {
@@ -212,10 +212,10 @@ describe("CreateBackfillJobDialog – mount and structure", () => {
     expect(drawer.props("secondary")?.label).toBe("Cancel");
   });
 
-  it("forwards 'Create backfill job' as the primary button label", () => {
+  it("forwards 'Create Backfill Job' as the primary button label", () => {
     const wrapper = createWrapper();
     const drawer = wrapper.findComponent(ODrawerStub);
-    expect(drawer.props("primary")?.label).toBe("Create backfill job");
+    expect(drawer.props("primary")?.label).toBe("Create Backfill Job");
   });
 
   it("opens the ODrawer at the fixed md (640) size", () => {
@@ -474,10 +474,10 @@ describe("CreateBackfillJobDialog – onSubmit validation", () => {
 describe("CreateBackfillJobDialog – delete-confirmation ODialog", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("forwards 'Confirm data deletion' as the ODialog title", () => {
+  it("forwards 'Confirm Data Deletion' as the ODialog title", () => {
     const wrapper = createWrapper();
     const dialog = wrapper.findComponent(ODialogStub);
-    expect(dialog.props("title")).toBe("Confirm data deletion");
+    expect(dialog.props("title")).toBe("Confirm Data Deletion");
   });
 
   it("uses size='sm' on the confirmation ODialog, which a busy delete keeps open", () => {

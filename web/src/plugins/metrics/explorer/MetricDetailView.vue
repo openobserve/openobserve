@@ -16,10 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div ref="root" class="flex min-h-0 flex-1 flex-col" data-test="metrics-detail">
-    <div v-if="loading" class="flex flex-col gap-3 p-3" data-test="metrics-detail-loading">
-      <OSkeleton class="h-6 w-64" />
-      <OSkeleton shape="block" class="h-72" />
-      <OSkeleton preset="tableRows" :rows="4" />
+    <div
+      v-if="loading"
+      class="flex flex-1 flex-col items-center justify-center gap-2.5 opacity-80"
+      data-test="metrics-detail-loading"
+    >
+      <OSpinner size="lg" />
+      <span>{{ t("metrics.explorer.detail.loading") }}</span>
     </div>
 
     <OEmptyState
@@ -372,7 +375,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="compareOptions"
               :label="t('metrics.explorer.detail.compare.label')"
               variant="filter"
-              reset-value="off"
               :searchable="false"
               data-test="metrics-detail-compare"
               @update:model-value="onCompareChange"
@@ -385,7 +387,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="forecastOptions"
                   :label="t('metrics.explorer.detail.forecast.label')"
                   variant="filter"
-                  reset-value="off"
                   :searchable="false"
                   data-test="metrics-detail-forecast"
                   @update:model-value="onForecastChange"
@@ -416,7 +417,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="forecastHorizonOptions"
                   :label="t('metrics.explorer.detail.forecast.horizon')"
                   variant="filter"
-                  reset-value="auto"
                   :searchable="false"
                   data-test="metrics-detail-forecast-horizon"
                   @update:model-value="onForecastHorizonChange"
@@ -492,20 +492,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("metrics.explorer.retry") }}
               </OButton>
             </div>
-            <OEmptyState
+            <div
               v-else-if="!overview.queries.length"
-              size="compact"
-              icon="show-chart"
-              class="h-full"
-              :title="t('metrics.explorer.detail.noPreview')"
-            />
-            <OEmptyState
+              class="text-text-secondary flex h-full items-center justify-center text-xs"
+            >
+              {{ t("metrics.explorer.detail.noPreview") }}
+            </div>
+            <div
               v-else-if="overviewState.status === 'done' && !overviewHasSamples"
-              size="compact"
-              icon="bar-chart"
-              class="h-full"
-              :title="t('metrics.explorer.noData')"
-            />
+              class="text-text-secondary flex h-full items-center justify-center text-xs"
+            >
+              {{ t("metrics.explorer.noData") }}
+            </div>
             <MetricCardChart
               v-else-if="overviewState.status === 'done'"
               :results="overviewState.results"
@@ -595,7 +593,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else data-test="metrics-detail-related">
             <OEmptyState
               v-if="!related.length"
-              size="compact"
+              size="inline"
               icon="search-off"
               :title="t('metrics.explorer.detail.related.empty')"
               data-test="metrics-detail-related-empty"
@@ -693,7 +691,6 @@ import { STALE_DIM } from "@/lib/styles/motion";
 import { announceAlert } from "@/lib/feedback/RegionStatus/announcer";
 import { formatRefreshFailed } from "@/utils/formatters";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OLoadingLine from "@/lib/feedback/LoadingLine/OLoadingLine.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
@@ -793,7 +790,6 @@ export interface DetailStatus {
 export default defineComponent({
   name: "MetricDetailView",
   components: {
-    OSkeleton,
     ODataAge,
     ODataAgeFailedReserve,
     PanelChartPlaceholder,

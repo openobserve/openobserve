@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- The Settings shell owns the header, scroll and gutter; the content just flows. -->
-  <div class="domain_management flex flex-col gap-6">
+  <div class="domain_management flex flex-col gap-4">
     <OFormSection
       variant="plain"
       :title="t('settings.domainManagement.claimParserTitle')"
@@ -106,13 +106,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OForm>
         </div>
 
-        <OEmptyState
+        <p
           v-if="loaded && domains.length === 0"
-          size="compact"
-          icon="domain"
-          :title="t('settings.domainManagement.noDomains')"
           data-test="domain-management-no-domain-message"
-        />
+          class="text-text-secondary text-xs"
+        >
+          {{ t("settings.domainManagement.noDomains") }}
+        </p>
         <p v-else-if="domains.length > 0" class="text-text-secondary text-xs">
           {{ t("settings.domainConfiguredCount", { count: domains.length }) }}
         </p>
@@ -294,17 +294,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div v-if="loadingErrors" class="flex flex-col gap-1">
-            <OSkeleton shape="block" class="h-10" />
-            <OSkeleton shape="block" class="h-10" />
+          <div v-if="loadingErrors" class="py-4 text-center">
+            <OSpinner />
           </div>
 
-          <OEmptyState
-            v-else-if="recentErrors.length === 0"
-            size="compact"
-            icon="check-circle"
-            :title="t('settings.noRecentErrors')"
-          />
+          <div v-else-if="recentErrors.length === 0" class="text-text-muted py-2 text-center">
+            {{ t("settings.noRecentErrors") }}
+          </div>
 
           <div v-else class="error-list max-h-100 overflow-y-auto">
             <div
@@ -422,8 +418,7 @@ import jstransform from "@/services/jstransform";
 import { updateOrgSettingsMutation } from "@/services/organizations.queries";
 import { useMutation } from "@tanstack/vue-query";
 import searchService from "@/services/search";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Service name source banner -->
           <div
             v-if="!serviceOptional"
-            class="rounded-default overflow-hidden border transition-colors"
+            class="rounded-default overflow-hidden border transition-all"
             :class="
               serviceNameDetected
                 ? 'bg-banner-info-bg border-banner-info-border'
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-compact min-w-0 flex-1 leading-tight">
                 <template v-if="serviceNameDetected">
                   {{ t("settings.serviceIdentitySetup.serviceNameDetectedFrom") }}
-                  <span class="text-primary font-semibold">{{
+                  <span class="text-primary font-bold">{{
                     t("settings.correlation.service")
                   }}</span>
                   {{ t("settings.serviceIdentitySetup.fieldAlias") }}
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Legend row -->
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <div
-                    class="text-2xs flex flex-wrap items-center gap-3"
+                    class="text-3xs flex flex-wrap items-center gap-3"
                     :class="'text-text-secondary'"
                   >
                     <div class="flex items-center gap-1">
@@ -185,27 +185,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OSettingRow>
 
             <div>
-              <OEmptyState
-                v-if="allConfiguredEnvs.length === 0 && !addingToEnv"
-                size="compact"
-                icon="tune"
-                :title="t('settings.serviceIdentitySetup.noFieldsConfiguredYet')"
-              >
-                <template #actions>
+              <!-- Empty state: nothing configured anywhere -->
+              <div v-if="allConfiguredEnvs.length === 0 && !addingToEnv" class="px-4 py-3">
+                <div
+                  class="rounded-default flex flex-col items-center gap-2 border border-dashed px-4 py-3"
+                  :class="'border-border-default bg-surface-subtle'"
+                >
+                  <OIcon name="tune" size="lg" class="text-icon-color mb-1" />
+                  <span class="text-sm font-medium" :class="'text-text-secondary'">
+                    {{ t("settings.serviceIdentitySetup.noFieldsConfiguredYet") }}
+                  </span>
                   <OButton
                     variant="secondary"
-                    size="sm"
+                    class="mt-1"
                     data-test="service-identity-add-distinguish-btn"
                     @click="addingToEnv = activeEnvironment"
                   >
+                    <template #icon><OIcon name="add" size="xs" /></template>
                     {{ t("settings.correlation.addField") }}
                   </OButton>
-                </template>
-              </OEmptyState>
+                </div>
+              </div>
 
               <!-- Each group is a direct child, so its rule reaches the card edges. -->
               <template v-else>
-                <div v-if="isAutoSuggested" class="pt-3">
+                <div v-if="isAutoSuggested" class="px-4 pt-3">
                   <div
                     class="rounded-default flex items-start gap-2 px-3 py-2 text-xs"
                     :class="'bg-status-info-bg text-status-info-text'"
@@ -218,11 +222,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="envKey in allConfiguredEnvs"
                   :key="envKey"
-                  class="border-border-subtle flex flex-col gap-2 border-b py-3 last:border-b-0"
+                  class="border-border-default flex flex-col gap-2 border-b px-4 py-3 last:border-b-0"
                 >
                   <div
                     v-if="allConfiguredEnvs.length > 1"
-                    class="text-text-heading text-compact font-medium"
+                    class="text-text-heading text-sm font-medium"
                   >
                     {{ getIdentitySetLabel(envKey) }}
                   </div>
@@ -313,6 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else-if="(setDistinguishBy[envKey] ?? []).filter(Boolean).length < 5"
                       variant="secondary"
                       @click="addingToEnv = envKey"
+                      icon="add"
                     >
                       {{ t("settings.correlation.addField") }}
                       <OTooltip side="top" :content="t('settings.correlation.addFieldTooltip')" />
@@ -322,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Adding to a new env (not yet in the list) -->
                 <template v-if="addingToEnv && !allConfiguredEnvs.includes(addingToEnv)">
-                  <div class="flex flex-wrap items-center gap-2 py-3">
+                  <div class="flex flex-wrap items-center gap-2 px-4 py-3">
                     <OSelect
                       ref="addFieldSelectRef"
                       v-model="addFieldValue"
@@ -365,8 +370,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <!-- Add group -->
-                <div v-if="!addingToEnv" class="flex items-center justify-between py-3">
-                  <OButton variant="secondary" @click="addingToEnv = generateGroupId()">
+                <div v-if="!addingToEnv" class="flex items-center justify-between px-4 py-3">
+                  <OButton variant="secondary" @click="addingToEnv = generateGroupId()" icon="add">
                     {{ t("settings.correlation.addGroup") }}
                     <OTooltip side="top" :content="t('settings.correlation.addGroupTooltip')" />
                   </OButton>
@@ -395,10 +400,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("settings.serviceIdentitySetup.goToServices") }}
           </OButton>
         </template>
-        <div class="rounded-surface border-border-default border">
+        <div class="-mx-4 -my-3">
           <!-- Collapsible: Workload detected using fields (N) -->
           <div
-            class="rounded-default mx-3 mt-3 overflow-hidden border transition-colors"
+            class="rounded-default mx-3 mt-3 overflow-hidden border transition-all"
             :class="'bg-banner-info-bg border-banner-info-border'"
           >
             <div
@@ -508,7 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                   </template>
                   <!-- Add field button -->
-                  <OButton v-else variant="secondary" @click="addingTrackedAlias = true">
+                  <OButton v-else variant="secondary" @click="addingTrackedAlias = true" icon="add">
                     {{ t("settings.correlation.addField") }}
                   </OButton>
                 </div>
@@ -522,7 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="env in detectedEnvironments"
               :key="env.key"
-              class="rounded-t-default relative min-w-17.5 cursor-pointer border border-b-0 px-4 py-2 text-center text-xs font-medium transition-colors"
+              class="rounded-t-default relative min-w-17.5 cursor-pointer border border-b-0 px-4 py-2 text-center text-xs font-medium transition-all"
               :class="
                 activeEnvironment === env.key
                   ? 'text-text-body'
@@ -569,7 +574,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="text-2xs font-medium" :class="'text-text-secondary'">{{
                       card.label
                     }}</span>
-                    <span class="ms-auto text-lg font-semibold" :class="card.theme.countClass">{{
+                    <span class="ms-auto text-lg font-bold" :class="card.theme.countClass">{{
                       card.count
                     }}</span>
                   </div>
@@ -653,19 +658,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Stream type legend -->
             <div class="ms-1 mt-2 flex items-center gap-3">
-              <div class="text-2xs flex items-center gap-1" :class="'text-text-secondary'">
+              <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
                 <span class="bg-badge-blue-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
                 <span>{{ t("settings.correlation.foundInLogs") }}</span>
               </div>
-              <div class="text-2xs flex items-center gap-1" :class="'text-text-secondary'">
+              <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
                 <span class="bg-badge-orange-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
                 <span>{{ t("settings.correlation.foundInTraces") }}</span>
               </div>
-              <div class="text-2xs flex items-center gap-1" :class="'text-text-secondary'">
+              <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
                 <span class="bg-badge-success-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
                 <span>{{ t("settings.correlation.foundInMetrics") }}</span>
               </div>
-              <div class="text-2xs flex items-center gap-1" :class="'text-text-secondary'">
+              <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
                 <span class="bg-badge-purple-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
                 <span>{{ t("settings.correlation.foundInProfiles") }}</span>
               </div>
@@ -684,7 +689,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="'bg-surface-subtle'"
           >
             <div class="min-w-0 flex-1 text-xs" :class="'text-text-secondary'">
-              <span class="font-semibold" :class="'text-text-body'">{{
+              <span class="font-bold" :class="'text-text-body'">{{
                 t("settings.serviceIdentitySetup.recommended")
               }}</span>
               {{ " " }}{{ t("settings.serviceIdentitySetup.recommendedUse") }}
@@ -729,7 +734,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #header>
               <div class="min-w-0 flex-1">
                 <div
-                  class="flex items-center text-sm"
+                  class="flex items-center text-base"
                   data-test="service-identity-setup-insight-header"
                 >
                   {{ insightData.subtitle }}
@@ -860,7 +865,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="'bg-surface-subtle'"
                     >
                       <div
-                        class="h-full rounded-full transition-[width] duration-(--duration-expand)"
+                        class="h-full rounded-full transition-all"
                         :class="
                           insightDialogLevel === 'primary'
                             ? 'bg-blue-5'
@@ -904,7 +909,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex min-w-0 flex-1 flex-col px-3"
                     :class="[dimIdx > 0 ? 'border-border-default border-s' : '']"
                   >
-                    <div class="text-compact mb-2 font-semibold" :class="'text-text-body'">
+                    <div class="text-compact mb-2 font-bold" :class="'text-text-body'">
                       {{ dim.label }}
                       <span class="font-normal" :class="'text-text-secondary'"
                         >({{ dim.values.length }})</span
@@ -1050,7 +1055,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div
                       v-if="typeIdx > 0"
-                      class="text-2xs text-text-label bg-surface-subtle sticky top-0 z-10 border-t border-b px-4 py-1 font-semibold uppercase"
+                      class="text-3xs text-text-label bg-surface-subtle sticky top-0 z-10 border-t border-b px-4 py-1 font-bold uppercase"
                     >
                       {{ typeName }}
                     </div>
@@ -1111,14 +1116,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-              <OEmptyState
+              <!-- Fallback when no ranked dims beyond the selected field -->
+              <div
                 v-if="popupColumns.length === 0"
-                :title="t('settings.serviceIdentitySetup.noAdditionalDimensions')"
-              />
+                class="text-text-muted flex flex-1 items-center justify-center text-sm italic"
+              >
+                {{ t("settings.serviceIdentitySetup.noAdditionalDimensions") }}
+              </div>
             </div>
           </div>
 
-          <OEmptyState v-else :title="t('settings.serviceIdentitySetup.noSampleData')" />
+          <div v-else class="text-text-muted p-4 text-center italic">
+            {{ t("settings.serviceIdentitySetup.noSampleData") }}
+          </div>
         </div>
       </ODialog>
     </div>
@@ -1161,7 +1171,6 @@ import type {
 } from "@/services/service_streams";
 import { groupEnvKey } from "@/utils/serviceStreamEnvs";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";

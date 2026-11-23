@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="emit('update:open', false)"
   >
     <div class="flex flex-col gap-6 pb-8">
-      <p class="text-text-body text-sm leading-relaxed">
+      <p class="text-text-body text-base leading-relaxed">
         {{ t("autoobserve2.howItWorks.intro") }}
       </p>
       <ol class="flex flex-col gap-5">

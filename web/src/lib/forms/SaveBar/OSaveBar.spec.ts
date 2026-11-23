@@ -75,10 +75,7 @@ const text = (key: string, n?: number) =>
   n === undefined ? i18n.global.t(key) : i18n.global.t(key, n);
 const input = (w: VueWrapper, f: string) => w.find(`[data-row="${f}"] input`);
 const part = (w: VueWrapper, name: string) => w.find(`[data-test="save-bar-${name}"]`);
-const barState = (w: VueWrapper) => {
-  const bar = w.find('[data-test="save-bar"]');
-  return bar.exists() ? bar.attributes("data-state") : "hidden";
-};
+const barState = (w: VueWrapper) => w.find('[data-test="save-bar"]').attributes("data-state");
 
 async function type(w: VueWrapper, f: string, value: string) {
   await input(w, f).setValue(value);
@@ -94,10 +91,17 @@ describe("OSaveBar", () => {
   afterEach(() => submitted.mockClear());
 
   it.each([
-    { name: "hidden", props: { loaded: false }, edits: {} },
-    { name: "hidden", props: {}, edits: {} },
+    { name: "loading", props: { loaded: false }, edits: {}, discard: false, save: false },
+    { name: "clean", props: {}, edits: {}, status: "noChanges", discard: false, save: false },
     // A number field hands back text; the saved digits typed again are not a change.
-    { name: "hidden", props: {}, edits: { low: "1" } },
+    {
+      name: "clean",
+      props: {},
+      edits: { low: "1" },
+      status: "noChanges",
+      discard: false,
+      save: false,
+    },
     { name: "changed", props: {}, edits: { name: "b" }, count: 1, discard: true, save: true },
     {
       name: "changed",
@@ -136,25 +140,27 @@ describe("OSaveBar", () => {
       discard: "disabled",
       save: true,
     },
-  ])("status and buttons follow hidden (V3), changed, invalid and saving ($name)", async (row) => {
-    const w = mount(Host, { props: row.props });
-    for (const [f, v] of Object.entries(row.edits)) await type(w, f, v);
-    if (row.blur) await leave(w, row.blur);
+  ])(
+    "status and buttons follow clean, changed, invalid, saving and loading ($name)",
+    async (row) => {
+      const w = mount(Host, { props: row.props });
+      for (const [f, v] of Object.entries(row.edits)) await type(w, f, v);
+      if (row.blur) await leave(w, row.blur);
 
-    await vi.waitFor(() => expect(barState(w)).toBe(row.name));
-    if (row.name === "hidden") return;
-    const status = part(w, "status").text();
-    if (row.status) expect(status).toBe(text(`common.saveBar.${row.status}`));
-    if (row.count) expect(status).toContain(text("common.saveBar.unsavedChanges", row.count));
-    expect(part(w, "fix").exists()).toBe(!!row.fix);
-    if (row.fix) expect(part(w, "fix").text()).toBe(text("common.saveBar.fixFields", row.fix));
-    expect(part(w, "discard").exists()).toBe(!!row.discard);
-    if (row.discard === "disabled") {
-      expect(part(w, "discard").attributes("disabled")).toBeDefined();
-    }
-    // Save is unavailable only when there is nothing to save; an invalid change keeps it pressable.
-    expect(part(w, "save").attributes("disabled") === undefined).toBe(row.save);
-  });
+      await vi.waitFor(() => expect(barState(w)).toBe(row.name));
+      const status = part(w, "status").text();
+      if (row.status) expect(status).toBe(text(`common.saveBar.${row.status}`));
+      if (row.count) expect(status).toContain(text("common.saveBar.unsavedChanges", row.count));
+      expect(part(w, "fix").exists()).toBe(!!row.fix);
+      if (row.fix) expect(part(w, "fix").text()).toBe(text("common.saveBar.fixFields", row.fix));
+      expect(part(w, "discard").exists()).toBe(!!row.discard);
+      if (row.discard === "disabled") {
+        expect(part(w, "discard").attributes("disabled")).toBeDefined();
+      }
+      // Save is unavailable only when there is nothing to save; an invalid change keeps it pressable.
+      expect(part(w, "save").attributes("disabled") === undefined).toBe(row.save);
+    },
+  );
 
   it("Save on an invalid form sends nothing and focuses the first invalid field", async () => {
     Element.prototype.scrollIntoView = vi.fn();
@@ -181,14 +187,14 @@ describe("OSaveBar", () => {
     await part(w, "save").trigger("click");
     await flushPromises();
     await vi.waitFor(() => expect(submitted).toHaveBeenCalledWith({ ...SAVED, name: "b" }));
-    await vi.waitFor(() => expect(barState(w)).toBe("hidden"));
+    await vi.waitFor(() => expect(barState(w)).toBe("clean"));
 
     await type(w, "name", "c");
     await part(w, "discard").trigger("click");
     await flushPromises();
 
     expect((input(w, "name").element as HTMLInputElement).value).toBe("b");
-    expect(barState(w)).toBe("hidden");
+    expect(barState(w)).toBe("clean");
     expect(w.findComponent(OSaveBar).emitted("discard")).toHaveLength(1);
   });
 
@@ -283,13 +289,13 @@ describe("OSaveBar", () => {
         return button?.dataset.test;
       };
 
-      expect(pressEnter()).toBeUndefined();
+      expect(pressEnter()).toBe(outside ? "legacy-save" : "save-bar-save");
       await flushPromises();
       expect(submitted).not.toHaveBeenCalled();
 
       await type(w, "name", "b");
       pressEnter();
-      await vi.waitFor(() => expect(barState(w)).toBe("hidden"));
+      await vi.waitFor(() => expect(barState(w)).toBe("clean"));
       expect(submitted).toHaveBeenCalledTimes(1);
       w.unmount();
     },

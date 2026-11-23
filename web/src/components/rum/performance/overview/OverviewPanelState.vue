@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div v-else-if="status === 'error'" role="alert" :data-test="`${dataTest}-error`">
       <OEmptyState
-        size="compact"
+        size="inline"
         kind="error"
         :title="t('rum.overviewPage.stateErrorTitle', { panel: panelLabel })"
         :text="t('rum.overviewPage.stateErrorBody')"
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #actions>
           <OButton
             variant="secondary"
-            size="sm"
+            icon="refresh"
             :data-test="`${dataTest}-retry`"
             @click="emit('retry')"
           >
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OEmptyState
       v-else-if="status === 'forbidden'"
-      size="compact"
+      size="inline"
       kind="denied"
       :data-test="`${dataTest}-forbidden`"
       :title="t('rum.overviewPage.forbiddenTitle', { panel: panelLabel })"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <div v-if="status === 'low'" class="mb-3">
         <OInlineNotice tone="info" :data-test="`${dataTest}-low-data`">
-          <p class="font-semibold">
+          <p class="font-bold">
             {{ t("rum.overviewPage.stateLowTitle", { count: formatCount(lowCount) }, lowCount) }}
           </p>
           <p>{{ t("rum.overviewPage.stateLowBody", { min: MIN_VIEWS }) }}</p>

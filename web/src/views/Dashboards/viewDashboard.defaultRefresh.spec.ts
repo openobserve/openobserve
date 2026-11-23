@@ -83,6 +83,7 @@ vi.mock("moment-timezone", () => ({
 }));
 
 import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
+import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import i18n from "@/locales";
 import { updateDashboard } from "@/utils/commons.ts";
 
@@ -130,12 +131,7 @@ describe("ViewDashboard default auto refresh", () => {
           OPageLayout: { template: '<div><slot name="actions" /><slot /></div>' },
           ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
           OPopover: { template: '<div><slot name="trigger" /><slot /></div>' },
-          ORefreshButton: {
-            name: "ORefreshButton",
-            props: ["autoRefresh"],
-            emits: ["update:autoRefresh"],
-            template: "<div />",
-          },
+          AutoRefreshInterval: false,
           DateTimePickerDashboard: PickerStub,
           RenderDashboardCharts: RenderDashboardChartsStub,
         },
@@ -144,7 +140,7 @@ describe("ViewDashboard default auto refresh", () => {
     await flushPromises();
   };
 
-  const toolbarControl = () => wrapper.findComponent({ name: "ORefreshButton" });
+  const toolbarControl = () => wrapper.findComponent(AutoRefreshInterval);
 
   beforeEach(() => {
     route.query = { dashboard: "d1", folder: "default", tab: "t1", period: "15m" };
@@ -165,7 +161,8 @@ describe("ViewDashboard default auto refresh", () => {
     await mountDashboard();
 
     expect(wrapper.vm.refreshInterval).toBe(60);
-    expect(toolbarControl().props("autoRefresh")).toBe(60);
+    expect(toolbarControl().props("modelValue")).toBe(60);
+    expect(toolbarControl().text()).toContain("1m");
     expect(route.query.refresh).toBe("1m");
   });
 
@@ -174,7 +171,7 @@ describe("ViewDashboard default auto refresh", () => {
     route.query = { ...route.query, refresh: "Off" };
     await mountDashboard();
 
-    expect(toolbarControl().props("autoRefresh")).toBe(0);
+    expect(toolbarControl().props("modelValue")).toBe(0);
   });
 
   it("uses a URL refresh value over the saved default", async () => {
@@ -182,14 +179,14 @@ describe("ViewDashboard default auto refresh", () => {
     route.query = { ...route.query, refresh: "5m" };
     await mountDashboard();
 
-    expect(toolbarControl().props("autoRefresh")).toBe(300);
+    expect(toolbarControl().props("modelValue")).toBe(300);
   });
 
   it("stays Off when neither the URL nor the dashboard sets an interval", async () => {
     dashboards.d1 = makeDashboard("d1");
     await mountDashboard();
 
-    expect(toolbarControl().props("autoRefresh")).toBe(0);
+    expect(toolbarControl().props("modelValue")).toBe(0);
   });
 
   it("raises a saved default below the server minimum to the minimum", async () => {
@@ -197,7 +194,7 @@ describe("ViewDashboard default auto refresh", () => {
     dashboards.d1 = makeDashboard("d1", 10);
     await mountDashboard();
 
-    expect(toolbarControl().props("autoRefresh")).toBe(30);
+    expect(toolbarControl().props("modelValue")).toBe(30);
   });
 
   it("applies the saved default with Auto Run on as well as off", async () => {
@@ -205,19 +202,19 @@ describe("ViewDashboard default auto refresh", () => {
     dashboards.d1 = makeDashboard("d1", 300);
     await mountDashboard();
 
-    expect(toolbarControl().props("autoRefresh")).toBe(300);
+    expect(toolbarControl().props("modelValue")).toBe(300);
   });
 
   it("treats a toolbar change as view-only: nothing is saved and a reload keeps it", async () => {
     dashboards.d1 = makeDashboard("d1", 60);
     await mountDashboard();
 
-    toolbarControl().vm.$emit("update:autoRefresh", 0);
+    toolbarControl().vm.$emit("update:modelValue", 0);
     await flushPromises();
     await wrapper.vm.loadDashboard();
     await flushPromises();
 
-    expect(toolbarControl().props("autoRefresh")).toBe(0);
+    expect(toolbarControl().props("modelValue")).toBe(0);
     expect(route.query.refresh).toBe("Off");
     expect(dashboards.d1.defaultRefreshInterval).toBe(60);
     expect(updateDashboard).not.toHaveBeenCalled();
@@ -231,6 +228,6 @@ describe("ViewDashboard default auto refresh", () => {
     route.query = { dashboard: "d2", folder: "default", tab: "t1", period: "15m" };
     await flushPromises();
 
-    expect(toolbarControl().props("autoRefresh")).toBe(900);
+    expect(toolbarControl().props("modelValue")).toBe(900);
   });
 });

@@ -30,7 +30,7 @@ import { createMemoryHistory, createRouter, type Router } from "vue-router";
 import i18n from "@/locales";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import { providePageHeaderStatus } from "@/lib/core/PageHeader/pageHeaderStatus";
-import { providePageNavContext, providePageRailGroup } from "@/lib/core/PageHeader/pageContext";
+import { providePageNavContext } from "@/lib/core/PageHeader/pageContext";
 import { raw } from "@/types/i18n";
 import OAccessHeaderChip from "@/components/access/OAccessHeaderChip.vue";
 import { viewDenial } from "@/composables/useAccessStore";
@@ -89,7 +89,6 @@ async function mountAt(
   slots: Record<string, () => unknown> = {},
   links?: NavItem[] | Ref<NavItem[]>,
   flat = false,
-  railGroup?: string,
 ): Promise<Router> {
   const router = makeRouter();
   await router.push(path);
@@ -100,7 +99,6 @@ async function mountAt(
           links: computed(() => unref(links)),
           flat: computed(() => flat),
         });
-      if (railGroup !== undefined) providePageRailGroup(computed(() => raw(railGroup)));
       return () => h(OPageHeader, props, slots);
     },
   });
@@ -141,14 +139,14 @@ afterEach(() => {
 });
 
 describe("OPageHeader anatomy (H1)", () => {
-  it("stacks a 16 px context line over an 18 px title on a 24 px line in a fixed 56 px band", async () => {
+  it("stacks a 16 px context line over a 24 px title in a fixed 56 px band", async () => {
     await mountAt("/logs", { title: raw("Logs") });
     expect(byTest("o-page-header-band").classes()).toContain("h-14");
     expect(byTest("o-page-header-context").classes()).toContain("h-4");
     expect(byTest("o-page-header-title-row").classes()).toContain("h-6");
     const title = wrapper!.find("h1");
     expect(title.text()).toBe("Logs");
-    expect(title.classes()).toEqual(expect.arrayContaining(["text-lg", "leading-6", "font-title"]));
+    expect(title.classes()).toEqual(expect.arrayContaining(["text-base", "font-semibold"]));
   });
 
   it("renders no icon tile and no subtitle paragraph (H2)", async () => {
@@ -199,35 +197,16 @@ describe("OPageHeader context line (H4)", () => {
     expect(contextText()).toBe("Data");
   });
 
-  it("keeps an empty, hidden slot on an ungrouped page, never the org", async () => {
-    const store = { state: { selectedOrganization: { label: "acme-prod", identifier: "acme" } } };
-    const router = makeRouter();
-    await router.push("/logs");
-    wrapper = mount(OPageHeader, {
-      props: { title: raw("Logs") },
-      attachTo: document.body,
-      global: { plugins: [i18n, router], provide: { store } },
-    });
-    await flushPromises();
+  it("names the org on an ungrouped page", async () => {
+    await mountAt("/logs", { title: raw("Logs") }, {}, links);
     expect(contextText()).toBe("");
-    expect(byTest("o-page-header-context").classes()).toContain("h-4");
-    expect(byTest("o-page-header-context-label").attributes("aria-hidden")).toBe("true");
+    expect(byTest("o-page-header-context-label").exists()).toBe(true);
   });
 
-  it("shows the group to assistive tech once it names one", async () => {
-    await mountAt("/alerts/destinations", { title: raw("Alerts") }, {}, links);
-    expect(byTest("o-page-header-context-label").attributes("aria-hidden")).toBeUndefined();
-  });
-
-  it("leaves the line empty instead of a group spelled like the title", async () => {
-    await mountAt("/pipelines", { title: raw("data") }, {}, links);
-    expect(contextText()).toBe("");
-  });
-
-  it("leaves the line empty when the rail does not emit the group", async () => {
+  it("names the org when the rail does not emit the group", async () => {
     const lone: NavItem[] = [{ title: raw("Alerts"), icon: "a", link: "/alerts", name: "logs" }];
     await mountAt("/alerts", { title: raw("Alerts") }, {}, lone);
-    expect(contextText()).toBe("");
+    expect(contextText()).not.toBe("Reliability");
   });
 
   it("takes an explicit context over the derived one", async () => {
@@ -240,32 +219,15 @@ describe("OPageHeader context line (H4)", () => {
   ];
 
   it.each([
-    ["/settings/correlation/services", "Data"],
-    ["/iam/users", "Access"],
-    ["/ai/model-pricing", "Configure"],
-  ])(
-    "names the rail group of %s inside its module rail, in either solution",
-    async (path, group) => {
-      await mountAt(path, { title: raw("Page") }, {}, links, false, group);
-      expect(contextText()).toBe(group);
-      wrapper!.unmount();
-      await mountAt(path, { title: raw("Page") }, {}, securityLinks, true, group);
-      expect(contextText()).toBe(group);
-    },
-  );
-
-  it.each(["/settings/correlation/services", "/iam/users", "/ai/model-pricing"])(
-    "never repeats the module the rail heading names on %s",
-    async (path) => {
-      await mountAt(path, { title: raw("Page") }, {}, links);
-      expect(["Settings", "IAM", "AI observability"]).not.toContain(contextText());
-      expect(contextText()).toBe("");
-    },
-  );
-
-  it("leaves the line empty when the rail group is spelled like the title", async () => {
-    await mountAt("/iam/users", { title: raw("access") }, {}, links, false, "Access");
-    expect(contextText()).toBe("");
+    ["/settings/correlation/services", "Settings"],
+    ["/iam/users", "IAM"],
+    ["/ai/model-pricing", "AI Observability"],
+  ])("names the module whose section rail holds %s, in either solution", async (path, label) => {
+    await mountAt(path, { title: raw("Page") }, {}, links);
+    expect(contextText()).toBe(label);
+    wrapper!.unmount();
+    await mountAt(path, { title: raw("Page") }, {}, securityLinks, true);
+    expect(contextText()).toBe(label);
   });
 
   it("names the Security solution on a page of its flat rail", async () => {
@@ -273,17 +235,17 @@ describe("OPageHeader context line (H4)", () => {
     expect(contextText()).toBe("Security");
   });
 
-  it("leaves the line empty on a shared page the flat rail does not hold", async () => {
+  it("names the org on a shared page the flat rail does not hold", async () => {
     await mountAt("/alert-destinations", { title: raw("Destinations") }, {}, securityLinks, true);
     expect(contextText()).toBe("");
   });
 
   it.each([
-    ["/iam/users", "Access", false],
+    ["/iam/users", "IAM", false],
     ["/security/overview", "Security", true],
   ])("keeps %s on its label while the rail's links load", async (path, label, flat) => {
     const pending = ref<NavItem[]>([]);
-    await mountAt(path, { title: raw("Page") }, {}, pending, flat, flat ? undefined : label);
+    await mountAt(path, { title: raw("Page") }, {}, pending, flat);
     expect(contextText()).toBe(label);
     pending.value = flat ? securityLinks : links;
     await flushPromises();

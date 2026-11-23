@@ -68,7 +68,7 @@ describe("ShareButton", () => {
         en: {
           search: {
             shareLink: "Share Link",
-            linkCopied: "Link copied",
+            linkCopiedSuccessfully: "Link copied successfully",
             errorCopyingLink: "Error copying link",
             errorShorteningLink: "Error shortening link",
             webUrlNotConfigured:
@@ -224,7 +224,7 @@ describe("ShareButton", () => {
       "https://short.url/abc123",
       expect.any(Function),
       {
-        successMessage: "Link copied",
+        successMessage: "Link copied successfully",
         errorMessage: "Error copying link",
         timeout: 5000,
         anchor: wrapper.find("button").element,

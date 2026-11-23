@@ -33,8 +33,8 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
   | Variant        | Job                                                                                    |
   | -------------- | -------------------------------------------------------------------------------------- |
   | `primary`      | The one main action of a region: page header, dialog/drawer footer, form (B1)          |
-  | `secondary`    | Surface fill on the control edge (`--color-control-border`, hover lifts it); `pressed` takes the accent fill and the selected edge. Alternatives, Cancel, toolbar actions beside a field |
-  | `ghost`        | Borderless, secondary ink that lifts to heading ink on hover. Quiet actions in toolbars, rows and panel headers; most icon-only buttons |
+  | `secondary`    | Outline. Alternatives, Cancel, toolbar actions beside a field                          |
+  | `ghost`        | Quiet actions in toolbars, rows and panel headers; most icon-only buttons              |
   | `accent-ghost` | An inline next step that reads as a link-like action ("View logs")                     |
   | `danger`       | Solid red, **only** the confirm button inside a confirmation dialog (B2)               |
   | `danger-ghost` | Red text: Delete in bulk bars and footers; a row's Delete lives last in its ⋯ menu (B7) |
@@ -292,7 +292,7 @@ More than three actions in a header or toolbar: the extras go into ⋯ More, fre
 **Don't use for:** Narrowing a list by state ("Firing", "Paused") — that is a filter select, a KPI tile or a chip (F6). Peer pages — that is `OTabs` (N2). A binary on/off setting — use a switch/checkbox. Joined action buttons — use [OButtonGroup](#obuttongroup). Form-bound toggles — use [OFormToggleGroup](#oformtogglegroup).
 **Key props:**
 
-- `size` (`"sm"` 28 | `"md"` 32 default) — set on the GROUP, never on an item; the tray is `h-control-*`, `rounded-default`, on the surface with the 1 px control edge (`--color-control-border`, the same as every input and secondary button in the row) and 1 px padding, so segments one token down fit; they use `text-compact` at weight 500 (S1, S2). Inside a field (`OInput` provides it, e.g. `OSearchInput`'s scope) the tray drops its edge for a `bg-surface-subtle` tray with 2 px padding. Never an `h-*` class on the group or an item (`local/o2-control-height`).
+- `size` (`"sm"` 28 | `"md"` 32 default) — set on the GROUP, never on an item; the track is `h-control-*` with 2 px padding and `rounded-default`, segments are one token down with `text-compact` at weight 500 (S1, S2). Never an `h-*` class on the group or an item (`local/o2-control-height`).
 - `type` (`"single"` | `"multiple"`, default `"single"`) — in `single` mode empty/null selections are ignored so one item always stays active
 - `modelValue` (`AcceptableValue | AcceptableValue[]`) — active value(s); `v-model`
 - `variant` (`"default"` | `"primary"`, default `"default"`) — use `primary` when the bar sits on a primary-colored surface (e.g. dashboard query bar)
@@ -319,7 +319,7 @@ More than three actions in a header or toolbar: the extras go into ⋯ More, fre
 ### OToggleGroupItem
 
 **Import:** `@/lib/core/ToggleGroup/OToggleGroupItem.vue`
-**Use when:** Each option inside an [OToggleGroup](#otogglegroup) / [OFormToggleGroup](#oformtogglegroup). The active segment (`data-state=on`) is the selected accent fill (`--color-toggle-item-active-bg`) with accent ink, and no ring or shadow.
+**Use when:** Each option inside an [OToggleGroup](#otogglegroup) / [OFormToggleGroup](#oformtogglegroup). Active state shows a white chip with shadow (`data-state=on`).
 **Don't use for:** Anything outside a ToggleGroup — it relies on reka-ui `ToggleGroupItem` context.
 **Key props:**
 
@@ -422,7 +422,7 @@ More than three actions in a header or toolbar: the extras go into ⋯ More, fre
     - `skeletonOnRefetch` — skeleton on every load, for tables whose old rows mislead once the query changes (log search results).
   - `density` (`"default"` | `"compact"`, default `"default"`) — rows 36 / 28 px, header 32 / 28 px, 12 px cell padding (L7, D1). One density per view; there is no `dense`, `compact` or `rowHeight`, and no user density setting exists yet. A page whose rows are taller or shorter (a two-line cell, the logs viewer's own row CSS) keeps its look: virtual scroll reads its estimate off a rendered row.
   - One frame (D8): `frame`, `bordered`, `toolbarBordered`, `paginationBordered` and `width` are gone; rows always carry dividers, the toolbar and footer always carry theirs, and the table fills its container. `striped` (default false)
-  - The header is 12 px medium secondary text on the body's surface, no coloured band (D1); an actions column's header is labelled for screen readers only, and is an opaque pinned cell with the same left edge as its cells, so a column scrolled under it never shows its label above the row icons (D7).
+  - The header is 12 px medium secondary text on the body's surface, no coloured band (D1); an actions column's header is screen-reader only and see-through, so a label scrolled under it is never covered (D7).
   - `stickyHeader` (default `true`), `showHeader` (default `true`), `wrap` (default false), `horizontalScroll` (natural-width cells + horizontal scroll; pair with `wrap=false`)
   - `cellOverflowTooltip` (default `true`) — the shared full-text tooltip on cut body cells; pass `false` for a table whose reveal is Wrap / row expansion (logs, correlated logs). See [Cut cell text](#cut-cell-text--the-shared-tooltip)
   - `fillHeight` (default `true` — set false to shrink to content), `virtualScroll` (default false; the row estimate is the density's height, then a measured row), `maxHeight`
@@ -595,7 +595,7 @@ arrow, the rows re-order, and the order is wrong.
 - Columns: `column-order-change`, `column-visibility-change`, `update:columnSizes`
 - Virtual scroll: `scroll`, `scroll-end`
 
-**The `error` prop renders the shared error state.** Without an `#error` slot, OTable shows a region `OEmptyState kind="error"` ("Couldn't load this data", the message unless it is raw transport text, and Retry, which emits `retry`). Supply `#error` only to wire Retry to a different handler or to name what failed: `<template #error><OEmptyState kind="error" @action="onRefresh()" /></template>`.
+**Always supply `#error` when `error` can be set.** Without the slot, OTable falls back to a solid red banner carrying the raw server string — a different failure look on every page. Use `<template #error="{ message }"><OEmptyState kind="error" :title="t('common.errorLoadingData')" :text="raw(message)" @action="onRefresh()" /></template>`, with Retry wired to the page's own refresh handler.
 
 **Main slots:** `cell` (scoped `{ row, column, value, table }`), `top`, `toolbar` (inside the frame, above header), `toolbar-trailing`, `header-actions`, `selection-actions` (bulk-action buttons for the footer), `footer-note` (a footer line the pager cannot say), `pagination-bar` (a caller-drawn pager, scoped with pagination state/actions), `loading`, `loading-banner`, `empty`, `error` (`{ message }`), `expansion` (`{ row }`), `tree-warning` (`{ row }`)
 

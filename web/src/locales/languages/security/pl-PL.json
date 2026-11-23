@@ -20,8 +20,7 @@
       "close": "Zamknij",
       "mitre": "MITRE ATT&CK",
       "severity": "Ważność",
-      "viewAll": "Zobacz wszystkie",
-      "moreActions": "Więcej akcji"
+      "viewAll": "Zobacz wszystkie"
     },
     "caseStatus": {
       "open": "Nowy",
@@ -162,15 +161,7 @@
       "explore": "Przeglądaj",
       "noSources": "Nie ma jeszcze źródeł bezpieczeństwa",
       "noSourcesHint": "Pozyskuj dane z CloudTrail, Okta, VPC Flow lub syslog. Strumienie zawierające w nazwie security, audit, auth lub firewall pojawią się tutaj automatycznie.",
-      "summaryPartial": "To okno zawiera więcej historii alertów, niż może zmieścić jedno podsumowanie, więc liczby i wykresy pokazują dolną granicę; wybierz krótsze okno, aby uzyskać pełne liczby.",
-      "autoRefresh": "Odświeżaj automatycznie co minutę",
-      "whatDetections": "wykrycia",
-      "rulesFailedHint": "Nie udało się odczytać wykryć, więc nie można policzyć wyzwoleń. Spróbuj ponownie lub sprawdź stronę Wykrycia.",
-      "historyFailedHint": "Historia wyzwoleń jest niedostępna, więc wyzwolenia nie są liczone. Spróbuj ponownie lub sprawdź stronę Alerty.",
-      "whatFirings": "wyzwolenia",
-      "emptyTitle": "Brak włączonych wykryć",
-      "emptyHint": "Włącz wykrycia z katalogu Sigma, aby rozpocząć monitorowanie. W Źródłach sprawdź, czy dane bezpieczeństwa docierają.",
-      "openSources": "Otwórz źródła"
+      "summaryPartial": "To okno zawiera więcej historii alertów, niż może zmieścić jedno podsumowanie, więc liczby i wykresy pokazują dolną granicę; wybierz krótsze okno, aby uzyskać pełne liczby."
     },
     "events": {
       "title": "Zdarzenia bezpieczeństwa",
@@ -288,8 +279,7 @@
           "outcome": "Wynik",
           "message": "Wiadomość"
         }
-      },
-      "openSources": "Otwórz źródła"
+      }
     },
     "drawer": {
       "event": "Zdarzenie bezpieczeństwa",
@@ -469,9 +459,7 @@
         "action": "Akcja",
         "object": "Obiekt",
         "host": "Host"
-      },
-      "whatAlerts": "alerty",
-      "loadFailedHint": "Nie udało się odczytać historii wyzwoleń. Spróbuj ponownie lub sprawdź w Wykryciach, czy wykrycia są włączone."
+      }
     },
     "cases": {
       "title": "Sprawy",
@@ -720,9 +708,7 @@
         "showAll": "Pokaż wszystkie wiersze",
         "onlyEntity": "Tylko encje tej sprawy",
         "noneForEntity": "Żaden wiersz tego wyzwolenia nie wskazuje encji tej sprawy"
-      },
-      "whatCases": "sprawy",
-      "loadFailedHint": "Nie udało się odczytać spraw. Spróbuj ponownie lub sprawdź, czy zarządzanie sprawami jest włączone dla tej organizacji."
+      }
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -785,9 +771,7 @@
       "manageDetections": "Zarządzaj detekcjami",
       "historyNarrowed": "Maksymalny zakres zapytań historii alertów ogranicza wyzwolenia do tych od {from}; wcześniejsze wyzwolenia w tym oknie nie są liczone.",
       "cellNone": "Brak reguły",
-      "coverageError": "Nie udało się wczytać pokrycia ATT&CK: {reason}",
-      "whatCoverage": "pokrycie ATT&CK",
-      "loadFailedHint": "Nie udało się obliczyć pokrycia, więc nie pokazano liczb. Spróbuj ponownie lub sprawdź stronę Wykrycia."
+      "coverageError": "Nie udało się wczytać pokrycia ATT&CK: {reason}"
     },
     "detections": {
       "title": "Detekcje",
@@ -1014,9 +998,7 @@
           "in_cidr": "jest w zakresie (CIDR)",
           "in_list": "jest na liście dozwolonych"
         }
-      },
-      "whatDetections": "wykrycia",
-      "loadFailedHint": "Nie udało się odczytać wykryć. Spróbuj ponownie lub sprawdź, czy możesz wyświetlać alerty w tej organizacji."
+      }
     },
     "tuning": {
       "open": "Dostrajanie",
@@ -1233,9 +1215,7 @@
         "openAllowlists": "Otwórz listy dozwolonych"
       },
       "otherSourceOnly": "Tylko inne źródła",
-      "otherSourceOnlyHint": "Napisana dla {logsource}. Kompiluje się na Twoich strumieniach tylko dzięki wspólnym nazwom pól, więc nie jest liczona jako gotowa do instalacji.",
-      "whatRules": "katalog wykryć",
-      "loadFailedHint": "Katalog Sigma się nie wczytał, więc liczby reguł i źródeł są nieznane. Spróbuj ponownie za chwilę."
+      "otherSourceOnlyHint": "Napisana dla {logsource}. Kompiluje się na Twoich strumieniach tylko dzięki wspólnym nazwom pól, więc nie jest liczona jako gotowa do instalacji."
     },
     "entities": {
       "title": "Encje",
@@ -1355,9 +1335,7 @@
       "loadError": "Nie udało się załadować źródeł bezpieczeństwa",
       "detailFailed": "Nie udało się odczytać części danych tej encji: {streams}.",
       "aliasCount": "+{n} pisownia | +{n} pisowni",
-      "aliasHint": "Zapisano z tą pisownią; to ta sama tożsamość.",
-      "whatEntities": "encje",
-      "loadFailedHint": "Źródła bezpieczeństwa są nieosiągalne. Sprawdź w Źródłach, czy źródło jest połączone, i spróbuj ponownie."
+      "aliasHint": "Zapisano z tą pisownią; to ta sama tożsamość."
     },
     "ueba": {
       "title": "Analiza zachowań użytkowników",
@@ -1456,9 +1434,7 @@
       "volumeNotJudged": "Wolumen nie jest oceniany dla tego użytkownika: okna krótsze niż dzień są porównywane z tymi samymi godzinami dnia w poziomie bazowym, co wymaga co najmniej jednego dnia historii.",
       "baselineBuilding": "Budowanie okresu bazowego",
       "baselineBuildingHint": "Dotychczas {span} historii. Porównanie z własną przeszłością tego użytkownika zacznie się, gdy będzie dostępna pełna historia z okresu {baseline}; do tego czasu oznaczane są tylko wyraźne odchylenia względem innych użytkowników.",
-      "buildingNotice": "Okres bazowy wciąż się buduje dla {n} użytkownika: dopóki nie będzie pełnej historii z okresu {baseline}, oznaczane są tylko wyraźne odchylenia względem innych użytkowników. | Okresy bazowe wciąż się budują dla {n} użytkowników: dopóki nie będzie pełnej historii z okresu {baseline}, oznaczane są tylko wyraźne odchylenia względem innych użytkowników.",
-      "whatUsers": "zachowanie użytkowników",
-      "loadFailedHint": "Źródła bezpieczeństwa są nieosiągalne. Sprawdź w Źródłach, czy źródło jest połączone, i spróbuj ponownie."
+      "buildingNotice": "Okres bazowy wciąż się buduje dla {n} użytkownika: dopóki nie będzie pełnej historii z okresu {baseline}, oznaczane są tylko wyraźne odchylenia względem innych użytkowników. | Okresy bazowe wciąż się budują dla {n} użytkowników: dopóki nie będzie pełnej historii z okresu {baseline}, oznaczane są tylko wyraźne odchylenia względem innych użytkowników."
     },
     "intel": {
       "title": "Analiza zagrożeń",
@@ -1626,11 +1602,7 @@
       },
       "partialChecked": "Wynik częściowy: sprawdzono {checked} z {total} wskaźników. Liczby dla pozostałych mogą być zaniżone.",
       "partialCapped": "Wynik częściowy: sprawdzono {checked} z {total} wskaźników. Skanowanie kończy się na {n} zapytaniach; najmniej poważne wskaźniki nie zostały sprawdzone.",
-      "inText": "{column} (w tekście)",
-      "runSweepDisabled": "Dodaj co najmniej jeden wskaźnik, aby uruchomić skanowanie.",
-      "whatIndicators": "analiza zagrożeń",
-      "loadFailedHint": "Nie udało się odczytać list wskaźników. Spróbuj ponownie lub sprawdź, czy możesz czytać tabele wyszukiwania w tej organizacji.",
-      "filterType": "Typ"
+      "inText": "{column} (w tekście)"
     },
     "sources": {
       "title": "Źródła danych",
@@ -1695,9 +1667,7 @@
         "pipeline_missing": "już nie istnieje",
         "other_stream": "odczytuje teraz inny strumień",
         "other_pack": "uruchamia teraz inny pakiet"
-      },
-      "whatSources": "źródła bezpieczeństwa",
-      "loadFailedHint": "Źródła bezpieczeństwa są nieosiągalne. Sprawdź połączenie lub uprawnienia i spróbuj ponownie."
+      }
     },
     "nav": {
       "overview": "Przegląd",
@@ -1765,10 +1735,6 @@
       "indicatorType": "Typ wskaźnika",
       "severityFilter": "Filtr ważności",
       "stream": "Strumień"
-    },
-    "loadError": {
-      "title": "Nie udało się wczytać: {what}",
-      "hint": "Serwer nie odpowiedział dla: {what}. Sprawdź połączenie lub uprawnienia i spróbuj ponownie."
     }
   }
 }

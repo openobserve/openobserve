@@ -121,9 +121,11 @@ test.describe("CTE Logs Queries testcases", () => {
     // Deterministic wait — confirms Monaco model reflects the new query before Run.
     await pageManager.logsPage.waitForQueryEditorValue('Counts');
     await applyQueryButton(pageManager);
-    // An aggregate's rows render as the query's own columns, one per result key.
+    // Aggregate results have no user-pinned fields, so the table shows a single
+    // "source" column containing the full row as JSON. Verify the source cell is
+    // present and that it includes the expected field key.
     await pageManager.logsPage.expectLogTableColumnSourceVisible();
-    await pageManager.logsPage.expectLogTableColumnVisible('kubernetes_pod_name');
+    await pageManager.logsPage.expectInterestingFieldInTable('kubernetes_pod_name');
 
     testLogger.info('Counts CTE query completed successfully');
   });
@@ -139,9 +141,11 @@ test.describe("CTE Logs Queries testcases", () => {
     // Deterministic wait — confirms Monaco model reflects the new query before Run.
     await pageManager.logsPage.waitForQueryEditorValue('Levels');
     await applyQueryButton(pageManager);
-    // An aggregate's rows render as the query's own columns, one per result key.
+    // Aggregate results have no user-pinned fields, so the table shows a single
+    // "source" column containing the full row as JSON. Verify the source cell is
+    // present and that it includes the expected field key.
     await pageManager.logsPage.expectLogTableColumnSourceVisible();
-    await pageManager.logsPage.expectLogTableColumnVisible('level');
+    await pageManager.logsPage.expectInterestingFieldInTable('level');
 
     testLogger.info('Levels CTE query completed successfully');
   });

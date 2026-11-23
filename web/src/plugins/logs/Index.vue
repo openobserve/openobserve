@@ -183,6 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <LogsNoStreamState
                         :org-id="store.state.selectedOrganization.identifier"
                         :stream-type="searchObj.data.stream.streamType"
+                        :auto-run="isAutoRunOn"
                         data-test="logs-search-no-stream-selected-text"
                         @select-stream="onSelectStream"
                         @pick-stream="onPickStream"
@@ -536,6 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 :org-id="store.state.selectedOrganization.identifier"
                 :stream-type="searchObj.data.stream.streamType"
+                :auto-run="isAutoRunOn"
                 data-test="logs-drill-down-no-stream-selected-text"
                 @select-stream="onSelectStream"
                 @pick-stream="onPickStream"
@@ -781,7 +783,6 @@ import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import AnomalyOriginBanner from "@/components/alerts/AnomalyOriginBanner.vue";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import LogsNoStreamState from "@/plugins/logs/LogsNoStreamState.vue";
-import { isNonTimeSeriesAggregate } from "@/utils/logs/sqlResultShape";
 import LogsErrorState from "@/plugins/logs/LogsErrorState.vue";
 import LogsNoFtsPanel from "@/plugins/logs/LogsNoFtsPanel.vue";
 import LogsMissingStreamBanner from "@/plugins/logs/LogsMissingStreamBanner.vue";
@@ -845,7 +846,6 @@ import {
 } from "@/composables/useLogs/freeTextSearch";
 import { isAutoRunActive, type RunContext } from "@/composables/useLogs/useAutoRun";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import { usePrimaryQueryFocus } from "@/composables/usePrimaryQueryFocus";
 import {
   logsRowNavAnnouncement,
   nextJobRequestId,
@@ -2177,10 +2177,9 @@ export default defineComponent({
     });
 
     const onDrillDownStreamChange = (stream: string) => {
-      const fromEmptyPage = !searchObj.data.stream.selectedStream.length;
       searchObj.data.stream.selectedStream = [stream];
       searchObj.data.filterErrMsg = "";
-      onStreamChange("", { origin: "selector", runNow: fromEmptyPage });
+      onStreamChange("", { origin: "selector" });
     };
 
     const onSelectStream = () => {
@@ -2208,7 +2207,7 @@ export default defineComponent({
 
     const onPickStream = (stream: string) => {
       searchObj.data.stream.selectedStream = [stream];
-      onStreamChange("", { origin: "selector", runNow: true });
+      onStreamChange("", { origin: "selector" });
     };
 
     const firstDataArrival = ref<FirstEventResult | null>(null);
@@ -4238,7 +4237,6 @@ export default defineComponent({
     };
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
-    usePrimaryQueryFocus("logsFocusQuery");
     useShortcuts([
       {
         id: "logsRunQuery",
@@ -4249,6 +4247,16 @@ export default defineComponent({
       {
         id: "logsSearchHistory",
         handler: () => showSearchHistoryfn(),
+      },
+      {
+        id: "logsFocusQuery",
+        handler: () => {
+          // The logs query editor is Monaco — focus its inner textarea.
+          const el = document.querySelector<HTMLElement>(
+            '[data-test="logs-search-bar-query-editor"] textarea, [data-test="logs-search-bar"] .monaco-editor textarea',
+          );
+          el?.focus();
+        },
       },
       {
         id: "logsRefresh",
@@ -4514,17 +4522,7 @@ export default defineComponent({
         // The page total is summed from aggs, so drop them only when a refetch replaces them.
         if (this.searchObj.meta.histogramDirtyFlag) this.searchObj.data.queryResults.aggs = [];
 
-        if (
-          this.searchObj.meta.sqlMode &&
-          isNonTimeSeriesAggregate(
-            parsedSQL,
-            this.searchObj.data.query ?? "",
-            this.store.state.zoConfig.timestamp_column || "_timestamp",
-          )
-        ) {
-          this.resetHistogramWithError(this.t("search.histogramHiddenForAggregates"), -1);
-          this.searchObj.meta.histogramDirtyFlag = false;
-        } else if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
+        if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(this.t("search.histogramUnavailableForQueries"), -1);
           this.searchObj.meta.histogramDirtyFlag = false;
         } else if (

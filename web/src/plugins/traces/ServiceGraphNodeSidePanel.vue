@@ -459,10 +459,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="panel-section mb-0! p-0!"
             data-test="service-graph-side-panel-recent-operations"
           >
-            <OEmptyState
+            <div
               v-if="recentOperations.length === 0 && !loadingOperations"
-              :title="t('traces.serviceGraphNodeSidePanel.noOperationsFound')"
-            />
+              class="text-text-secondary flex flex-col items-center justify-center py-16 text-center text-sm"
+            >
+              {{ t("traces.serviceGraphNodeSidePanel.noOperationsFound") }}
+            </div>
             <div
               v-else-if="recentOperations.length > 0 || loadingOperations"
               class="svc-panel-table overflow-hidden"
@@ -561,7 +563,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </template>
                 <template #empty>
-                  <OEmptyState :title="t('traces.serviceGraphNodeSidePanel.noOperationsFound')" />
+                  <div
+                    class="text-text-secondary flex flex-col items-center justify-center py-16 text-center text-sm"
+                  >
+                    {{ t("traces.serviceGraphNodeSidePanel.noOperationsFound") }}
+                  </div>
                 </template>
               </OTable>
             </div>
@@ -749,26 +755,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Error state -->
-            <OEmptyState
+            <div
               v-else-if="metricsCorrelationError"
-              kind="error"
               role="alert"
-              :text="
-                isRawHttpText(metricsCorrelationError)
-                  ? t('emptyState.loadError.description')
-                  : raw(metricsCorrelationError)
-              "
+              class="text-status-error-text flex flex-col items-center gap-3 py-6 text-center text-sm"
               data-test="service-graph-side-panel-metrics-error"
             >
-              <template #actions>
-                <OButton
-                  data-test="service-graph-side-panel-metrics-retry-btn"
-                  @click="fetchMetricsCorrelation(true)"
-                >
-                  {{ t("traces.serviceGraphNodeSidePanel.retry") }}
-                </OButton>
-              </template>
-            </OEmptyState>
+              <span>{{ metricsCorrelationError }}</span>
+              <OButton
+                variant="accent-ghost"
+                data-test="service-graph-side-panel-metrics-retry-btn"
+                @click="fetchMetricsCorrelation(true)"
+                >{{ t("traces.serviceGraphNodeSidePanel.retry") }}</OButton
+              >
+            </div>
 
             <!-- Metrics dashboard -->
             <TelemetryCorrelationDashboard
@@ -794,10 +794,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-graph-side-panel-metrics-dashboard"
             />
 
+            <!-- Empty state — standard OEmptyState -->
             <OEmptyState
               v-else-if="metricsCorrelationLoaded"
+              size="inline"
               icon="insights"
               :title="t('traces.serviceGraphNodeSidePanel.noMetricsAvailable')"
+              class="py-16"
               data-test="service-graph-side-panel-metrics-empty"
             />
           </OTabPanel>
@@ -903,7 +906,6 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
 
@@ -3262,7 +3264,6 @@ export default defineComponent({
       // Metrics Tab
       metricsCorrelationLoading,
       metricsCorrelationError,
-      isRawHttpText,
       metricsCorrelationData,
       metricsCorrelationLoaded,
       fetchMetricsCorrelation,

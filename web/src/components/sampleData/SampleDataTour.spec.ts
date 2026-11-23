@@ -119,9 +119,9 @@ describe("SampleDataTour", () => {
     const { wrapper } = await mountTour();
     const text = (id: string) => wrapper.get(`[data-test="sample-tour-${id}"]`).text();
     expect([text("connect"), text("restart"), text("finish")]).toEqual([
-      "Connect your own data",
-      "Restart tour",
-      "Finish tour",
+      "Connect Your Own Data",
+      "Restart Tour",
+      "Finish Tour",
     ]);
   });
 

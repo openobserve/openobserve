@@ -14,16 +14,16 @@
   /* Text — grey-based semantic hierarchy */
   --color-text-heading: var(--color-grey-800); /* h1-h6, modal titles, page/panel titles */
   --color-text-body: var(--color-grey-700); /* paragraphs, default body */
-  --color-text-secondary: var(--color-grey-600); /* supporting text, descriptions, captions */
-  --color-text-label: var(--color-grey-600); /* form labels, metadata, badges */
+  --color-text-secondary: var(--color-grey-500); /* supporting text, descriptions, captions */
+  --color-text-label: var(--color-grey-500); /* form labels, metadata, badges */
   --color-text-muted: var(--color-grey-500); /* absent, de-emphasized */
   /* disabled, border-strong and scrollbar-thumb-hover share grey-400 but stay separate tokens so each can diverge. */
   --color-text-disabled: var(--color-grey-400);
   /* grey-500, not grey-400: placeholder text must clear 4.5:1 on white. */
   --color-text-placeholder: var(--color-grey-500);
   --color-text-soft: rgba(0, 0, 0, 0.75); /* black at 75% — readable but not harsh */
-  --color-text-link: var(--color-primary-700); /* clickable links */
-  --color-text-link-hover: var(--color-primary-800); /* link hover state */
+  --color-text-link: var(--color-primary-600); /* clickable links */
+  --color-text-link-hover: var(--color-primary-700); /* link hover state */
   --color-text-code: var(--color-grey-700); /* inline code, monospace */
   --color-text-inverse: var(--color-white); /* text on dark/colored bg */
 
@@ -56,8 +56,8 @@
      (Home resource/explore rows, KPI-card icons, section headers). Registered
      as semantic tokens so the pale light-mode fill flips to a dark accent tint
      in dark.css instead of staying light on the dark canvas. */
-  --color-icon-chip-primary-bg: var(--color-surface-subtle);
-  --color-icon-chip-primary-text: var(--color-grey-600);
+  --color-icon-chip-primary-bg: var(--color-primary-50);
+  --color-icon-chip-primary-text: var(--color-primary-600);
   --color-icon-chip-success-bg: var(--color-success-50);
   --color-icon-chip-success-text: var(--color-success-600);
   --color-icon-chip-warning-bg: var(--color-warning-50);
@@ -73,11 +73,7 @@
      barely-tinted near-white, just a whisper of brand hue so the white content
      card floats on a calm backdrop. A strong tint reads as "too bright". */
   --color-surface-chrome: color-mix(in srgb, var(--color-primary-50) 55%, var(--color-grey-50));
-  --color-surface-chrome-deeper: color-mix(
-    in srgb,
-    var(--color-primary-600) 2%,
-    var(--color-grey-100)
-  );
+  --color-surface-chrome-deeper: var(--color-primary-100);
 
   /* Borders — three steps, chosen against WCAG 2.1 SC 1.4.11 (Non-text
      Contrast), which asks for 3:1 on the visual boundary of a UI COMPONENT.
@@ -103,15 +99,6 @@
   /* Soft divider — lighter than the structural border. Use for in-list row
      dividers and intra-card section splits. */
   --color-border-subtle: var(--color-grey-150);
-  /* One resting edge for every bordered control, so a toolbar row reads as one set (S2).
-     Hover lifts it to the 3:1 control edge; selected controls take the accent-300 edge. */
-  --color-control-border: var(--color-grey-350);
-  --color-control-border-hover: var(--color-border-control);
-  --color-control-border-selected: var(--color-primary-300);
-  /* Input focus: an accent-500 edge plus a 3px outer halo at 18% (16% red when invalid), never an inset ring. */
-  --color-control-border-focus: var(--color-primary-500);
-  --color-control-focus-halo: color-mix(in srgb, var(--color-primary-500) 18%, transparent);
-  --color-control-error-halo: color-mix(in srgb, var(--color-error-500) 16%, transparent);
 
   /* Overlay scrim — semi-transparent backdrop */
   --color-overlay-scrim: color-mix(in srgb, var(--color-grey-950) 50%, transparent);
@@ -213,20 +200,14 @@
   --color-focus-ring-success: var(--color-success-600);
   --color-focus-ring-warning: var(--color-warning-700);
 
-  /* Motion: every interactive control colours on one timing; overlays open slower than they close.
-     Nothing decorative runs past 220 ms, so motion never makes a person wait. */
-  --duration-control: 100ms;
-  --ease-control: cubic-bezier(0.2, 0, 0, 1);
-  --duration-indicator: 150ms;
-  --duration-expand: 180ms;
-  --duration-page-in: 120ms;
+  /* Motion: every interactive control colours on one timing; overlays open slower than they close. */
+  --duration-control: 120ms;
+  --ease-control: cubic-bezier(0, 0, 0.2, 1);
   --duration-overlay-in: 140ms;
   --duration-overlay-out: 100ms;
   --ease-overlay-out: cubic-bezier(0.4, 0, 1, 1);
-  --duration-dialog-in: 160ms;
-  --duration-dialog-out: 120ms;
-  --duration-drawer-in: 200ms;
-  --duration-drawer-out: 150ms;
+  --duration-dialog-in: 200ms;
+  --duration-dialog-out: 150ms;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* Control heights: a size name is one height in every component, and controls that
@@ -236,18 +217,15 @@
   --spacing-control-md: 2rem; /* 32px — default: inputs, selects, buttons, toggles, date pickers */
   --spacing-control-lg: 2.25rem; /* 36px — sign-in and empty-state call to action only */
 
-  /* Floating menus and popovers: the edge is the surface's own border; dark values in dark.css. */
+  /* Floating menus and popovers: the 1px ring lives in the shadow; dark values in dark.css. */
   /* eslint-disable local/no-hardcoded-px -- optical shadow geometry, not layout */
-  --shadow-overlay: 0 12px 28px -6px rgb(19 21 31 / 0.22), 0 4px 8px -4px rgb(19 21 31 / 0.1);
+  --shadow-overlay:
+    0 0 0 1px #00000014, 0 1px 1px #00000005, 0 4px 8px -4px #0000000a, 0 16px 24px -8px #0000000f;
   /* eslint-enable local/no-hardcoded-px */
 }
 
 /* ── Register ALL semantic tokens for Tailwind utilities ── */
 @theme inline {
-  /* A bare transition-colors or transition takes the control timing, so no control falls back to 150 ms. */
-  --default-transition-duration: var(--duration-control);
-  --default-transition-timing-function: var(--ease-control);
-
   /* Text */
   --color-text-heading: var(--color-text-heading);
   --color-text-body: var(--color-text-body);
@@ -294,12 +272,6 @@
   --color-border-strong: var(--color-border-strong);
   --color-border-control: var(--color-border-control);
   --color-border-subtle: var(--color-border-subtle);
-  --color-control-border: var(--color-control-border);
-  --color-control-border-hover: var(--color-control-border-hover);
-  --color-control-border-selected: var(--color-control-border-selected);
-  --color-control-border-focus: var(--color-control-border-focus);
-  --color-control-focus-halo: var(--color-control-focus-halo);
-  --color-control-error-halo: var(--color-control-error-halo);
 
   /* Overlay scrim */
   --color-overlay-scrim: var(--color-overlay-scrim);

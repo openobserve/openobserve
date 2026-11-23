@@ -74,40 +74,38 @@
       </PanelBar>
 
       <div class="h-45 w-full">
-        <OSkeleton
+        <div
           v-if="loading"
-          preset="chart"
-          class="h-full p-4"
+          class="flex h-full items-center justify-center"
           data-test="slos-slotimeslicepreview-loading"
-        />
-        <OEmptyState
+        >
+          <OSpinner size="lg" />
+        </div>
+        <div
           v-else-if="error"
-          kind="error"
-          size="compact"
-          class="px-4"
-          :title="raw(error)"
+          class="flex h-full items-center justify-center px-4 text-center"
           data-test="slos-slotimeslicepreview-error"
-        />
+        >
+          <span class="text-text-secondary text-sm">{{ error }}</span>
+        </div>
         <!-- Ungrouped, the ingest pass REFUSES a slice two series both report —
              you cannot sum two p95s — and records a coverage hole instead.
              Grouped, the same series are the group values and each is scored on
              its own; either way this single-value chart cannot draw them. -->
-        <OEmptyState
+        <div
           v-else-if="hasMultiSeries"
-          size="compact"
-          class="px-4"
-          icon="info-outline"
-          :title="multiSeriesNotice"
+          class="flex h-full items-center justify-center px-4 text-center"
           data-test="slos-slotimeslicepreview-multiseries"
-        />
-        <OEmptyState
+        >
+          <span class="text-text-secondary text-sm">{{ multiSeriesNotice }}</span>
+        </div>
+        <div
           v-else-if="!points.length"
-          size="compact"
-          class="px-4"
-          icon="bar-chart"
-          :title="t('slos.preview.noSlices')"
+          class="flex h-full items-center justify-center px-4 text-center"
           data-test="slos-slotimeslicepreview-empty"
-        />
+        >
+          <span class="text-text-secondary text-sm">{{ t("slos.preview.noSlices") }}</span>
+        </div>
         <ChartRenderer
           v-else
           :data="{ options: chartOptions }"
@@ -135,13 +133,12 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { format } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import PanelBar from "@/components/common/PanelBar.vue";

@@ -120,7 +120,7 @@ const onDateChange = (field: any, dt: any) => {
       />
       <p
         v-if="props.showError && shown(field).message !== undefined"
-        class="text-input-error-text mt-1 text-xs leading-4"
+        class="text-input-error-text mt-1 text-xs leading-snug"
         :data-test="$attrs['data-test'] ? `${$attrs['data-test']}-error` : undefined"
       >
         {{ raw(shown(field).message) }}

@@ -22,7 +22,7 @@ test.use({
  * Bug 1: SQL query validation was hardcoding "logs" as page_type instead of
  *        using the user-selected stream type (logs, metrics, traces)
  *
- * Bug 2: When user quickly clicks "Validate and close" after typing a query,
+ * Bug 2: When user quickly clicks "Validate and Close" after typing a query,
  *        the blur event was interfering with the button click
  */
 test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@all', '@pipelines', '@pipelineRegression', '@regression', '@smoke', '@P0'] }, () => {
@@ -137,7 +137,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     // Clear previous API calls before validation
     validationApiCalls.length = 0;
 
-    // Click "Validate and close" button using page object method
+    // Click "Validate and Close" button using page object method
     await pageManager.pipelinesPage.clickValidateAndClose();
 
     // Wait for validation to complete
@@ -159,7 +159,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
 
     testLogger.info('Validation API correctly used metrics stream type');
 
-    // Verify no unexpected "Discard changes" dialog appeared using page object
+    // Verify no unexpected "Discard Changes" dialog appeared using page object
     const discardVisible = await pageManager.pipelinesPage.isDiscardChangesDialogVisible();
     expect(discardVisible, 'No Discard Changes dialog should appear').toBe(false);
 
@@ -245,7 +245,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     // Clear previous API calls before validation
     validationApiCalls.length = 0;
 
-    // Click "Validate and close" button using page object method
+    // Click "Validate and Close" button using page object method
     await pageManager.pipelinesPage.clickValidateAndClose();
 
     // Wait for validation to complete
@@ -267,7 +267,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
 
     testLogger.info('Validation API correctly used traces stream type');
 
-    // Verify no unexpected "Discard changes" dialog appeared using page object
+    // Verify no unexpected "Discard Changes" dialog appeared using page object
     const discardVisibleTraces = await pageManager.pipelinesPage.isDiscardChangesDialogVisible();
     expect(discardVisibleTraces, 'No Discard Changes dialog should appear').toBe(false);
 
@@ -280,9 +280,9 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
   /**
    * Test: Quick click on Validate and Close button works correctly
    *
-   * Issue #9901 Bug 2: When user quickly clicks "Validate and close" after
+   * Issue #9901 Bug 2: When user quickly clicks "Validate and Close" after
    * typing in the query editor, the blur event was triggering validation
-   * which interfered with the button click, causing "Discard changes" dialog.
+   * which interfered with the button click, causing "Discard Changes" dialog.
    *
    * The fix adds @mousedown.prevent to the button to prevent this race condition.
    */
@@ -323,7 +323,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
 
     // Now simulate the bug scenario:
     // 1. Click in the SQL editor to focus it
-    // 2. Immediately click "Validate and close" (without waiting)
+    // 2. Immediately click "Validate and Close" (without waiting)
 
     testLogger.info('Simulating quick click scenario - focus editor then immediately click button');
 
@@ -339,7 +339,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     // Wait a moment for any dialogs to appear
     await page.waitForTimeout(2000);
 
-    // The "Discard changes" dialog should NOT appear
+    // The "Discard Changes" dialog should NOT appear
     // Before the fix, this dialog would appear because blur was triggering validation
     const discardDialogVisible = await pageManager.pipelinesPage.isDiscardChangesDialogVisible();
 
@@ -350,7 +350,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     expect(discardDialogVisible).toBe(false);
 
     // If we got a validation error, that's expected (might not have valid data)
-    // The important thing is no "Discard changes" dialog from blur interference
+    // The important thing is no "Discard Changes" dialog from blur interference
     const invalidQueryError = await pageManager.pipelinesPage.isInvalidSqlQueryErrorVisible();
     if (invalidQueryError) {
       testLogger.info('Got expected validation error (query validation worked)');

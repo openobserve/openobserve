@@ -8,7 +8,6 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -834,7 +833,7 @@ function openInLogs() {
           </OButton>
           <OButton
             icon-only
-            variant="ghost"
+            variant="secondary"
             icon="refresh"
             :loading="loading"
             data-test="log-explorer-run"
@@ -875,18 +874,18 @@ function openInLogs() {
         <OLoadingLine :active="loading && events.length > 0" />
         <OSkeleton v-if="loading && !events.length" preset="tableRows" />
 
-        <OEmptyState
+        <!-- Empty state (after the fetch settles) -->
+        <div
           v-else-if="!events.length"
-          icon="manage-search"
-          :title="t('panel.logExplorer.noEvents')"
+          class="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-10"
         >
-          <template #extra>
-            <code
-              class="text-text-secondary bg-surface-subtle rounded-default max-w-full overflow-x-auto px-3 py-2 text-center font-mono text-xs break-all whitespace-pre-wrap"
-              >{{ customSql }}</code
-            >
-          </template>
-        </OEmptyState>
+          <OIcon name="manage-search" size="xl" class="text-text-secondary opacity-30" />
+          <span class="text-text-secondary text-sm">{{ t("panel.logExplorer.noEvents") }}</span>
+          <code
+            class="text-text-secondary bg-surface-subtle rounded-default max-w-full overflow-x-auto px-3 py-2 text-center font-mono text-xs break-all whitespace-pre-wrap"
+            >{{ customSql }}</code
+          >
+        </div>
 
         <!-- Highlighted log rows — same LogsHighLighting + expandable JSON as Surrounding events. -->
         <div v-else class="min-h-0 flex-1 overflow-y-auto">
@@ -981,7 +980,7 @@ function openInLogs() {
           <div class="flex shrink-0 items-center gap-1">
             <OButton
               icon-only
-              variant="ghost"
+              variant="secondary"
               icon="chevron-left"
               :disabled="!hasPrev"
               data-test="log-explorer-detail-prev"
@@ -994,7 +993,7 @@ function openInLogs() {
             >
             <OButton
               icon-only
-              variant="ghost"
+              variant="secondary"
               icon="chevron-right"
               :disabled="!hasNext"
               data-test="log-explorer-detail-next"

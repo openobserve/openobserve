@@ -1009,7 +1009,7 @@ describe("Ingestion", () => {
       await flushPromises();
 
       expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
-        successMessage: "Content copied successfully!",
+        successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -1035,7 +1035,7 @@ describe("Ingestion", () => {
 
       // Verify that copyToClipboard was called
       expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
-        successMessage: "Content copied successfully!",
+        successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });

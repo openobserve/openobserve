@@ -103,7 +103,6 @@ onUnmounted(() => {
     :class="[
       'rounded-menu shadow-toast bg-toast-inverse-bg text-toast-inverse-text text-compact pointer-events-auto flex min-h-10 w-max max-w-[min(26.25rem,calc(100vw-2rem))] items-center gap-3 py-2 ps-3 pe-2',
       'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-4',
-      'animation-duration-(--duration-overlay-in) data-[state=closed]:animation-duration-(--duration-overlay-out) ease-(--ease-out-expo) data-[state=closed]:ease-(--ease-overlay-out)',
       'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-bottom-4',
     ]"
     :role="rootRole"
@@ -141,14 +140,14 @@ onUnmounted(() => {
       v-if="action"
       type="button"
       data-test="o-toast-action-btn"
-      class="text-toast-inverse-action hover:bg-toast-inverse-text/10 focus-visible:outline-focus-ring-accent rounded-chip text-compact shrink-0 cursor-pointer px-1.5 py-1 font-semibold whitespace-nowrap transition-colors outline-none focus-visible:outline-2 focus-visible:outline-solid"
+      class="text-toast-inverse-action hover:bg-toast-inverse-text/10 focus-visible:outline-focus-ring-accent rounded-chip text-compact shrink-0 cursor-pointer px-1.5 py-1 font-semibold whitespace-nowrap outline-none focus-visible:outline-2 focus-visible:outline-solid"
       @click.stop="handleActionClick"
     >
       {{ actionSucceeded && action.successLabel ? action.successLabel : action.label }}
     </button>
 
     <ToastClose
-      class="text-toast-inverse-text-secondary hover:bg-toast-inverse-text/10 hover:text-toast-inverse-text focus-visible:outline-focus-ring-accent rounded-chip grid size-6 shrink-0 cursor-pointer place-items-center transition-colors outline-none focus-visible:outline-2 focus-visible:outline-solid"
+      class="text-toast-inverse-text-secondary hover:bg-toast-inverse-text/10 hover:text-toast-inverse-text focus-visible:outline-focus-ring-accent rounded-chip grid size-6 shrink-0 cursor-pointer place-items-center outline-none focus-visible:outline-2 focus-visible:outline-solid"
       :aria-label="t('components.toast.dismissNotification')"
       data-test="o-toast-dismiss"
     >

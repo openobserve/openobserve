@@ -32,8 +32,8 @@ describe("SecurityAccessLock", () => {
     const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
     const lock = mountLock("admin");
     expect(lock.find('[data-test="security-access-lock-ask-admin"]').exists()).toBe(false);
-    const link = lock.findAll("button").find((b) => b.text().includes("SOC analyst"));
-    expect(link?.text()).toContain("Start a role from SOC analyst");
+    const link = lock.findAll("button").find((b) => b.text().includes("SOC Analyst"));
+    expect(link?.text()).toContain("Start a role from SOC Analyst");
     await link!.trigger("click");
     expect(push).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -47,7 +47,7 @@ describe("SecurityAccessLock", () => {
   it("tells anyone else which preset to ask an admin for", () => {
     const lock = mountLock("editor", viewDenial("alerts", "list"));
     expect(lock.find('[data-test="security-access-lock-ask-admin"]').text()).toBe(
-      "Ask an admin for the Security viewer preset.",
+      "Ask an admin for the Security Viewer preset.",
     );
     expect(lock.text()).not.toContain("Start a role from");
   });

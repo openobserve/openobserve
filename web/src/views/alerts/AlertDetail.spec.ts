@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, flushPromises, RouterLinkStub, VueWrapper } from "@vue/test-utils";
+import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { reactive, type Component } from "vue";
 
 vi.mock("@/services/alerts", async (importOriginal) => {
@@ -254,7 +254,6 @@ async function mountView({
         AlertCalibrationHeadroomCard: true,
         AnomalyDetectionChart: true,
         AlertHeaderActions: true,
-        RouterLink: RouterLinkStub,
         ...stubs,
       },
     },
@@ -1008,13 +1007,20 @@ describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () =
     expect(header().props("firing")).toBe(true);
   });
 
-  it("shows how long a single-row alert has fired, under its condition line", async () => {
+  it("shows the Level and Firing since tiles and how long a single-row alert has fired", async () => {
     // Half a minute of slack: the shared clock ticks once a minute.
     const since = (Date.now() - 150_000) * 1000;
     withListRow({ last_outcome: "firing", last_outcome_since: since, level: "critical" });
     wrapper = await mountView();
-    expect(wrapper.find('[data-test="alerts-alertdetail-condition"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="alerts-alertdetail-tiles"]').exists()).toBe(false);
+    const tiles = wrapper.find('[data-test="alerts-alertdetail-tiles"]');
+    expect(tiles.exists()).toBe(true);
+    expect(wrapper.find('[data-test="alerts-alertdetail-tile-level"]').text()).toContain("Level");
+    expect(wrapper.find('[data-test="alerts-alertdetail-tile-level"]').text()).toContain(
+      "Critical",
+    );
+    expect(wrapper.find('[data-test="alerts-alertdetail-tile-firing-since"]').text()).toContain(
+      "Firing since",
+    );
     expect(wrapper.find('[data-test="alerts-alertdetail-firing-for"]').text()).toBe(
       "firing for 2 min",
     );
@@ -1034,7 +1040,7 @@ describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () =
     );
   });
 
-  it("links the firing's incident from the condition line (MK-1)", async () => {
+  it("adds the Incident tile when the firing has one, and the tile opens the incident (MK-1)", async () => {
     withListRow({
       last_outcome: "firing",
       last_outcome_since: Date.now() * 1000,
@@ -1042,11 +1048,14 @@ describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () =
       incident: { id: "inc-1", title: "Checkout errors", status: "open" },
     });
     wrapper = await mountView();
-    const slot = wrapper.find('[data-test="alerts-alertdetail-condition-incident"]');
-    expect(slot.text()).toContain("Incident");
-    expect(slot.text()).toContain("Checkout errors");
-    const link = wrapper.findComponent(RouterLinkStub);
-    expect(link.props("to")).toMatchObject({ name: "incidentDetail", params: { id: "inc-1" } });
+    const tile = wrapper.find('[data-test="alerts-alertdetail-tile-incident"]');
+    expect(tile.text()).toContain("Incident");
+    expect(tile.text()).toContain("Checkout errors");
+    mockRouterPush.mockClear();
+    await tile.trigger("click");
+    expect(mockRouterPush).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "incidentDetail", params: { id: "inc-1" } }),
+    );
   });
 
   it("falls back to the incident id when it has no title", async () => {
@@ -1056,29 +1065,26 @@ describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () =
       incident: { id: "inc-2", status: "open" },
     });
     wrapper = await mountView();
-    expect(wrapper.find('[data-test="alerts-alertdetail-incident-link"]').text()).toContain(
+    expect(wrapper.find('[data-test="alerts-alertdetail-tile-incident"]').text()).toContain(
       "inc-2",
     );
   });
 
-  it("says no incident yet while a firing has none", async () => {
+  it("leaves out the Level tile when the alert never classified a level", async () => {
     withListRow({ last_outcome: "firing", last_outcome_since: Date.now() * 1000 });
     wrapper = await mountView();
-    expect(wrapper.find('[data-test="alerts-alertdetail-no-incident"]').text()).toBe(
-      "No incident yet",
-    );
+    expect(wrapper.find('[data-test="alerts-alertdetail-tile-level"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alerts-alertdetail-tile-firing-since"]').exists()).toBe(true);
   });
 
-  it("names no incident slot and no firing time while the alert is not firing", async () => {
+  it("shows no tiles and no firing time while the alert is not firing", async () => {
     withListRow({ last_outcome: "ok", last_outcome_since: Date.now() * 1000, level: "ok" });
     wrapper = await mountView();
-    expect(wrapper.find('[data-test="alerts-alertdetail-condition-incident"]').exists()).toBe(
-      false,
-    );
+    expect(wrapper.find('[data-test="alerts-alertdetail-tiles"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="alerts-alertdetail-firing-for"]').exists()).toBe(false);
   });
 
-  it("keeps the group strip on a multi-alert", async () => {
+  it("keeps the group strip, not the tiles, on a multi-alert", async () => {
     withListRow({
       last_outcome: "firing",
       last_outcome_since: Date.now() * 1000,
@@ -1088,7 +1094,7 @@ describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () =
       alert: makeMultiAlert(),
       groupsResponse: { list: [], capped: false, group_cap: 100 },
     });
-    expect(wrapper.find('[data-test="alerts-alertdetail-group-stats"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alerts-alertdetail-tiles"]').exists()).toBe(false);
   });
 
   it("hands the firing groups to the header so its Until… can scope the mute", async () => {
@@ -1139,50 +1145,28 @@ describe("AlertDetail — first paint", () => {
     query_condition: { aggregation: { group_by: ["host"], multi_alert: false } },
   });
 
-  const pending = () => wrapper.find('[data-test="alerts-alertdetail-pending"]');
-
-  it("holds a chart-shaped skeleton while the GET runs, then mounts the chart and tabs together", async () => {
+  it("mounts the evaluation chart with no alert while the GET runs, ahead of the tabs", async () => {
     const { alertRequest, resolveAlert } = pendingAlert();
     wrapper = await mountView({ alertRequest });
 
-    expect(pending().exists()).toBe(true);
-    expect(chart().exists()).toBe(false);
+    expect(chart().exists()).toBe(true);
+    expect(chart().props("alert")).toBeNull();
     expect(tabs().exists()).toBe(false);
 
     resolveAlert(makeSimpleAlert());
     await flushPromises();
-    expect(pending().exists()).toBe(false);
     expect(chart().props("alert")).toMatchObject({ name: "cpu-high" });
     expect(tabs().exists()).toBe(true);
   });
 
-  it("never mounts the chart when the alert turns out to be an anomaly config", async () => {
+  it("drops the held chart when the alert turns out to be an anomaly config", async () => {
     const { alertRequest, resolveAlert } = pendingAlert();
     wrapper = await mountView({ alertRequest });
-    expect(pending().exists()).toBe(true);
+    expect(chart().exists()).toBe(true);
 
     resolveAlert(makeAnomalyAlert());
     await flushPromises();
-    expect(pending().exists()).toBe(false);
     expect(chart().exists()).toBe(false);
-    expect(tabs().exists()).toBe(true);
-  });
-
-  it("waits for a single alert's list row, so its condition line never pushes the chart down", async () => {
-    let resolveList: (value: any) => void = () => {};
-    vi.mocked(alertsService.listByFolderId).mockReturnValue(
-      new Promise((resolve) => {
-        resolveList = resolve;
-      }) as any,
-    );
-    wrapper = await mountView();
-    expect(pending().exists()).toBe(true);
-    expect(chart().exists()).toBe(false);
-
-    resolveList({ data: { list: [] } });
-    await flushPromises();
-    expect(pending().exists()).toBe(false);
-    expect(chart().exists()).toBe(true);
   });
 
   it("puts the grouped-but-simple banner below the tabs, so the tabs never move when it lands", async () => {
@@ -1192,80 +1176,5 @@ describe("AlertDetail — first paint", () => {
     expect(
       tabs().element.compareDocumentPosition(banner().element) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-  });
-});
-
-describe("AlertDetail — Open in logs", () => {
-  let wrapper: VueWrapper;
-
-  const sqlAlert = () => ({
-    id: "alert-1",
-    name: "5xx_error_rate",
-    stream_type: "logs",
-    stream_name: "nginx_access",
-    query_condition: {
-      type: "sql",
-      sql: "SELECT count(*) as cnt FROM nginx_access WHERE status >= 500",
-    },
-    trigger_condition: { period: 10, frequency: 5, operator: ">=", threshold: 1 },
-  });
-  const openIn = (page: string) =>
-    wrapper
-      .findAllComponents({ name: "OButton" })
-      .find((b) => b.attributes("data-test") === `alerts-alertdetail-open-in-${page}`);
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    queryClient.clear();
-    vi.mocked(alertsService.listByFolderId).mockResolvedValue({ data: { list: [] } } as any);
-  });
-  afterEach(() => wrapper?.unmount());
-
-  it("opens Logs on the alert's stream, the rows its query reads and its look-back window", async () => {
-    wrapper = await mountView({ alert: sqlAlert() });
-    await vi.waitFor(() => expect(openIn("logs")?.props("loading")).toBe(false));
-    const to = openIn("logs")!.props("to") as any;
-    expect(to.path).toBe("/logs");
-    expect(to.query).toMatchObject({
-      stream: "nginx_access",
-      stream_type: "logs",
-      sql_mode: "false",
-      period: "10m",
-    });
-    expect(atob(to.query.query.replace(/-/g, "+").replace(/_/g, "/").replace(/\./g, "="))).toMatch(
-      /status"?\s*>=\s*500/,
-    );
-  });
-
-  it("sits before Edit as a secondary action", async () => {
-    wrapper = await mountView({ alert: sqlAlert() });
-    const html = wrapper.html();
-    expect(html.indexOf("alerts-alertdetail-open-in-logs")).toBeLessThan(
-      html.indexOf("alerts-alertdetail-edit"),
-    );
-    expect(openIn("logs")!.props("variant")).toBe("secondary");
-  });
-
-  it("offers Open in traces for a traces alert", async () => {
-    wrapper = await mountView({ alert: { ...sqlAlert(), stream_type: "traces" } });
-    expect(openIn("traces")).toBeTruthy();
-    expect(openIn("logs")).toBeUndefined();
-  });
-
-  it("offers nothing for families with no single stream query", async () => {
-    wrapper = await mountView({ alert: makeCompositeAlert() });
-    expect(wrapper.html()).not.toContain("alerts-alertdetail-open-in-");
-    wrapper.unmount();
-    wrapper = await mountView({ alert: makeAnomalyAlert() });
-    expect(wrapper.html()).not.toContain("alerts-alertdetail-open-in-");
-  });
-
-  it("keeps the history hidden until the chart settles, so a collapsing chart moves nothing visible", async () => {
-    wrapper = await mountView({ alert: sqlAlert() });
-    const below = () => wrapper.find('[data-test="alerts-alertdetail-below-chart"]');
-    expect(below().classes()).toContain("invisible");
-    wrapper.findComponent({ name: "AlertGroupChart" }).vm.$emit("settled", true);
-    await flushPromises();
-    expect(below().classes()).not.toContain("invisible");
   });
 });

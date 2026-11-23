@@ -93,7 +93,7 @@ describe("ErrorStackTrace Component", () => {
     // Arrange + Act handled in beforeEach
 
     // Assert
-    expect(wrapper.text()).toContain("Error stack");
+    expect(wrapper.text()).toContain("Error Stack");
   });
 
   it("displays the first stack line as a standalone line", () => {

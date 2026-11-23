@@ -19,12 +19,16 @@ import config from "@/aws-exports";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
+import OverviewAlertsCard from "./OverviewAlertsCard.vue";
+import OverviewDataHealthCard from "./OverviewDataHealthCard.vue";
+import OverviewRowButton from "./OverviewRowButton.vue";
 import OverviewLimitCard from "./OverviewLimitCard.vue";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
 import OverviewSignalCards from "./OverviewSignalCards.vue";
 import OverviewTopStreamsCard from "./OverviewTopStreamsCard.vue";
 import { buildOverview } from "./overviewFixtures";
 import type {
+  OverviewAlertsData,
   OverviewLimitsData,
   OverviewSection,
   OverviewStreamsData,
@@ -45,6 +49,7 @@ afterEach(() => {
 });
 
 const okSection = <T>(data: T): OverviewSection<T> => ({ status: "ok", data });
+const alertsWith = (over: Partial<OverviewAlertsData>) => okSection({ ...o.alerts.data!, ...over });
 const streamsWith = (over: Partial<OverviewStreamsData>) =>
   okSection({ ...o.streams.data!, ...over });
 const limitsWith = (over: Partial<OverviewLimitsData>) => okSection({ ...o.limits.data!, ...over });
@@ -56,7 +61,7 @@ const stateSections: Array<[string, OverviewSection<never>, string]> = [
 ];
 
 describe("OverviewSectionCard", () => {
-  it("sits on the page surface with a 14 px heading and its subtitle on one line", () => {
+  it("draws every card with the Kubernetes overview panel chrome", () => {
     const w = mount(OverviewSectionCard, {
       props: {
         section: "x",
@@ -67,24 +72,32 @@ describe("OverviewSectionCard", () => {
       },
       global,
     });
-    const classes = w.get('[data-test="overview-x-card"]').classes();
-    for (const box of ["border", "rounded-surface", "bg-surface-panel"])
-      expect(classes).not.toContain(box);
-    const title = w.get("h2");
+    expect(w.get('[data-test="overview-x-card"]').classes()).toEqual(
+      expect.arrayContaining([
+        "bg-surface-panel",
+        "border-border-default",
+        "rounded-surface",
+        "border",
+      ]),
+    );
+    const title = w.get("h3");
     expect(title.text()).toBe("X");
-    expect(title.classes()).toEqual(expect.arrayContaining(["text-sm", "font-semibold"]));
+    expect(title.element.parentElement!.classList.contains("p-3")).toBe(true);
+    expect(title.element.parentElement!.classList.contains("items-baseline")).toBe(true);
     const sub = w.get('[data-test="overview-x-subtitle"]');
     expect(sub.text()).toBe("Sub");
     expect(sub.classes()).toContain("text-text-secondary");
   });
 
-  it("shows the empty message under the heading and keeps the header action", () => {
+  it("centres the empty message and keeps the header action", () => {
     const w = mount(OverviewSectionCard, {
       props: { section: "x", title: raw("X"), view: "empty", linkLabel: raw("Add") },
       slots: { empty: '<p data-test="empty-slot">none</p>' },
       global,
     });
-    expect(w.get('[data-test="empty-slot"]').text()).toBe("none");
+    const slot = w.get('[data-test="empty-slot"]').element.parentElement!;
+    expect(slot.classList.contains("justify-center")).toBe(true);
+    expect(slot.classList.contains("flex-1")).toBe(true);
     expect(w.get('[data-test="overview-x-view-all"]').text()).toBe("Add");
     expect(w.find('[data-test="overview-x-subtitle"]').exists()).toBe(false);
   });
@@ -123,7 +136,279 @@ describe("OverviewSectionCard", () => {
   });
 });
 
+describe("OverviewAlertsCard", () => {
+  const mountAlerts = (props: Record<string, unknown> = {}) =>
+    mount(OverviewAlertsCard, { props: { ...base, section: o.alerts, ...props }, global });
+  const box = (w: ReturnType<typeof mountAlerts>, key: string) =>
+    w.get(`[data-test="overview-alerts-box-${key}"]`);
+  const boxKeys = (w: ReturnType<typeof mountAlerts>) =>
+    w
+      .findAll('[data-test^="overview-alerts-box-"]:not([data-test="overview-alerts-box-count"])')
+      .map((b) => b.attributes("data-test")!.replace("overview-alerts-box-", ""));
+
+  it("renders the firing rows compact", () => {
+    const rows = mountAlerts().findAllComponents(OverviewRowButton);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) expect(r.props("compact")).toBe(true);
+  });
+
+  it("reserves no label padding on a box without the button", () => {
+    const label = (w: ReturnType<typeof mountAlerts>) =>
+      box(w, "critical").get("span.text-text-label");
+    expect(label(mountAlerts()).classes()).not.toContain("pe-6");
+  });
+
+  it("states the active rules and the rules failing to evaluate under the title", () => {
+    const w = mountAlerts();
+    expect(w.get('[data-test="overview-alerts-subtitle"]').text()).toBe(
+      "10 rules active · 4 failing to evaluate",
+    );
+    const one = mountAlerts({ section: alertsWith({ enabled: 1, failed_evaluation: 1 }) });
+    expect(one.get('[data-test="overview-alerts-subtitle"]').text()).toBe(
+      "1 rule active · 1 failing to evaluate",
+    );
+  });
+
+  it("shows critical, warning, open incidents and failing rules as four boxes", () => {
+    const w = mountAlerts({ incidentsState: "ok", incidentsTotal: 6 });
+    expect(boxKeys(w)).toEqual(["critical", "warning", "incidents", "failing"]);
+    expect(w.get('[data-test="overview-alerts-boxes"]').classes()).toContain("grid-cols-4");
+    const count = (key: string) => box(w, key).get('[data-test="overview-alerts-box-count"]');
+    expect(box(w, "critical").text()).toBe("2Critical level");
+    expect(box(w, "warning").text()).toBe("1Warning level");
+    expect(box(w, "incidents").text()).toBe("6Open incidents");
+    expect(box(w, "failing").text()).toBe("4Rules failing");
+    expect(count("critical").classes()).toEqual(
+      expect.arrayContaining(["text-xl", "font-bold", "text-status-negative"]),
+    );
+    expect(count("warning").classes()).toContain("text-status-warning-text");
+    expect(count("incidents").classes()).toContain("text-text-heading");
+    expect(count("failing").classes()).toContain("text-status-negative");
+    const frame = (key: string) => w.get(`[data-test="overview-alerts-frame-${key}"]`).classes();
+    expect(frame("critical")).toEqual(
+      expect.arrayContaining(["bg-status-error-bg", "border-status-negative"]),
+    );
+    expect(frame("warning")).toEqual(
+      expect.arrayContaining(["bg-status-warning-bg", "border-status-warning-text"]),
+    );
+    expect(frame("failing")).toContain("bg-status-error-bg");
+    expect(frame("incidents")).not.toContain("bg-status-error-bg");
+  });
+
+  it("drops the incidents box when incidents are unavailable, and keeps zeros neutral", () => {
+    for (const incidentsState of [undefined, "locked", "unavailable", "error"]) {
+      const w = mountAlerts({ incidentsState });
+      expect(boxKeys(w)).toEqual(["critical", "warning", "failing"]);
+      expect(w.get('[data-test="overview-alerts-boxes"]').classes()).toContain("grid-cols-3");
+    }
+    const zero = mountAlerts({
+      section: alertsWith({
+        failed_evaluation: 0,
+        firing_by_level: { ok: 0, warning: 0, critical: 0, no_data: 0, unclassified: 0 },
+      }),
+    });
+    expect(
+      box(zero, "critical").get('[data-test="overview-alerts-box-count"]').classes(),
+    ).toContain("text-text-heading");
+    expect(zero.get('[data-test="overview-alerts-frame-critical"]').classes()).toEqual(
+      expect.arrayContaining(["border-border-default", "hover:border-border-strong"]),
+    );
+  });
+
+  it("links each box to the list that shows exactly the rows it counts", async () => {
+    const w = mountAlerts({ incidentsState: "ok", incidentsTotal: 2 });
+    for (const key of ["critical", "warning", "incidents", "failing"]) {
+      await box(w, key).trigger("click");
+    }
+    expect(w.emitted("select")).toEqual([["critical"], ["warning"], ["incidents"], ["failing"]]);
+  });
+
+  it("heads the firing list with what it lists and how long each has fired", () => {
+    const header = mountAlerts().get('[data-test="overview-alerts-table-header"]');
+    expect(header.findAll("span").map((x) => x.text())).toEqual([
+      "Firing now, oldest first",
+      "Firing for",
+    ]);
+  });
+
+  it("lists firing alerts in the given order with a level pill, name, stream and age", () => {
+    const w = mountAlerts();
+    const rows = w.findAll('[data-test^="overview-alerts-firing-"]:not([data-test*="level"])');
+    expect(rows.map((r) => r.attributes("data-test"))).toEqual([
+      "overview-alerts-firing-high_cpu",
+      "overview-alerts-firing-slow_requests",
+    ]);
+    expect(rows[0].text()).toContain("Critical");
+    expect(rows[0].text()).toContain("high_cpu");
+    expect(rows[0].text()).toContain("cpu_usage");
+    expect(rows[0].text()).toContain("1h 0m");
+    expect(rows[1].text()).toContain("Warning");
+    expect(rows[1].text()).toContain("16m");
+    const pill = w.get('[data-test="overview-alerts-firing-level-high_cpu"]');
+    expect(pill.classes()).toEqual(expect.arrayContaining(["min-w-16", "justify-center"]));
+  });
+
+  it.each(["ok", "no_data", "unclassified"] as const)(
+    "shows a neutral Firing pill for a firing rule whose level is %s",
+    (level) => {
+      const [first] = o.alerts.data!.firing;
+      const w = mountAlerts({ section: alertsWith({ firing: [{ ...first, level }] }) });
+      const tag = w.get(`[data-test="overview-alerts-firing-level-${first.name}"]`);
+      expect(tag.text()).toBe("Firing");
+      expect(tag.classes()).toContain("bg-badge-default-soft-bg");
+    },
+  );
+
+  it("lists at most five firing alerts and counts the rest in the show-more link", () => {
+    const [first] = o.alerts.data!.firing;
+    const firing = Array.from({ length: 6 }, (_, i) => ({ ...first, name: `rule_${i}` }));
+    const w = mountAlerts({
+      section: alertsWith({
+        firing,
+        firing_by_level: { ok: 0, warning: 0, critical: 8, no_data: 0, unclassified: 0 },
+      }),
+    });
+    expect(
+      w.findAll('[data-test^="overview-alerts-firing-rule_"]:not([data-test*="level"])'),
+    ).toHaveLength(5);
+    expect(w.get('[data-test="overview-alerts-show-more"]').text()).toBe(
+      "Show 3 more firing alerts",
+    );
+  });
+
+  it("renders two same-named rules on one stream as separate rows", () => {
+    const [first] = o.alerts.data!.firing;
+    const w = mountAlerts({
+      section: alertsWith({ firing: [first, { ...first, since: first.since + 1 }] }),
+    });
+    expect(w.findAll(`[data-test="overview-alerts-firing-${first.name}"]`)).toHaveLength(2);
+  });
+
+  it("shows no age for a firing rule whose since is unknown", () => {
+    const [first, second] = o.alerts.data!.firing;
+    const w = mountAlerts({ section: alertsWith({ firing: [{ ...first, since: 0 }, second] }) });
+    const rows = w.findAll('[data-test^="overview-alerts-firing-"]:not([data-test*="level"])');
+    expect(rows[0].text()).not.toMatch(/\d+[dhm]/);
+    expect(rows[1].text()).toContain("16m");
+  });
+
+  it("fills the list area with a centred all-clear naming the rules being evaluated", () => {
+    const w = mountAlerts({
+      section: alertsWith({
+        firing: [],
+        firing_by_level: { ok: 0, warning: 0, critical: 0, no_data: 0, unclassified: 0 },
+      }),
+    });
+    const clear = w.get('[data-test="overview-alerts-none-firing"]');
+    expect(clear.classes()).toEqual(
+      expect.arrayContaining(["flex-1", "items-center", "justify-center"]),
+    );
+    expect(clear.find("svg").exists()).toBe(true);
+    expect(clear.get("p").text()).toBe("No alerts firing right now");
+    expect(clear.get("p").classes()).toContain("text-text-heading");
+    expect(w.get('[data-test="overview-alerts-evaluated"]').text()).toBe(
+      "10 rules are being evaluated",
+    );
+    expect(w.find('[data-test="overview-alerts-table-header"]').exists()).toBe(false);
+    expect(w.find('[data-test="overview-alerts-boxes"]').exists()).toBe(true);
+    expect(w.find('[data-test="overview-alerts-show-more"]').exists()).toBe(false);
+  });
+
+  it("links to all alerts from the header", async () => {
+    const w = mountAlerts();
+    const link = w.get('[data-test="overview-alerts-view-all"]');
+    expect(link.text()).toBe("View all alerts");
+    await link.trigger("click");
+    expect(w.emitted("open")).toHaveLength(1);
+  });
+
+  it("offers the remaining count when more rules fire than are listed", async () => {
+    const w = mountAlerts();
+    const more = w.get('[data-test="overview-alerts-show-more"]');
+    expect(more.text()).toBe("Show 1 more firing alert");
+    await more.trigger("click");
+    expect(w.emitted("select")).toEqual([["firing"]]);
+    expect(w.emitted("open")).toBeUndefined();
+  });
+
+  it("pluralises the remaining count and hides the link when everything is listed", () => {
+    const levels = (critical: number, warning: number) =>
+      alertsWith({ firing_by_level: { ok: 0, warning, critical, no_data: 0, unclassified: 0 } });
+    expect(
+      mountAlerts({ section: levels(3, 4) })
+        .get('[data-test="overview-alerts-show-more"]')
+        .text(),
+    ).toBe("Show 5 more firing alerts");
+    expect(
+      mountAlerts({ section: levels(1, 1) })
+        .find('[data-test="overview-alerts-show-more"]')
+        .exists(),
+    ).toBe(false);
+  });
+
+  it("titles the card alerts and incidents only where incidents exist", () => {
+    const title = (props: Record<string, unknown>) => mountAlerts(props).get("h3").text();
+    expect(title({ incidentsState: "ok", incidentsTotal: 0 })).toBe("Alerts and incidents");
+    expect(title({ incidentsState: "error" })).toBe("Alerts and incidents");
+    expect(title({ incidentsState: "locked" })).toBe("Alerts");
+    expect(title({ incidentsState: "unavailable" })).toBe("Alerts");
+    expect(title({})).toBe("Alerts");
+  });
+
+  it("shows a one-line empty state and puts Create an alert in the header", async () => {
+    const w = mountAlerts({ section: alertsWith({ total: 0, enabled: 0, failed_evaluation: 0 }) });
+    const empty = w.get('[data-test="overview-alerts-empty"]');
+    expect(empty.text()).toContain("No alert rules yet");
+    expect(w.find('[data-test="overview-alerts-boxes"]').exists()).toBe(false);
+    expect(w.find('[data-test="overview-alerts-subtitle"]').exists()).toBe(false);
+    const action = w.get('[data-test="overview-alerts-view-all"]');
+    expect(action.text()).toBe("Create an alert");
+    await action.trigger("click");
+    expect(w.emitted("create")).toHaveLength(1);
+    expect(w.emitted("open")).toBeUndefined();
+  });
+
+  it("opens the firing alerts from a firing row", async () => {
+    const w = mountAlerts();
+    await w.get('[data-test="overview-alerts-firing-high_cpu"]').trigger("click");
+    expect(w.emitted("select")).toEqual([["firing"]]);
+    expect(w.emitted("open")).toBeUndefined();
+  });
+
+  it("shows a skeleton while loading", () => {
+    const w = mount(OverviewAlertsCard, { props: { pending: true, failed: false }, global });
+    expect(w.find('[data-test="overview-alerts-loading"]').exists()).toBe(true);
+    expect(w.find('[data-test="overview-alerts-boxes"]').exists()).toBe(false);
+  });
+
+  it("shows the load error and emits retry", async () => {
+    const w = mount(OverviewAlertsCard, { props: { pending: false, failed: true }, global });
+    expect(w.find('[data-test="overview-alerts-error"]').exists()).toBe(true);
+    await w.get('[data-test="overview-alerts-retry-btn"]').trigger("click");
+    expect(w.emitted("retry")).toHaveLength(1);
+  });
+
+  it.each(stateSections)("renders %s without the API text", (_n, section, suffix) => {
+    const w = mount(OverviewAlertsCard, {
+      props: { ...base, section: section as never },
+      global,
+    });
+    expect(w.find(`[data-test="overview-alerts-${suffix}"]`).exists()).toBe(true);
+    expect(w.text()).not.toContain("secret internal");
+  });
+});
+
 describe("forbidden copy", () => {
+  it("asks for plain access when the whole request was refused", () => {
+    const w = mount(OverviewAlertsCard, {
+      props: { pending: false, failed: false, forbidden: true },
+      global,
+    });
+    expect(w.get('[data-test="overview-alerts-forbidden"]').text()).toContain(
+      "Ask an org admin for access.",
+    );
+  });
+
   it("asks for plain access when only one section was refused", () => {
     const w = mount(OverviewTopStreamsCard, {
       props: { ...base, section: { status: "forbidden" } as never },
@@ -133,10 +418,37 @@ describe("forbidden copy", () => {
     expect(text).toContain("Ask an org admin for access.");
     expect(text).not.toContain("Summary");
   });
+
+  it("does not link to pipelines or open rows whose section is unavailable", async () => {
+    const overview = buildOverview({ pipelines: { status: "forbidden" } });
+    const w = mount(OverviewDataHealthCard, { props: { ...base, overview }, global });
+    expect(w.find('[data-test="overview-data-health-view-all"]').exists()).toBe(false);
+    const blocked = w.get('[data-test="overview-data-health-row-pipelines"]');
+    expect(blocked.attributes("aria-disabled")).toBe("true");
+    await blocked.trigger("click");
+    expect(w.emitted("open")).toBeUndefined();
+    await w.get('[data-test="overview-data-health-row-quiet"]').trigger("click");
+    expect(w.emitted("open")).toEqual([["streams"]]);
+  });
+
+  it("treats rules that are all disabled as not set up", () => {
+    const overview = buildOverview({
+      alerts: okSection({ ...o.alerts.data!, total: 3, enabled: 0, disabled: 3 }),
+    });
+    const w = mount(OverviewDataHealthCard, { props: { ...base, overview }, global });
+    expect(w.get('[data-test="overview-data-health-row-failing"]').text()).toContain("Not set up");
+    const alerts = mount(OverviewAlertsCard, {
+      props: { ...base, section: overview.alerts },
+      global,
+    });
+    expect(alerts.find('[data-test="overview-alerts-empty"]').exists()).toBe(false);
+  });
 });
 
 describe("forbidden request", () => {
   it.each([
+    ["alerts", OverviewAlertsCard],
+    ["data-health", OverviewDataHealthCard],
     ["streams", OverviewTopStreamsCard],
     ["limit", OverviewLimitCard],
   ])("shows %s as no access without Retry", (name, comp) => {
@@ -149,6 +461,187 @@ describe("forbidden request", () => {
   });
 });
 
+describe("OverviewDataHealthCard", () => {
+  const mountHealth = (overview = o, props: Record<string, unknown> = {}) =>
+    mount(OverviewDataHealthCard, { props: { ...base, overview, ...props }, global });
+  const row = (w: ReturnType<typeof mountHealth>, key: string) =>
+    w.get(`[data-test="overview-data-health-row-${key}"]`);
+  const status = (w: ReturnType<typeof mountHealth>, key: string) =>
+    w.get(`[data-test="overview-data-health-status-${key}"]`);
+  const value = (w: ReturnType<typeof mountHealth>, key: string) =>
+    w.get(`[data-test="overview-data-health-value-${key}"]`);
+  const order = (w: ReturnType<typeof mountHealth>) =>
+    w
+      .findAll('[data-test^="overview-data-health-row-"]')
+      .map((r) => r.attributes("data-test")?.replace("overview-data-health-row-", ""));
+  const FIXED = ["quiet", "failing", "pipelines", "delivery", "schema", "compaction"];
+
+  it("asks what it checks under the title and links to pipelines", () => {
+    const w = mountHealth();
+    expect(w.get('[data-test="overview-data-health-subtitle"]').text()).toBe(
+      "Is data arriving, intact and delivered?",
+    );
+    expect(w.get('[data-test="overview-data-health-view-all"]').text()).toBe("View pipelines");
+  });
+
+  it("emits viewAll, not an errored open, from the header link", async () => {
+    const w = mountHealth();
+    await w.get('[data-test="overview-data-health-view-all"]').trigger("click");
+    expect(w.emitted("viewAll")).toHaveLength(1);
+    expect(w.emitted("open")).toBeUndefined();
+    await row(w, "pipelines").trigger("click");
+    expect(w.emitted("open")).toEqual([["pipelines"]]);
+  });
+
+  it("keeps every row in one fixed order whatever its state, with no summary or collapse", () => {
+    expect(order(mountHealth())).toEqual(FIXED);
+    const overview = buildOverview({
+      alerts: alertsWith({ total: 0, enabled: 0, disabled: 0, failed_evaluation: 0, by_state: {} }),
+      pipelines: { status: "error", error: "boom" },
+    });
+    const w = mountHealth(overview);
+    expect(order(w)).toEqual(FIXED);
+    expect(w.find('[data-test="overview-data-health-healthy"]').exists()).toBe(false);
+    expect(w.find("[aria-expanded]").exists()).toBe(false);
+    expect(w.text()).not.toContain("need attention");
+  });
+
+  it("labels each row with what it checks and why", () => {
+    const w = mountHealth();
+    expect(row(w, "quiet").text()).toContain("Streams gone quiet");
+    expect(row(w, "quiet").text()).toContain("Stopped writing between an hour and 7 days ago");
+    expect(row(w, "failing").text()).toContain("Alert rules failing to evaluate");
+    expect(row(w, "failing").text()).toContain("Blind spots, not firing");
+    expect(row(w, "pipelines").text()).toContain("Pipelines with errors");
+    expect(row(w, "pipelines").text()).toContain("Of 8 active pipelines");
+    expect(row(w, "delivery").text()).toContain("Alert delivery failures");
+    expect(row(w, "delivery").text()).toContain("Alerts that fired but could not notify");
+    expect(row(w, "schema").text()).toContain("New schema versions across your streams");
+    expect(row(w, "compaction").text()).toContain("Compaction jobs pending");
+    expect(row(w, "compaction").text()).toContain("Across stream types you can see");
+  });
+
+  it("puts a muted status word and a toned value on the right of each row", () => {
+    const w = mountHealth();
+    expect(status(w, "failing").text()).toBe("Needs action");
+    expect(status(w, "failing").classes()).toEqual(
+      expect.arrayContaining(["text-xs", "font-semibold", "text-status-error-text"]),
+    );
+    expect(status(w, "quiet").classes()).toContain("text-status-warning-text");
+    expect(status(w, "schema").classes()).toContain("text-status-info-text");
+    const dot = (key: string) => w.get(`[data-test="overview-data-health-dot-${key}"]`);
+    expect(dot("failing").classes()).toContain("bg-status-negative");
+    expect(dot("quiet").classes()).toContain("bg-status-warning-text");
+    expect(dot("schema").classes()).toContain("bg-status-info-text");
+    expect(dot("delivery").classes()).toContain("bg-status-positive");
+    expect(dot("delivery").attributes("aria-hidden")).toBe("true");
+    expect(value(w, "failing").text()).toBe("4");
+    expect(value(w, "failing").classes()).toEqual(
+      expect.arrayContaining(["text-sm", "font-semibold", "tabular-nums", "text-status-negative"]),
+    );
+    expect(status(w, "quiet").text()).toBe("Warning");
+    expect(value(w, "quiet").text()).toBe("3");
+    expect(value(w, "quiet").classes()).toContain("text-status-warning-text");
+    expect(status(w, "schema").text()).toBe("Info");
+    expect(value(w, "schema").text()).toBe("5");
+    expect(value(w, "schema").classes()).toContain("text-text-heading");
+    expect(value(w, "compaction").text()).toBe("12");
+  });
+
+  it("reads delivery failures from notify_failed", () => {
+    const overview = buildOverview({
+      alerts: alertsWith({ by_state: { firing: 1, notify_failed: 7 } }),
+    });
+    const w = mountHealth(overview);
+    expect(value(w, "delivery").text()).toBe("7");
+    expect(status(w, "delivery").text()).toBe("Needs action");
+  });
+
+  it("calls zero problems healthy, in words, with a neutral zero", () => {
+    const overview = buildOverview({
+      alerts: alertsWith({ failed_evaluation: 0, by_state: {} }),
+      pipelines: okSection({ total: 3, enabled: 3, disabled: 0, errored: 0 }),
+      streams: streamsWith({ quiet_count: 0 }),
+    });
+    const w = mountHealth(overview);
+    for (const key of ["quiet", "failing", "pipelines", "delivery"]) {
+      expect(status(w, key).text()).toBe("Healthy");
+      expect(status(w, key).classes()).toContain("text-status-success-text");
+      expect(value(w, key).text()).toBe("0");
+      expect(value(w, key).classes()).toContain("text-text-heading");
+    }
+  });
+
+  it("shows not set up with a muted dash, never healthy, for things that do not exist", () => {
+    const overview = buildOverview({
+      alerts: alertsWith({ total: 0, enabled: 0, disabled: 0, failed_evaluation: 0, by_state: {} }),
+      pipelines: okSection({ total: 0, enabled: 0, disabled: 0, errored: 0 }),
+    });
+    const w = mountHealth(overview);
+    for (const key of ["failing", "delivery", "pipelines"]) {
+      expect(status(w, key).text()).toBe("Not set up");
+      expect(status(w, key).classes()).toContain("text-text-muted");
+      expect(value(w, key).text()).toBe("—");
+      expect(value(w, key).classes()).toContain("text-text-muted");
+      expect(row(w, key).text()).not.toContain("Healthy");
+    }
+    expect(row(w, "pipelines").text()).toContain("No pipelines yet");
+  });
+
+  it("shows quiet streams, schema changes and compaction as not set up when there are no streams", () => {
+    const w = mountHealth(buildOverview({ streams: streamsWith({ total_streams: 0 }) }));
+    for (const key of ["quiet", "schema", "compaction"]) {
+      expect(status(w, key).text()).toBe("Not set up");
+    }
+  });
+
+  it("shows the state and a dash, never a zero, for a row whose section is unavailable", () => {
+    const overview = buildOverview({
+      streams: { status: "error", error: "secret internal failure" },
+      pipelines: { status: "forbidden", reason: "secret internal reason" },
+      alerts: { status: "locked", reason: "secret internal reason" },
+    });
+    const w = mountHealth(overview);
+    expect(status(w, "quiet").text()).toBe("Could not load");
+    expect(status(w, "schema").text()).toBe("Could not load");
+    expect(status(w, "pipelines").text()).toBe("No access");
+    expect(status(w, "failing").text()).toBe("Locked");
+    expect(status(w, "delivery").text()).toBe("Locked");
+    for (const key of FIXED) {
+      expect(value(w, key).text()).toBe("—");
+      expect(value(w, key).classes()).toContain("text-text-muted");
+    }
+    expect(w.text()).not.toContain("secret internal");
+  });
+
+  it("links each row to its list page", async () => {
+    const w = mountHealth();
+    for (const key of FIXED) await row(w, key).trigger("click");
+    expect(w.emitted("open")).toEqual([
+      ["streams"],
+      ["failing"],
+      ["pipelines"],
+      ["delivery"],
+      ["streams"],
+      ["streams"],
+    ]);
+  });
+
+  it("shows a dash for compaction when the count is unknown", () => {
+    const w = mountHealth(buildOverview({ streams: streamsWith({ compaction_pending: null }) }));
+    expect(value(w, "compaction").text()).toBe("—");
+  });
+
+  it("shows a skeleton while loading, an error with retry, and no access", async () => {
+    const loading = mountHealth(null as never, { pending: true });
+    expect(loading.find('[data-test="overview-data-health-loading"]').exists()).toBe(true);
+    const failed = mountHealth(null as never, { failed: true });
+    expect(failed.find('[data-test="overview-data-health-error"]').exists()).toBe(true);
+    await failed.get('[data-test="overview-data-health-retry-btn"]').trigger("click");
+    expect(failed.emitted("retry")).toHaveLength(1);
+  });
+});
+
 describe("OverviewTopStreamsCard", () => {
   const mountTop = (props: Record<string, unknown> = {}) =>
     mount(OverviewTopStreamsCard, { props: { ...base, section: o.streams, ...props }, global });
@@ -158,18 +651,15 @@ describe("OverviewTopStreamsCard", () => {
       .map((r) => r.attributes("data-test")!)
       .filter((id) => !/-(share|bar|size)-/.test(id) && id !== "overview-streams-top");
 
-  it("keeps each stream on one row with its type and share beside the name", () => {
-    const w = mountTop();
-    const share = w.get('[data-test="overview-streams-top-share-logs-app_logs"]');
-    expect(
-      share.element.closest('[data-test="overview-streams-top-logs-app_logs"]'),
-    ).not.toBeNull();
-    expect(share.element.parentElement!.classList.contains("items-baseline")).toBe(true);
+  it("keeps the default row padding, which the lower cards tighten", () => {
+    expect(mountTop().find('[data-test^="overview-streams-top-"] span.py-0\\.5').exists()).toBe(
+      true,
+    );
   });
 
   it("is titled by data size, says whose streams, and links to all streams", () => {
     const w = mountTop();
-    expect(w.get("h2").text()).toBe("Top streams by data size");
+    expect(w.get("h3").text()).toBe("Top streams by data size");
     expect(w.get('[data-test="overview-streams-subtitle"]').text()).toBe(
       "Largest streams you can access",
     );
@@ -203,12 +693,7 @@ describe("OverviewTopStreamsCard", () => {
       expect.arrayContaining(["h-2.5", "bg-border-default"]),
     );
     expect(w.get('[data-test="overview-streams-top-size-logs-app_logs"]').classes()).toEqual(
-      expect.arrayContaining([
-        "text-text-heading",
-        "text-compact",
-        "font-semibold",
-        "tabular-nums",
-      ]),
+      expect.arrayContaining(["text-text-heading", "text-sm", "font-semibold", "tabular-nums"]),
     );
     expect(segment("metrics-cpu_usage").classes()).toContain("bg-signal-metrics");
   });
@@ -270,7 +755,7 @@ describe("OverviewLimitCard", () => {
 
   it("titles the card by limit and storage and explains the UTC day", () => {
     const w = mountLimit();
-    expect(w.get("h2").text()).toBe("Ingest limit and storage");
+    expect(w.get("h3").text()).toBe("Ingest limit and storage");
     expect(w.get('[data-test="overview-limit-subtitle"]').text()).toBe(
       "Daily limit counts the UTC day, not a rolling 24h",
     );
@@ -301,10 +786,10 @@ describe("OverviewLimitCard", () => {
     else expect(tag.exists()).toBe(false);
   });
 
-  it("states the days over the limit with the real allowed count, without a box", () => {
+  it("boxes the days over the limit with the real allowed count", () => {
     const w = mountLimit();
     const days = w.get('[data-test="overview-limit-days-box"]');
-    expect(days.classes()).not.toContain("border");
+    expect(days.classes()).toEqual(expect.arrayContaining(["border", "rounded-default"]));
     expect(days.text()).toContain("Days over limit this month");
     expect(w.get('[data-test="overview-limit-days-over"]').text()).toBe("1 of 3 allowed");
     expect(w.get('[data-test="overview-limit-block-note"]').text()).toBe(
@@ -405,7 +890,7 @@ describe("OverviewLimitCard", () => {
   it("shows only the data size, titled data size, when the limit is locked", () => {
     const w = mountLimit({ status: "locked", reason: "secret internal reason" });
     expect(w.find('[data-test="overview-storage-card"]').exists()).toBe(true);
-    expect(w.get("h2").text()).toBe("Data size");
+    expect(w.get("h3").text()).toBe("Data size");
     expect(w.find('[data-test="overview-storage-subtitle"]').exists()).toBe(false);
     expect(w.find('[data-test="overview-limit-body"]').exists()).toBe(false);
     expect(w.find('[role="separator"]').exists()).toBe(false);
@@ -417,7 +902,7 @@ describe("OverviewLimitCard", () => {
     config.isCloud = "true";
     try {
       const w = mountLimit();
-      expect(w.get("h2").text()).toBe("Data size");
+      expect(w.get("h3").text()).toBe("Data size");
       expect(w.find('[data-test="overview-limit-body"]').exists()).toBe(false);
       expect(w.get('[data-test="overview-storage-total"]').text()).toBe("2.00 GB");
     } finally {
@@ -460,10 +945,10 @@ describe("OverviewSignalCards", () => {
   const mountSignals = (props: Record<string, unknown> = {}) =>
     mount(OverviewSignalCards, { props: { ...base, section: o.streams, ...props }, global });
 
-  it("always shows logs, metrics and traces as three aligned columns", () => {
+  it("always shows logs, metrics and traces as three aligned cards", () => {
     const w = mountSignals();
     expect(w.get('[data-test="overview-signal-cards"]').classes()).toEqual(
-      expect.arrayContaining(["grid-cols-3", "gap-x-8"]),
+      expect.arrayContaining(["grid-cols-3", "gap-3"]),
     );
     expect(w.findAll('[data-test$="-card"]').map((c) => c.attributes("data-test"))).toEqual([
       "overview-signal-logs-card",
@@ -480,16 +965,16 @@ describe("OverviewSignalCards", () => {
     expect(w.get('[data-test="overview-signal-traces-swatch"]').classes()).toContain(
       "bg-signal-traces",
     );
-    expect(w.get('[data-test="overview-signal-metrics-card"] h2').text()).toBe("Metrics");
+    expect(w.get('[data-test="overview-signal-metrics-card"] h3').text()).toBe("Metrics");
   });
 
   it("lists streams, events and data size as label and value rows", () => {
     const w = mountSignals();
     const stats = w.get('[data-test="overview-signal-logs-stats"]');
-    expect(stats.classes()).toEqual(expect.arrayContaining(["divide-y", "divide-border-subtle"]));
+    expect(stats.findAll("dt")[0].element.parentElement!.classList.contains("border-t")).toBe(true);
     expect(stats.findAll("dt").map((d) => d.text())).toEqual(["Streams", "Events", "Data size"]);
     expect(w.get('[data-test="overview-signal-logs-streams"]').text()).toBe("4");
-    expect(w.get('[data-test="overview-signal-logs-events"]').text()).toBe("1K");
+    expect(w.get('[data-test="overview-signal-logs-events"]').text()).toBe("1000");
     expect(w.get('[data-test="overview-signal-logs-stored"]').text()).toBe("1.50 GB");
     expect(w.get('[data-test="overview-signal-metrics-streams"]').text()).toBe("3");
     expect(w.get('[data-test="overview-signal-metrics-card"]').text()).toContain("Samples");
@@ -543,27 +1028,174 @@ describe("OverviewSignalCards", () => {
 describe("type roles", () => {
   it("uses one style per role across the cards", () => {
     const o2 = buildOverview();
+    const health = mount(OverviewDataHealthCard, { props: { ...base, overview: o2 }, global });
     const top = mount(OverviewTopStreamsCard, { props: { ...base, section: o2.streams }, global });
+    const alerts = mount(OverviewAlertsCard, { props: { ...base, section: o2.alerts }, global });
     const limit = mount(OverviewLimitCard, {
       props: { ...base, limits: o2.limits, streams: o2.streams },
       global,
     });
     const signals = mount(OverviewSignalCards, { props: { ...base, section: o2.streams }, global });
-    for (const w of [top, limit]) {
-      expect(w.get("h2").classes()).toEqual(expect.arrayContaining(["text-sm", "font-semibold"]));
+    for (const w of [health, top, alerts, limit]) {
+      expect(w.get("h3").classes()).toEqual(expect.arrayContaining(["text-sm", "font-semibold"]));
     }
-    const valueClasses = ["text-compact", "font-semibold", "tabular-nums"];
+    const valueClasses = ["text-sm", "font-semibold", "tabular-nums"];
     expect(top.get('[data-test="overview-streams-top-size-logs-app_logs"]').classes()).toEqual(
       expect.arrayContaining(valueClasses),
     );
     expect(limit.get('[data-test="overview-storage-total"]').classes()).toEqual(
-      expect.arrayContaining(["text-sm", "font-semibold", "tabular-nums"]),
+      expect.arrayContaining(valueClasses),
     );
     expect(signals.get('[data-test="overview-signal-logs-streams"]').classes()).toEqual(
       expect.arrayContaining(valueClasses),
     );
-    const labels = [...signals.findAll("dt"), ...limit.findAll(".text-text-label")];
+    expect(health.get('[data-test="overview-data-health-value-quiet"]').classes()).toEqual(
+      expect.arrayContaining(valueClasses),
+    );
+    const labels = [
+      ...signals.findAll("dt"),
+      ...limit.findAll(".text-text-label"),
+      ...alerts.findAll('[data-test="overview-alerts-boxes"] .text-text-label'),
+    ];
     expect(labels.length).toBeGreaterThan(5);
     for (const label of labels) expect(label.classes()).toContain("text-xs");
+  });
+});
+
+describe("Ask AI on the overview cards", () => {
+  let zo: Record<string, unknown>;
+  let flag: string;
+  const aiGlobal = { plugins: [i18n, store] };
+  const ask = (w: ReturnType<typeof mount>, id: string) =>
+    w.find(`[data-test="overview-ask-ai-${id}"]`);
+
+  beforeEach(() => {
+    zo = { ...store.state.zoConfig };
+    flag = config.isEnterprise;
+    config.isEnterprise = "true";
+    store.commit("setConfig", { ...zo, ai_enabled: true, features: { ai_assistant: "enabled" } });
+  });
+  afterEach(() => {
+    config.isEnterprise = flag;
+    store.commit("setConfig", zo);
+  });
+
+  describe("OverviewAlertsCard", () => {
+    const mountAlerts = (props: Record<string, unknown> = {}) =>
+      mount(OverviewAlertsCard, {
+        props: { ...base, section: o.alerts, incidentsState: "ok", incidentsTotal: 6, ...props },
+        global: aiGlobal,
+      });
+
+    it("offers Ask AI on each count box above zero, as a sibling of the box button", async () => {
+      const w = mountAlerts();
+      for (const key of ["critical", "warning", "incidents", "failing"])
+        expect(ask(w, `box-${key}`).exists(), key).toBe(true);
+      const btn = ask(w, "box-critical");
+      expect(btn.element.closest('[data-test="overview-alerts-box-critical"]')).toBeNull();
+      await btn.trigger("click");
+      expect(w.emitted("askAi")).toEqual([
+        [{ kind: "count", topic: "critical", count: 2, level: "critical" }],
+      ]);
+      expect(w.emitted("select")).toBeUndefined();
+    });
+
+    it("names the box in the label and omits the level where it means nothing", async () => {
+      const w = mountAlerts();
+      expect(ask(w, "box-critical").attributes("aria-label")).toBe("Ask AI about Critical level");
+      await ask(w, "box-incidents").trigger("click");
+      expect(w.emitted("askAi")).toEqual([[{ kind: "count", topic: "incidents", count: 6 }]]);
+    });
+
+    it("sends the failing box without a level", async () => {
+      const w = mountAlerts();
+      await ask(w, "box-failing").trigger("click");
+      expect(w.emitted("askAi")![0][0]).not.toHaveProperty("level");
+    });
+
+    it("reserves end padding on the box label for the Ask AI icon", () => {
+      const label = mountAlerts().get('[data-test="overview-alerts-box-critical"]').findAll("span");
+      expect(label.some((n) => n.classes().includes("pe-6"))).toBe(true);
+    });
+
+    it("leaves a zero box without the button", () => {
+      const w = mountAlerts({ section: alertsWith({ failed_evaluation: 0 }), incidentsTotal: 0 });
+      expect(ask(w, "box-failing").exists()).toBe(false);
+      expect(ask(w, "box-incidents").exists()).toBe(false);
+      expect(ask(w, "box-critical").exists()).toBe(true);
+    });
+
+    it("offers Ask AI on each firing alert row with the alert target", async () => {
+      const w = mountAlerts();
+      const btn = ask(w, "alert-high_cpu");
+      expect(btn.exists()).toBe(true);
+      expect(btn.element.closest('[data-test="overview-alerts-firing-high_cpu"]')).toBeNull();
+      await btn.trigger("click");
+      expect(btn.attributes("aria-label")).toBe("Ask AI about high_cpu");
+      expect(w.emitted("askAi")![0][0]).toEqual({
+        kind: "alert",
+        alert: o.alerts.data!.firing[0],
+      });
+    });
+
+    it("shows no button when AI is disabled", () => {
+      store.commit("setConfig", { ...zo, ai_enabled: false, features: {} });
+      expect(ask(mountAlerts(), "box-critical").exists()).toBe(false);
+      expect(ask(mountAlerts(), "alert-high_cpu").exists()).toBe(false);
+    });
+
+    it.each([
+      ["locked", { lockedReason: raw("Upgrade") }],
+      ["failed", { failed: true }],
+      ["loading", { pending: true }],
+      ["forbidden", { forbidden: true, section: { status: "forbidden" } }],
+    ])("shows no button while the section is %s", (_name, props) => {
+      const w = mountAlerts(props);
+      expect(w.find('[data-test^="overview-ask-ai-"]').exists()).toBe(false);
+    });
+  });
+
+  describe("OverviewDataHealthCard", () => {
+    const mountHealth = (overview = o, props: Record<string, unknown> = {}) =>
+      mount(OverviewDataHealthCard, { props: { ...base, overview, ...props }, global: aiGlobal });
+
+    it("offers Ask AI on a row in a problem state, beside the row button", async () => {
+      const w = mountHealth();
+      const btn = ask(w, "health-pipelines");
+      expect(btn.exists()).toBe(true);
+      expect(btn.element.closest('[data-test="overview-data-health-row-pipelines"]')).toBeNull();
+      await btn.trigger("click");
+      expect(w.emitted("askAi")).toEqual([[{ kind: "count", topic: "pipelines", count: 2 }]]);
+      expect(btn.attributes("aria-label")).toContain("Ask AI about ");
+      expect(w.emitted("open")).toBeUndefined();
+    });
+
+    it("sends the failing row without a level", async () => {
+      const w = mountHealth();
+      await ask(w, "health-failing").trigger("click");
+      expect(w.emitted("askAi")![0][0]).not.toHaveProperty("level");
+    });
+
+    it("skips healthy, informational and not-set-up rows", () => {
+      const w = mountHealth();
+      expect(ask(w, "health-delivery").exists()).toBe(false);
+      expect(ask(w, "health-schema").exists()).toBe(false);
+      expect(ask(w, "health-compaction").exists()).toBe(false);
+      expect(ask(w, "health-quiet").exists()).toBe(true);
+      const off = mountHealth(
+        buildOverview({ alerts: okSection({ ...o.alerts.data!, enabled: 0 }) }),
+      );
+      expect(ask(off, "health-failing").exists()).toBe(false);
+    });
+
+    it("shows none when AI is disabled or the overview failed", () => {
+      expect(
+        mountHealth(o, { failed: true, overview: null })
+          .find('[data-test^="overview-ask-ai-"]')
+          .exists(),
+      ).toBe(false);
+      store.commit("setConfig", { ...zo, ai_enabled: false, features: {} });
+      expect(ask(mountHealth(), "health-pipelines").exists()).toBe(false);
+    });
   });
 });

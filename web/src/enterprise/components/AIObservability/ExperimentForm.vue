@@ -30,7 +30,7 @@
     >
       <div class="flex min-h-0 flex-1 gap-0 overflow-hidden max-[68.75rem]:flex-col">
         <div
-          class="px-page-edge flex min-h-0 min-w-0 flex-[6.5] flex-col gap-3 overflow-auto py-3 max-[68.75rem]:flex-[1_1_auto]"
+          class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 max-[68.75rem]:flex-[1_1_auto]"
         >
           <!-- Identity — what this run IS: its name, what it measures, and the
              dataset it is pinned to. The dataset lives here because nothing
@@ -41,11 +41,12 @@
             data-test="ai-experiment-form-identity-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.experiments.form.identitySection") }}
               </span>
             </div>
-            <div class="flex flex-col gap-4 px-4 py-3.5">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
               <OFormInput
                 name="name"
                 :label="t('aiObservability.experiments.form.nameLabel')"
@@ -125,6 +126,7 @@
             data-test="ai-experiment-form-task-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.experiments.form.tabTask") }}
               </span>
@@ -479,6 +481,7 @@
             data-test="ai-experiment-form-scorers-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.experiments.scorers") }}
               </span>

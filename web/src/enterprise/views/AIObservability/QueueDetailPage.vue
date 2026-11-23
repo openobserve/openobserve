@@ -104,12 +104,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @row-click="startReviewing"
       >
         <template #toolbar-trailing>
-          <ORefreshButton
-            :last-run-at="loadedAt"
+          <OButton
+            icon-only
+            variant="secondary"
+            icon="refresh"
             :loading="loading"
             data-test="ai-queue-detail-refresh-btn"
             @click="refresh"
-          />
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" />
+          </OButton>
         </template>
 
         <template #toolbar>
@@ -134,14 +138,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <OEmptyState
-            :kind="Boolean(search) || statusFilters.length > 0 ? 'filtered' : 'first-run'"
-            :icon="Boolean(search) || statusFilters.length > 0 ? undefined : 'task-alt'"
-            :title="t('aiObservability.queues.detail.emptyTitle')"
-            :text="t('aiObservability.queues.detail.emptyBody')"
-            data-test="ai-queue-detail-empty-state"
-            @action="clearFilters"
-          />
+          <div class="flex items-center justify-center py-8">
+            <OEmptyState
+              :kind="Boolean(search) || statusFilters.length > 0 ? 'filtered' : 'first-run'"
+              :icon="Boolean(search) || statusFilters.length > 0 ? undefined : 'task-alt'"
+              :title="t('aiObservability.queues.detail.emptyTitle')"
+              :text="t('aiObservability.queues.detail.emptyBody')"
+              data-test="ai-queue-detail-empty-state"
+              @action="clearFilters"
+            />
+          </div>
         </template>
 
         <template #cell-refType="{ row }">
@@ -200,12 +206,12 @@ import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -238,7 +244,6 @@ const queueId = computed<string>(() => String(route.params.id ?? ""));
 const queue = ref<LlmQueue | null>(null);
 const items = ref<LlmQueueItem[]>([]);
 const loading = ref(false);
-const loadedAt = ref<number | null>(null);
 const search = ref("");
 const statusFilters = ref<LlmQueueItemStatus[]>([]);
 
@@ -363,7 +368,6 @@ async function refresh() {
     ]);
     queue.value = queueRow;
     items.value = queueItems;
-    loadedAt.value = Date.now();
   } catch {
     toast({ variant: "error", message: t("aiObservability.queues.detail.loadError") });
   } finally {

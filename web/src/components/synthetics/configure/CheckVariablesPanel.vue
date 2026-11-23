@@ -358,7 +358,7 @@ function onPromoted(name: string) {
     <div class="border-border-default shrink-0 border-b px-3">
       <div class="mb-3 flex h-8.5 items-center gap-2">
         <OIcon name="data-object" size="sm" class="text-text-secondary" aria-hidden="true" />
-        <h3 class="text-text-heading m-0 text-sm font-semibold">
+        <h3 class="text-text-heading m-0 text-base font-semibold">
           {{ t("synthetics.variablesPanel.title") }}
         </h3>
         <OBadge tone="neutral" size="sm" data-test="synthetics-check-variables-panel-count">{{
@@ -428,7 +428,7 @@ function onPromoted(name: string) {
           <OButton
             icon-only
             icon="add"
-            variant="ghost"
+            variant="secondary"
             size="xs"
             class="ms-auto"
             :aria-label="t('synthetics.authNetwork.addVariable')"

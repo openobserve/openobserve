@@ -13,19 +13,40 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
-<!-- `plain` is an unboxed title over its rows, so a section never outweighs the page title (T1, T2).
-     `accent` keeps the bordered card the Add alert steps share. -->
+<!--
+  One titled section of a long form — the bordered card with an accent-marked
+  header that the Add Alert page established.
+
+  It exists because that shape was hand-assembled from the same six utility
+  classes in five different places (`AddAlert.vue`, and `steps/QueryConfig`,
+  `CompareWithPast`, `Deduplication`, `Advanced`, `AlertSettings`), which is
+  five chances for one of them to drift. The accent bar's width, the header's
+  padding and the body's padding are decisions that should be made once.
+
+  The card is `bg-surface-overlay` (white) with a border, NOT `bg-card-bg`:
+  a form section has to read as a container sitting ON the page. `bg-card-bg`
+  resolves to `--color-grey-50`, close enough to the page behind it that the
+  section boundary disappears and the fields run together — which is exactly
+  what the borderless version looked like.
+
+  Use it for any multi-section form. For a page's own content inset use
+  `OContent`; this is a container, not an inset.
+-->
 <template>
-  <section v-if="isPlain" class="flex flex-col" :data-test="dataTest">
+  <div
+    v-if="isPlain"
+    class="rounded-surface bg-surface-overlay border"
+    :class="isDanger ? 'border-button-ghost-destructive-text' : 'border-border-default'"
+    :data-test="dataTest"
+  >
     <div
-      class="flex items-center gap-3 border-b pb-2"
-      :class="isDanger ? 'border-button-ghost-destructive-text' : 'border-border-default'"
+      class="rounded-t-surface bg-surface-subtle border-border-default flex items-center gap-3 border-b px-4 py-3"
     >
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2">
           <OIcon v-if="isDanger" name="warning" size="sm" class="text-status-error-text shrink-0" />
           <h2
-            class="text-sm font-semibold"
+            class="text-base font-semibold"
             :class="isDanger ? 'text-status-error-text' : 'text-text-heading'"
           >
             {{ title }}<span v-if="required" class="text-text-body"> *</span>
@@ -54,13 +75,11 @@
         <slot name="actions" />
       </div>
     </div>
-    <!-- Row rules are a step lighter than the heading's, so the section edge stays the stronger line. -->
-    <div
-      class="[&_[data-o-setting-row]]:border-border-subtle pt-3 has-[[data-o-setting-row]]:pt-0 [&_[data-o-setting-row]]:px-0"
-    >
+    <!-- Rows carry the inset so their rules reach the card edge; other content keeps the body's. -->
+    <div class="px-4 py-3 has-[[data-o-setting-row]]:p-0 [&_[data-o-setting-row]]:px-4">
       <slot />
     </div>
-  </section>
+  </div>
   <div
     v-else
     class="rounded-default bg-surface-overlay border-border-default border"
@@ -68,7 +87,10 @@
   >
     <div class="border-border-default border-b px-3 py-2.5">
       <div class="flex items-center gap-2">
-        <span class="text-text-heading text-sm font-semibold">
+        <!-- The accent bar. A 3px rule rather than an icon: it marks the header
+             as a section boundary without competing with the controls below. -->
+        <div class="rounded-default bg-theme-accent h-4 w-0.75 shrink-0" />
+        <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
           {{ title }}<span v-if="required" class="text-text-body"> *</span>
         </span>
         <span
@@ -88,7 +110,7 @@
       </div>
       <p
         v-if="description || $slots.description"
-        class="text-text-secondary text-compact mt-0.5"
+        class="text-text-secondary mt-0.5 text-xs"
         :data-test="dataTest ? `${dataTest}-description` : undefined"
       >
         <slot name="description">{{ description }}</slot>
@@ -114,7 +136,7 @@ const props = withDefaults(
     info?: I18nText;
     /** Appends the required marker to the heading. */
     required?: boolean;
-    /** `plain` is an unboxed `h2` over a hairline, with setting rows aligned to the heading. */
+    /** `plain` puts an `h2` heading in a header band and lets setting rows run edge to edge. */
     variant?: "accent" | "plain";
     /** One line under the heading. */
     description?: I18nText;

@@ -435,38 +435,6 @@ describe("Dashboards.vue", () => {
       await nextTick();
       expect(table().vm.$attrs["loading-reset-key"]).toBe("folder2");
     });
-
-    it("keeps an all-folders search when the folder comes from the URL, and drops it on a click", async () => {
-      // The list's URL sync only runs on a named route.
-      router = createRouter({
-        history: createWebHistory(),
-        routes: [
-          { path: "/dashboards", name: "dashboards", component: { template: "<div>D</div>" } },
-        ],
-      });
-      resetListViewState();
-      await router.push({
-        path: "/dashboards",
-        query: { folder: "default", "v.search": "cpu", "v.all": "true" },
-      });
-      wrapper = shallowMount(Dashboards, { global: buildGlobalConfig(store, router, i18n) });
-      await flushPromises();
-      expect(wrapper.vm.searchAcrossFolders).toBe(true);
-
-      await router.push({
-        path: "/dashboards",
-        query: { folder: "folder1", "v.search": "cpu", "v.all": "true" },
-      });
-      wrapper.vm.updateActiveFolderId("folder1");
-      await flushPromises();
-      expect(wrapper.vm.searchAcrossFolders).toBe(true);
-      expect(wrapper.vm.searchQuery).toBe("cpu");
-      expect(wrapper.vm.filterQuery).toBe("");
-
-      wrapper.vm.updateActiveFolderId("folder2");
-      await flushPromises();
-      expect(wrapper.vm.searchAcrossFolders).toBe(false);
-    });
   });
 
   // T1.3 (design 4.3/§6): template cards render only on the true "new org" empty state.

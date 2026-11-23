@@ -28,11 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :text="notice.description"
       class="flex-1"
     >
-      <template v-if="notice.retry || action" #actions>
+      <template v-if="notice.retry || (notice.details && detail) || action" #actions>
         <OButton
           v-if="notice.retry"
           variant="secondary"
-          :size="buttonSize"
+          icon="refresh"
           :loading="busy"
           :data-test="retryTest"
           @click="emit('retry')"
@@ -40,19 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("autoobserveLive.retry") }}
         </OButton>
         <OButton
-          v-else-if="action"
-          variant="secondary"
-          :size="buttonSize"
-          :data-test="`${dataTest}-action`"
-          @click="emit('action')"
-        >
-          {{ action }}
-        </OButton>
-      </template>
-      <template v-if="notice.details && detail" #extra>
-        <OButton
-          variant="link"
-          size="sm"
+          v-if="notice.details && detail"
+          variant="ghost"
           :icon-end="showDetail ? 'expand-less' : 'expand-more'"
           :aria-expanded="showDetail"
           :data-test="`${dataTest}-details`"
@@ -60,11 +49,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("autoobserveLive.notice.details") }}
         </OButton>
-        <OText
-          v-if="showDetail"
-          variant="mono"
-          class="text-text-secondary max-w-xl text-xs wrap-break-word"
+        <OButton
+          v-if="action"
+          variant="accent-ghost"
+          icon-end="arrow-forward"
+          :data-test="`${dataTest}-action`"
+          @click="emit('action')"
         >
+          {{ action }}
+        </OButton>
+      </template>
+      <template v-if="showDetail && detail" #extra>
+        <OText variant="mono" class="text-text-secondary max-w-xl text-xs break-words">
           {{ detail }}
         </OText>
       </template>
@@ -96,7 +92,6 @@ const emit = defineEmits<{ retry: []; action: [] }>();
 const { t } = useI18nTyped();
 
 const showDetail = ref(false);
-const buttonSize = computed(() => (props.size === "compact" ? "sm" : undefined));
 
 // A denial is the only error notice drawn with the lock, and it is not a failed load (K5).
 const kind = computed<EmptyStateKind>(() => {

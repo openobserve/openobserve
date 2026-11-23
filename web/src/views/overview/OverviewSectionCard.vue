@@ -13,10 +13,13 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <section class="flex min-w-0 flex-col gap-2" :data-test="`overview-${section}-card`">
-    <div class="flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+  <section
+    class="bg-surface-panel border-border-default rounded-surface flex min-w-0 flex-col border"
+    :data-test="`overview-${section}-card`"
+  >
+    <div class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 p-3">
       <slot name="lead" />
-      <OText variant="card-title" as="h2" class="min-w-0">{{ title }}</OText>
+      <OText variant="card-title" class="min-w-0">{{ title }}</OText>
       <OText
         v-if="subtitle"
         variant="meta"
@@ -24,12 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`overview-${section}-subtitle`"
         >{{ subtitle }}</OText
       >
-      <!-- the negative end margin puts the link's text on the column edge the row values end on -->
       <OButton
         v-if="linkLabel && (view === 'ok' || view === 'empty')"
         variant="accent-ghost"
-        size="sm"
-        class="ms-auto -me-2.5 shrink-0"
+        class="ms-auto shrink-0"
         :aria-label="linkAriaLabel"
         :data-test="`overview-${section}-view-all`"
         @click="emit('viewAll')"
@@ -37,9 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
     </div>
     <div class="flex min-h-0 flex-1 flex-col">
-      <slot v-if="view === 'empty'" name="empty" />
+      <!-- a card stretched beside a taller one centres its one-line empty message instead of leaving a gap under it -->
+      <div v-if="view === 'empty'" class="flex flex-1 flex-col justify-center px-3 pb-3">
+        <slot name="empty" />
+      </div>
       <slot v-else-if="view === 'ok'" />
-      <div v-else>
+      <div v-else class="px-3 pb-3">
         <OverviewSectionState
           :section="section"
           :view="view"

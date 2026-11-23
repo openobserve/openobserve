@@ -1,7 +1,7 @@
 /**
  * Dashboard Refresh Without Cache
  *
- * Verifies the two "Refresh cache & reload" entry points (dashboard-level and
+ * Verifies the two "Refresh Cache & Reload" entry points (dashboard-level and
  * panel-level) actually fire a `_search_stream` request whose URL carries
  * `clear_cache=true`, and that the standard Refresh path does NOT regress into
  * bypassing the cache. The flag flows `refreshData(true)` / `onRefreshPanel(true)`

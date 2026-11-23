@@ -15,23 +15,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OEmptyState
-    kind="error"
-    role="alert"
-    :title="t('alerts.incidents.rcaRun.reportLoadFailedTitle')"
-    data-test="rca-report-load-failed"
-  >
+  <OInlineNotice data-test="rca-report-load-failed" class="max-w-215" tone="err">
+    <p class="text-banner-error-soft-text m-0 text-sm font-semibold">
+      {{ t("alerts.incidents.rcaRun.reportLoadFailedTitle") }}
+    </p>
     <template #actions>
-      <OButton data-test="rca-report-retry-btn" variant="secondary" @click="emit('retry')">
+      <OButton
+        data-test="rca-report-retry-btn"
+        variant="secondary"
+        icon="refresh"
+        @click="emit('retry')"
+      >
         {{ t("common.retry") }}
       </OButton>
     </template>
-  </OEmptyState>
+  </OInlineNotice>
 </template>
 
 <script setup lang="ts">
 import OButton from "@/lib/core/Button/OButton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 const emit = defineEmits<{ retry: [] }>();

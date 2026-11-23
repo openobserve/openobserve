@@ -16,7 +16,7 @@ const {
 // mocked (deterministic readiness / bulk counts / states); install hits the
 // real alert API and is verified by reading the created alert back. Selectors
 // and element assertions live in alertLibraryPage — never inline here.
-test.describe('Alert library', () => {
+test.describe('Alert Library', () => {
   let pm;
   let lib;
   let readyStream;

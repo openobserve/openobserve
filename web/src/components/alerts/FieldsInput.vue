@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          injected form (pushFieldValue/removeFieldValue). No v-model, no manual
          error refs — the consuming form's schema owns validation (Rule ②). -->
     <template v-if="formMode">
-      <div data-test="alert-conditions-text" class="font-semibold">
+      <div data-test="alert-conditions-text" class="font-bold">
         {{ t("alerts.filters.conditions") + " *" }} {{ t("alerts.filters.conditionsHint") }}
       </div>
       <template v-if="!formRows.length">
@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="secondary"
           class="mt-2"
           @click="addFormRow"
+          icon="add"
         >
           {{ t("alerts.addCondition") }}
         </OButton>
@@ -108,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          Consumed bare by functions/logstream/pipeline forms; a legitimate
          permanent pattern (see START-HERE 🔀). Do NOT delete. -->
     <template v-else>
-      <div data-test="alert-conditions-text" class="font-semibold">
+      <div data-test="alert-conditions-text" class="font-bold">
         {{ t("alerts.filters.conditions") + " *" }} {{ t("alerts.filters.conditionsHint") }}
       </div>
       <template v-if="!fields.length">
@@ -117,6 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="secondary"
           class="mt-2"
           @click="addApiHeader"
+          icon="add"
         >
           {{ t("alerts.addCondition") }}
         </OButton>

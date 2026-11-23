@@ -497,14 +497,14 @@ describe("HostDetailDrawer", () => {
   // ── Non-ready faces, sized for a drawer tab (§7.3) ─────────────────────────
 
   describe("non-ready faces", () => {
-    it("`unknown` renders a skeleton in the METRICS TAB BODY only", async () => {
+    it("`unknown` renders an inline spinner in the METRICS TAB BODY only", async () => {
       let release!: (v: any) => void;
       getStreamsMock.mockImplementation(() => new Promise((resolve) => (release = resolve)));
       wrapper = await mountDrawer();
-      expect(wrapper.find('[data-test="host-drawer-metrics-loading"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="host-drawer-metrics-spinner"]').exists()).toBe(true);
       release({ name: "metrics", schema: false, list: HOST_STREAMS.map((n) => streamEntry(n)) });
       await flushPromises();
-      expect(wrapper.find('[data-test="host-drawer-metrics-loading"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="host-drawer-metrics-spinner"]').exists()).toBe(false);
     });
 
     it("a lists failure renders an inline Retry that fires refresh({force:true})", async () => {

@@ -131,7 +131,7 @@ describe("Source Details correlation header", () => {
       expect(
         document.body.querySelectorAll('[data-test="svcver-correlation-header"]'),
       ).toHaveLength(1);
-      expect($("svcver-service-name")?.textContent).toContain("Correlated streams - ingester");
+      expect($("svcver-service-name")?.textContent).toContain("Correlated Streams - ingester");
       expect($("svcver-service-name-detected")?.textContent).toBe(
         "detected as c1-openobserve-ingester",
       );
@@ -195,7 +195,7 @@ describe("Source Details correlation header", () => {
   it("keeps the title and hides the chips on a 403", async () => {
     serve(() => Promise.reject({ isAxiosError: true, response: { status: 403 } }));
     await render();
-    expect($("svcver-service-name")?.textContent).toContain("Correlated streams - ingester");
+    expect($("svcver-service-name")?.textContent).toContain("Correlated Streams - ingester");
     expect($("svcver-correlation-env-chip")).toBe(null);
     expect($("svcver-correlation-rollout-verdict")).toBe(null);
   });

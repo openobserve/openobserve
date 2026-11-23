@@ -488,7 +488,7 @@ describe("AlertCalibrationFindingCard", () => {
     expect(quiet.findAll("dt").map((dt) => dt.text())).toEqual(["Stream", "Last data", "Checked"]);
     expect(quiet.find('[data-test="alert-calibration-finding-tier"]').text()).toBe("Investigate");
     expect(quiet.find('[data-test="alert-calibration-finding-action-review_source"]').text()).toBe(
-      "Open in logs",
+      "Open in Logs",
     );
     expect(quiet.find('[data-test="alert-calibration-finding-limitations"]').text()).toContain(
       "A quiet source can be a batch or cron job that is idle by design.",

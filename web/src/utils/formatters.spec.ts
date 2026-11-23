@@ -327,9 +327,8 @@ describe("formatLargeNumber", () => {
 // ---------------------------------------------------------------------------
 
 describe("formatEventCount", () => {
-  it("prints the same string as every other count: exact below 1 000, then compact", () => {
-    expect(formatEventCount(999)).toBe("999");
-    expect(formatEventCount(98_213)).toBe("98.2K");
+  it("prints counts below 100 000 exactly", () => {
+    expect(formatEventCount(99_999)).toBe("99999");
   });
 
   it("formats larger counts with one decimal and drops a trailing .0", () => {

@@ -37,12 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-analytics-event-editor-load-error"
         @action="retry"
       />
-      <div
-        v-else-if="!formReady"
-        class="mx-auto flex w-full max-w-4xl flex-col gap-4 px-6 py-5 max-md:px-4"
-        data-test="rum-analytics-event-editor-loading"
-      >
-        <OSkeleton v-for="row in 5" :key="row" class="h-control-md" />
+      <div v-else-if="!formReady" class="flex h-full items-center justify-center">
+        <OSpinner size="lg" />
       </div>
       <template v-else>
         <div class="min-h-0 flex-1 overflow-auto">
@@ -169,7 +165,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";

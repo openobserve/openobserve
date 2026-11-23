@@ -26,9 +26,12 @@
           class="flex-none"
           data-test="eval-job-detail-window"
         />
-        <ORefreshButton
-          :last-run-at="lastRunAt"
+        <OButton
+          icon-only
+          variant="secondary"
+          icon="refresh"
           :loading="isLoadingKpis || isLoadingRuns"
+          :title="t('onlineEvals.job.detail.refresh')"
           data-test="eval-job-detail-refresh"
           @click="refreshAll"
         />
@@ -55,7 +58,7 @@
             {{ card.label }}
           </div>
           <div class="flex items-baseline gap-[0.2rem]">
-            <span class="text-text-secondary text-2xl leading-none font-semibold">
+            <span class="text-text-secondary text-2xl leading-none font-bold">
               {{ card.value }}
             </span>
             <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
@@ -189,7 +192,7 @@
             </h4>
             <OEmptyState
               v-if="resolvedScorers.length === 0"
-              size="compact"
+              size="inline"
               :title="t('onlineEvals.job.detail.scorersEmpty')"
               data-test="eval-job-detail-scorers-empty"
             />
@@ -237,7 +240,7 @@
                   </span>
                   <div class="flex min-w-0 flex-1 flex-col gap-1.25">
                     <div class="flex flex-wrap items-center gap-2">
-                      <span class="text-text-heading text-sm font-semibold">{{ item.name }}</span>
+                      <span class="text-text-heading text-sm font-bold">{{ item.name }}</span>
                       <OTag
                         v-if="item.scorerTypeLabel"
                         type="scorerType"
@@ -259,7 +262,7 @@
                       <span class="font-medium">
                         {{ t("onlineEvals.job.detail.producesPrefix") }}
                       </span>
-                      <span class="text-text-body font-semibold">{{ item.scoreConfigName }}</span>
+                      <span class="text-text-body font-bold">{{ item.scoreConfigName }}</span>
                       <template v-if="item.scoreConfigDataType">
                         <span class="text-text-secondary opacity-50">·</span>
                         <span class="text-text-secondary">
@@ -502,8 +505,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
-import { useLoadedAt } from "@/composables/useLoadedAt";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -886,7 +888,6 @@ function openEvaluationRun(run: JobRunRow) {
 }
 
 const refreshToken = ref(0);
-const lastRunAt = useLoadedAt(() => isLoadingKpis.value || isLoadingRuns.value);
 
 async function refreshAll() {
   syncDateWindow();

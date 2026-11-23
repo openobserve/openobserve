@@ -235,10 +235,11 @@ onMounted(() =>
             'rounded-default w-full border ps-3 pe-3',
             'bg-input-bg text-input-text',
             'placeholder:text-input-placeholder',
-            'transition-[border-color,box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none',
+            'transition-[border-color,box-shadow] duration-150 outline-none',
             hasError
-              ? 'border-input-border-error focus:ring-control-error-halo focus:ring-3'
-              : 'border-input-border hover:border-input-border-hover focus:border-control-border-focus focus:ring-control-focus-halo focus:ring-3',
+              ? 'border-input-border-error'
+              : 'border-input-border hover:border-input-border-hover',
+            'focus:border-input-border-focus focus:ring-input-focus-ring focus:ring-2',
             'disabled:bg-input-disabled-bg disabled:text-input-disabled-text disabled:cursor-not-allowed',
             heightClass,
           ]"
@@ -256,9 +257,12 @@ onMounted(() =>
             'z-10001 w-(--reka-combobox-trigger-width) max-w-(--reka-combobox-trigger-width) min-w-(--reka-combobox-trigger-width)',
             'max-h-60 overflow-hidden',
             'max-lg:max-h-[var(--reka-popper-available-height,15rem)]',
-            'rounded-default shadow-overlay border-border-default border',
+            'rounded-default shadow-overlay border border-transparent',
             'bg-select-content-bg',
             'p-1',
+            // Clip-path reveal: unveiled at full size from its trigger edge (no
+            // scale/squish). Wipes down by default; top-placed wipes up. Soft
+            // ease-out-expo in, quick wipe out.
             'data-[state=open]:animate-[o2-reveal-down-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
             'data-[state=closed]:animate-[o2-reveal-down-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
             'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
@@ -327,13 +331,13 @@ onMounted(() =>
     <!-- Error message -->
     <span
       v-if="effectiveError && effectiveError.trim()"
-      class="text-input-error-text text-xs leading-4"
+      class="text-input-error-text text-xs leading-snug"
       role="alert"
     >
       {{ effectiveError }}
     </span>
     <!-- Help text -->
-    <span v-else-if="helpText" class="text-input-help-text text-xs leading-4">
+    <span v-else-if="helpText" class="text-input-help-text text-xs leading-snug">
       {{ helpText }}
     </span>
   </div>

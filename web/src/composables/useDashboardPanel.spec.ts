@@ -416,7 +416,7 @@ describe("useDashboardPanel", () => {
 
     it("should return correct labels for different chart types", () => {
       panel.dashboardPanelData.data.type = "table";
-      expect(panel.currentXLabel.value).toBe("First column");
+      expect(panel.currentXLabel.value).toBe("First Column");
 
       panel.dashboardPanelData.data.type = "h-bar";
       expect(panel.currentXLabel.value).toBe("Y-Axis");
@@ -3350,7 +3350,7 @@ describe("useDashboardPanel", () => {
     it("should test generateLabelFromName function with various inputs", () => {
       const testCases = [
         { input: "test_field", expected: "Test Field" },
-        { input: "field-name", expected: "Field name" },
+        { input: "field-name", expected: "Field Name" },
         { input: "simpleField", expected: "Simple Field" },
       ];
 

@@ -133,11 +133,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #empty>
-              <OEmptyState
-                v-if="!addFunctionInProgress"
-                icon="functions"
-                :title="t('logStream.noFunctionsFound')"
-              />
+              <div v-if="!addFunctionInProgress" class="w-full text-center">
+                {{ t("logStream.noFunctionsFound") }}
+              </div>
             </template>
           </OTable>
         </div>
@@ -175,7 +173,6 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -193,7 +190,6 @@ export default defineComponent({
     OSelect,
     OSearchInput,
     OTable,
-    OEmptyState,
   },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {

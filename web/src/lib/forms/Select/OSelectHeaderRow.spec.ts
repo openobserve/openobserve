@@ -16,7 +16,7 @@ describe("OSelectHeaderRow", () => {
     wrapper = mount(OSelectHeaderRow, {
       props: { label: raw("Internal streams"), count: raw("3 hidden") },
     });
-    expect(wrapper.find(".font-semibold").text()).toBe("Internal streams");
+    expect(wrapper.find(".font-bold").text()).toBe("Internal streams");
     expect(wrapper.text()).toContain("3 hidden");
     const hidden = wrapper.findAll('[aria-hidden="true"]').map((el) => el.text());
     expect(hidden).toContain("·");

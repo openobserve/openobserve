@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OEmptyState
             v-if="!versionsLoading && !versions.length"
-            size="compact"
+            size="inline"
             :title="t('aiObservability.datasets.detail.itemDetail.versionsEmpty')"
             data-test="ai-dataset-item-detail-versions-empty"
           />
@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`ai-dataset-item-detail-version-${itemLocalVersion(index)}`"
             >
               <div class="flex flex-wrap items-center gap-2">
-                <span class="text-text-heading text-compact font-semibold">
+                <span class="text-text-heading text-compact font-bold">
                   {{
                     t("aiObservability.datasets.detail.itemDetail.versionLabel", {
                       version: itemLocalVersion(index),

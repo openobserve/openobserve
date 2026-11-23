@@ -119,17 +119,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OEmptyState
           v-else-if="history.isError.value"
-          size="compact"
+          size="inline"
           kind="error"
-          class="px-4"
           :title="t('recentSearches.loadError')"
           @action="history.refetch()"
         />
         <OEmptyState
           v-else-if="!rows.length"
-          size="compact"
+          size="inline"
           icon="history"
-          class="px-4"
           :title="filtered ? t('recentSearches.noMatch') : t('recentSearches.emptyTitle')"
           :action-label="filtered ? t('recentSearches.resetFilters') : undefined"
           data-test="recent-searches-drawer-empty"

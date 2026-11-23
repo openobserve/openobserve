@@ -27,7 +27,7 @@ export class ThemePage {
         this.customColorPreviewLight = page.locator('[data-test="predefined-themes-custom-color-preview-light"]');
         // ODialog hosting OColor picker
         this.colorPickerDialog = page.locator('[data-test="predefined-themes-color-picker-dialog"]');
-        // PredefinedThemes.vue's "Pick custom color" ODialog now has two footer
+        // PredefinedThemes.vue's "Pick Custom Color" ODialog now has two footer
         // buttons: the primary "Apply" button (confirms + applies the color) and
         // the neutral "Cancel" button (closes without applying). ODialog forwards
         // them as o-dialog-primary-btn / o-dialog-neutral-btn under the parent slug.
@@ -90,7 +90,7 @@ export class ThemePage {
 
     /**
      * The custom-color row no longer carries its own Apply button — clicking the
-     * card opens the "Pick custom color" dialog, and the dialog's primary "Apply"
+     * card opens the "Pick Custom Color" dialog, and the dialog's primary "Apply"
      * button is what applies the color. Expose that dialog button here so callers
      * have a single source of truth for "apply the custom color".
      */
@@ -269,7 +269,7 @@ export class ThemePage {
         }
 
         // The custom-color row no longer applies directly — clicking it opens the
-        // "Pick custom color" dialog, whose primary "Apply" button applies the
+        // "Pick Custom Color" dialog, whose primary "Apply" button applies the
         // color and shows a success toast.
         const card = this.getCustomColorCard(mode);
         await expect(card).toBeVisible({ timeout: 5000 });

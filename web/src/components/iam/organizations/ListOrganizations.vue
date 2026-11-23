@@ -36,7 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-menu-data-test="organization-row-more-actions"
           :loading="loading"
           :forbidden="forbidden"
-          :error="loadError"
           v-model:global-filter="filterQuery"
           pagination="client"
           :page-size="20"
@@ -47,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-organizations-list"
-          @retry="getOrganizations"
         >
           <template #toolbar>
             <div class="flex flex-1 items-center gap-2 max-md:contents">
@@ -134,7 +132,6 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useI18nTyped } from "@/types/i18n";
-import { loadErrorText } from "@/utils/featureGate";
 
 import organizationsService from "@/services/organizations";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -312,8 +309,6 @@ export default defineComponent({
 
     const loading = ref(false);
     const forbidden = ref(false);
-    // A failed read with no rows on screen is the table's error state, never the first-run one (K5).
-    const loadError = ref<string | null>(null);
     const lastUpdatedAt = ref<number | null>(null);
     const getOrganizations = () => {
       const dismiss = toast({
@@ -323,7 +318,6 @@ export default defineComponent({
       });
       loading.value = true;
       forbidden.value = false;
-      loadError.value = null;
       organizationsService
         .list(0, 1000000, "name", false, "")
         .then((res) => {
@@ -395,9 +389,6 @@ export default defineComponent({
         })
         .catch((err: any) => {
           forbidden.value = err?.response?.status === 403;
-          if (!organizations.value.length) {
-            loadError.value = loadErrorText(err, t("emptyState.loadError.description"));
-          }
           dismiss();
         })
         .finally(() => {
@@ -542,7 +533,6 @@ export default defineComponent({
       config,
       loading,
       forbidden,
-      loadError,
       lastUpdatedAt,
       organizations,
       organization,

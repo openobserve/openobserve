@@ -41,7 +41,7 @@ defineSlots<{ icon?: () => unknown; default?: () => unknown; end?: () => unknown
       :id="noteId"
       :data-test="noteId"
       aria-hidden="true"
-      class="text-text-muted text-2xs leading-4 whitespace-normal"
+      class="text-text-muted text-2xs leading-snug whitespace-normal"
       >{{ note }}</span
     >
   </span>

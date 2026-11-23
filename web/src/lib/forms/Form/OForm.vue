@@ -1,9 +1,8 @@
 <script setup lang="ts" generic="T extends Record<string, unknown>">
 // Copyright 2026 OpenObserve Inc.
 
-import { provide, inject, onBeforeUnmount, watch } from "vue";
+import { provide, inject, onBeforeUnmount, ref, watch } from "vue";
 import { FORM_CONTEXT_KEY, FORM_DIRTY_STATE_KEY, FORM_SUBMIT_STATE_KEY } from "./OForm.types";
-import { trackUnsavedEdits } from "./unsavedEdits";
 import { revealFieldErrors, useOForm, type FormFieldPath } from "./useOForm";
 import type { FormValidateOn } from "./OForm.types";
 
@@ -101,14 +100,28 @@ if (overlaySubmitting) {
 
 // Edits not yet put back or saved count as unsaved, so the enclosing overlay asks before discarding them.
 const overlayDirty = inject(FORM_DIRTY_STATE_KEY, null);
-const unsaved = overlayDirty ? trackUnsavedEdits(form, overlayDirty) : null;
+const savedValues = ref<string | null>(null);
+if (overlayDirty) {
+  const values = form.useStore((s: any) => s.values);
+  const isEdited = form.useStore((s: any) => !!s.isDirty && !s.isDefaultValue);
+  watch(
+    [isEdited, values, savedValues],
+    () => {
+      const unsaved =
+        savedValues.value === null || JSON.stringify(values.value) !== savedValues.value;
+      overlayDirty.value = !!isEdited.value && unsaved;
+    },
+    { immediate: true, deep: true },
+  );
+  onBeforeUnmount(() => (overlayDirty.value = false));
+}
 
 async function handleSubmit(e: Event) {
   e.preventDefault();
   if (isSubmitting.value) return; // guard double-submit (e.g. Enter while saving)
   try {
     await form.handleSubmit();
-    if (form.state.isSubmitSuccessful) unsaved?.markSaved();
+    if (form.state.isSubmitSuccessful) savedValues.value = JSON.stringify(form.state.values);
   } catch {
     // The consumer's submit handler owns error reporting (e.g. a toast).
   }
@@ -179,7 +192,7 @@ function submit() {
   if (isSubmitting.value) return; // guard double-submit
   void Promise.resolve(form.handleSubmit())
     .then(() => {
-      if (form.state.isSubmitSuccessful) unsaved?.markSaved();
+      if (form.state.isSubmitSuccessful) savedValues.value = JSON.stringify(form.state.values);
     })
     .catch(() => {});
 }

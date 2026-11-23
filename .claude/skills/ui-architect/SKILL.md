@@ -22,7 +22,7 @@ prop, a class string, or a path.
 ## Binding: the v2 UI guidelines
 
 **[references/guidelines.md](references/guidelines.md) is binding** for every change under
-`web/`: 117 rules with stable ids (L, T, C, H, F, B, S, O, V, D, N, K, U, KB, R, W) under
+`web/`: 114 rules with stable ids (L, T, C, H, F, B, S, O, V, D, N, K, U, KB, R, W) under
 seven principles (P1–P7). Where an older rule in this skill or its references disagrees with
 a guideline, the guideline wins.
 
@@ -37,20 +37,6 @@ a guideline, the guideline wins.
   every change. The page header has its own spec: [header-spec.md](references/header-spec.md).
   Why each rule exists (the survey register and bug list):
   [ui-audit-2026-11.md](references/ui-audit-2026-11.md).
-- **Verify by looking, not by counting.** Before a UI change is done, take 2x close-ups of
-  the header, tabs, toolbar and first rows of every screen it touches, on `main` and on the
-  branch, and check each pair against the guideline ids. In particular:
-  - indicators sit on their dividers;
-  - every control in a row shares one height and one border language;
-  - grouped controls share one border;
-  - text is sentence case (T5);
-  - the header has at most two secondary actions (H3).
-
-  Lint, type-check and metrics (heights, radii, error counts) are necessary but never prove
-  how a screen looks.
-- **Recent polish on `main` is the baseline.** Before changing a shared component, read
-  `git log origin/main -- <component>`. Keep what recent polish commits decided unless a
-  guideline says otherwise, and name that guideline in the change.
 
 ---
 
@@ -64,8 +50,8 @@ read it once, it is the backbone of everything below.
 1. **Every page header is `OPageHeader`, the stacked v2 header** — never a
    hand-rolled `<div class="header">…<h1>` or a `q-toolbar`
    ([header-spec](references/header-spec.md), guidelines H1–H8). One 56 px band: a
-   context line above an 18 px title, actions on the right. The context line is
-   derived from the route (the rail group, else an empty slot, never the org); a detail, editor or import
+   context line above a 16 px title, actions on the right. The context line is
+   derived from the route (the rail group, else the org); a detail, editor or import
    page passes **`:back="{ label, to }"`** and it becomes a real "‹ Parent" link on
    `useSmartBack` (H4, N3). The title sits at the same x and y on every page and
    never changes on a tab click. Peer tabs (`#header-tabs`) always sit on their own
@@ -181,16 +167,16 @@ read it once, it is the backbone of everything below.
      | `text-2xs` | 11 | key chips, chart axes, micro captions |
      | `text-xs` | 12 | meta, helper text, chips, badges, column headers |
      | `text-compact` | 13 | **all UI text** (start here): controls, menus, table cells, labels |
-     | `text-sm` | 14 | **reading text only**: descriptions, dialog bodies, empty-state text, notices; semibold, the section, card and panel titles (owned by `OFormSection` / `OCard`) |
-     | `text-title` | 15 | dialog and drawer titles: owned by `ODialog` / `ODrawer` |
-     | `text-lg` | 18 | the page title, 600 on a 24 px line (owned by `OPageHeader`), never larger |
+     | `text-sm` | 14 | **reading text only**: descriptions, dialog bodies, empty-state text, notices |
+     | `text-title` | 15 | dialog, drawer and section titles: owned by `ODialog` / `ODrawer` / `OFormSection` |
+     | `text-base` | 16 | the page title (owned by `OPageHeader`), never larger |
      | `text-xl` · `text-2xl` | 20 · 24 | KPI values only |
 
      `text-compact` is the UI default: every O* control, menu, table cell and label
      sets it itself, so a call site does not. Reach for `text-sm` only for prose a
-     person reads. `text-3xs`, `text-base`, `text-3xl` and `text-4xl` sit outside T1:
+     person reads. `text-3xs`, `text-lg`, `text-3xl` and `text-4xl` sit outside T1:
      no new uses. A settings form's section heading comes from
-     `OFormSection variant="plain"`, never a hand-set size; it must never outweigh the page title (T2). If a design needs a size not on the scale, snap to the nearest
+     `OFormSection variant="plain"`, never a hand-set size. If a design needs a size not on the scale, snap to the nearest
      step — do **not** reintroduce an arbitrary `text-[..]`.
    - **Casing — never uppercase anywhere in the app, except an established short
      form.** This is app-wide and strict. No shouting: don't bake caps into a string
@@ -569,7 +555,6 @@ and each domain has its own reference below.
 | **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the stacked header (from `:title`/`:back`/`:context`/`:about` props + `#status`/`#actions`/`#actions-overflow`/`#header-tabs`, the tabs always on their own 40 px row; no icon or subtitle, H1–H8), a `#banner` for a lasting page condition (K3), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the one 16 px gutter by default (L3) — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a reading column (forms): centered by default; `content-align="start"` pins it to the start edge, which Settings forms use at `lg` (1024). Lists stay full width. The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
 | **Content inset** | `OPageLayout` already insets the body. Anywhere else (a panel, a dialog section, one tab's content) wrap it in **`OContent`** (bakes the one `px-page-edge` grid line, the primitive `OPageLayout` uses internally) instead of hand-picking `px-2`/`px-4`/`p-2.5`; pass `bleed` (or `bleed-x`/`bleed-y`) for full-bleed content that owns its own edge — same escape-hatch idea as `ODrawer`/`ODialog` `bleed`. Never hand-roll a content inset. | [conventions](references/conventions.md) |
 | **Tab strips** | page tabs go in `#header-tabs`: the header's 40 px tab row draws the divider and starts the first label at the content edge (H8, N2). Any other `OTabs` strip needs **no** horizontal wrapper padding; put its bottom divider on the strip (`border-b`) and give it no `px-*`, since wrapping it in `px-page-edge` double-insets the labels. | [conventions](references/conventions.md) |
-| **Pick the recipe by the job** | before laying out a screen, choose its recipe from the "Which recipe?" table: listing, explore, overview, investigation detail, dashboard, row drawer, builder, settings form or detail/editor. Each recipe fixes the bands, the toolbar, the states and the links out (N8); every region gets the shared state matrix (loading, first run, filtered, no data in range, denied, locked, error, partial). A screen that fits no recipe is a design question for the user, not a new local layout | [page-recipes](references/page-recipes.md#which-recipe) |
 | **Listing toolbar** | every list carries three affordances — search + filters (`#toolbar`), refresh (`#toolbar-trailing`), and the auto-injected column-visibility toggle; empty state is one `OEmptyState` of the right `kind` (`filtered` while a search or filter is on), in the `#empty` slot only, plus `:forbidden` on the table so a 403 shows "You don't have access" instead of "create your first…" | [page-recipes](references/page-recipes.md) |
 | **Form container** | confirm → `ConfirmDialog`; short form → `ODialog`; tall or contextual form → `ODrawer`; primary multi-section flow → a full in-page view. Use `ODialog` / `ODrawer` for these | [conventions](references/conventions.md) |
 | **Form validation** | `OForm` + a colocated Zod `<Form>.schema.ts`; fields are `OForm*` bound **only by `name=`** (no `v-model`/`ref` mirror, no `formData`); submit + loading automatic; payload built with explicit keys; field arrays use `:key="index"` | [forms-validation](references/forms-validation.md) |
@@ -686,7 +671,7 @@ Each line is the short form of the rule in
 [references/guidelines.md](references/guidelines.md).
 
 - [ ] **L2** Bands in order: header, tabs, toolbar, strip, chips, content, footer.
-- [ ] **H1** Header is a context line above an 18 px title, actions right.
+- [ ] **H1** Header is a context line above a 16 px title, actions right.
 - [ ] **H8** Nothing in the header moves on tab switch or navigation.
 - [ ] **H3** At most two secondary, one primary, then ⋯ More.
 - [ ] **H6** Create button: "New <object>", label only.

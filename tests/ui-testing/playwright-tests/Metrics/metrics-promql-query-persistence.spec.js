@@ -167,7 +167,7 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
    * Validates that each tab maintains its own query state
    * and switching between tabs doesn't affect the queries.
    *
-   * This test clicks "Run query" after entering each query to ensure
+   * This test clicks "Run Query" after entering each query to ensure
    * the query is properly saved to Vue state before switching tabs.
    */
   test('P1: Multiple tabs maintain separate queries independently', {

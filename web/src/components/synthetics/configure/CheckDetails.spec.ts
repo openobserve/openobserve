@@ -141,7 +141,7 @@ describe("CheckDetails", () => {
     });
 
     it("should render the title", () => {
-      expect(wrapper.text()).toContain("Check details");
+      expect(wrapper.text()).toContain("Check Details");
     });
 
     it("should render the name input with check name value", () => {

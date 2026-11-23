@@ -94,8 +94,8 @@ function onSelect(event: Event, name: string) {
         :class="[
           'z-10001 flex flex-col overflow-hidden',
           hasDescriptions ? 'w-72' : 'w-56',
-          'rounded-default shadow-overlay',
-          'bg-select-content-bg border-border-default border',
+          'rounded-default shadow-md',
+          'bg-select-content-bg border-select-content-border border',
         ]"
         :style="{ maxHeight: 'min(18rem, var(--reka-popover-content-available-height, 18rem))' }"
         @open-auto-focus.prevent

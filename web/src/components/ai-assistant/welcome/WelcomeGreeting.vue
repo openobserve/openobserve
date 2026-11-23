@@ -41,7 +41,7 @@ const logoSrc = computed(() =>
 
       <div class="welcome-hero__heading-block flex items-center">
         <div
-          class="welcome-hero__title text-typography-body m-0 flex items-center gap-2 text-2xl leading-[1.15] font-semibold tracking-[-0.01em]"
+          class="welcome-hero__title text-typography-body m-0 flex items-center gap-2 text-3xl leading-[1.15] font-bold tracking-[-0.01em] max-md:text-2xl"
         >
           {{ greeting }}
           <span

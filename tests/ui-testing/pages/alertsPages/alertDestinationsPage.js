@@ -412,25 +412,9 @@ export class AlertDestinationsPage {
         return this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
     }
 
-    /** Delete item of a destination's row ⋯ menu; it renders only while that menu is open. */
+    /** Locator for the row containing a destination's delete button. */
     getDeleteDestinationBtn(name) {
         return this.page.locator(`[data-test="alert-destination-list-${name}-delete-destination"]`);
-    }
-
-    /** A destination's inline Edit button: always in the row's DOM, so it anchors the row. */
-    getDestinationRowAnchor(name) {
-        return this.page.locator(`[data-test="alert-destination-list-${name}-update-destination"]`);
-    }
-
-    /** Delete sits in the row's ⋯ menu (a portal), so hover the row and open the menu first. */
-    async clickDeleteDestination(name) {
-        const row = this.getDestinationRow(name);
-        await row.waitFor({ state: 'visible', timeout: 10000 });
-        await row.hover();
-        await row.locator('[data-test="alert-destination-list-row-more-actions"]').click();
-        const deleteBtn = this.getDeleteDestinationBtn(name);
-        await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await deleteBtn.click();
     }
 
     /** Locator for the row containing a destination's edit button. */
@@ -439,12 +423,12 @@ export class AlertDestinationsPage {
     }
 
     /**
-     * Row containing a named destination. Resolves via the destination-specific edit-button data-test
+     * Row containing a named destination. Resolves via the destination-specific delete-button data-test
      * and walks up to the OTable row ancestor.
      */
     getDestinationRow(name) {
         return this.page.locator(
-            `xpath=//*[@data-test="alert-destination-list-${name}-update-destination"]/ancestor::*[starts-with(@data-test,'o2-table-row-')][1]`
+            `xpath=//*[@data-test="alert-destination-list-${name}-delete-destination"]/ancestor::*[starts-with(@data-test,'o2-table-row-')][1]`
         );
     }
 
@@ -656,7 +640,7 @@ export class AlertDestinationsPage {
             await searchField.fill(destinationName);
             // Wait for the OTable loading skeleton to clear so we check real rows, not placeholders.
             await listSkeleton.first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
-            const rowAnchor = this.getDestinationRowAnchor(destinationName);
+            const rowAnchor = this.getDeleteDestinationBtn(destinationName);
             try {
                 await rowAnchor.waitFor({ state: 'visible', timeout: 10000 });
                 testLogger.info('Found destination via search', { destinationName });
@@ -870,7 +854,7 @@ export class AlertDestinationsPage {
         await searchField.click();
         await searchField.fill(destinationName);
         await this.page.waitForTimeout(1000); // Wait for search results
-        await this.clickDeleteDestination(destinationName);
+        await this.page.locator(this.deleteDestinationButton.replace('{destinationName}', destinationName)).click();
         await this.page.locator(this.confirmButton).click();
         await this.page.waitForTimeout(1000); // Wait for deletion to complete
         await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
@@ -896,13 +880,13 @@ export class AlertDestinationsPage {
     async getAllDestinationNames() {
         const destinationNames = [];
 
-        // Every row carries an inline Edit button named after its destination; Delete is in the ⋯ menu.
-        const editButtons = await this.page.locator('[data-test^="alert-destination-list-"][data-test$="-update-destination"]').all();
+        // Find all delete buttons with the pattern
+        const deleteButtons = await this.page.locator('[data-test*="alert-destination-list-"][data-test*="-delete-destination"]').all();
 
-        for (const button of editButtons) {
+        for (const button of deleteButtons) {
             const dataTest = await button.getAttribute('data-test');
-            // Extract destination name from data-test="alert-destination-list-{destinationName}-update-destination"
-            const match = dataTest.match(/alert-destination-list-(.+)-update-destination/);
+            // Extract destination name from data-test="alert-destination-list-{destinationName}-delete-destination"
+            const match = dataTest.match(/alert-destination-list-(.+)-delete-destination/);
             if (match && match[1]) {
                 destinationNames.push(match[1]);
             }
@@ -918,7 +902,9 @@ export class AlertDestinationsPage {
      * @param {string} destinationName - Name of the destination to delete
      */
     async deleteDestinationByName(destinationName) {
-        await this.clickDeleteDestination(destinationName);
+        const deleteButton = this.page.locator(this.deleteDestinationButton.replace('{destinationName}', destinationName));
+        await deleteButton.waitFor({ state: 'visible', timeout: 5000 });
+        await deleteButton.click();
         await this.page.locator(this.confirmButton).click();
 
         // Check if the "'name' is used by ..." error toast appears; a real timeout here (element
@@ -1239,7 +1225,7 @@ export class AlertDestinationsPage {
         // Try multiple fallback selectors for the import button
         const importBtnFallbackLocators = [
             this.destinationImportButton,
-            'button:has-text("Import destination")',
+            'button:has-text("Import Destination")',
             '[data-test*="destination-import"]',
             'button:has-text("Import")',
             'table button:has-text("Import")',
@@ -1862,7 +1848,7 @@ export class AlertDestinationsPage {
         // re-fetches, search to scope, and confirm the row — retrying the whole navigate+search
         // so a transient empty list ("0 of 0") re-fetches and renders the row.
         const searchField = this.page.locator(this.destinationListSearchInputField);
-        const rowAnchor = this.getDestinationRowAnchor(name);
+        const rowAnchor = this.getDeleteDestinationBtn(name);
         const skeleton = this.page.locator('[data-test="o2-table"][data-test-loading="true"]');
         for (let attempt = 1; attempt <= 5; attempt++) {
             await this.navigateToDestinations();
@@ -1916,8 +1902,8 @@ export class AlertDestinationsPage {
      * @param {string} name - Destination name
      */
     async expectDestinationNotInList(name) {
-        // After search-and-delete, the row anchor (named edit button) must not be present.
-        await expect(this.getDestinationRowAnchor(name)).toHaveCount(0, { timeout: 10000 });
+        // After search-and-delete, the row anchor (named delete button) must not be present.
+        await expect(this.getDeleteDestinationBtn(name)).toHaveCount(0, { timeout: 10000 });
     }
 
     // ============================================================================
@@ -2025,8 +2011,10 @@ export class AlertDestinationsPage {
             await searchField.fill(name);
         }
 
-        // Delete lives in the row's ⋯ menu, anchored on the destination-specific edit button
-        await this.clickDeleteDestination(name);
+        // Anchor on the destination-specific delete button data-test
+        const deleteBtn = this.getDeleteDestinationBtn(name);
+        await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await deleteBtn.click();
 
         // Confirm deletion in dialog
         const confirmBtn = this.page.locator(this.confirmButton);
@@ -2911,7 +2899,9 @@ export class AlertDestinationsPage {
 
     /** Click a destination's delete button and confirm (blocked-delete 409 or successful delete); asserts neither outcome. */
     async attemptDeleteDestination(name) {
-        await this.clickDeleteDestination(name);
+        const deleteBtn = this.getDeleteDestinationBtn(name);
+        await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await deleteBtn.click();
         const confirmBtn = this.page.locator(this.confirmButton);
         await confirmBtn.waitFor({ state: 'visible', timeout: 10000 });
         await confirmBtn.click();
@@ -2945,7 +2935,7 @@ export class AlertDestinationsPage {
 
     /** The in-use destination row must still be present after a blocked delete. */
     async expectDestinationRowStillVisible(name) {
-        await expect(this.getDestinationRowAnchor(name)).toHaveCount(1, { timeout: 10000 });
+        await expect(this.getDeleteDestinationBtn(name)).toBeVisible({ timeout: 10000 });
     }
 
     /** A success toast whose message contains `text` (e.g. "deleted" for in-dialog delete). */

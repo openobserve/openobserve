@@ -45,9 +45,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="fleet-fleet-settings-error"
       @action="retry"
     />
-    <div v-else-if="!ready" class="flex flex-col gap-4" data-test="fleet-fleet-settings-loading">
-      <OSkeleton class="w-2/3" />
-      <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-8" />
+    <div
+      v-else-if="!ready"
+      class="flex justify-center py-6"
+      data-test="fleet-fleet-settings-loading"
+    >
+      <OSpinner size="lg" />
     </div>
     <div v-else class="flex flex-col gap-4">
       <OText variant="meta">{{ t("fleet.fleets.settingsHint") }}</OText>
@@ -69,7 +72,7 @@ import { useMutation } from "@tanstack/vue-query";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { updateFleetSettingsOfMutation } from "@/services/fleet.queries";

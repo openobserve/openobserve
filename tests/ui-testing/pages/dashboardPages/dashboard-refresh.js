@@ -19,10 +19,10 @@ export default class DashboardTimeRefresh {
     this.dateTimeMenu = page.locator("#date-time-menu").first();
     this.selectTime = page.locator('[data-test="date-time-relative-10-m-btn"]');
     this.refreshBtnManual = page.locator(
-      '[data-test="dashboard-refresh-btn-auto-menu"]'
+      '[data-test="logs-search-bar-refresh-interval-btn"]'
     );
     this.offBtn = page.locator(
-      '[data-test="dashboard-refresh-btn-auto-0"]'
+      '[data-test="logs-search-off-refresh-interval"]'
     );
     this.refresh = page.locator('[data-test="dashboard-refresh-btn"]');
   }
@@ -153,7 +153,7 @@ export default class DashboardTimeRefresh {
     await this.refreshBtnManual.waitFor({ state: "visible" });
     await this.refreshBtnManual.click();
     await this.page
-      .locator(`[data-test="dashboard-refresh-btn-auto-${time}"]`)
+      .locator(`[data-test="logs-search-bar-refresh-time-${time}"]`)
       .click();
     await this.offBtn.click();
   }

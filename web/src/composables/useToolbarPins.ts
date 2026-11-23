@@ -18,7 +18,7 @@
 import { computed, ref, type Ref } from "vue";
 
 export type ToolbarPinKey =
-  "histogram" | "quickMode" | "functionEditor" | "savedViews" | "syntaxGuide";
+  "histogram" | "sqlMode" | "quickMode" | "functionEditor" | "savedViews" | "syntaxGuide";
 
 export type ToolbarPinScope = "logs" | "traces";
 
@@ -26,6 +26,7 @@ export type ToolbarPinScope = "logs" | "traces";
 // item's position — it only toggles whether the item is shown outside the menu.
 export const TOOLBAR_PIN_ORDER: ToolbarPinKey[] = [
   "histogram",
+  "sqlMode",
   "quickMode",
   "functionEditor",
   "savedViews",
@@ -35,21 +36,32 @@ export const TOOLBAR_PIN_ORDER: ToolbarPinKey[] = [
 interface ToolbarPinScopeConfig {
   storageKey: string;
   keys: ToolbarPinKey[];
+  // A default pin's absence from storageKey means "never decided" until its decided flag is set.
+  defaultPins: Partial<Record<ToolbarPinKey, string>>;
 }
 
-// Nothing is pinned by default: the toolbar holds only its fixed controls until a user pins one.
 const SCOPES: Record<ToolbarPinScope, ToolbarPinScopeConfig> = {
   logs: {
     storageKey: "logs_toolbar_pinned_items",
     keys: TOOLBAR_PIN_ORDER,
+    defaultPins: { histogram: "logs_toolbar_histogram_pin_decided" },
   },
   traces: {
     storageKey: "traces_toolbar_pinned_items",
     keys: ["histogram", "savedViews"],
+    defaultPins: {},
   },
 };
 
 const scopeStates = new Map<ToolbarPinScope, Ref<Set<ToolbarPinKey>>>();
+
+const isDecided = (decidedKey: string): boolean => {
+  try {
+    return window.localStorage.getItem(decidedKey) === "true";
+  } catch {
+    return false;
+  }
+};
 
 const readStoredPins = (config: ToolbarPinScopeConfig): ToolbarPinKey[] => {
   try {
@@ -65,10 +77,18 @@ const readStoredPins = (config: ToolbarPinScopeConfig): ToolbarPinKey[] => {
   }
 };
 
+const readInitial = (config: ToolbarPinScopeConfig): ToolbarPinKey[] => {
+  const pins = readStoredPins(config);
+  for (const [key, decidedKey] of Object.entries(config.defaultPins) as [ToolbarPinKey, string][]) {
+    if (!isDecided(decidedKey) && !pins.includes(key)) pins.push(key);
+  }
+  return pins;
+};
+
 const getScopeState = (scope: ToolbarPinScope): Ref<Set<ToolbarPinKey>> => {
   let state = scopeStates.get(scope);
   if (!state) {
-    state = ref(new Set(readStoredPins(SCOPES[scope]))) as Ref<Set<ToolbarPinKey>>;
+    state = ref(new Set(readInitial(SCOPES[scope]))) as Ref<Set<ToolbarPinKey>>;
     scopeStates.set(scope, state);
   }
   return state;
@@ -96,6 +116,14 @@ export function useToolbarPins(scope: ToolbarPinScope = "logs") {
     if (next.has(key)) next.delete(key);
     else next.add(key);
     pinnedSet.value = next;
+    const decidedKey = config.defaultPins[key];
+    if (decidedKey) {
+      try {
+        window.localStorage.setItem(decidedKey, "true");
+      } catch {
+        // localStorage may be unavailable — the default-pinned fallback reapplies next session.
+      }
+    }
     persist();
   };
 

@@ -159,7 +159,7 @@ or modal surface (dialogs, drawers).
 **Key props:**
 
 - `title` · `meta` (I18nText) — the 40 px header shows when `title` or `#header` is set:
-  title 14 px semibold strong (a section title, T1), meta 12 tertiary, `border-b border-border-subtle`.
+  title 13/600 strong, meta 12 tertiary, `border-b border-border-subtle`.
 - `flush` (boolean) — no body padding, for a table or chart; the body is `p-3`, 13 px otherwise.
 - `loading` (boolean) — skeleton body; the frame and header stay.
 
@@ -320,78 +320,49 @@ Hide the truncated line while open so it is not said twice; do not draw a second
 ### OEmptyState
 
 **Import:** `@/lib/core/EmptyState/OEmptyState.vue`
-**Use when:** Every empty, error and denied state, inside the table body or panel that is empty
-(never instead of the frame). Four kinds in one component (K5), each telling the one next step:
+**Use when:** Every empty state, inside the table body or panel that is empty (never instead
+of the frame). Four kinds in one component (K5), each telling the one next step:
 
 | `kind` | Says | Action |
 | --- | --- | --- |
 | `first-run` (default) | What this is and why you would use it | One primary, the header's words: "New alert" (H6) |
-| `filtered` | No rows match ("No matches" by default) | Clear filters (default label) (F5) |
+| `filtered` | No rows match; which filters are on | Clear filters (default label) (F5) |
 | `denied` | No access, and who can grant it (`contact`) | None, or "Request access" |
-| `error` | What failed, in plain words (K6): "Couldn't load this data" by default | Retry (default label) |
+| `error` | What failed, in plain words (K6) | Retry (default label, refresh icon) |
 
 **A failed load is `error`, never `first-run` (K5).** No pager under an empty table (D5).
-**Don't use for:** Loading (skeletons after 150 ms, K4) or field validation errors (inline, K2).
+**Don't use for:** Loading (skeletons, K4) or field validation errors (inline, K2).
+**Key props:**
 
-**Two variants (R3), set by `size`:**
+- `kind` (above) · `size` (`page` default: 40 px icon tile, 16/600 title, 14 px text at 44ch;
+  `inline`: 32 px tile, 14 px title, 13 px text — inside a table body, list or dropdown)
+- `title` · `text` (I18nText) · `icon` (IconName; the kind sets a default; the tile is neutral,
+  red-tinted only for `error`)
+- `actionLabel` + `@action` (an `lg` 36 px button: primary for first-run, secondary otherwise) ·
+  `secondaryActionLabel` + `@secondary-action`. With a listener and no label, `error` shows
+  Retry and `filtered` shows Clear filters.
+- `requestId` (string, mono under an error) · `contact` (I18nText, denied)
 
-- `region` (default): a table body, a page body, or a panel taller than 240 px. It places itself
-  64 px below its container's top and centres horizontally, so it never moves with page height:
-  a 20 px icon in a 40 px neutral tile, title 14/600, text 13 px up to 420 px, md (32 px) buttons,
-  one primary (first-run) plus at most one secondary.
-- `compact`: a panel 240 px tall or less, a rail, a list inside a drawer or popover, a cell. A
-  16 px icon inline with a 13/500 title, text under it, one sm button, left-aligned. It adds no
-  horizontal padding: it sits at its container's content inset (add `px-*` only where there is none).
-
-Do not centre it or pad it from outside: no `flex items-center justify-center`, `place-items-center`,
-`m-auto` or `py-*` wrapper. `local/o2-display-api` rejects position classes on it.
-
-**Key props:** `kind` · `size` (`region` | `compact`) · `title` · `text` (I18nText; `filtered`,
-`denied` and `error` fill in their own copy when no title is given) · `icon` (IconName; the kind
-sets a default; the tile is neutral, the icon red only for `error`) · `actionLabel` + `@action`
-(with a listener and no label, `error` shows Retry and `filtered` shows Clear filters) ·
-`secondaryActionLabel` + `@secondary-action` (region only) · `requestId` · `contact`.
-Raw transport text ("Request failed with status code 500") never reaches `text`: filter it with
-`isRawHttpText` from `@/lib/core/EmptyState/emptyStateCopy` and let the kind's copy speak.
-
-**Slots:** `#text` (rich text), `#actions` (`OButton`s only, md in a region and sm in compact, to
-keep a `data-test` on the button; never cards, tiles or chips), `#extra` (content below, such as a
-plain checklist or a row of `variant="link"` buttons; no card frame)
+**Slots:** `#text` (rich text), `#actions` (onboarding cards such as `EmptyStateIngestionCard`
+in place of the buttons), `#extra` (content below)
 **Emits:** `action`, `secondary-action` (no payload)
-**Removed:** `size="page"` → `region`, `size="inline"` → `compact`; the tile actions
-`EmptyStateIngestionCard` / `EmptyStateIngestionChip` (deleted). `preset`, `illustration`,
-`backdrop`, `toneIcon`, `variant`, `filtered`, `hideAction`, `actions`, `actionIcon`,
-`description` stay removed. `local/o2-display-api` rejects all of them.
-**In a scroll pane:** pass `class="shrink-0"` so it does not clip its own `#extra` list.
-
-**Whole-page failure (R3):** when every data panel on a page fails for the same reason, render one
-region `OEmptyState` for the page instead of one per panel; a panel that fails on its own keeps a
-compact error. `useAllPanelsFailed` from `@/lib/feedback/RegionStatus/useAllPanelsFailed` decides it:
-
-```ts
-const { allFailed, kind } = useAllPanelsFailed(() => [
-  { pending: alerts.isPending.value, error: alerts.error.value },
-  { pending: health.isPending.value, error: health.error.value },
-]);
-```
-
-```vue
-<OEmptyState v-if="allFailed" :kind="kind!" @action="refreshAll" />
-<template v-else><!-- the panels, each with its own compact error --></template>
-```
-
+**Removed:** `preset` (and `presets.ts`) → `kind` + `title`/`text`; `illustration` (and the 35
+SVGs), `backdrop`, `toneIcon` → `icon`; `variant`, `filtered` → `kind`; `hideAction`; `actions`
+cards → the two action labels; `actionIcon`; `description` → `text`; sizes hero/block/compact →
+`page`, slim → `inline`. `local/o2-display-api` rejects all of them.
+**In a scroll pane:** pass `class="shrink-0"` so it does not clip its own `#extra` list, and
+centre with `justify-center-safe` on the pane.
 **Example:**
 
 ```vue
 <OEmptyState
   :kind="search ? 'filtered' : 'first-run'"
-  :title="search ? undefined : t('alerts.emptyTitle')"
+  :title="search ? t('alerts.noMatch') : t('alerts.emptyTitle')"
   :text="search ? undefined : t('alerts.emptyText')"
   :action-label="search ? undefined : t('alerts.newAlert')"
   @action="search ? (search = '') : openCreate()"
 />
-<OEmptyState v-if="isError" kind="error" @action="refetch" />
-<OEmptyState v-if="panelEmpty" size="compact" :title="t('panel.noData')" />
+<OEmptyState v-if="isError" kind="error" :title="t('alerts.loadFailed')" @action="refetch" />
 ```
 
 **Family:** Composes `OButton`, `OIcon`. Standalone.
@@ -442,13 +413,13 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
 
 ### OFormSection
 **Import:** `@/lib/core/FormSection/OFormSection.vue`
-**Use when:** One titled section of a multi-section form — a 14 px semibold heading (never larger than the 18 px page title, T2) over the section's fields or `OSettingRow`s.
+**Use when:** One titled section of a multi-section form — a bordered card with a heading and the section's fields or `OSettingRow`s inside.
 **Don't use for:** A page's own content inset (use `OContent`), or a section wrapped around a single control — except where the heading is that control's label, and the danger zone.
 **Key props:**
 - `title` (`I18nText`, required — the section heading)
-- `variant` (`"accent" | "plain"`, default `"accent"` — `"accent"` is a bordered card; `"plain"` is unboxed: an `h2` and its description over one hairline, no tinted band, and the body aligned to the heading with setting rows on lighter rules. Settings and IAM pages use it)
-- `description` (`I18nText` — one 13 px secondary line under the heading, either variant)
-- `tone` (`"default" | "danger"`, default `"default"` — `"danger"` applies to `variant="plain"` only: error-coloured heading with a warning icon and an error-coloured hairline, for a destructive section)
+- `variant` (`"accent" | "plain"`, default `"accent"` — `"plain"` drops the accent bar, gives the header a tinted band above its divider and renders the heading as an `h2`; Settings and IAM pages use it)
+- `description` (`I18nText` — one line under the heading, either variant)
+- `tone` (`"default" | "danger"`, default `"default"` — `"danger"` applies to `variant="plain"` only: error-coloured heading with a warning icon and an error-coloured card border, for a destructive section)
 - `info` (`I18nText` — tooltip on an info icon after the heading)
 - `required` (boolean — appends the required marker to the heading)
 - `dataTest` (string)
@@ -477,7 +448,7 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
   …
 </OFormSection>
 ```
-**Family:** `OSettingRow` for the rows inside. One `h1` (the page title) above the plain sections' `h2`s. The parent stacks sections 24 px apart (`gap-6`, L4, V1). In a plain section the body has no inset: a block aligns with the heading (no `px-4`), and a table or list that needs edges sits in its own `rounded-surface border` frame instead of bleeding with negative margins.
+**Family:** `OSettingRow` for the rows inside. One `h1` (the page title) above the plain sections' `h2`s.
 
 ---
 
@@ -505,7 +476,7 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
 
 ### OSettingRow
 **Import:** `@/lib/core/SettingRow/OSettingRow.vue`
-**Use when:** One labelled setting inside a settings section — a 13 px medium name and 13 px secondary description on the left, the control on the right, hairline rule between rows (the last row drops its own). Pass `name` (or `error`) and the field's error takes the description's place, so nothing moves. Pass `loading` while the value is pending. `control-at="end"` pins a fixed control column to the row's end; Settings forms use it.
+**Use when:** One labelled setting inside a settings card — name and one-line description on the left, the control on the right, hairline rule between rows (the last row drops its own). Pass `name` (or `error`) and the field's error takes the description's place, so nothing moves. Pass `loading` while the value is pending. `control-at="end"` pins a fixed control column to the row's end; Settings forms use it.
 **Don't use for:** Form fields with a label above the control — use `OFormInput` directly.
 **Key props:**
 - `label` (`I18nText`, required — the setting's name)
@@ -530,7 +501,7 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
   <OFormInput name="min_length" type="number" width="s" />
 </OSettingRow>
 ```
-**Family:** Pair with `OFormSection`, which supplies the heading. On Settings and IAM pages use `variant="plain"`: one heading level, no tinted band, no section over a single control.
+**Family:** Pair with `OFormSection`, which supplies the card. On Settings and IAM pages use `variant="plain"`: one heading level, no accent bar, no section over a single control.
 
 ---
 

@@ -38,6 +38,7 @@
             <span class="text-text-secondary text-sm">{{ t("oncall.scheduleHint") }}</span>
             <OButton
               variant="secondary"
+              icon="add"
               data-test="oncall-schedule-add-rotation"
               @click="addRotation"
             >
@@ -92,6 +93,7 @@
 
         <template #empty>
           <OEmptyState
+            size="inline"
             :title="t('emptyState.noData.title')"
             :text="t('oncall.noRotations')"
             data-test="oncall-schedule-empty"
@@ -151,7 +153,7 @@
              read rather than a plain form that turns into tabs the moment a
              second rule shows up. -->
         <section class="border-border-default flex flex-col gap-4 border-t pt-6">
-          <h3 class="text-sm font-semibold">{{ t("oncall.rotationSectionRules") }}</h3>
+          <h3 class="text-base font-semibold">{{ t("oncall.rotationSectionRules") }}</h3>
           <p
             v-if="!active.shift_rules.length"
             class="text-status-warning-text text-xs"

@@ -64,8 +64,7 @@ rounded-default` (synthetics). Copy the class string from the sibling family
   (label + value). Only distinct groups get a background; don't shade every line.
 - **Separate detail from the edit form** with a divider on the detail wrapper:
   `class="… mb-8 pb-8 border-b border-border-default"`.
-- **Section heading** for the form: `OFormSection variant="plain"` (14 px semibold, T2), never a
-  hand-set size.
+- **Section heading** for the form: `class="text-base font-semibold mb-4"`.
 - **Edit form**: same as a dialog — `class="flex flex-col gap-4"` on `<OForm>`.
 - Footer: same `:primary` / `:secondary` / `:extra` + `:form-id` pattern as
   ODialog. Don't restyle the buttons.

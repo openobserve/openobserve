@@ -28,8 +28,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
@@ -262,7 +261,7 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
       <div class="flex min-w-0 flex-col gap-1" data-test="k8s2-drawer-header">
         <OText variant="meta" data-test="k8s2-drawer-kind">{{ t(info.title) }}</OText>
         <div class="flex min-w-0 items-center gap-1">
-          <OTruncatedText class="text-title font-semibold" data-test="k8s2-drawer-name">{{
+          <OTruncatedText class="text-base font-semibold" data-test="k8s2-drawer-name">{{
             raw(details.name)
           }}</OTruncatedText>
           <OCopyButton
@@ -288,17 +287,12 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
       </div>
     </template>
     <div ref="body" class="flex flex-col gap-5">
-      <template v-if="!row">
-        <div v-if="pending" class="flex flex-col gap-3" data-test="k8s2-drawer-pending">
-          <OSkeleton v-for="line in 6" :key="line" class="h-4 w-full" />
-        </div>
-        <OEmptyState
-          v-else
-          icon="search-off"
-          :title="t('infra.k8s2.drawerNotFound')"
-          data-test="k8s2-drawer-not-found"
-        />
-      </template>
+      <div v-if="!row" class="flex justify-center py-6">
+        <OSpinner v-if="pending" size="lg" data-test="k8s2-drawer-pending" />
+        <OText v-else variant="meta" data-test="k8s2-drawer-not-found">{{
+          t("infra.k8s2.drawerNotFound")
+        }}</OText>
+      </div>
       <template v-else>
         <div class="flex flex-wrap items-center gap-2" data-test="k8s2-drawer-actions">
           <OButton
@@ -492,38 +486,22 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
           <OText variant="card-title" as="h3" class="border-border-default border-b pb-1">{{
             t("infra.k8s2.drawerEvents")
           }}</OText>
-          <OEmptyState
-            v-if="!hasEvents"
-            size="compact"
-            :title="t('infra.k8s2.drawerEventsNoStream', { stream: raw('k8s_events') })"
-            data-test="k8s2-drawer-events-no-stream"
-          />
-          <OEmptyState
-            v-else-if="!eventsScoped"
-            size="compact"
-            :title="t('infra.k8s2.drawerEventsUnscoped')"
-            data-test="k8s2-drawer-events-unscoped"
-          />
-          <OEmptyState
-            v-else-if="eventsFailed"
-            size="compact"
-            kind="error"
-            :title="t('infra.k8s2.drawerEventsFailed')"
-            data-test="k8s2-drawer-events-failed"
-          />
-          <div
-            v-else-if="events === null"
-            class="flex flex-col gap-2"
-            data-test="k8s2-drawer-events-pending"
-          >
-            <OSkeleton v-for="line in 3" :key="line" class="h-4 w-full" />
-          </div>
-          <OEmptyState
+          <OText v-if="!hasEvents" variant="meta" data-test="k8s2-drawer-events-no-stream">{{
+            t("infra.k8s2.drawerEventsNoStream", { stream: raw("k8s_events") })
+          }}</OText>
+          <OText v-else-if="!eventsScoped" variant="meta" data-test="k8s2-drawer-events-unscoped">{{
+            t("infra.k8s2.drawerEventsUnscoped")
+          }}</OText>
+          <OText v-else-if="eventsFailed" variant="meta" data-test="k8s2-drawer-events-failed">{{
+            t("infra.k8s2.drawerEventsFailed")
+          }}</OText>
+          <OSpinner v-else-if="events === null" size="lg" data-test="k8s2-drawer-events-pending" />
+          <OText
             v-else-if="!shownEvents.length"
-            size="compact"
-            :title="t('infra.k8s2.drawerEventsEmpty')"
+            variant="meta"
             data-test="k8s2-drawer-events-empty"
-          />
+            >{{ t("infra.k8s2.drawerEventsEmpty") }}</OText
+          >
           <template v-else>
             <div
               v-for="event in shownEvents"

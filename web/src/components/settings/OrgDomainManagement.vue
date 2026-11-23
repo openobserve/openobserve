@@ -84,8 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-else-if="activeTab === 'requests' && isMetaOrg">
         <OrgDomainRequests :key="`requests-${orgId}`" :org-id="orgId" />
       </template>
-      <div v-else-if="settings.isPending.value" class="px-page-edge pt-3">
-        <OSkeleton preset="tableRows" :rows="6" />
+      <div v-else-if="settings.isPending.value" class="flex justify-center py-8">
+        <OSpinner size="lg" />
       </div>
       <OEmptyState
         v-else-if="settings.isError.value"
@@ -123,7 +123,7 @@ import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import { useOrgId } from "@/composables/query";

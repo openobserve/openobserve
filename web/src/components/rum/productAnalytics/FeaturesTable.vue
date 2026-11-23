@@ -26,13 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       kind="denied"
       :title="t('emptyState.noAccess.title')"
       :text="t('emptyState.noAccess.description')"
-      size="compact"
+      size="inline"
       data-test="rum-analytics-overview-features-no-access"
     />
     <OEmptyState
       v-else-if="!events.length"
       :text="t('emptyState.noData.description')"
-      size="compact"
+      size="inline"
       :title="t('rum.analytics.events.featuresEmpty')"
       data-test="rum-analytics-overview-features-empty"
     >
@@ -40,7 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="permission === 'write'"
           variant="secondary"
-          size="sm"
           data-test="rum-analytics-overview-features-create-btn"
           @click="emit('manage')"
           >{{ t("rum.analytics.events.manage") }}</OButton

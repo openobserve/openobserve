@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="canConfigure"
         variant="primary"
+        icon="add"
         data-test="oncall-teams-add-btn"
         @click="openCreate"
       >

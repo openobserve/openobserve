@@ -35,16 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sort-order="asc"
       @row-click="(row: QualityRow) => emit('open', row, 'all')"
     >
-      <!-- In the toolbar so the column picker shares their row; hidden only for an empty list,
-           so a failed load keeps the row (counts "—") instead of collapsing it under the table. -->
-      <template v-if="loading || loadError || tiles.total > 0" #toolbar>
+      <!-- In the toolbar so the column picker shares their row; hidden when the list is empty. -->
+      <template v-if="loading || tiles.total > 0" #toolbar>
         <div class="min-w-0 flex-1" data-test="quality-tiles">
           <OStatStrip>
             <OTooltip :content="t('onlineEvals.quality.tiles.attentionTooltip')">
               <OStatCard
                 class="grow basis-52 max-lg:shrink-0 max-lg:basis-auto"
                 :label="t('onlineEvals.quality.tiles.attention')"
-                :value="countsUnknown ? '—' : tiles.attention"
+                :value="loading ? '—' : tiles.attention"
                 :max="tiles.total"
                 :tone="tiles.attention > 0 ? 'error' : 'neutral'"
                 clickable
@@ -54,13 +53,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #value>
                   <span data-test="quality-tile-attention-value">{{
-                    countsUnknown ? "—" : tiles.attention
+                    loading ? "—" : tiles.attention
                   }}</span>
-                  <span
-                    v-if="!countsUnknown"
-                    class="text-text-secondary ms-1 text-sm font-normal"
-                    >{{ t("onlineEvals.quality.tiles.ofTotal", { total: tiles.total }) }}</span
-                  >
+                  <span v-if="!loading" class="text-text-secondary ms-1 text-sm font-normal">{{
+                    t("onlineEvals.quality.tiles.ofTotal", { total: tiles.total })
+                  }}</span>
                 </template>
                 <template v-if="tiles.attention > 0 && tileFilter !== 'attention'" #chart>
                   <span
@@ -75,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OStatCard
                 class="grow basis-52 max-lg:shrink-0 max-lg:basis-auto"
                 :label="t('onlineEvals.quality.tiles.withoutResult')"
-                :value="countsUnknown ? '—' : tiles.withoutResult"
+                :value="loading ? '—' : tiles.withoutResult"
                 :max="tiles.total"
                 :tone="tiles.withoutResult > 0 ? 'warning' : 'neutral'"
                 clickable
@@ -85,16 +82,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #value>
                   <span data-test="quality-tile-without-result-value">{{
-                    countsUnknown ? "—" : tiles.withoutResult
+                    loading ? "—" : tiles.withoutResult
                   }}</span>
-                  <span
-                    v-if="!countsUnknown"
-                    class="text-text-secondary ms-1 text-sm font-normal"
-                    >{{ t("onlineEvals.quality.tiles.ofTotal", { total: tiles.total }) }}</span
-                  >
+                  <span v-if="!loading" class="text-text-secondary ms-1 text-sm font-normal">{{
+                    t("onlineEvals.quality.tiles.ofTotal", { total: tiles.total })
+                  }}</span>
                 </template>
                 <!-- No rows yet would read as the all-clear, so the note waits for the list. -->
-                <template v-if="!countsUnknown" #chart>
+                <template v-if="!loading" #chart>
                   <div
                     class="text-text-secondary flex flex-wrap items-center gap-x-1.5 text-xs"
                     data-test="quality-tile-without-result-note"
@@ -112,38 +107,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #empty>
-        <OEmptyState
-          v-if="loadError"
-          kind="error"
-          :title="t('emptyState.loadError.title')"
-          :text="t('emptyState.loadError.description')"
-          @action="emit('retry')"
-        />
-        <OEmptyState
-          v-else
-          :kind="!!search.trim() || !!tileFilter ? 'filtered' : 'first-run'"
-          :title="
-            !!search.trim() || !!tileFilter
-              ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.scoreConfigs') })
-              : t('emptyState.noScoreConfigs.title')
-          "
-          :text="
-            !!search.trim() || !!tileFilter
-              ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.scoreConfigs') })
-              : t('emptyState.noScoreConfigs.description')
-          "
-          :icon="!!search.trim() || !!tileFilter ? undefined : 'dashboard'"
-          :action-label="
-            search.trim() || tileFilter
-              ? undefined
-              : t('oneClickEval.evaluate', { agent: agent ?? t('oneClickEval.anAgent') })
-          "
-          :secondary-action-label="
-            search.trim() || tileFilter ? undefined : t('emptyState.noScoreConfigs.action')
-          "
-          @action="onEmptyAction(search.trim() || tileFilter ? 'clear-filters' : 'one-click')"
-          @secondary-action="onEmptyAction('create')"
-        />
+        <div class="flex items-center justify-center py-8" data-test="quality-configs-empty">
+          <OEmptyState
+            v-if="loadError"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="t('emptyState.loadError.description')"
+            @action="emit('retry')"
+          />
+          <OEmptyState
+            v-else
+            :kind="!!search.trim() || !!tileFilter ? 'filtered' : 'first-run'"
+            :title="
+              !!search.trim() || !!tileFilter
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.scoreConfigs') })
+                : t('emptyState.noScoreConfigs.title')
+            "
+            :text="
+              !!search.trim() || !!tileFilter
+                ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.scoreConfigs') })
+                : t('emptyState.noScoreConfigs.description')
+            "
+            :icon="!!search.trim() || !!tileFilter ? undefined : 'dashboard'"
+            :action-label="
+              search.trim() || tileFilter
+                ? undefined
+                : t('oneClickEval.evaluate', { agent: agent ?? t('oneClickEval.anAgent') })
+            "
+            :secondary-action-label="
+              search.trim() || tileFilter ? undefined : t('emptyState.noScoreConfigs.action')
+            "
+            @action="onEmptyAction(search.trim() || tileFilter ? 'clear-filters' : 'one-click')"
+            @secondary-action="onEmptyAction('create')"
+          />
+        </div>
       </template>
 
       <template #cell-name="{ row }">
@@ -290,9 +287,6 @@ const route = useRoute();
 const router = useRouter();
 // Owned by the page, like the tile filter, so it survives opening a config and coming back.
 const search = defineModel<string>("search", { default: "" });
-
-// While loading or after a failed load the counts are unknown, not zero (C4).
-const countsUnknown = computed(() => props.loading || props.loadError);
 
 const filteredRows = computed(() => {
   const query = search.value.trim().toLowerCase();

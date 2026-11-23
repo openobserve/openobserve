@@ -161,7 +161,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ t("function.urlJobsCompleted", { count: row.urlJobs.length })
                             }}<br />
                             <br />
-                            <em class="text-xs">{{ t("function.clickUrlToSeeDetails") }}</em>
+                            <em style="font-size: 0.85em">{{
+                              t("function.clickUrlToSeeDetails")
+                            }}</em>
                           </div>
                         </template>
                       </OTooltip>
@@ -176,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ><br />
                             {{ t("function.jobsCurrentlyProcessing") }}<br />
                             <br />
-                            <em class="text-xs"
+                            <em style="font-size: 0.85em"
                               >{{ t("function.progressNotRealTimeNote") }}<br />{{
                                 t("function.clickUrlForDetails")
                               }}</em
@@ -215,7 +217,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ><br />
                             {{ t("function.jobsWaitingToBeProcessed") }}<br />
                             <br />
-                            <em class="text-xs">{{ t("function.clickUrlForDetails") }}</em>
+                            <em style="font-size: 0.85em">{{
+                              t("function.clickUrlForDetails")
+                            }}</em>
                           </div>
                         </template>
                       </OTooltip>
@@ -439,7 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center gap-2 p-4"
             >
               <div class="flex min-w-0 flex-1 flex-col">
-                <span class="text-sm font-semibold"
+                <span class="text-sm font-bold"
                   >{{ t("function.jobLabelPrefix") }} {{ (index as number) + 1 }}</span
                 >
                 <span class="text-muted-foreground block text-xs">{{ job.url }}</span>
@@ -475,7 +479,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </li>
           </ul>
         </div>
-        <OEmptyState v-else size="compact" :title="t('function.noUrlJobsFound')" />
+        <div v-else class="text-text-muted p-3 text-center">
+          {{ t("function.noUrlJobsFound") }}
+        </div>
       </div>
     </ODrawer>
   </div>
@@ -488,7 +494,7 @@ import { enrichmentTableStatusesQuery } from "@/services/jstransform.queries";
 import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
+import { useListViewState } from "@/composables/useListViewState";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 import AddEnrichmentTable from "./AddEnrichmentTable.vue";
@@ -562,18 +568,14 @@ export default defineComponent({
     const showEnrichmentSchema = ref<boolean>(false);
     const showUrlJobsDialogState = ref<boolean>(false);
     const selectedTableForUrlJobs = ref<any>(null);
-    const viewState = useListViewState(
-      "enrichmentTables",
-      {
-        filterQuery: "",
-        filter: "all",
-        pageSize: 20,
-        currentPage: 1,
-        sortBy: "",
-        sortOrder: "asc" as "asc" | "desc",
-      },
-      { url: { ...LIST_URL_PARAMS, filter: "filter" } },
-    );
+    const viewState = useListViewState("enrichmentTables", {
+      filterQuery: "",
+      filter: "all",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
     const filterQuery = ref(viewState.filterQuery);
     const loading = ref(false);
     // Request in flight with rows still on screen — the refresh button's

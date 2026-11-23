@@ -110,7 +110,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="privateLocationsEnabled && activeSection === 'private'"
         :locations="privateLocations"
         :loading="locationsLoading"
-        :last-run-at="locationsLoadedAt"
         :forbidden="locationsForbidden"
         @refresh="loadPrivateLocations"
         @copy-setup="openSetupDrawer"
@@ -274,7 +273,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="activeSection === 'status-pages'"
         :pages="statusPages"
         :loading="statusPagesLoading"
-        :last-run-at="statusPagesLoadedAt"
         :forbidden="statusPagesForbidden"
         :timezone="store.state.timezone"
         @refresh="loadStatusPages"
@@ -488,7 +486,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import { useUnsavedChanges } from "@/lib/forms/Form/unsavedEdits";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -1049,11 +1046,10 @@ const duplicateSource = ref<any>(null);
 // "browser" | "http" | "tcp" | "tls" | "ssh" — picks the mapper/payload builder.
 const duplicateSourceType = ref<string>("browser");
 const isDuplicating = ref(false);
-// A stray dismiss asks before dropping an edit (V5); the folder picker settling after open is none.
-const { dirty: isDuplicateFormChanged } = useUnsavedChanges(
-  () => [duplicateName.value, duplicateFolder.value],
-  () => showDuplicateDialog.value,
-);
+// The duplicate form as it opened, so a stray dismiss asks before dropping an edit (V5).
+const duplicateFormState = () => JSON.stringify([duplicateName.value, duplicateFolder.value]);
+const duplicateOpenedWith = ref("");
+const isDuplicateFormChanged = computed(() => duplicateFormState() !== duplicateOpenedWith.value);
 
 const openBulkDeleteConfirm = () => {
   bulkDeleteCount.value = selectedMonitorIds.value.length;
@@ -1153,7 +1149,6 @@ const onTabChange = (v: unknown) => {
 // ── Private locations tab ──────────────────────────────────────────────
 const privateLocations = ref<SyntheticLocation[]>([]);
 const locationsLoading = ref(false);
-const locationsLoadedAt = ref<number | null>(null);
 const showSetupDrawer = ref(false);
 const setupInstall = ref<string | null>(null);
 const setupLocationName = ref<string | null>(null);
@@ -1171,7 +1166,6 @@ async function loadPrivateLocations() {
     const res = await syntheticsService.getLocations(orgIdentifier.value);
     const all: SyntheticLocation[] = (res.data as any).locations ?? [];
     privateLocations.value = all.filter((l) => l.kind === "private");
-    locationsLoadedAt.value = Date.now();
   } catch (err) {
     locationsForbidden.value = forbiddenState(err);
     console.error("[synthetics] failed to load private locations", err);
@@ -1225,7 +1219,6 @@ async function deleteLocation() {
 // ── Status pages tab ───────────────────────────────────────────────────
 const statusPages = ref<StatusPageListItem[]>([]);
 const statusPagesLoading = ref(false);
-const statusPagesLoadedAt = ref<number | null>(null);
 const statusPagesForbidden = ref<ForbiddenState>(false);
 const showCreateStatusPage = ref(false);
 
@@ -1236,7 +1229,6 @@ async function loadStatusPages() {
   try {
     const res = await statusPagesService.list(orgIdentifier.value);
     statusPages.value = (res.data as any).pages ?? [];
-    statusPagesLoadedAt.value = Date.now();
   } catch (err) {
     statusPagesForbidden.value = forbiddenState(err);
     console.error("[status-pages] failed to load", err);
@@ -1768,6 +1760,7 @@ async function duplicateMonitor(m: any) {
   // should land beside its original rather than jump to the active folder.
   duplicateFolder.value = m.folderId || activeFolderId.value;
   duplicateSource.value = null;
+  duplicateOpenedWith.value = duplicateFormState();
   showDuplicateDialog.value = true;
   try {
     const res = await syntheticsService.get(

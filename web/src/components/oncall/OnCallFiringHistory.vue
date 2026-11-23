@@ -26,7 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <OEmptyState
         v-if="!loading && !firings.length"
-        size="compact"
+        size="inline"
+        kind="filtered"
         :title="t('oncall.firingHistoryNone')"
         data-test="oncall-firing-history-empty"
       />

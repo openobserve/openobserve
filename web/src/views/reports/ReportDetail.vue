@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
     </template>
 
-    <OContent v-if="notFound">
+    <OContent v-if="notFound" class="py-6">
       <OEmptyState
         :title="t('reports.history.notFoundTitle')"
         :text="t('reports.history.notFoundDescription')"

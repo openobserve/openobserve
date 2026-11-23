@@ -245,31 +245,31 @@ describe("CompareWithPast.vue", () => {
 
   describe("Get Display Value", () => {
     it("should convert seconds correctly", () => {
-      expect(wrapper.vm.getDisplayValue("30s")).toBe("30 seconds");
-      expect(wrapper.vm.getDisplayValue("1s")).toBe("1 second");
+      expect(wrapper.vm.getDisplayValue("30s")).toBe("30 Seconds");
+      expect(wrapper.vm.getDisplayValue("1s")).toBe("1 Second");
     });
 
     it("should convert minutes correctly", () => {
-      expect(wrapper.vm.getDisplayValue("15m")).toBe("15 minutes");
-      expect(wrapper.vm.getDisplayValue("1m")).toBe("1 minute");
+      expect(wrapper.vm.getDisplayValue("15m")).toBe("15 Minutes");
+      expect(wrapper.vm.getDisplayValue("1m")).toBe("1 Minute");
     });
 
     it("should convert hours correctly", () => {
-      expect(wrapper.vm.getDisplayValue("2h")).toBe("2 hours");
-      expect(wrapper.vm.getDisplayValue("24h")).toBe("24 hours");
+      expect(wrapper.vm.getDisplayValue("2h")).toBe("2 Hours");
+      expect(wrapper.vm.getDisplayValue("24h")).toBe("24 Hours");
     });
 
     it("should convert days correctly", () => {
-      expect(wrapper.vm.getDisplayValue("7d")).toBe("7 days");
-      expect(wrapper.vm.getDisplayValue("1d")).toBe("1 day");
+      expect(wrapper.vm.getDisplayValue("7d")).toBe("7 Days");
+      expect(wrapper.vm.getDisplayValue("1d")).toBe("1 Day");
     });
 
     it("should convert weeks correctly", () => {
-      expect(wrapper.vm.getDisplayValue("2w")).toBe("2 weeks");
+      expect(wrapper.vm.getDisplayValue("2w")).toBe("2 Weeks");
     });
 
     it("should convert months correctly", () => {
-      expect(wrapper.vm.getDisplayValue("3M")).toBe("3 months");
+      expect(wrapper.vm.getDisplayValue("3M")).toBe("3 Months");
     });
 
     it("should return original value for invalid format", () => {
@@ -284,31 +284,31 @@ describe("CompareWithPast.vue", () => {
 
   describe("Convert Minutes To Display Value", () => {
     it("should convert minutes correctly (< 60)", () => {
-      expect(wrapper.vm.convertMinutesToDisplayValue(1)).toBe("1 minute");
-      expect(wrapper.vm.convertMinutesToDisplayValue(30)).toBe("30 minutes");
-      expect(wrapper.vm.convertMinutesToDisplayValue(59)).toBe("59 minutes");
+      expect(wrapper.vm.convertMinutesToDisplayValue(1)).toBe("1 Minute");
+      expect(wrapper.vm.convertMinutesToDisplayValue(30)).toBe("30 Minutes");
+      expect(wrapper.vm.convertMinutesToDisplayValue(59)).toBe("59 Minutes");
     });
 
     it("should convert hours correctly (60 - 1439)", () => {
-      expect(wrapper.vm.convertMinutesToDisplayValue(60)).toBe("1 hour");
-      expect(wrapper.vm.convertMinutesToDisplayValue(120)).toBe("2 hours");
-      expect(wrapper.vm.convertMinutesToDisplayValue(1439)).toBe("23 hours");
+      expect(wrapper.vm.convertMinutesToDisplayValue(60)).toBe("1 Hour");
+      expect(wrapper.vm.convertMinutesToDisplayValue(120)).toBe("2 Hours");
+      expect(wrapper.vm.convertMinutesToDisplayValue(1439)).toBe("23 Hours");
     });
 
     it("should convert days correctly (1440 - 10079)", () => {
-      expect(wrapper.vm.convertMinutesToDisplayValue(1440)).toBe("1 day");
-      expect(wrapper.vm.convertMinutesToDisplayValue(2880)).toBe("2 days");
-      expect(wrapper.vm.convertMinutesToDisplayValue(10079)).toBe("6 days");
+      expect(wrapper.vm.convertMinutesToDisplayValue(1440)).toBe("1 Day");
+      expect(wrapper.vm.convertMinutesToDisplayValue(2880)).toBe("2 Days");
+      expect(wrapper.vm.convertMinutesToDisplayValue(10079)).toBe("6 Days");
     });
 
     it("should convert weeks correctly (10080 - 43199)", () => {
-      expect(wrapper.vm.convertMinutesToDisplayValue(10080)).toBe("1 week");
-      expect(wrapper.vm.convertMinutesToDisplayValue(20160)).toBe("2 weeks");
+      expect(wrapper.vm.convertMinutesToDisplayValue(10080)).toBe("1 Week");
+      expect(wrapper.vm.convertMinutesToDisplayValue(20160)).toBe("2 Weeks");
     });
 
     it("should convert months correctly (>= 43200)", () => {
-      expect(wrapper.vm.convertMinutesToDisplayValue(43200)).toBe("1 month");
-      expect(wrapper.vm.convertMinutesToDisplayValue(86400)).toBe("2 months");
+      expect(wrapper.vm.convertMinutesToDisplayValue(43200)).toBe("1 Month");
+      expect(wrapper.vm.convertMinutesToDisplayValue(86400)).toBe("2 Months");
     });
   });
 
@@ -392,8 +392,8 @@ describe("CompareWithPast.vue", () => {
 
     it("should render running text with period and frequency", () => {
       // Test the conversion functions directly
-      expect(wrapper.vm.convertMinutesToDisplayValue(10)).toBe("10 minutes");
-      expect(wrapper.vm.convertMinutesToDisplayValue(1)).toBe("1 minute");
+      expect(wrapper.vm.convertMinutesToDisplayValue(10)).toBe("10 Minutes");
+      expect(wrapper.vm.convertMinutesToDisplayValue(1)).toBe("1 Minute");
     });
 
     it("should render add comparison button", () => {
@@ -449,8 +449,8 @@ describe("CompareWithPast.vue", () => {
     });
 
     it("should handle very large time values", () => {
-      expect(wrapper.vm.getDisplayValue("999d")).toBe("999 days");
-      expect(wrapper.vm.convertMinutesToDisplayValue(999999)).toBe("23 months");
+      expect(wrapper.vm.getDisplayValue("999d")).toBe("999 Days");
+      expect(wrapper.vm.convertMinutesToDisplayValue(999999)).toBe("23 Months");
     });
 
     it("should handle removal of last window", async () => {
@@ -509,13 +509,13 @@ describe("CompareWithPast.vue", () => {
     it("should handle minimum period (1 minute)", async () => {
       await wrapper.setProps({ period: 1 });
       // Test the conversion function directly
-      expect(wrapper.vm.convertMinutesToDisplayValue(1)).toBe("1 minute");
+      expect(wrapper.vm.convertMinutesToDisplayValue(1)).toBe("1 Minute");
     });
 
     it("should handle large period values", async () => {
       await wrapper.setProps({ period: 100000 });
       const display = wrapper.vm.convertMinutesToDisplayValue(100000);
-      expect(display).toContain("month");
+      expect(display).toContain("Month");
     });
   });
 

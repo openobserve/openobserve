@@ -90,10 +90,10 @@ describe("CheckTypePicker.vue", () => {
       const cards = wrapper.findAll(".empty-state-action-card-stub");
       const labels = cards.map((c) => c.attributes("data-label"));
       expect(labels).toEqual([
-        "Browser test",
+        "Browser Test",
         "HTTP / API",
-        "TCP port",
-        "SSL / TLS certificate",
+        "TCP Port",
+        "SSL / TLS Certificate",
         "SSH",
       ]);
     });
@@ -262,7 +262,7 @@ describe("CheckTypePicker.vue", () => {
       expect(sshCard.classes()).toContain("cursor-not-allowed");
     });
 
-    it('coming-soon card renders an OTag badge with "Coming soon" text', () => {
+    it('coming-soon card renders an OTag badge with "Coming Soon" text', () => {
       const wrapper = createWrapper({
         variant: "modal",
         layout: "grid",
@@ -271,7 +271,7 @@ describe("CheckTypePicker.vue", () => {
       const sshCard = wrapper.find('[data-test="check-type-picker-grid-card-ssh"]');
       const badge = sshCard.find(".o-tag-stub");
       expect(badge.exists()).toBe(true);
-      expect(badge.text()).toContain("Coming soon");
+      expect(badge.text()).toContain("Coming Soon");
     });
 
     it("non-coming-soon cards do NOT render a badge", () => {
@@ -372,7 +372,7 @@ describe("CheckTypePicker.vue", () => {
       > = {
         browser: {
           icon: "open-in-browser",
-          label: "Browser test",
+          label: "Browser Test",
           sublabel: "Record multi-step user journeys in a real browser",
         },
         http: {
@@ -380,10 +380,10 @@ describe("CheckTypePicker.vue", () => {
           label: "HTTP / API",
           sublabel: "Check endpoints, status codes, and response bodies",
         },
-        tcp: { icon: "bolt", label: "TCP port", sublabel: "Verify a host and port are reachable" },
+        tcp: { icon: "bolt", label: "TCP Port", sublabel: "Verify a host and port are reachable" },
         tls: {
           icon: "shield",
-          label: "SSL / TLS certificate",
+          label: "SSL / TLS Certificate",
           sublabel: "Monitor SSL/TLS certificate validity and expiry",
         },
         ssh: { icon: "keyboard", label: "SSH", sublabel: "Confirm SSH connectivity to a server" },

@@ -45,20 +45,13 @@ export const toSearchHit = (row: any): DashboardSearchHit => {
 };
 
 /** Dashboards across every folder whose title matches; the backend searches all folders when none is given. */
-export const dashboardsSearchQuery = (
-  org: string,
-  title: string,
-  options?: { silentForbidden?: boolean },
-) =>
+export const dashboardsSearchQuery = (org: string, title: string) =>
   queryOptions({
     queryKey: dashboardKeys.search(org, title),
-    queryFn: async (): Promise<DashboardSearchHit[]> => {
-      const args = [0, 100, "name", false, "", org, "", title] as const;
-      const res = await (options ? dashboards.list(...args, options) : dashboards.list(...args));
-      return (res.data?.dashboards ?? [])
+    queryFn: async (): Promise<DashboardSearchHit[]> =>
+      ((await dashboards.list(0, 100, "name", false, "", org, "", title)).data?.dashboards ?? [])
         .map(toSearchHit)
-        .filter((hit: DashboardSearchHit) => hit.dashboardId);
-    },
+        .filter((hit: DashboardSearchHit) => hit.dashboardId),
     staleTime: NORMAL_STALE_TIME,
   });
 

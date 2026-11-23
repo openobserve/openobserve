@@ -144,7 +144,7 @@ test.describe('Traces search window and error state (#15130, ENT#2805, ENT#2806)
   test('running a relative range again after time passes moves the RED charts with the results', {
     tag: ['@bug-ent2805', '@P1', '@regression', '@tracesRegression'],
   }, async ({ page }) => {
-    await pm.tracesPage.searchUntilResultCount('Spans found');
+    await pm.tracesPage.searchUntilResultCount('Spans Found');
     // Let the stored relative window age, so a chart that reuses it would visibly lag.
     await page.waitForTimeout(20000);
     const capture = pm.tracesPage.captureSearchRequests();
@@ -162,7 +162,7 @@ test.describe('Traces search window and error state (#15130, ENT#2805, ENT#2806)
     tag: ['@bug-ent2805', '@P2', '@regression', '@tracesRegression'],
   }, async ({ page }) => {
     const first = pm.tracesPage.captureSearchRequests();
-    await pm.tracesPage.searchUntilResultCount('Spans found');
+    await pm.tracesPage.searchUntilResultCount('Spans Found');
     first.stop();
     const lastRun = first.requests.filter((r) => r.panel === 'results').pop();
     expect(lastRun, 'Precondition: a results search must have run').toBeTruthy();
@@ -225,7 +225,7 @@ test.describe('Traces search window and error state (#15130, ENT#2805, ENT#2806)
   test('switching to Traces with invalid editor text shows the shared error state, and a valid run recovers', {
     tag: ['@bug-ent2806', '@P2', '@regression', '@tracesRegression'],
   }, async () => {
-    await pm.tracesPage.searchUntilResultCount('Spans found');
+    await pm.tracesPage.searchUntilResultCount('Spans Found');
     await pm.tracesPage.enterTraceQuery('operation_name');
     await pm.tracesPage.switchToTracesMode();
     await pm.tracesPage.expectGenericQueryError();
@@ -239,7 +239,7 @@ test.describe('Traces search window and error state (#15130, ENT#2805, ENT#2806)
   test('the Services Catalog side panel resolves a relative range when it opens', {
     tag: ['@bug-ent2805', '@P2', '@regression', '@tracesRegression'],
   }, async ({ page }) => {
-    await pm.tracesPage.searchUntilResultCount('Spans found');
+    await pm.tracesPage.searchUntilResultCount('Spans Found');
     await pm.tracesPage.navigateToServicesViaTab();
     await pm.tracesPage.expectServicesCatalogServiceVisible(SERVICE);
     await page.waitForTimeout(20000);

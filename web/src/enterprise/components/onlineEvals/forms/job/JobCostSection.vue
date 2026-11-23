@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="job-form-cost-section"
   >
     <div class="border-border-default flex items-center gap-2 border-b px-3 py-2.5">
+      <div class="rounded-default bg-theme-accent h-4 w-0.75 shrink-0" />
       <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
         t("evalSpend.cost.title")
       }}</span>
@@ -35,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`job-form-cost-${tile.id}`"
         >
           <span class="text-2xs text-text-secondary font-semibold">{{ tile.label }}</span>
-          <span class="text-text-heading text-lg leading-none font-semibold tabular-nums">{{
+          <span class="text-text-heading text-lg leading-none font-bold tabular-nums">{{
             tile.value
           }}</span>
           <span v-if="tile.id === 'perDay' && unpricedJudge" class="text-2xs">

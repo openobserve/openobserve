@@ -69,7 +69,7 @@ async function ensureQuickModeOff(page) {
   const candidates = [
     page.locator('button:has-text("More")').first(),
     page.locator('[data-test="logs-search-bar-more-btn"]').first(),
-    page.locator('[data-test="logs-search-bar-utilities-menu-btn"]').first(),
+    page.locator('[data-test="logs-search-bar-more-options-btn"]').first(),
   ];
   let opened = false;
   for (const cand of candidates) {

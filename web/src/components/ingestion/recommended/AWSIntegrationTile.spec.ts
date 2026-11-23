@@ -400,24 +400,24 @@ describe("AWSIntegrationTile.vue", () => {
       expect(dialogs.length).toBe(2);
     });
 
-    it('passes title "Choose integration method" to the template selection ODialog', () => {
+    it('passes title "Choose Integration Method" to the template selection ODialog', () => {
       wrapper = createWrapper();
       const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props("title") === "Choose integration method");
+      const templateDialog = dialogs.find((d) => d.props("title") === "Choose Integration Method");
       expect(templateDialog).toBeTruthy();
     });
 
     it('passes size "sm" to the template selection ODialog', () => {
       wrapper = createWrapper();
       const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props("title") === "Choose integration method");
+      const templateDialog = dialogs.find((d) => d.props("title") === "Choose Integration Method");
       expect(templateDialog!.props("size")).toBe("sm");
     });
 
     it('passes secondary?.label "Cancel" to the template selection ODialog', () => {
       wrapper = createWrapper();
       const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props("title") === "Choose integration method");
+      const templateDialog = dialogs.find((d) => d.props("title") === "Choose Integration Method");
       expect(templateDialog!.props("secondary")?.label).toBe("Cancel");
     });
 
@@ -432,7 +432,7 @@ describe("AWSIntegrationTile.vue", () => {
     it("forwards open=false to the template selection ODialog initially", () => {
       wrapper = createWrapper();
       const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props("title") === "Choose integration method");
+      const templateDialog = dialogs.find((d) => d.props("title") === "Choose Integration Method");
       expect(templateDialog!.props("open")).toBe(false);
     });
 
@@ -463,7 +463,7 @@ describe("AWSIntegrationTile.vue", () => {
       await addSourceBtn.trigger("click");
 
       const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props("title") === "Choose integration method");
+      const templateDialog = dialogs.find((d) => d.props("title") === "Choose Integration Method");
       expect(templateDialog!.props("open")).toBe(true);
     });
 
@@ -491,7 +491,7 @@ describe("AWSIntegrationTile.vue", () => {
 
       // Drive Cancel button via click:secondary emit
       const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props("title") === "Choose integration method");
+      const templateDialog = dialogs.find((d) => d.props("title") === "Choose Integration Method");
       await templateDialog!.vm.$emit("click:secondary");
 
       expect(vm.showTemplateDialog).toBe(false);

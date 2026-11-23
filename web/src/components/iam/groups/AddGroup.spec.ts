@@ -242,7 +242,7 @@ describe("AddGroup", () => {
       const updateOpen = wrapper.emitted("update:open");
       expect(updateOpen[updateOpen.length - 1]).toEqual([false]);
       expect(mockToast).toHaveBeenCalledWith({
-        message: 'User group "test_group" created successfully!',
+        message: 'User Group "test_group" Created Successfully!',
         variant: "success",
       });
     });

@@ -192,9 +192,10 @@ onBeforeUnmount(() => {
 });
 
 const indicatorClasses = computed(() => [
-  "pointer-events-none absolute left-0 top-0 rounded-default bg-toggle-item-active-bg ring-1 ring-toggle-item-active-border shadow-xs",
+  // An inset ring paints inside the measured box, so the edge moves neither the pill nor the items.
+  "pointer-events-none absolute left-0 top-0 rounded-default bg-toggle-item-active-bg ring-1 ring-inset ring-toggle-item-active-border shadow-xs",
   transitionOn.value &&
-    "transition-[transform,width,height] duration-(--duration-indicator) ease-(--ease-control) motion-reduce:transition-none",
+    "transition-[transform,width,height] duration-300 ease-out motion-reduce:transition-none",
   indicatorVisible.value ? "opacity-100" : "opacity-0",
 ]);
 
@@ -222,13 +223,22 @@ const wrapperClasses = computed(() => {
 const isVertical = computed(() => props.orientation === "vertical");
 
 // Horizontal tracks take the control height; items take the next token down, inside the padding.
-// The tray is a fill with no edge; the raised selected segment carries the only hairline.
-const trackClasses = computed(() => [
-  "relative inline-flex rounded-default bg-toggle-track-bg",
-  isVertical.value
-    ? "flex-col items-stretch p-0.5"
-    : ["flex-row items-center p-0.5", props.size === "sm" ? "h-control-sm" : "h-control-md"],
-]);
+// A bordered track spends one pixel of that padding on its edge, so its items keep their token.
+function trackClassesFor(bordered: boolean): (string | string[])[] {
+  return [
+    "relative inline-flex bg-toggle-track-bg rounded-default",
+    bordered ? "border-toggle-border border" : "",
+    isVertical.value
+      ? "flex-col items-stretch p-0.5"
+      : [
+          "flex-row items-center",
+          bordered ? "p-px" : "p-0.5",
+          props.size === "sm" ? "h-control-sm" : "h-control-md",
+        ],
+  ];
+}
+const trackClasses = computed(() => trackClassesFor(false));
+const borderedTrackClasses = computed(() => trackClassesFor(true));
 
 const draggingValue = ref<string | null>(null);
 const dropTargetValue = ref<string | null>(null);
@@ -386,7 +396,7 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
     :orientation="orientation"
     :data-variant="variant"
     :class="[
-      trackClasses,
+      borderedTrackClasses,
       // Wrapped toggle chips read as two unrelated controls, so the strip scrolls within its track.
       orientation !== 'vertical' &&
         'max-md:max-w-full max-md:overflow-x-auto @max-4xl/page:max-w-full @max-4xl/page:overflow-x-auto',

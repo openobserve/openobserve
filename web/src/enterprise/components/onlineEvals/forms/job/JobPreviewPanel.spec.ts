@@ -42,9 +42,9 @@ function mountPreview(targetScope: EvalTargetScope) {
 
 describe("JobPreviewPanel", () => {
   it.each([
-    ["span", "Matched spans", "spans matched · last 1h"],
-    ["trace", "Matched traces", "traces matched · last 1h"],
-    ["session", "Matched sessions", "sessions matched · last 1h"],
+    ["span", "Matched Spans", "spans matched · last 1h"],
+    ["trace", "Matched Traces", "traces matched · last 1h"],
+    ["session", "Matched Sessions", "sessions matched · last 1h"],
   ] as const)("uses %s target terminology", (targetScope, title, matchedSuffix) => {
     const text = mountPreview(targetScope).find('[data-test="job-preview-matched-targets"]').text();
 

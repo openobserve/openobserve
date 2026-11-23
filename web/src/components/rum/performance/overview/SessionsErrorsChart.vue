@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div class="flex flex-wrap items-baseline justify-between gap-2">
-      <h2 class="text-text-heading text-sm font-semibold">
+      <h2 class="text-text-heading text-base font-bold">
         {{ t("rum.overviewPage.chartTitle") }}
         <span
           class="text-text-secondary text-sm font-normal"

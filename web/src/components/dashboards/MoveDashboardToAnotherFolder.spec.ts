@@ -245,10 +245,10 @@ describe("MoveDashboardToAnotherFolder", () => {
       expect(drawer.props("size")).toBe("md");
     });
 
-    it("should pass 'Move dashboard' title to ODrawer", () => {
+    it("should pass 'Move Dashboard' title to ODrawer", () => {
       wrapper = createWrapper();
       const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("title")).toBe("Move dashboard");
+      expect(drawer.props("title")).toBe("Move Dashboard");
     });
 
     it("should render i18n label on secondary (cancel) button", () => {
@@ -550,7 +550,7 @@ describe("MoveDashboardToAnotherFolder", () => {
     });
 
     it("should translate labels correctly", () => {
-      expect(wrapper.vm.t("dashboard.currentFolderLabel")).toBe("Current folder");
+      expect(wrapper.vm.t("dashboard.currentFolderLabel")).toBe("Current Folder");
       expect(wrapper.vm.t("dashboard.cancel")).toBe("Cancel");
       expect(wrapper.vm.t("common.move")).toBe("Move");
     });

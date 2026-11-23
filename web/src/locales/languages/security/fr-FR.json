@@ -20,8 +20,7 @@
       "close": "Fermer",
       "mitre": "MITRE ATT&CK",
       "severity": "Sévérité",
-      "viewAll": "Voir tout",
-      "moreActions": "Plus d'actions"
+      "viewAll": "Voir tout"
     },
     "caseStatus": {
       "open": "Nouveau",
@@ -162,15 +161,7 @@
       "explore": "Explorer",
       "noSources": "Aucune source de sécurité pour l'instant",
       "noSourcesHint": "Ingérez CloudTrail, Okta, VPC Flow ou syslog. Les flux dont le nom contient security, audit, auth ou firewall apparaissent ici automatiquement.",
-      "summaryPartial": "Cette fenêtre contient plus d'historique d'alertes qu'un résumé ne peut en contenir ; les décomptes et les graphiques constituent donc une borne inférieure. Choisissez une fenêtre plus courte pour obtenir des chiffres complets.",
-      "autoRefresh": "Actualisation automatique chaque minute",
-      "whatDetections": "détections",
-      "rulesFailedHint": "Les détections n'ont pas pu être lues, les déclenchements ne peuvent donc pas être comptés. Réessayez ou consultez la page Détections.",
-      "historyFailedHint": "L'historique des déclenchements est indisponible, ils ne sont donc pas comptés. Réessayez ou consultez la page Alertes.",
-      "whatFirings": "déclenchements",
-      "emptyTitle": "Aucune détection activée pour le moment",
-      "emptyHint": "Activez des détections depuis le catalogue Sigma pour démarrer la surveillance. Vérifiez dans Sources que vos données de sécurité arrivent.",
-      "openSources": "Ouvrir les sources"
+      "summaryPartial": "Cette fenêtre contient plus d'historique d'alertes qu'un résumé ne peut en contenir ; les décomptes et les graphiques constituent donc une borne inférieure. Choisissez une fenêtre plus courte pour obtenir des chiffres complets."
     },
     "events": {
       "title": "Événements de sécurité",
@@ -288,8 +279,7 @@
           "outcome": "Résultat",
           "message": "Message"
         }
-      },
-      "openSources": "Ouvrir les sources"
+      }
     },
     "drawer": {
       "event": "Événement de sécurité",
@@ -469,9 +459,7 @@
         "action": "Action",
         "object": "Objet",
         "host": "Hôte"
-      },
-      "whatAlerts": "alertes",
-      "loadFailedHint": "L'historique des déclenchements n'a pas pu être lu. Réessayez ou vérifiez dans Détections que des détections sont activées."
+      }
     },
     "cases": {
       "title": "Cas",
@@ -720,9 +708,7 @@
         "showAll": "Afficher toutes les lignes",
         "onlyEntity": "Uniquement les entités de ce cas",
         "noneForEntity": "Aucune ligne de ce déclenchement ne désigne les entités de ce cas"
-      },
-      "whatCases": "cas",
-      "loadFailedHint": "Les cas n'ont pas pu être lus. Réessayez ou vérifiez que la gestion des cas est activée pour cette organisation."
+      }
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -785,9 +771,7 @@
       "manageDetections": "Gérer les détections",
       "historyNarrowed": "La plage de requête maximale de l'historique des alertes limite les déclenchements à ceux depuis {from} ; les déclenchements antérieurs dans cette fenêtre ne sont pas comptés.",
       "cellNone": "Aucune règle",
-      "coverageError": "Impossible de charger la couverture ATT&CK : {reason}",
-      "whatCoverage": "la couverture ATT&CK",
-      "loadFailedHint": "La couverture n'a pas pu être calculée, aucun chiffre n'est donc affiché. Réessayez ou consultez la page Détections."
+      "coverageError": "Impossible de charger la couverture ATT&CK : {reason}"
     },
     "detections": {
       "title": "Détections",
@@ -1014,9 +998,7 @@
           "in_cidr": "est dans la plage (CIDR)",
           "in_list": "est dans la liste d'autorisation"
         }
-      },
-      "whatDetections": "détections",
-      "loadFailedHint": "Les détections n'ont pas pu être lues. Réessayez ou vérifiez que vous pouvez voir les alertes de cette organisation."
+      }
     },
     "tuning": {
       "open": "Réglage",
@@ -1233,9 +1215,7 @@
         "openAllowlists": "Ouvrir les listes d'autorisation"
       },
       "otherSourceOnly": "Autres sources uniquement",
-      "otherSourceOnlyHint": "Écrite pour {logsource}. Elle ne se compile sur vos flux que via des noms de champs partagés, elle n'est donc pas comptée comme prête à installer.",
-      "whatRules": "le catalogue de détections",
-      "loadFailedHint": "Le catalogue Sigma n'a pas chargé, le nombre de règles et de sources est donc inconnu. Réessayez dans un instant."
+      "otherSourceOnlyHint": "Écrite pour {logsource}. Elle ne se compile sur vos flux que via des noms de champs partagés, elle n'est donc pas comptée comme prête à installer."
     },
     "entities": {
       "title": "Entités",
@@ -1355,9 +1335,7 @@
       "loadError": "Impossible de charger les sources de sécurité",
       "detailFailed": "Certaines données de cette entité n’ont pas pu être lues : {streams}.",
       "aliasCount": "+{n} graphie | +{n} graphies",
-      "aliasHint": "Journalisée avec cette graphie ; c'est la même identité.",
-      "whatEntities": "entités",
-      "loadFailedHint": "Les sources de sécurité sont injoignables. Vérifiez dans Sources qu'une source est connectée, puis réessayez."
+      "aliasHint": "Journalisée avec cette graphie ; c'est la même identité."
     },
     "ueba": {
       "title": "Analyse du comportement des utilisateurs",
@@ -1456,9 +1434,7 @@
       "volumeNotJudged": "Le volume n'est pas évalué pour cet utilisateur : les fenêtres de moins d'un jour sont comparées aux mêmes heures de la journée dans la référence, ce qui nécessite au moins un jour d'historique.",
       "baselineBuilding": "Référence en cours de constitution",
       "baselineBuildingHint": "{span} d'historique pour l'instant. La comparaison avec le passé propre à cet utilisateur démarre dès qu'un historique complet de {baseline} existe ; entre-temps, seules les valeurs aberrantes nettes par rapport aux autres utilisateurs sont signalées.",
-      "buildingNotice": "La référence est encore en cours de constitution pour {n} utilisateur : tant qu'un historique complet de {baseline} n'existe pas, seules les valeurs aberrantes nettes par rapport aux autres utilisateurs sont signalées. | Les références sont encore en cours de constitution pour {n} utilisateurs : tant qu'un historique complet de {baseline} n'existe pas, seules les valeurs aberrantes nettes par rapport aux autres utilisateurs sont signalées.",
-      "whatUsers": "comportement des utilisateurs",
-      "loadFailedHint": "Les sources de sécurité sont injoignables. Vérifiez dans Sources qu'une source est connectée, puis réessayez."
+      "buildingNotice": "La référence est encore en cours de constitution pour {n} utilisateur : tant qu'un historique complet de {baseline} n'existe pas, seules les valeurs aberrantes nettes par rapport aux autres utilisateurs sont signalées. | Les références sont encore en cours de constitution pour {n} utilisateurs : tant qu'un historique complet de {baseline} n'existe pas, seules les valeurs aberrantes nettes par rapport aux autres utilisateurs sont signalées."
     },
     "intel": {
       "title": "Renseignement sur les menaces",
@@ -1626,11 +1602,7 @@
       },
       "partialChecked": "Résultat partiel : {checked} indicateurs sur {total} vérifiés. Les totaux pour les autres peuvent être trop bas.",
       "partialCapped": "Résultat partiel : {checked} indicateurs sur {total} vérifiés. Le balayage s'arrête à {n} requêtes ; les indicateurs les moins graves n'ont pas été vérifiés.",
-      "inText": "{column} (dans le texte)",
-      "runSweepDisabled": "Ajoutez au moins un indicateur pour lancer un balayage.",
-      "whatIndicators": "renseignement sur les menaces",
-      "loadFailedHint": "Les listes d'indicateurs n'ont pas pu être lues. Réessayez ou vérifiez que vous pouvez lire les tables de référence de cette organisation.",
-      "filterType": "Type"
+      "inText": "{column} (dans le texte)"
     },
     "sources": {
       "title": "Sources de données",
@@ -1695,9 +1667,7 @@
         "pipeline_missing": "il n’existe plus",
         "other_stream": "il lit désormais un autre flux",
         "other_pack": "il exécute désormais un autre pack"
-      },
-      "whatSources": "sources de sécurité",
-      "loadFailedHint": "Les sources de sécurité sont injoignables. Vérifiez la connexion ou les autorisations, puis réessayez."
+      }
     },
     "nav": {
       "overview": "Vue d'ensemble",
@@ -1765,10 +1735,6 @@
       "indicatorType": "Type d’indicateur",
       "severityFilter": "Filtre de gravité",
       "stream": "Flux"
-    },
-    "loadError": {
-      "title": "Impossible de charger {what}",
-      "hint": "Le serveur n'a pas répondu pour {what}. Vérifiez la connexion ou les autorisations, puis réessayez."
     }
   }
 }

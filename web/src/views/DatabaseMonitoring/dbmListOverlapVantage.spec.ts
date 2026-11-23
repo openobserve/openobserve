@@ -140,11 +140,9 @@ describe("QueriesPage sources its overlap measures from the database", () => {
     expect(cellSlot(source, "calls")).toContain("row.overlapCalls.source === 'client'");
   });
 
-  // The provenance rides in the header tooltip, so the header stays one line.
-  it("labels the columns with their provenance in the header tooltip", () => {
-    expect(source).toContain('headerTooltip: t("dbm.queries.columnHints.calls")');
-    expect(source).toContain('headerTooltip: t("dbm.queries.columnHints.load")');
-    expect(source).not.toContain("headerSubLabel");
+  it("labels the columns with their provenance in the header", () => {
+    expect(source).toContain("dbm.queries.columnSubLabels.calls");
+    expect(source).toContain("dbm.queries.columnSubLabels.load");
   });
 
   describe("the summary tiles", () => {
@@ -347,8 +345,8 @@ describe("DatabasesPage qualifies its overlap measures", () => {
     expect(source).not.toContain("DbmAppSourceLegend");
   });
 
-  it("states the calls provenance in the header tooltip too", () => {
-    expect(source).toContain('headerTooltip: t("dbm.databases.columnHints.calls")');
+  it("states the calls provenance in the header too", () => {
+    expect(source).toContain("dbm.databases.columnSubLabels.calls");
   });
 
   /**
@@ -356,10 +354,9 @@ describe("DatabasesPage qualifies its overlap measures", () => {
    * hide: `attention` is the server's own saturation and `load` is
    * client-observed span time. Extending the page must not cost these.
    */
-  it("keeps the attention/load provenance in their header tooltips", () => {
-    expect(source).toContain('headerTooltip: t("dbm.databases.columnHints.attention")');
-    expect(source).toContain('headerTooltip: t("dbm.databases.columnHints.load")');
-    expect(source).not.toContain("headerSubLabel");
+  it("keeps the attention/load provenance sub-labels", () => {
+    expect(source).toContain("dbm.databases.columnSubLabels.attention");
+    expect(source).toContain("dbm.databases.columnSubLabels.load");
   });
 
   describe("the two vantage states", () => {
@@ -624,11 +621,11 @@ describe("a MySQL row can never show its time without a wait qualifier", () => {
   });
 });
 
-describe("the Databases calls header", () => {
-  it("stays one line, with its provenance in the tooltip", () => {
+describe("the Databases calls header fits its sub-label", () => {
+  it("leaves room for 'from your apps' beside the sort chevron", () => {
     const source = read("DatabasesPage.vue");
     const calls = source.slice(source.indexOf('id: "calls",'), source.indexOf('id: "qps",'));
-    expect(calls).not.toContain("headerSubLabel");
-    expect(calls).toContain("dbm.databases.columnHints.calls");
+    const size = Number(/size: (\d+),/.exec(calls)?.[1]);
+    expect(size).toBeGreaterThanOrEqual(124);
   });
 });

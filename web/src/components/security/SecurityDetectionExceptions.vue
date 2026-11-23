@@ -7,13 +7,14 @@ import { computed, ref } from "vue";
 import { securityTime } from "@/utils/security/time";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -166,6 +167,7 @@ const opLabel = (op: string) =>
       <OButton
         v-if="canAuthor && !adding"
         variant="secondary"
+        icon="add"
         data-test="security-detection-exceptions-add"
         @click="startAdding"
         >{{ t("siem.detections.exceptions.add") }}</OButton
@@ -253,18 +255,18 @@ const opLabel = (op: string) =>
       </OForm>
     </div>
 
-    <OSkeleton v-if="list.isLoading.value" preset="tableRows" :rows="3" />
-    <OEmptyState
+    <div v-if="list.isLoading.value" class="flex items-center justify-center py-6">
+      <OSpinner size="sm" />
+    </div>
+    <OInlineNotice
       v-else-if="list.isError.value && !isForbiddenError(list.error.value)"
-      kind="error"
-      size="compact"
-      :title="t('siem.detections.exceptions.loadError')"
+      tone="err"
       data-test="security-detection-exceptions-error"
-      @action="list.refetch()"
-    />
+      >{{ t("siem.detections.exceptions.loadError") }}</OInlineNotice
+    >
     <OEmptyState
       v-else-if="!exceptions.length && !adding"
-      size="compact"
+      size="inline"
       icon="rule"
       :title="t('siem.detections.exceptions.empty')"
       :text="t('siem.detections.exceptions.emptyHint')"

@@ -20,8 +20,7 @@
       "close": "Fechar",
       "mitre": "MITRE ATT&CK",
       "severity": "Severidade",
-      "viewAll": "Ver tudo",
-      "moreActions": "Mais ações"
+      "viewAll": "Ver tudo"
     },
     "caseStatus": {
       "open": "Novo",
@@ -162,15 +161,7 @@
       "explore": "Explorar",
       "noSources": "Ainda não há fontes de segurança",
       "noSourcesHint": "Ingira CloudTrail, Okta, VPC Flow ou syslog. Os streams com security, audit, auth ou firewall no nome aparecem aqui automaticamente.",
-      "summaryPartial": "Esta janela tem mais histórico de alertas do que um resumo consegue conter, pelo que as contagens e os gráficos são um limite inferior; escolha uma janela mais curta para obter números completos.",
-      "autoRefresh": "Atualizar automaticamente a cada minuto",
-      "whatDetections": "deteções",
-      "rulesFailedHint": "Não foi possível ler as deteções, por isso os disparos não podem ser contados. Tente novamente ou verifique a página Deteções.",
-      "historyFailedHint": "O histórico de disparos não está disponível, por isso os disparos não são contados. Tente novamente ou verifique a página Alertas.",
-      "whatFirings": "disparos",
-      "emptyTitle": "Ainda não há deteções ativadas",
-      "emptyHint": "Ative deteções do catálogo Sigma para começar a monitorizar. Verifique em Origens se os seus dados de segurança estão a chegar.",
-      "openSources": "Abrir origens"
+      "summaryPartial": "Esta janela tem mais histórico de alertas do que um resumo consegue conter, pelo que as contagens e os gráficos são um limite inferior; escolha uma janela mais curta para obter números completos."
     },
     "events": {
       "title": "Eventos de segurança",
@@ -288,8 +279,7 @@
           "outcome": "Resultado",
           "message": "Mensagem"
         }
-      },
-      "openSources": "Abrir origens"
+      }
     },
     "drawer": {
       "event": "Evento de segurança",
@@ -469,9 +459,7 @@
         "action": "Ação",
         "object": "Objeto",
         "host": "Host"
-      },
-      "whatAlerts": "alertas",
-      "loadFailedHint": "Não foi possível ler o histórico de disparos. Tente novamente ou verifique em Deteções se há deteções ativadas."
+      }
     },
     "cases": {
       "title": "Casos",
@@ -720,9 +708,7 @@
         "showAll": "Mostrar todas as linhas",
         "onlyEntity": "Apenas as entidades deste caso",
         "noneForEntity": "Nenhuma linha deste disparo indica as entidades deste caso"
-      },
-      "whatCases": "casos",
-      "loadFailedHint": "Não foi possível ler os casos. Tente novamente ou verifique se a gestão de casos está ativada para esta organização."
+      }
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -785,9 +771,7 @@
       "manageDetections": "Gerir deteções",
       "historyNarrowed": "O intervalo máximo de consulta do histórico de alertas limita os disparos aos ocorridos desde {from}; os disparos anteriores nesta janela não são contabilizados.",
       "cellNone": "Sem regra",
-      "coverageError": "Não foi possível carregar a cobertura ATT&CK: {reason}",
-      "whatCoverage": "a cobertura ATT&CK",
-      "loadFailedHint": "Não foi possível calcular a cobertura, por isso não são mostradas contagens. Tente novamente ou verifique a página Deteções."
+      "coverageError": "Não foi possível carregar a cobertura ATT&CK: {reason}"
     },
     "detections": {
       "title": "Deteções",
@@ -1014,9 +998,7 @@
           "in_cidr": "está no intervalo (CIDR)",
           "in_list": "está na lista de permissões"
         }
-      },
-      "whatDetections": "deteções",
-      "loadFailedHint": "Não foi possível ler as deteções. Tente novamente ou verifique se pode ver alertas nesta organização."
+      }
     },
     "tuning": {
       "open": "Afinação",
@@ -1233,9 +1215,7 @@
         "openAllowlists": "Abrir listas de permissões"
       },
       "otherSourceOnly": "Apenas outras fontes",
-      "otherSourceOnlyHint": "Escrita para {logsource}. Só compila nos seus fluxos através de nomes de campos partilhados, por isso não conta como pronta a instalar.",
-      "whatRules": "o catálogo de deteções",
-      "loadFailedHint": "O catálogo Sigma não foi carregado, por isso as contagens de regras e origens são desconhecidas. Tente novamente daqui a pouco."
+      "otherSourceOnlyHint": "Escrita para {logsource}. Só compila nos seus fluxos através de nomes de campos partilhados, por isso não conta como pronta a instalar."
     },
     "entities": {
       "title": "Entidades",
@@ -1355,9 +1335,7 @@
       "loadError": "Não foi possível carregar fontes de segurança",
       "detailFailed": "Não foi possível ler alguns dos dados desta entidade: {streams}.",
       "aliasCount": "+{n} grafia | +{n} grafias",
-      "aliasHint": "Registada com esta grafia; é a mesma identidade.",
-      "whatEntities": "entidades",
-      "loadFailedHint": "As origens de segurança estão inacessíveis. Verifique em Origens se há uma origem ligada e tente novamente."
+      "aliasHint": "Registada com esta grafia; é a mesma identidade."
     },
     "ueba": {
       "title": "Análise de comportamento do utilizador",
@@ -1456,9 +1434,7 @@
       "volumeNotJudged": "O volume não é avaliado para este utilizador: as janelas inferiores a um dia são comparadas com as mesmas horas do dia na linha de base, o que exige pelo menos um dia de histórico.",
       "baselineBuilding": "A criar linha de base",
       "baselineBuildingHint": "{span} de histórico até agora. A comparação com o passado deste utilizador começa quando existir um histórico completo de {baseline}; entretanto, só são assinalados os valores atípicos claros face a outros utilizadores.",
-      "buildingNotice": "A linha de base ainda está a ser criada para {n} utilizador: até existir um histórico completo de {baseline}, só são assinalados os valores atípicos claros face a outros utilizadores. | As linhas de base ainda estão a ser criadas para {n} utilizadores: até existir um histórico completo de {baseline}, só são assinalados os valores atípicos claros face a outros utilizadores.",
-      "whatUsers": "comportamento dos utilizadores",
-      "loadFailedHint": "As origens de segurança estão inacessíveis. Verifique em Origens se há uma origem ligada e tente novamente."
+      "buildingNotice": "A linha de base ainda está a ser criada para {n} utilizador: até existir um histórico completo de {baseline}, só são assinalados os valores atípicos claros face a outros utilizadores. | As linhas de base ainda estão a ser criadas para {n} utilizadores: até existir um histórico completo de {baseline}, só são assinalados os valores atípicos claros face a outros utilizadores."
     },
     "intel": {
       "title": "Inteligência de ameaças",
@@ -1626,11 +1602,7 @@
       },
       "partialChecked": "Resultado parcial: {checked} de {total} indicadores verificados. As contagens dos restantes podem estar abaixo do real.",
       "partialCapped": "Resultado parcial: {checked} de {total} indicadores verificados. O varrimento pára às {n} consultas; os indicadores menos graves não foram verificados.",
-      "inText": "{column} (no texto)",
-      "runSweepDisabled": "Adicione pelo menos um indicador para executar uma varredura.",
-      "whatIndicators": "inteligência de ameaças",
-      "loadFailedHint": "Não foi possível ler as listas de indicadores. Tente novamente ou verifique se pode ler tabelas de consulta nesta organização.",
-      "filterType": "Tipo"
+      "inText": "{column} (no texto)"
     },
     "sources": {
       "title": "Fontes de dados",
@@ -1695,9 +1667,7 @@
         "pipeline_missing": "já não existe",
         "other_stream": "agora lê outro stream",
         "other_pack": "agora executa um pacote diferente"
-      },
-      "whatSources": "origens de segurança",
-      "loadFailedHint": "As origens de segurança estão inacessíveis. Verifique a ligação ou as permissões e tente novamente."
+      }
     },
     "nav": {
       "overview": "Visão geral",
@@ -1765,10 +1735,6 @@
       "indicatorType": "Tipo de indicador",
       "severityFilter": "Filtro de gravidade",
       "stream": "Stream"
-    },
-    "loadError": {
-      "title": "Não foi possível carregar {what}",
-      "hint": "O servidor não respondeu para {what}. Verifique a ligação ou as permissões e tente novamente."
     }
   }
 }

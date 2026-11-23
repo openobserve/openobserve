@@ -43,10 +43,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else role="list" data-test="date-time-rail-recent-list">
         <div
-          v-for="item in visibleRecent"
+          v-for="(item, index) in visibleRecent"
           :key="item.id"
           role="listitem"
           class="group relative px-1"
+          :class="
+            index < visibleRecent.length - 1 ? 'border-border-default border-b border-dotted' : ''
+          "
         >
           <OTooltip side="right" :content="item.disabled ? restrictionMsg : item.tooltip" />
           <!-- An over-limit row stays focusable without native disabled, so Delete can still remove it. -->
@@ -129,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       role="group"
       :aria-labelledby="calendarHeadingId"
       class="flex flex-col"
-      :class="recent.length > 0 ? 'mt-2' : ''"
+      :class="recent.length > 0 ? 'border-border-default mt-2 border-t' : ''"
       data-test="date-time-rail-calendar-group"
     >
       <div
@@ -140,7 +143,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("common.timeRangeCalendar") }}
       </div>
       <div role="list" class="flex flex-col px-1" data-test="date-time-rail-calendar-list">
-        <div v-for="item in calendar" :key="item.id" role="listitem" class="min-w-0">
+        <div
+          v-for="(item, index) in calendar"
+          :key="item.id"
+          role="listitem"
+          class="min-w-0"
+          :class="index < calendar.length - 1 ? 'border-border-default border-b' : ''"
+        >
           <OTooltip side="right" :content="item.disabled ? restrictionMsg : item.tooltip" />
           <OButton
             variant="ghost"

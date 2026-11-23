@@ -342,6 +342,7 @@
                 <div class="flex flex-wrap items-center gap-2">
                   <OButton
                     variant="secondary"
+                    icon="add"
                     :data-test="`oncall-policy-add-step-${current.priority}`"
                     @click="addStep(current)"
                   >

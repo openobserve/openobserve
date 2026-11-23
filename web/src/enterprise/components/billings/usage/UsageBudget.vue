@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="px-4 pt-3 pb-1.5">
           <div class="flex items-baseline gap-2.5">
-            <span class="text-text-heading text-xl font-semibold tabular-nums">
+            <span class="text-text-heading text-xl font-bold tabular-nums">
               {{ formatCost(spent) }}
             </span>
             <span v-if="hasBudget" class="text-text-secondary text-sm tabular-nums">

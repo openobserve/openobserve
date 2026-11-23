@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="!summaryOpen" class="bg-surface-base rounded-default absolute start-3 top-3 z-20">
         <OButton
           icon-only
-          variant="ghost"
+          variant="secondary"
           icon="left-panel-open"
           :aria-label="t('search.queryProfile.showSummary')"
           data-test="query-plan-show-summary"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OButton
           icon-only
-          variant="ghost"
+          variant="secondary"
           icon="left-panel-open"
           :aria-label="t('search.queryProfile.showDetails')"
           data-test="query-plan-show-detail"

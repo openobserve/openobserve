@@ -488,12 +488,14 @@ const namespaceOf = (row: any): string =>
     <template #empty>
       <OEmptyState
         v-if="anchorMissing"
+        size="inline"
         :title="t('infra.k8s2.noKindData', { kind: kindLabel })"
         :text="t('infra.k8s2.needsMetric', { stream: raw(anchorMissing) })"
         data-test="k8s2-empty-anchor"
       />
       <OEmptyState
         v-else
+        size="inline"
         :kind="narrowed ? 'filtered' : 'first-run'"
         :text="
           narrowed

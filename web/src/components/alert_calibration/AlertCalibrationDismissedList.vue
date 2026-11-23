@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <LiveNoticeState
       v-else-if="unknown"
-      size="region"
+      size="page"
       :notice="readNotice(t, query.error.value, t('alertCalibration.dismiss.loadFailedTitle'))"
       :detail="readFailedDetail(query.error.value)"
       data-test="alert-calibration-dismissed-error"

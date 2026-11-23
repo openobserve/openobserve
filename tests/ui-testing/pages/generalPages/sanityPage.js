@@ -16,7 +16,7 @@ export class SanityPage {
         this.quickModeToggleButton = page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
         this.allFieldsButton = page.locator('[data-test="logs-all-fields-btn"]');
         this.interestingJobFieldButton = page.locator('[data-test="log-search-index-list-interesting-job-field-btn"]');
-        this.sqlModeToggleButton = page.locator('[data-test="logs-search-bar-query-mode-sql"]');
+        this.sqlModeToggleButton = page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
         this.queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
 
         // ============================================================
@@ -111,8 +111,7 @@ export class SanityPage {
         // Stream search input on Streams page; OInput auto-generates `-field` variant.
         this.searchStreamInputField = page.locator('[data-test="streams-search-stream-input-field"]');
         // Stream delete button per row (data-test added in LogStream.vue this pass).
-        this.streamRowMoreBtn = page.locator('[data-test="log-stream-row-more-actions"]').first();
-        this.streamDeleteFirstRowBtn = page.locator('[data-test="log-stream-delete-btn-menu"]').first();
+        this.streamDeleteFirstRowBtn = page.locator('[data-test="log-stream-delete-btn"]').first();
         // Stream delete confirmation dialog primary button.
         this.streamDeleteDialogPrimary = page.locator('[data-test="log-stream-delete-dialog"] [data-test="o-dialog-primary-btn"]');
 
@@ -248,7 +247,9 @@ export class SanityPage {
     // Histogram Methods
     // ================================================================
     async clickHistogramToggle() {
-        // The histogram toggle is a ⋯ item; a toolbar copy exists only when the user pinned it.
+        // Histogram has an inline toolbar button at normal viewport widths
+        // (data-test="logs-search-bar-histogram-btn"). It moves into the
+        // utilities ("More") menu only at narrow viewports (shouldMoveButtonsToMenu).
         const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
         const isInline = await inlineBtn.isVisible({ timeout: 1000 }).catch(() => false);
         if (isInline) {
@@ -267,14 +268,20 @@ export class SanityPage {
         await this.page.waitForTimeout(100);
     }
 
-    // Returns true when the histogram is ON: a pinned toolbar copy reports aria-pressed,
-    // the ⋯ item's OSwitch reports aria-checked on its role="switch".
+    // Returns true when the histogram OSwitch is currently ON.
+    // OSwitch surfaces its state via a nested `role="switch"` element carrying
+    // `aria-checked="true|false"`. At normal viewport widths the histogram button
+    // is inline; at narrow widths it lives inside the utilities menu.
     async isHistogramOn() {
+        // Check the inline histogram button first (normal viewport).
         const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
         const isInline = await inlineBtn.isVisible({ timeout: 1000 }).catch(() => false);
         if (isInline) {
-            return (await inlineBtn.getAttribute('aria-pressed')) === 'true';
+            const switchControl = inlineBtn.locator('[role="switch"]');
+            const aria = await switchControl.getAttribute('aria-checked');
+            return aria === 'true';
         }
+        // Narrow-viewport fallback: read state from the menu item OSwitch.
         const menuHistogramBtn = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
         const isMenuItemVisible = await menuHistogramBtn.isVisible({ timeout: 500 }).catch(() => false);
         if (!isMenuItemVisible) {
@@ -325,13 +332,6 @@ export class SanityPage {
      */
     async _clickSqlModeToggle() {
         await expect(this.queryEditor).toBeVisible({ timeout: 10000 });
-        // Turn SQL on through the toolbar tray when it is shown; idempotent, so a second call is safe.
-        if (await this.sqlModeToggleButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-            if ((await this.sqlModeToggleButton.getAttribute('data-state')) !== 'on') {
-                await this.sqlModeToggleButton.click();
-                await expect(this.sqlModeToggleButton).toHaveAttribute('data-state', 'on', { timeout: 10000 });
-            }
-        }
         const monacoHelper = new MonacoEditorHelper(this.page);
         await monacoHelper.setContentVerified(this.queryEditor, 'SELECT * FROM "e2e_automate"');
         await this.page.waitForTimeout(200);
@@ -679,8 +679,7 @@ export class SanityPage {
         // register clicks immediately after the list re-renders from the search filter.
         await this.page.waitForTimeout(1500);
 
-        // Delete lives in the row's more menu.
-        await this.streamRowMoreBtn.click();
+        // Click the per-row delete button.
         await this.streamDeleteFirstRowBtn.click();
 
         // Confirm via any visible primary dialog button (ODialog teleports content to body,

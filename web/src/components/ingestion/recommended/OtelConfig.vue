@@ -1,11 +1,11 @@
 <template>
   <div ref="root">
     <div class="p-2 pt-1">
-      <div class="text-sm font-semibold">{{ t("ingestion.otlpHttp") }}</div>
+      <div class="text-base font-bold font-medium">{{ t("ingestion.otlpHttp") }}</div>
       <CredentialCodeBlock slug="otel-http" class="mt-2" :content="getOtelHttpConfig" />
     </div>
     <div class="p-3" v-if="showOtlpGrpc">
-      <div class="text-sm font-semibold">{{ t("ingestion.otlpGrpc") }}</div>
+      <div class="text-base font-bold font-medium">{{ t("ingestion.otlpGrpc") }}</div>
       <CredentialCodeBlock slug="otel-grpc" :content="getOtelGrpcConfig" />
     </div>
     <FirstEventStatus

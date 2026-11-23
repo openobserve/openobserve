@@ -416,7 +416,7 @@ describe("O2AIChat", () => {
     const deleteDialog = () =>
       wrapper
         .findAllComponents({ name: "ODialog" })
-        .find((d) => d.props("title") === "Delete chat")!;
+        .find((d) => d.props("title") === "Delete Chat")!;
 
     it("names the chat in bold behind a destructive Delete", async () => {
       (wrapper.vm as any).chatHistory = [{ id: 42, title: "Latency review", serverBacked: false }];
@@ -590,9 +590,9 @@ describe("O2AIChat", () => {
       const drawer = wrapper.findComponent({ name: "ODrawer" });
       expect(drawer.exists()).toBe(true);
       expect(drawer.props("open")).toBe(true);
-      expect(drawer.props("title")).toBe("Chat history");
+      expect(drawer.props("title")).toBe("Chat History");
       expect(drawer.props("size")).toBe("sm");
-      expect(wrapper.find('[data-test="o-drawer-title"]').text()).toBe("Chat history");
+      expect(wrapper.find('[data-test="o-drawer-title"]').text()).toBe("Chat History");
     });
 
     it("should close the drawer when update:open is emitted with false", async () => {
@@ -630,7 +630,7 @@ describe("O2AIChat", () => {
     function findEditTitleDialog() {
       return wrapper
         .findAllComponents({ name: "ODialog" })
-        .find((d) => d.props("title") === "Edit chat title");
+        .find((d) => d.props("title") === "Edit Chat Title");
     }
 
     it("should not render the edit title dialog when showEditTitleDialog is false", async () => {

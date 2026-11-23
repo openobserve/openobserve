@@ -221,7 +221,7 @@ describe("ModelPricingEditor.vue", () => {
       const wrapper = createWrapper();
       await flushPromises();
       const title = wrapper.find('[data-test="model-pricing-editor-title"]');
-      expect(title.text()).toBe("New model pricing");
+      expect(title.text()).toBe("New Model Pricing");
     });
 
     it("renders the Edit title when route has id and not duplicate", async () => {
@@ -237,7 +237,7 @@ describe("ModelPricingEditor.vue", () => {
       const wrapper = createWrapper({ query: { id: "abc" } });
       await flushPromises();
       const title = wrapper.find('[data-test="model-pricing-editor-title"]');
-      expect(title.text()).toBe("Edit model pricing");
+      expect(title.text()).toBe("Edit Model Pricing");
     });
 
     it("shows New title (and clears id) when route is duplicate", async () => {
@@ -253,7 +253,7 @@ describe("ModelPricingEditor.vue", () => {
       const wrapper = createWrapper({ query: { id: "abc", duplicate: "true" } });
       await flushPromises();
       const title = wrapper.find('[data-test="model-pricing-editor-title"]');
-      expect(title.text()).toBe("New model pricing");
+      expect(title.text()).toBe("New Model Pricing");
       expect((wrapper.vm as any).model.id).toBeNull();
       expect((wrapper.vm as any).model.name).toContain("(Copy)");
     });
@@ -1647,7 +1647,7 @@ describe("ModelPricingEditor.vue", () => {
       await flushPromises();
       const dialog = wrapper.findComponent(ODialogStub);
       expect(dialog.props("size")).toBe("sm");
-      expect(dialog.props("title")).toBe("Match pattern examples");
+      expect(dialog.props("title")).toBe("Match Pattern Examples");
       expect(dialog.props("subtitle")).toBe("Common regex patterns used for popular models");
     });
 

@@ -26,9 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSkeleton class="h-4 w-1/2" />
       </div>
 
+      <!-- An org with no history yet is told plainly rather than being shown
+           an empty box it cannot act on — the same inline empty state the
+           deliveries ledger uses, so "nothing here yet" reads the same way
+           in both places. -->
       <OEmptyState
         v-else-if="!groups.length"
-        size="compact"
+        size="inline"
+        kind="filtered"
         :title="t('oncall.priorCausesEmpty')"
         data-test="oncall-prior-causes-empty"
       />

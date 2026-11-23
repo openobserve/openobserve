@@ -221,7 +221,7 @@ export default class DashboardSetting {
     await this.tab.waitFor({ state: "visible" });
     await this.tab.click();
     // TabsSettings loads dashboard data async on mount; wait for the first
-    // tab row (the default tab) to appear before clicking "Add tab",
+    // tab row (the default tab) to appear before clicking "Add Tab",
     // otherwise dashboardId is still undefined and the API call fails.
     await this.tabNameCells
       .first()
@@ -272,10 +272,6 @@ export default class DashboardSetting {
 
   //Full screen//
   async fullScreenSettings() {
-    // Full screen lives in the More menu; the exit button shows alone once in full screen.
-    if (!(await this.fullScreen.isVisible().catch(() => false))) {
-      await this.page.locator('[data-test="dashboard-more-options-btn"]').click();
-    }
     await this.fullScreen.waitFor({ state: "visible" });
     await this.fullScreen.click();
   }
@@ -487,7 +483,7 @@ export default class DashboardSetting {
     await this.page.locator(`[data-test="dashboard-variable-type-select-option"][data-test-value="${type.toLowerCase()}"]`).click();
     await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(variableName);
     // Selecting "Custom" type auto-creates the first option row (index 0).
-    // Do NOT click "Add option" — that would add a second empty row and fail validation.
+    // Do NOT click "Add Option" — that would add a second empty row and fail validation.
     await this.page
       .locator('[data-test="dashboard-custom-variable-0-label"]')
       .waitFor({ state: "visible", timeout: 10000 });

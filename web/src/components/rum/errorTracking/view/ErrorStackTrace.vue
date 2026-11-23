@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="ms-1 mt-4 flex">
     <div class="w-full">
-      <div class="mb-1 text-sm font-semibold">{{ t("rum.errorStack") }}</div>
+      <div class="mb-1 text-base font-bold">{{ t("rum.errorStack") }}</div>
       <div class="mb-2">{{ error_stack[0] }}</div>
 
       <!-- Tabs for Pretty and Raw views -->

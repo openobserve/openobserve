@@ -182,7 +182,7 @@ describe("FilterBuilder", () => {
         type: "condition",
         column: { field: "level", streamAlias: null },
         filterType: "condition",
-        operator: "Is empty",
+        operator: "Is Empty",
         value: null,
         logicalOperator: "AND",
         values: [],
@@ -195,7 +195,7 @@ describe("FilterBuilder", () => {
       };
       const state = mountBuilder("dashboard-panel", saved);
       await flushPromises();
-      expect(wrapper!.text()).toContain("Is empty");
+      expect(wrapper!.text()).toContain("Is Empty");
       await click("connector-1");
       expect(state.value.conditions[1].logicalOperator).toBe("AND");
       expect(state.value.conditions[0]).toEqual(empty);

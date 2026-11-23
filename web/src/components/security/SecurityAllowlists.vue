@@ -5,9 +5,10 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 import { computed, ref } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -71,6 +72,7 @@ async function onDelete(list: AllowList) {
       <OButton
         v-if="!editing"
         variant="secondary"
+        icon="add"
         :disabled="!canAuthor"
         data-test="security-allowlists-add"
         @click="editing = 'new'"
@@ -90,18 +92,18 @@ async function onDelete(list: AllowList) {
       @cancel="editing = null"
     />
 
-    <OSkeleton v-if="query.isLoading.value" preset="tableRows" :rows="3" />
-    <OEmptyState
+    <div v-if="query.isLoading.value" class="flex items-center justify-center py-6">
+      <OSpinner size="sm" />
+    </div>
+    <OInlineNotice
       v-else-if="query.isError.value && !isForbiddenError(query.error.value)"
-      kind="error"
-      size="compact"
-      :title="t('siem.tuning.allowlists.loadError')"
+      tone="err"
       data-test="security-allowlists-error"
-      @action="query.refetch()"
-    />
+      >{{ t("siem.tuning.allowlists.loadError") }}</OInlineNotice
+    >
     <OEmptyState
       v-else-if="!lists.length && !editing"
-      size="compact"
+      size="inline"
       icon="checklist"
       :title="t('siem.tuning.allowlists.empty')"
       :text="t('siem.tuning.allowlists.emptyHint')"

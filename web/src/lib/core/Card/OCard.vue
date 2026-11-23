@@ -22,7 +22,7 @@ const hasHeader = computed(() => !!props.title || !!slots.header);
       data-test="o-card-header"
     >
       <slot name="header">
-        <h3 class="text-text-heading min-w-0 truncate text-sm font-semibold">{{ title }}</h3>
+        <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">{{ title }}</h3>
         <span v-if="meta" class="text-text-muted shrink-0 text-xs whitespace-nowrap">{{
           meta
         }}</span>

@@ -30,7 +30,7 @@ export class RumPage {
         this.prettyUnavailableState = page.locator('[data-test="rum-pretty-stack-trace-unavailable"]');
         this.prettyErrorState = page.locator('[data-test="rum-pretty-stack-trace-error"]');
         this.prettyLoadingText = page.getByText('Translating stack trace with source maps...');
-        this.prettyUnavailableText = page.getByText('Source maps not available');
+        this.prettyUnavailableText = page.getByText('Source Maps Not Available');
         this.prettyTranslateFailedText = page.getByText(/Unable to translate stack trace/i);
         this.prettyMobileUnsupportedState = page.locator('[data-test="rum-pretty-stack-trace-mobile-unsupported"]');
         this.prettyUploadSourceMapsBtn = this.prettyUnavailableState.getByRole('button', { name: 'Upload Source Maps' });

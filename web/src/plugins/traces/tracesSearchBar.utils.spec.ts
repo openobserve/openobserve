@@ -302,19 +302,19 @@ describe("tracesToolbarLayout", () => {
 
   it.each([
     [1200, "full"],
-    [663, "full"],
-    [662, "compactButtons"],
-    [566, "compactButtons"],
-    [565, "iconToggle"],
-    [294, "iconToggle"],
-    [293, "resetInMenu"],
+    [739, "full"],
+    [738, "compactButtons"],
+    [642, "compactButtons"],
+    [641, "iconToggle"],
+    [370, "iconToggle"],
+    [369, "resetInMenu"],
     [0, "resetInMenu"],
   ])("at %i px picks the %s stage", (available, stage) => {
     expect(layout(available).stage).toBe(stage);
   });
 
   it("drops button labels before the view toggle labels", () => {
-    expect(layout(600).stage).toBe("compactButtons");
+    expect(layout(700).stage).toBe("compactButtons");
   });
 
   it("shrinks labels before a pinned group falls back into More", () => {
@@ -325,7 +325,7 @@ describe("tracesToolbarLayout", () => {
   it("keeps the toggle icon-only, not Reset in More, while the base items still fit", () => {
     const result = layout(400, { pinnedWidth: 171 });
     expect(result.stage).toBe("iconToggle");
-    expect(result.pinnedBudget).toBe(400 - 234);
+    expect(result.pinnedBudget).toBe(400 - 310);
   });
 
   it("uses the narrower toggle when Service Graph is hidden", () => {

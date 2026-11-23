@@ -238,23 +238,6 @@ describe("CreateAlertFromSourceDialog", () => {
       expect(wrapper.emitted("update:open")).toEqual([[false]]);
     });
 
-    it("closes on Escape when the source refined its prefill after the dialog opened", async () => {
-      wrapper = mount(CreateAlertFromSourceDialog, {
-        attachTo: document.body,
-        props: { open: true, prefill: asking(null) },
-        global: { plugins: [i18n], stubs: { ...stubs, ODialog: false } },
-      });
-      await flushPromises();
-      await wrapper.setProps({ prefill: { ...asking(30), streamName: "k8s_logs_v2" } });
-      await flushPromises();
-
-      pressEscape();
-      await flushPromises();
-
-      expect(byTest("o-dialog-discard-row")).toBeNull();
-      expect(wrapper.emitted("update:open")).toEqual([[false]]);
-    });
-
     it("asks the source to rebuild with the typed threshold", async () => {
       wrapper = mountDialog(asking(null));
       await wrapper.find('[data-test="create-alert-threshold-value"] input').setValue("40");

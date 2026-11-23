@@ -52,7 +52,7 @@ const toggleClasses = computed(() => [
   "h-control-xs px-2 cursor-pointer",
   "focus-visible:ring-badge-focus-ring focus-visible:ring-2 focus-visible:outline-none",
   props.pressed
-    ? "border-badge-primary-ol-border bg-badge-primary-soft-bg text-badge-primary-soft-text"
+    ? CHIP_TONE_CLASSES.accent
     : props.tone === "neutral"
       ? "border-border-default bg-surface-base text-text-secondary hover:border-border-strong hover:text-text-heading"
       : [CHIP_TONE_CLASSES[props.tone], "hover:border-current/50"],
@@ -63,7 +63,7 @@ const spanToggle = computed(() => props.toggle && props.removable);
 
 const classes = computed(() => [
   "rounded-chip inline-flex max-w-full items-center gap-1 border whitespace-nowrap",
-  "text-xs leading-none font-medium transition-colors duration-(--duration-control) ease-(--ease-control)",
+  "text-xs leading-none font-medium transition-colors duration-150",
   props.mono && "font-mono",
   props.toggle ? toggleClasses.value : [CHIP_TONE_CLASSES[props.tone], sizeClasses[props.size]],
   props.disabled && "pointer-events-none opacity-40",

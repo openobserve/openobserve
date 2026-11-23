@@ -45,13 +45,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #toolbar-trailing>
-            <ORefreshButton
-              :last-run-at="lastUpdatedAt"
+            <OButton
+              icon-only
+              variant="secondary"
+              icon="refresh"
               :loading="loading"
-              shortcut="orgManagementRefresh"
               data-test="org-management-list-refresh-btn"
               @click="getData"
-            />
+            >
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut="orgManagementRefresh"
+              />
+            </OButton>
           </template>
           <template #empty>
             <OEmptyState
@@ -346,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @submit="onExtendTrialSubmit"
       >
         <div class="flex flex-col gap-3">
-          <div class="font-semibold">{{ t("settings.organizationManagementPage.weeks") }}</div>
+          <div class="font-bold">{{ t("settings.organizationManagementPage.weeks") }}</div>
           <div class="flex gap-1">
             <span
               v-for="page in 4"
@@ -534,7 +541,6 @@ import { useRouter } from "vue-router";
 import OrganizationServices from "@/services/organizations";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -584,7 +590,6 @@ export default defineComponent({
     OBadge,
     OrgCleanupTasksDialog,
     OButton,
-    ORefreshButton,
     ODialog,
     ODropdown,
     ODropdownItem,
@@ -607,7 +612,6 @@ export default defineComponent({
     const extendTrialDataRow = ref();
     const extendedTrial = ref(1);
     const loading = ref(false);
-    const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref(false);
     const extendTrialPrompt = ref(false);
     const tabledata = ref<any>([]);
@@ -964,7 +968,6 @@ export default defineComponent({
 
           tabledata.value = data;
           resultTotal.value = responseData.length;
-          lastUpdatedAt.value = Date.now();
           loading.value = false;
           dismiss();
         })
@@ -1355,7 +1358,6 @@ export default defineComponent({
       resultTotal,
       tabledata,
       loading,
-      lastUpdatedAt,
       forbidden,
       extendedTrial,
       extendTrialPrompt,

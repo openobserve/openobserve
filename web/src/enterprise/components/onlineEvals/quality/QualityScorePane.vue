@@ -16,11 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section class="flex min-h-0 min-w-0 flex-1 flex-col" data-test="quality-score-pane">
-    <OEmptyState
+    <div
       v-if="!score && !loading"
-      :title="t('onlineEvals.quality.pane.noneSelected')"
+      class="text-text-secondary flex flex-1 items-center justify-center p-6 text-sm"
       data-test="quality-score-pane-empty"
-    />
+    >
+      {{ t("onlineEvals.quality.pane.noneSelected") }}
+    </div>
     <template v-else>
       <!-- While the scores page loads there is no score yet: the frame stays and each part shows a skeleton. -->
       <!-- The selected row shows the value, input and time, and the footer opens the target, so the header shows only the health and rule. -->
@@ -296,7 +298,6 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ReviewContentBox from "@/enterprise/views/AIObservability/ReviewContentBox.vue";
 import AddToDatasetDrawer from "@/enterprise/components/AIObservability/AddToDatasetDrawer.vue";

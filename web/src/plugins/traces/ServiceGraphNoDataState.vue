@@ -24,14 +24,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :text="t('emptyState.noServiceGraph.description')"
   >
     <template #actions>
-      <OButton
-        variant="primary"
-        :title="jumpTargetSublabel"
+      <EmptyStateActionCard
+        icon="schedule"
+        :label="t('traces.noEvents.jumpToData')"
+        :sublabel="raw(jumpTargetSublabel)"
         data-test="service-graph-no-data-jump-to-data-card"
         @click="emit('jump-to-stream-data', jumpTarget.from, jumpTarget.to)"
-      >
-        {{ t("traces.noEvents.jumpToData") }}
-      </OButton>
+      />
     </template>
   </OEmptyState>
   <OEmptyState
@@ -43,9 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import useJumpToLatestData from "@/composables/useJumpToLatestData";
 
 const { t } = useI18nTyped();

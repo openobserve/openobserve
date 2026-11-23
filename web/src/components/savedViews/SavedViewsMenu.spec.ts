@@ -65,7 +65,7 @@ describe("SavedViewsMenu", () => {
     await mountMenu();
     expect(el("sv-favorites-group")?.textContent).toContain("Favorites (1)");
     expect(el("sv-favorites-group")?.querySelector('[data-test="sv-apply-b"]')).not.toBeNull();
-    expect(el("sv-all-group")?.textContent).toContain("All saved views");
+    expect(el("sv-all-group")?.textContent).toContain("All Saved Views");
     expect(el("sv-all-group")?.textContent).not.toContain("(2)");
     expect(el("sv-all-group")?.querySelector('[data-test="sv-apply-a"]')).not.toBeNull();
     expect(el("sv-all-group")?.querySelector('[data-test="sv-apply-b"]')).toBeNull();
@@ -240,7 +240,7 @@ describe("SavedViewsSubmenu", () => {
     });
     await flushPromises();
     const text = el("sv-trigger")?.textContent ?? "";
-    expect(text).toContain("Saved views");
+    expect(text).toContain("Saved Views");
     expect(text).toContain("3 views, 2 favorites");
   });
 

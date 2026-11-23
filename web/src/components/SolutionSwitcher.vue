@@ -2,9 +2,9 @@
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed } from "vue";
 import { useStore } from "vuex";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -14,8 +14,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import { lastSolutionPage, rememberSolutionPage, solutionLanding } from "./solutionLanding";
-import useBreakpoint from "@/composables/useBreakpoint";
 
 defineProps<{
   /** The license locks Security, so its entry opens the upsell page. */
@@ -26,9 +24,6 @@ const { t } = useI18nTyped();
 
 const store = useStore();
 const router = useRouter();
-const route = useRoute();
-// From xl the label shows in full, so a tooltip would only repeat it over the page header.
-const { xlUp } = useBreakpoint();
 
 const mode = computed(() => store.state.solutionMode as "observability" | "security");
 
@@ -37,51 +32,33 @@ const SOLUTIONS: {
   labelKey: I18nKey;
   icon: IconName;
   descriptionKey: I18nKey;
+  route: string;
 }[] = [
   {
     key: "observability",
     labelKey: "solutionSwitcher.observability.label",
     icon: "monitor-heart",
     descriptionKey: "solutionSwitcher.observability.description",
+    route: "/",
   },
   {
     key: "security",
     labelKey: "solutionSwitcher.security.label",
     icon: "verified-user",
     descriptionKey: "solutionSwitcher.security.description",
+    route: "/security/overview",
   },
 ];
 
 const current = computed(() => SOLUTIONS.find((s) => s.key === mode.value) ?? SOLUTIONS[0]);
 
-const org = () => String(store.state.selectedOrganization?.identifier ?? "");
-// The path a switch landed on, until the user moves; switching again from it goes straight back.
-const landedPath = ref<string | null>(null);
-
-// The catch-all 404 route resolves every path, so only a named match is a real page.
-const routeExists = (path: string) => !!router.resolve(path).name;
-
-watch(
-  () => route.fullPath,
-  () => {
-    if (route.path !== landedPath.value) landedPath.value = null;
-    const { org_identifier: _org, ...query } = route.query;
-    rememberSolutionPage(org(), router.resolve({ path: route.path, query }).fullPath);
-  },
-  { immediate: true },
-);
-
 function switchTo(solution: (typeof SOLUTIONS)[0]) {
   if (solution.key === mode.value) return;
   store.commit("setSolutionMode", solution.key);
-  const landing = solutionLanding(route.path, solution.key, routeExists, {
-    lastPage: lastSolutionPage(org(), solution.key),
-    justSwitched: landedPath.value === route.path,
+  router.push({
+    path: solution.route,
+    query: { org_identifier: store.state.selectedOrganization.identifier },
   });
-  if (landing === null) return;
-  const target = router.resolve(landing);
-  landedPath.value = target.path;
-  router.push({ path: target.path, query: { ...target.query, org_identifier: org() } });
 }
 </script>
 
@@ -92,16 +69,15 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
         variant="ghost"
         :icon="current.icon"
         icon-end="expand-more"
-        class="md:max-xl:max-w-full md:max-xl:min-w-0"
+        class="font-semibold tracking-tight md:max-xl:max-w-full md:max-xl:min-w-0"
         data-test="solution-switcher"
-        :aria-label="t(current.labelKey)"
       >
-        <span class="max-md:hidden md:max-xl:truncate">{{ t(current.labelKey) }}</span>
-        <OTooltip :content="t(current.labelKey)" :disabled="xlUp" />
+        <span class="md:max-xl:truncate">{{ t(current.labelKey) }}</span>
+        <OTooltip :content="t(current.labelKey)" />
       </OButton>
     </template>
 
-    <div class="text-text-secondary text-2xs px-3.5 pt-1.5 pb-1 font-semibold">
+    <div class="text-text-secondary text-3xs px-3.5 pt-1.5 pb-1 font-bold">
       {{ t("solutionSwitcher.title") }}
     </div>
 

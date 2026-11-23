@@ -58,7 +58,7 @@ export class AlertsPage {
             folderExistsError: 'Folder with this name already exists in this organization',
             folderMoreOptionsButton: '[data-test="dashboard-more-icon"]',
             deleteFolderOption: 'Delete',
-            deleteFolderConfirmText: 'Delete folder',
+            deleteFolderConfirmText: 'Delete Folder',
             folderDeletedMessage: 'Folder deleted successfully.',
 
             // Alert creation locators - Alerts 2.0 Wizard UI
@@ -80,7 +80,7 @@ export class AlertsPage {
             streamTypeOption: '[data-test="add-alert-stream-type-select-dropdown-option"]',
             streamNameDropdown: '[data-test="add-alert-stream-name-select-dropdown"]',
             queryEditorDialog: '[data-test="query-editor-dialog"]',
-            queryResultLabel: 'Query result',
+            queryResultLabel: 'Query Result',
             multiWindowBadgeText: 'results across all time windows',
             streamNamePopover: '[data-test="add-alert-stream-name-select-dropdown-popover"]',
             streamNameOption: '[data-test="add-alert-stream-name-select-dropdown-option"]',
@@ -173,7 +173,7 @@ export class AlertsPage {
             // Messages
             alertSuccessMessage: 'Alert saved successfully.',
             alertUpdatedMessage: 'Alert updated successfully.',
-            alertClonedMessage: 'Alert cloned successfully',
+            alertClonedMessage: 'Alert Cloned Successfully',
             alertDeletedMessage: 'Alert deleted',
             deleteConfirmText: /Are you sure you want to delete the .+ alert\?/,
             deleteButtonText: 'Delete',
@@ -1276,7 +1276,7 @@ export class AlertsPage {
     // ==================== ALERTS 4.0 (PRIORITY & TAGS) HELPERS ====================
 
     /**
-     * Switch to the "Alert rules" (condition) tab — where stream, threshold and destination live.
+     * Switch to the "Alert Rules" (condition) tab — where stream, threshold and destination live.
      * Uses a normal click (waits for actionability) rather than the force-click in
      * `_switchToTab`, which can fire before a just-closed popover settles and miss the tab.
      */
@@ -1494,7 +1494,7 @@ export class AlertsPage {
 
     /**
      * Assert a specific section tab renders the exact label text (proves the rename landed:
-     * "Notification destinations" / "Alert library" rather than the deleted short forms).
+     * "Notification Destinations" / "Alert Library" rather than the deleted short forms).
      * @param {'alertList' | 'alertDestinations' | 'alertTemplates' | 'alertLibrary'} key
      * @param {string} text
      */
@@ -1963,8 +1963,6 @@ export class AlertsPage {
     }
 
     async verifyCloneAlertUIValidation(alertName) {
-        // Clone lives in the row's ⋯ menu.
-        await this.page.locator(`[data-test="alert-list-${alertName}-more-options"]`).click();
         await this.page.locator(`[data-test="alert-list-${alertName}-clone-alert"]`).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
@@ -2001,8 +1999,6 @@ export class AlertsPage {
         await this.page.locator(this.locators.cloneCancelButton).click();
         await this.page.waitForTimeout(500);
 
-        // Clone lives in the row's ⋯ menu.
-        await this.page.locator(`[data-test="alert-list-${alertName}-more-options"]`).click();
         await this.page.locator(`[data-test="alert-list-${alertName}-clone-alert"]`).click();
         await this.page.waitForTimeout(1000);
         await this.page.locator(this.locators.cloneCancelButton).click();
@@ -2614,7 +2610,7 @@ export class AlertsPage {
     }
 
     /**
-     * Click the "Alert triggers" tab on the incident detail page.
+     * Click the "Alert Triggers" tab on the incident detail page.
      * The tab uses Reka TabsTrigger with role="tab".
      */
     async clickAlertTriggersTab() {
@@ -2706,7 +2702,7 @@ export class AlertsPage {
      * Uses :has-text to distinguish from other .o2-incident-card-bg panels.
      */
     _getRelatedAlertsContainer() {
-        return this.page.locator(`${this.locators.relatedAlertsContainer}:has-text("Related alerts")`).first();
+        return this.page.locator(`${this.locators.relatedAlertsContainer}:has-text("Related Alerts")`).first();
     }
 
     /**
@@ -3539,7 +3535,7 @@ export class AlertsPage {
      * @param {string} name - The template name to search for
      */
     async searchTemplate(name) {
-        const searchInput = this.page.getByPlaceholder('Search template');
+        const searchInput = this.page.getByPlaceholder('Search Template');
         await searchInput.click();
         await searchInput.fill(name);
         testLogger.info('Searched for template', { name });
@@ -3558,7 +3554,7 @@ export class AlertsPage {
     // ==================== STEP 2 / QUERY CONFIG HELPERS (scheduled features) ====================
 
     /**
-     * Click the "Open full editor" button (Step 2) to launch the SQL/PromQL editor dialog.
+     * Click the "Open Full Editor" button (Step 2) to launch the SQL/PromQL editor dialog.
      * Waits deterministically for the editor dialog to attach.
      */
     async clickViewEditorButton() {
@@ -3746,7 +3742,7 @@ export class AlertsPage {
     }
 
     /**
-     * Switch to a wizard tab by name (e.g. 'Alert rules', 'Advanced')
+     * Switch to a wizard tab by name (e.g. 'Alert Rules', 'Advanced')
      * Exposes the internal creation wizard's tab switching for test spec usage
      */
     async switchWizardTab(tabName) {
@@ -4421,7 +4417,7 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getFiringCountElements() {
-        return this.page.locator('[data-test="alert-list-table"] th:has-text("Last triggered")');
+        return this.page.locator('[data-test="alert-list-table"] th:has-text("Last Triggered")');
     }
 
     /**
@@ -4764,7 +4760,7 @@ export class AlertsPage {
     }
 
     /**
-     * Get "Compare with past" step container (not a toggle - it's a step in alert wizard)
+     * Get "Compare with Past" step container (not a toggle - it's a step in alert wizard)
      * @returns {Locator}
      */
     getCompareWithPastContainer() {

@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #toolbar-trailing>
               <OButton
                 icon-only
-                variant="ghost"
+                variant="secondary"
                 icon="refresh"
                 :loading="listLoading"
                 data-test="synthetics-locations-refresh-btn"

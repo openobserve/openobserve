@@ -34,10 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("chatHistory.title") }}
         </OButton>
       </template>
-      <!-- Overview teleports its range and refresh here, so the page needs no band for them (R1, R5) -->
-      <template v-else-if="activeHomeTab === 'overview'" #actions>
-        <div id="home-overview-actions" class="contents" data-test="home-overview-actions" />
-      </template>
       <template v-if="tabOrder.length > 1" #header-tabs>
         <OTabs
           v-model="activeHomeTab"
@@ -198,10 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
             data-test="home-overview-panel"
           >
-            <OverviewTab
-              actions-target="#home-overview-actions"
-              @send-to-ai-chat="onSendToAiChat"
-            />
+            <OverviewTab @send-to-ai-chat="onSendToAiChat" />
           </div>
           <div v-else class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
             <UsageTab />
@@ -216,10 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
             data-test="home-overview-panel"
           >
-            <OverviewTab
-              actions-target="#home-overview-actions"
-              @send-to-ai-chat="onSendToAiChat"
-            />
+            <OverviewTab @send-to-ai-chat="onSendToAiChat" />
           </div>
 
           <!-- Usage tab -->

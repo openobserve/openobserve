@@ -47,9 +47,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("synthetics.privateLocations.copySetupCmd") }}
       </OButton>
-      <ORefreshButton
-        :last-run-at="loadedAt"
+      <OButton
+        icon-only
+        variant="secondary"
+        icon="refresh"
         :loading="loading"
+        :title="t('common.refresh')"
         data-test="synthetics-private-location-detail-refresh-btn"
         @click="load"
       />
@@ -196,24 +199,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <OEmptyState
+      <div
         v-else-if="!loading && loadError"
-        kind="error"
-        :text="t('synthetics.privateLocations.detail.loadFailed')"
+        class="flex flex-col items-center gap-3 p-6"
         data-test="synthetics-private-location-detail-error"
       >
-        <template #actions>
-          <OButton data-test="synthetics-private-location-detail-retry-btn" @click="load">
-            {{ t("synthetics.privateLocations.detail.retry") }}
-          </OButton>
-        </template>
-      </OEmptyState>
+        <p class="text-status-error-text text-sm">
+          {{ t("synthetics.privateLocations.detail.loadFailed") }}
+        </p>
+        <OButton
+          variant="secondary"
+          icon="refresh"
+          data-test="synthetics-private-location-detail-retry-btn"
+          @click="load"
+        >
+          {{ t("synthetics.privateLocations.detail.retry") }}
+        </OButton>
+      </div>
 
-      <OEmptyState
-        v-else-if="!loading"
-        :title="t('synthetics.privateLocations.detail.notFound')"
-        data-test="synthetics-private-location-detail-empty"
-      />
+      <div v-else-if="!loading" class="p-6">
+        <OEmptyState
+          :title="t('synthetics.privateLocations.detail.notFound')"
+          data-test="synthetics-private-location-detail-empty"
+        />
+      </div>
     </div>
 
     <AgentSetupDrawer
@@ -239,7 +248,6 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -273,7 +281,6 @@ const backTo = computed(() => syntheticsListRoute(navContext.value, { section: "
 
 const detail = ref<SyntheticLocationDetail | null>(null);
 const loading = ref(false);
-const loadedAt = ref<number | null>(null);
 /** True after a retryable failure (network error, timeout, 5xx). 403/404 keep
  *  the not-found/forbidden handling instead. */
 const loadError = ref(false);
@@ -320,7 +327,6 @@ async function load() {
   try {
     const res = await syntheticsService.getLocation(orgIdentifier.value, String(route.params.id));
     detail.value = res.data as SyntheticLocationDetail;
-    loadedAt.value = Date.now();
   } catch (err) {
     detail.value = null;
     const status = (err as { response?: { status?: number } })?.response?.status;

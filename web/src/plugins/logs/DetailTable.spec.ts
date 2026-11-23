@@ -507,14 +507,14 @@ describe("DetailTable Component", () => {
     const mockCrossLinks = {
       stream_links: [
         {
-          name: "View trace",
+          name: "View Trace",
           url: "https://traces.example.com/${field.__value}",
           fields: [{ name: "trace_id", alias: "kubernetes_container_name" }],
         },
       ],
       org_links: [
         {
-          name: "View dashboard",
+          name: "View Dashboard",
           url: "https://dashboard.example.com/${field.__value}",
           fields: [{ name: "host", alias: "kubernetes_container_hash" }],
         },
@@ -544,7 +544,7 @@ describe("DetailTable Component", () => {
 
       const result = wrapper.vm.getCrossLinksForField("kubernetes_container_name");
       expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("View trace");
+      expect(result[0].name).toBe("View Trace");
       expect(result[0].resolvedUrl).toBe("https://traces.example.com/my-trace-123");
     });
 
@@ -558,7 +558,7 @@ describe("DetailTable Component", () => {
 
       const result = wrapper.vm.getCrossLinksForField("kubernetes_container_hash");
       expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("View dashboard");
+      expect(result[0].name).toBe("View Dashboard");
       expect(result[0].resolvedUrl).toBe("https://dashboard.example.com/host-abc");
     });
 
@@ -593,7 +593,7 @@ describe("DetailTable Component", () => {
       wrapper.vm.searchObj.data.crossLinks = {
         stream_links: [
           {
-            name: "No match",
+            name: "No Match",
             url: "https://example.com/${field.__value}",
             fields: [{ name: "foo", alias: "bar" }],
           },
@@ -737,7 +737,7 @@ describe("DetailTable Component", () => {
       expect(result[0].resolvedUrl).toBe("https://example.com/search?q=hello%20world%26foo%3Dbar");
     });
   });
-  // The "View trace" action used to live inside JsonPreview, i.e. inside the JSON
+  // The "View Trace" action used to live inside JsonPreview, i.e. inside the JSON
   // tab. It now sits in this component's header row next to the wrap toggle so it
   // stays reachable from every tab, and JsonPreview is told to hide its own copy.
   describe("View Trace action in the header", () => {
@@ -910,91 +910,7 @@ describe("DetailTable Component", () => {
       expect(traceWrapper.find(WRAP_TOGGLE).isVisible()).toBe(true);
     });
   });
-  describe("trace links and neutral correlation state", () => {
-    let w: any;
-    const row = { _timestamp: 1_700_000_000_000_000, trace_id: "abc123", span_id: "s1" };
-    const mountRow = (extra: Record<string, unknown> = {}) =>
-      mount(DetailTable, {
-        attachTo: document.body,
-        props: { ...defaultProps, modelValue: row, initialTab: "table", ...extra },
-        global: globalMountOptions,
-      });
-
-    afterEach(() => {
-      w?.unmount();
-    });
-
-    it("renders trace_id and span_id values as links, other values as plain text", async () => {
-      w = mountRow();
-      await flushPromises();
-      expect(w.find('[data-test="log-detail-trace_id-link"]').text()).toBe("abc123");
-      expect(w.find('[data-test="log-detail-span_id-link"]').exists()).toBe(true);
-      expect(w.find('[data-test="log-detail-_timestamp-link"]').exists()).toBe(false);
-    });
-
-    it("opens the trace in the same tab with the log's time window", async () => {
-      const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
-      w = mountRow();
-      await flushPromises();
-      w.vm.searchObj.meta.selectedTraceStream = "default";
-      await w.find('[data-test="log-detail-trace_id-link"]').trigger("click");
-      await flushPromises();
-      const arg: any = push.mock.calls[0][0];
-      push.mockRestore();
-      expect(arg.name).toBe("traceDetails");
-      expect(arg.query.trace_id).toBe("abc123");
-      expect(arg.query.from).toBe(row._timestamp - 900_000_000);
-      expect(arg.query.span_id).toBeUndefined();
-    });
-
-    it("shows a neutral, non-error state when a log without a trace id matches no service", async () => {
-      w = mountRow({
-        modelValue: { _timestamp: row._timestamp, message: "no ids" },
-        initialTab: "correlated-traces",
-        correlationError: i18n.global.t("logs.searchResult.noMatchingService"),
-      });
-      await flushPromises();
-      const states = w.findAll('[data-test="logs-correlation-no-match"]');
-      const state = states[states.length - 1];
-      expect(states).toHaveLength(3);
-      expect(state.attributes("data-kind")).not.toBe("error");
-      expect(state.text()).toContain("No trace linked to this log");
-      expect(state.text()).toContain("Search traces around this time");
-      expect(w.find('[data-test="log-detail-linked-trace"]').exists()).toBe(false);
-    });
-
-    it("offers the log's own trace and span instead of 'No trace linked'", async () => {
-      w = mountRow({
-        initialTab: "correlated-traces",
-        correlationError: i18n.global.t("logs.searchResult.noMatchingService"),
-      });
-      await flushPromises();
-      const linked = w.find('[data-test="log-detail-linked-trace"]');
-      expect(linked.exists()).toBe(true);
-      expect(linked.text()).toContain("abc123");
-      expect(linked.text()).toContain("s1");
-      expect(w.text()).not.toContain("No trace linked to this log");
-    });
-
-    it("opens the linked trace focused on the log's span", async () => {
-      const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
-      w = mountRow({
-        initialTab: "correlated-traces",
-        correlationError: i18n.global.t("logs.searchResult.noMatchingService"),
-      });
-      await flushPromises();
-      w.vm.searchObj.meta.selectedTraceStream = "default";
-      await w.find('[data-test="log-detail-linked-trace-open-btn"]').trigger("click");
-      await flushPromises();
-      const arg: any = push.mock.calls[0][0];
-      push.mockRestore();
-      expect(arg.name).toBe("traceDetails");
-      expect(arg.query.trace_id).toBe("abc123");
-      expect(arg.query.span_id).toBe("s1");
-    });
-  });
-
-  describe("severity tag (A7)", () => {
+  describe("severity tag and drawer border (A7)", () => {
     let sevWrapper: any;
     const BADGE = '[data-test="log-detail-severity-badge"]';
     const POPOVER = '[data-test="log-detail-severity-popover"]';
@@ -1010,7 +926,7 @@ describe("DetailTable Component", () => {
       document.body.querySelectorAll("[data-o-popover-content]").forEach((n) => n.remove());
     });
 
-    it("AC-A1.3: an inferred row shows an 'inferred' tag, and no band under the drawer header", async () => {
+    it("AC-A1.3: an inferred row shows an 'inferred' tag and the same solid border", async () => {
       sevWrapper = mountWith({ message: "2026-10-06 12:00:01 ERROR payment failed" });
       await flushPromises();
       const badge = sevWrapper.find(BADGE);
@@ -1018,31 +934,44 @@ describe("DetailTable Component", () => {
       expect(badge.element.tagName).toBe("BUTTON");
       expect(badge.attributes("data-severity-source")).toBe("message");
       expect(badge.text()).toContain("inferred");
-      // The drawer header's hairline is the only line above the tabs; the tag carries the level.
       const root = sevWrapper.find('[data-test="dialog-box"]');
-      expect(root.classes().some((c: string) => c.startsWith("border-"))).toBe(false);
+      expect(root.classes()).toEqual(
+        expect.arrayContaining([
+          "border-t-3",
+          "border-log-severity-error-indicator",
+          "border-solid",
+        ]),
+      );
+      expect(root.classes()).not.toContain("border-dashed");
     });
 
-    it("an HTTP row shows a solid tag", async () => {
+    it("an HTTP row shows a solid tag and border", async () => {
       sevWrapper = mountWith({ status: 503 });
       await flushPromises();
       const badge = sevWrapper.find(BADGE);
       expect(badge.attributes("data-severity-source")).toBe("http");
       expect(badge.text()).not.toContain("inferred");
+      expect(sevWrapper.find('[data-test="dialog-box"]').classes()).toEqual(
+        expect.arrayContaining(["border-log-severity-error-indicator", "border-solid"]),
+      );
     });
 
-    it("a row with no evidence shows an unknown tag", async () => {
+    it("a row with no evidence shows an unknown tag and a neutral border", async () => {
       sevWrapper = mountWith({ host: "a" });
       await flushPromises();
       const badge = sevWrapper.find(BADGE);
       expect(badge.attributes("data-severity-source")).toBe("none");
       expect(badge.text()).toBe("Unknown");
+      expect(sevWrapper.find('[data-test="dialog-box"]').classes()).toContain(
+        "border-border-default",
+      );
     });
 
-    it("is hidden when embedded", async () => {
+    it("is hidden, with no border, when embedded", async () => {
       sevWrapper = mountWith({ message: "[ERROR] x" }, { embedded: true });
       await flushPromises();
       expect(sevWrapper.find(BADGE).exists()).toBe(false);
+      expect(sevWrapper.find('[data-test="dialog-box"]').classes()).not.toContain("border-t-3");
     });
 
     it("opens its popover from the keyboard with the 'Not searchable' note", async () => {

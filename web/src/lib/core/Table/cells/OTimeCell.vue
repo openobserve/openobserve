@@ -176,11 +176,7 @@ const showAbsoluteTooltip = computed(
 <template>
   <span v-if="display === null" class="text-text-body text-xs">{{ emptyLabel }}</span>
   <template v-else>
-    <span
-      class="whitespace-nowrap tabular-nums"
-      :class="props.mode === 'relative' ? '' : 'font-mono text-xs'"
-      >{{ display }}</span
-    >
+    <span class="whitespace-nowrap tabular-nums">{{ display }}</span>
     <OTooltip v-if="showAbsoluteTooltip">
       <template #content>{{ absolute }}</template>
     </OTooltip>

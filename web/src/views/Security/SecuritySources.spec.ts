@@ -57,7 +57,6 @@ vi.mock("@/composables/security/useSecuritySources", () => ({
     rows: rowsRef,
     notices: noticesRef,
     loading: ref(false),
-    error: ref(""),
     ...sources,
   }),
 }));

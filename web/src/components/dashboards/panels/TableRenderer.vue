@@ -186,11 +186,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #empty>
         <slot name="empty">
           <OEmptyState
-            size="compact"
+            size="inline"
             icon="bar-chart"
-            :title="t('panel.noDataInRange')"
+            :title="t('panel.noData')"
             data-test="no-data"
-            class="px-3"
           />
         </slot>
       </template>
@@ -891,7 +890,7 @@ export default defineComponent({
 
 /* Pivot table styles */
 .table-wrapper :deep(.pivot-total-row) {
-  font-weight: var(--font-semibold);
+  font-weight: bold;
   background-color: var(--color-table-row-striped-bg);
 }
 
@@ -909,12 +908,12 @@ export default defineComponent({
 
 .table-wrapper :deep(.pivot-value-header) {
   font-weight: 500;
-  font-size: var(--text-2xs);
+  font-size: 0.85em;
 }
 
 /* Sticky total row */
 .table-wrapper :deep(.pivot-sticky-total-row) {
-  font-weight: var(--font-semibold);
+  font-weight: bold;
 }
 
 .table-wrapper :deep(.pivot-sticky-total-row td) {

@@ -224,18 +224,3 @@
   background-image: radial-gradient(var(--color-border-strong) 0.0625rem, transparent 0.0625rem);
   background-size: 1.125rem 1.125rem;
 }
-
-/* Route entrance (ROUTE_ENTER): the page's children fade in but its header band and a sidebar frame stay put.
-   :where() keeps it at zero specificity, so a child's own entrance (the OPageLayout body) wins. */
-@utility o2-route-enter {
-  @media (prefers-reduced-motion: no-preference) {
-    :where(&:not([data-o2-page-frame]))
-      > :where(:not([data-o2-page-shell], [data-o2-page-frame], :has(> [data-o2-page-shell]))),
-    :where(&:not([data-o2-page-frame]))
-      > :where(:has(> [data-o2-page-shell]))
-      > :where(:not([data-o2-page-shell], [data-o2-page-frame])) {
-      --tw-enter-opacity: 0.4;
-      animation: enter var(--duration-page-in) var(--ease-control);
-    }
-  }
-}

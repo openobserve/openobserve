@@ -64,12 +64,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           aria-hidden="true"
           :data-test="`dbm-section-tab-lock-${section.key}`"
         />
-        <!-- OTab's own count chip; an overlap count's vantage is said in the tooltip (D2). -->
+        <!-- The count is what the tab is about, so the reader can see the shape
+           of the other views without opening them.
+
+           An OVERLAP count (calls) carries its vantage as a suffix on the
+           badge itself — `141,984 client` — because D2 makes the qualifier
+           mandatory wherever an overlap value renders, and this badge is the
+           one place the same number appears on all eight pages. The suffix is
+           absent for the counts that exist in one vantage only: qualifying a
+           deadlock count would imply a choice between feeds that was never
+           available. -->
         <span
           v-if="section.count != null"
-          class="text-2xs bg-surface-subtle text-text-secondary inline-flex min-w-[calc(2ch+0.5rem)] shrink-0 items-center justify-center rounded-full px-1 leading-4 font-medium tabular-nums"
+          class="text-2xs inline-flex items-baseline gap-1 rounded-full px-1.5 py-1 leading-none font-bold"
+          :class="
+            section.key === activeTab
+              ? 'bg-badge-primary-soft-bg text-badge-primary-soft-text'
+              : 'bg-surface-subtle text-text-secondary'
+          "
           :data-test="`dbm-section-tab-badge-${section.key}`"
-          >{{ section.count }}</span
+          ><span>{{ section.count }}</span
+          ><span
+            v-if="section.vantageLabel"
+            class="text-3xs font-normal opacity-80"
+            :data-test="`dbm-section-tab-vantage-${section.key}`"
+            >{{ section.vantageLabel }}</span
+          ></span
         >
         <OTooltip v-if="section.hint" side="bottom" :content="section.hint" />
       </OTab>
@@ -220,6 +240,12 @@ interface Section {
    * reach the template as a bare total.
    */
   count?: string | null;
+  /**
+   * The vantage suffix printed beside an OVERLAP count, or `undefined` for a
+   * count with only one possible source. Resolved from the count itself, so a
+   * badge cannot be qualified with a vantage that did not produce it.
+   */
+  vantageLabel?: I18nText;
   /** What the count means, when that is not obvious from the label. */
   hint?: I18nText;
   /**
@@ -242,9 +268,16 @@ interface Section {
  * printed over all three: false for a server-fed badge, and false even for the
  * trace one, which counts every finished INSTRUMENTED call.
  */
-const overlapBadge = (count: DbmCountClaim | number | null | undefined): { hint: I18nText } => {
+const overlapBadge = (
+  count: DbmCountClaim | number | null | undefined,
+): { vantageLabel?: I18nText; hint: I18nText } => {
   const vantage = countVantage(count);
-  if (vantage === "server") return { hint: t("dbm.page.tabs.samplesHintServer") };
+  if (vantage === "server") {
+    return {
+      vantageLabel: t("dbm.list.overlap.serverCounted"),
+      hint: t("dbm.page.tabs.samplesHintServer"),
+    };
+  }
   if (vantage === "client") {
     return { hint: t("dbm.page.tabs.samplesHintClient") };
   }
@@ -253,10 +286,12 @@ const overlapBadge = (count: DbmCountClaim | number | null | undefined): { hint:
   return { hint: t("dbm.page.tabs.samplesHintUnknown") };
 };
 
-/** The Top-queries badge's source, on the same terms as the overlap one. */
-const queriesHint = computed<I18nText | undefined>(() =>
-  countVantage(props.queryCount) === "server" ? t("dbm.page.tabs.queriesHintServer") : undefined,
-);
+/** The Top-queries badge's source marker, on the same terms as the overlap one. */
+const queriesVantageLabel = computed<I18nText | undefined>(() => {
+  const vantage = countVantage(props.queryCount);
+  if (vantage === "server") return t("dbm.list.overlap.serverCounted");
+  return undefined;
+});
 
 /**
  * Everything the user has set — filters, search, time range — rides along, so
@@ -305,7 +340,7 @@ const sections = computed<Section[]>(() => [
     // database time), but its provenance swaps between the trace rollup and
     // the database-reported list exactly as the samples badge's does — so the
     // reader is told which list was counted, on the same terms.
-    hint: queriesHint.value,
+    vantageLabel: queriesVantageLabel.value,
   },
   {
     // Beside Top queries, deliberately: the aggregate and the per-execution

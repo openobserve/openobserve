@@ -113,94 +113,93 @@
       </div>
     </div>
     <div v-show="activeTab !== 'unflattened'" class="ps-3">
-      <div class="text-compact font-mono leading-5">{</div>
+      {
       <div
-        class="log_json_content text-compact [&_.logs-highlight-json]:text-compact flex items-start font-mono leading-5 whitespace-pre-wrap"
+        class="log_json_content flex font-mono text-xs whitespace-pre-wrap"
         v-for="(key, index) in Object.keys(value)"
         :key="key"
         :data-test="`log-detail-row-${key}`"
       >
-        <!-- One line box tall: the taller button overhangs it evenly, so its caret centres on the first line. -->
-        <span v-if="!hideFieldOptions" class="ms-2 flex h-5 shrink-0 items-center">
-          <ODropdown v-model:open="dropdownOpenMap[key]" side="bottom" align="start">
-            <template #trigger>
-              <OButton
-                data-test="log-details-include-exclude-field-btn"
-                size="xs"
-                variant="ghost"
-                icon-only
-                :aria-label="t('logs.jsonPreview.addIcon')"
-              >
-                <OIcon
-                  :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'"
-                  size="sm"
-                />
-              </OButton>
+        <ODropdown
+          v-if="!hideFieldOptions"
+          v-model:open="dropdownOpenMap[key]"
+          side="bottom"
+          align="start"
+        >
+          <template #trigger>
+            <OButton
+              data-test="log-details-include-exclude-field-btn"
+              size="sm"
+              variant="ghost"
+              class="ms-2 w-5! min-w-5! p-0! align-middle"
+              :aria-label="t('logs.jsonPreview.addIcon')"
+            >
+              <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
+            </OButton>
+          </template>
+          <ODropdownItem
+            v-if="!hideSearchTermActions && canFilterOnField(key)"
+            data-test="log-details-include-field-btn"
+            @select.stop="addSearchTerm(key, value[key], 'include')"
+          >
+            <template #icon><EqualIcon class="size-2.5" /></template>
+            {{ t("common.includeSearchTerm") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!hideSearchTermActions && canFilterOnField(key)"
+            data-test="log-details-exclude-field-btn"
+            @select.stop="addSearchTerm(key, value[key], 'exclude')"
+          >
+            <template #icon><NotEqualIcon class="size-2.5" /></template>
+            {{ t("common.excludeSearchTerm") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="key !== store.state.zoConfig.timestamp_column && !hideAddFieldToTable"
+            data-test="log-details-add-field-btn"
+            @select.stop="addFieldToTable(key)"
+            icon="visibility"
+          >
+            {{ addOrRemoveLabel(key) }}
+          </ODropdownItem>
+          <!-- Cross-link options -->
+          <template v-if="getCrossLinksForField(key).length > 0">
+            <ODropdownSeparator />
+            <ODropdownItem
+              v-for="crossLink in getCrossLinksForField(key)"
+              :key="crossLink.name"
+              :data-test="`log-details-cross-link-${crossLink.name}`"
+              @select.stop="openCrossLink(crossLink.resolvedUrl)"
+              icon="open-in-new"
+            >
+              {{ crossLink.name }}
+            </ODropdownItem>
+          </template>
+          <ODropdownItem
+            v-if="store.state.zoConfig.ai_enabled"
+            data-test="send-to-ai-chat-btn"
+            @select.stop="sendToAiChat(JSON.stringify({ [key]: value[key] }))"
+          >
+            <template #icon>
+              <img :src="getBtnLogo" width="14" height="14" alt="" />
             </template>
-            <ODropdownItem
-              v-if="!hideSearchTermActions && canFilterOnField(key)"
-              data-test="log-details-include-field-btn"
-              @select.stop="addSearchTerm(key, value[key], 'include')"
-            >
-              <template #icon><EqualIcon class="size-2.5" /></template>
-              {{ t("common.includeSearchTerm") }}
-            </ODropdownItem>
-            <ODropdownItem
-              v-if="!hideSearchTermActions && canFilterOnField(key)"
-              data-test="log-details-exclude-field-btn"
-              @select.stop="addSearchTerm(key, value[key], 'exclude')"
-            >
-              <template #icon><NotEqualIcon class="size-2.5" /></template>
-              {{ t("common.excludeSearchTerm") }}
-            </ODropdownItem>
-            <ODropdownItem
-              v-if="key !== store.state.zoConfig.timestamp_column && !hideAddFieldToTable"
-              data-test="log-details-add-field-btn"
-              @select.stop="addFieldToTable(key)"
-              icon="visibility"
-            >
-              {{ addOrRemoveLabel(key) }}
-            </ODropdownItem>
-            <!-- Cross-link options -->
-            <template v-if="getCrossLinksForField(key).length > 0">
-              <ODropdownSeparator />
-              <ODropdownItem
-                v-for="crossLink in getCrossLinksForField(key)"
-                :key="crossLink.name"
-                :data-test="`log-details-cross-link-${crossLink.name}`"
-                @select.stop="openCrossLink(crossLink.resolvedUrl)"
-                icon="open-in-new"
-              >
-                {{ crossLink.name }}
-              </ODropdownItem>
+            {{ t("logs.jsonPreview.sendToAiChat") }}
+            <template v-if="!aiAssistantAccess.allowed" #end>
+              <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
             </template>
-            <ODropdownItem
-              v-if="store.state.zoConfig.ai_enabled"
-              data-test="send-to-ai-chat-btn"
-              @select.stop="sendToAiChat(JSON.stringify({ [key]: value[key] }))"
-            >
-              <template #icon>
-                <img :src="getBtnLogo" width="14" height="14" alt="" />
-              </template>
-              {{ t("logs.jsonPreview.sendToAiChat") }}
-              <template v-if="!aiAssistantAccess.allowed" #end>
-                <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
-              </template>
-            </ODropdownItem>
-            <ODropdownItem
-              data-test="redirect-to-regex-pattern-btn"
-              @select.stop="createRegexPatternFromLogs(key, value[key])"
-            >
-              <template #icon>
-                <img :src="regexIcon" width="14" height="14" alt="" />
-              </template>
-              {{ t("regex_patterns.create_regex_pattern_field") }}
-              <template v-if="!regexPatternsAccess.allowed" #end>
-                <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
-              </template>
-            </ODropdownItem>
-          </ODropdown>
-        </span>
+          </ODropdownItem>
+          <ODropdownItem
+            data-test="redirect-to-regex-pattern-btn"
+            @select.stop="createRegexPatternFromLogs(key, value[key])"
+          >
+            <template #icon>
+              <img :src="regexIcon" width="14" height="14" alt="" />
+            </template>
+            {{ t("regex_patterns.create_regex_pattern_field") }}
+            <template v-if="!regexPatternsAccess.allowed" #end>
+              <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
+            </template>
+          </ODropdownItem>
+        </ODropdown>
 
         <span class="min-w-0 ps-1" :data-test="`log-expand-detail-key-${key}`">
           <span class="log-key">{{ key }}</span
@@ -219,10 +218,10 @@
           ><span v-if="index < Object.keys(value).length - 1">,</span>
         </span>
       </div>
-      <div class="text-compact font-mono leading-5">}</div>
+      }
       <div
         v-if="showMenu"
-        class="context-menu rounded-default text-compact bg-surface-overlay border-border-default text-text-body min-w-50 border py-1 shadow-lg"
+        class="context-menu rounded-default [font-size: var(--text-compact)] bg-surface-overlay border-border-default text-text-body min-w-50 border py-1 shadow-lg"
         :style="{
           position: 'fixed',
           top: `${menuY}px`,

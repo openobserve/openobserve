@@ -41,23 +41,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <template v-if="opt.slot === 'user_defined_slot'">
-            <OIcon name="person" size="xs" class="text-2xs!"></OIcon>
-            <OIcon name="schema" size="xs" class="text-2xs!"></OIcon>
+            <OIcon name="person" size="xs" class="text-3xs!"></OIcon>
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip :content="t('search.userDefinedSchemaLabel')" side="right" />
           </template>
           <template v-else-if="opt.slot === 'all_fields_slot'">
-            <OIcon name="schema" size="xs" class="text-2xs!"></OIcon>
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip side="right">
               <template #content>
-                <span class="font-semibold">{{ t("search.allFieldsLabel") }}</span>
+                <span class="font-bold">{{ t("search.allFieldsLabel") }}</span>
                 <hr class="my-1 opacity-50" />
                 {{ t("search.allFieldsWarningMsg") }}
               </template>
             </OTooltip>
           </template>
           <template v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode">
-            <OIcon name="info-outline" size="xs" class="text-2xs!" />
-            <OIcon name="schema" size="xs" class="text-2xs!"></OIcon>
+            <OIcon name="info-outline" size="xs" class="text-3xs!" />
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip :content="t('search.showOnlyInterestingFields')" side="right" />
           </template>
           <template v-else>{{ opt.label }}</template>
@@ -84,18 +84,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <template v-if="opt.slot === 'all_fields_slot'">
-            <OIcon name="schema" size="xs" class="text-2xs!"></OIcon>
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip side="right">
               <template #content>
-                <span class="font-semibold">{{ t("search.allFieldsLabel") }}</span>
+                <span class="font-bold">{{ t("search.allFieldsLabel") }}</span>
                 <hr class="my-1 opacity-50" />
                 {{ t("search.allFieldsWarningMsg") }}
               </template>
             </OTooltip>
           </template>
           <template v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode">
-            <OIcon name="info-outline" size="xs" class="text-2xs!" />
-            <OIcon name="schema" size="xs" class="text-2xs!"></OIcon>
+            <OIcon name="info-outline" size="xs" class="text-3xs!" />
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip :content="t('search.showOnlyInterestingFields')" side="right" />
           </template>
           <template v-else>{{ opt.label }}</template>

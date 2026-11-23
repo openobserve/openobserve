@@ -1037,7 +1037,7 @@ describe("OrganizationManagement.vue", () => {
       const openDialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
       // Either contract dialog may be open separately; ensure none for extendTrial
       const titles = openDialogs.map((d: any) => d.attributes("data-title"));
-      expect(titles.every((t: string) => !t || !t.startsWith("Extend trial"))).toBe(true);
+      expect(titles.every((t: string) => !t || !t.startsWith("Extend Trial"))).toBe(true);
     });
 
     it("should show loading state in table", async () => {
@@ -1065,9 +1065,9 @@ describe("OrganizationManagement.vue", () => {
 
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find((d: any) => (d.attributes("data-title") || "").startsWith("Extend trial"));
+        .find((d: any) => (d.attributes("data-title") || "").startsWith("Extend Trial"));
       expect(dialog?.exists()).toBe(true);
-      expect(dialog!.attributes("data-title")).toBe("Extend trial for Acme");
+      expect(dialog!.attributes("data-title")).toBe("Extend Trial for Acme");
       expect(dialog!.attributes("data-sub-title")).toBe("Set the new trial extension period.");
       expect(dialog!.attributes("data-primary-label")).toBe("Extend trial by 2 weeks");
       expect(dialog!.attributes("data-secondary-label")).toBe("Cancel");
@@ -1082,7 +1082,7 @@ describe("OrganizationManagement.vue", () => {
 
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find((d: any) => (d.attributes("data-title") || "").startsWith("Extend trial"));
+        .find((d: any) => (d.attributes("data-title") || "").startsWith("Extend Trial"));
       expect(dialog?.exists()).toBe(true);
 
       await dialog!.find('[data-test="o-dialog-stub-secondary"]').trigger("click");
@@ -1149,9 +1149,9 @@ describe("OrganizationManagement.vue", () => {
       expect(wrapper.vm.aiCreditsFormDefaults).toEqual({ creditsLimit: 5000 });
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find((item: any) => (item.attributes("data-title") || "").startsWith("Set AI credits"));
-      expect(dialog?.attributes("data-title")).toBe("Set AI credits for Acme");
-      expect(dialog?.attributes("data-primary-label")).toBe("Save credits");
+        .find((item: any) => (item.attributes("data-title") || "").startsWith("Set AI Credits"));
+      expect(dialog?.attributes("data-title")).toBe("Set AI Credits for Acme");
+      expect(dialog?.attributes("data-primary-label")).toBe("Save Credits");
     });
 
     it("targets the ai_credits pool and updates the row from the response", async () => {
@@ -1226,9 +1226,9 @@ describe("OrganizationManagement.vue", () => {
       expect(wrapper.vm.syntheticsStepsFormDefaults).toEqual({ stepsLimit: 10000 });
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find((item: any) => (item.attributes("data-title") || "").startsWith("Set browser steps"));
-      expect(dialog?.attributes("data-title")).toBe("Set browser steps for Acme");
-      expect(dialog?.attributes("data-primary-label")).toBe("Save steps");
+        .find((item: any) => (item.attributes("data-title") || "").startsWith("Set Browser Steps"));
+      expect(dialog?.attributes("data-title")).toBe("Set Browser Steps for Acme");
+      expect(dialog?.attributes("data-primary-label")).toBe("Save Steps");
     });
 
     it("targets the browser step pool and updates the row from the response", async () => {
@@ -1369,10 +1369,10 @@ describe("OrganizationManagement.vue", () => {
 
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find((d: any) => (d.attributes("data-title") || "").includes("external contract"));
+        .find((d: any) => (d.attributes("data-title") || "").includes("External Contract"));
       expect(dialog?.exists()).toBe(true);
-      expect(dialog!.attributes("data-title")).toBe("Create external contract for Acme");
-      expect(dialog!.attributes("data-primary-label")).toBe("Create contract");
+      expect(dialog!.attributes("data-title")).toBe("Create External Contract for Acme");
+      expect(dialog!.attributes("data-primary-label")).toBe("Create Contract");
       expect(dialog!.attributes("data-secondary-label")).toBe("Cancel");
     });
 
@@ -1383,10 +1383,10 @@ describe("OrganizationManagement.vue", () => {
 
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find((d: any) => (d.attributes("data-title") || "").includes("external contract"));
+        .find((d: any) => (d.attributes("data-title") || "").includes("External Contract"));
       expect(dialog?.exists()).toBe(true);
-      expect(dialog!.attributes("data-title")).toBe("Extend external contract for Acme");
-      expect(dialog!.attributes("data-primary-label")).toBe("Extend contract");
+      expect(dialog!.attributes("data-title")).toBe("Extend External Contract for Acme");
+      expect(dialog!.attributes("data-primary-label")).toBe("Extend Contract");
     });
 
     it("should close the contract dialog when secondary is clicked", async () => {
@@ -1396,7 +1396,7 @@ describe("OrganizationManagement.vue", () => {
 
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find((d: any) => (d.attributes("data-title") || "").includes("external contract"));
+        .find((d: any) => (d.attributes("data-title") || "").includes("External Contract"));
       expect(dialog?.exists()).toBe(true);
 
       await dialog!.find('[data-test="o-dialog-stub-secondary"]').trigger("click");
@@ -1605,7 +1605,7 @@ describe("OrganizationManagement.vue", () => {
       });
 
       expect(mockConfirmFn).toHaveBeenCalledWith({
-        title: "Revoke external contract",
+        title: "Revoke External Contract",
         messageKeypath: "settings.organizationManagementPage.revokeConfirmMessage",
         messageName: "TestOrg",
         kind: "destructive",

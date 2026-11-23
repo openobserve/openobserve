@@ -483,7 +483,7 @@ describe("PanelSchemaRenderer", () => {
         panelSchema: { ...defaultProps.panelSchema, type: "html" },
       });
 
-      expect(wrapper.text()).not.toContain("No data");
+      expect(wrapper.text()).not.toContain("No Data");
     });
 
     it("should not display no data for markdown panels", () => {
@@ -491,11 +491,11 @@ describe("PanelSchemaRenderer", () => {
         panelSchema: { ...defaultProps.panelSchema, type: "markdown" },
       });
 
-      expect(wrapper.text()).not.toContain("No data");
+      expect(wrapper.text()).not.toContain("No Data");
     });
 
     // Regression: removing the required columns after a successful run clears
-    // the underlying data (noData => "No data") but leaves the already-converted
+    // the underlying data (noData => "No Data") but leaves the already-converted
     // rows in panelData, because convertPanelDataCommon bails on validation and
     // never refreshes it. tableRendererData must NOT re-serve those stale rows
     // behind the empty state (mirrors chartRendererData's noData guard).
@@ -518,7 +518,7 @@ describe("PanelSchemaRenderer", () => {
       });
       await flushPromises();
 
-      // Default loader data has no usable rows => hasRawData falsy => "No data".
+      // Default loader data has no usable rows => hasRawData falsy => "No Data".
       // Simulate a prior successful run leaving converted rows in panelData.
       wrapper.vm.panelData = {
         chartType: "table",
@@ -527,7 +527,7 @@ describe("PanelSchemaRenderer", () => {
       };
       await flushPromises();
 
-      expect(wrapper.vm.noData).toBe("No data");
+      expect(wrapper.vm.noData).toBe("No Data");
       expect(wrapper.vm.tableRendererData).toEqual({ rows: [], columns: [] });
     });
 
@@ -551,7 +551,7 @@ describe("PanelSchemaRenderer", () => {
       });
       await flushPromises();
 
-      expect(wrapper.vm.noData).toBe("No data");
+      expect(wrapper.vm.noData).toBe("No Data");
       expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="panel-schema-renderer-error-message"]').exists()).toBe(
         false,
@@ -585,7 +585,7 @@ describe("PanelSchemaRenderer", () => {
       const empty = wrapper.find('[data-test="no-data"]');
       expect(empty.exists()).toBe(true);
       expect(empty.text()).toContain("Set site_meter: candidates for pm-07");
-      expect(empty.text()).not.toContain("No data");
+      expect(empty.text()).not.toContain("No Data");
     });
 
     it("shows No Data when the panel sets no empty-state text", async () => {
@@ -606,7 +606,7 @@ describe("PanelSchemaRenderer", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="no-data"]').text()).toContain("No data");
+      expect(wrapper.find('[data-test="no-data"]').text()).toContain("No Data");
     });
 
     it("clears a stale custom_chart error when switching to another chart type", async () => {
@@ -681,11 +681,11 @@ describe("PanelSchemaRenderer", () => {
       });
 
       it("shows No Data when every query is empty", async () => {
-        expect(await mountBar([[], []])).toBe("No data");
+        expect(await mountBar([[], []])).toBe("No Data");
       });
 
       it("shows No Data when the only non-empty query is hidden", async () => {
-        expect(await mountBar([rows, []], 0)).toBe("No data");
+        expect(await mountBar([rows, []], 0)).toBe("No Data");
       });
 
       it("keeps the chart when a hidden query is the empty one", async () => {
@@ -701,7 +701,7 @@ describe("PanelSchemaRenderer", () => {
       );
 
       it("shows No Data for a gauge when no query has a value", async () => {
-        expect(await mountBar([[], []], -1, "gauge")).toBe("No data");
+        expect(await mountBar([[], []], -1, "gauge")).toBe("No Data");
       });
     });
 
@@ -741,11 +741,11 @@ describe("PanelSchemaRenderer", () => {
       });
 
       it("keeps No Data without one, and for a PromQL gauge", async () => {
-        expect(await mountEmpty({ type: "metric" }, [[]])).toBe("No data");
+        expect(await mountEmpty({ type: "metric" }, [[]])).toBe("No Data");
         const config = { ...defaultProps.panelSchema.config, no_value_replacement: "-" };
         expect(
           await mountEmpty({ type: "gauge", queryType: "promql", config }, [{ result: [] }]),
-        ).toBe("No data");
+        ).toBe("No Data");
       });
     });
 
@@ -814,7 +814,7 @@ describe("PanelSchemaRenderer", () => {
       wrapper.vm.panelData = { chartType: "geomap", options: { series: [] } };
       await flushPromises();
 
-      expect(wrapper.vm.noData).toBe("No data");
+      expect(wrapper.vm.noData).toBe("No Data");
       expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
     });
 
@@ -839,7 +839,7 @@ describe("PanelSchemaRenderer", () => {
       wrapper.vm.panelData = { chartType: "geomap", options: null };
       await flushPromises();
 
-      expect(wrapper.vm.noData).toBe("No data");
+      expect(wrapper.vm.noData).toBe("No Data");
       expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
     });
 
@@ -879,7 +879,7 @@ describe("PanelSchemaRenderer", () => {
       wrapper.vm.panelData = { chartType: "geomap", options: { series: [] } };
       await flushPromises();
 
-      expect(wrapper.vm.noData).toBe("No data");
+      expect(wrapper.vm.noData).toBe("No Data");
     });
   });
 

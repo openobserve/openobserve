@@ -20,19 +20,14 @@
         width="s"
         data-test="prompt-traffic-window"
       />
-      <ORefreshButton
-        :last-run-at="lastRunAt"
-        :loading="loading"
-        data-test="prompt-traffic-refresh"
-        @click="refresh"
-      />
+      <ORefreshButton :loading="loading" data-test="prompt-traffic-refresh" @click="refresh" />
     </div>
 
     <OEmptyState
       v-if="error"
       kind="error"
       :title="t('emptyState.loadError.title')"
-      :text="isRawHttpText(error) ? t('emptyState.loadError.description') : raw(error)"
+      :text="raw(error)"
       @action="refresh"
     />
     <OEmptyState
@@ -107,11 +102,9 @@
         <h4 class="text-text-heading mb-2 text-sm font-semibold">
           {{ t("aiObservability.promptManagement.experimentEvidence") }}
         </h4>
-        <OEmptyState
-          v-if="!evidence.length"
-          size="compact"
-          :title="t('aiObservability.promptManagement.noExperimentEvidence')"
-        />
+        <div v-if="!evidence.length" class="text-text-secondary text-xs">
+          {{ t("aiObservability.promptManagement.noExperimentEvidence") }}
+        </div>
         <article
           v-for="entry in evidence"
           :key="entry.experiment.id"
@@ -137,9 +130,7 @@
 import { computed, onMounted, ref, toRef, watch } from "vue";
 import { useStore } from "vuex";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
-import { useLoadedAt } from "@/composables/useLoadedAt";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
@@ -182,7 +173,6 @@ const isLlmStream = computed(() =>
 );
 const { kpis, breakdown, recent, evidence, loading, error, loadTraffic, loadExperimentEvidence } =
   usePromptAnalytics(promptRef, versionRef, streamName, window, isLlmStream);
-const lastRunAt = useLoadedAt(loading);
 
 const streamOptions = computed(() =>
   (store.state.streams?.traces?.list ?? []).map((stream: { name: string }) => ({

@@ -50,7 +50,7 @@
       class="mb-3"
       data-test="slos-addslo-regen-warning"
     >
-      <span class="font-semibold">{{ t("slos.regenerate.title") }}</span>
+      <span class="font-bold">{{ t("slos.regenerate.title") }}</span>
       {{ t("slos.regenerate.body") }}
     </OInlineNotice>
 
@@ -75,7 +75,7 @@
                `items-start`, not `items-end`: OTagInput is taller than an
                OInput, and bottom-aligning the cells lifted its label clear of
                the other two so the row read as three unrelated fields. -->
-          <div class="grid grid-cols-1 items-start gap-4 2xl:grid-cols-[14rem_1fr_1fr]">
+          <div class="grid grid-cols-1 items-start gap-3 2xl:grid-cols-[14rem_1fr_1fr]">
             <div>
               <!-- No label here: SelectFolderDropDown renders its own, and a
                    second one above it left this column a row taller than the
@@ -120,7 +120,7 @@
           <OTextarea
             v-model="form.description"
             :label="t('slos.field.description')"
-            class="mt-4"
+            class="mt-3"
             data-test="slos-addslo-description"
           />
         </OFormSection>
@@ -144,7 +144,7 @@
           </p>
 
           <template v-if="form.sli_type === 'count'">
-            <div class="mt-4 grid grid-cols-2 gap-4">
+            <div class="mt-3 grid grid-cols-2 gap-3">
               <OSelect
                 v-model="form.config.stream_type"
                 :label="t('slos.field.streamType')"
@@ -174,7 +174,7 @@
               v-if="isMetricsStream"
               :model-value="metricsLanguage"
               :label="t('slos.field.queryLanguage')"
-              class="mt-4"
+              class="mt-3"
               data-test="slos-addslo-count-language"
               @update:model-value="onMetricsLanguageChange"
             >
@@ -204,7 +204,7 @@
                 :hint="t('slos.field.countGoodPromqlHint')"
                 language="prom_ql"
                 required
-                class="mt-4"
+                class="mt-3"
                 :error-message="fieldError('config.good') || undefined"
                 data-test="slos-addslo-promql-good"
               />
@@ -215,7 +215,7 @@
                 :hint="t('slos.field.countTotalPromqlHint')"
                 language="prom_ql"
                 required
-                class="mt-4"
+                class="mt-3"
                 :error-message="fieldError('config.total') || undefined"
                 data-test="slos-addslo-promql-total"
               />
@@ -235,7 +235,7 @@
                 :keywords="effectiveKeywords"
                 :suggestions="effectiveSuggestions"
                 :field-value-resolver="resolveFieldValues"
-                class="mt-4"
+                class="mt-3"
                 data-test="slos-addslo-scope"
               />
               <SloExpressionField
@@ -247,7 +247,7 @@
                 :suggestions="effectiveSuggestions"
                 :field-value-resolver="resolveFieldValues"
                 required
-                class="mt-4"
+                class="mt-3"
                 :error-message="fieldError('config.good_expr') || undefined"
                 data-test="slos-addslo-good-expr"
               />
@@ -255,7 +255,7 @@
           </template>
 
           <template v-else-if="form.sli_type === 'time_slice'">
-            <div class="mt-4 grid grid-cols-2 gap-4">
+            <div class="mt-3 grid grid-cols-2 gap-3">
               <OSelect
                 v-model="form.config.stream_type"
                 :label="t('slos.field.streamType')"
@@ -283,7 +283,7 @@
               v-if="isMetricsStream"
               :model-value="metricsLanguage"
               :label="t('slos.field.queryLanguage')"
-              class="mt-4"
+              class="mt-3"
               data-test="slos-addslo-timeslice-language"
               @update:model-value="onMetricsLanguageChange"
             >
@@ -312,7 +312,7 @@
               :keywords="effectiveKeywords"
               :suggestions="effectiveSuggestions"
               :field-value-resolver="resolveFieldValues"
-              class="mt-4"
+              class="mt-3"
               required
               :error-message="fieldError('config.query') || undefined"
               data-test="slos-addslo-aggregate"
@@ -327,7 +327,7 @@
             >
               {{ t("slos.field.promqlAbsentHint") }}
             </p>
-            <div class="mt-4 grid grid-cols-2 gap-4">
+            <div class="mt-3 grid grid-cols-2 gap-3">
               <OSelect
                 v-model="form.config.comparator"
                 :label="t('slos.field.comparator')"
@@ -357,7 +357,7 @@
               :keywords="effectiveKeywords"
               :suggestions="effectiveSuggestions"
               :field-value-resolver="resolveFieldValues"
-              class="mt-4"
+              class="mt-3"
               data-test="slos-addslo-timeslice-scope"
             />
           </template>
@@ -374,7 +374,7 @@
               :loading="isFetchingAlertSources"
               :placeholder="t('slos.alertSli.sourcePlaceholder')"
               required
-              class="mt-4"
+              class="mt-3"
               :error="!!sourceError"
               :error-message="sourceError || undefined"
               data-test="slos-addslo-alert-source"
@@ -386,7 +386,7 @@
             <OInlineNotice
               v-if="!isFetchingAlertSources && !hasEligibleAlert && !alertSourceError"
               tone="info"
-              class="mt-4"
+              class="mt-3"
               data-test="slos-addslo-alert-source-empty"
             >
               {{ t("slos.alertSli.noneEligible") }}
@@ -395,7 +395,7 @@
         </OFormSection>
 
         <OFormSection :title="t('slos.section.objective')">
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-2 gap-3">
             <OInput
               v-model.number="form.target"
               :label="t('slos.field.target')"
@@ -415,7 +415,7 @@
           <!-- OToggleGroup renders OToggleGroupItem children; it has no
                  `options` prop. Passing one rendered an empty bar, which left
                  S-3's rolling window and S-4's slice interval unreachable. -->
-          <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
             <OToggleGroup
               v-model="form.window_secs"
               :label="t('slos.field.window')"
@@ -488,7 +488,7 @@
             :label="t('slos.field.groupsEstimate')"
             :help-text="t('slos.field.groupsEstimateHint')"
             type="number"
-            class="mt-4"
+            class="mt-3"
             data-test="slos-addslo-groups-estimate"
           />
         </OFormSection>
@@ -564,7 +564,7 @@
             <dd>{{ reservationLabel }}</dd>
           </dl>
 
-          <OInlineNotice tone="info" class="mt-4">
+          <OInlineNotice tone="info" class="mt-3">
             {{ t("slos.backfillNote") }}
           </OInlineNotice>
         </OFormSection>

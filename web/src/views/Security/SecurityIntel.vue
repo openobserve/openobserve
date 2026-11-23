@@ -11,16 +11,13 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import SecurityTimeRange from "@/components/security/SecurityTimeRange.vue";
-import { useSecurityRange } from "@/composables/security/useSecurityRange";
-import type { DateTimeRangeChange } from "@/lib/forms/DateTimeRange/ODateTimeRange.types";
-import SecurityLoadError from "@/components/security/SecurityLoadError.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -29,7 +26,6 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
@@ -91,13 +87,25 @@ const queryClient = useQueryClient();
 const { canAuthor, canAdmin } = useSecurityAccess();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
-const range = useSecurityRange(route.query);
-const windowUs = computed(() => ({ start: range.startUs.value, end: range.endUs.value }));
+const RANGES = [
+  { value: "24h", minutes: 1440 },
+  { value: "7d", minutes: 10080 },
+  { value: "30d", minutes: 43200 },
+] as const;
+type RangeKey = (typeof RANGES)[number]["value"];
+const range = ref<RangeKey>(
+  RANGES.some((r) => r.value === route.query.period) ? (route.query.period as RangeKey) : "7d",
+);
+// Pinned at sweep start so the sweep, the counts and the drawer timeline describe the same window.
+const windowEndUs = ref(Date.now() * 1000);
+const windowUs = computed(() => ({
+  start: windowEndUs.value - RANGES.find((r) => r.value === range.value)!.minutes * 60_000_000,
+  end: windowEndUs.value,
+}));
 
 const tables = ref<IntelTable[]>([]);
 const indicators = ref<Indicator[]>([]);
 const loading = ref(false);
-const indicatorsLoadedAt = ref<number | null>(null);
 const loadError = ref("");
 /** The list read was refused; threat-intel lists are enrichment tables, read with their own grant. */
 const loadRefusal = shallowRef<unknown>(null);
@@ -146,7 +154,6 @@ async function loadIndicators(): Promise<boolean> {
       });
     });
     indicators.value = all;
-    indicatorsLoadedAt.value = Date.now();
     tableColumns.value = Object.fromEntries(
       list.map((tb, i) => [tb.name, reads[i]?.columns ?? []]),
     );
@@ -201,7 +208,7 @@ async function runSweep() {
   sweepController?.abort();
   const ctrl = (sweepController = new AbortController());
   now.value = Date.now();
-  range.touch();
+  windowEndUs.value = now.value * 1000;
   // Expired indicators are kept on the list but not hunted for.
   await sweep.run(orgId.value, liveIndicators.value, windowUs.value, ctrl.signal);
 }
@@ -216,9 +223,10 @@ onBeforeUnmount(() => {
   disposed = true;
   sweepController?.abort();
 });
-function onRangeChange(change: DateTimeRangeChange) {
-  if (!range.apply(change)) return;
-  analytics.track("security_time_range_changed", { view: "intel", range: range.text.value });
+function onRangeChange(value: unknown) {
+  if (!value || value === range.value) return;
+  range.value = value as RangeKey;
+  analytics.track("security_time_range_changed", { view: "intel", range: range.value });
   syncUrl();
   void runSweep();
 }
@@ -759,7 +767,7 @@ async function loadTimeline() {
 watch(
   () =>
     selected.value
-      ? `${indicatorKey(selected.value)}|${sweep.lastRunAt.value ?? 0}|${range.text.value}`
+      ? `${indicatorKey(selected.value)}|${sweep.lastRunAt.value ?? 0}|${range.value}`
       : "",
   () => void loadTimeline(),
 );
@@ -771,7 +779,7 @@ function huntInEvents(s: Sighting) {
     query: {
       org_identifier: orgId.value,
       stream: s.stream,
-      ...range.linkQuery.value,
+      period: range.value,
       filters:
         b64EncodeUnicode(
           JSON.stringify([
@@ -825,7 +833,7 @@ async function removeIndicator() {
 function urlQuery(): Record<string, string> {
   const query: Record<string, string> = {
     org_identifier: orgId.value,
-    ...range.linkQuery.value,
+    period: range.value,
     tab: tab.value,
   };
   if (selected.value) query.indicator = `${indicatorKey(selected.value)}@${selected.value.table}`;
@@ -866,6 +874,15 @@ async function onSaved() {
   >
     <template #actions>
       <div class="flex items-center gap-2">
+        <OToggleGroup
+          :model-value="range"
+          data-test="security-intel-range"
+          @update:model-value="onRangeChange"
+        >
+          <OToggleGroupItem v-for="r in RANGES" :key="r.value" :value="r.value">
+            {{ t(`siem.range.${r.value}`) }}
+          </OToggleGroupItem>
+        </OToggleGroup>
         <OButton
           variant="secondary"
           icon="radar"
@@ -875,7 +892,6 @@ async function onSaved() {
           @click="runSweep"
         >
           {{ t("siem.intel.runSweep") }}
-          <OTooltip v-if="!liveIndicators.length" :content="t('siem.intel.runSweepDisabled')" />
         </OButton>
         <ODropdown>
           <template #trigger>
@@ -905,13 +921,9 @@ async function onSaved() {
             {{ t("siem.intel.importFeed") }}
           </ODropdownItem>
         </ODropdown>
-        <SecurityTimeRange
-          :picker-props="range.pickerProps.value"
-          data-test="security-intel-range"
-          @change="onRangeChange"
-        />
         <OButton
           variant="primary"
+          icon="add"
           :disabled="!canAuthor"
           data-test="security-intel-add"
           @click="showAdd = true"
@@ -919,12 +931,6 @@ async function onSaved() {
           {{ t("siem.intel.add") }}
           <OTooltip v-if="!canAuthor" :content="t('siem.access.needsAuthor')" />
         </OButton>
-        <ORefreshButton
-          :last-run-at="sweep.lastRunAt.value ?? indicatorsLoadedAt"
-          :loading="loading || sweep.running.value"
-          data-test="security-intel-refresh"
-          @click="refresh"
-        />
       </div>
     </template>
 
@@ -934,19 +940,19 @@ async function onSaved() {
       :reason="raw(forbiddenReason(loadRefusal))"
       data-test="security-intel-access-lock"
     />
-    <SecurityLoadError
-      v-else-if="loadError && !indicators.length"
-      :what="t('siem.intel.whatIndicators')"
-      :hint="t('siem.intel.loadFailedHint')"
-      data-test="security-intel-load-error"
-      @retry="refresh"
-    />
-    <div v-else-if="!loading && !tables.length" class="flex min-h-0 flex-1 flex-col">
+    <div
+      v-else-if="!loading && !tables.length && !loadError"
+      class="flex min-h-0 flex-1 items-center justify-center"
+    >
       <OEmptyState
         icon="radar"
         :title="t('siem.intel.empty.title')"
         :text="t('siem.intel.empty.description')"
+        :action-label="canAuthor ? t('siem.intel.add') : undefined"
+        :secondary-action-label="canAuthor ? t('siem.intel.importCsv') : undefined"
         data-test="security-intel-empty"
+        @action="showAdd = true"
+        @secondary-action="importMode = 'file'"
       />
     </div>
 
@@ -1041,10 +1047,8 @@ async function onSaved() {
               class="max-w-80 flex-1"
               data-test="security-intel-search"
             />
-            <div class="shrink-0">
+            <div class="w-44 shrink-0">
               <OSelect
-                variant="filter"
-                :label="t('siem.intel.filterType')"
                 :aria-label="t('siem.aria.indicatorType')"
                 v-model="typeFilter"
                 :options="typeOptions"
@@ -1061,6 +1065,18 @@ async function onSaved() {
               }}
             </span>
           </div>
+        </template>
+        <template #toolbar-trailing>
+          <OButton
+            icon-only
+            variant="secondary"
+            icon="refresh"
+            :loading="loading || sweep.running.value"
+            data-test="security-intel-refresh"
+            @click="refresh"
+          >
+            <OTooltip side="bottom" :content="t('siem.intel.refresh')" />
+          </OButton>
         </template>
         <template #cell-indicator="{ row }">
           <span class="text-text-heading truncate font-mono text-xs font-semibold">{{
@@ -1110,7 +1126,7 @@ async function onSaved() {
           <OEmptyState
             kind="error"
             :title="t('siem.intel.loadFailed')"
-            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
+            :text="raw(message)"
             @action="refresh"
           />
         </template>
@@ -1126,7 +1142,7 @@ async function onSaved() {
                   t('siem.intel.noMatches.description', {
                     n: formatEventCount(liveIndicators.length),
                     streams: sweep.streams.value.length,
-                    range: range.text.value,
+                    range: t(`siem.range.${range}`),
                   }),
                   ...sweepCaveats,
                 ].join(' '),
@@ -1170,17 +1186,15 @@ async function onSaved() {
         @row-click="(r: IndicatorRow) => openIndicator(r.indicator)"
       >
         <template #toolbar>
-          <div class="flex flex-1 items-center gap-2 max-md:basis-full">
+          <div class="flex flex-1 items-center gap-2">
             <OSearchInput
               v-model="search"
               :placeholder="t('siem.intel.search')"
               class="max-w-80 flex-1"
               data-test="security-intel-indicator-search"
             />
-            <div class="shrink-0">
+            <div class="w-44 shrink-0">
               <OSelect
-                variant="filter"
-                :label="t('siem.intel.filterType')"
                 :aria-label="t('siem.aria.indicatorType')"
                 v-model="typeFilter"
                 :options="typeOptions"
@@ -1197,6 +1211,18 @@ async function onSaved() {
               {{ t("siem.intel.expiringOnly") }}
             </OButton>
           </div>
+        </template>
+        <template #toolbar-trailing>
+          <OButton
+            icon-only
+            variant="secondary"
+            icon="refresh"
+            :loading="loading"
+            data-test="security-intel-indicators-refresh"
+            @click="refresh"
+          >
+            <OTooltip side="bottom" :content="t('siem.intel.refresh')" />
+          </OButton>
         </template>
         <template #cell-indicator="{ row }">
           <span
@@ -1249,7 +1275,7 @@ async function onSaved() {
           <OEmptyState
             kind="error"
             :title="t('siem.intel.loadFailed')"
-            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
+            :text="raw(message)"
             @action="refresh"
           />
         </template>
@@ -1335,7 +1361,7 @@ async function onSaved() {
           </div>
           <OEmptyState
             v-if="!sweep.coverage.value.length && !sweep.running.value"
-            size="compact"
+            size="inline"
             icon="fact-check"
             :title="t('siem.intel.noCoverage')"
           />
@@ -1378,7 +1404,7 @@ async function onSaved() {
           }}
         </OTag>
         <OTag v-else tone="ok" icon="task-alt" size="sm">
-          {{ t("siem.intel.notSightedIn", { range: range.text.value }) }}
+          {{ t("siem.intel.notSightedIn", { range: t(`siem.range.${range}`) }) }}
         </OTag>
         <OTag v-if="isExpired(selected, now)" tone="warn" icon="schedule" size="sm">
           {{ t("siem.intel.expired") }}
@@ -1393,7 +1419,7 @@ async function onSaved() {
               <span class="text-text-heading text-sm font-semibold">{{
                 t("siem.intel.drawer.overTime")
               }}</span>
-              <span class="text-text-secondary text-xs">{{ range.text.value }}</span>
+              <span class="text-text-secondary text-xs">{{ t(`siem.range.${range}`) }}</span>
             </div>
             <div class="h-40">
               <SecuritySeverityChart
@@ -1451,7 +1477,7 @@ async function onSaved() {
               ? t('siem.intel.drawer.cidrNotSwept')
               : t('siem.intel.drawer.notSeen', {
                   streams: sweep.streams.value.length,
-                  range: range.text.value,
+                  range: t(`siem.range.${range}`),
                 })
           "
         />

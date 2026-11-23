@@ -122,12 +122,12 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
     });
 
-    it("should render the ODialog with title 'Index fields detected'", async () => {
+    it("should render the ODialog with title 'Index Fields Detected'", async () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
       const dialog = wrapper.find('[data-test-stub="o-dialog"]');
       expect(dialog.exists()).toBe(true);
-      expect(dialog.attributes("data-title")).toBe("Index fields detected");
+      expect(dialog.attributes("data-title")).toBe("Index Fields Detected");
     });
 
     it("should pass size='md' to ODialog", async () => {
@@ -147,7 +147,7 @@ describe("PerformanceFieldsDialog", () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
       const dialog = wrapper.find('[data-test-stub="o-dialog"]');
-      expect(dialog.attributes("data-primary-label")).toBe("Add fields");
+      expect(dialog.attributes("data-primary-label")).toBe("Add Fields");
     });
 
     it("should not render the dialog body when modelValue is false", async () => {
@@ -163,7 +163,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.fts.length).toBeGreaterThan(0);
-      expect(wrapper.text()).toContain("Full text search (1)");
+      expect(wrapper.text()).toContain("Full Text Search (1)");
     });
 
     it("should show correct FTS field count", async () => {
@@ -174,7 +174,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.fts.length).toBe(2);
-      expect(wrapper.text()).toContain("Full text search (2)");
+      expect(wrapper.text()).toContain("Full Text Search (2)");
     });
 
     it("should display FTS field chip with the field name", async () => {
@@ -190,7 +190,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.fts.length).toBe(0);
-      expect(wrapper.text()).not.toContain("Full text search (");
+      expect(wrapper.text()).not.toContain("Full Text Search (");
     });
   });
 
@@ -200,7 +200,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.secondaryIndex.length).toBeGreaterThan(0);
-      expect(wrapper.text()).toContain("Secondary index (1)");
+      expect(wrapper.text()).toContain("Secondary Index (1)");
     });
 
     it("should show correct secondary index field count", async () => {
@@ -212,7 +212,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.secondaryIndex.length).toBe(3);
-      expect(wrapper.text()).toContain("Secondary index (3)");
+      expect(wrapper.text()).toContain("Secondary Index (3)");
     });
 
     it("should display secondary index field chip with the field name", async () => {
@@ -228,7 +228,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.secondaryIndex.length).toBe(0);
-      expect(wrapper.text()).not.toContain("Secondary index (");
+      expect(wrapper.text()).not.toContain("Secondary Index (");
     });
   });
 

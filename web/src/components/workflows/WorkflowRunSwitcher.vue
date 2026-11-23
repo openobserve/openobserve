@@ -87,14 +87,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             side="left"
           />
         </ODropdownItem>
-        <OEmptyState
+        <div
           v-if="!sortedRuns.length"
-          size="compact"
-          class="px-3"
-          icon="history"
-          :title="t('workflow.ndv.noRunsList')"
           data-test="workflow-run-switcher-empty"
-        />
+          class="text-text-secondary px-3 py-4 text-center text-xs italic"
+        >
+          {{ t("workflow.ndv.noRunsList") }}
+        </div>
       </div>
       <!-- Rows are only ever withheld as a CLASS (test runs), so the menu says so
            and offers them back rather than shrinking silently. -->
@@ -126,7 +125,6 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";

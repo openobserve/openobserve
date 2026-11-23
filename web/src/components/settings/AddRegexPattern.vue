@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="toggleAIChat"
           data-test="add-regex-pattern-open-close-ai-btn"
           :aria-label="t('menu.aiAssistant')"
-          class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_var(--duration-control)_var(--ease-control),box-shadow_var(--duration-control)_var(--ease-control),color_var(--duration-control)_var(--ease-control)] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
+          class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
           :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <img
             alt=""
             :src="getBtnLogo"
-            class="header-icon [transition:transform_var(--duration-indicator)_var(--ease-control)] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_var(--duration-control)_var(--ease-control)]"
+            class="header-icon [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
           />
         </OButton>
         <OButton
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OInlineNotice>
             <div class="regex-pattern-input-container">
               <div class="flex items-center justify-between">
-                <span class="text-sm leading-5.25 font-semibold">{{
+                <span class="text-sm leading-5.25 font-bold">{{
                   t("settings.addRegexPattern.regexPatternLabel")
                 }}</span>
                 <OButton
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSeparator class="my-2" />
             <div>
               <div class="flex items-center justify-between">
-                <span class="text-sm leading-5.25 font-semibold">
+                <span class="text-sm leading-5.25 font-bold">
                   {{ t("settings.addRegexPattern.testRegexPattern") }}
                 </span>
                 <OButton
@@ -213,7 +213,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("settings.addRegexPattern.clickTestInputHint") }}
                     </span>
                   </div>
-                  <OSkeleton v-else-if="testLoading" shape="block" class="h-27.75" />
+                  <div v-else-if="testLoading">
+                    <span class="flex h-27.75 items-center justify-center">
+                      <OSpinner size="lg" />
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -256,7 +260,7 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import regexPatternService from "@/services/regex_pattern";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
@@ -291,7 +295,7 @@ export default defineComponent({
     O2AIChat,
     OButton,
     ODrawer,
-    OSkeleton,
+    OSpinner,
     OIcon,
     OForm,
     OFormInput,

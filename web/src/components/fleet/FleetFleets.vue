@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="fleet-fleets-no-access"
         >
           <OEmptyState
-            size="compact"
+            size="inline"
             kind="denied"
             :title="t('emptyState.noAccess.title')"
             :text="
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="fleet-fleets-load-error"
         >
           <OEmptyState
-            size="compact"
+            size="inline"
             kind="error"
             :title="t('emptyState.loadError.title')"
             :text="t('emptyState.loadError.description')"
@@ -60,11 +60,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else-if="!fleet && fleets.loading.value"
-          class="px-page-edge border-border-default flex shrink-0 flex-col gap-2 border-b py-3"
+          class="px-page-edge border-border-default flex shrink-0 justify-center border-b py-3"
           data-test="fleet-fleets-loading"
         >
-          <OSkeleton shape="block" class="h-5 w-48" />
-          <OSkeleton shape="block" class="h-4 w-80 max-w-full" />
+          <OSpinner size="lg" />
         </div>
         <div
           v-else-if="!fleet"
@@ -72,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="fleet-fleets-not-found"
         >
           <OEmptyState
-            size="compact"
+            size="inline"
             :text="t('emptyState.noData.description')"
             :title="t('fleet.fleets.notFound')"
           />
@@ -95,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="ms-auto flex flex-wrap items-center gap-2">
               <OButton
                 variant="ghost"
+                icon="add"
                 data-test="fleet-fleets-add-collector"
                 @click="installOpen = true"
               >
@@ -265,7 +265,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import KpiCard from "@/components/common/KpiCard.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import FleetCollectors from "./FleetCollectors.vue";
 import FleetFleetSettingsDrawer from "./FleetFleetSettingsDrawer.vue";

@@ -22,9 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="relative h-full" ref="chartPanelRef" :class="chartPanelClass">
       <div
-        v-if="
-          (!errorDetail?.message || showsCustomChartError) && !isAwaitingFirstLoad && !statHasNoData
-        "
+        v-if="(!errorDetail?.message || showsCustomChartError) && !isAwaitingFirstLoad"
         v-show="!errorDetail?.message"
         :style="{ height: chartPanelHeight, width: '100%' }"
       >
@@ -71,13 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <template v-if="customNoDataText" #empty>
-            <OEmptyState
-              :size="panelStateSize"
-              icon="bar-chart"
-              :title="noDataTitle"
-              data-test="no-data"
-              class="px-3"
-            />
+            <OEmptyState size="inline" icon="bar-chart" :title="noDataTitle" data-test="no-data" />
           </template>
         </TableRenderer>
         <div
@@ -216,16 +208,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
-      <div
-        v-if="statHasNoData"
-        class="absolute inset-0 flex flex-col items-center justify-center"
-        data-test="dashboard-stat-no-data"
-      >
-        <span class="text-text-heading text-2xl leading-none font-semibold" aria-hidden="true"
-          >—</span
-        >
-        <span class="text-text-secondary text-xs">{{ t("panel.noDataInRange") }}</span>
-      </div>
       <PanelChartPlaceholder
         v-if="showsChartPlaceholder"
         class="absolute inset-0"
@@ -234,7 +216,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState
         v-if="
           noData &&
-          !statHasNoData &&
           !isAwaitingFirstLoad &&
           !errorDetail?.message &&
           panelSchema.type != 'maps' &&
@@ -242,18 +223,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !loading &&
           !panelSchema.config?.curated_no_data_eligible
         "
-        :size="panelStateSize"
+        size="inline"
         icon="bar-chart"
         :title="noDataTitle"
         data-test="no-data"
-        class="noData absolute! inset-0 px-3"
+        class="noData [container-type:size] absolute! inset-0 h-full !min-h-0 w-full !p-2"
       />
       <div
         v-if="errorDetail?.message && !panelSchema?.error_config?.custom_error_handeling"
-        class="absolute inset-0 overflow-hidden px-3"
+        class="absolute top-[20%] h-[80%] w-full overflow-hidden text-center text-ellipsis"
         data-test="panel-schema-renderer-error-message"
       >
-        <OEmptyState :size="panelStateSize" kind="error" :title="panelErrorText" />
+        <OIcon size="md" name="warning" />
+        <div class="h-4/5 w-full">
+          {{
+            errorDetail?.code?.toString().startsWith("4")
+              ? errorDetail.message
+              : t("common.errorLoadingData")
+          }}
+        </div>
       </div>
       <div
         v-if="
@@ -262,14 +250,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !panelSchema?.error_config?.default_data_on_error &&
           panelSchema?.error_config?.custom_error_message
         "
-        class="absolute inset-0 overflow-hidden px-3"
+        class="absolute top-[20%] h-[80%] w-full overflow-hidden text-center text-ellipsis"
         data-test="panel-schema-renderer-custom-error-message"
       >
-        <OEmptyState
-          :size="panelStateSize"
-          kind="error"
-          :title="raw(panelSchema.error_config.custom_error_message)"
-        />
+        {{ panelSchema?.error_config?.custom_error_message }}
       </div>
       <div class="absolute top-0 z-999 flex w-full">
         <LoadingProgress
@@ -405,7 +389,6 @@ import { useTheme } from "@/composables/useTheme";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import { chartColor } from "@/utils/chartTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
@@ -465,7 +448,7 @@ import ExemplarCard from "@/components/dashboards/exemplars/ExemplarCard.vue";
 import ExemplarMarkerList from "@/components/dashboards/exemplars/ExemplarMarkerList.vue";
 import type { ExemplarMarker, InjectedExemplars, TraceVerdict } from "@/ts/interfaces/exemplars";
 import { detectChunkingDirection } from "@/utils/dashboard/chunkingDirection";
-import { scannedNoRecords, type SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
+import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
 import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
 import type { SankeyNotice } from "@/utils/dashboard/convertSankeyData";
 import type { TreemapNotice } from "@/utils/dashboard/convertTreemapData";
@@ -2046,25 +2029,13 @@ export default defineComponent({
       }
     };
 
-    // R3: a panel taller than 240 px shows the region state, a shorter one the compact state.
-    const panelHeight = ref(0);
-    const panelStateSize = computed(() => (panelHeight.value > 240 ? "region" : "compact"));
-    // 4xx text is the query's own error; anything else, or raw transport text, gets the shared copy.
-    const panelErrorText = computed(() => {
-      const msg = errorDetail.value?.message;
-      if (!msg || !errorDetail.value?.code?.toString().startsWith("4") || isRawHttpText(msg))
-        return undefined;
-      return raw(msg);
-    });
-
     // ResizeObserver to detect chartPanelRef dimension changes
     let resizeObserver: ResizeObserver | null = null;
     let resizeTimeout: number | null = null;
 
     onMounted(() => {
       if (chartPanelRef.value) {
-        resizeObserver = new ResizeObserver((entries) => {
-          panelHeight.value = entries[0]?.contentRect.height ?? 0;
+        resizeObserver = new ResizeObserver(() => {
           // Debounce the resize handler to prevent "ResizeObserver loop" errors
           // This error occurs when the callback takes longer than one animation frame
           if (resizeTimeout) {
@@ -2231,18 +2202,6 @@ export default defineComponent({
       );
     });
 
-    // An aggregate over zero scanned records returns a row of 0, which a stat must not present as a measurement.
-    const statHasNoData = computed(() => {
-      if (panelSchema.value?.type !== "metric" || loading.value || drawsMissingValue.value) {
-        return false;
-      }
-      const queries = panelDiagnostics?.value?.queries ?? [];
-      if (!queries.length || !queries.every(scannedNoRecords)) return false;
-      const firstRow = data.value?.[0]?.[0];
-      const yAliases = panelSchema.value?.queries?.[0]?.fields?.y?.map((it: any) => it.alias) ?? [];
-      return yAliases.every((y: any) => !Number(getDataValue(firstRow, y)));
-    });
-
     const noData = computed(() => {
       const type = panelSchema.value.type;
 
@@ -2258,14 +2217,14 @@ export default defineComponent({
           filteredData.value.some((item: any) => item?.result?.length);
         // Series without the lat/lon labels convert to no points.
         if (hasResults && type === "geomap" && panelData.value?.chartType === "geomap") {
-          return hasGeoPoints() ? "" : "No data";
+          return hasGeoPoints() ? "" : "No Data";
         }
         if (hasResults) return "";
         // During a reload the executor clears state.data before the new results
         // stream in. Keep showing the previously rendered chart while loading
         // (matching the SQL branch below); only show "No Data" once the load
         // completes with no results.
-        return loading.value && panelData.value?.options?.series?.length > 0 ? "" : "No data";
+        return loading.value && panelData.value?.options?.series?.length > 0 ? "" : "No Data";
       }
 
       const hasRawData = bufferHasRows(filteredData.value);
@@ -2274,7 +2233,7 @@ export default defineComponent({
       // suppress "No Data" only while still loading to avoid flicker.
       // Once loading completes with empty data, show "No Data".
       if (!hasRawData) {
-        return loading.value && panelData.value?.chartType ? "" : "No data";
+        return loading.value && panelData.value?.chartType ? "" : "No Data";
       }
 
       // Custom chart output is user-defined ECharts options, so row presence is the only reliable signal.
@@ -2288,21 +2247,21 @@ export default defineComponent({
       }
 
       if (type === "flame-graph") {
-        return panelData.value?.root ? "" : "No data";
+        return panelData.value?.root ? "" : "No Data";
       }
 
       if (type === "logs") {
-        return panelData.value?.rows?.length > 0 ? "" : "No data";
+        return panelData.value?.rows?.length > 0 ? "" : "No Data";
       }
 
       // Table renders raw rows; the conversion returns { rows, columns }.
       if (type === "table") {
-        return panelData.value?.rows?.length > 0 ? "" : "No data";
+        return panelData.value?.rows?.length > 0 ? "" : "No Data";
       }
 
       // Rows with null lat/lon are dropped, so raw rows can still mean no points.
       if (type === "geomap") {
-        return hasGeoPoints() ? "" : "No data";
+        return hasGeoPoints() ? "" : "No Data";
       }
 
       // Maps handles its own empty state.
@@ -2312,7 +2271,7 @@ export default defineComponent({
 
       // Sankey returns { options: null } when data is invalid.
       if (type === "sankey") {
-        return panelData.value?.options != null ? "" : "No data";
+        return panelData.value?.options != null ? "" : "No Data";
       }
 
       // Metric/gauge series are always created by the converter
@@ -2324,13 +2283,13 @@ export default defineComponent({
           const yAlias = (queries[i].fields?.y ?? []).map((it: any) => it.alias || []);
           return yAlias.every((y: any) => getDataValue(rows?.[0], y) != null);
         });
-        return hasValue ? "" : "No data";
+        return hasValue ? "" : "No Data";
       }
 
       // For all other chart types (line, area, bar, scatter, heatmap, etc.),
       // the series filter in the conversion pipeline already excluded series
       // whose data is entirely null. Just check what survived.
-      return panelData.value?.options?.series?.length > 0 ? "" : "No data";
+      return panelData.value?.options?.series?.length > 0 ? "" : "No Data";
     });
 
     const customNoDataText = computed(() =>
@@ -2355,7 +2314,7 @@ export default defineComponent({
     );
 
     const noDataTitle = computed(() =>
-      customNoDataText.value ? raw(customNoDataText.value) : t("panel.noDataInRange"),
+      customNoDataText.value ? raw(customNoDataText.value) : t("panel.noData"),
     );
 
     // Determines what data to pass to ChartRenderer.
@@ -2441,13 +2400,13 @@ export default defineComponent({
 
     // An empty layer list would still build a bare map, so it gets the placeholder too.
     const geoMapRendererData = computed(() =>
-      panelData.value?.chartType === "geomap" && noData.value !== "No data" && hasGeoPoints()
+      panelData.value?.chartType === "geomap" && noData.value !== "No Data" && hasGeoPoints()
         ? panelData.value
         : { options: { backgroundColor: "transparent" } },
     );
 
     const chartRendererData = computed(() => {
-      if (noData.value === "No data") {
+      if (noData.value === "No Data") {
         return { options: { backgroundColor: "transparent" } };
       }
       if (
@@ -2604,7 +2563,7 @@ export default defineComponent({
         // and never refreshes panelData — so guard on noData here to avoid
         // rendering the stale converted rows behind the "No Data" state.
         // Mirrors chartRendererData's noData guard for the chart path.
-        if (noData.value === "No data") {
+        if (noData.value === "No Data") {
           return { rows: [], columns: [] };
         }
         if (panelSchema.value.queryType === "promql") {
@@ -2810,8 +2769,6 @@ export default defineComponent({
     }
 
     return {
-      panelStateSize,
-      panelErrorText,
       hoveredQueryAnnotation,
       onChartMouseOver,
       onChartMouseOut,
@@ -2835,7 +2792,6 @@ export default defineComponent({
       onCustomChartRendered,
       showsCustomChartError,
       noData,
-      statHasNoData,
       noDataTitle,
       customNoDataText,
       geoMapRendererData,

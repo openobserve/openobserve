@@ -127,10 +127,10 @@ describe("rumIOSCard builder", () => {
   // ── provider metadata ────────────────────────────────────────────────────────
 
   describe("provider", () => {
-    it("names the provider 'Real user monitoring'", () => {
+    it("names the provider 'Real User Monitoring'", () => {
       const card = buildCard();
 
-      expect(card.provider.name).toBe("Real user monitoring");
+      expect(card.provider.name).toBe("Real User Monitoring");
     });
 
     it("sets runtime to 'iOS'", () => {
@@ -153,7 +153,7 @@ describe("rumIOSCard builder", () => {
         "Views",
         "Errors",
         "Crashes",
-        "Session replay",
+        "Session Replay",
       ]);
     });
 

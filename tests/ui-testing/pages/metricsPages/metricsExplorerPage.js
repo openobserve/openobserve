@@ -35,9 +35,7 @@ export class MetricsExplorerPage {
         this.refreshButton = '[data-test="metrics-explorer-refresh"]';
         this.runButton = '[data-test="metrics-explorer-run"]';
         this.runOptionsButton = '[data-test="metrics-explorer-run-options"]';
-        // A menu item inside the toolbar ⋯: open it with openShareMenuItem().
         this.shareButton = '[data-test="metrics-explorer-share-btn"]';
-        this.moreMenuButton = '[data-test="metrics-explorer-more-btn"]';
         // Result-count label in the filter bar ("N" or "N of M").
         this.countLabel = '[data-test="metrics-explorer-count"]';
 
@@ -98,7 +96,7 @@ export class MetricsExplorerPage {
 
         // ===== SHARE TOASTS (OToast exposes variant + message as data-test attrs) =====
         this.shareSuccessToast = page.locator(
-            '[data-test-variant="success"][data-test-message*="Link copied"]'
+            '[data-test-variant="success"][data-test-message*="Link Copied"]'
         );
         this.shareErrorToast = page.locator(
             '[data-test-variant="error"][data-test-message*="shortening link"]'
@@ -758,57 +756,26 @@ export class MetricsExplorerPage {
 
     /* ----------------------------------------------------------------- share */
 
-    /** Opens the toolbar ⋯ unless it is already open; Share and Recent searches live there. */
-    async openMoreMenu() {
-        const trigger = this.page.locator(this.moreMenuButton);
-        await trigger.waitFor({ state: 'visible', timeout: 10000 });
-        if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
-        await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 5000 });
-    }
-
-    /** Closes ⋯ so an inspection leaves no menu over the page. */
-    async closeMoreMenu() {
-        const trigger = this.page.locator(this.moreMenuButton);
-        if ((await trigger.getAttribute('aria-expanded').catch(() => null)) === 'true') {
-            await this.page.keyboard.press('Escape');
-        }
-    }
-
-    /** Opens ⋯ and returns the Share link item. */
-    async openShareMenuItem() {
-        await this.openMoreMenu();
-        return this.page.locator(this.shareButton);
-    }
-
     getShareButton() {
         return this.page.locator(this.shareButton);
     }
 
     async isShareButtonInDom() {
-        await this.openMoreMenu();
-        const count = await this.page.locator(this.shareButton).count();
-        await this.closeMoreMenu();
-        return count > 0;
+        return (await this.page.locator(this.shareButton).count()) > 0;
     }
 
     async isShareButtonVisible() {
-        await this.openMoreMenu();
-        const visible = await this.page
+        return await this.page
             .locator(this.shareButton)
             .isVisible({ timeout: 5000 })
             .catch(() => false);
-        await this.closeMoreMenu();
-        return visible;
     }
 
     async isShareButtonEnabled() {
-        await this.openMoreMenu();
-        const enabled = await this.page
+        return await this.page
             .locator(this.shareButton)
             .isEnabled({ timeout: 5000 })
             .catch(() => false);
-        await this.closeMoreMenu();
-        return enabled;
     }
 
     async isShareButtonDisabled() {
@@ -816,21 +783,20 @@ export class MetricsExplorerPage {
     }
 
     async expectShareButtonVisible() {
-        await this.openMoreMenu();
         await expect(this.page.locator(this.shareButton)).toBeVisible({ timeout: 15000 });
-        await this.closeMoreMenu();
     }
 
-    /** The ⋯ item closes on select, so a share in flight shows no busy control. */
+    /** OButton surfaces its loading prop as aria-busy (OButton.vue:318). */
     async isShareButtonLoading() {
-        const item = this.page.locator(this.shareButton);
-        if ((await item.count()) === 0) return false;
-        const state = await item.getAttribute('aria-busy', { timeout: 1000 }).catch(() => null);
+        const state = await this.page
+            .locator(this.shareButton)
+            .getAttribute('aria-busy')
+            .catch(() => null);
         return state === 'true' || state === '';
     }
 
     async clickShareButton() {
-        await (await this.openShareMenuItem()).click();
+        await this.page.locator(this.shareButton).click();
     }
 
     async waitForShareSuccessToast(timeout = 15000) {

@@ -115,18 +115,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Body -->
-    <OEmptyState
+    <div
       v-if="!props.spans || props.spans.length === 0"
-      :title="t('traces.threadView.noSpansLoaded')"
-    />
-    <OEmptyState v-else-if="turns.length === 0">
-      <template #text>
-        <!-- One inline run, so the space after "with" survives whitespace collapsing. -->
+      class="text-text-secondary flex flex-1 items-center justify-center text-sm"
+    >
+      {{ t("traces.threadView.noSpansLoaded") }}
+    </div>
+    <div
+      v-else-if="turns.length === 0"
+      class="text-text-secondary flex flex-1 items-center justify-center px-4 text-center text-sm"
+    >
+      <!-- Single inline span: the message, the <code> token and the period must
+           flow as one text run. As separate flex items the browser strips the
+           whitespace between them, dropping the space after "with". The space is
+           concatenated into the interpolation so no template-whitespace
+           collapsing (or formatter re-wrap) can drop it. -->
+      <span>
         {{ t("traces.threadView.noLlmTurns") + " " }}
         <code class="text-text-body font-mono">{{ raw("gen_ai.operation.name = chat") }}</code
         >.
-      </template>
-    </OEmptyState>
+      </span>
+    </div>
     <div v-else class="thread-scroll-body bg-surface-base flex-1 overflow-auto px-4 py-3">
       <!-- System prompt (global — identical across traces in a session). -->
       <div
@@ -184,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="thread-bubble thread-bubble--user thread-user-row rounded-default text-text-body border-chat-bubble-user-border bg-chat-bubble-user dark:border-thread-bubble-border-dark ms-auto mb-4 flex w-fit max-w-[40%] items-start gap-2.5 border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-xs dark:shadow-white/8"
         >
           <div
-            class="thread-user-avatar text-2xs bg-gradient-ai inline-flex h-6 w-6 shrink-0 cursor-default items-center justify-center rounded-full font-semibold text-white dark:bg-[image:linear-gradient(135deg,var(--color-indigo-600)_0%,var(--color-indigo-500)_100%)]"
+            class="thread-user-avatar text-2xs bg-gradient-ai inline-flex h-6 w-6 shrink-0 cursor-default items-center justify-center rounded-full font-bold text-white dark:bg-[image:linear-gradient(135deg,var(--color-indigo-600)_0%,var(--color-indigo-500)_100%)]"
             :title="group.userId || t('traces.threadView.user')"
           >
             <OIcon name="person" size="sm" />
@@ -307,7 +316,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, inject, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export interface Props {
@@ -543,10 +551,10 @@ function formatTime(ns: number): string {
     line-height: 1.3;
   }
   :deep(h1) {
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
   }
   :deep(h2) {
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
   }
   :deep(h3) {
     font-size: var(--text-sm);

@@ -58,9 +58,9 @@ describe("OEmptyState", () => {
   });
 
   describe("API constants", () => {
-    it("exposes the four kinds and the region and compact variants", () => {
+    it("exposes the four kinds and two sizes", () => {
       expect(EMPTY_STATE_KINDS).toEqual(["first-run", "filtered", "denied", "error"]);
-      expect(EMPTY_STATE_SIZES).toEqual(["region", "compact"]);
+      expect(EMPTY_STATE_SIZES).toEqual(["page", "inline"]);
     });
   });
 
@@ -81,95 +81,47 @@ describe("OEmptyState", () => {
       expect(iconName(wrapper)).toBe(icon);
     });
 
-    it("keeps the tile neutral for every kind and tints only the error icon", () => {
+    it("tints the tile red only for error", () => {
       wrapper = mountState({ kind: "error" });
-      expect(tile(wrapper).classes()).toEqual(
-        expect.arrayContaining(["bg-surface-subtle", "text-status-error-text"]),
-      );
+      expect(tile(wrapper).classes()).toContain("bg-status-error-bg");
       wrapper.unmount();
       wrapper = mountState({ kind: "denied" });
-      expect(tile(wrapper).classes()).toContain("text-text-secondary");
+      expect(tile(wrapper).classes()).not.toContain("bg-status-error-bg");
     });
 
     it("lets icon override the kind default", () => {
       wrapper = mountState({ kind: "filtered", icon: "dashboard" });
       expect(iconName(wrapper)).toBe("dashboard");
     });
-
-    it.each([
-      ["error", "Couldn't load this data"],
-      ["denied", "You don't have access"],
-      ["filtered", "No matches"],
-    ] as const)("%s falls back to its own title and text", (kind, title) => {
-      wrapper = mount(OEmptyState, {
-        props: { kind },
-        global: { plugins: [i18n], stubs: { OIcon: OIconStub, OButton: OButtonStub } },
-      });
-      expect(wrapper.find('[data-test="o2-empty-state-title"]').text()).toBe(title);
-      expect(wrapper.find('[data-test="o2-empty-state-text"]').exists()).toBe(true);
-    });
-
-    it("keeps a caller title without adding the kind's text", () => {
-      wrapper = mountState({ kind: "error" });
-      expect(wrapper.find('[data-test="o2-empty-state-title"]').text()).toBe("No alerts yet");
-      expect(wrapper.find('[data-test="o2-empty-state-text"]').exists()).toBe(false);
-    });
   });
 
-  describe("region variant", () => {
-    it("sits 64 px below the region top, centred, never vertically centred", () => {
+  describe("size", () => {
+    it("page renders a 40 px surface tile and an h2 title", () => {
       wrapper = mountState();
-      expect(wrapper.attributes("data-o2-empty")).toBe("region");
-      expect(wrapper.classes()).toEqual(
-        expect.arrayContaining(["pt-16", "items-center", "self-start", "text-center"]),
-      );
-      expect(wrapper.classes()).not.toContain("justify-center");
-    });
-
-    it("renders a 40 px tile, a 14 px / 600 h2 title and 13 px text up to 420 px", () => {
-      wrapper = mountState({ text: raw("Alerts watch a query.") });
       expect(tile(wrapper).classes()).toEqual(
         expect.arrayContaining(["size-10", "rounded-surface"]),
       );
       expect(wrapper.find("h2").text()).toBe("No alerts yet");
-      expect(wrapper.find("h2").classes()).toEqual(
-        expect.arrayContaining(["text-sm", "font-title"]),
-      );
-      const text = wrapper.find('[data-test="o2-empty-state-text"]');
-      expect(text.text()).toBe("Alerts watch a query.");
-      expect(text.classes()).toEqual(
-        expect.arrayContaining(["text-compact", "text-text-secondary", "max-w-105"]),
-      );
+      expect(wrapper.find("h2").classes()).toContain("text-base");
     });
-  });
 
-  describe("compact variant", () => {
-    it("puts a 16 px icon inline with a 13 px / 500 title, left-aligned", () => {
-      wrapper = mountState({ size: "compact", text: raw("Try another search.") });
-      expect(wrapper.attributes("data-o2-empty")).toBe("compact");
-      expect(wrapper.classes()).toEqual(expect.arrayContaining(["items-start", "text-start"]));
-      expect(tile(wrapper).attributes("data-name")).toBe("inbox");
+    it("inline renders a 32 px menu tile, a 14 px title and 13 px text", () => {
+      wrapper = mountState({ size: "inline", text: raw("Try another search.") });
+      expect(tile(wrapper).classes()).toEqual(expect.arrayContaining(["size-8", "rounded-menu"]));
       expect(wrapper.find("h2").exists()).toBe(false);
-      expect(wrapper.find('[data-test="o2-empty-state-title"]').classes()).toEqual(
-        expect.arrayContaining(["text-compact", "font-medium"]),
-      );
-    });
-
-    it("shows one sm action and drops the secondary", () => {
-      wrapper = mountState({
-        size: "compact",
-        kind: "error",
-        onAction: vi.fn(),
-        secondaryActionLabel: raw("Import"),
-        onSecondaryAction: vi.fn(),
-      });
-      expect(primary(wrapper).attributes("data-size")).toBe("sm");
-      expect(primary(wrapper).text()).toBe("Retry");
-      expect(secondary(wrapper).exists()).toBe(false);
+      expect(wrapper.find('[data-test="o2-empty-state-title"]').classes()).toContain("text-sm");
+      expect(wrapper.find('[data-test="o2-empty-state-text"]').classes()).toContain("text-compact");
     });
   });
 
   describe("copy", () => {
+    it("renders text in 14 px secondary reading text", () => {
+      wrapper = mountState({ text: raw("Alerts watch a query.") });
+      const text = wrapper.find('[data-test="o2-empty-state-text"]');
+      expect(text.text()).toBe("Alerts watch a query.");
+      expect(text.classes()).toEqual(expect.arrayContaining(["text-sm", "text-text-secondary"]));
+    });
+
     it("renders the #text slot in place of the text prop", () => {
       wrapper = mountState({}, { text: () => h("strong", "rich") });
       expect(wrapper.find('[data-test="o2-empty-state-text"] strong').text()).toBe("rich");
@@ -199,11 +151,11 @@ describe("OEmptyState", () => {
       expect(primary(wrapper).exists()).toBe(false);
     });
 
-    it("renders a primary md button for first-run and calls onAction", async () => {
+    it("renders a primary lg CTA for first-run and calls onAction", async () => {
       const onAction = vi.fn();
       wrapper = mountState({ actionLabel: raw("New alert"), onAction });
       expect(primary(wrapper).attributes("data-variant")).toBe("primary");
-      expect(primary(wrapper).attributes("data-size")).toBeUndefined();
+      expect(primary(wrapper).attributes("data-size")).toBe("lg");
       await primary(wrapper).trigger("click");
       expect(onAction).toHaveBeenCalledTimes(1);
       expect(onAction).toHaveBeenCalledWith();
@@ -214,29 +166,31 @@ describe("OEmptyState", () => {
       expect(primary(wrapper).exists()).toBe(false);
     });
 
-    it("defaults error to a plain secondary Retry when someone listens", () => {
+    it("defaults error to Retry with the refresh icon when someone listens", () => {
       wrapper = mountState({ kind: "error", onAction: vi.fn() });
       expect(primary(wrapper).text()).toBe("Retry");
-      expect(primary(wrapper).attributes("data-icon")).toBeUndefined();
+      expect(primary(wrapper).attributes("data-icon")).toBe("refresh");
       expect(primary(wrapper).attributes("data-variant")).toBe("secondary");
     });
 
     it("defaults filtered to Clear filters when someone listens", () => {
       wrapper = mountState({ kind: "filtered", onAction: vi.fn() });
       expect(primary(wrapper).text()).toBe("Clear filters");
+      expect(primary(wrapper).attributes("data-icon")).toBeUndefined();
       expect(primary(wrapper).attributes("data-variant")).toBe("secondary");
     });
 
     it("keeps an explicit label over the kind default", () => {
       wrapper = mountState({ kind: "error", actionLabel: raw("Reconnect"), onAction: vi.fn() });
       expect(primary(wrapper).text()).toBe("Reconnect");
+      expect(primary(wrapper).attributes("data-icon")).toBeUndefined();
     });
 
-    it("renders the secondary md action and calls onSecondaryAction", async () => {
+    it("renders the secondary action and calls onSecondaryAction", async () => {
       const onSecondaryAction = vi.fn();
       wrapper = mountState({ secondaryActionLabel: raw("Import"), onSecondaryAction });
       expect(secondary(wrapper).attributes("data-variant")).toBe("secondary");
-      expect(secondary(wrapper).attributes("data-size")).toBeUndefined();
+      expect(secondary(wrapper).attributes("data-size")).toBe("lg");
       await secondary(wrapper).trigger("click");
       expect(onSecondaryAction).toHaveBeenCalledTimes(1);
     });

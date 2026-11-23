@@ -190,7 +190,7 @@ describe("useHistogram Composable", () => {
       mockState.searchObj.meta.logsVisualizeToggle = "logs";
 
       expect(wrapper.vm.getHistogramTitle()).toBe(
-        "Showing 1 to 100 out of 250 events in 42 ms. (Scan size: 0 MB)",
+        "Showing 1 to 100 out of 250 events in 42 ms. (Scan Size: 0 MB)",
       );
     });
 
@@ -199,7 +199,7 @@ describe("useHistogram Composable", () => {
       mockState.searchObj.data.queryResults.result_cache_ratio = 50;
 
       expect(wrapper.vm.getHistogramTitle()).toBe(
-        "Showing 1 to 100 out of 250 events in 42 ms. (Delta scan size: 0 MB)",
+        "Showing 1 to 100 out of 250 events in 42 ms. (Delta Scan Size: 0 MB)",
       );
     });
 
@@ -207,22 +207,6 @@ describe("useHistogram Composable", () => {
       mockState.searchObj.meta.logsVisualizeToggle = "visualize";
 
       expect(wrapper.vm.getHistogramTitle()).toBe("Showing 1 to 100 out of 250 events in 42 ms.");
-    });
-
-    it("counts an SQL aggregate's result as rows, not events", () => {
-      mockState.searchObj.meta.logsVisualizeToggle = "visualize";
-      mockState.searchObj.meta.sqlMode = true;
-      mockState.searchObj.data.query = 'SELECT service, count(*) FROM "a" GROUP BY service';
-      mockState.searchObj.meta.resultGrid.showPagination = false;
-      mockState.searchObj.data.queryResults.hits = [{ service: "a" }, { service: "b" }];
-      try {
-        expect(wrapper.vm.getHistogramTitleParts()).toMatchObject({ rows: true, end: 2 });
-        expect(wrapper.vm.getHistogramTitle()).toBe("Showing 2 rows in 42 ms.");
-      } finally {
-        mockState.searchObj.meta.sqlMode = false;
-        mockState.searchObj.data.query = "";
-        mockState.searchObj.meta.resultGrid.showPagination = true;
-      }
     });
 
     it("returns an empty title and sets a notification when it throws", () => {
@@ -253,7 +237,7 @@ describe("useHistogram Composable", () => {
         end: 100,
         total: "250",
         took: 42,
-        scanLabel: "Scan size",
+        scanLabel: "Scan Size",
         scanSize: "0 MB",
       });
     });

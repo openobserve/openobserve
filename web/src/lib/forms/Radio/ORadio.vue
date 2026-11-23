@@ -54,8 +54,8 @@ const surfaceClasses = computed(() => [
   props.variant === "card"
     ? [
         "w-full items-start rounded-surface border border-border-default bg-surface-base p-4",
-        "transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)",
-        "hover:border-accent",
+        "transition-[color,background-color,border-color,box-shadow] duration-150",
+        "hover:border-input-border-hover",
         "has-[[data-state=checked]]:border-input-border-focus",
         "has-[[data-state=checked]]:ring-2 has-[[data-state=checked]]:ring-accent/20",
       ]
@@ -89,7 +89,7 @@ const surfaceClasses = computed(() => [
       :data-test-value="parentDataTestValue"
       :class="[
         'flex shrink-0 items-center justify-center rounded-full border-2',
-        'transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)',
+        'transition-[color,background-color,border-color,box-shadow] duration-150',
         'ring-offset-surface-base ring-offset-1 outline-none',
         'focus-visible:ring-radio-focus-ring focus-visible:ring-2',
         'size-4',

@@ -134,20 +134,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <section class="flex min-w-0 flex-1 flex-col">
         <div
           v-if="loading || detailLoading"
-          class="flex min-h-0 flex-1 flex-col gap-4 p-4"
+          class="flex flex-1 items-center justify-center"
           data-test="ai-queue-workbench-loading"
         >
-          <OSkeleton class="h-5 w-64" />
-          <OSkeleton shape="block" class="min-h-0 flex-1" />
+          <OSpinner size="lg" />
         </div>
 
-        <OEmptyState
+        <div
           v-else-if="!currentItem"
-          icon="check-circle"
-          :title="t('aiObservability.queues.workbench.allReviewedTitle')"
-          :text="t('aiObservability.queues.workbench.allReviewedBody')"
+          class="text-text-secondary flex flex-1 flex-col items-center justify-center gap-2 p-8"
           data-test="ai-queue-workbench-empty"
-        />
+        >
+          <OIcon name="check-circle" class="text-status-success-text h-10 w-10" />
+          <span class="text-text-heading text-sm font-semibold">
+            {{ t("aiObservability.queues.workbench.allReviewedTitle") }}
+          </span>
+          <span class="text-center text-xs">
+            {{ t("aiObservability.queues.workbench.allReviewedBody") }}
+          </span>
+        </div>
 
         <template v-else>
           <div class="flex min-h-0 flex-1">
@@ -163,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-center gap-2">
                   <OButton
                     icon-only
-                    variant="ghost"
+                    variant="secondary"
                     size="xs"
                     class="shrink-0"
                     data-test="ai-queue-workbench-nav-toggle"
@@ -269,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="ai-queue-workbench-system-scores"
               >
                 <span class="inline-flex items-center gap-2">
-                  <span class="text-text-heading text-sm font-semibold">
+                  <span class="text-text-heading text-sm font-bold">
                     {{ t("aiObservability.queues.workbench.systemScores") }}
                   </span>
                   <span class="text-text-disabled text-sm font-normal">
@@ -341,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="min-h-0 flex-1 overflow-y-auto p-4">
                 <div class="mb-4 flex flex-col gap-1">
                   <span class="inline-flex items-center gap-2">
-                    <span class="text-text-heading text-sm font-semibold">
+                    <span class="text-text-heading text-base font-semibold">
                       {{ t("aiObservability.queues.workbench.scoreTitle") }}
                     </span>
                     <span class="text-text-secondary text-xs">
@@ -498,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div class="flex items-center gap-2">
                         <span
-                          class="bg-primary/15 text-text-body text-2xs flex h-5 w-5 items-center justify-center rounded-full font-semibold"
+                          class="bg-primary/15 text-text-body text-2xs flex h-5 w-5 items-center justify-center rounded-full font-bold"
                         >
                           {{ a.initials }}
                         </span>
@@ -690,8 +695,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSlider from "@/lib/forms/Slider/OSlider.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";

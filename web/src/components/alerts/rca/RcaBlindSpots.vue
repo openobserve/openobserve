@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <section data-test="rca-blind-spots" :aria-labelledby="headingId" class="flex flex-col">
     <div class="mb-2.5 flex flex-wrap items-baseline gap-2">
-      <h3 :id="headingId" class="text-text-heading m-0 text-sm font-semibold">
+      <h3 :id="headingId" class="text-text-heading m-0 text-base font-bold">
         {{ t("alerts.incidents.rcaSummary.blindSpots") }}
       </h3>
       <span class="text-text-secondary text-xs">{{ blindSpots.length }}</span>

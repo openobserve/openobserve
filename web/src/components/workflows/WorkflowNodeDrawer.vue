@@ -274,14 +274,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex h-8 items-center"
           :class="stepsCollapsed ? 'justify-center' : 'justify-between ps-2'"
         >
-          <span v-if="!stepsCollapsed" class="text-text-body text-sm font-semibold">
+          <span v-if="!stepsCollapsed" class="text-text-body text-sm font-bold">
             {{ t("workflow.results.nodesTitle") }}
           </span>
           <!-- Same toggle style as the Logs field-panel collapse button
                (SearchResult.vue): outline icon button + double-arrow + tooltip. -->
           <OButton
             icon-only
-            variant="ghost"
+            variant="secondary"
             size="sm"
             class="shrink-0"
             data-test="workflow-ndv-steps-collapse"
@@ -457,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="flex h-8 items-center gap-2 ps-2">
-          <div class="text-text-body text-sm font-semibold">{{ t("workflow.ndv.input") }}</div>
+          <div class="text-text-body text-sm font-bold">{{ t("workflow.ndv.input") }}</div>
           <div
             v-if="inputPaged && inputCount > 1"
             data-test="workflow-ndv-input-pager"
@@ -654,7 +654,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <div class="flex h-8 shrink-0 items-center gap-2 ps-2">
-          <div class="text-text-body text-sm font-semibold">{{ t("workflow.ndv.output") }}</div>
+          <div class="text-text-body text-sm font-bold">{{ t("workflow.ndv.output") }}</div>
           <!-- Run status (Passed / Errored / No Records) — same source as the canvas
                badge and the results dock. -->
           <OBadge
@@ -790,12 +790,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <OEmptyState
+          <div
             v-else-if="!outputHasError && !outputNoMatch"
-            size="compact"
-            class="px-4"
-            :title="hasResult ? t('workflow.ndv.noOutput') : t('workflow.ndv.noRunYet')"
-          />
+            class="text-text-secondary flex h-full items-center justify-center p-4 text-center text-sm italic"
+          >
+            {{ hasResult ? t("workflow.ndv.noOutput") : t("workflow.ndv.noRunYet") }}
+          </div>
         </div>
       </section>
     </div>
@@ -833,7 +833,6 @@ import WorkflowRunHttpOutcome from "./WorkflowRunHttpOutcome.vue";
 import { DEFAULT_TRIGGER_KIND } from "@/plugins/workflows/triggers";
 import WorkflowRunRequestFacts from "./WorkflowRunRequestFacts.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { HttpRequestFacts, WorkflowHistoryRow } from "@/services/workflows";
 import { isHttpRun } from "@/plugins/workflows/httpEndpoint";
 import {

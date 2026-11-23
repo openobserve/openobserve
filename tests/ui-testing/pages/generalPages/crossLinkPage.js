@@ -8,7 +8,7 @@ export class CrossLinkPage {
 
         // Navigation selectors
         this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
-        this.streamSearchPlaceholder = 'Search stream';
+        this.streamSearchPlaceholder = 'Search Stream';
         this.streamDetailButton = 'Stream Detail';
 
         // CrossLinkManager selectors (VERIFIED from CrossLinkManager.vue)

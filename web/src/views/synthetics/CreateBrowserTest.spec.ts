@@ -1747,7 +1747,7 @@ describe("CreateBrowserTest", () => {
       expect((wrapper.vm as any).validationErrors.folder).toBeUndefined();
       expect((wrapper.vm as any).pickerFolders).toEqual([
         { folderId: "folder-1", name: "Checkout" },
-        { folderId: "direct-grant-folder", name: "Current folder" },
+        { folderId: "direct-grant-folder", name: "Current Folder" },
       ]);
       expect(wrapper.find(DOT).exists()).toBe(false);
       expect(await leaveAsks(wrapper)).toBe(false);

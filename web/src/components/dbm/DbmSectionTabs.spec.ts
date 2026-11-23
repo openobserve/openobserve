@@ -331,12 +331,11 @@ describe("DbmSectionTabs", () => {
     });
 
     /** STATE 2 — the database-reported list (`server_samples`), capped. */
-    it("keeps the badge a plain number and says server-counted in its tooltip", () => {
+    it("says server-counted when the databases reported it", () => {
       const wrapper = mountWith({ count: 100, complete: false, vantage: "server" });
-      // The cap survives: still a floor, attributed by the tooltip, not a suffix.
-      expect(wrapper.find("[data-test='dbm-section-tab-badge-samples']").text()).toBe("100+");
-      expect(vantageOf(wrapper).exists()).toBe(false);
-      expect(samplesHint(wrapper)).toContain("inside the database");
+      // The cap survives the qualifier: still a floor, now an attributed one.
+      expect(wrapper.text()).toContain("100+");
+      expect(vantageOf(wrapper).text()).toBe("server count");
     });
 
     /**
@@ -374,13 +373,9 @@ describe("DbmSectionTabs", () => {
         } as never,
         global: { plugins: [i18n] },
       });
-      expect(wrapper.find("[data-test='dbm-section-tab-badge-queries']").text()).toBe("50+");
-      expect(
-        wrapper
-          .find("[data-test='dbm-section-tab-queries']")
-          .findComponent({ name: "OTooltip" })
-          .props("content"),
-      ).toContain("inside the database");
+      expect(wrapper.find("[data-test='dbm-section-tab-vantage-queries']").text()).toBe(
+        "server count",
+      );
     });
 
     /**

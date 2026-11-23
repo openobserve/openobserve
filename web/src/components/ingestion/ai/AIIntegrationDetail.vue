@@ -22,7 +22,7 @@ import { useStore } from "vuex";
 import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import useIngestion from "@/composables/useIngestion";
 import { basicIngestToken } from "@/composables/useCredentialSnippet";
-import { aiCategoriesWithLogos as aiCategories } from "./cardLogos";
+import { aiCategories } from "./data";
 import type { AICategory, AIIntegration } from "./data";
 import { getAICardRaw } from "./content";
 import { safeHttpUrl, type CardSubstitutions } from "./content/renderMarkdown";
@@ -163,9 +163,9 @@ const agentGuideName = computed(
       :logo-url-dark="integration.logoDark"
     />
     <AIIntegrationCard v-else-if="cardContent" :content="raw(cardContent)" :doc-url="docURL" />
-    <div v-else class="text-sm">
+    <div v-else class="text-base">
       <CredentialCodeBlock slug="ai-integration" :content="aiContent" />
-      <div class="pt-6 pb-2 font-semibold">
+      <div class="pt-6 pb-2 font-bold">
         {{ t("ingestion.ai.viewDocsPrefix") }}
         <a
           :href="safeHttpUrl(docURL)"

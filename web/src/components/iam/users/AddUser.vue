@@ -107,7 +107,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('user.role')"
           required
           :options="roles"
-          :help-text="t('user.roleHint')"
           class="showLabelOnTop mt-2"
           data-test="user-role-field"
         />
@@ -138,17 +137,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :help-text="
               rbacLocked
                 ? undefined
-                : rbacOff
-                  ? t('user.customRolesNeedRbac')
-                  : isCloud
-                    ? filterdOption.length === 0
+                : isCloud
+                  ? filterdOption.length === 0
+                    ? t('user.noCustomRolesHint')
+                    : undefined
+                  : isExternalUser
+                    ? t('user.externalUserCustomRoleHint')
+                    : filterdOption.length === 0
                       ? t('user.noCustomRolesHint')
                       : undefined
-                    : isExternalUser
-                      ? t('user.externalUserCustomRoleHint')
-                      : filterdOption.length === 0
-                        ? t('user.noCustomRolesHint')
-                        : undefined
             "
           >
             <template v-if="rbacLocked" #icon>
@@ -415,11 +412,6 @@ export default defineComponent({
     const unlockStaged = ref(false);
     const { confirm } = useConfirmDialog();
 
-    // The least-privileged built-in, or the only role on offer, so a new member never starts blank.
-    const defaultRole = () =>
-      ["viewer", "member", "user"].find((r) => props.roles.some((o) => o.value === r)) ??
-      (props.roles.length === 1 ? String(props.roles[0].value) : "");
-
     const blankForm = (): AddUserForm => ({
       email: "",
       password: "",
@@ -439,8 +431,6 @@ export default defineComponent({
     // Custom roles cannot be listed without the rbac license, so the picker would stay empty.
     const rbacState = computed(() => featureState(store.state.zoConfig?.features, "rbac"));
     const rbacLocked = computed(() => rbacState.value === "locked");
-    // Roles is locked in place when this is off, so the "create one in Roles" hint would point at a dead end.
-    const rbacOff = computed(() => store.state.zoConfig?.rbac_enabled === false);
     const { lockedReason: rbacLockedReason } = useLicenseLock("rbac");
 
     // Decide whether to send `custom_role`:
@@ -722,19 +712,9 @@ export default defineComponent({
         organization.value = store.state.selectedOrganization.identifier;
         editRecord.value = null;
         isExternalUser.value = false;
-        form.reset({ ...blankForm(), role: defaultRole() });
+        form.reset(blankForm());
       }
     };
-
-    // Roles can arrive after the dialog opens; fill the blank required field once they do.
-    watch(
-      () => props.roles,
-      () => {
-        if (props.open && !beingUpdated.value && !form.getFieldValue("role")) {
-          form.setFieldValue("role", defaultRole());
-        }
-      },
-    );
 
     watch(
       () => props.open,
@@ -779,7 +759,6 @@ export default defineComponent({
       isExternalUser,
       rbacState,
       rbacLocked,
-      rbacOff,
       rbacLockedReason,
       changePassword,
       formEmail,

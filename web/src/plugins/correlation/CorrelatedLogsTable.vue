@@ -266,20 +266,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTable>
 
           <!-- Table Skeleton (initial load) -->
-          <OSkeleton
+          <div
             v-else-if="isLoading && !hasError"
-            preset="tableRows"
-            :rows="10"
+            class="flex h-full flex-col items-center justify-center"
             data-test="table-skeleton"
-          />
+          >
+            <!-- Loading indicator -->
+            <div class="flex items-center justify-center gap-3 max-md:flex-col">
+              <OSpinner size="lg" />
+              <span class="text-sm opacity-70">
+                {{ t("correlation.logs.loading") }}
+              </span>
+            </div>
+          </div>
 
-          <OEmptyState
+          <!-- Error State -->
+          <div
             v-else-if="hasError"
-            kind="error"
-            :text="t('correlation.logs.errorDetails')"
+            class="flex h-full flex-col items-center justify-center py-20"
             data-test="error-state"
-            @action="fetchCorrelatedLogs()"
-          />
+          >
+            <p class="max-w-md text-center text-base opacity-70">
+              {{ error || t("correlation.logs.errorDetails") }}
+            </p>
+          </div>
 
           <div v-else-if="noLogStreams" class="min-h-80">
             <OEmptyState
@@ -351,8 +361,9 @@ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { correlatedByKeys, correlatedByLabel, useLocationDimensions } from "./correlationHeader";
 import { byString } from "@/utils/json";
 import { searchState } from "@/composables/useLogs/searchState";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { canvasFont } from "@/utils/fonts";
@@ -375,6 +386,7 @@ const { loadKeyFields } = useServiceCorrelation();
 
 // Use correlated logs composable
 const {
+  error,
   searchResults,
   pagedResults,
   currentFilters,

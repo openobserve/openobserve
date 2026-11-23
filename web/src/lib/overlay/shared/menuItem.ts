@@ -25,4 +25,4 @@ export function menuItemClasses(tone: MenuItemTone, unavailable: boolean, twoLin
 
 /** The menu surface: 200–320 wide, radius 8, 4 px inset (guideline O1). */
 export const MENU_SURFACE =
-  "min-w-50 max-w-80 p-1 bg-dropdown-bg rounded-menu shadow-overlay border border-border-default text-dropdown-item-text text-compact";
+  "min-w-50 max-w-80 p-1 bg-dropdown-bg rounded-menu shadow-overlay border border-transparent text-dropdown-item-text text-compact";

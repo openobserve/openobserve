@@ -71,7 +71,6 @@ function resolveShortcuts(
           allowInInput: def.allowInInput,
           skipInInput: def.skipInInput,
           allowInDialog: def.allowInDialog,
-          capture: def.capture,
         });
       });
     } else {

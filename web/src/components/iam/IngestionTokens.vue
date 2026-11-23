@@ -18,11 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     :title="t('iam.ingestionTokens')"
     title-data-test="ingestion-tokens-title-text"
-    :about="aboutText"
+    :about="t('ingestion.orgLevelExplanation')"
     bleed
   >
     <template #actions>
-      <OButton variant="primary" data-test="add-ingestion-token" @click="openCreate">
+      <OButton variant="primary" data-test="add-ingestion-token" @click="showCreateForm = true">
         {{ t("ingestion.createTokenBtn") }}
       </OButton>
     </template>
@@ -34,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="name"
           :row-actions="rowActions"
-          :row-menu="rowMenu"
           :loading="loading"
           :forbidden="forbidden"
           v-model:global-filter="filterQuery"
@@ -57,11 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="ingestion-tokens-search-input"
               />
             </div>
-          </template>
-          <template #footer-note>
-            <span class="text-text-secondary text-xs" data-test="ingestion-tokens-rotation-note">
-              {{ t("ingestion.rotationNote") }}
-            </span>
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
@@ -88,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t('emptyState.noIngestionTokens.description')
               "
               :action-label="filterQuery ? undefined : t('emptyState.noIngestionTokens.action')"
-              @action="filterQuery ? (filterQuery = '') : openCreate()"
+              @action="filterQuery ? (filterQuery = '') : (showCreateForm = true)"
             />
           </template>
 
@@ -113,22 +107,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="font-medium">{{ row.name }}</span>
           </template>
 
-          <!-- Masked until revealed; Copy yields a ready-to-paste "Basic base64(name:token)". -->
+          <!-- Copy yields a ready-to-paste "Basic base64(name:token)" credential
+               (OCodeCell copies exactly what it shows), so no manual email +
+               base64 step is needed. -->
           <template #cell-token="{ row }">
-            <OSecretCell
+            <OCodeCell
               :value="
                 isReservedIngestionTokenName(row.name) ? null : toBasicAuth(row.name, row.token)
               "
-              mask="Basic ••••••••"
-              :data-test="`ingestion-token-${row.name}-auth`"
+              :tooltip="false"
             />
           </template>
 
           <template #cell-splunk_token="{ row }">
-            <OSecretCell
+            <OCodeCell
               :value="row.splunk_token"
               :empty-label="t('ingestion.splunkTokenNone')"
-              :data-test="`ingestion-token-${row.name}-splunk-value`"
+              :tooltip="false"
             />
           </template>
 
@@ -156,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OForm
         id="create-token-form"
         :schema="createTokenSchema"
-        :default-values="createDefaults"
+        :default-values="createTokenDefaults()"
         @submit="createToken"
       >
         <OFormInput
@@ -183,24 +178,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("ingestion.splunkTokenCreateHint") }}
         </div>
       </OForm>
-    </ODialog>
-
-    <ODialog
-      v-model:open="showRotateDialog"
-      size="sm"
-      :title="t('ingestion.rotateTitle', { name: rotateName })"
-      :primary="{ label: t('ingestion.rotateCreateNew') }"
-      :secondary="{ label: t('common.cancel') }"
-      data-test="ingestion-token-rotate-dialog"
-      @click:primary="startRotation"
-      @click:secondary="showRotateDialog = false"
-    >
-      <ol class="text-text-body flex list-decimal flex-col gap-2 ps-5 text-sm">
-        <li>{{ t("ingestion.rotateStep1") }}</li>
-        <li>{{ t("ingestion.rotateStep2") }}</li>
-        <li>{{ t("ingestion.rotateStep3", { name: rotateName }) }}</li>
-      </ol>
-      <div class="text-text-secondary mt-3 text-xs">{{ t("ingestion.rotateNever") }}</div>
     </ODialog>
 
     <!-- Revealed token dialog -->
@@ -283,7 +260,7 @@ import { ingestionTokensQuery } from "@/services/organizations.queries";
 import analytics from "@/services/product_analytics";
 import { ref, computed, defineComponent, onBeforeMount, watch } from "vue";
 import { useStore } from "vuex";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -296,19 +273,14 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OSecretCell from "@/lib/core/Table/cells/OSecretCell.vue";
+import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import {
   makeCreateTokenSchema,
   createTokenDefaults,
   type CreateTokenForm,
 } from "./IngestionTokens.schema";
-import {
-  COL,
-  type OTableColumnDef,
-  type OTableRowAction,
-  type OTableRowMenuItem,
-} from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef, type OTableRowAction } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { getBasicAuth } from "@/utils/auth";
@@ -350,7 +322,7 @@ export default defineComponent({
     OFormCheckbox,
     OTable,
     OTag,
-    OSecretCell,
+    OCodeCell,
     OUserCell,
   },
   setup() {
@@ -361,8 +333,6 @@ export default defineComponent({
     // its defaults factory MUST be returned from setup() (Options-API), else
     // :schema/:default-values resolve to undefined.
     const createTokenSchema = makeCreateTokenSchema(t);
-
-    const aboutText = computed(() => raw(t("ingestion.orgLevelExplanation")));
 
     const orgIdForList = useOrgId();
     const tokensList = useQuery(() =>
@@ -388,10 +358,6 @@ export default defineComponent({
     });
     const filterQuery = ref("");
     const showCreateForm = ref(false);
-    const showRotateDialog = ref(false);
-    const rotateTarget = ref<Token | null>(null);
-    const createDefaults = ref(createTokenDefaults());
-    const rotateName = computed(() => rotateTarget.value?.name ?? "");
     const showRevealedDialog = ref(false);
     const revealedToken = ref<{ name: string; token: string; splunk_token?: string } | null>(null);
     const { confirm } = useConfirmDialog();
@@ -458,34 +424,6 @@ export default defineComponent({
         hideable: true,
         size: COL.owner,
         meta: { align: "left" },
-      },
-    ];
-
-    // Opens the walkthrough only: the backend has no rotate, so nothing is created or disabled here.
-    const openRotate = (row: Token) => {
-      rotateTarget.value = row;
-      showRotateDialog.value = true;
-    };
-
-    const startRotation = () => {
-      const name = rotateTarget.value?.name ?? "";
-      createDefaults.value = {
-        ...createTokenDefaults(),
-        name: t("ingestion.rotateNewName", { name }),
-        description: t("ingestion.rotateDescription", { name }),
-      };
-      showRotateDialog.value = false;
-      showCreateForm.value = true;
-    };
-
-    const rowMenu: OTableRowMenuItem<Token>[] = [
-      {
-        id: "rotate",
-        label: () => t("ingestion.rotateAction"),
-        icon: "refresh",
-        onSelect: (row) => openRotate(row),
-        hidden: (row) => isReservedIngestionTokenName(row.name),
-        dataTest: (row) => `ingestion-token-${row.name}-rotate`,
       },
     ];
 
@@ -579,11 +517,6 @@ export default defineComponent({
       }
     };
 
-    const openCreate = () => {
-      createDefaults.value = createTokenDefaults();
-      showCreateForm.value = true;
-    };
-
     const toggleEnabled = async (name: string, enabled: boolean) => {
       loading.value = true;
       try {
@@ -669,7 +602,7 @@ export default defineComponent({
       {
         id: "ingestionTokensAdd",
         handler: () => {
-          if (!isInputFocused()) openCreate();
+          if (!isInputFocused()) showCreateForm.value = true;
         },
       },
       {
@@ -689,7 +622,6 @@ export default defineComponent({
     return {
       store,
       t,
-      aboutText,
       tokens,
       loading,
       fetching,
@@ -698,14 +630,7 @@ export default defineComponent({
       filterQuery,
       columns,
       rowActions,
-      rowMenu,
       showCreateForm,
-      showRotateDialog,
-      rotateTarget,
-      rotateName,
-      startRotation,
-      openCreate,
-      createDefaults,
       showRevealedDialog,
       revealedToken,
       revealedBasicAuth,
