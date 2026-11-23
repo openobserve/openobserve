@@ -956,7 +956,7 @@ describe("panel records for Visualize and Build (J7)", () => {
     expect(run().engine.currentGeneration("grid")?.id).toBe(before);
     run().panelLoadingChanged(true, false);
     run().panelLoadingChanged(false, false);
-    expect(fakeSearchObj.value.meta.executedPanel).toBeNull();
+    expect(fakeSearchObj.value.meta.executedPanel).toBeUndefined();
   });
 
   it("a Visualize toggle that loads the chart records the live query once the load ends", () => {
