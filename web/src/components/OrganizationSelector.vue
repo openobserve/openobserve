@@ -456,7 +456,8 @@ useShortcuts([
             :debounce="1"
             :placeholder="t('organization.searchByNameOrId')"
             role="combobox"
-            aria-expanded="true"
+            :aria-expanded="orgRowCount > 0"
+            aria-haspopup="grid"
             aria-autocomplete="list"
             :aria-controls="orgRowCount ? gridId : undefined"
             :aria-activedescendant="activeDescendant"
@@ -471,6 +472,7 @@ useShortcuts([
           :id="gridId"
           ref="scrollRef"
           role="grid"
+          :aria-rowcount="listRows.length"
           :aria-label="t('organization.header')"
           data-test="organization-menu-table"
           class="relative max-h-96 overflow-x-hidden overflow-y-auto pt-2 pb-1"
@@ -480,6 +482,7 @@ useShortcuts([
               <div
                 v-if="v.row.kind === 'heading'"
                 role="row"
+                :aria-rowindex="v.index + 1"
                 :data-test="`organization-menu-section-${v.row.section}`"
                 class="absolute top-0 right-0 left-0 box-border flex h-7 items-end px-3 pb-1"
                 :style="{ transform: `translateY(${v.start}px)` }"
@@ -491,6 +494,7 @@ useShortcuts([
               <div
                 v-else
                 role="row"
+                :aria-rowindex="v.index + 1"
                 :aria-selected="isSelected(v.row.org)"
                 data-test="organization-menu-item-label-item-label"
                 :data-test-org-identifier="v.row.org.identifier"
@@ -503,11 +507,7 @@ useShortcuts([
                 @click="select(v.row.org)"
                 @mousemove="onRowHover(v.index)"
               >
-                <!-- Name with the id inline beside it. The id shows only when it
-                     differs from the name (an equal id is just a redundant echo).
-                     The name takes priority and is never truncated (it only clips
-                     if it alone exceeds the whole row); the id yields, truncating
-                     to whatever space is left. -->
+                <!-- The ID appears only when it adds information and yields to keep the name readable. -->
                 <div
                   :id="cellId(v.index, 'name')"
                   role="gridcell"
@@ -555,9 +555,7 @@ useShortcuts([
                   </OButton>
                 </div>
 
-                <!-- Copy identifier without selecting the row. Feedback is the
-                     tick on the button itself (kept visible during the flash),
-                     no toast. -->
+                <!-- Copying leaves the selection in place, so the button tick is the only confirmation. -->
                 <div
                   :id="cellId(v.index, 'copy')"
                   role="gridcell"

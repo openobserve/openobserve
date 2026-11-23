@@ -146,4 +146,14 @@ describe("MainLayout — org switcher recents", () => {
     await flushPromises();
     expect(useOrgSwitcherPrefs().recents.value).toEqual(["stale"]);
   });
+
+  it("F14 records the resolved org when org_identifier is repeated in the URL", async () => {
+    store.state.organizations = [
+      { identifier: "default", name: "Default" },
+      { identifier: "acme", name: "Acme" },
+    ];
+    wrapper = await mountLayout("/?org_identifier=a&org_identifier=b");
+    await flushPromises();
+    expect(noteLanding).toHaveBeenCalledWith("default", ["default", "acme"]);
+  });
 });

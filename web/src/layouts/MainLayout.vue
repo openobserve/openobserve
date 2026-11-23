@@ -2082,7 +2082,7 @@ export default defineComponent({
     "store.state.selectedOrganization.identifier": {
       handler(identifier: string | undefined, previous: string | undefined) {
         if (!identifier || previous) return;
-        if (this.router.currentRoute.value.query?.org_identifier) return;
+        if (typeof this.router.currentRoute.value.query?.org_identifier === "string") return;
         const orgs = this.store?.state?.organizations;
         noteLanding(
           identifier,

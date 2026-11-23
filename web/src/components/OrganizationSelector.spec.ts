@@ -152,6 +152,7 @@ describe("OrganizationSelector", () => {
       const grid = $('[data-test="organization-menu-table"]')!;
       expect(grid.getAttribute("role")).toBe("grid");
       expect(input().getAttribute("role")).toBe("combobox");
+      expect(input().getAttribute("aria-haspopup")).toBe("grid");
       expect(input().getAttribute("aria-expanded")).toBe("true");
       expect(input().getAttribute("aria-controls")).toBe(grid.id);
       const row = $('[data-test="organization-menu-item-label-item-label"]')!;
@@ -201,6 +202,12 @@ describe("OrganizationSelector", () => {
       expect($('[data-test="organization-menu-section-recent"]')).not.toBeNull();
       expect($('[data-test="organization-menu-section-all"]')).not.toBeNull();
       expect(rowIds().slice(0, 2)).toEqual(["golf", "bravo"]);
+      const grid = $('[data-test="organization-menu-table"]')!;
+      const rows = [...grid.querySelectorAll('[role="row"]')];
+      expect(grid.getAttribute("aria-rowcount")).toBe(String(rows.length));
+      expect(rows.map((row) => row.getAttribute("aria-rowindex"))).toEqual(
+        rows.map((_, index) => String(index + 1)),
+      );
     });
   });
 
@@ -400,11 +407,12 @@ describe("OrganizationSelector", () => {
       expect(activeDescendant()).toMatch(/-0-name$/);
     });
 
-    it("drops aria-controls while no grid is rendered", async () => {
+    it("collapses the combobox and drops aria-controls when search finds no matches", async () => {
       await mountSelector(MANY);
       await openMenu();
       await typeQuery("zzz");
       expect($('[data-test="organization-menu-table"]')).toBeNull();
+      expect(input().getAttribute("aria-expanded")).toBe("false");
       expect(input().getAttribute("aria-controls")).toBeNull();
     });
   });
