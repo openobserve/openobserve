@@ -78,8 +78,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:searchMode="onSearchModeChange"
               @apply-saved-view="onApplySavedView"
               @recent-restore="onRecentRestore"
+              :refresh-loading="activeHealthView?.loading ?? false"
+              :refresh-last-run-at="activeHealthView?.lastRunAt ?? null"
               @service-graph-refresh="serviceGraphRef?.refresh()"
-              @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
+              @services-catalog-refresh="servicesCatalogRef?.refresh()"
               @filter-builder-growth="filterBuilderGrowth = $event"
               @drill-down="searchResultRef?.openComparison()"
             />
@@ -453,6 +455,14 @@ const searchResultRef = ref<any>(null);
 const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
+// The toolbar's one refresh button shows whichever of these two tabs is open.
+const activeHealthView = computed(() =>
+  activeTab.value === "service-graph"
+    ? serviceGraphRef.value
+    : activeTab.value === "services-catalog"
+      ? servicesCatalogRef.value
+      : null,
+);
 const splitterModel = ref(90);
 const fieldValues = ref({});
 
