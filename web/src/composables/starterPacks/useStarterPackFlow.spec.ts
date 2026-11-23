@@ -4,7 +4,7 @@ import { defineComponent } from "vue";
 import { createStore } from "vuex";
 
 import type { PackInstallRecord, StarterPack } from "./types";
-import { StarterPackPermissionError } from "./types";
+import { StarterPackBusyError, StarterPackPermissionError } from "./types";
 import { UNDO_WINDOW_US, useStarterPackFlow } from "./useStarterPackFlow";
 
 const fake = vi.hoisted(() => ({
@@ -358,6 +358,18 @@ describe("useStarterPackFlow", () => {
     expect(flow.forbidden.value).toBe(false);
     expect(flow.installFailed.value).toBe(true);
     expect(flow.running.value).toBe(false);
+  });
+
+  it("names who is already setting the pack up, and clears it on the next setup", async () => {
+    fake.installPack.mockRejectedValueOnce(new StarterPackBusyError("first@x"));
+    const flow = setup();
+    expect(await flow.install()).toBe(false);
+    expect(flow.busyBy.value).toBe("first@x");
+    expect(flow.installFailed.value).toBe(false);
+    expect(flow.forbidden.value).toBe(false);
+    fake.installPack.mockResolvedValueOnce(record());
+    await flow.install();
+    expect(flow.busyBy.value).toBeNull();
   });
 
   it("shows partial progress, then failed items, then retry to complete", async () => {

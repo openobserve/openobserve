@@ -306,3 +306,11 @@ export class StarterPackPermissionError extends Error {
     this.name = "StarterPackPermissionError";
   }
 }
+
+/** Another install of the pack started first, so this one stopped before creating anything. */
+export class StarterPackBusyError extends Error {
+  constructor(public readonly installedBy: string) {
+    super("starter_pack_busy");
+    this.name = "StarterPackBusyError";
+  }
+}

@@ -23,7 +23,7 @@ import store from "@/test/unit/helpers/store";
 import { HOST_METRICS_DASHBOARD_TITLE } from "@/composables/useHostMetricsDashboard";
 
 import type { PackStreamRole, StarterPack } from "./types";
-import { leftOutIds, StarterPackPermissionError } from "./types";
+import { leftOutIds, StarterPackBusyError, StarterPackPermissionError } from "./types";
 import { catalogVersion, packById } from "./usePackCatalog";
 import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
 
@@ -51,6 +51,7 @@ const fake = vi.hoisted(() => {
     calls: [] as string[],
     tagSearchLag: 0,
     parseFails: 0,
+    onRequest: null as null | ((method: string, url: string, body: any) => void),
   };
   const reply = (data: unknown) => ({ status: 200, data });
   const httpError = (status: number) => Object.assign(new Error("http"), { response: { status } });
@@ -124,13 +125,14 @@ const fake = vi.hoisted(() => {
     if ((match = url.match(/\/api\/org\/dashboards(?:\/([^?]+))?/))) {
       const id = match[1];
       if (method === "post") {
+        const dashboardId = nextId("d");
         state.dashboards.push({
-          dashboard_id: nextId("d"),
+          dashboard_id: dashboardId,
           title: body.title,
           folder_id: folderParam(url),
           body,
         });
-        return reply({});
+        return reply({ version: 8, v8: { dashboardId } });
       }
       if (id) {
         const row = state.dashboards.find((candidate) => candidate.dashboard_id === id);
@@ -160,6 +162,7 @@ const fake = vi.hoisted(() => {
 
   const request = async (method: string, url: string, body?: unknown, config?: Row) => {
     state.calls.push(`${method} ${url}`);
+    state.onRequest?.(method, url, body);
     const index = state.faults.findIndex((f) => f.method === method && f.url.test(url));
     if (index < 0) return commit(method, url, body, config);
     const [fault] = state.faults.splice(index, 1);
@@ -279,6 +282,7 @@ describe("useStarterPacks", () => {
       calls: [],
       tagSearchLag: 0,
       parseFails: 0,
+      onRequest: null,
     });
   });
 
@@ -646,6 +650,73 @@ describe("useStarterPacks", () => {
 
       expect(record.status).toBe("incomplete");
       expect(fake.state.alerts).toEqual([]);
+    });
+
+    describe("another install of the same pack at the same time", () => {
+      const otherKey = "starter_pack.kubernetes.other";
+      const seedOther = (installedAt: number) => {
+        const other = {
+          packId: "kubernetes",
+          installId: "other",
+          status: "installing",
+          installedAt,
+          installedBy: "first@example.com",
+          items: [],
+        };
+        fake.state.onRequest = (method, url) => {
+          if (method !== "post" || !url.includes("/kv/") || fake.state.kv.has(otherKey)) return;
+          fake.state.kv.set(otherKey, JSON.stringify(other));
+        };
+      };
+
+      it("keeps the ids its own creates returned when the other's copies match first", async () => {
+        fake.state.onRequest = (method, url, body) => {
+          if (method !== "post") return;
+          const folder_id = new URL(url, "http://x").searchParams.get("folder") ?? "";
+          if (url.includes("/api/v2/org/alerts")) {
+            fake.state.alerts.unshift({ ...body, id: `other-${body.name}`, folder_id });
+          } else if (url.includes("/api/org/dashboards")) {
+            fake.state.dashboards.unshift({
+              dashboard_id: "other-d",
+              title: body.title,
+              folder_id,
+              body,
+            });
+          }
+        };
+        const api = packs();
+        const record = await api.installPack(PACK);
+        fake.state.onRequest = null;
+
+        const ids = record.items.filter(({ kind }) => kind !== "folder").map(({ id }) => id);
+        expect(ids.some((id) => id?.startsWith("other-"))).toBe(false);
+        await api.undoPack(PACK, record.installId);
+        expect(fake.state.alerts.map(({ id }) => id).sort()).toEqual([
+          "other-k8s/one",
+          "other-k8s/two",
+        ]);
+        expect(fake.state.dashboards.map(({ dashboard_id }) => dashboard_id)).toEqual(["other-d"]);
+      });
+
+      it("stops, removes its own record and creates nothing when the other started first", async () => {
+        seedOther(1);
+
+        const error = await packs()
+          .installPack(PACK)
+          .catch((caught) => caught);
+
+        expect(error).toBeInstanceOf(StarterPackBusyError);
+        expect(error.installedBy).toBe("first@example.com");
+        expect([...fake.state.kv.keys()]).toEqual([otherKey]);
+        expect(counts()).toEqual(EMPTY);
+      });
+
+      it("carries on when the other started later", async () => {
+        seedOther(Number.MAX_SAFE_INTEGER);
+        const record = await packs().installPack(PACK);
+        expect(record.status).toBe("complete");
+        expect(counts()).toEqual(FULL);
+      });
     });
 
     it("joins a concurrent install of the same pack", async () => {

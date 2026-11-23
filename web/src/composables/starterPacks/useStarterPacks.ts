@@ -51,6 +51,7 @@ import { buildSavedViewPayload } from "@/utils/logs/savedViewPayload";
 import { getUUID } from "@/utils/uuid";
 
 import {
+  StarterPackBusyError,
   StarterPackPermissionError,
   type PackFolderType,
   type PackDashboard,
@@ -281,10 +282,13 @@ export function useStarterPacks(org: string) {
     if (shared) {
       return { lookup: () => shared.find(org), create: () => shared.create(org), snapshot, remove };
     }
+    let savedId: string | undefined;
     return {
       lookup: async () => {
         const folderId = folderIdOf(items, "dashboards");
         if (!folderId) return null;
+        // Titles are not unique, so a concurrent install's copy must not stand in for ours.
+        if (savedId) return { id: savedId, folderId };
         const rows = await readQuery(dashboardsByFolderQuery(org, folderId), true);
         const row = rows.find((candidate) => candidate.title === dashboard.title);
         return row ? { id: row.dashboard_id, folderId } : null;
@@ -293,10 +297,11 @@ export function useStarterPacks(org: string) {
         const { doc: fitted } = await fitPackDashboard(dashboard, adaptation);
         const picked = await addStreamPickers(structuredClone(fitted), adaptation.repairs);
         const doc = convertDashboardSchemaVersion(picked);
-        await createDashboard.mutateAsync({
+        const created = await createDashboard.mutateAsync({
           json: { ...doc, title: dashboard.title, created: new Date().toISOString() },
           folderId: folderIdOf(items, "dashboards")!,
         });
+        savedId = created?.data?.[`v${created?.data?.version}`]?.dashboardId || undefined;
       },
       snapshot,
       remove,
@@ -340,15 +345,15 @@ export function useStarterPacks(org: string) {
     return {
       // Alert names and client ids are not unique, so the tags are the only identity.
       lookup: async () => {
+        // A concurrent install's copy carries the same tags, so our own create's id wins.
+        if (savedId) return { id: savedId, folderId: folderIdOf(items, "alerts") };
         const { copyOf, itemId, stream } = item;
         const tags = alertTags(pack.id, copyOf ?? itemId, stream);
         // The tag filter is a subset match, so the base alert must skip per-stream copies.
         const rows = (await readQuery(alertsByTagsQuery(org, tags), true)).filter(
           (row) => !!stream || !(row.tags ?? []).some((tag: string) => tag.startsWith("stream:")),
         );
-        if (rows[0]) return { id: rows[0].alert_id, folderId: rows[0].folder_id };
-        // The server's tag search reads a cache that trails a create, so trust the id it returned.
-        return savedId ? { id: savedId, folderId: folderIdOf(items, "alerts") } : null;
+        return rows[0] ? { id: rows[0].alert_id, folderId: rows[0].folder_id } : null;
       },
       create: async () => {
         const entryId = item.copyOf ?? item.itemId;
@@ -753,6 +758,20 @@ export function useStarterPacks(org: string) {
     }
   };
 
+  // Two browsers can each start the pack; the one that sorts first keeps going.
+  const stopIfNotFirst = async (record: PackInstallRecord) => {
+    const order = (row: PackInstallRecord) => [row.installedAt ?? 0, row.installId] as const;
+    const [at, id] = order(record);
+    const earlier = (await records.list(record.packId)).find((row) => {
+      if (row.installId === id || !["installing", "incomplete"].includes(row.status)) return false;
+      const [rowAt, rowId] = order(row);
+      return rowAt < at || (rowAt === at && rowId < id);
+    });
+    if (!earlier) return;
+    await records.remove(record);
+    throw new StarterPackBusyError(earlier.installedBy ?? "");
+  };
+
   const runInstall = async (
     sourcePack: StarterPack,
     {
@@ -807,6 +826,8 @@ export function useStarterPacks(org: string) {
           items: (await planItems(pack, entries, copies)).filter((item) => !excluded(item)),
         };
     await writeFirstRecord(record);
+    // A resumed record was already the pack's active one, so only a fresh one can lose the race.
+    if (!interrupted) await stopIfNotFirst(record);
     onProgress?.(record);
     return settleRecord(pack, record, entries, onProgress, enableAlerts, destination);
   };
