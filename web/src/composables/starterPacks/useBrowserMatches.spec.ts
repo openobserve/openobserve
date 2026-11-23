@@ -101,7 +101,7 @@ describe("useBrowserMatches", () => {
     expect(matches.copy.value?.interrupted?.packId).toBe("kubernetes");
   });
 
-  it("keeps the last full check time on a Home save, and sets it only for a first copy", () => {
+  it("stamps Home's check as the latest check time", () => {
     const now = vi.spyOn(Date, "now").mockReturnValue(1000);
     const matches = useBrowserMatches("org");
     matches.saveBuiltIn([HOSTS], [], null);
@@ -111,8 +111,8 @@ describe("useBrowserMatches", () => {
     expect(matches.copy.value?.checkedAt).toBe(2000);
     now.mockReturnValue(3000);
     matches.saveBuiltIn([HOSTS], ["kubernetes"], null);
-    expect(matches.copy.value?.checkedAt).toBe(2000);
-    expect(JSON.parse(window.localStorage.getItem(matchesKey("org"))!).checkedAt).toBe(2000);
+    expect(matches.copy.value?.checkedAt).toBe(3000);
+    expect(JSON.parse(window.localStorage.getItem(matchesKey("org"))!).checkedAt).toBe(3000);
   });
 
   it("drops saved sources without a streams list", () => {

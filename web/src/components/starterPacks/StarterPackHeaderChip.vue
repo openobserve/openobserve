@@ -40,6 +40,8 @@ import StarterPackListPane from "./StarterPackListPane.vue";
 // The header passes its spacing class; the popup is a sibling of the chip.
 defineOptions({ inheritAttrs: false });
 
+const STALE_CHECK_MS = 5 * 60_000;
+
 const { t } = useI18nTyped();
 const store = useStore();
 
@@ -136,6 +138,13 @@ watch(
   },
   { immediate: true },
 );
+
+// The saved check can name streams deleted since, so an old copy is re-checked when the popup opens.
+watch(popupOpen, (isOpen) => {
+  const checkedAt = matches.copy.value?.checkedAt;
+  if (!isOpen || !gate.visible.value || checkedAt === undefined) return;
+  if (Date.now() - checkedAt > STALE_CHECK_MS) void checker.refresh();
+});
 
 // Reopening while a setup runs goes straight back to it.
 const openFromChip = () => {

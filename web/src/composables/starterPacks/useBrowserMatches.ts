@@ -33,7 +33,7 @@ export interface BrowserInterrupted {
 }
 
 export interface BrowserMatchCopy {
-  /** Milliseconds since epoch of the last check that ran in this browser. */
+  /** Milliseconds since epoch of the last check (full or Home) that ran in this browser. */
   checkedAt: number;
   /** Built-in packs, set-up ones hidden by `installedPackIds`; load drops older copies' Library groups. */
   sources: FindMoreSource[];
@@ -145,11 +145,10 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
     writeJson(matchesKey(toValue(org)), next);
   };
 
-  const save = (
+  const saveBuiltIn = (
     sources: FindMoreSource[],
     installedPackIds: string[],
-    interrupted: BrowserInterrupted | null,
-    checkedAt: number,
+    interrupted: BrowserInterrupted | null = null,
   ) => {
     const installed = [...new Set(installedPackIds)];
     const fresh = builtInOnly(sources);
@@ -158,22 +157,19 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
       ({ packId }) =>
         !!packId && installed.includes(packId) && !fresh.some((row) => row.packId === packId),
     );
-    setCopy({ checkedAt, sources: [...fresh, ...kept], installedPackIds: installed, interrupted });
+    setCopy({
+      checkedAt: Date.now(),
+      sources: [...fresh, ...kept],
+      installedPackIds: installed,
+      interrupted,
+    });
   };
 
   const saveFull = (
     result: FindMoreResult,
     installedPackIds: string[],
     interrupted: BrowserInterrupted | null = null,
-  ) => save(result.sources, installedPackIds, interrupted, Date.now());
-
-  const saveBuiltIn = (
-    sources: FindMoreSource[],
-    installedPackIds: string[],
-    interrupted: BrowserInterrupted | null,
-  ) =>
-    // Home's check is not a full check, so it keeps the last full check time.
-    save(sources, installedPackIds, interrupted, copy.value?.checkedAt ?? Date.now());
+  ) => saveBuiltIn(result.sources, installedPackIds, interrupted);
 
   const markInstalled = (sourceId: string, packId?: string) => {
     const current = copy.value;
