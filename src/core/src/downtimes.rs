@@ -43,6 +43,7 @@ use config::{
     },
     utils::time::now_micros,
 };
+use infra::table::downtimes::IdleRun;
 use o2_enterprise::enterprise::{
     announcements::meta::{Banner, BannerCount, BannerCta, BannerVariant},
     common::config::get_config as get_o2_config,
@@ -302,17 +303,19 @@ pub async fn cancel(
     access::authorize_row(org, user_id, &before, "PUT").await?;
     // The same row goes to the guarded write, so an edit after this check also fails.
     check_version(version, &before)?;
-    cancel_row(org, user_id, before).await
+    cancel_row(org, user_id, before, None).await
 }
 
-/// [cancel] of a quick mute, whose alert rule stands in for the row check.
+/// [cancel] of a quick mute, whose alert rule stands in for the row check; `idle` also guards it
+/// by the alert's scheduler row.
 pub async fn cancel_quick_mute(
     org: &str,
     user_id: &str,
     before: Downtime,
+    idle: Option<IdleRun<'_>>,
 ) -> Result<Downtime, DowntimeError> {
     ensure_enabled()?;
-    cancel_row(org, user_id, before).await
+    cancel_row(org, user_id, before, idle).await
 }
 
 /// Ends an Until-it-clears row at the moment its alert first cleared (R-117); idempotent.
@@ -726,7 +729,12 @@ pub fn corrections_may_change(before: Option<&Downtime>, after: &Downtime) -> bo
     })
 }
 
-async fn cancel_row(org: &str, user_id: &str, before: Downtime) -> Result<Downtime, DowntimeError> {
+async fn cancel_row(
+    org: &str,
+    user_id: &str,
+    before: Downtime,
+    idle: Option<IdleRun<'_>>,
+) -> Result<Downtime, DowntimeError> {
     let id = before.id.clone();
     let now = now_micros();
     if before.cancelled_at.is_some() {
@@ -739,7 +747,14 @@ async fn cancel_row(org: &str, user_id: &str, before: Downtime) -> Result<Downti
     check_cancellable(&before, now)?;
     let after = cancelled(&before, user_id, now);
     let plan = remeasure_plan(Some(&before), &after).await?;
-    set_if_unchanged(&after, before.updated_at, &plan).await?;
+    match idle {
+        Some(run) => {
+            if !db::downtimes::set_if_idle(&after, before.updated_at, run, plan.jobs()).await? {
+                return Err(changed_meanwhile());
+            }
+        }
+        None => set_if_unchanged(&after, before.updated_at, &plan).await?,
+    }
     forget_recorded_mutes(&after.org, &after.id).await;
     if let Some(window) = cancelled_window(&before, now) {
         notify::deliver_in_background(
@@ -4106,27 +4121,30 @@ mod tests {
         let now = now_micros();
         let conn = infra::db::get_orm_client_rw().await;
         let mut versions = HashMap::new();
-        for id in ["stale", "current", "absent"] {
+        // Rows are keyed by id alone, so a fixed id would move another test's row into this org.
+        let id_of = |name: &str| format!("{org}_{name}");
+        for name in ["stale", "current", "absent"] {
+            let id = id_of(name);
             let mut mute = row(
                 vec![TargetModule::AnomalyDetections],
                 now - HOUR,
                 now + 10 * HOUR,
             );
-            mute.id = id.to_string();
+            mute.id = id.clone();
             mute.org = org.clone();
             infra::table::downtimes::put_with(conn, &mute)
                 .await
                 .unwrap();
-            let stored = infra::table::downtimes::get_rw(&org, id)
+            let stored = infra::table::downtimes::get_rw(&org, &id)
                 .await
                 .unwrap()
                 .unwrap();
-            versions.insert(id, stored.version);
+            versions.insert(name, stored.version);
         }
-        let live = |id: &'static str| {
-            let org = org.clone();
+        let live = |name: &'static str| {
+            let (org, id) = (org.clone(), id_of(name));
             async move {
-                let stored = infra::table::downtimes::get_rw(&org, id)
+                let stored = infra::table::downtimes::get_rw(&org, &id)
                     .await
                     .unwrap()
                     .unwrap();
@@ -4134,7 +4152,7 @@ mod tests {
             }
         };
 
-        let refused = cancel(&org, root, "stale", Some(versions["stale"] - 1)).await;
+        let refused = cancel(&org, root, &id_of("stale"), Some(versions["stale"] - 1)).await;
         assert!(
             matches!(refused, Err(DowntimeError::Conflict(_))),
             "{refused:?}"
@@ -4144,13 +4162,13 @@ mod tests {
             "a refused cancel leaves the downtime live"
         );
 
-        let ended = cancel(&org, root, "current", Some(versions["current"]))
+        let ended = cancel(&org, root, &id_of("current"), Some(versions["current"]))
             .await
             .unwrap();
         assert!(ended.cancelled_at.is_some());
         assert!(!live("current").await);
 
-        cancel(&org, root, "absent", None).await.unwrap();
+        cancel(&org, root, &id_of("absent"), None).await.unwrap();
         assert!(
             !live("absent").await,
             "a caller with no version still cancels"

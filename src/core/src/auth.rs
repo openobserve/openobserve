@@ -41,8 +41,9 @@ use {
 
 pub const V2_API_PREFIX: &str = "v2";
 /// Modules routed as `/v2/{org_id}/{module}`; any other path names its org in the first segment.
-pub const V2_ORG_MODULES: [&str; 10] = [
+pub const V2_ORG_MODULES: [&str; 11] = [
     "alerts",
+    "alert_leases",
     "folders",
     "reports",
     "synthetics",
@@ -141,7 +142,6 @@ pub use config::utils::str::{
     is_valid_email,
 };
 
-#[cfg(feature = "enterprise")]
 pub fn is_ofga_object_visible(
     org_id: &str,
     object_type: &str,

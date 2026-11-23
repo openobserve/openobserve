@@ -10,7 +10,6 @@ const { pipelinesWithMissingFunctions } = require('../utils/pipeline-import-fixt
 test.describe.configure({ mode: 'parallel' });
 
 const IMPORT_ORG = process.env["ORGNAME"] || "default";
-const ORG_ID_BUG = 'openobserve/openobserve#16694: import keeps remote_stream nodes in the fixture\'s "default" org, so outside it the Organization Id error never clears';
 
 // Use stored authentication state from global setup instead of logging in each test
 const authFile = path.join(__dirname, '../utils/auth/user.json');
@@ -42,7 +41,7 @@ test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipeline
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     });
 
-    // A #16694 expected failure stops before the end of the flow, and cleanup.spec sweeps these function names only in "default".
+    // cleanup.spec sweeps these function and destination names only in "default".
     test.afterEach(async () => {
         if (IMPORT_ORG !== "default" && importPrerequisites) {
             await pipelinesEP.deleteImportPrerequisites(IMPORT_ORG, importPrerequisites);
@@ -133,7 +132,6 @@ test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipeline
 
     test("Import Scheduled Pipeline from URL, download and delete imported pipeline", async ({ page }) => {
         test.skip(isCloudEnvironment(), 'Pipeline import not functional on cloud — imported pipelines do not appear in list');
-        test.fail(IMPORT_ORG !== "default", ORG_ID_BUG);
 
         const randomPipeline = `scheurl${Math.floor(Math.random() * 1000)}`;
         const randomFirstFunction = `first${Math.floor(Math.random() * 1000)}`;
@@ -171,7 +169,6 @@ test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipeline
 
     test("Import Scheduled Pipeline from JSON file, download and delete imported pipeline", async ({ page }) => {
         test.skip(isCloudEnvironment(), 'Pipeline import not functional on cloud — imported pipelines do not appear in list');
-        test.fail(IMPORT_ORG !== "default", ORG_ID_BUG);
 
         const randomPipeline = `schefile${Math.floor(Math.random() * 1000)}`;
         const randomFirstFunction = `first${Math.floor(Math.random() * 1000)}`;

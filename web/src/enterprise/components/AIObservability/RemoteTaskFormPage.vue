@@ -799,7 +799,6 @@ async function runStoredVersionTest() {
   testReport.value = row
     ? {
         rawRequest: row.rawRequest,
-        rawResponse: row.rawResponse,
         statusCode: row.httpStatus,
         parsedOutput: row.parsedOutput,
         latencyMs: row.latencyMs,

@@ -866,6 +866,7 @@
     "loading": "Загрузка...",
     "getStartedRUM": "Начните работу с RUM",
     "beta": "Бета",
+    "alpha": "Альфа",
     "optional": "необязательно",
     "play": "Воспроизвести",
     "pause": "Пауза",
@@ -4859,6 +4860,10 @@
       "failedToInitiateDeletion": "Не удалось запустить удаление.",
       "organizationResurrected": "Организация восстановлена.",
       "failedToResurrect": "Не удалось восстановить.",
+      "organizationBlocked": "Организация заблокирована.",
+      "failedToBlock": "Не удалось заблокировать.",
+      "organizationUnblocked": "Организация разблокирована.",
+      "failedToUnblock": "Не удалось разблокировать.",
       "organizationUpdated": "Организация успешно обновлена.",
       "organizationAdded": "Организация успешно добавлена.",
       "requestCompleted": "Запрос успешно выполнен.",
@@ -5227,7 +5232,12 @@
     "daysLeft": "Осталось {n} дн.",
     "resurrect": "Восстановить организацию",
     "statusActive": "Активна",
-    "statusDeleting": "Удаляется"
+    "statusDeleting": "Удаляется",
+    "statusBlocked": "Заблокирована",
+    "block": "Заблокировать организацию",
+    "unblock": "Разблокировать организацию",
+    "blockConfirmMessage": "Заблокировать {name}? До разблокировки организация не будет принимать данные, запросы и входы.",
+    "blockConfirmLabel": "Заблокировать"
   },
   "template": {
     "search": "Поиск шаблона"
@@ -12392,9 +12402,6 @@
     "testErrorClientError": "Ошибка клиента (4xx). Проверьте учетные данные и конфигурацию.",
     "testErrorServerError": "Ошибка сервера (5xx). Сервис получателя испытывает проблемы.",
     "viewDetails": "Просмотреть детали",
-    "error": "Ошибка",
-    "httpStatus": "HTTP статус",
-    "responseBody": "Тело ответа",
     "retry": "Повторить",
     "suggestCheckUrl": "Пожалуйста, проверьте, что URL вебхука правильный и доступен.",
     "suggestCheckFirewall": "Проверьте настройки брандмауэра и убедитесь, что сервис получателя доступен.",
@@ -14192,7 +14199,6 @@
       "loadFailedTitle": "Не удалось загрузить это оповещение"
     },
     "timeLabel": "Время",
-    "unknownHttpStatus": "Неизвестно",
     "previewEvaluation": {
       "realTimeReason": "При совпадении условий",
       "matchingGroup": "совпавшая группа",
@@ -14978,6 +14984,12 @@
       "quickMuteTooltip": "Быстрое заглушение из оповещения",
       "endedLabel": "завершено"
     },
+    "lease": {
+      "temporary": "Временный, создан {who}, действует до {time}",
+      "incidentsOn": "Создание инцидентов включено {who} до {time}",
+      "incidentsOff": "Создание инцидентов отключено {who} до {time}",
+      "why": "{label}. Причина: {reason}"
+    },
     "ack": {
       "acknowledge": "Принять",
       "acknowledgeGroups": "Все {count} срабатывающие группы | Все {count} срабатывающих групп",
@@ -15607,7 +15619,6 @@
       "hideWebhook": "Скрыть URL вебхука Slack",
       "slackAppFallback": "Приложение Slack",
       "previewDisclaimer": "Slack предоставляет фактическую иконку приложения и канал назначения после установки.",
-      "successResponseBody": "Ответ Slack",
       "callbackTitle": "Подключение Slack",
       "callbackWorking": "Возвращаемся в {product}…",
       "callbackError": "Это подключение Slack невозможно завершить. Закройте это окно и попробуйте снова.",
@@ -16216,6 +16227,37 @@
     "nodesDesc": "Узлы кластера и их состояние",
     "licenseDesc": "Детали лицензии Enterprise",
     "organizationManagementDesc": "Создание и управление организациями",
+    "userManagement": "Управление пользователями",
+    "userManagementDesc": "Находите пользователей всех организаций и блокируйте их",
+    "userManagementPage": {
+      "subtitle": "Пользователи всех организаций и их статус блокировки SSO",
+      "searchPlaceholder": "Поиск по email или ID пользователя",
+      "allOrganizations": "Все организации",
+      "filterByOrganization": "Фильтр по организации",
+      "email": "Email",
+      "organizations": "Организации",
+      "blockState": "Статус блокировки",
+      "orgCount": "{count} организация | {count} организации",
+      "notBlocked": "Не заблокирован",
+      "blockedByEmail": "Заблокирован по email",
+      "blockedByDomain": "Заблокирован по домену",
+      "block": "Заблокировать",
+      "unblock": "Разблокировать",
+      "blockConfirmTitle": "Заблокировать этого пользователя?",
+      "blockConfirmMessage": "{email} будет добавлен в список блокировки SSO, а ограничения доменов будут включены.",
+      "blocked": "{email} заблокирован",
+      "unblocked": "{email} разблокирован",
+      "updateFailed": "Не удалось обновить список блокировки SSO",
+      "dormantRules": "Ограничения доменов выключены, и их включение также применит сохранённые в них правила. Заблокируйте этого пользователя в разделе {page}.",
+      "detailsTitle": "Сведения о пользователе",
+      "userId": "ID пользователя",
+      "orgId": "ID организации",
+      "orgName": "Организация",
+      "orgOption": "{name} ({id})",
+      "role": "Роль",
+      "noOrganizations": "Не состоит ни в одной организации",
+      "ssoOnlyHint": "Действует, когда этот email входит через SSO"
+    },
     "queryManagement": "Управление запросами",
     "scrapintervalLabel": "Интервал сбора (в секундах) *",
     "logoLabel": "Перетащите изображение логотипа",
@@ -16470,7 +16512,8 @@
       "noEmails": "Адреса электронной почты пока не указаны.",
       "removeDomain": "Удалить {domain}",
       "removeEmail": "Удалить {email}",
-      "saved": "Настройки SSO сохранены"
+      "saved": "Настройки SSO сохранены",
+      "blocksRemovedKeepsAllowRule": "Блокировки сняты. Для {domain} сохраняется разрешающее правило."
     },
     "general": {
       "close": "Закрыть",
@@ -20155,7 +20198,6 @@
         "latency": "Задержка",
         "output": "Извлеченный результат",
         "rawRequest": "Отправленный запрос",
-        "rawResponse": "Полученный ответ",
         "idle": "Запрос и ответ появятся здесь после запуска теста.",
         "disabledHint": "Сначала укажите название и конечную точку.",
         "failure": {
@@ -23832,6 +23874,7 @@
       "llmProviders": "LLM-провайдеры",
       "aiToolsets": "Наборы AI-инструментов",
       "orgManagement": "Управление организацией",
+      "userManagement": "Управление пользователями",
       "rumErrors": "RUM — Отслеживание ошибок",
       "rumSessions": "{product} — Сеансы",
       "sourceMaps": "RUM — Карты исходного кода",
@@ -23949,6 +23992,7 @@
       "llmProvidersRefresh": "Обновить список",
       "aiToolsetsRefresh": "Обновить список",
       "orgManagementRefresh": "Обновить список",
+      "userManagementRefresh": "Обновить список",
       "rumErrorsRefresh": "Обновить список",
       "rumErrorsCopyUrl": "Скопировать общий URL отслеживания ошибок",
       "rumSessionsRefresh": "Обновить список",

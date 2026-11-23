@@ -1466,8 +1466,21 @@ pub async fn create<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
     folder_id: &str,
+    alert: Alert,
+    overwrite: bool,
+) -> Result<Alert, AlertError> {
+    create_stamped(conn, org_id, folder_id, alert, overwrite, None).await
+}
+
+/// [`create`] that, given a stamp, keeps the alert's own id and starts its `updated_at` at the
+/// stamp, so the caller can tell its row from a later save.
+pub async fn create_stamped<C: TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: &str,
     mut alert: Alert,
     overwrite: bool,
+    stamp: Option<infra::table::alerts::CreateStamp>,
 ) -> Result<Alert, AlertError> {
     if !table::folders::exists(org_id, folder_id, FolderType::Alerts).await? {
         if folder_id == DEFAULT_FOLDER {
@@ -1489,7 +1502,10 @@ pub async fn create<C: TransactionTrait>(
     )
     .await?;
 
-    let alert = db::alerts::alert::create(conn, org_id, folder_id, alert, overwrite).await?;
+    let use_given_id = overwrite || stamp.is_some();
+    let alert =
+        db::alerts::alert::create_stamped(conn, org_id, folder_id, alert, use_given_id, stamp)
+            .await?;
     slo_effect.apply().await;
 
     set_ownership(
@@ -1871,64 +1887,86 @@ pub(crate) async fn delete_by_id<C: ConnectionTrait>(
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<(), AlertError> {
+    delete_by_id_where(conn, org_id, alert_id, None)
+        .await
+        .map(|_| ())
+}
+
+/// With `written_us`, deletes only while the alert's `updated_at` holds it; false when it did not.
+async fn delete_by_id_where<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+    written_us: Option<i64>,
+) -> Result<bool, AlertError> {
     if db::alerts::alert::get_by_id(conn, org_id, alert_id)
         .await?
         .is_none()
     {
-        return Ok(());
+        return Ok(false);
     };
 
     let alert_id_str = alert_id.to_string();
-    match db::alerts::alert::delete_by_id(conn, org_id, alert_id).await {
-        Ok(_) => {
-            remove_ownership(org_id, "alerts", Authz::new(&alert_id_str)).await;
-            let firing = crate::alerts::lifecycle::firing_rows(&alert_id_str).await;
-            let groups = infra::table::alert_states::list_groups(&alert_id_str)
-                .await
-                .unwrap_or_default();
-            crate::alerts::recovery::log_orphaned_episodes(
-                &alert_id_str,
-                &groups,
-                "deleted with its alert",
-            );
-            // Alert run state is owned by the alert's lifecycle (Part IV of
-            // alerts.md), so it goes when the alert does. Best-effort: a
-            // leftover state row must not fail the delete.
-            if let Err(e) = db::alerts::alert_states::delete_by_alert(&alert_id_str).await {
-                log::warn!("failed to delete alert state for {alert_id_str}: {e}");
-            }
-            if let Err(e) = infra::table::alert_acks::delete_by_alert(org_id, &alert_id_str).await {
-                log::warn!("failed to delete alert acks for {alert_id_str}: {e}");
-            }
-            let cleared = crate::alerts::lifecycle::deleted_clears(
-                &firing,
-                config::utils::time::now_micros(),
-                crate::alerts::lifecycle::ClearKind::AlertDeleted,
-            );
-            crate::alerts::lifecycle::on_all_cleared(org_id, &alert_id_str, &cleared).await;
-            // The availability ledger (S-16) is owned by the same lifecycle, so
-            // org deletion inherits it through `delete_org_alerts` with no
-            // dedicated cleanup step. Written straight to `infra`, unlike its
-            // neighbour above, because the other regions are already told by
-            // that call's `DeleteByAlert` message — which drops the ledger too.
-            // Best-effort for the same reason: a stranded interval is retention's
-            // problem, not a reason to fail the delete.
-            if let Err(e) = infra::table::alert_eval_intervals::delete_by_alert(&alert_id_str).await
-            {
-                log::warn!("failed to delete alert eval ledger for {alert_id_str}: {e}");
-            }
-            #[cfg(feature = "enterprise")]
-            if let Err(e) = crate::alerts::alert_calibration::dismissals::delete_for_alert(
-                org_id,
-                &alert_id_str,
-            )
-            .await
-            {
-                log::warn!("failed to delete alert calibration dismissals for {alert_id_str}: {e}");
-            }
-            Ok(())
+    match db::alerts::alert::delete_by_id_where(conn, org_id, alert_id, written_us).await {
+        Ok(false) => Ok(false),
+        Ok(true) => {
+            after_row_deleted(org_id, &alert_id_str).await;
+            Ok(true)
         }
         Err(e) => Err(e.into()),
+    }
+}
+
+/// The cleanup a deleted alert's row leaves behind; idempotent, so a retry after a crash finishes
+/// it.
+pub(crate) async fn forget_deleted(org_id: &str, alert_id: Ksuid) -> Result<(), AlertError> {
+    db::alerts::alert::forget_deleted(org_id, alert_id).await?;
+    after_row_deleted(org_id, &alert_id.to_string()).await;
+    Ok(())
+}
+
+async fn after_row_deleted(org_id: &str, alert_id_str: &str) {
+    let alert_id_str = alert_id_str.to_string();
+    remove_ownership(org_id, "alerts", Authz::new(&alert_id_str)).await;
+    let firing = crate::alerts::lifecycle::firing_rows(&alert_id_str).await;
+    let groups = infra::table::alert_states::list_groups(&alert_id_str)
+        .await
+        .unwrap_or_default();
+    crate::alerts::recovery::log_orphaned_episodes(
+        &alert_id_str,
+        &groups,
+        "deleted with its alert",
+    );
+    // Alert run state is owned by the alert's lifecycle (Part IV of
+    // alerts.md), so it goes when the alert does. Best-effort: a
+    // leftover state row must not fail the delete.
+    if let Err(e) = db::alerts::alert_states::delete_by_alert(&alert_id_str).await {
+        log::warn!("failed to delete alert state for {alert_id_str}: {e}");
+    }
+    if let Err(e) = infra::table::alert_acks::delete_by_alert(org_id, &alert_id_str).await {
+        log::warn!("failed to delete alert acks for {alert_id_str}: {e}");
+    }
+    let cleared = crate::alerts::lifecycle::deleted_clears(
+        &firing,
+        config::utils::time::now_micros(),
+        crate::alerts::lifecycle::ClearKind::AlertDeleted,
+    );
+    crate::alerts::lifecycle::on_all_cleared(org_id, &alert_id_str, &cleared).await;
+    // The availability ledger (S-16) is owned by the same lifecycle, so
+    // org deletion inherits it through `delete_org_alerts` with no
+    // dedicated cleanup step. Written straight to `infra`, unlike its
+    // neighbour above, because the other regions are already told by
+    // that call's `DeleteByAlert` message — which drops the ledger too.
+    // Best-effort for the same reason: a stranded interval is retention's
+    // problem, not a reason to fail the delete.
+    if let Err(e) = infra::table::alert_eval_intervals::delete_by_alert(&alert_id_str).await {
+        log::warn!("failed to delete alert eval ledger for {alert_id_str}: {e}");
+    }
+    #[cfg(feature = "enterprise")]
+    if let Err(e) =
+        crate::alerts::alert_calibration::dismissals::delete_for_alert(org_id, &alert_id_str).await
+    {
+        log::warn!("failed to delete alert calibration dismissals for {alert_id_str}: {e}");
     }
 }
 
@@ -1982,6 +2020,31 @@ pub async fn delete_by_id_user<C: ConnectionTrait>(
             return Err(refusal);
         }
         delete_by_id(conn, org_id, alert_id).await
+    }
+    .await;
+    finish_graph_locked(result, locker).await
+}
+
+/// [`delete_by_id_user`] that deletes only while the alert's `updated_at` holds `written_us`.
+pub async fn delete_by_id_user_where<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+    written_us: i64,
+) -> Result<bool, AlertError> {
+    let locker = lock_composite_graph(org_id).await?;
+    let result = async {
+        ensure_alerts_not_referenced(conn, org_id, &[alert_id]).await?;
+        let dependents =
+            crate::slo::service::slos_sourced_from_alert(org_id, &alert_id.to_string())
+                .await
+                .map_err(|e| {
+                    AlertError::InfraError(infra::errors::Error::Message(e.to_string()))
+                })?;
+        if let Some(refusal) = delete_blocked_by(&dependents) {
+            return Err(refusal);
+        }
+        delete_by_id_where(conn, org_id, alert_id, Some(written_us)).await
     }
     .await;
     finish_graph_locked(result, locker).await
@@ -2477,9 +2540,9 @@ mod slo_source_guard_tests {
             ),
             (
                 "create",
-                "pub async fn create<C: TransactionTrait>(",
+                "pub async fn create_stamped<C: TransactionTrait>(",
                 "\n/// Moves the alerts into the specified destination folder.",
-                "db::alerts::alert::create(conn, org_id, folder_id, alert, overwrite)",
+                "db::alerts::alert::create_stamped(",
             ),
             (
                 "update",
@@ -3183,8 +3246,11 @@ impl AlertExt for Alert {
                     );
                     ctx.chart_png = if needs_png {
                         if chart_png.is_none() {
-                            chart_png =
-                                Some(chart::try_render_png(payload).map(std::sync::Arc::new));
+                            chart_png = Some(
+                                chart::try_render_png(payload)
+                                    .await
+                                    .map(std::sync::Arc::new),
+                            );
                         }
                         chart_png.clone().flatten()
                     } else {

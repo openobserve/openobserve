@@ -6273,6 +6273,12 @@
     "lastSatisfied": "ed57e1d9f29d8b12",
     "lastSuccessfulAt": "71df2f4d7df31454",
     "lastTriggered": "4bf20af9f685a903",
+    "lease": {
+      "incidentsOff": "2de72bed9e200058",
+      "incidentsOn": "d42f2d987bc6530e",
+      "temporary": "89dc36f039e16c51",
+      "why": "aad5b01c7bd5364f"
+    },
     "levelCritical": "427dd2969bd140be",
     "levelFilter": "2504011d541122b6",
     "levelFilterRemove": "82a162de54c56db4",
@@ -9041,6 +9047,7 @@
     "all": "a52ace420f2175d0",
     "allStates": "f189411452ed2860",
     "allStatuses": "8ee57323a6f24cc7",
+    "alpha": "b1a96dd646bccaa2",
     "and": "6201111b83a0cb5b",
     "apply": "31e392d1c0378bec",
     "applyTheme": "436a5136609141a6",
@@ -16106,11 +16113,15 @@
       "deleteOrganization": "a70d189a87d61556",
       "deletionInitiated": "2f3e4192f0193268",
       "edit": "464c4ffd019e1e96",
+      "failedToBlock": "047f6cad3dcb7008",
       "failedToInitiateDeletion": "57944af5ac044ec9",
       "failedToResurrect": "caf47fa0c0f5ed90",
+      "failedToUnblock": "d137c99580adc75d",
       "loadingOrganizations": "a863d587b91807e2",
       "organizationAdded": "694fa5d81188cd54",
+      "organizationBlocked": "d40f94e329c3dd11",
       "organizationResurrected": "eca431ceb6829bc4",
+      "organizationUnblocked": "d88c0dfb6ee65516",
       "organizationUpdated": "c2dc3ed876fefe43",
       "requestCompleted": "e95fb44cd2a394b9",
       "status": "920e413c7d411b61",
@@ -23323,6 +23334,9 @@
   },
   "organization": {
     "add": "62e34b700059aaf3",
+    "block": "ee5990f564045d44",
+    "blockConfirmLabel": "211d0bb8cf4f5b52",
+    "blockConfirmMessage": "c40374ee072b5817",
     "cancel": "19766ed6ccb2f4a3",
     "createOrganization": "62e34b700059aaf3",
     "daysLeft": "762c939c05a0be7a",
@@ -23342,9 +23356,11 @@
     "search": "83ebd2f5fe9fb746",
     "searchByNameOrId": "46d13bba91c65470",
     "statusActive": "92340695899bd2d8",
+    "statusBlocked": "18f2a0947f9d6523",
     "statusDeleting": "21ed2f9e00a509be",
     "subscription_plan": "1c8b07d56c07434b",
     "type": "baaddf70fb5d432b",
+    "unblock": "b5a76d3ad3bae30d",
     "updateOrganization": "f927b01e6f33a249"
   },
   "overview": {
@@ -28531,6 +28547,7 @@
     "domainManagement": {
       "accessFor": "ad705802d36f59a5",
       "addDomain": "d86476ae6cc9e4a5",
+      "blocksRemovedKeepsAllowRule": "4469d17edba09037",
       "claimParserFormatLink": "6874fe4b298d9868",
       "claimParserHelp": "331153bf2a47e653",
       "claimParserLabel": "53846fc1266c5ec6",
@@ -29092,7 +29109,37 @@
     "trial_expiry": "03378fba7bf9c9ae",
     "updateAiCreditsFailed": "5754421c67124875",
     "updateSyntheticsStepsFailed": "157bde22fd62f83a",
-    "usageStreamEnabledLabel": "d3e2513df5d8f8e7"
+    "usageStreamEnabledLabel": "d3e2513df5d8f8e7",
+    "userManagement": "fe45f3a1addc213e",
+    "userManagementDesc": "c06cd2ffab1bb5d0",
+    "userManagementPage": {
+      "allOrganizations": "e3002b23036a8247",
+      "block": "211d0bb8cf4f5b52",
+      "blockConfirmMessage": "dc05738d420fc3ce",
+      "blockConfirmTitle": "c00c765866f58d25",
+      "blockState": "1f8fb3b1711888e4",
+      "blocked": "a9320440537b247c",
+      "blockedByDomain": "ffc176fa28eb4f7f",
+      "blockedByEmail": "e4371934c2206790",
+      "detailsTitle": "59c972df13e46290",
+      "dormantRules": "1682fd700a248794",
+      "email": "969ccbd3cf6300ec",
+      "filterByOrganization": "f21fc3decd5c0d21",
+      "noOrganizations": "49453904f3bafb3c",
+      "notBlocked": "8625218ce52a445d",
+      "orgCount": "5445ca255ff9f4a3",
+      "orgId": "1f466322634e2d85",
+      "orgName": "d764d42592fc9687",
+      "organizations": "2730183d6b776b40",
+      "role": "14736a2eb9f4159f",
+      "searchPlaceholder": "64ace2cc3723e0c1",
+      "ssoOnlyHint": "05775b23f56a2542",
+      "subtitle": "764f84c1ad36c947",
+      "unblock": "712da63171e0c9de",
+      "unblocked": "c6fec68b7245cf88",
+      "updateFailed": "412daf98f509da0e",
+      "userId": "7967e089a7b94464"
+    }
   },
   "shortcuts": {
     "actions": {
@@ -29228,7 +29275,8 @@
       "tracesPrevRow": "0aed00c70b626486",
       "tracesRefresh": "0e91610117029a62",
       "tracesRowOpen": "1e8364c6cdef42bf",
-      "tracesSearch": "1837e00c45e8663d"
+      "tracesSearch": "1837e00c45e8663d",
+      "userManagementRefresh": "3cf8d66227384dc2"
     },
     "escKey": "52f878edb34fa14f",
     "footerClose": "310ff200149b44a3",
@@ -29315,7 +29363,8 @@
       "syntheticsJourney": "6139c8806a81156d",
       "syntheticsTokens": "7864444a72000b95",
       "traceDetail": "b5ae8e6e78ccce2f",
-      "traces": "998741a58ed2b411"
+      "traces": "998741a58ed2b411",
+      "userManagement": "fe45f3a1addc213e"
     },
     "search": "ae6ebe2f27d169ab",
     "subtitle": "ca1deb2bf3e5d8a2",

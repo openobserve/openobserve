@@ -866,6 +866,7 @@
     "loading": "Ładowanie...",
     "getStartedRUM": "Rozpocznij pracę z RUM",
     "beta": "Beta",
+    "alpha": "Alfa",
     "optional": "opcjonalne",
     "play": "Odtwórz",
     "pause": "Wstrzymaj",
@@ -4859,6 +4860,10 @@
       "failedToInitiateDeletion": "Nie udało się zainicjować usuwania.",
       "organizationResurrected": "Organizacja przywrócona.",
       "failedToResurrect": "Nie udało się przywrócić.",
+      "organizationBlocked": "Organizacja zablokowana.",
+      "failedToBlock": "Nie udało się zablokować.",
+      "organizationUnblocked": "Organizacja odblokowana.",
+      "failedToUnblock": "Nie udało się odblokować.",
       "organizationUpdated": "Organizacja zaktualizowana pomyślnie.",
       "organizationAdded": "Organizacja dodana pomyślnie.",
       "requestCompleted": "Żądanie zakończone pomyślnie.",
@@ -5227,7 +5232,12 @@
     "daysLeft": "Pozostałe dni: {n}",
     "resurrect": "Przywróć organizację",
     "statusActive": "Aktywna",
-    "statusDeleting": "Usuwanie"
+    "statusDeleting": "Usuwanie",
+    "statusBlocked": "Zablokowana",
+    "block": "Zablokuj organizację",
+    "unblock": "Odblokuj organizację",
+    "blockConfirmMessage": "Zablokować {name}? Do czasu odblokowania organizacja nie będzie przyjmować danych, zapytań ani logowań.",
+    "blockConfirmLabel": "Zablokuj"
   },
   "template": {
     "search": "Szukaj szablonu"
@@ -12392,9 +12402,6 @@
     "testErrorClientError": "Błąd klienta (4xx). Sprawdź swoje dane uwierzytelniające i konfigurację.",
     "testErrorServerError": "Błąd serwera (5xx). Usługa miejsca docelowego napotyka problemy.",
     "viewDetails": "Wyświetl szczegóły",
-    "error": "Błąd",
-    "httpStatus": "Status HTTP",
-    "responseBody": "Treść odpowiedzi",
     "retry": "Ponów",
     "suggestCheckUrl": "Sprawdź, czy URL webhooka jest poprawny i osiągalny.",
     "suggestCheckFirewall": "Sprawdź ustawienia zapory sieciowej i upewnij się, że usługa miejsca docelowego jest dostępna.",
@@ -14192,7 +14199,6 @@
       "loadFailedTitle": "Nie udało się wczytać tego alertu"
     },
     "timeLabel": "Czas",
-    "unknownHttpStatus": "Nieznany",
     "previewEvaluation": {
       "realTimeReason": "Gdy warunki są spełnione",
       "matchingGroup": "pasująca grupa",
@@ -14978,6 +14984,12 @@
       "quickMuteTooltip": "Szybkie wyciszenie z alertu",
       "endedLabel": "zakończone"
     },
+    "lease": {
+      "temporary": "Tymczasowe, utworzone przez {who}, wygasa o {time}",
+      "incidentsOn": "Tworzenie incydentów włączone przez {who} do {time}",
+      "incidentsOff": "Tworzenie incydentów wyłączone przez {who} do {time}",
+      "why": "{label}. Powód: {reason}"
+    },
     "ack": {
       "acknowledge": "Potwierdź",
       "acknowledgeGroups": "Wszystkie {count} wyzwolone grupy | Wszystkie {count} wyzwolone grupy",
@@ -15607,7 +15619,6 @@
       "hideWebhook": "Ukryj adres URL webhooka Slacka",
       "slackAppFallback": "Aplikacja Slack",
       "previewDisclaimer": "Slack udostępnia rzeczywistą ikonę aplikacji i kanał docelowy po instalacji.",
-      "successResponseBody": "Odpowiedź Slacka",
       "callbackTitle": "Łączenie ze Slackiem",
       "callbackWorking": "Powrót do {product}…",
       "callbackError": "To połączenie ze Slackiem nie może zostać ukończone. Zamknij to okno i spróbuj ponownie.",
@@ -16216,6 +16227,37 @@
     "nodesDesc": "Węzły klastra i ich stan",
     "licenseDesc": "Szczegóły licencji Enterprise",
     "organizationManagementDesc": "Twórz i zarządzaj organizacjami",
+    "userManagement": "Zarządzanie użytkownikami",
+    "userManagementDesc": "Znajduj użytkowników we wszystkich organizacjach i blokuj ich",
+    "userManagementPage": {
+      "subtitle": "Użytkownicy wszystkich organizacji i ich stan blokady SSO",
+      "searchPlaceholder": "Szukaj po e-mailu lub ID użytkownika",
+      "allOrganizations": "Wszystkie organizacje",
+      "filterByOrganization": "Filtruj według organizacji",
+      "email": "E-mail",
+      "organizations": "Organizacje",
+      "blockState": "Stan blokady",
+      "orgCount": "{count} organizacja | {count} organizacje",
+      "notBlocked": "Niezablokowany",
+      "blockedByEmail": "Zablokowany przez e-mail",
+      "blockedByDomain": "Zablokowany przez domenę",
+      "block": "Zablokuj",
+      "unblock": "Odblokuj",
+      "blockConfirmTitle": "Zablokować tego użytkownika?",
+      "blockConfirmMessage": "{email} zostanie dodany do listy blokad SSO, a ograniczenia domen zostaną włączone.",
+      "blocked": "{email} jest zablokowany",
+      "unblocked": "{email} jest odblokowany",
+      "updateFailed": "Nie udało się zaktualizować listy blokad SSO",
+      "dormantRules": "Ograniczenia domen są wyłączone, a ich włączenie zastosowałoby też zapisane w nich reguły. Zablokuj tego użytkownika w {page}.",
+      "detailsTitle": "Szczegóły użytkownika",
+      "userId": "ID użytkownika",
+      "orgId": "ID organizacji",
+      "orgName": "Organizacja",
+      "orgOption": "{name} ({id})",
+      "role": "Rola",
+      "noOrganizations": "Nie należy do żadnej organizacji",
+      "ssoOnlyHint": "Dotyczy logowania tego adresu e-mail przez SSO"
+    },
     "queryManagement": "Zarządzanie zapytaniami",
     "scrapintervalLabel": "Interwał zbierania (w sekundach) *",
     "logoLabel": "Przeciągnij i upuść obraz logo",
@@ -16470,7 +16512,8 @@
       "noEmails": "Nie wymieniono jeszcze żadnych adresów e-mail.",
       "removeDomain": "Usuń {domain}",
       "removeEmail": "Usuń {email}",
-      "saved": "Ustawienia SSO zapisane"
+      "saved": "Ustawienia SSO zapisane",
+      "blocksRemovedKeepsAllowRule": "Blokady usunięte. {domain} zachowuje swoją regułę zezwalającą."
     },
     "general": {
       "close": "Zamknij",
@@ -20155,7 +20198,6 @@
         "latency": "Opóźnienie",
         "output": "Wyodrębnione dane wyjściowe",
         "rawRequest": "Wysłane żądanie",
-        "rawResponse": "Otrzymana odpowiedź",
         "idle": "Żądanie i odpowiedź pojawią się tutaj po uruchomieniu testu.",
         "disabledHint": "Najpierw podaj nazwę i punkt końcowy.",
         "failure": {
@@ -23832,6 +23874,7 @@
       "llmProviders": "Dostawcy LLM",
       "aiToolsets": "Zestawy narzędzi AI",
       "orgManagement": "Zarządzanie organizacją",
+      "userManagement": "Zarządzanie użytkownikami",
       "rumErrors": "RUM — Śledzenie błędów",
       "rumSessions": "{product} — Sesje",
       "sourceMaps": "RUM — Mapy źródłowe",
@@ -23949,6 +23992,7 @@
       "llmProvidersRefresh": "Odśwież listę",
       "aiToolsetsRefresh": "Odśwież listę",
       "orgManagementRefresh": "Odśwież listę",
+      "userManagementRefresh": "Odśwież listę",
       "rumErrorsRefresh": "Odśwież listę",
       "rumErrorsCopyUrl": "Kopiuj URL udostępniania śledzenia błędów",
       "rumSessionsRefresh": "Odśwież listę",

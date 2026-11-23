@@ -81,7 +81,7 @@ export type RcaTrigger =
   | "legacy"
   | "evidence_settled";
 
-export type RcaRunMode = "fresh" | "build_on_previous";
+export type RcaRunMode = "fresh" | "build_on_previous" | "recheck";
 
 /** `v1`: a pre-upgrade report served as markdown only; `v2`: an `rca_runs` row. */
 export type RcaReportFormat = "v1" | "v2";
