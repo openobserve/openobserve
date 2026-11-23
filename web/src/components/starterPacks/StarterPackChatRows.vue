@@ -101,6 +101,11 @@ const progressLine = ({ flow }: HomePack): I18nText => {
     : t("starterPacks.stepper.settingUp");
 };
 
+const busyLine = ({ flow }: HomePack): I18nText =>
+  flow.busyBy.value
+    ? t("starterPacks.busyBy", { who: raw(flow.busyBy.value) })
+    : t("starterPacks.busySomeone");
+
 const setUpLabel = (count: number | null): I18nText =>
   count === null
     ? t("starterPacks.drawer.setUp")
@@ -166,6 +171,10 @@ const setUpLabel = (count: number | null): I18nText =>
             <template v-else-if="state.kind === 'forbidden'">
               <OIcon name="lock" size="sm" class="shrink-0" />
               <span class="truncate">{{ t("starterPacks.askAdmin") }}</span>
+            </template>
+            <template v-else-if="state.kind === 'idle' && item.flow.busyBy.value !== null">
+              <OIcon name="schedule" size="sm" class="shrink-0" />
+              <span class="truncate">{{ busyLine(item) }}</span>
             </template>
             <span v-else-if="state.installFailed" class="text-status-error-text truncate">{{
               t("starterPacks.progress.installError")

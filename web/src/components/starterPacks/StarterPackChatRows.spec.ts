@@ -127,6 +127,25 @@ describe("StarterPackChatRows", () => {
     expect(fake.matchers.kubernetes.checkShared).toHaveBeenCalled();
   });
 
+  it("says who is setting the pack up when the chat Set up was stopped by another install", async () => {
+    const wrapper = await render(["kubernetes"]);
+    const flow = fake.flows.kubernetes;
+    flow.install = vi.fn(async () => {
+      flow.busyBy.value = "first@example.com";
+      return false;
+    });
+    await wrapper.get('[data-test="starter-pack-chat-set-up-kubernetes"]').trigger("click");
+    await flushPromises();
+    const note = () => wrapper.get('[data-test="starter-pack-chat-note-kubernetes"]').text();
+    expect(note()).toBe(
+      "first@example.com is setting this pack up right now. Check back in a minute.",
+    );
+    flow.busyBy.value = "";
+    await nextTick();
+    expect(note()).toBe("Someone else is setting this pack up right now. Check back in a minute.");
+    expect(fake.browser.markInstalled).not.toHaveBeenCalled();
+  });
+
   it("keeps the set up pack ready, drops the other offers and the badge once the offer ends", async () => {
     const wrapper = await render();
     fake.flows.kubernetes.record.value = { status: "complete", items: [] };
