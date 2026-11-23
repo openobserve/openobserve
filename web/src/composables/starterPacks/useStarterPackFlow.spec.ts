@@ -353,6 +353,25 @@ describe("useStarterPackFlow", () => {
     });
   });
 
+  it("names items from the pack itself until the preview has loaded", async () => {
+    const pack = {
+      ...PACK,
+      alerts: ["lib/cpu", "lib/bare"],
+      dashboards: [{ id: "host_metrics", title: "Host Metrics" }],
+      savedViews: [{ id: "events", name: "Events" }],
+      bundledAlerts: [{ entry: { id: "lib/cpu", title: "High CPU" }, file: {} }],
+    } as unknown as StarterPack;
+    fake.previewPack.mockRejectedValueOnce(new Error("down"));
+    const flow = setup({}, pack);
+    await flow.loadPreview();
+    expect(["host_metrics", "events", "lib/cpu", "lib/bare"].map(flow.nameOf)).toEqual([
+      "Host Metrics",
+      "Events",
+      "High CPU",
+      "lib/bare",
+    ]);
+  });
+
   const refused = Object.assign(new Error("http"), { response: { status: 403 } });
 
   it("calls a refused preview forbidden, not a load error to retry", async () => {
