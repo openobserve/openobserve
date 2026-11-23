@@ -444,11 +444,12 @@ export const reconcileQueryVariableValue = (
     : variable.value === null || variable.value === undefined
       ? []
       : [variable.value];
+  // A capped list cannot show a pick is gone, so one it leaves out stays.
   const kept = current.filter(
     (value: unknown) =>
       value === SELECT_ALL_VALUE ||
       optionValues.has(value as string) ||
-      (typeof value === "string" && value.endsWith(CUSTOM_VALUE)),
+      (typeof value === "string" && (value.endsWith(CUSTOM_VALUE) || !!variable.queryCapped)),
   );
   const pick = (values: string[]) => (variable.multiSelect ? values : values[0]);
   if (kept.length) return pick(kept);

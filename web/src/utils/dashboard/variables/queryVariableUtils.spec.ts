@@ -782,6 +782,18 @@ describe("reconcileQueryVariableValue", () => {
     ).toEqual(["b"]);
   });
 
+  it("keeps a pick a capped list leaves out, such as one found by search", () => {
+    expect(reconcileQueryVariableValue({ value: "host15", queryCapped: true }, options)).toBe(
+      "host15",
+    );
+    expect(
+      reconcileQueryVariableValue(
+        { multiSelect: true, value: ["b", "host15"], queryCapped: true },
+        options,
+      ),
+    ).toEqual(["b", "host15"]);
+  });
+
   it("falls back to the first option, or nothing when the range has no values", () => {
     expect(reconcileQueryVariableValue({ value: "gone" }, options)).toBe("a");
     expect(reconcileQueryVariableValue({ value: "gone" }, [])).toBeNull();

@@ -164,7 +164,12 @@ export default defineComponent({
     const selectRef = ref(null);
     const isOpen = ref(false);
 
-    const availableOptions = computed(() => props.variableItem?.options || []);
+    // A query variable's server search answers one typed text; its loaded options stay what "All" stands for.
+    const availableOptions = computed(() => {
+      const search = props.variableItem?.querySearch;
+      const term = currentSearchTerm.value.trim();
+      return (term && search?.text === term ? search.options : props.variableItem?.options) || [];
+    });
 
     // Options with (Custom) label transformation — OSelect handles local filtering
     const computedOptions = computed(() => {

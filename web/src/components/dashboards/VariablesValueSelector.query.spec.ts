@@ -198,6 +198,45 @@ describe("VariablesValueSelector — custom and PromQL query_values variables", 
     wrapper.unmount();
   });
 
+  it("searches a custom variable on the server without changing the list behind 'All'", async () => {
+    streamReturns([{ svc: "a" }, { svc: "b" }, { svc: "c" }]);
+    const wrapper = mountSelector({
+      variablesConfig: {
+        list: [
+          {
+            name: "service",
+            type: "query_values",
+            multiSelect: true,
+            selectAllValueForMultiSelect: "all",
+            query_data: { stream_type: "logs", query: "SELECT svc FROM logs", max_record_size: 2 },
+          },
+        ],
+      },
+      initialVariableValues: { value: {} },
+    });
+    await flushPromises();
+    const service = findVariable(wrapper, "service");
+    const streamsBefore = streamMock.mock.calls.length;
+
+    streamReturns([{ svc: "host15" }]);
+    await (wrapper.vm as any).onVariableSearch(0, { variableItem: service, filterText: "host15" });
+    await flushPromises();
+
+    expect(sentSql()).toBe(`SELECT * FROM (SELECT svc FROM logs) WHERE str_match("svc", 'host15')`);
+    expect(streamMock.mock.calls.length).toBe(streamsBefore + 1);
+    expect(service.querySearch).toEqual({
+      text: "host15",
+      options: [{ label: "host15", value: "host15" }],
+    });
+    expect(service.options.map((o: any) => o.value)).toEqual(["a", "b"]);
+    expect(resolveQueryVariableValue(service)).toEqual([SELECT_ALL_VALUE]);
+
+    await (wrapper.vm as any).onVariableSearch(0, { variableItem: service, filterText: "" });
+    expect(service.querySearch).toBeUndefined();
+    expect(streamMock.mock.calls.length).toBe(streamsBefore + 1);
+    wrapper.unmount();
+  });
+
   describe("with the variables manager", () => {
     const promNamespace = {
       name: "namespace",

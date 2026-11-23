@@ -182,6 +182,7 @@ import {
   isQueryVariableAllCapped,
   reconcileQueryVariableValue,
   resolveQueryVariableValue,
+  resolveSqlOptionColumns,
   substituteQueryVariables,
   toSqlLabelGroup,
   usesQueryVariableLoader,
@@ -193,6 +194,7 @@ import {
   QueryVariableCancelledError,
   runSqlVariableQueryOnStream,
   type SqlVariableQueryRequest,
+  type SqlVariableQueryRunner,
 } from "@/utils/dashboard/variables/queryVariableLoader";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
@@ -850,6 +852,31 @@ export default defineComponent({
       }).finally(() => removeTraceId(variableObject.name, traceId));
     };
 
+    const queryVariableLoadParams = (
+      variableObject: any,
+      startTime: number,
+      endTime: number,
+      runSql: SqlVariableQueryRunner,
+    ) => {
+      const language = getQueryVariableLanguage(variableObject);
+      return {
+        query: substituteQueryVariables(
+          getQueryVariableQuery(variableObject),
+          getVariablesForSubstitution(),
+          language,
+        ),
+        language,
+        streamType: variableObject.query_data?.stream_type,
+        valueField: variableObject.query_data?.value_field,
+        labelField: variableObject.query_data?.label_field,
+        maxRecords: getQueryVariableMaxRecords(variableObject),
+        startTime,
+        endTime,
+        orgId: store.state.selectedOrganization.identifier,
+        runSql,
+      };
+    };
+
     // The user's own pick per query variable, kept while a time range drops some of it so a later range can restore it.
     const pinnedQuerySelections: Record<string, any> = {};
 
@@ -974,28 +1001,23 @@ export default defineComponent({
       variableObject.isLoading = true;
       variableObject.isVariableLoadingPending = true;
 
-      const language = getQueryVariableLanguage(variableObject);
       try {
-        const result = await loadQueryVariableValues({
-          query: substituteQueryVariables(
-            getQueryVariableQuery(variableObject),
-            getVariablesForSubstitution(),
-            language,
-          ),
-          language,
-          streamType: variableObject.query_data?.stream_type,
-          valueField: variableObject.query_data?.value_field,
-          labelField: variableObject.query_data?.label_field,
-          maxRecords: getQueryVariableMaxRecords(variableObject),
+        const params = queryVariableLoadParams(
+          variableObject,
           startTime,
           endTime,
-          orgId: store.state.selectedOrganization.identifier,
-          runSql: runSqlForVariable(variableObject),
-        });
+          runSqlForVariable(variableObject),
+        );
+        const result = await loadQueryVariableValues(params);
         if (isStale()) return;
         timeRangeReloads.delete(name);
         variableObject.queryError = undefined;
         variableObject.queryCapped = result.capped;
+        variableObject.querySearchColumn = resolveSqlOptionColumns(
+          result.columns,
+          params.valueField,
+          params.labelField,
+        )?.labelColumn;
         applyQueryVariableOptions(variableObject, result.options, pruneStale);
         onSettled?.();
       } catch (error) {
@@ -1007,6 +1029,65 @@ export default defineComponent({
         }
         endFailedQueryVariableLoad(variableObject);
         onSettled?.();
+      }
+    };
+
+    // Search streams are tracked apart from loads, so typing never cancels a reload.
+    const querySearchTraces: Record<string, string> = {};
+    const querySearchIds: Record<string, number> = {};
+
+    const cancelQuerySearch = (name: string) => {
+      const traceId = querySearchTraces[name];
+      if (!traceId) return;
+      delete querySearchTraces[name];
+      cancelStreamQueryBasedOnRequestId({
+        trace_id: traceId,
+        org_id: store.state.selectedOrganization.identifier,
+      });
+    };
+
+    const runSqlForSearch = (name: string) => (request: SqlVariableQueryRequest) => {
+      const { traceId } = generateTraceContext();
+      querySearchTraces[name] = traceId;
+      return runSqlVariableQueryOnStream(fetchQueryDataWithHttpStream, {
+        ...request,
+        orgId: store.state.selectedOrganization.identifier,
+        traceId,
+      }).finally(() => {
+        if (querySearchTraces[name] === traceId) delete querySearchTraces[name];
+      });
+    };
+
+    onUnmounted(() => Object.keys(querySearchTraces).forEach(cancelQuerySearch));
+
+    // Typed text asks the server as a Query Values search does; the answer only feeds the open list.
+    const searchQueryVariableOptions = async (variableObject: any, text: string) => {
+      const { name } = variableObject;
+      cancelQuerySearch(name);
+      const searchId = (querySearchIds[name] ?? 0) + 1;
+      querySearchIds[name] = searchId;
+      const startTime = props.selectedTimeDate?.start_time?.getTime();
+      const endTime = props.selectedTimeDate?.end_time?.getTime();
+      if (!text || !startTime || !endTime) {
+        delete variableObject.querySearch;
+        return;
+      }
+      try {
+        const result = await loadQueryVariableValues({
+          ...queryVariableLoadParams(variableObject, startTime, endTime, runSqlForSearch(name)),
+          search: text,
+          searchColumn: variableObject.querySearchColumn,
+        });
+        if (isUnmounted || querySearchIds[name] !== searchId) return;
+        // Picked options stay in the list so their chips keep their labels while searching.
+        const found = new Set(result.options.map((option) => option.value));
+        const picked = new Set([variableObject.value].flat());
+        const kept = (variableObject.options ?? []).filter(
+          (option: any) => picked.has(option.value) && !found.has(option.value),
+        );
+        variableObject.querySearch = { text, options: [...result.options, ...kept] };
+      } catch {
+        // A failed search leaves the loaded list in place.
       }
     };
 
@@ -2639,6 +2720,14 @@ export default defineComponent({
     const onVariableSearch = async (index: number, { variableItem, filterText }: any) => {
       if (typeof index !== "number" || !variableItem || variableItem.type !== "query_values")
         return;
+
+      if (usesQueryVariableLoader(variableItem)) {
+        await searchQueryVariableOptions(
+          variableItem,
+          typeof filterText === "string" ? filterText.trim() : "",
+        );
+        return;
+      }
 
       const variableName = variableItem.name;
 

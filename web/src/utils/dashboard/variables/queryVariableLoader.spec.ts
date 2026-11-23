@@ -140,6 +140,28 @@ describe("loadQueryVariableValues — PromQL", () => {
     expect(result.capped).toBe(true);
   });
 
+  it("keeps only values holding the search text before capping", async () => {
+    const hosts = Array.from({ length: 15 }, (_, i) => `host${i + 1}`);
+    labelValues.mockResolvedValue(promOk(hosts));
+    const result = await loadQueryVariableValues(
+      baseParams({ query: "label_values(up, instance)", maxRecords: 2, search: "host15" }),
+    );
+    expect(result.options.map((o) => o.value)).toEqual(["host15"]);
+    expect(result.capped).toBe(false);
+  });
+
+  it("counts only matching values while it unions a label across metrics", async () => {
+    labelValues.mockImplementation(async ({ label, match }: any) => {
+      if (label === "__name__") return promOk(["a", "b"]);
+      if (!match) return { data: { status: "error", error: "match[] must specify a metric" } };
+      return promOk(match === "a" ? ["x1", "x2", "x3"] : ["y9"]);
+    });
+    const result = await loadQueryVariableValues(
+      baseParams({ query: "label_values(job)", maxRecords: 1, search: "y" }),
+    );
+    expect(result.options.map((o) => o.value)).toEqual(["y9"]);
+  });
+
   it("label_names() reads /labels", async () => {
     labels.mockResolvedValue(promOk(["job", "instance"]));
     const result = await loadQueryVariableValues(baseParams({ query: "label_names()" }));
@@ -324,6 +346,21 @@ describe("loadQueryVariableValues — SQL", () => {
     const result = await sqlLoad(runSql);
     expect(result.options.map((o) => o.value)).toEqual(["a", "b"]);
     expect(result.capped).toBe(true);
+  });
+
+  it("searches the shown column of the query's own result on the server", async () => {
+    const runSql = vi.fn().mockResolvedValue([{ host: "h15", svc: "host15" }]);
+    const result = await sqlLoad(runSql, {
+      query: "SELECT host, svc FROM t;",
+      valueField: "host",
+      labelField: "svc",
+      search: "host'15",
+      searchColumn: "svc",
+    });
+    expect(runSql.mock.calls[0][0].sql).toBe(
+      `SELECT * FROM (SELECT host, svc FROM t) WHERE str_match("svc", 'host''15')`,
+    );
+    expect(result.options).toEqual([{ value: "h15", label: "host15" }]);
   });
 
   it("passes a cancel of the distinct query through", async () => {

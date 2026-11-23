@@ -200,6 +200,18 @@ describe("VariableQueryValueSelector", () => {
       expect(filtered).toHaveLength(0);
     });
 
+    it("lists a query variable's server search results only while their text is typed", async () => {
+      const found = [{ label: "host15", value: "host15" }];
+      wrapper = createWrapper({
+        variableItem: { ...defaultVariableItem, querySearch: { text: "host15", options: found } },
+      });
+      expect(wrapper.vm.computedOptions).toHaveLength(3);
+      wrapper.vm.onSearch("host15 ");
+      expect(wrapper.vm.computedOptions).toEqual(found);
+      wrapper.vm.onSearch("host1");
+      expect(wrapper.vm.computedOptions).toHaveLength(3);
+    });
+
     it("should perform case-insensitive filtering", () => {
       // Filtering is delegated to OSelect, but the search term is preserved.
       wrapper.vm.onSearch("EUROPE");

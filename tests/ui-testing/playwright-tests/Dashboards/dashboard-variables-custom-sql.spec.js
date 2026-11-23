@@ -271,6 +271,25 @@ test.describe("Query Values variables - Custom SQL", { tag: ["@dashboards", "@da
     expect(svc.query_data).not.toHaveProperty("query");
   });
 
+  test("typing in a capped custom dropdown asks the server, so a value past the cap is found", async ({ page }) => {
+    const qv = new PageManager(page).dashboardQueryVariable;
+    const svc = customSql(`SELECT DISTINCT service_name FROM "${S}" ORDER BY service_name`, { max_record_size: 2 });
+    const id = await createDashboard([svc]);
+    const queries = fx.trackQueries(page);
+    await qv.openDashboard(fx.dashboardUrl(id));
+    await qv.expectOptionValues("svc", ["auth", "cart"]);
+
+    await qv.openDropdown("svc");
+    await page.locator('[data-test="variable-selector-svc-inner-search"]').fill("pay");
+    await fx.waitForSearch(queries, `WHERE str_match("service_name", 'pay')`);
+    const payments = page.locator('[data-test="variable-selector-svc-inner-option"][data-test-value="payments"]');
+    await payments.click();
+    await expect(qv.shownValue("svc")).toHaveText("payments");
+    await qv.refreshDashboard();
+    await fx.waitForSearch(queries, "service_name = 'payments'");
+    await qv.expectOptionValues("svc", ["auth", "cart", "payments"]);
+  });
+
   test("a custom query that uses its own variable is blocked with a plain message", async ({ page }) => {
     const qv = new PageManager(page).dashboardQueryVariable;
     await startCustomVariable(qv);

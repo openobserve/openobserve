@@ -16,7 +16,7 @@
 import { gt } from "@/types/i18n";
 import metricsService from "@/services/metrics";
 import searchService from "@/services/search";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import {
   formatPromSeries,
   mapSqlRowsToOptions,
@@ -65,6 +65,9 @@ export interface QueryVariableLoadParams {
   endTime: number;
   orgId: string;
   runSql: SqlVariableQueryRunner;
+  /** Typed text the values must contain; SQL matches it in `searchColumn` on the server. */
+  search?: string;
+  searchColumn?: string;
 }
 
 export interface QueryVariableLoadResult {
@@ -200,6 +203,7 @@ const labelValuesAcrossMetrics = async (
   range: PromRange,
   label: string,
   maxRecords: number,
+  search = "",
 ): Promise<unknown[]> => {
   const names = await loadMetricNames(range);
   const values = new Set<string>();
@@ -213,7 +217,10 @@ const labelValuesAcrossMetrics = async (
     batch.forEach((result) => {
       if (result.status !== "fulfilled") return;
       try {
-        promValues(result.value).forEach((value) => values.add(String(value)));
+        promValues(result.value)
+          .map(String)
+          .filter((value) => value.includes(search))
+          .forEach((value) => values.add(value));
       } catch {
         // A metric without the label answers with an error; the others still count.
       }
@@ -227,13 +234,14 @@ const loadLabelValues = async (
   label: string,
   match: string | undefined,
   maxRecords: number,
+  search?: string,
 ): Promise<unknown[]> => {
   if (match) return promValues(await metricsService.labelValues({ ...range, label, match }));
   if (label === "__name__") return loadMetricNames(range);
   try {
     return promValues(await metricsService.labelValues({ ...range, label }));
   } catch {
-    return labelValuesAcrossMetrics(range, label, maxRecords);
+    return labelValuesAcrossMetrics(range, label, maxRecords, search);
   }
 };
 
@@ -248,7 +256,7 @@ const loadPromValues = async (params: QueryVariableLoadParams): Promise<unknown[
 
   switch (parsed.kind) {
     case "label_values":
-      return loadLabelValues(range, parsed.label, parsed.match, params.maxRecords);
+      return loadLabelValues(range, parsed.label, parsed.match, params.maxRecords, params.search);
     case "label_names":
       return withIndexLagWindows(range, async (window) =>
         promValues(await metricsService.labels({ ...window, match: parsed.match })),
@@ -286,6 +294,8 @@ const loadPromValues = async (params: QueryVariableLoadParams): Promise<unknown[
 
 const quoteIdentifier = (name: string): string => `"${name.replace(/"/g, '""')}"`;
 
+const asSubquery = (query: string): string => query.trim().replace(/[;\s]+$/, "");
+
 // The outer ORDER BY keeps the list stable, as GROUP BY returns groups in no fixed order.
 const distinctValuesSql = (query: string, valueColumn: string, labelColumn: string): string => {
   const value = quoteIdentifier(valueColumn);
@@ -293,9 +303,12 @@ const distinctValuesSql = (query: string, valueColumn: string, labelColumn: stri
     labelColumn === valueColumn
       ? ""
       : `, MIN(${quoteIdentifier(labelColumn)}) AS ${quoteIdentifier(labelColumn)}`;
-  const inner = query.trim().replace(/[;\s]+$/, "");
-  return `SELECT ${value}${label} FROM (${inner}) GROUP BY ${value} ORDER BY ${value}`;
+  return `SELECT ${value}${label} FROM (${asSubquery(query)}) GROUP BY ${value} ORDER BY ${value}`;
 };
+
+// str_match, as a Query Values search sends it, so both kinds of variable find the same values.
+const searchSql = (query: string, column: string, text: string): string =>
+  `SELECT * FROM (${asSubquery(query)}) WHERE str_match(${quoteIdentifier(column)}, '${escapeSingleQuotes(text)}')`;
 
 const loadSqlValues = async (params: QueryVariableLoadParams): Promise<QueryVariableLoadResult> => {
   const request = {
@@ -311,14 +324,18 @@ const loadSqlValues = async (params: QueryVariableLoadParams): Promise<QueryVari
       labelField: params.labelField,
       maxRecords: params.maxRecords,
     });
-  const rows = await params.runSql({ ...request, sql: params.query });
+  const query =
+    params.search && params.searchColumn
+      ? searchSql(params.query, params.searchColumn, params.search)
+      : params.query;
+  const rows = await params.runSql({ ...request, sql: query });
   const mapped = toOptions(rows);
   const picked = resolveSqlOptionColumns(mapped.columns, params.valueField, params.labelField);
   if (mapped.capped || rows.length <= params.maxRecords || !picked) return { ...mapped, rows };
 
   // Duplicate rows filled the cap and may hide later values, so ask again for one row per value.
   try {
-    const sql = distinctValuesSql(params.query, picked.valueColumn, picked.labelColumn);
+    const sql = distinctValuesSql(query, picked.valueColumn, picked.labelColumn);
     const { options, capped } = toOptions(await params.runSql({ ...request, sql }));
     return { options, capped, columns: mapped.columns, rows };
   } catch (error) {
@@ -333,7 +350,10 @@ export const loadQueryVariableValues = async (
   params: QueryVariableLoadParams,
 ): Promise<QueryVariableLoadResult> => {
   if (params.language === "promql") {
-    const { options, capped } = mapValuesToOptions(await loadPromValues(params), params.maxRecords);
+    const values = (await loadPromValues(params)).filter((value) =>
+      String(value).includes(params.search ?? ""),
+    );
+    const { options, capped } = mapValuesToOptions(values, params.maxRecords);
     return { options, capped, columns: [], rows: [] };
   }
   return loadSqlValues(params);
