@@ -609,7 +609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Every card checked so far is empty but candidates remain: not a verdict, so no remedies, just Show more below. -->
           <OEmptyState
-            v-else-if="!visibleCards.length && grid.hasMore.value"
+            v-else-if="!gridItems.length && grid.hasMore.value"
             kind="filtered"
             :title="t('metrics.explorer.noMatchYet')"
             :text="t('metrics.explorer.noMatchYetHint')"

@@ -16,7 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- The "Beta" tag: one accent chip so every beta surface reads the same. -->
 <template>
-  <OTag tone="accent" :size="size" data-test="beta-badge" :label="t('common.beta')" />
+  <OTag
+    tone="accent"
+    :size="size"
+    :data-test="`${stage}-badge`"
+    :label="stage === 'alpha' ? t('common.alpha') : t('common.beta')"
+  />
 </template>
 
 <script lang="ts" setup>
@@ -24,7 +29,10 @@ import { useI18nTyped } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { ChipSize } from "@/lib/core/Badge/OBadge.types";
 
-withDefaults(defineProps<{ size?: ChipSize }>(), { size: "sm" });
+withDefaults(defineProps<{ size?: ChipSize; stage?: "alpha" | "beta" }>(), {
+  size: "sm",
+  stage: "beta",
+});
 
 const { t } = useI18nTyped();
 </script>

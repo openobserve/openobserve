@@ -345,6 +345,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_inactive_org_response_refuses_blocked_and_missing_orgs() {
+        // A missing org is read from the organizations table, which only the migrations create.
+        crate::request::security::tests::meta_store().await;
         let blocked = "ext-events-blocked-org";
         common::infra::config::ORG_STATUS_CACHE.insert(
             blocked.into(),

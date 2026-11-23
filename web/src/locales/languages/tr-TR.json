@@ -868,6 +868,7 @@
     "loading": "Yükleniyor...",
     "getStartedRUM": "RUM ile Başlayın",
     "beta": "Beta",
+    "alpha": "Alfa",
     "optional": "isteğe bağlı",
     "play": "Oynat",
     "pause": "Duraklat",
@@ -4862,6 +4863,10 @@
       "failedToInitiateDeletion": "Silme başlatılamadı.",
       "organizationResurrected": "Kuruluş geri getirildi.",
       "failedToResurrect": "Geri getirme başarısız oldu.",
+      "organizationBlocked": "Kuruluş engellendi.",
+      "failedToBlock": "Engellenemedi.",
+      "organizationUnblocked": "Kuruluşun engeli kaldırıldı.",
+      "failedToUnblock": "Engel kaldırılamadı.",
       "organizationUpdated": "Kuruluş başarıyla güncellendi.",
       "organizationAdded": "Kuruluş başarıyla eklendi.",
       "requestCompleted": "İstek başarıyla tamamlandı.",
@@ -5230,7 +5235,12 @@
     "daysLeft": "{n} gün kaldı",
     "resurrect": "Kuruluşu canlandır",
     "statusActive": "Etkin",
-    "statusDeleting": "Siliniyor"
+    "statusDeleting": "Siliniyor",
+    "statusBlocked": "Engellendi",
+    "block": "Kuruluşu engelle",
+    "unblock": "Kuruluşun engelini kaldır",
+    "blockConfirmMessage": "{name} engellensin mi? Engeli kaldırılana kadar veri alımı, sorgu ve oturum açma kabul edilmez.",
+    "blockConfirmLabel": "Engelle"
   },
   "template": {
     "search": "Şablon ara"
@@ -12404,9 +12414,6 @@
     "testErrorClientError": "İstemci hatası (4xx). Lütfen kimlik bilgilerinizi ve yapılandırmanızı kontrol edin.",
     "testErrorServerError": "Sunucu hatası (5xx). Hedef hizmet sorun yaşıyor.",
     "viewDetails": "Ayrıntıları Görüntüle",
-    "error": "Hata",
-    "httpStatus": "HTTP Durumu",
-    "responseBody": "Yanıt Gövdesi",
     "retry": "Tekrar dene",
     "suggestCheckUrl": "Lütfen webhook URL'sinin doğru ve erişilebilir olduğunu doğrulayın.",
     "suggestCheckFirewall": "Güvenlik duvarı ayarlarınızı kontrol edin ve hedef hizmete erişilebildiğinden emin olun.",
@@ -14204,7 +14211,6 @@
       "loadFailedTitle": "Bu uyarı yüklenemedi"
     },
     "timeLabel": "Zaman",
-    "unknownHttpStatus": "Bilinmiyor",
     "previewEvaluation": {
       "realTimeReason": "Koşullar eşleştiğinde",
       "matchingGroup": "eşleşen grup",
@@ -14990,6 +14996,12 @@
       "quickMuteTooltip": "Bir uyarıdan hızlı sessize alma",
       "endedLabel": "sona erdi"
     },
+    "lease": {
+      "temporary": "Geçici, {who} tarafından oluşturuldu, {time} tarihinde sona eriyor",
+      "incidentsOn": "Vaka oluşturma {who} tarafından {time} tarihine kadar açık",
+      "incidentsOff": "Vaka oluşturma {who} tarafından {time} tarihine kadar kapalı",
+      "why": "{label}. Neden: {reason}"
+    },
     "ack": {
       "acknowledge": "Üstlen",
       "acknowledgeGroups": "Tüm {count} tetiklenmiş grup | Tüm {count} tetiklenmiş grup",
@@ -15620,7 +15632,6 @@
       "hideWebhook": "Slack webhook URL'sini gizle",
       "slackAppFallback": "Slack uygulaması",
       "previewDisclaimer": "Slack, kurulumdan sonra gerçek uygulama simgesini ve hedef kanalı sağlar.",
-      "successResponseBody": "Slack yanıtı",
       "callbackTitle": "Slack'e bağlanılıyor",
       "callbackWorking": "{product} uygulamasına geri dönülüyor…",
       "callbackError": "Bu Slack bağlantısı tamamlanamıyor. Bu pencereyi kapatıp tekrar deneyin.",
@@ -16229,6 +16240,37 @@
     "nodesDesc": "Küme düğümleri ve durumları",
     "licenseDesc": "Kurumsal lisans ayrıntıları",
     "organizationManagementDesc": "Kuruluş oluşturun ve yönetin",
+    "userManagement": "Kullanıcı Yönetimi",
+    "userManagementDesc": "Tüm kuruluşlardaki kullanıcıları bulun ve engelleyin",
+    "userManagementPage": {
+      "subtitle": "Tüm kuruluşların kullanıcıları ve SSO engelleme durumları",
+      "searchPlaceholder": "E-posta veya kullanıcı kimliğine göre ara",
+      "allOrganizations": "Tüm kuruluşlar",
+      "filterByOrganization": "Kuruluşa göre filtrele",
+      "email": "E-posta",
+      "organizations": "Kuruluşlar",
+      "blockState": "Engelleme durumu",
+      "orgCount": "{count} kuruluş | {count} kuruluş",
+      "notBlocked": "Engellenmedi",
+      "blockedByEmail": "E-posta ile engellendi",
+      "blockedByDomain": "Alan adı ile engellendi",
+      "block": "Engelle",
+      "unblock": "Engeli kaldır",
+      "blockConfirmTitle": "Bu kullanıcı engellensin mi?",
+      "blockConfirmMessage": "{email} SSO engelleme listesine eklenir ve alan adı kısıtlamaları açılır.",
+      "blocked": "{email} engellendi",
+      "unblocked": "{email} kullanıcısının engeli kaldırıldı",
+      "updateFailed": "SSO engelleme listesi güncellenemedi",
+      "dormantRules": "Alan adı kısıtlamaları kapalı ve açılmaları içerdikleri kuralları da uygular. Bu kullanıcıyı {page} üzerinden engelleyin.",
+      "detailsTitle": "Kullanıcı ayrıntıları",
+      "userId": "Kullanıcı kimliği",
+      "orgId": "Kuruluş kimliği",
+      "orgName": "Kuruluş",
+      "orgOption": "{name} ({id})",
+      "role": "Rol",
+      "noOrganizations": "Hiçbir kuruluşun üyesi değil",
+      "ssoOnlyHint": "Bu e-posta SSO ile oturum açtığında geçerlidir"
+    },
     "queryManagement": "Sorgu Yönetimi",
     "scrapintervalLabel": "Kazıma Aralığı (Saniye cinsinden) *",
     "logoLabel": "Logo Resmini Sürükleyip Bırakın",
@@ -16483,7 +16525,8 @@
       "noEmails": "Henüz listelenen e-posta adresi yok.",
       "removeDomain": "{domain} kaldır",
       "removeEmail": "{email} kaldır",
-      "saved": "SSO ayarları kaydedildi"
+      "saved": "SSO ayarları kaydedildi",
+      "blocksRemovedKeepsAllowRule": "Engeller kaldırıldı. {domain} izin kuralını korur."
     },
     "general": {
       "close": "Kapat",
@@ -20168,7 +20211,6 @@
         "latency": "Gecikme",
         "output": "Çıkarılan Çıktı",
         "rawRequest": "Gönderilen İstek",
-        "rawResponse": "Alınan Yanıt",
         "idle": "Bir test çalıştırdığınızda istek ve yanıt burada görünür.",
         "disabledHint": "Önce adı ve uç noktayı doldurun.",
         "failure": {
@@ -23859,6 +23901,7 @@
       "llmProviders": "LLM Sağlayıcıları",
       "aiToolsets": "Yapay Zeka Araç Setleri",
       "orgManagement": "Kuruluş Yönetimi",
+      "userManagement": "Kullanıcı Yönetimi",
       "rumErrors": "RUM - Hata Takibi",
       "rumSessions": "{product} — Oturumlar",
       "sourceMaps": "RUM - Kaynak Haritaları",
@@ -23976,6 +24019,7 @@
       "llmProvidersRefresh": "Listeyi yenile",
       "aiToolsetsRefresh": "Listeyi yenile",
       "orgManagementRefresh": "Listeyi yenile",
+      "userManagementRefresh": "Listeyi yenile",
       "rumErrorsRefresh": "Listeyi yenile",
       "rumErrorsCopyUrl": "Hata izleme paylaşım URL'sini kopyala",
       "rumSessionsRefresh": "Listeyi yenile",

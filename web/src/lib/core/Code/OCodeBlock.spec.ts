@@ -77,6 +77,12 @@ describe("OCodeBlock", () => {
     expect(copyMock.mock.calls[0][0]).toBe(code);
   });
 
+  it("leaves the failure wording to the shared copy, so a failed copy reads Couldn't copy", () => {
+    const wrapper = mountBlock({ code: "x", lang: "bash" });
+    wrapper.find('[data-test="code-block-copy-btn"]').trigger("click");
+    expect(copyMock.mock.calls[0][2].errorMessage).toBeUndefined();
+  });
+
   it("emits copy after copying", async () => {
     const wrapper = mountBlock({ code: "x", lang: "bash" });
     await wrapper.find('[data-test="code-block-copy-btn"]').trigger("click");

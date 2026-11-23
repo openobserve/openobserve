@@ -508,13 +508,12 @@ pub struct TestConnectionRequestBody {
     pub metadata: Option<serde_json::Value>,
 }
 
-/// The raw exchange a test connection produced, shown to the operator whether
-/// it passed or failed.
+/// What a test connection sent and observed, shown whether it passed or failed;
+/// the endpoint's body is left out.
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct VerificationReportBody {
     pub raw_request: String,
-    pub raw_response: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status_code: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -526,7 +525,6 @@ impl From<VerificationReport> for VerificationReportBody {
     fn from(report: VerificationReport) -> Self {
         Self {
             raw_request: report.raw_request,
-            raw_response: report.raw_response,
             status_code: report.status_code,
             parsed_output: report.parsed_output,
             latency_ms: report.latency_ms,
@@ -643,7 +641,6 @@ pub struct TestRunRowResultBody {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parsed_output: Option<serde_json::Value>,
     pub raw_request: String,
-    pub raw_response: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub http_status: Option<u16>,
     pub latency_ms: i64,
@@ -666,7 +663,6 @@ impl From<openobserve_core::llm_evaluations::remote_tasks::bench::BenchRowResult
             status: result.status.as_str().to_string(),
             parsed_output: result.parsed_output,
             raw_request: result.raw_request,
-            raw_response: result.raw_response,
             http_status: result.http_status,
             latency_ms: result.latency_ms,
             attempts: result.attempts,

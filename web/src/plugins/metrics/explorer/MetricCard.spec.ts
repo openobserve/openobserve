@@ -168,11 +168,11 @@ describe("MetricCard (ported to @/lib)", () => {
       expect(fresh.text()).toMatch(/Updated \d{2}:\d{2}/);
       expect(hidingClasses(info.element, wrapper.element)).toEqual([]);
       // Only the card-width query swaps the words for the clock icon; nothing hides it on hover.
-      expect(hidingClasses(fresh.element, wrapper.element)).toEqual(["@max-md/panelbar:hidden"]);
+      expect(hidingClasses(fresh.element, wrapper.element)).toEqual(["@max-3xl/panelbar:hidden"]);
       const icon = wrapper.find(
         '[data-test="metrics-explorer-card-data-age-icon-node_cpu_seconds_total"]',
       );
-      expect(hidingClasses(icon.element, wrapper.element)).toEqual(["@md/panelbar:hidden"]);
+      expect(hidingClasses(icon.element, wrapper.element)).toEqual(["@3xl/panelbar:hidden"]);
     });
 
     it("cuts a long name in the middle, so names that differ only at the end stay apart (CS11)", () => {
@@ -986,8 +986,8 @@ describe("MetricCard (ported to @/lib)", () => {
       });
       const words = wrapper.find(`[data-test="metrics-explorer-card-refresh-failed-${N}"]`);
       const icon = wrapper.find(`[data-test="metrics-explorer-card-refresh-failed-icon-${N}"]`);
-      expect(words.classes()).toContain("@max-md/panelbar:hidden");
-      expect(icon.classes()).toContain("@md/panelbar:hidden");
+      expect(words.classes()).toContain("@max-3xl/panelbar:hidden");
+      expect(icon.classes()).toContain("@3xl/panelbar:hidden");
       expect(icon.attributes("data-state")).toBe("failed");
       expect(icon.findAll('[aria-hidden="true"]').filter((el) => el.text())).toHaveLength(0);
       expect(icon.find(".sr-only").text()).toMatch(/^Refresh failed at \d{2}:\d{2}/);
@@ -1001,10 +1001,10 @@ describe("MetricCard (ported to @/lib)", () => {
       await wrapper.vm.$nextTick();
       const icon = wrapper.find(`[data-test="metrics-explorer-card-data-age-icon-${N}"]`);
       expect(icon.attributes("data-state")).toBe("age");
-      expect(icon.classes()).toContain("@md/panelbar:hidden");
+      expect(icon.classes()).toContain("@3xl/panelbar:hidden");
       expect(icon.find(".sr-only").text()).toMatch(/^Updated \d{2}:\d{2}:\d{2}/);
       expect(wrapper.find(`[data-test="metrics-explorer-card-data-age-${N}"]`).classes()).toContain(
-        "@max-md/panelbar:hidden",
+        "@max-3xl/panelbar:hidden",
       );
     });
 
@@ -1132,7 +1132,7 @@ describe("MetricCard (ported to @/lib)", () => {
             "invisible",
             "ms-1.5",
             "[grid-area:1/1]",
-            "@max-md/panelbar:hidden",
+            "@max-3xl/panelbar:hidden",
           ]),
         );
       }

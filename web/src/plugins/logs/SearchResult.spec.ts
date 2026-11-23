@@ -1326,15 +1326,17 @@ describe("SearchResult Component", () => {
       await flushPromises();
 
       await runUntilHistogramLands(landed());
-      expect(wrapper.find(".histogram-chart").classes()).not.toContain(STALE_DIM);
+      expect(wrapper.find(".histogram-chart").classes()).not.toContain("opacity-60");
       vi.advanceTimersByTime(STALE_DIM_DELAY_MS);
       await nextTick();
-      expect(wrapper.find(".histogram-chart").classes()).toContain(STALE_DIM);
+      expect(wrapper.find(".histogram-chart").classes()).toEqual(
+        expect.arrayContaining(STALE_DIM.split(" ")),
+      );
       expect(wrapper.vm.summaryView.updating).toBe(true);
 
       chart().vm.$emit("finished");
       await flushPromises();
-      expect(wrapper.find(".histogram-chart").classes()).not.toContain(STALE_DIM);
+      expect(wrapper.find(".histogram-chart").classes()).not.toContain("opacity-60");
       expect(wrapper.vm.summaryView.updating).toBe(false);
     });
 
@@ -1615,13 +1617,13 @@ describe("SearchResult rows while a search re-runs", () => {
     try {
       await rerun();
       expect(table().attributes("data-stale-rows")).toBe("true");
-      expect(table().classes()).not.toContain(STALE_DIM);
+      expect(table().classes()).not.toContain("opacity-60");
       vi.advanceTimersByTime(STALE_DIM_DELAY_MS - 1);
       await nextTick();
-      expect(table().classes()).not.toContain(STALE_DIM);
+      expect(table().classes()).not.toContain("opacity-60");
       vi.advanceTimersByTime(1);
       await nextTick();
-      expect(table().classes()).toContain(STALE_DIM);
+      expect(table().classes()).toEqual(expect.arrayContaining(STALE_DIM.split(" ")));
 
       wrapper.vm.searchObj.loading = false;
       wrapper.vm.searchObj.data.queryResults = { hits: [...rows] };
@@ -1631,7 +1633,7 @@ describe("SearchResult rows while a search re-runs", () => {
       vi.advanceTimersByTime(STALE_DIM_DELAY_MS);
       await nextTick();
       expect(table().attributes("data-stale-rows")).toBe("true");
-      expect(table().classes()).not.toContain(STALE_DIM);
+      expect(table().classes()).not.toContain("opacity-60");
     } finally {
       wrapper.vm.searchObj.meta.refreshInterval = 0;
       vi.useRealTimers();

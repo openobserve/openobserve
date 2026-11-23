@@ -30,6 +30,7 @@ export class UserPage {
         this.userRoleField = page.locator('[data-test="user-role-field"]');
         // Add/Edit user dialog footer uses ODialog's built-in primary/secondary
         // buttons; scope to the dialog so they don't collide with other dialogs' btns.
+        this.userDialog = page.locator('[data-test="add-user-dialog"]');
         this.saveUserButton = page.locator('[data-test="add-user-dialog"] [data-test="add-user-submit-btn"]');
         this.cancelUserButton = page.locator('[data-test="add-user-dialog"] [data-test="o-dialog-secondary-btn"]');
         // Change-password toggle in edit mode
@@ -273,6 +274,40 @@ export class UserPage {
         }, { timeout: 15000, intervals: [250, 500, 1000] }).toBe(true);
 
 
+    }
+
+
+    _apiContext() {
+        const base = process.env["ZO_BASE_URL_SC"] || process.env["ZO_BASE_URL"];
+        const org = process.env["ORGNAME"];
+        const headers = { Authorization: 'Basic ' + Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64') };
+        return { api: this.page.context().request, url: `${base}/api/${org}`, headers };
+    }
+
+    async isRbacEnabledViaApi() {
+        const { api, url, headers } = this._apiContext();
+        const cfg = await (await api.get(`${url}/config`, { headers })).json();
+        return cfg.rbac_enabled === true;
+    }
+
+    async createUserViaApi(email, role) {
+        const { api, url, headers } = this._apiContext();
+        const res = await api.post(`${url}/users`, {
+            headers,
+            data: { email, password: process.env["ZO_ROOT_USER_PASSWORD"], first_name: 'r', last_name: 'c', role },
+        });
+        return res.status();
+    }
+
+    async getUserRoleViaApi(email) {
+        const { api, url, headers } = this._apiContext();
+        const list = await (await api.get(`${url}/users`, { headers })).json();
+        return (list.data || []).find((u) => u.email === email)?.role;
+    }
+
+    async deleteUserViaApi(email) {
+        const { api, url, headers } = this._apiContext();
+        await api.delete(`${url}/users/${encodeURIComponent(email)}`, { headers });
     }
 
 }

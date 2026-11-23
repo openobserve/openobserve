@@ -577,6 +577,7 @@ describe("ImportPipeline.vue", () => {
             nodes: [
               { data: { node_type: "stream", org_id: "" } },
               { data: { node_type: "query", org_id: "" } },
+              { data: { node_type: "remote_stream", org_id: "" } },
               { data: { node_type: "function", org_id: "" } },
             ],
           },
@@ -594,16 +595,18 @@ describe("ImportPipeline.vue", () => {
       expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].source.org_id).toBe("my-org");
     });
 
-    it("updates org_id on stream and query nodes", () => {
-      wrapper.vm.updateOrgId("my-org", 0);
-      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.org_id).toBe("my-org");
-      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[1].data.org_id).toBe("my-org");
+    it("updates org_id on stream, query, and remote_stream nodes so validateNodesForOrg passes", () => {
+      wrapper.vm.updateOrgId("default", 0);
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[0].data.org_id).toBe("default");
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[1].data.org_id).toBe("default");
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[2].data.org_id).toBe("default");
+      expect(wrapper.vm.validateNodesForOrg(wrapper.vm.baseImportRef.jsonArrayOfObj[0])).toBe(true);
     });
 
     it("does not update function node org_id", () => {
       wrapper.vm.updateOrgId("my-org", 0);
       // function nodes are excluded from org_id updates
-      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[2].data.org_id).toBe("");
+      expect(wrapper.vm.baseImportRef.jsonArrayOfObj[0].nodes[3].data.org_id).toBe("");
     });
   });
 

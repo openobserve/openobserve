@@ -325,6 +325,40 @@ pub async fn delete_claim_in_transaction<C: ConnectionTrait>(
     claim_statement(conn, sql, values).await
 }
 
+/// Locks a job in the caller's transaction while it claimed no run since `claim_epoch`, none runs,
+/// and none is due within `margin_us` of the granted lock; false otherwise.
+pub async fn hold_idle_in_transaction<C: ConnectionTrait>(
+    conn: &C,
+    (org, module, module_key): (&str, TriggerModule, &str),
+    claim_epoch: i64,
+    margin_us: i64,
+) -> std::result::Result<bool, sea_orm::DbErr> {
+    let module = module as i32;
+    let lock = "UPDATE scheduled_jobs SET claim_epoch = claim_epoch WHERE org = ? AND module = ? \
+                AND module_key = ? AND claim_epoch = ? AND status <> ?";
+    let values = [
+        org.into(),
+        module.into(),
+        module_key.into(),
+        claim_epoch.into(),
+        (TriggerStatus::Processing as i32).into(),
+    ];
+    if !claim_statement(conn, lock, values).await? {
+        return Ok(false);
+    }
+    // Read once the lock is granted, so a wait for it never eats into the margin.
+    let run_after = config::utils::time::now_micros() + margin_us;
+    let due = "UPDATE scheduled_jobs SET claim_epoch = claim_epoch WHERE org = ? AND module = ? \
+               AND module_key = ? AND next_run_at > ?";
+    let values = [
+        org.into(),
+        module.into(),
+        module_key.into(),
+        run_after.into(),
+    ];
+    claim_statement(conn, due, values).await
+}
+
 /// One upsert: `push` alone keeps an existing job's time, and update-then-insert loses races.
 pub async fn arm_with<C: ConnectionTrait>(
     conn: &C,
@@ -934,6 +968,72 @@ mod tests {
             ),
             (1, 50),
             "the later arm's time wins"
+        );
+        admin
+            .execute_unprepared(&format!(r#"DROP SCHEMA "{schema}" CASCADE"#))
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn an_idle_hold_counts_its_margin_from_the_granted_job_lock_on_postgres_when_ci_provides_it()
+     {
+        const SEC: i64 = 1_000_000;
+        let dsn = std::env::var("ZO_META_POSTGRES_DSN").unwrap_or_default();
+        if dsn.trim().is_empty() {
+            return;
+        }
+        let schema = format!(
+            "idle_hold_test_{}",
+            config::ider::generate().to_ascii_lowercase()
+        );
+        let admin = Database::connect(&dsn).await.unwrap();
+        admin
+            .execute_unprepared(&format!(r#"CREATE SCHEMA "{schema}""#))
+            .await
+            .unwrap();
+        let mut pools = Vec::new();
+        for _ in 0..2 {
+            let mut options = sea_orm::ConnectOptions::new(dsn.clone());
+            options
+                .max_connections(1)
+                .min_connections(1)
+                .set_schema_search_path(schema.clone());
+            pools.push(std::sync::Arc::new(
+                Database::connect(options).await.unwrap(),
+            ));
+        }
+        create_jobs_table(&pools[0], "BIGSERIAL PRIMARY KEY").await;
+        let due = config::utils::time::now_micros() + 4 * SEC;
+        pools[0]
+            .execute_unprepared(&format!(
+                "INSERT INTO scheduled_jobs (org, module, module_key, status, retries, \
+                 next_run_at, data, claim_epoch) VALUES ('o', {}, 'a1', {}, 0, {due}, '', 4)",
+                TriggerModule::Alert as i32,
+                TriggerStatus::Waiting as i32
+            ))
+            .await
+            .unwrap();
+        let locker = pools[0].begin().await.unwrap();
+        locker
+            .execute_unprepared("SELECT id FROM scheduled_jobs FOR UPDATE")
+            .await
+            .unwrap();
+        let waiter = pools[1].clone();
+        let hold = tokio::spawn(async move {
+            let txn = waiter.begin().await.unwrap();
+            let held =
+                hold_idle_in_transaction(&txn, ("o", TriggerModule::Alert, "a1"), 4, 2 * SEC)
+                    .await
+                    .unwrap();
+            txn.rollback().await.unwrap();
+            held
+        });
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        locker.commit().await.unwrap();
+        assert!(
+            !hold.await.unwrap(),
+            "after a 3 s lock wait the run due at +4 s is inside the 2 s margin"
         );
         admin
             .execute_unprepared(&format!(r#"DROP SCHEMA "{schema}" CASCADE"#))

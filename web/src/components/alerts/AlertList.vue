@@ -287,6 +287,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :downtime="row.active_downtime"
                     :data-test="`alert-list-${row.name}-muted`"
                   />
+                  <LeaseChip
+                    v-for="lease in row.leases ?? []"
+                    :key="lease.id"
+                    :lease="lease"
+                    :data-test="`alert-list-${row.name}-lease-${lease.kind}`"
+                  />
                   <template v-if="row.alert_type === 'Composite'">
                     <OTag
                       tone="warn"
@@ -1371,6 +1377,7 @@ import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 import MutedChip from "./downtimes/MutedChip.vue";
+import LeaseChip from "./LeaseChip.vue";
 import AckChip from "./AckChip.vue";
 import AlertMuteUntilDialog from "./AlertMuteUntilDialog.vue";
 import {
@@ -1481,6 +1488,7 @@ export default defineComponent({
   name: "AlertList",
   components: {
     MutedChip,
+    LeaseChip,
     AckChip,
     AlertMuteUntilDialog,
     MuteMenuItems,
@@ -2832,6 +2840,7 @@ export default defineComponent({
             last_outcome_since: data.last_outcome_since ?? null,
             active_downtime: data.active_downtime ?? null,
             ack: data.ack ?? null,
+            leases: data.leases ?? [],
             firing_started_at: data.firing_started_at ?? null,
             selected: false,
             type: data.condition.type,

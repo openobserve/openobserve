@@ -22,7 +22,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
 import { failedRequests, viewDenial, type AccessDenial } from "@/composables/useAccessStore";
-import { isForbiddenError } from "@/composables/security/useSecurityAccess";
+import { isForbiddenError, isSecurityAlpha } from "@/composables/security/useSecurityAccess";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -60,6 +61,7 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
+const securityAlpha = isSecurityAlpha();
 
 const RANGES = [
   { value: "1h", minutes: 60 },
@@ -574,6 +576,12 @@ function nav(path: string, query: Record<string, string> = {}) {
     pad-y
     title-data-test="security-overview-title"
   >
+    <template v-if="securityAlpha" #title>
+      <span class="inline-flex max-w-full min-w-0 items-center gap-2">
+        <span class="truncate">{{ t("siem.nav.overview") }}</span>
+        <BetaBadge stage="alpha" class="shrink-0" />
+      </span>
+    </template>
     <template #actions>
       <div class="flex items-center gap-2">
         <OToggleGroup

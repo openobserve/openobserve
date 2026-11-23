@@ -173,15 +173,6 @@
                 data-test="ai-remote-task-test-raw-request"
                 >{{ prettyJson(report.rawRequest) }}</pre>
             </details>
-            <details class="text-text-secondary text-xs">
-              <summary class="cursor-pointer font-medium">
-                {{ t("aiObservability.remoteTasks.testPanel.rawResponse") }}
-              </summary>
-              <pre
-                class="rounded-default bg-card-bg border-border-default text-text-body mt-1.5 max-h-40 overflow-auto border p-2 font-mono text-xs whitespace-pre-wrap"
-                data-test="ai-remote-task-test-raw-response"
-                >{{ prettyJson(report.rawResponse) }}</pre>
-            </details>
           </template>
         </template>
       </div>

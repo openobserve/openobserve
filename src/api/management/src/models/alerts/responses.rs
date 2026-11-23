@@ -190,6 +190,9 @@ pub struct ListAlertsResponseBodyItem {
     /// The acks in force on the alert's current firings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ack: Option<config::meta::alerts::ack::AlertAckSummary>,
+    /// Active leases: the alert is temporary, or its incident creation is held for a window.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub leases: Vec<config::meta::alerts::lease::LeaseView>,
     /// The open incident the current firing belongs to. Enterprise only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub incident: Option<AlertIncidentLink>,
@@ -579,6 +582,7 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             active_downtime: None,
             firing_started_at: None,
             ack: None,
+            leases: vec![],
             incident: None,
             downtime_dimensions: HashMap::new(),
         })
@@ -718,6 +722,7 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         active_downtime: None,
         firing_started_at: None,
         ack: None,
+        leases: vec![],
         incident: None,
         downtime_dimensions: HashMap::new(),
     })
@@ -749,6 +754,26 @@ pub async fn anomaly_list_items(
             Some(item)
         })
         .collect()
+}
+
+/// The lease chips: one read of the listed alerts' active leases; none shown when it fails.
+pub async fn fill_active_leases(org: &str, list: &mut [ListAlertsResponseBodyItem]) {
+    let ids: Vec<String> = list.iter().map(|item| item.alert_id.to_string()).collect();
+    let leases = match infra::table::alert_leases::active_for_alerts(org, &ids).await {
+        Ok(leases) => leases,
+        Err(e) => {
+            log::warn!("[ALERT LEASE] org {org}: could not read active leases: {e}");
+            return;
+        }
+    };
+    for lease in leases {
+        if let Some(item) = list
+            .iter_mut()
+            .find(|item| item.alert_id.to_string() == lease.alert_id)
+        {
+            item.leases.push(lease.view());
+        }
+    }
 }
 
 /// The Muted chip, from the cache or from the downtime the last firing recorded.
@@ -966,6 +991,7 @@ mod tests {
             active_downtime: None,
             firing_started_at: None,
             ack: None,
+            leases: vec![],
             incident: None,
             downtime_dimensions: HashMap::new(),
         };

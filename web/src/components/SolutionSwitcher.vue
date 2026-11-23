@@ -13,6 +13,8 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
+import { isSecurityAlpha } from "@/composables/security/useSecurityAccess";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 defineProps<{
@@ -26,6 +28,8 @@ const store = useStore();
 const router = useRouter();
 
 const mode = computed(() => store.state.solutionMode as "observability" | "security");
+
+const securityAlpha = isSecurityAlpha();
 
 const SOLUTIONS: {
   key: "observability" | "security";
@@ -73,6 +77,11 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
         data-test="solution-switcher"
       >
         <span class="md:max-xl:truncate">{{ t(current.labelKey) }}</span>
+        <BetaBadge
+          v-if="securityAlpha && current.key === 'security'"
+          stage="alpha"
+          class="shrink-0"
+        />
         <OTooltip :content="t(current.labelKey)" />
       </OButton>
     </template>
@@ -104,7 +113,10 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
           />
         </div>
         <div class="flex flex-1 flex-col gap-0.25">
-          <span class="text-compact font-semibold">{{ t(solution.labelKey) }}</span>
+          <span class="flex items-center gap-1.5">
+            <span class="text-compact font-semibold">{{ t(solution.labelKey) }}</span>
+            <BetaBadge v-if="securityAlpha && solution.key === 'security'" stage="alpha" />
+          </span>
           <span class="text-text-secondary text-2xs">{{ t(solution.descriptionKey) }}</span>
         </div>
         <OIcon v-if="solution.key === mode" name="task-alt" class="text-accent size-3.5 shrink-0" />
