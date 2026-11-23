@@ -445,9 +445,10 @@ async fn send_cached_responses(
     }
 
     let num_fn = req.query.query_fn.is_some() as u16;
+    let (response_time, took_wait_in_queue) = cache_hit_usage_timing(cached.cached_response.took);
     let req_stats = RequestStats {
         records: cached.cached_response.hits.len() as i64,
-        response_time: cached.cached_response.took as f64,
+        response_time,
         size: cached.cached_response.scan_size as f64,
         request_body: Some(req.query.sql.clone()),
         function: req.query.query_fn.clone(),
@@ -458,7 +459,7 @@ async fn send_cached_responses(
         search_type: req.search_type,
         search_event_context: req.search_event_context.clone(),
         trace_id: Some(trace_id.to_string()),
-        took_wait_in_queue: Some(cached.cached_response.took_detail.wait_in_queue),
+        took_wait_in_queue,
         work_group: None, // TODO: add work group
         result_cache_ratio: Some(cached.cached_response.result_cache_ratio),
         peak_memory_usage: cached.cached_response.peak_memory_usage,
@@ -522,8 +523,32 @@ pub async fn write_partial_results_to_cache(
     }
 }
 
+/// Usage timing for a search served from the result cache.
+///
+/// `took_ms` is the cache read time in milliseconds. `RequestStats.response_time`
+/// is in seconds, like every other search path. The queue wait is 0 because a
+/// cache hit does not wait in the search queue. The `took_detail.wait_in_queue`
+/// of the cached response belongs to the query that filled the cache.
+fn cache_hit_usage_timing(took_ms: usize) -> (f64, Option<usize>) {
+    (took_ms as f64 / 1000.0, Some(0))
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_cache_hit_usage_timing_reports_seconds_and_no_queue_wait() {
+        use super::cache_hit_usage_timing;
+
+        let (response_time, took_wait_in_queue) = cache_hit_usage_timing(40);
+        assert!((response_time - 0.04).abs() < f64::EPSILON);
+        assert_eq!(took_wait_in_queue, Some(0));
+
+        let (response_time, _) = cache_hit_usage_timing(5185);
+        assert!((response_time - 5.185).abs() < 1e-9);
+
+        assert_eq!(cache_hit_usage_timing(0), (0.0, Some(0)));
+    }
+
     use config::meta::search::Response;
 
     use crate::common::meta::search::CachedQueryResponse;
