@@ -26,58 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
     </div>
 
-    <!-- Scope control — left-aligned Stream/Agent bar directly under the page
-         header, matching Agent Graph / Agent Behavior / LLM Insights so every
-         AI page places its scope selector identically. Sits above the table
-         rather than inside the OTable toolbar. -->
-    <!-- Shared scope control. The outer guard (no bar until we know there ARE
-         streams) stays here, wrapping the component. Sessions' original bar mixed
-         its data-test prefix — `sessions-list-*` for the toggle/pickers but
-         `sessions-*` for the count/badges — so those two are passed explicitly to
-         stay byte-identical. solidAgentTrigger keeps the "All Agents" empty state
-         in solid text (Sessions never dimmed it). -->
-    <!-- Debounced 300 ms like the Streams search; the term lives in useSessions so Back restores the filtered page. -->
-    <div
-      v-if="!(streamsLoaded && availableStreams.length === 0)"
-      class="px-page-edge shrink-0 pt-2"
-    >
-      <label :for="SEARCH_INPUT_ID" class="sr-only">
-        {{ t("traces.sessionsList.search.placeholder") }}
-      </label>
-      <OSearchInput
-        :id="SEARCH_INPUT_ID"
-        v-model="searchKeyword"
-        :placeholder="t('traces.sessionsList.search.placeholder')"
-        :title="t('traces.sessionsList.search.title')"
-        clearable
-        :debounce="300"
-        class="w-full"
-        data-test="sessions-list-search"
-      />
-      <!-- Exact user from a `?user=` link (Users page "Sessions"). -->
-      <OTag
-        v-if="searchUser"
-        variant="primary-soft"
-        :label="t('traces.sessionsList.search.user', { user: searchUser })"
-        removable
-        :remove-label="t('traces.sessionsList.search.clearUser')"
-        class="mt-2"
-        data-test="sessions-list-user-filter"
-        @remove="clearUserFilter"
-      />
-      <SqlFilterBuilder
-        :query="searchFilter"
-        :fields="filterFields"
-        :fields-loading="filterFieldsLoading"
-        :load-values="loadFilterValues"
-        :free-text="false"
-        appearance="field"
-        class="mt-2"
-        data-test="sessions-list-filter"
-        @update:query="searchFilter = $event"
-        @submit="refresh()"
-      />
-    </div>
     <AiScopeBar
       v-if="!(streamsLoaded && availableStreams.length === 0)"
       :filter-mode="filterMode"
@@ -113,6 +61,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @agent-pick="modeExplicit = true"
       @stream-change="onStreamChange"
     >
+      <template #trailing>
+        <SqlFilterBuilder
+          v-model:query="searchFilter"
+          :fields="filterFields"
+          :fields-loading="filterFieldsLoading"
+          :load-values="loadFilterValues"
+          :free-text="false"
+          appearance="field"
+          class="grow basis-64"
+          data-test="sessions-list-filter"
+          @submit="refresh()"
+        />
+      </template>
     </AiScopeBar>
 
     <!-- Stream mode because these LLM spans carry no agent identity. -->
@@ -188,11 +149,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           action-id="view-by-stream"
           @action="onFilterModeChange('stream')"
         />
-        <!-- A search that matched nothing is NOT a first-run situation — the
-             stream has sessions, just none for this term — so never show the
-             "instrument your app" screen here; offer to clear the search. -->
         <OEmptyState
-          v-else-if="searchActive"
+          v-else-if="searchFilter"
           size="hero"
           illustration="no-results"
           data-test="sessions-empty-search"
@@ -332,13 +290,7 @@ import {
 import { replaceRouteQuery } from "@/utils/url/replaceRouteQuery";
 import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";
 import AiAgentsLoadError from "@/enterprise/components/AIObservability/AiAgentsLoadError.vue";
-import {
-  useSessions,
-  normalizeSearchTerm,
-  type SessionRow,
-  type SessionSearch,
-} from "./composables/useSessions";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import { useSessions, type SessionRow } from "./composables/useSessions";
 import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
 import { toFilterFields, type FilterField } from "@/utils/query/filterBar";
 import { parseSqlFilter } from "@/utils/query/filterBarParser";
@@ -388,9 +340,7 @@ const {
   loadedOrg,
   currentPage,
   rowsPerPage,
-  searchKeyword,
   searchFilter,
-  searchUser,
   sortBy,
   sortOrder,
   agents,
@@ -402,48 +352,16 @@ const {
 } = useSessions();
 
 const urlScope = readUrlScope(route.query);
-// Search deep-link: `?keyword=<term>`. Read once at setup, like the scope.
-const urlKeyword = normalizeSearchTerm(
-  typeof route.query.keyword === "string" ? route.query.keyword : "",
-);
-// The bar has no text mode, so a `?filter=` it cannot draw is dropped.
 const rawUrlFilter = typeof route.query.filter === "string" ? route.query.filter.trim() : "";
 const urlFilter = parseSqlFilter(rawUrlFilter) ? rawUrlFilter : "";
 
-// ── List search ─────────────────────────────────────────────────────────────
-// `searchKeyword` is module-scoped in useSessions so back-navigation restores
-// the filtered page with its term, and it's the search box's own v-model —
-// there's no separate draft/applied split. The input's own `:debounce="300"`
-// (same as the Streams list's search) settles typing into one value; the
-// watch below re-fetches whenever it changes, live, same as LogStream.vue.
-// Matched server-side against the user id OR the conversation text,
-// whichever the stream has.
-const SEARCH_INPUT_ID = "sessions-list-search";
-// A URL term overrides the singleton and bypasses the cache guard once, so a pasted link reproduces its view.
-let searchChangedByUrl = false;
-if (urlKeyword && (urlKeyword !== searchKeyword.value || !window.history.state?.forward)) {
-  searchKeyword.value = urlKeyword;
-  searchChangedByUrl = true;
-}
-if (urlFilter !== searchFilter.value || (urlFilter && !window.history.state?.forward)) {
+// A followed filter link must not reuse a cached list from another scope.
+let searchChangedByUrl =
+  urlFilter !== searchFilter.value || Boolean(urlFilter && !window.history.state?.forward);
+if (searchChangedByUrl) {
   searchFilter.value = urlFilter;
   currentPage.value = 1;
-  searchChangedByUrl = true;
 }
-// The URL alone owns `?user=`: a link without it shows every user.
-const urlUser = normalizeSearchTerm(typeof route.query.user === "string" ? route.query.user : "");
-if (urlUser !== searchUser.value) {
-  searchUser.value = urlUser;
-  searchChangedByUrl = true;
-}
-const searchActive = computed(
-  () => searchKeyword.value.length > 0 || searchFilter.value.length > 0,
-);
-const activeSearch = computed<SessionSearch | undefined>(() =>
-  searchKeyword.value || searchUser.value
-    ? { keyword: searchKeyword.value || undefined, user: searchUser.value || undefined }
-    : undefined,
-);
 
 const activeStream = ref<string>(
   urlScope.stream || localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
@@ -821,10 +739,6 @@ function syncFilterUrl() {
           }
         : null,
     });
-    if (searchKeyword.value) query.keyword = searchKeyword.value;
-    else delete query.keyword;
-    if (searchUser.value) query.user = searchUser.value;
-    else delete query.user;
     if (searchFilter.value) query.filter = searchFilter.value;
     else delete query.filter;
     return query;
@@ -868,9 +782,7 @@ async function loadSessions(
   // An org switch invalidates the list (see the guard above); the search
   // belonged to the previous org's data, so it goes with it.
   if (loadedOrg.value && loadedOrg.value !== orgId) {
-    searchKeyword.value = "";
     searchFilter.value = "";
-    searchUser.value = "";
   }
 
   // Hold the table skeleton across the whole load. We await the stream list and
@@ -945,24 +857,16 @@ async function loadSessions(
     currentPage.value - 1,
     rowsPerPage.value,
     sessionFilter.value,
-    activeSearch.value,
   );
 }
 
-watch([searchKeyword, searchFilter], () => {
+watch(searchFilter, () => {
   currentPage.value = 1;
   loadSessions(undefined, undefined, true);
 });
 
 function clearSearch() {
-  searchKeyword.value = "";
   searchFilter.value = "";
-}
-
-function clearUserFilter() {
-  searchUser.value = "";
-  currentPage.value = 1;
-  loadSessions(undefined, undefined, true);
 }
 
 // Filter / pagination changes are deliberate user actions — force a re-fetch

@@ -17555,13 +17555,9 @@
       "noAgentsDescription": "No GenAI agents were detected for the selected time window. Try a wider range or switch back to stream view.",
       "viewByStream": "View by Stream",
       "search": {
-        "placeholder": "Search by user or message",
-        "title": "Match sessions whose user ID or conversation text contains the text",
         "noResultsTitle": "No sessions match your search",
-        "noResultsDescription": "Try a different term or filter, or a wider time range.",
-        "clear": "Clear search",
-        "user": "User: {user}",
-        "clearUser": "Show all users"
+        "noResultsDescription": "Try a different filter or a wider time range.",
+        "clear": "Clear filter"
       }
     },
     "sessionDetail": {

@@ -157,6 +157,7 @@ import { ATTRIBUTION_COLUMNS, USERS_LIMIT, usersSql } from "@/plugins/traces/llm
 import { PARENT_SPAN_FIELD } from "@/plugins/traces/config/llmInsightsPanels";
 import LLMCostCell from "@/plugins/traces/LLMCostCell.vue";
 import { formatCost, formatTokens } from "@/utils/llmUtils";
+import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 
 defineOptions({ name: "AIUsersPage" });
@@ -365,7 +366,7 @@ function openSessions(user: string) {
       ...(agentName.value
         ? { type: "agent", agent: agentName.value }
         : { type: "stream", stream: stream.value }),
-      user,
+      filter: sqlEquals(ATTRIBUTION_COLUMNS.user, user),
     },
   });
 }
