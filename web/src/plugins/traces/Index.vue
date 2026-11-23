@@ -795,6 +795,33 @@ function dropKeptCount(results: any) {
   searchObj.meta.resultGrid.showPagination = false;
 }
 
+// Everything the count query reads, so a failed count only ever keeps the total of the same query.
+function countKeyOf(): string {
+  const dt = searchObj.data.datetime;
+  const range = dt.type === "relative" ? dt.relativeTimePeriod : `${dt.startTime}-${dt.endTime}`;
+  return [selectedStreamName.value, searchObj.meta.searchMode, builtWhereClause, range].join(
+    "\u0000",
+  );
+}
+
+// Only a count that arrived, or one kept from it, carries over; a placeholder total is not a count.
+function keptTotalOf(results: any): number | undefined {
+  if (!results) return undefined;
+  return results.countLanded ? results.total : (results.lastTotal ?? undefined);
+}
+
+// A failed count keeps the last count of this query, never the page size; only a kept count is a failed refresh.
+function keepLastCount(results: any): boolean {
+  if (results.lastTotal == null) {
+    results.countFailed = true;
+    return false;
+  }
+  searchObj.meta.refreshFailedAt = Date.now();
+  results.total = results.lastTotal;
+  searchObj.meta.resultGrid.showPagination = results.lastTotal > 0;
+  return true;
+}
+
 function fetchTracesCount() {
   const queryReq = searchObj.data.queryPayload;
   const results = searchObj.data.queryResults;
@@ -854,12 +881,18 @@ function fetchTracesCount() {
           results.total = count;
           results.errorCount = hits[0]?.error_count ?? 0;
           searchObj.meta.resultGrid.showPagination = count > 0;
+          results.countLanded = true;
           landed = true;
         }
       },
       error: (_payload: any, err: any) => {
-        // The count is a best-effort badge; the main search reports its own failures.
         console.warn("Failed to fetch traces count", err);
+        // A count that already landed stands; an error after it must not replace it.
+        const current =
+          !landed &&
+          searchObj.data.queryResults === results &&
+          currentCountTraceId === countTraceId;
+        if (current && keepLastCount(results)) landed = true;
         settle();
       },
       complete: (_payload: any) => {
@@ -976,12 +1009,16 @@ async function getQueryData(
       const sameDataset = dataset === countedDataset;
       countedDataset = dataset;
       if (!sameDataset) searchObj.meta.resultGrid.showPagination = false;
+      const previous = searchObj.data.queryResults;
+      const countKey = countKeyOf();
       // Reset hits for a fresh search
       searchObj.data.queryResults = {
         hits: [],
         total: null,
         countPending: true,
-        errorCount: sameDataset ? searchObj.data.queryResults?.errorCount : undefined,
+        errorCount: sameDataset ? previous?.errorCount : undefined,
+        countKey,
+        lastTotal: previous?.countKey === countKey ? keptTotalOf(previous) : undefined,
         from: 0,
         size: queryReq.query.size,
         took: 0,

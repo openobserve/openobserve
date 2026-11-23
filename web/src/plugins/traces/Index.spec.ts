@@ -2106,6 +2106,28 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.queryResults.hits).toEqual([]);
     });
 
+    it("carries a landed count only into a re-run of the same query, never a placeholder total", async () => {
+      await mountPage();
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      Object.assign(mockSearchObj.data.queryResults, { total: 600, countLanded: true });
+
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      expect(mockSearchObj.data.queryResults.lastTotal).toBe(600);
+
+      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      expect(mockSearchObj.data.queryResults.lastTotal).toBeUndefined();
+
+      mockSearchObj.data.editorValue = "";
+      mockSearchObj.data.queryResults = { hits: [], total: 0 };
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      expect(mockSearchObj.data.queryResults.lastTotal).toBeUndefined();
+    });
+
     // Logs shows its error banner over the last results rather than blanking; traces matches it.
     it("keeps the previous rows when a page fails before writing any", async () => {
       await mountPage();
@@ -4843,6 +4865,95 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(err).not.toHaveBeenCalledWith("Failed to fetch traces count");
       warn.mockRestore();
       err.mockRestore();
+      mockSearchObj.data.queryPayload = null;
+    });
+
+    it.each([
+      ["keeps the last count of the query and reports a failed refresh", 200, { total: 200 }],
+      [
+        "has no count and no failed refresh when none was kept",
+        undefined,
+        { total: null, countFailed: true },
+      ],
+    ])("on a failed count %s", async (_name, lastTotal, expected) => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.data.queryPayload = { query: { start_time: 1, end_time: 2 } };
+      const results = { hits: new Array(25).fill({}), total: null, countPending: true, lastTotal };
+      mockSearchObj.data.queryResults = results;
+      mockSearchObj.meta.refreshFailedAt = null;
+      mockFetchQueryDataWithHttpStream.mockClear();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      wrapper.vm.fetchTracesCount();
+      const [, handlers] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      handlers.error({}, { content: { message: "network error" } });
+
+      expect(results).toMatchObject({ ...expected, countPending: false });
+      expect(!!(results as any).countFailed).toBe(lastTotal === undefined);
+      expect(mockSearchObj.meta.refreshFailedAt).toEqual(
+        lastTotal === undefined ? null : expect.any(Number),
+      );
+      warn.mockRestore();
+      mockSearchObj.data.queryPayload = null;
+      mockSearchObj.meta.refreshFailedAt = null;
+    });
+
+    it("keeps a count that landed when the stream errors after it", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.data.queryPayload = { query: { start_time: 1, end_time: 2 } };
+      mockSearchObj.meta.searchMode = "spans";
+      const results = {
+        hits: new Array(25).fill({}),
+        total: null,
+        countPending: true,
+        lastTotal: 600,
+      };
+      mockSearchObj.data.queryResults = results;
+      mockSearchObj.meta.refreshFailedAt = null;
+      mockFetchQueryDataWithHttpStream.mockClear();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      wrapper.vm.fetchTracesCount();
+      const [, handlers] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      handlers.data({}, { content: { results: { hits: [{ span_count: 531, error_count: 0 }] } } });
+      handlers.error({}, { content: { message: "late error" } });
+
+      expect(results).toMatchObject({ total: 531, errorCount: 0, countPending: false });
+      expect((results as any).countFailed).toBeUndefined();
+      expect(mockSearchObj.meta.refreshFailedAt).toBeNull();
+      warn.mockRestore();
       mockSearchObj.data.queryPayload = null;
     });
   });
