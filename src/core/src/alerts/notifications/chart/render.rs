@@ -43,6 +43,11 @@ static REGISTER_FONT: Once = Once::new();
 const PURPLE: RGBColor = RGBColor(98, 76, 245);
 const RED: RGBColor = RGBColor(224, 62, 62);
 const ORANGE: RGBColor = RGBColor(255, 158, 44);
+/// Plotters' tick search scales the span by 10 and loops forever once it overflows, so values
+/// stay far below f64::MAX.
+const MAX_ABS_VALUE: f64 = 1e300;
+/// 9999-12-31T23:59:59Z; also keeps the `+ 1800` and `+ 1` x-range math from overflowing.
+const MAX_TIMESTAMP_SECS: u64 = 253_402_300_799;
 
 type Chart<'a, 'b> =
     ChartContext<'a, BitMapBackend<'b>, Cartesian2d<RangedCoordu64, RangedCoordf64>>;
@@ -169,6 +174,9 @@ fn axis_ranges(p: &ChartPayload) -> Option<((u64, u64), (f64, f64))> {
     if p.points.len() < 2 && !(anomaly && (!p.points.is_empty() || !p.marks.is_empty())) {
         return None;
     }
+    if !within_bounds(p) {
+        return None;
+    }
     let band = p.band.iter().flatten().flatten();
     let marks: &[(u64, f64)] = if anomaly { &p.marks } else { &[] };
     let (x_min, x_max) = if anomaly {
@@ -205,11 +213,20 @@ fn axis_ranges(p: &ChartPayload) -> Option<((u64, u64), (f64, f64))> {
     let pad = (y_max - y_min) * 0.15;
     y_max += pad;
     y_min -= pad * 0.3;
-    // An overflowed span (e.g. 1e308 and -1e308) makes plotters loop forever.
-    if !(y_max - y_min).is_finite() {
-        return None;
-    }
     Some(((x_min, x_max), (y_min, y_max)))
+}
+
+/// Checks every field that reaches an axis, marks included even on a threshold chart.
+fn within_bounds(p: &ChartPayload) -> bool {
+    let mut series = p.points.iter().chain(&p.marks);
+    let band = p.band.iter().flatten().flatten().flat_map(|&(l, u)| [l, u]);
+    let mut values = series
+        .clone()
+        .map(|(_, v)| *v)
+        .chain(band)
+        .chain(p.crit)
+        .chain(p.warn);
+    values.all(|v| v.abs() <= MAX_ABS_VALUE) && series.all(|(t, _)| *t <= MAX_TIMESTAMP_SECS)
 }
 
 /// Aggregation alerts record no value below the warning band, so interpolating across a
@@ -435,8 +452,42 @@ mod tests {
     }
 
     #[test]
+    fn a_value_past_the_bound_in_any_field_is_an_error() {
+        let over = MAX_ABS_VALUE * 1.0001;
+        let cases: [fn(&mut ChartPayload, f64); 5] = [
+            |p, v| p.points[3].1 = -v,
+            |p, v| p.marks[0].1 = v,
+            |p, v| p.band = Some(vec![Some((0.0, v)); p.points.len()]),
+            |p, v| p.crit = Some(v),
+            |p, v| p.warn = Some(-v),
+        ];
+        for (i, set) in cases.iter().enumerate() {
+            let mut p = anomaly_sample();
+            assert!(render_png(&p).is_ok());
+            set(&mut p, over);
+            assert!(render_png(&p).is_err(), "case {i}");
+        }
+    }
+
+    #[test]
+    fn a_timestamp_past_the_year_9999_is_an_error() {
+        for t in [MAX_TIMESTAMP_SECS + 1, u64::MAX] {
+            let mut p = sample();
+            p.points.last_mut().unwrap().0 = t;
+            assert!(render_png(&p).is_err(), "point {t}");
+            let mut p = anomaly_sample();
+            p.marks[0].0 = t;
+            assert!(render_png(&p).is_err(), "mark {t}");
+        }
+    }
+
+    #[test]
     fn large_finite_value_range_renders() {
-        for (hi, lo) in [(1e308, 0.0), (1e300, -1e300), (1e15, -1e15)] {
+        for (hi, lo) in [
+            (MAX_ABS_VALUE, -MAX_ABS_VALUE),
+            (MAX_ABS_VALUE, 0.0),
+            (1e15, -1e15),
+        ] {
             let mut p = sample();
             p.points[0].1 = hi;
             p.points[1].1 = lo;

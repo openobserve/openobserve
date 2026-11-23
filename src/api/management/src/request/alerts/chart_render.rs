@@ -60,8 +60,6 @@ pub struct RenderQuery {
 /// payload hash. Replays — Slack's double-fetch, Teams clients re-fetching on
 /// every view — become memory reads instead of renders. ~32 × ~35 KB ≈ 1 MB.
 const CACHE_CAPACITY: usize = 32;
-/// A normal render takes milliseconds; past this the request gets the usual 404.
-const RENDER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 /// FIFO of (payload hash, rendered PNG).
 type RenderCache = VecDeque<(u64, Arc<Vec<u8>>)>;
 static RENDER_CACHE: std::sync::LazyLock<std::sync::Mutex<RenderCache>> =
@@ -152,29 +150,15 @@ pub async fn render_chart(
         return MetaHttpResponse::not_found("not found");
     };
 
-    // The permit moves into the task, so a render that outlives the timeout keeps its slot.
-    let render = tokio::task::spawn_blocking(move || {
-        let _permit = permit;
-        chart::render::render_png(&payload)
-    });
-    match tokio::time::timeout(RENDER_TIMEOUT, render).await {
-        Ok(Ok(Ok(png))) => {
+    match chart::render_png_bounded(payload, permit).await {
+        Ok(png) => {
             event("rendered_fetch");
             let png = Arc::new(png);
             cache_put(ckey, png.clone());
             png_response(png)
         }
-        Ok(Ok(Err(e))) => {
+        Err(e) => {
             log::warn!("[ALERT_CHART] fetch-time render failed: {e}");
-            MetaHttpResponse::not_found("not found")
-        }
-        Ok(Err(e)) => {
-            log::error!("[ALERT_CHART] fetch-time render task failed: {e}");
-            MetaHttpResponse::not_found("not found")
-        }
-        Err(_) => {
-            log::error!("[ALERT_CHART] fetch-time render timed out after {RENDER_TIMEOUT:?}");
-            event("render_timeout");
             MetaHttpResponse::not_found("not found")
         }
     }
