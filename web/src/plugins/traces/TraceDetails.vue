@@ -1196,7 +1196,13 @@ import { escapeSingleQuotes } from "@/utils/queryUtils";
 import useNotifications from "@/composables/useNotifications";
 import { parseUsageDetails, parseCostDetails, hasTracePreview, isLLMTrace } from "@/utils/llmUtils";
 import { formatTimestamp, useTraceProcessing } from "@/composables/traces/useTraceProcessing";
-import { hasLLMPayload, spanTimeBounds } from "./threadView.utils";
+import {
+  classify,
+  classifyCacheUse,
+  hasLLMPayload,
+  spanTimeBounds,
+  type CacheUse,
+} from "./threadView.utils";
 import {
   attributeSteps,
   headlineSteps,
@@ -2971,6 +2977,9 @@ export default defineComponent({
       });
 
       const formattedSpanMap: any = {};
+      const cacheBySpan = classifyCacheUse(
+        spanList.value.filter((s: any) => classify(s) === "llm_turn"),
+      );
 
       spanList.value.forEach((spanData: any, idx: number) => {
         // Validate span data before processing
@@ -2982,7 +2991,7 @@ export default defineComponent({
           );
         }
 
-        const formattedSpan = getFormattedSpan(spanData);
+        const formattedSpan = getFormattedSpan(spanData, cacheBySpan.get(String(spanData.span_id)));
         const spanId = spanData.span_id || formattedSpan.spanId || `span_${idx}_${Date.now()}`;
         formattedSpanMap[spanId] = formattedSpan;
       });
@@ -3228,7 +3237,7 @@ export default defineComponent({
 
     // Convert span object to required format
     // Converting ns to ms
-    const getFormattedSpan = (span: any) => {
+    const getFormattedSpan = (span: any, cacheUse?: CacheUse) => {
       const usage = parseUsageDetails(span);
       const cost = parseCostDetails(span);
 
@@ -3254,6 +3263,7 @@ export default defineComponent({
         links: JSON.parse(span.links || "[]"),
         genAiUsage: usage,
         genAiCost: cost,
+        cacheUse,
         resolvedIdentity: resolveSpanIdentity(span),
       };
     };

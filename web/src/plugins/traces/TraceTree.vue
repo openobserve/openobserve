@@ -224,6 +224,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OIcon name="attach-money" size="xs" />
                         {{ formatCost((spans as any[])[virtualRow.index].genAiCost.total) }}
                       </span>
+                      <span
+                        v-if="(spans as any[])[virtualRow.index].cacheUse"
+                        class="ms-2"
+                        :class="
+                          (spans as any[])[virtualRow.index].cacheUse.state === 'miss'
+                            ? 'text-status-warning-text! font-medium'
+                            : 'text-text-secondary!'
+                        "
+                        :data-test="`trace-tree-span-cache-${(spans as any[])[virtualRow.index].spanId}`"
+                        :title="
+                          t('traces.threadView.cacheDetail', {
+                            read: formatTokens(
+                              (spans as any[])[virtualRow.index].cacheUse.readTokens,
+                            ),
+                            written: formatTokens(
+                              (spans as any[])[virtualRow.index].cacheUse.writeTokens,
+                            ),
+                          })
+                        "
+                      >
+                        <template
+                          v-if="(spans as any[])[virtualRow.index].cacheUse.state === 'miss'"
+                        >
+                          <OIcon name="warning-amber" size="xs" />
+                          {{ t("traces.threadView.cacheMiss") }}
+                        </template>
+                        <template
+                          v-else-if="(spans as any[])[virtualRow.index].cacheUse.state === 'hit'"
+                        >
+                          <OIcon name="cached" size="xs" />
+                          {{
+                            t("traces.threadView.cacheHit", {
+                              tokens: formatTokens(
+                                (spans as any[])[virtualRow.index].cacheUse.readTokens,
+                              ),
+                            })
+                          }}
+                        </template>
+                        <template v-else>
+                          <OIcon name="cached" size="xs" />
+                          {{
+                            t("traces.threadView.cacheWrite", {
+                              tokens: formatTokens(
+                                (spans as any[])[virtualRow.index].cacheUse.writeTokens,
+                              ),
+                            })
+                          }}
+                        </template>
+                      </span>
                     </div>
                   </div>
 

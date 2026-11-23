@@ -606,12 +606,16 @@ export function useSessions() {
     return buildTurnDetail(traceId, hits || []);
   }
 
-  /** Fetch all gen_ai spans of the given turns, by trace id so tool-execution spans are included. */
+  /**
+   * Fetch all gen_ai spans of the given turns, by trace id so tool-execution spans are included.
+   * `cacheColumns` are selected only when the caller knows the stream has them.
+   */
   async function fetchSessionSpans(
     streamName: string,
     turns: Pick<SessionTraceRow, "traceId" | "spanCount">[],
     startTime: number,
     endTime: number,
+    cacheColumns: string[] = [],
   ): Promise<any[]> {
     if (!streamName || !turns.length || !startTime || !endTime) return [];
     const pages = await Promise.all(
@@ -625,6 +629,7 @@ export function useSessions() {
             span_status, status_message,
             gen_ai_request_model, gen_ai_response_model,
             gen_ai_usage_cost, gen_ai_usage_total_tokens,
+            ${cacheColumns.map((c) => `${c},`).join(" ")}
             gen_ai_input_messages, gen_ai_output_messages
           FROM "${streamName}"
           WHERE trace_id IN (${inList})

@@ -1080,7 +1080,13 @@ import {
   type SessionTraceRow,
   type TurnDetail,
 } from "./composables/useSessions";
-import { buildTurnDetail, classify, getOutputRaw, toolCallParts } from "./threadView.utils";
+import {
+  buildTurnDetail,
+  classify,
+  classifyCacheUse,
+  getOutputRaw,
+  toolCallParts,
+} from "./threadView.utils";
 import { patternsForAgent, type HarnessPatternRule, type HarnessStripped } from "./harnessText";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1505,9 +1511,19 @@ const kpiCards = computed<
         tokens: formatTokens(s.cachedTokens),
       }),
       subTurns: [],
-      subTail: "",
+      subTail: cacheCalls.value.calls
+        ? t("traces.sessionDetail.kpiSub.cacheHits", cacheCalls.value)
+        : "",
     },
   ];
+});
+
+// Counts the calls whose spans are loaded; empty until then or when the session never caches.
+const cacheCalls = computed(() => {
+  const uses = [
+    ...classifyCacheUse(sessionSpans.value.filter((s) => classify(s) === "llm_turn")).values(),
+  ];
+  return { calls: uses.length, hits: uses.filter((u) => u.state === "hit").length };
 });
 
 // ── Conversation: filters, sort, expand. All client-side over `traces`. ──
@@ -1790,11 +1806,17 @@ async function loadSessionSpans() {
   spanLoads.value++;
   try {
     // The details endpoint widens the window to the whole session, so turns can start before `from`.
+    // A non-zero session total proves the stream has that column; selecting a missing one fails.
+    const cacheColumns = [
+      detail.value?.cacheReadInputTokens && "gen_ai_usage_cache_read_input_tokens",
+      detail.value?.cacheCreationInputTokens && "gen_ai_usage_cache_creation_input_tokens",
+    ].filter((c): c is string => !!c);
     const rows = await fetchSessionSpans(
       streamName.value,
       pending,
       sessionEvaluationRange.value.startTime,
       sessionEvaluationRange.value.endTime,
+      cacheColumns,
     );
     sessionSpans.value = [...sessionSpans.value, ...rows].sort(
       (a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0),
