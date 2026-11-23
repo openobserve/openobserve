@@ -11,12 +11,14 @@
 
     <OPageLayout
       v-else
-      :title="t('llmProviders.tabLabel')"
-      title-data-test="llm-providers-settings-title"
-      :about="t('llmProviders.subtitle')"
+      icon="smart-toy"
+      :subtitle="t('llmProviders.subtitle')"
       bleed
       :scroll="false"
     >
+      <template #title>
+        <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>
+      </template>
       <template #actions>
         <OButton data-test="llm-providers-add-btn" variant="primary" @click="openCreate">
           {{ t("llmProviders.newButton") }}

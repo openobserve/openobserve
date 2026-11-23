@@ -13,8 +13,8 @@ vi.mock("@/lib/core/PageHeader/OPageHeader.vue", () => ({
   default: {
     name: "OPageHeader",
     template:
-      '<div class="app-page-header" data-test="app-page-header"><slot name="tabs" /><slot name="status" /><slot name="actions" /></div>',
-    props: ["title", "about", "back"],
+      '<div class="app-page-header" data-test="app-page-header"><slot name="tabs" /><slot name="title-trail" /><slot name="actions" /></div>',
+    props: ["title", "subtitle", "icon", "back", "tabsBelow"],
   },
 }));
 

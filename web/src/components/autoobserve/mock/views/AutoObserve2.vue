@@ -18,24 +18,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     bleed
     :title="header.title"
+    :icon="page ? undefined : 'navigation'"
     :back="header.back"
-    :about="header.about"
+    :subtitle="header.subtitle"
     :title-data-test="header.titleTest"
   >
-    <template #status>
+    <template #title-trail>
       <OTag
         tone="neutral"
         size="sm"
         :label="t('autoobserve2.demoTag')"
         data-test="autoobserve-sample-tag"
       />
-      <TopBarStatus
-        v-if="!page"
-        class="text-text-secondary text-xs"
-        :live="live"
-        :date="liveData.today.value"
-        :checked="liveData.checked.value"
-      />
+    </template>
+    <template v-if="!page" #subtitle>
+      <TopBarStatus :live="live" :date="liveData.today.value" :checked="liveData.checked.value" />
     </template>
     <template v-if="!page" #actions>
       <TopBar @open="openNamed" @search="searchIssues" />
@@ -326,7 +323,6 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import TopBar from "@/components/autoobserve/v2/TopBar.vue";
 import TopBarStatus from "@/components/autoobserve/mock/v2/TopBarStatus.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import type { PageHeaderBack } from "@/lib/core/PageHeader/OPageHeader.types";
 import ThisWeek from "@/components/autoobserve/mock/v2/ThisWeek.vue";
 import Suggestions from "@/components/autoobserve/mock/v2/Suggestions.vue";
 import PageFooter from "@/components/autoobserve/v2/PageFooter.vue";
@@ -607,6 +603,12 @@ const openChange = (ledgerId: string) => {
   openActivity(ledgerId);
 };
 
+// Back pops history when the page was opened from here, so browser Forward still returns to it.
+const closePage = () => {
+  if (window.history.state?.back) router.back();
+  else void router.replace({ query: { ...route.query, ...PAGE_QUERY } });
+};
+
 const PAGE_TITLE: Record<(typeof PAGES)[number], { title: I18nKey; test: string }> = {
   coverage: { title: "autoobserve2.coveragePage.title", test: "autoobserve2-coverage-title" },
   issues: { title: "autoobserve2.issuesPage.title", test: "autoobserve2-issues-title" },
@@ -617,14 +619,14 @@ const PAGE_TITLE: Record<(typeof PAGES)[number], { title: I18nKey; test: string 
 const header = computed<{
   title: I18nText;
   titleTest: string;
-  about?: I18nText;
-  back?: PageHeaderBack;
+  subtitle?: I18nText;
+  back?: { label: I18nText; onClick: () => void; dataTest: string };
 }>(() => {
   if (!page.value) return { title: t("autoobserve.title"), titleTest: "autoobserve2-title" };
   return {
     title: t(PAGE_TITLE[page.value].title),
     titleTest: PAGE_TITLE[page.value].test,
-    about:
+    subtitle:
       page.value === "issues"
         ? t("autoobserve2.issuesPage.sentence", {
             within: t(ISSUES_RANGE_WITHIN[issuesRange.value]),
@@ -632,7 +634,7 @@ const header = computed<{
         : undefined,
     back: {
       label: t("autoobserve.title"),
-      to: { query: { ...route.query, ...PAGE_QUERY } },
+      onClick: closePage,
       dataTest: `autoobserve2-${page.value}-back`,
     },
   };

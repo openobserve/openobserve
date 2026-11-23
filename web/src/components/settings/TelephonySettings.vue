@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('telephony.title')"
-    :about="t('telephony.subtitle')"
+    :subtitle="t('telephony.subtitle')"
+    icon="call"
     title-data-test="telephony-settings-title"
     scroll
   >

@@ -16,9 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout
+    icon="domain"
     :title="t('settings.orgDomainMapping.tabLabel')"
-    :about="t('settings.orgDomainMapping.pageSubtitle')"
+    :subtitle="t('settings.orgDomainMapping.pageSubtitle')"
     data-test="settings-org-domain-management"
+    tabs-below
     bleed
   >
     <template #header-tabs>

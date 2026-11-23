@@ -1,28 +1,17 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <OPageLayout
-    :title="t('routeTitles.streamExplorer')"
-    :back="{
-      label: t('menu.index'),
-      to: {
-        name: 'logstreams',
-        query: { org_identifier: store.state.selectedOrganization.identifier },
-      },
-    }"
-    bleed
-  >
-    <div class="shrink-0">
-      <SearchBar
-        ref="searchBarRef"
-        :query-data="queryData"
-        @searchdata="runSearch"
-        @update-query="updateQuery"
-        :is-loading="isLoading"
-        @change:date-time="updateDateTime"
-      />
-    </div>
-    <div class="min-h-0 flex-1">
+  <div class="rounded-default">
+    <SearchBar
+      ref="searchBarRef"
+      :query-data="queryData"
+      @searchdata="runSearch"
+      @update-query="updateQuery"
+      :is-loading="isLoading"
+      @change:date-time="updateDateTime"
+    />
+    <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
+    <div class="h-[calc(100vh-197px)]">
       <OTable
         data-test="stream-explorer-results-table"
         class="h-full"
@@ -43,7 +32,7 @@
         </template>
       </OTable>
     </div>
-  </OPageLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -53,7 +42,6 @@ import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
 import { cloneDeep } from "lodash-es";
 
-import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SearchBar from "@/components/logstream/explore/SearchBar.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";

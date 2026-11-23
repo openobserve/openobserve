@@ -19,9 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="quota-page text-left"
     :class="isDark ? 'dark-theme-page' : 'light-theme-page'"
-    :title="t('iam.quota')"
+    :title="t('quota.header')"
     title-data-test="user-title-text"
-    :about="t('iam.quotaPage.subtitle')"
+    :subtitle="t('iam.quotaPage.subtitle')"
+    icon="speed"
     bleed
   >
     <div :style="{ marginTop: 0 }" class="app-table-container flex min-h-0 flex-1 flex-col">

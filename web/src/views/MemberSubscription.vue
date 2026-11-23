@@ -15,11 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-    :title="t('billing.memberSubscription.title')"
-    pad-y
-    data-test="member-subscription-page"
-  >
+  <div class="rounded-default">
+    <div class="my-10 w-full text-center text-(length:--text-3xl)">
+      {{ t("billing.memberSubscription.title") }}
+    </div>
     <div v-if="status == 'processing'">{{ message }}</div>
     <div v-else-if="status == 'error' && error == ''" class="text-center">
       {{ t("billing.memberSubscription.errorProcessing") }}<br /><br />
@@ -40,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <b>Please click the button below to proceed with your subscription after taking above mentioned action.</b><br />
       <OButton variant="primary" class="mt-3" @click="ProcessSubscription(queryString, 'confirm')">Confirm Member Subscription</OButton>
     </div> -->
-  </OPageLayout>
+  </div>
 </template>
 
 <script lang="ts">
@@ -51,7 +50,6 @@ import { useLocalOrganization, getPath } from "../utils/zincutils";
 
 import organizationsService from "../services/organizations";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
-import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -59,7 +57,6 @@ export default defineComponent({
   name: "PageUser",
   components: {
     SanitizedHtmlRenderer,
-    OPageLayout,
   },
   data() {
     return {

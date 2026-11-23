@@ -15,27 +15,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout :title="t('iam.roles')" :about="t('iam.rolesPage.subtitle')" bleed>
+  <OPageLayout :title="t('iam.roles')" icon="shield" bleed>
+    <template #subtitle>
+      <span data-test="iam-roles-subtitle">
+        {{ t("iam.rolesPage.subtitle") }}
+      </span>
+    </template>
     <template #actions>
       <OButton data-test="iam-roles-add-role-btn" variant="primary" @click="addRole">
         {{ t("iam.addRole") }}
       </OButton>
     </template>
     <!-- ?member=<email> (from the token popup's "Assign a role" link) drives the Assign column below. -->
-    <template v-if="assignTarget" #banner>
-      <OBanner tone="info" icon="shield" data-test="iam-roles-assign-banner">
-        {{ t("iam.rolesPage.assignBannerText", { member: assignTarget }) }}
-        <template #actions>
-          <OButton
-            data-test="iam-roles-assign-banner-dismiss"
-            variant="ghost"
-            @click="clearAssignTarget"
-          >
-            {{ t("iam.rolesPage.assignBannerDone") }}
-          </OButton>
-        </template>
-      </OBanner>
-    </template>
+    <OBanner
+      v-if="assignTarget"
+      tone="info"
+      icon="shield"
+      data-test="iam-roles-assign-banner"
+      class="mb-3"
+    >
+      {{ t("iam.rolesPage.assignBannerText", { member: assignTarget }) }}
+      <template #actions>
+        <OButton
+          data-test="iam-roles-assign-banner-dismiss"
+          variant="ghost"
+          @click="clearAssignTarget"
+        >
+          {{ t("iam.rolesPage.assignBannerDone") }}
+        </OButton>
+      </template>
+    </OBanner>
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <RoleTable

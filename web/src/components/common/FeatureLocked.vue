@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <FeatureLockExempt class="h-full">
-    <OPageLayout :title="label" data-test="feature-locked-page">
+    <OPageLayout :title="label" :icon="meta?.icon ?? 'lock'" data-test="feature-locked-page">
       <LicenseDeniedState :features="[key]" />
     </OPageLayout>
   </FeatureLockExempt>
@@ -30,11 +30,13 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import { useFeatureNames } from "@/composables/useFeatureLock";
+import { LOCKED_FEATURES } from "@/utils/featureGate";
 
 const { t } = useI18nTyped();
 const route = useRoute();
 const { featureName } = useFeatureNames();
 
 const key = computed(() => String(route.params.feature ?? ""));
+const meta = computed(() => LOCKED_FEATURES[key.value]);
 const label = computed(() => raw(featureName(key.value)) || t("featureLock.thisFeature"));
 </script>

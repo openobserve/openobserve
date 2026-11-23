@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('enterpriseFeature.featuresPageTitle')"
+    icon="workspace-premium"
     data-test="enterprise-features-page"
   >
     <div class="flex flex-col gap-8 pt-6 pb-4">

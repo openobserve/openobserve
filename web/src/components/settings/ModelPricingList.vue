@@ -29,11 +29,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Main List View -->
     <OPageLayout
+      overflow-first
       v-if="!showImportModelPricingPage"
-      :title="t('settings.llmModelPricing')"
-      :about="t('modelPricing.matchingPriorityTooltip')"
+      icon="paid"
+      :subtitle="t('settings.modelPricingList.subtitle')"
       bleed
     >
+      <template #title>
+        {{ t("modelPricing.header") }}
+        <OButton
+          icon-only
+          variant="ghost"
+          size="sm"
+          class="-ms-1"
+          data-test="model-pricing-info-btn"
+        >
+          <OIcon name="info-outline" size="sm" />
+          <OTooltip :content="t('modelPricing.matchingPriorityTooltip')" />
+        </OButton>
+      </template>
       <template #actions-overflow>
         <OButton variant="secondary" @click="openGaps" data-test="model-pricing-gaps-btn">
           {{ t("modelPricing.unpriced.title") }}

@@ -16,11 +16,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout
-    :title="t('iam.syntheticsTokens')"
+    :title="t('synthetics.tokens.title')"
     title-data-test="synthetics-tokens-title-text"
-    :about="t('synthetics.tokens.explanation')"
+    icon="key"
     bleed
   >
+    <template #title-trail>
+      <span class="inline-flex items-center">
+        <OIcon
+          name="info-outline"
+          size="sm"
+          class="text-text-secondary cursor-help"
+          data-test="synthetics-tokens-info-icon"
+        />
+        <OTooltip :content="t('synthetics.tokens.explanation')" />
+      </span>
+    </template>
+    <template #subtitle>
+      <span class="min-w-0 truncate leading-normal">{{ t("synthetics.tokens.summary") }}</span>
+    </template>
     <template #actions>
       <OButton
         variant="secondary"
@@ -235,7 +249,9 @@ import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -275,7 +291,9 @@ export default defineComponent({
     OPageLayout,
     OButton,
     OEmptyState,
+    OIcon,
     OSearchInput,
+    OTooltip,
     OTruncatedText,
     ORefreshButton,
     ODialog,

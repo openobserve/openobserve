@@ -19,8 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="!showImportRegexPatternDialog">
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->
       <OPageLayout
+        overflow-first
         :title="t('regex_patterns.title')"
-        :about="t('settings.regexPatternList.subtitle')"
+        icon="pattern"
+        :subtitle="t('settings.regexPatternList.subtitle')"
         bleed
       >
         <template #actions-overflow>

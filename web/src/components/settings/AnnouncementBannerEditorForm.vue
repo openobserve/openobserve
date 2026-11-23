@@ -19,17 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       bleed
       :title="isNew ? t('announcements.editor.addTitle') : t('announcements.editor.editTitle')"
+      :subtitle="storedStatusLabel"
       :back="{
         label: t('announcements.settings.label'),
-        to: listRoute,
+        onClick: goBack,
         dataTest: 'announcement-editor-back',
       }"
+      :title-overflow="isMobile ? 'visible' : 'truncate'"
     >
-      <template v-if="storedStatus" #status>
-        <OBadge :tone="STATUS_TONES[storedStatus]" size="sm" data-test="announcement-editor-status">
-          {{ t(STATUS_LABEL_KEYS[storedStatus]) }}
-        </OBadge>
-      </template>
       <template #actions>
         <OButton variant="secondary" data-test="announcement-editor-cancel" @click="goBack">{{
           t("common.cancel")
@@ -551,8 +548,6 @@ import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vu
 import EditorDraftLeaveDialog from "@/components/common/drafts/EditorDraftLeaveDialog.vue";
 import { useEditorDraft, type EditorDraftLeaveChoice } from "@/composables/useEditorDraft";
 import useBreakpoint from "@/composables/useBreakpoint";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
@@ -814,13 +809,9 @@ const STATUS_LABEL_KEYS = {
   ended: "announcements.editor.statusEnded",
 } as const;
 
-const STATUS_TONES: Record<keyof typeof STATUS_LABEL_KEYS, ChipTone> = {
-  live: "ok",
-  scheduled: "accent",
-  ended: "neutral",
-};
-
-const storedStatus = computed(() => (isNew.value ? undefined : bannerStatus(props.draft)));
+const storedStatusLabel = computed(() =>
+  isNew.value ? undefined : t(STATUS_LABEL_KEYS[bannerStatus(props.draft)]),
+);
 
 const pendingStatus = computed(() => bannerStatus(draftFromValues(values.value)));
 
@@ -1263,13 +1254,11 @@ const reload = () => {
   emit("reload");
 };
 
-const listRoute = computed(() => ({
-  name: "announcementBanners",
-  query: { org_identifier: store.state.selectedOrganization?.identifier },
-}));
-
 const goBack = () => {
-  void router.push(listRoute.value);
+  void router.push({
+    name: "announcementBanners",
+    query: { org_identifier: store.state.selectedOrganization?.identifier },
+  });
 };
 
 // Exposed so a test can drive the real submit and the toolbar without a browser selection.

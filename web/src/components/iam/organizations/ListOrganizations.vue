@@ -19,7 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- OPageLayout owns the whole skeleton (header + body inset/bleed) — search
        lives in the table's own toolbar. -->
-  <OPageLayout :title="t('iam.organizations')" bleed :scroll="false">
+  <OPageLayout
+    :title="t('organization.header')"
+    :subtitle="t('iam.listOrganizations.subtitle')"
+    icon="corporate-fare"
+    bleed
+    :scroll="false"
+  >
     <template #actions>
       <OButton variant="primary" @click="addOrganization" data-test="Add Organization">
         {{ t("organization.add") }}

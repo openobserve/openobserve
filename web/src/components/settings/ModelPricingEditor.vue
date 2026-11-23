@@ -17,14 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :back="{
-      label: backToGaps ? t('modelPricing.unpriced.title') : t('settings.llmModelPricing'),
-      to: parentRoute,
+      label: backToGaps ? t('modelPricing.unpriced.title') : t('modelPricing.header'),
+      onClick: goBack,
       dataTest: 'model-pricing-editor-back-btn',
     }"
     :title="headerTitle"
-    title-data-test="model-pricing-editor-title"
     bleed
   >
+    <template #title>
+      <span data-test="model-pricing-editor-title">{{ headerTitle }}</span>
+    </template>
+
     <!-- Form Body -->
     <OForm :form="form" v-slot="{ isSubmitting }" class="flex min-h-0 flex-1 flex-col">
       <ConstrainedPage size="md" align="left" :padded="false" class="min-h-0 flex-1">
@@ -1292,22 +1295,23 @@ function validateUsageKey(key: string): string | null {
 // Pricing gaps' Create price sets `from=gaps&stream=`, so Back and Save return to that stream's gaps.
 const backToGaps = computed(() => route.query.from === "gaps");
 
-const parentRoute = computed(() =>
-  backToGaps.value
-    ? {
-        name: "modelPricingGaps",
-        query: {
-          org_identifier: orgIdentifier.value,
-          stream: route.query.stream as string,
-          start_time: route.query.start_time,
-          end_time: route.query.end_time,
-        },
-      }
-    : { name: "modelPricing", query: { org_identifier: orgIdentifier.value } },
-);
-
 function goBack() {
-  router.push(parentRoute.value);
+  if (backToGaps.value) {
+    router.push({
+      name: "modelPricingGaps",
+      query: {
+        org_identifier: orgIdentifier.value,
+        stream: route.query.stream as string,
+        start_time: route.query.start_time,
+        end_time: route.query.end_time,
+      },
+    });
+    return;
+  }
+  router.push({
+    name: "modelPricing",
+    query: { org_identifier: orgIdentifier.value },
+  });
 }
 
 function notifyWarn(message: string) {

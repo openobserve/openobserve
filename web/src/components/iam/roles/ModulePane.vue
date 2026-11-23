@@ -19,10 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageHeader
       :title="trail[trail.length - 1]"
       title-data-test="edit-role-module-pane-title"
-      :context="context"
+      :icon="backTarget ? undefined : icon"
       :back="backTarget"
     >
-      <template #status>
+      <template #title-trail>
         <OBadge v-if="grantedRowCount" tone="accent" size="sm">
           {{ t("iam.editRole.moduleGrantedCount", { count: grantedRowCount }) }}
         </OBadge>
@@ -191,6 +191,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ModulePaneBulkHeader from "@/components/iam/roles/ModulePaneBulkHeader.vue";
 import { GROUP_LABEL_KEYS, matchModule, moduleGroup } from "@/components/iam/roles/roleModules";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -231,8 +232,7 @@ const props = defineProps<{
   isPendingRemoval: (node: any, action: string) => boolean;
   added?: number;
   removed?: number;
-  /** The role being edited, shown above the module name while no parent level offers a back link. */
-  context?: I18nText;
+  icon?: IconName;
   /** Rows are whole modules (All Modules view): each action header gets a select-all box, and every row opens its module. */
   listsModules?: boolean;
 }>();

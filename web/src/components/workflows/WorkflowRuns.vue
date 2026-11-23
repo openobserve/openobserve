@@ -35,15 +35,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="workflow-runs-page" class="flex h-full min-h-0 flex-col">
     <OPageHeader
-      :title="workflowName ? raw(workflowName) : t('workflow.runs.title')"
+      :title="workflowName || t('workflow.runs.title')"
       :back="{
-        label: t('menu.workflows'),
-        to: workflowsListRoute(),
+        label: t('workflow.header'),
+        onClick: goBack,
         dataTest: 'workflow-runs-back',
       }"
+      class="border-border-default border-b px-4"
+      overflow-first
     >
-      <template #status>
-        <BetaBadge />
+      <!-- Beta tag inside the title line (see WorkflowsList: #title-trail sits
+           after the title+subtitle column, stranding it far from the title). -->
+      <template #title>
+        <span class="flex min-w-0 items-center gap-2">
+          <OTruncatedText>{{ workflowName || t("workflow.runs.title") }}</OTruncatedText>
+          <BetaBadge />
+        </span>
       </template>
       <template #actions-overflow>
         <WorkflowHttpEndpointButton
@@ -180,6 +187,7 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
@@ -277,10 +285,12 @@ const togglePanel = () => {
   }
 };
 
-const workflowsListRoute = () => ({
-  name: "workflows",
-  query: { org_identifier: orgId.value, folder: activeFolderId.value },
-});
+const goBack = () => {
+  router.push({
+    name: "workflows",
+    query: { org_identifier: orgId.value, folder: activeFolderId.value },
+  });
+};
 
 // Dry-run the current graph without leaving to the editor. Deselect the historical
 // run first — the canvas is about to show the LIVE test result instead, and a

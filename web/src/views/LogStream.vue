@@ -18,7 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="alert-list-page" class="h-full">
-    <OPageLayout bleed :title="t('menu.index')" title-data-test="log-stream-title-text">
+    <OPageLayout
+      bleed
+      :title="t('logStream.header')"
+      title-data-test="log-stream-title-text"
+      :subtitle="t('logStream.subtitle')"
+      icon="window"
+    >
       <template #actions>
         <OButton
           v-if="isSchemaUDSEnabled"

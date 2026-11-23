@@ -15,27 +15,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout :title="t('iam.groups')" :about="t('iam.groupsPage.subtitle')" bleed>
+  <OPageLayout :title="t('iam.groups')" icon="group" bleed>
+    <template #subtitle>
+      <span data-test="iam-groups-subtitle">
+        {{ t("iam.groupsPage.subtitle") }}
+      </span>
+    </template>
     <template #actions>
       <OButton data-test="iam-groups-add-group-btn" variant="primary" @click="addGroup">
         {{ t("iam.addGroup") }}
       </OButton>
     </template>
     <!-- ?member=<email> (from the token popup's "Add to a user group" link) drives the Assign column below. -->
-    <template v-if="assignTarget" #banner>
-      <OBanner tone="info" icon="group" data-test="iam-groups-assign-banner">
-        {{ t("iam.groupsPage.assignBannerText", { member: assignTarget }) }}
-        <template #actions>
-          <OButton
-            data-test="iam-groups-assign-banner-dismiss"
-            variant="ghost"
-            @click="clearAssignTarget"
-          >
-            {{ t("iam.groupsPage.assignBannerDone") }}
-          </OButton>
-        </template>
-      </OBanner>
-    </template>
+    <OBanner
+      v-if="assignTarget"
+      tone="info"
+      icon="group"
+      data-test="iam-groups-assign-banner"
+      class="mb-3"
+    >
+      {{ t("iam.groupsPage.assignBannerText", { member: assignTarget }) }}
+      <template #actions>
+        <OButton
+          data-test="iam-groups-assign-banner-dismiss"
+          variant="ghost"
+          @click="clearAssignTarget"
+        >
+          {{ t("iam.groupsPage.assignBannerDone") }}
+        </OButton>
+      </template>
+    </OBanner>
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable

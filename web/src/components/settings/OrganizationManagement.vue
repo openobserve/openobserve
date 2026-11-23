@@ -16,7 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex h-full flex-col p-0">
-    <OPageLayout :title="t('settings.organizationManagement')" bleed>
+    <OPageLayout
+      :title="t('settings.organizationManagement')"
+      icon="lan"
+      :subtitle="t('settings.organizationManagementPage.subtitle')"
+      bleed
+    >
       <div class="bg-card-glass-bg mt-2.5 min-h-0 flex-1 overflow-hidden">
         <OTable
           data-test="org-management-list-table"

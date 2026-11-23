@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('function.import.title')"
     :back="{
       label: t('function.header'),
-      to: functionListRoute(),
+      onClick: goBack,
       dataTest: 'function-import-back-btn',
     }"
     bleed

@@ -17,12 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="raw(name)"
-    :about="about"
+    :subtitle="raw(subtitle)"
     :back="{ label: t('fleet.tabs.configurations'), to: backTo }"
     bleed
+    overflow-first
     data-test="fleet-config-editor-page"
   >
-    <template #status>
+    <template #title-trail>
       <OTag
         class="max-md:min-w-0 max-md:shrink-999"
         :tone="modeChip.variant"
@@ -555,9 +556,8 @@ const unsaved = computed(
 );
 // Taken off the list page at load and applied only once the draft baseline is the seed.
 let pendingImport: string | null = null;
-// The config's own description is what the page is about; a new config has none yet.
-const about = computed(() =>
-  !isNew.value && detail.value?.description ? raw(detail.value.description) : undefined,
+const subtitle = computed(() =>
+  isNew.value ? t("fleet.editor.newDescription") : (detail.value?.description ?? ""),
 );
 const savedYaml = computed(
   () => detail.value?.draft?.yaml ?? savedVersion.version.value?.yaml ?? "",

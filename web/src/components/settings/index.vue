@@ -30,10 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          header above a centered reading column. -->
     <div v-if="isConstrainedSection" class="flex h-full min-h-0 flex-col">
       <OPageHeader
-        :title="activeSectionItem?.label ?? raw('')"
+        :title="raw(activeSectionItem?.label || '')"
         :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
-        :about="pageSubtitles[activeSection] ?? activeSectionItem?.description"
+        :subtitle="raw(pageSubtitles[activeSection] || activeSectionItem?.description || '')"
+        :icon="activeSectionItem?.icon as any"
         content-size="lg"
+        class="border-border-default shrink-0 border-b"
       >
         <template v-if="HEADER_ACTION_SECTIONS.has(activeSection)" #actions>
           <div :id="PAGE_ACTIONS_SLOT_ID" class="flex items-center gap-2"></div>

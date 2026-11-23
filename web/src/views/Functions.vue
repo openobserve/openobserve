@@ -36,9 +36,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          teleport target. Section pages (functions/enrichment/eval) render
          nothing here — their content components have their own headers. -->
       <OPageHeader
-        :title="showPipelineActions ? t('function.streamPipeline') : breadcrumbLabel"
-        :about="showPipelineActions ? t('pipeline.subtitle') : undefined"
+        :title="showPipelineActions ? t('menu.pipeline') : breadcrumbLabel"
+        :subtitle="
+          showPipelineActions
+            ? t('pipeline.subtitle')
+            : routeName === 'createPipeline'
+              ? breadcrumbLabel
+              : raw('')
+        "
+        :title-overflow="routeName === 'createPipeline' ? 'visible' : 'truncate'"
+        :icon="showPipelineActions ? 'lan' : undefined"
         :back="detailBack"
+        :tabs-below="showPipelineActions"
+        class="border-border-default border-b"
       >
         <!-- Always pass the slot: hasTabs reads the slot's content, so the row follows showPipelineActions. -->
         <template #tabs>
@@ -209,7 +219,7 @@ export default defineComponent({
         return name ? raw(name) : t("pipeline.editPipeline");
       },
       createPipeline: () => t("pipeline.addPipeline"),
-      importPipeline: () => t("pipeline.importPipelineTitle"),
+      importPipeline: () => t("pipeline.import"),
       pipelineHistory: () => t("pipeline.history"),
       pipelineBackfill: () => t("pipeline.backfill"),
     };
@@ -287,6 +297,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       config,
       pipelineDrafts,

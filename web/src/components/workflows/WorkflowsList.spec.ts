@@ -209,9 +209,9 @@ const globalStubs = {
   },
   OPageLayout: {
     name: "OPageLayout",
-    props: ["title", "about", "bleed"],
+    props: ["title", "subtitle", "icon", "bleed"],
     template:
-      '<div class="page-layout"><slot name="status" /><slot name="sidebar" />' +
+      '<div class="page-layout"><slot name="title" /><slot name="sidebar" />' +
       '<slot name="actions" /><slot /></div>',
   },
   BetaBadge: { name: "BetaBadge", template: '<span class="beta-badge" />' },

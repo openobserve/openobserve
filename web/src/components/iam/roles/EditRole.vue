@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     data-test="edit-role-page"
     :title="raw(editingRole)"
-    :back="{ label: t('iam.roles'), to: rolesRoute }"
+    :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
     bleed
   >
     <!-- TODO OK : Add button to delete role in toolbar -->
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :loading="moduleLoading || isFetchingInitialRoles"
                   :is-granted="isGranted"
                   :is-pending-removal="isPendingRemoval"
-                  :context="raw(editingRole)"
+                  :icon="isAllModules ? ALL_MODULES_ICON : activeRailModule?.icon"
                   :added="activeRailModule?.added"
                   :removed="activeRailModule?.removed"
                   @change="changeFromPane"
@@ -146,7 +146,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :entity-label="entityLabel"
                   :summary-actions="summaryActions"
                   :license-denied="licenseDenied"
-                  :context="raw(editingRole)"
                   @open="(moduleKey) => (activeModule = moduleKey)"
                   @preset="(presetId) => applyPreset(presetId, { announce: true })"
                   @load-streams="loadPresetStreams()"
@@ -330,6 +329,7 @@ import PermissionsViewSwitch from "@/components/iam/roles/PermissionsViewSwitch.
 import UnsavedChangesDrawer from "@/components/iam/roles/UnsavedChangesDrawer.vue";
 import RoleSummary from "@/components/iam/roles/RoleSummary.vue";
 import {
+  ALL_MODULES_ICON,
   ALL_MODULES_KEY,
   buildRoleModules,
   GROUP_LABEL_KEYS,

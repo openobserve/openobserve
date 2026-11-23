@@ -142,8 +142,8 @@ const fork = async () => {
     :class="isPublic ? 'bg-surface-base h-screen' : 'h-full'"
     data-test="shared-chat-view"
   >
-    <OPageLayout :title="title" scroll pad-y title-data-test="shared-chat-view-title">
-      <template v-if="chat" #status>
+    <OPageLayout :title="title" icon="share" scroll pad-y title-data-test="shared-chat-view-title">
+      <template v-if="chat" #title-trail>
         <OBadge
           size="sm"
           :tone="chat.mode === 'live' ? 'ok' : 'accent'"
@@ -151,6 +151,25 @@ const fork = async () => {
         >
           {{ chat.mode === "live" ? t("aiChatShare.modeLive") : t("aiChatShare.modeSnapshot") }}
         </OBadge>
+      </template>
+      <template v-if="chat" #subtitle>
+        <span
+          v-if="chat.owner_name"
+          class="text-text-secondary me-2 text-xs"
+          data-test="shared-chat-view-shared-by"
+        >
+          {{ t("aiChatShare.sharedBy", { name: chat.owner_name }) }}
+        </span>
+        <span class="text-text-secondary text-xs">
+          {{ t("aiChatShare.sharedOn", { time: formatMicros(chat.shared_at) }) }}
+        </span>
+        <span
+          v-if="following && updatedAt"
+          class="text-text-secondary ms-2 text-xs"
+          data-test="shared-chat-view-updated"
+        >
+          {{ t("aiChatShare.updatedAt", { time: updatedAt }) }}
+        </span>
       </template>
       <template v-if="chat" #actions>
         <OButton
@@ -186,19 +205,6 @@ const fork = async () => {
       </template>
 
       <div class="mx-auto flex w-full max-w-225 flex-col">
-        <p
-          v-if="chat"
-          class="text-text-secondary mb-4 flex flex-wrap gap-x-2 text-xs"
-          data-test="shared-chat-view-meta"
-        >
-          <span v-if="chat.owner_name" data-test="shared-chat-view-shared-by">
-            {{ t("aiChatShare.sharedBy", { name: chat.owner_name }) }}
-          </span>
-          <span>{{ t("aiChatShare.sharedOn", { time: formatMicros(chat.shared_at) }) }}</span>
-          <span v-if="following && updatedAt" data-test="shared-chat-view-updated">
-            {{ t("aiChatShare.updatedAt", { time: updatedAt }) }}
-          </span>
-        </p>
         <div v-if="loading" class="flex justify-center py-10" data-test="shared-chat-view-loading">
           <OSpinner size="lg" />
         </div>

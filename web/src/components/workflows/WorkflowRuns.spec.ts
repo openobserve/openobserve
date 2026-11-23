@@ -342,10 +342,12 @@ describe("WorkflowRuns", () => {
     expect(box()).toEqual(before);
   });
 
-  it("back links to the workflows list", async () => {
+  it("back returns to the workflows list", async () => {
     const wrapper = await mountRuns();
-    expect(wrapper.findComponent({ name: "OPageHeader" }).props("back")).toMatchObject({
-      to: { name: "workflows", query: { org_identifier: "default", folder: "default" } },
+    await wrapper.find(".back-btn").trigger("click");
+    expect(mockRouter.push).toHaveBeenCalledWith({
+      name: "workflows",
+      query: { org_identifier: "default", folder: "default" },
     });
   });
 });

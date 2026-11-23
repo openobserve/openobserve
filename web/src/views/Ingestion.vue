@@ -17,7 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <OPageLayout class="ingestionPage" data-test="ingestion-page" :title="t('menu.ingestion')" bleed>
+  <OPageLayout
+    class="ingestionPage"
+    data-test="ingestion-page"
+    :title="t('ingestion.header')"
+    icon="data-plus-line"
+    tabs-below
+    bleed
+  >
     <template #actions>
       <!-- A fixed phone width lets the title, search and token button share one row. -->
       <!-- The search only routes to a matching guide, so a locked guide must not trap the reader. -->

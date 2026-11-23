@@ -31,9 +31,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="workflows-list-page"
     class="flex h-full min-h-0 flex-col"
   >
-    <OPageLayout :title="t('menu.workflows')" :about="t('workflow.subtitle')" bleed>
-      <template #status>
-        <BetaBadge />
+    <OPageLayout
+      :title="t('workflow.header')"
+      :subtitle="t('workflow.subtitle')"
+      icon="schema"
+      bleed
+    >
+      <!-- Beta tag rides inside the title line: #title-trail would place it after the whole
+           title and subtitle column, stranding it far from the word "Workflows". -->
+      <template #title>
+        <span class="inline-flex items-center gap-2">
+          {{ t("workflow.header") }}
+          <BetaBadge />
+        </span>
       </template>
       <template #sidebar>
         <FolderList type="workflows" @update:activeFolderId="onFolderChange" />

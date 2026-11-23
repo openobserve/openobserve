@@ -18,9 +18,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     :title="t('iam.ingestionTokens')"
     title-data-test="ingestion-tokens-title-text"
-    :about="t('ingestion.orgLevelExplanation')"
+    icon="key"
     bleed
   >
+    <!-- Full explanation lives in this info tooltip; the subtitle below is a
+           truncated preview so neither overruns the Create action button. -->
+    <template #title-trail>
+      <span class="inline-flex items-center">
+        <OIcon
+          name="info-outline"
+          size="sm"
+          class="text-text-secondary cursor-help"
+          data-test="ingestion-tokens-info-icon"
+        />
+        <OTooltip :content="t('ingestion.orgLevelExplanation')" />
+      </span>
+    </template>
+    <template #subtitle>
+      <span class="min-w-0 truncate leading-normal">{{ t("ingestion.orgLevelSummary") }}</span>
+    </template>
     <template #actions>
       <OButton variant="primary" data-test="add-ingestion-token" @click="showCreateForm = true">
         {{ t("ingestion.createTokenBtn") }}

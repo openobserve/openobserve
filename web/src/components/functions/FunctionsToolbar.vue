@@ -2,6 +2,8 @@
   <!-- The name + transType controls are form-owned (OForm*): AddFunction.vue's <OForm> wraps this
        header so they inject its context, which is what lets the name be the #title. -->
   <OPageHeader
+    :subtitle="embedded ? undefined : t('function.addFunction')"
+    title-overflow="visible"
     :back="
       embedded
         ? undefined
@@ -26,110 +28,121 @@
         :disabled="disableName"
       />
     </template>
-    <template #actions>
-      <!-- The language is a form field, not page navigation, so it sits with the actions. -->
-      <div class="o2-input flex items-center gap-4">
-        <OFormToggleGroup
-          v-if="!hideTransType"
-          name="transType"
-          type="single"
-          data-test="function-transform-type-toggle"
-        >
-          <OToggleGroupItem value="0" data-test="function-transform-type-vrl-option">
-            <template #icon-left>
-              <OBadge size="sm" tone="neutral">{{ raw("V") }}</OBadge>
-            </template>
-            {{ transformTypeOptions[0]?.label }}
-            <template #icon-right>
-              <OIcon
-                name="info-outline"
-                size="sm"
-                class="cursor-pointer opacity-70"
-                data-test="function-transform-type-vrl-info"
-              >
-                <OTooltip>
-                  <template #content>
-                    <!-- OTooltip lays #content out in a row; one column child keeps the title over the body. -->
-                    <div class="flex flex-col">
-                      <div class="mb-1 font-semibold">
-                        {{ t("function.vrl") }} {{ t("function.tipLabel") }}
-                      </div>
-                      <div>{{ t("function.vrlFunctionHint") }}</div>
-                    </div>
-                  </template>
-                </OTooltip>
-              </OIcon>
-            </template>
-          </OToggleGroupItem>
-          <OSeparator v-if="transformTypeOptions[1]" vertical class="my-1.5" />
-          <!-- A locked JS click is caught here, before the item writes "1" to the form state. -->
-          <span
-            v-if="transformTypeOptions[1]"
-            class="contents"
-            @click.capture="transformTypeOptions[1]?.disabled ? onLockedJsClick($event) : undefined"
+    <template #tabs>
+      <div class="o2-input flex h-full items-center gap-4 max-md:h-auto max-md:basis-full">
+        <!-- my-2 insets the divider so it runs past the subtitle line rather than stopping at the name. -->
+        <OSeparator vertical class="my-2 max-md:hidden" />
+        <div class="flex h-9 items-center gap-4">
+          <!-- Each option carries its own tip, so both languages can be understood without picking one. -->
+          <OFormToggleGroup
+            v-if="!hideTransType"
+            name="transType"
+            type="single"
+            data-test="function-transform-type-toggle"
           >
-            <OToggleGroupItem value="1" data-test="function-transform-type-js-option">
+            <OToggleGroupItem value="0" data-test="function-transform-type-vrl-option">
               <template #icon-left>
-                <OBadge size="sm" tone="warn">{{ raw("JS") }}</OBadge>
+                <OBadge size="sm" tone="neutral">{{ raw("V") }}</OBadge>
               </template>
-              {{ transformTypeOptions[1]?.label }}
-              <template v-if="transformTypeOptions[1]?.disabled" #icon-right>
-                <OIcon
-                  name="lock"
-                  size="sm"
-                  class="lock-chip"
-                  data-test="function-transform-type-js-lock"
-                />
-              </template>
-              <template v-else #icon-right>
+              {{ transformTypeOptions[0]?.label }}
+              <template #icon-right>
                 <OIcon
                   name="info-outline"
                   size="sm"
                   class="cursor-pointer opacity-70"
-                  data-test="function-transform-type-js-info"
+                  data-test="function-transform-type-vrl-info"
                 >
                   <OTooltip>
                     <template #content>
+                      <!-- OTooltip lays #content out in a row; one column child keeps the title over the body. -->
                       <div class="flex flex-col">
                         <div class="mb-1 font-semibold">
-                          {{ raw("JavaScript") }} {{ t("function.tipLabel") }}
+                          {{ t("function.vrl") }} {{ t("function.tipLabel") }}
                         </div>
-                        <div>{{ t("function.jsFunctionHint") }}</div>
+                        <div>{{ t("function.vrlFunctionHint") }}</div>
                       </div>
                     </template>
                   </OTooltip>
                 </OIcon>
               </template>
             </OToggleGroupItem>
-          </span>
-        </OFormToggleGroup>
-        <!-- A host that forces one language gets no toggle, so its tip stays reachable here. -->
-        <OIcon
-          v-else
-          name="info-outline"
-          size="sm"
-          class="text-icon-color shrink-0 cursor-pointer"
-          data-test="function-transform-type-info"
-        >
-          <OTooltip>
-            <template #content>
-              <div class="flex flex-col">
-                <div class="mb-1 font-semibold">
-                  {{ transTypeValue === "1" ? raw("JavaScript") : t("function.vrl") }}
-                  {{ t("function.tipLabel") }}
+
+            <OSeparator v-if="transformTypeOptions[1]" vertical class="my-1.5" />
+
+            <!-- A locked JS click is caught here, before the item writes "1" to the form state. -->
+            <span
+              v-if="transformTypeOptions[1]"
+              class="contents"
+              @click.capture="
+                transformTypeOptions[1]?.disabled ? onLockedJsClick($event) : undefined
+              "
+            >
+              <OToggleGroupItem value="1" data-test="function-transform-type-js-option">
+                <template #icon-left>
+                  <OBadge size="sm" tone="warn">{{ raw("JS") }}</OBadge>
+                </template>
+                {{ transformTypeOptions[1]?.label }}
+                <template v-if="transformTypeOptions[1]?.disabled" #icon-right>
+                  <OIcon
+                    name="lock"
+                    size="sm"
+                    class="lock-chip"
+                    data-test="function-transform-type-js-lock"
+                  />
+                </template>
+                <template v-else #icon-right>
+                  <OIcon
+                    name="info-outline"
+                    size="sm"
+                    class="cursor-pointer opacity-70"
+                    data-test="function-transform-type-js-info"
+                  >
+                    <OTooltip>
+                      <template #content>
+                        <div class="flex flex-col">
+                          <div class="mb-1 font-semibold">
+                            {{ raw("JavaScript") }} {{ t("function.tipLabel") }}
+                          </div>
+                          <div>{{ t("function.jsFunctionHint") }}</div>
+                        </div>
+                      </template>
+                    </OTooltip>
+                  </OIcon>
+                </template>
+              </OToggleGroupItem>
+            </span>
+          </OFormToggleGroup>
+
+          <!-- A host that forces one language gets no toggle, so its tip stays reachable here. -->
+          <OIcon
+            v-else
+            name="info-outline"
+            size="sm"
+            class="text-icon-color shrink-0 cursor-pointer"
+            data-test="function-transform-type-info"
+          >
+            <OTooltip>
+              <template #content>
+                <div class="flex flex-col">
+                  <div class="mb-1 font-semibold">
+                    {{ transTypeValue === "1" ? raw("JavaScript") : t("function.vrl") }}
+                    {{ t("function.tipLabel") }}
+                  </div>
+                  <div>
+                    {{
+                      transTypeValue === "1"
+                        ? t("function.jsFunctionHint")
+                        : t("function.vrlFunctionHint")
+                    }}
+                  </div>
                 </div>
-                <div>
-                  {{
-                    transTypeValue === "1"
-                      ? t("function.jsFunctionHint")
-                      : t("function.vrlFunctionHint")
-                  }}
-                </div>
-              </div>
-            </template>
-          </OTooltip>
-        </OIcon>
+              </template>
+            </OTooltip>
+          </OIcon>
+        </div>
       </div>
+    </template>
+    <template #actions>
       <OButton
         v-if="
           config.isEnterprise == 'true' &&
@@ -256,7 +269,7 @@ defineProps({
     default: false,
   },
   // Embedded in a host panel (workflow NDV): the host owns title, close and navigation,
-  // so the back link, Go Full Screen and Cancel are dropped.
+  // so the back link, subtitle, Go Full Screen and Cancel are dropped.
   embedded: {
     type: Boolean,
     default: false,

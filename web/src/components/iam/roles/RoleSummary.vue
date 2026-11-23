@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageHeader
       :title="t('iam.editRole.moduleOverviewTitle')"
       title-data-test="edit-role-summary-title"
-      :context="context"
+      icon="assignment"
     >
       <template #actions>
         <slot name="actions" />
@@ -211,8 +211,6 @@ defineProps<{
   summaryActions: (actions: string[]) => SummaryAction[];
   /** Missing license features when the role's permissions load was license-denied. */
   licenseDenied?: readonly string[] | null;
-  /** The role being edited, shown above the overview title. */
-  context?: I18nText;
 }>();
 
 const emit = defineEmits<{

@@ -23,8 +23,7 @@ export class ModelPricingPage {
         // table element itself: [data-test="model-pricing-list-table"].
         // listTitle is kept as an alias to listTable for backward-compat.
         this.listTitle          = page.locator('[data-test="model-pricing-list-table"]');
-        // The matching-priority help moved from a title tooltip into the header's About popover.
-        this.infoBtn            = page.locator('[data-test="o-page-header-about"]');
+        this.infoBtn            = page.locator('[data-test="model-pricing-info-btn"]');
         this.refreshBtn         = page.locator('[data-test="model-pricing-refresh-btn"]');
         this.testMatchBtn       = page.locator('[data-test="model-pricing-test-match-btn"]');
         this.importBtn          = page.locator('[data-test="model-pricing-import-btn"]');

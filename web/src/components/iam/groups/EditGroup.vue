@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     data-test="edit-group-section"
     :title="raw(groupDetails.group_name)"
-    :back="{ label: t('iam.groups'), to: groupsRoute }"
+    :back="{ label: t('iam.groups'), onClick: cancelEditGroup }"
     bleed
   >
     <div data-test="edit-group-section-title" class="shrink-0">

@@ -174,12 +174,15 @@ const globalStubs = {
   EditorDraftLeaveDialog: LeaveDialogStub,
   OPageHeader: {
     name: "OPageHeader",
-    props: ["title", "about", "back"],
-    // The name, folder and description are inline-edited in the #title slot, so render it.
+    props: ["title", "subtitle", "back"],
+    // The name and mode/description live in the #title and #subtitle slots (inline-edited),
+    // so render both for the OInlineEdit controls under test to mount.
     template:
       '<div class="app-page-header" :data-title="title">' +
+      '<button class="header-back" @click="back && back.onClick()" />' +
       '<div class="header-title"><slot name="title" /></div>' +
-      '<slot name="status" /><slot name="actions-overflow" /><slot name="actions" /></div>',
+      '<div class="header-subtitle"><slot name="subtitle" /></div>' +
+      '<slot name="title-trail" /><slot name="actions-overflow" /><slot name="actions" /></div>',
   },
   OButton: {
     name: "OButton",
@@ -1694,12 +1697,15 @@ describe("WorkflowEditor", () => {
       expect(wf().nodes).toEqual([]);
     });
 
-    it("links the header back to the list", async () => {
+    it("returns to the list from the header back chevron", async () => {
       wrapper = mountEditor();
       await flushPromises();
 
-      expect(wrapper.findComponent({ name: "OPageHeader" }).props("back")).toMatchObject({
-        to: { name: "workflows", query: { org_identifier: "default", folder: "default" } },
+      await wrapper.find(".header-back").trigger("click");
+
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "workflows",
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 

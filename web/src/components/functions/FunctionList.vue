@@ -21,7 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       v-if="!showAddJSTransformDialog"
       :title="t('function.header')"
-      :about="t('function.subtitle')"
+      icon="function"
+      :subtitle="t('function.subtitle')"
+      tabs-below
       bleed
     >
       <template #header-tabs>

@@ -69,7 +69,6 @@ vi.mock("@/composables/useBreakpoint", async () => {
       isMobile: computed(() => !mockViewport.mdUp),
       isTablet: computed(() => false),
       isDesktop: computed(() => mockViewport.mdUp),
-      smUp: computed(() => mockViewport.mdUp),
       mdUp: computed(() => mockViewport.mdUp),
       lgUp: computed(() => mockViewport.mdUp),
     }),

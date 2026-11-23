@@ -17,7 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <OPageLayout :title="t('iam.basicUsers')" bleed>
+  <OPageLayout
+    :title="t('iam.basicUsers')"
+    :subtitle="t('user.subtitle', { org: store.state.selectedOrganization?.label ?? '' })"
+    icon="person"
+    bleed
+  >
     <template #actions>
       <OButton
         v-if="config.isCloud === 'true' && canInvite"

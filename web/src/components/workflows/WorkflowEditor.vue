@@ -27,14 +27,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="workflow-editor-page" class="flex h-full min-h-0 flex-col">
     <OPageHeader
-      :back="{
-        label: t('menu.workflows'),
-        to: workflowsListRoute(),
-        dataTest: 'workflow-editor-back',
-      }"
+      :subtitle="headerModeLabel"
+      title-overflow="visible"
+      :back="{ label: t('workflow.header'), onClick: goBack, dataTest: 'workflow-editor-back' }"
+      class="border-border-default border-b px-4"
+      overflow-first
     >
-      <!-- The name is the title, editable on create only. Folder and description stay beside it
-           because the editor has no other place to set them before the first save. -->
+      <!-- The description shares the meta line with mode and folder: beside the title, a growing
+           name pushed it sideways on every keystroke. -->
+      <template #subtitle>
+        <span class="flex min-w-0 items-center gap-1 leading-normal">
+          <span class="whitespace-nowrap">
+            {{ t("workflow.modeInFolder", { mode: headerModeLabel }) }}
+          </span>
+          <InlineSelectFolderDropdown
+            v-if="!workflowObj.isEditWorkflow"
+            variant="inline"
+            :model-value="activeFolderId"
+            type="workflows"
+            data-test="workflow-editor-folder"
+            @update:model-value="activeFolderId = $event"
+          />
+          <OTruncatedText
+            v-else
+            data-test="workflow-editor-folder-static"
+            class="text-text-body font-medium"
+          >
+            {{ activeFolderName }}
+          </OTruncatedText>
+          <OInlineEdit
+            v-if="!workflowObj.isEditWorkflow"
+            v-model="workflowObj.currentSelectedWorkflow.description"
+            tone="meta"
+            data-test="workflow-editor-description"
+            :placeholder="t('workflow.descriptionPlaceholder')"
+            :aria-label="t('workflow.description')"
+            @update:model-value="markWorkflowDirty"
+          />
+        </span>
+      </template>
+
       <template #title>
         <!-- The name's sizer grid can't shrink below its text, so < md it needs an explicit max-w cap. -->
         <span class="inline-flex min-w-0 items-center gap-2">
@@ -59,33 +91,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('workflow.draft')"
             data-test="workflow-editor-draft-tag"
           />
-          <span
-            class="text-text-secondary flex min-w-0 items-center gap-1 text-xs font-normal max-md:hidden"
-          >
-            <InlineSelectFolderDropdown
-              v-if="!workflowObj.isEditWorkflow"
-              variant="inline"
-              :model-value="activeFolderId"
-              type="workflows"
-              data-test="workflow-editor-folder"
-              @update:model-value="activeFolderId = $event"
-            />
-            <template v-else>
-              <OIcon name="folder" size="xs" class="shrink-0" />
-              <OTruncatedText data-test="workflow-editor-folder-static">
-                {{ activeFolderName }}
-              </OTruncatedText>
-            </template>
-            <OInlineEdit
-              v-if="!workflowObj.isEditWorkflow"
-              v-model="workflowObj.currentSelectedWorkflow.description"
-              tone="meta"
-              data-test="workflow-editor-description"
-              :placeholder="t('workflow.descriptionPlaceholder')"
-              :aria-label="t('workflow.description')"
-              @update:model-value="markWorkflowDirty"
-            />
-          </span>
         </span>
       </template>
 
@@ -384,6 +389,9 @@ const activeFolderName = computed(() => {
   );
 });
 
+const headerModeLabel = computed(() =>
+  workflowObj.isEditWorkflow ? t("workflow.editMode") : t("workflow.create"),
+);
 const {
   resetWorkflowData,
   deleteNode,
@@ -575,13 +583,14 @@ const loadWorkflow = async (id: string) => {
   }
 };
 
-const workflowsListRoute = () => ({
-  name: "workflows",
-  query: { org_identifier: orgId(), folder: activeFolderId.value },
-});
 // Only navigates: onBeforeRouteLeave prompts on unsaved edits, and resetting here
 // would clear dirtyFlag and slip that guard.
-const goBack = () => router.push(workflowsListRoute());
+const goBack = () => {
+  router.push({
+    name: "workflows",
+    query: { org_identifier: orgId(), folder: activeFolderId.value },
+  });
+};
 
 // ── Unsaved-changes guard (T8) ──────────────────────────────────────────────
 // One prompt catches every exit path: Cancel/back and sidebar/programmatic nav

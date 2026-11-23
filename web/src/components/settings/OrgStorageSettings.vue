@@ -19,7 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       v-if="currentAction === 'list'"
       :title="t('storage_settings.tabLabel')"
-      :about="t('settings.orgStorageSettings.subtitle')"
+      icon="cloud"
+      :subtitle="t('settings.orgStorageSettings.subtitle')"
       bleed
       scroll
     >

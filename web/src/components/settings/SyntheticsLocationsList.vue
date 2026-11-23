@@ -18,8 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex h-full flex-col p-0">
     <template v-if="!showImportDialog">
       <OPageLayout
+        overflow-first
         :title="t('synthetics.locations.title')"
-        :about="t('synthetics.locations.description')"
+        icon="location-on"
+        :subtitle="t('synthetics.locations.description')"
         bleed
       >
         <template #actions-overflow>

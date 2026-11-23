@@ -1,11 +1,14 @@
 <template>
   <OPageLayout
+    overflow-first
     data-test="gen-ai-agent-mapping-settings"
-    :title="t('genAiAgentMapping.tabLabel')"
-    title-data-test="gen-ai-agent-mapping-page-title"
-    :about="t('genAiAgentMapping.subtitle')"
+    :subtitle="t('genAiAgentMapping.subtitle')"
+    icon="account-tree"
     bleed
   >
+    <template #title>
+      <span data-test="gen-ai-agent-mapping-page-title">{{ t("genAiAgentMapping.title") }}</span>
+    </template>
     <!-- Acts on the stored registry, not the form, so it lives in the header. -->
     <template #actions>
       <OButton

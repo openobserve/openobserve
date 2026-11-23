@@ -16,9 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout
-    :title="t('menu.fleet')"
-    :about="t('fleet.subtitle')"
+    :title="t('fleet.title')"
+    :subtitle="t('fleet.subtitle')"
+    icon="workspaces"
     bleed
+    tabs-below
     data-test="fleet-manager-page"
   >
     <template #actions>

@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="enrichment-tables-list-page" class="flex h-full min-h-0 flex-col">
     <OPageLayout
       :title="t('function.enrichmentTables')"
-      :about="t('function.enrichmentTablesSubtitle')"
+      icon="dataset"
+      :subtitle="t('function.enrichmentTablesSubtitle')"
+      tabs-below
       bleed
     >
       <template #header-tabs>

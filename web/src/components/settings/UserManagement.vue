@@ -18,7 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex h-full flex-col p-0">
     <OPageLayout
       :title="t('settings.userManagement')"
-      :about="t('settings.userManagementPage.subtitle')"
+      icon="manage-accounts"
+      :subtitle="t('settings.userManagementPage.subtitle')"
       bleed
     >
       <div class="bg-card-glass-bg mt-2.5 min-h-0 flex-1 overflow-hidden">
