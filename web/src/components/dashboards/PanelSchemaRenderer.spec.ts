@@ -637,6 +637,72 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
     });
 
+    describe("multi-query SQL panel (#16901)", () => {
+      const mountBar = async (data: any, hiddenIndex = -1, type = "bar") => {
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+          data: ref(data),
+          loading: ref(false),
+          errorDetail: ref({ message: "", code: "" }),
+          metadata: ref({}),
+          resultMetaData: ref({}),
+          annotations: ref([]),
+          lastTriggeredAt: ref(null),
+          isCachedDataDifferWithCurrentTimeRange: ref(false),
+          searchRequestTraceIds: ref([]),
+          loadingProgressPercentage: ref(0),
+          isPartialData: ref(false),
+        } as any);
+        const query = defaultProps.panelSchema.queries[0];
+        wrapper = createWrapper({
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type,
+            queries: [0, 1].map((i) => ({
+              ...query,
+              config: { ...query.config, hide: i === hiddenIndex },
+            })),
+          },
+        });
+        await flushPromises();
+        wrapper.vm.panelData = { chartType: type, options: { series: [{ data: [1] }] } };
+        await flushPromises();
+        return wrapper.vm.noData;
+      };
+      const rows = [{ x_axis_1: "a", y_axis_1: 1 }];
+
+      it("keeps the chart when only a later query has rows", async () => {
+        expect(await mountBar([[], rows])).toBe("");
+      });
+
+      it("keeps the chart when the first query has rows", async () => {
+        expect(await mountBar([rows, []])).toBe("");
+      });
+
+      it("shows No Data when every query is empty", async () => {
+        expect(await mountBar([[], []])).toBe("No Data");
+      });
+
+      it("shows No Data when the only non-empty query is hidden", async () => {
+        expect(await mountBar([rows, []], 0)).toBe("No Data");
+      });
+
+      it("keeps the chart when a hidden query is the empty one", async () => {
+        expect(await mountBar([[], rows], 0)).toBe("");
+      });
+
+      it.each(["gauge", "metric"])(
+        "keeps a %s panel when only a later query has a value",
+        async (type) => {
+          const alias = defaultProps.panelSchema.queries[0].fields.y[0].alias;
+          expect(await mountBar([[], [{ [alias]: 645 }]], -1, type)).toBe("");
+        },
+      );
+
+      it("shows No Data for a gauge when no query has a value", async () => {
+        expect(await mountBar([[], []], -1, "gauge")).toBe("No Data");
+      });
+    });
+
     describe("a named missing value replaces No Data", () => {
       const nullMapping = { type: "special", match: "null", text: "N/A", color: null };
       const mountEmpty = async (panelSchema: any, data: any) => {

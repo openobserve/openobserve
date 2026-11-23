@@ -28,10 +28,13 @@
 pub mod payload;
 pub mod render;
 
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::{
+    sync::atomic::{AtomicU32, AtomicU64, Ordering},
+    time::Duration,
+};
 
 use config::meta::{cluster::RoleGroup, search as meta_search, stream::StreamType};
-use tokio::sync::{OnceCell, Semaphore};
+use tokio::sync::{OnceCell, Semaphore, SemaphorePermit};
 
 use self::payload::ChartPayload;
 
@@ -40,6 +43,9 @@ use self::payload::ChartPayload;
 const MIN_LOOKBACK_SECS: u64 = 6 * 3600;
 const MAX_LOOKBACK_SECS: u64 = 24 * 3600;
 const LOOKBACK_PERIODS: u64 = 20;
+
+/// A normal render takes milliseconds; past this the caller goes on without a chart.
+pub const RENDER_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Signing key, cached on first SUCCESSFUL resolution. Failure (no key
 /// material, or a transient DB error fetching the root user) is NOT cached —
@@ -275,9 +281,9 @@ pub async fn build_chart_url(org_id: &str, p: &ChartPayload) -> Option<String> {
 /// Send-time render (email CID / discord upload): bounded by the same
 /// per-node semaphore as fetch-side renders; at capacity the send proceeds
 /// chartless.
-pub fn try_render_png(p: &ChartPayload) -> Option<Vec<u8>> {
-    let _permit = render_semaphore().try_acquire().ok()?;
-    match render::render_png(p) {
+pub async fn try_render_png(p: &ChartPayload) -> Option<Vec<u8>> {
+    let permit = render_semaphore().try_acquire().ok()?;
+    match render_png_bounded(p.clone(), permit).await {
         Ok(png) => {
             config::metrics::ALERT_CHART_EVENTS_TOTAL
                 .with_label_values(&["rendered_send"])
@@ -287,6 +293,28 @@ pub fn try_render_png(p: &ChartPayload) -> Option<Vec<u8>> {
         Err(e) => {
             log::warn!("[ALERT_CHART] send-time render failed: {e}");
             None
+        }
+    }
+}
+
+/// Renders off the async runtime, bounded by [`RENDER_TIMEOUT`]. Blocking work cannot be
+/// cancelled, so the permit stays with the task: a render past the timeout keeps its slot.
+pub async fn render_png_bounded(
+    p: ChartPayload,
+    permit: SemaphorePermit<'static>,
+) -> anyhow::Result<Vec<u8>> {
+    let task = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        render::render_png(&p)
+    });
+    match tokio::time::timeout(RENDER_TIMEOUT, task).await {
+        Ok(Ok(rendered)) => rendered,
+        Ok(Err(e)) => Err(anyhow::anyhow!("render task failed: {e}")),
+        Err(_) => {
+            config::metrics::ALERT_CHART_EVENTS_TOTAL
+                .with_label_values(&["render_timeout"])
+                .inc();
+            Err(anyhow::anyhow!("render timed out after {RENDER_TIMEOUT:?}"))
         }
     }
 }

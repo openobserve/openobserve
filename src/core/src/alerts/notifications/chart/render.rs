@@ -37,6 +37,11 @@ pub const CHART_HEIGHT: u32 = 360;
 const FONT_FAMILY: &str = "sans-serif";
 static FONT_BYTES: &[u8] = include_bytes!("font/DejaVuSans.ttf");
 static REGISTER_FONT: Once = Once::new();
+/// Plotters' tick search scales the span by 10 and loops forever once it overflows, so values
+/// stay far below f64::MAX.
+const MAX_ABS_VALUE: f64 = 1e300;
+/// 9999-12-31T23:59:59Z; also keeps the `+ 1` x-range math from overflowing.
+const MAX_TIMESTAMP_SECS: u64 = 253_402_300_799;
 
 fn ensure_font() {
     REGISTER_FONT.call_once(|| {
@@ -62,6 +67,9 @@ pub fn render_png(p: &ChartPayload) -> Result<Vec<u8>, anyhow::Error> {
     ensure_font();
     if p.points.len() < 2 {
         return Err(anyhow::anyhow!("need at least 2 points"));
+    }
+    if !within_bounds(p) {
+        return Err(anyhow::anyhow!("value or timestamp out of range"));
     }
 
     let mut rgb = vec![0u8; (CHART_WIDTH * CHART_HEIGHT * 3) as usize];
@@ -213,6 +221,13 @@ pub fn render_png(p: &ChartPayload) -> Result<Vec<u8>, anyhow::Error> {
     Ok(png)
 }
 
+/// Checks every field that reaches an axis.
+fn within_bounds(p: &ChartPayload) -> bool {
+    let mut values = p.points.iter().map(|(_, v)| *v).chain(p.crit).chain(p.warn);
+    values.all(|v| v.abs() <= MAX_ABS_VALUE)
+        && p.points.iter().all(|(t, _)| *t <= MAX_TIMESTAMP_SECS)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,5 +270,54 @@ mod tests {
         let mut p = sample();
         p.points.truncate(1);
         assert!(render_png(&p).is_err());
+    }
+
+    #[test]
+    fn overflowing_value_range_is_an_error() {
+        for (hi, lo) in [(1e308, -1e308), (9e307, -9e307), (f64::MAX, 0.0)] {
+            let mut p = sample();
+            p.points[0].1 = hi;
+            p.points[1].1 = lo;
+            assert!(render_png(&p).is_err(), "{hi} / {lo}");
+        }
+    }
+
+    #[test]
+    fn a_value_past_the_bound_in_any_field_is_an_error() {
+        let over = MAX_ABS_VALUE * 1.0001;
+        let cases: [fn(&mut ChartPayload, f64); 3] = [
+            |p, v| p.points[3].1 = -v,
+            |p, v| p.crit = Some(v),
+            |p, v| p.warn = Some(-v),
+        ];
+        for (i, set) in cases.iter().enumerate() {
+            let mut p = sample();
+            assert!(render_png(&p).is_ok());
+            set(&mut p, over);
+            assert!(render_png(&p).is_err(), "case {i}");
+        }
+    }
+
+    #[test]
+    fn a_timestamp_past_the_year_9999_is_an_error() {
+        for t in [MAX_TIMESTAMP_SECS + 1, u64::MAX] {
+            let mut p = sample();
+            p.points.last_mut().unwrap().0 = t;
+            assert!(render_png(&p).is_err(), "point {t}");
+        }
+    }
+
+    #[test]
+    fn large_finite_value_range_renders() {
+        for (hi, lo) in [
+            (MAX_ABS_VALUE, -MAX_ABS_VALUE),
+            (MAX_ABS_VALUE, 0.0),
+            (1e15, -1e15),
+        ] {
+            let mut p = sample();
+            p.points[0].1 = hi;
+            p.points[1].1 = lo;
+            assert!(render_png(&p).is_ok(), "{hi} / {lo}");
+        }
     }
 }
