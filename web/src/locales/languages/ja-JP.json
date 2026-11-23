@@ -6315,6 +6315,8 @@
     "fieldRequired": "フィールドは必須です！",
     "sqlQuery": "SQL クエリ",
     "promqlQuery": "プロムQL クエリ",
+    "queryRowLimitNote": "クエリで独自の LIMIT を指定しない限り、各実行で処理される行は最大 {limit} 行です。",
+    "queryRowLimitNoteNoLimit": "クエリで独自の LIMIT を指定しない限り、各実行で処理される行はデフォルトの行数までです。",
     "output": "出力",
     "validating": "検証中...",
     "validateAndClose": "検証して閉じる",

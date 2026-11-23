@@ -6315,6 +6315,8 @@
     "fieldRequired": "字段为必填字段！",
     "sqlQuery": "Sql 查询",
     "promqlQuery": "PromQL 查询",
+    "queryRowLimitNote": "除非查询自行设置 LIMIT，否则每次运行最多处理 {limit} 行。",
+    "queryRowLimitNoteNoLimit": "除非查询自行设置 LIMIT，否则每次运行最多处理默认行数。",
     "output": "输出",
     "validating": "正在验证...",
     "validateAndClose": "验证并关闭",

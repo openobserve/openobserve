@@ -6315,6 +6315,8 @@
     "fieldRequired": "필드는 필수입니다!",
     "sqlQuery": "SQL 쿼리",
     "promqlQuery": "PromQL 쿼리",
+    "queryRowLimitNote": "쿼리에서 자체 LIMIT을 설정하지 않으면 각 실행은 최대 {limit}개 행을 처리합니다.",
+    "queryRowLimitNoteNoLimit": "쿼리에서 자체 LIMIT을 설정하지 않으면 각 실행은 최대 기본 행 수만큼 처리합니다.",
     "output": "출력",
     "validating": "검증 중...",
     "validateAndClose": "검증 후 닫기",

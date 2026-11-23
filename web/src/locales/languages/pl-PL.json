@@ -6315,6 +6315,8 @@
     "fieldRequired": "Pole jest wymagane!",
     "sqlQuery": "Zapytanie SQL",
     "promqlQuery": "Zapytanie PromQL",
+    "queryRowLimitNote": "Każde uruchomienie przetwarza najwyżej {limit} wierszy, chyba że zapytanie ustawia własny LIMIT.",
+    "queryRowLimitNoteNoLimit": "Każde uruchomienie przetwarza najwyżej domyślną liczbę wierszy, chyba że zapytanie ustawia własny LIMIT.",
     "output": "Wyjście",
     "validating": "Sprawdzanie...",
     "validateAndClose": "Sprawdź i zamknij",

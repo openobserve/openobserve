@@ -6315,6 +6315,8 @@
     "fieldRequired": "Veld is verplicht!",
     "sqlQuery": "SQL-zoekopdracht",
     "promqlQuery": "PromQL-zoekopdracht",
+    "queryRowLimitNote": "Elke run verwerkt maximaal {limit} rijen, tenzij de query een eigen LIMIT instelt.",
+    "queryRowLimitNoteNoLimit": "Elke run verwerkt maximaal het standaardaantal rijen, tenzij de query een eigen LIMIT instelt.",
     "output": "Uitgang",
     "validating": "Valideren...",
     "validateAndClose": "Valideren en sluiten",

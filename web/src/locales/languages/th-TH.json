@@ -6315,6 +6315,8 @@
     "fieldRequired": "Field is required!",
     "sqlQuery": "Sql Query",
     "promqlQuery": "PromQL Query",
+    "queryRowLimitNote": "การรันแต่ละครั้งประมวลผลได้สูงสุด {limit} แถว เว้นแต่คิวรีจะกำหนด LIMIT ของตัวเอง",
+    "queryRowLimitNoteNoLimit": "การรันแต่ละครั้งประมวลผลได้สูงสุดตามจำนวนแถวเริ่มต้น เว้นแต่คิวรีจะกำหนด LIMIT ของตัวเอง",
     "output": "Output",
     "validating": "Validating...",
     "validateAndClose": "Validate and Close",

@@ -6315,6 +6315,8 @@
     "fieldRequired": "Il campo è obbligatorio!",
     "sqlQuery": "Query SQL",
     "promqlQuery": "Query PromQL",
+    "queryRowLimitNote": "Ogni esecuzione elabora al massimo {limit} righe, a meno che la query non imposti un proprio LIMIT.",
+    "queryRowLimitNoteNoLimit": "Ogni esecuzione elabora al massimo il numero predefinito di righe, a meno che la query non imposti un proprio LIMIT.",
     "output": "Uscita",
     "validating": "Convalida in corso...",
     "validateAndClose": "Convalida e chiudi",

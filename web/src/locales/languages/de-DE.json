@@ -6315,6 +6315,8 @@
     "fieldRequired": "Feld ist erforderlich!",
     "sqlQuery": "SQL-Abfrage",
     "promqlQuery": "PromQL-Abfrage",
+    "queryRowLimitNote": "Jeder Lauf verarbeitet höchstens {limit} Zeilen, sofern die Abfrage kein eigenes LIMIT setzt.",
+    "queryRowLimitNoteNoLimit": "Jeder Lauf verarbeitet höchstens die Standardanzahl an Zeilen, sofern die Abfrage kein eigenes LIMIT setzt.",
     "output": "Ausgang",
     "validating": "Es wird validiert...",
     "validateAndClose": "Bestätigen und schließen",

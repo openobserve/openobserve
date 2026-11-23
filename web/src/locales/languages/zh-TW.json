@@ -6315,6 +6315,8 @@
     "fieldRequired": "欄位為必填！",
     "sqlQuery": "SQL 查詢",
     "promqlQuery": "PromQL 查詢",
+    "queryRowLimitNote": "除非查詢自行設定 LIMIT，否則每次執行最多處理 {limit} 列。",
+    "queryRowLimitNoteNoLimit": "除非查詢自行設定 LIMIT，否則每次執行最多處理預設列數。",
     "output": "輸出",
     "validating": "驗證中...",
     "validateAndClose": "驗證並關閉",

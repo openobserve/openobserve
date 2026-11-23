@@ -1153,4 +1153,30 @@ describe("ScheduledPipeline Component", () => {
       expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
     });
   });
+
+  describe("row limit note", () => {
+    const note = () => wrapper.find('[data-test="scheduled-pipeline-row-limit-note"]');
+
+    it("shows the configured default limit in SQL mode", async () => {
+      wrapper.unmount();
+      mockStore.state.zoConfig.query_default_limit = 1000;
+      wrapper = mountHarness().w;
+      await flushPromises();
+      expect(note().text()).toBe(
+        "Each run processes at most 1000 rows unless the query sets its own LIMIT.",
+      );
+    });
+
+    it("omits the number when the server does not send a limit", () => {
+      expect(note().text()).toBe(
+        "Each run processes at most the default number of rows unless the query sets its own LIMIT.",
+      );
+    });
+
+    it("is hidden in PromQL mode", async () => {
+      child.tab = "promql";
+      await nextTick();
+      expect(note().exists()).toBe(false);
+    });
+  });
 });

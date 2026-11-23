@@ -6315,6 +6315,8 @@
     "fieldRequired": "Поле обязательно!",
     "sqlQuery": "SQL-запрос",
     "promqlQuery": "PromQL-запрос",
+    "queryRowLimitNote": "Каждый запуск обрабатывает не более {limit} строк, если в запросе не задан собственный LIMIT.",
+    "queryRowLimitNoteNoLimit": "Каждый запуск обрабатывает не более стандартного числа строк, если в запросе не задан собственный LIMIT.",
     "output": "Вывод",
     "validating": "Проверка...",
     "validateAndClose": "Проверить и закрыть",

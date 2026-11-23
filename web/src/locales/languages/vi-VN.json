@@ -6315,6 +6315,8 @@
     "fieldRequired": "Trường là bắt buộc!",
     "sqlQuery": "Truy vấn SQL",
     "promqlQuery": "Truy vấn PromQL",
+    "queryRowLimitNote": "Mỗi lần chạy xử lý tối đa {limit} hàng, trừ khi truy vấn tự đặt LIMIT.",
+    "queryRowLimitNoteNoLimit": "Mỗi lần chạy xử lý tối đa số hàng mặc định, trừ khi truy vấn tự đặt LIMIT.",
     "output": "Đầu ra",
     "validating": "Đang xác thực...",
     "validateAndClose": "Xác thực và Đóng",

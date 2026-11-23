@@ -6315,6 +6315,8 @@
     "fieldRequired": "الحقل مطلوب!",
     "sqlQuery": "استعلام SQL",
     "promqlQuery": "PromQL استعلام",
+    "queryRowLimitNote": "يعالج كل تشغيل {limit} صفًا كحد أقصى ما لم يحدد الاستعلام LIMIT خاصًا به.",
+    "queryRowLimitNoteNoLimit": "يعالج كل تشغيل العدد الافتراضي من الصفوف كحد أقصى ما لم يحدد الاستعلام LIMIT خاصًا به.",
     "output": "الإنتاج",
     "validating": "جارٍ التحقق...",
     "validateAndClose": "التحقق والإغلاق",

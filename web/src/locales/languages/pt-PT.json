@@ -6315,6 +6315,8 @@
     "fieldRequired": "O campo é obrigatório!",
     "sqlQuery": "Consulta SQL",
     "promqlQuery": "Consulta PromQL",
+    "queryRowLimitNote": "Cada execução processa no máximo {limit} linhas, a menos que a consulta defina o seu próprio LIMIT.",
+    "queryRowLimitNoteNoLimit": "Cada execução processa no máximo o número predefinido de linhas, a menos que a consulta defina o seu próprio LIMIT.",
     "output": "Saída",
     "validating": "A validar...",
     "validateAndClose": "Validar e fechar",

@@ -6315,6 +6315,8 @@
     "fieldRequired": "Field is required!",
     "sqlQuery": "Sql Query",
     "promqlQuery": "PromQL Query",
+    "queryRowLimitNote": "Each run processes at most {limit} rows unless the query sets its own LIMIT.",
+    "queryRowLimitNoteNoLimit": "Each run processes at most the default number of rows unless the query sets its own LIMIT.",
     "output": "Output",
     "validating": "Validating...",
     "validateAndClose": "Validate and Close",

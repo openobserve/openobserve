@@ -6315,6 +6315,8 @@
     "fieldRequired": "Alan zorunludur!",
     "sqlQuery": "Sql sorgusu",
     "promqlQuery": "PromQL Sorgulama",
+    "queryRowLimitNote": "Sorgu kendi LIMIT değerini belirlemedikçe her çalıştırma en fazla {limit} satır işler.",
+    "queryRowLimitNoteNoLimit": "Sorgu kendi LIMIT değerini belirlemedikçe her çalıştırma en fazla varsayılan satır sayısını işler.",
     "output": "Çıktı",
     "validating": "Doğrulanıyor...",
     "validateAndClose": "Doğrula ve Kapat",
