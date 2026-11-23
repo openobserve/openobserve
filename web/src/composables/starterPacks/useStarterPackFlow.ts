@@ -169,7 +169,12 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const load = async () => {
     loadFailed.value = false;
     try {
-      record.value = newestRecord(await listInstalls(pack.id), myEmail());
+      const rows = await listInstalls(pack.id);
+      record.value = newestRecord(rows, myEmail());
+      forbidden.value = false;
+      if (!rows.some(({ status }) => status === "installing" || status === "incomplete")) {
+        busyBy.value = null;
+      }
       if (record.value) await readAlertsOn();
     } catch (error) {
       // A retry cannot get past a refusal, so it reads as ask an admin, not as a failed load.
@@ -188,6 +193,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       if (run !== previewRun) return;
       preview.value = next;
       previewState.value = "ready";
+      forbidden.value = false;
     } catch (error) {
       if (run !== previewRun) return;
       if (isForbidden(error)) forbidden.value = true;
