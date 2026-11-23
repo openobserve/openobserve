@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #node-default="{ id, data }">
       <CustomNode :id="id" :data="data" io_type="default" />
     </template>
-    <Controls :showInteractive="false" class="controls-grp" position="top-left">
+    <FlowControls :show-interactive="false" class="controls-grp" position="top-left">
       <!-- Node-rail toggle. `#top` puts it ABOVE zoom-in / zoom-out / fit-view
              (the default slot would append it below them). The glyph is a bare
              32x32 currentColor <svg>, exactly like Vue Flow's own control icons
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </svg>
         </ControlButton>
       </template>
-    </Controls>
+    </FlowControls>
   </VueFlow>
   <!-- Empty-canvas start node. It is an OVERLAY, not a Vue Flow node: a real
          node would land in `currentSelectedPipeline.nodes` and show up in save,
@@ -167,7 +167,8 @@ import type { Ref } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import type { VueFlowStore } from "@vue-flow/core";
-import { Controls, ControlButton } from "@vue-flow/controls";
+import { ControlButton } from "@vue-flow/controls";
+import FlowControls from "@/components/flow/FlowControls.vue";
 // import vueFlowConfig from "./vueFlowConfig";
 // Shared, token-driven canvas styling — the SAME file the workflow canvas
 // imports, so the two canvases cannot drift. It owns the vue-flow node chrome
@@ -193,7 +194,7 @@ export default {
     CustomNode,
     OIcon,
     DropzoneBackground,
-    Controls,
+    FlowControls,
     ControlButton,
     FlowEdge,
     FlowNodeCard,

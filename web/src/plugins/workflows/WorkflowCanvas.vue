@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
 
-    <Controls :show-interactive="false" class="controls-grp" position="top-left">
+    <FlowControls :show-interactive="false" class="controls-grp" position="top-left">
       <!-- Node-rail toggle, same as the pipeline canvas: `#top` puts it ABOVE
            zoom-in / zoom-out / fit-view, and the glyph is a bare 32x32
            currentColor <svg> so it matches Vue Flow's own control icons. -->
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </svg>
       </ControlButton>
-    </Controls>
+    </FlowControls>
   </VueFlow>
 
   <!-- Empty-canvas start scaffold — two DASHED placeholder cards (Trigger on top,
@@ -312,7 +312,8 @@ import "@/components/flow/flow-canvas.css";
 import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
-import { Controls, ControlButton } from "@vue-flow/controls";
+import { ControlButton } from "@vue-flow/controls";
+import FlowControls from "@/components/flow/FlowControls.vue";
 import { useI18nTyped } from "@/types/i18n";
 import WorkflowNode from "./WorkflowNode.vue";
 import WorkflowStartCard from "./WorkflowStartCard.vue";

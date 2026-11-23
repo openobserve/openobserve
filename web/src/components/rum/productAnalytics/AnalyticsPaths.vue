@@ -149,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="depthOptions"
               size="sm"
               width="xs"
+              :aria-label="t('rum.analytics.funnel.railSteps')"
               data-test="rum-analytics-paths-depth-select"
               @update:model-value="(v) => update({ depth: Number(v) })"
             />

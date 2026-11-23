@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :name="`rules[${index}].op`"
       :options="opOptions"
       size="sm"
+      :aria-label="t('rum.analytics.exclusions.match')"
       :data-test="`rum-analytics-named-events-rule-${index}-op`"
     />
     <OFormCombobox

@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :options="serviceOptions"
         size="sm"
         class="min-w-36"
+        :aria-label="t('rum.service')"
         data-test="rum-errors-filter-service-select"
         @update:model-value="onServiceSelect"
       />
