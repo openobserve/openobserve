@@ -65,6 +65,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="sessions-list-user-filter"
         @remove="clearUserFilter"
       />
+      <SqlFilterBuilder
+        :query="searchFilter"
+        :fields="filterFields"
+        :fields-loading="filterFieldsLoading"
+        :load-values="loadFilterValues"
+        :free-text="false"
+        appearance="field"
+        class="mt-2"
+        data-test="sessions-list-filter"
+        @update:query="searchFilter = $event"
+        @submit="refresh()"
+      />
     </div>
     <AiScopeBar
       v-if="!(streamsLoaded && availableStreams.length === 0)"
@@ -327,6 +339,11 @@ import {
   type SessionSearch,
 } from "./composables/useSessions";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
+import { toFilterFields, type FilterField } from "@/utils/query/filterBar";
+import { parseSqlFilter } from "@/utils/query/filterBarParser";
+import { requestFieldValues, requestFieldValuesMatching } from "@/composables/fieldValueStore";
+import useStreams from "@/composables/useStreams";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -372,6 +389,7 @@ const {
   currentPage,
   rowsPerPage,
   searchKeyword,
+  searchFilter,
   searchUser,
   sortBy,
   sortOrder,
@@ -388,6 +406,9 @@ const urlScope = readUrlScope(route.query);
 const urlKeyword = normalizeSearchTerm(
   typeof route.query.keyword === "string" ? route.query.keyword : "",
 );
+// The bar has no text mode, so a `?filter=` it cannot draw is dropped.
+const rawUrlFilter = typeof route.query.filter === "string" ? route.query.filter.trim() : "";
+const urlFilter = parseSqlFilter(rawUrlFilter) ? rawUrlFilter : "";
 
 // ── List search ─────────────────────────────────────────────────────────────
 // `searchKeyword` is module-scoped in useSessions so back-navigation restores
@@ -404,15 +425,22 @@ if (urlKeyword && (urlKeyword !== searchKeyword.value || !window.history.state?.
   searchKeyword.value = urlKeyword;
   searchChangedByUrl = true;
 }
+if (urlFilter !== searchFilter.value || (urlFilter && !window.history.state?.forward)) {
+  searchFilter.value = urlFilter;
+  currentPage.value = 1;
+  searchChangedByUrl = true;
+}
 // The URL alone owns `?user=`: a link without it shows every user.
 const urlUser = normalizeSearchTerm(typeof route.query.user === "string" ? route.query.user : "");
 if (urlUser !== searchUser.value) {
   searchUser.value = urlUser;
   searchChangedByUrl = true;
 }
-const searchActive = computed(() => searchKeyword.value.length > 0);
+const searchActive = computed(
+  () => searchKeyword.value.length > 0 || searchFilter.value.length > 0,
+);
 const activeSearch = computed<SessionSearch | undefined>(() =>
-  searchActive.value || searchUser.value
+  searchKeyword.value || searchUser.value
     ? { keyword: searchKeyword.value || undefined, user: searchUser.value || undefined }
     : undefined,
 );
@@ -582,6 +610,45 @@ let resolvingScope = 0;
 const agentFilterClause = computed(() =>
   buildAgentSessionFilter(effectiveAgent.value, effectiveStream.value),
 );
+// One span must satisfy both; the parentheses keep a filter's OR from splitting the agent clause.
+const sessionFilter = computed(() => {
+  const agent = agentFilterClause.value;
+  const filter = searchFilter.value;
+  return agent && filter ? `${agent} AND (${filter})` : agent || filter;
+});
+
+const { getStream } = useStreams(t);
+const filterFields = ref<FilterField[]>([]);
+const filterFieldsLoading = ref(false);
+watch(
+  [effectiveStream, currentOrg],
+  async ([stream], _, onCleanup) => {
+    filterFields.value = [];
+    filterFieldsLoading.value = Boolean(stream);
+    if (!stream) return;
+    let stale = false;
+    onCleanup(() => {
+      stale = true;
+    });
+    const schema = await getStream(stream, "traces", true).catch(() => null);
+    if (stale) return;
+    filterFields.value = toFilterFields(schema?.schema ?? []);
+    filterFieldsLoading.value = false;
+  },
+  { immediate: true },
+);
+
+// Values come from the page's window: the store's own lookback is fifteen minutes.
+function loadFilterValues(field: string, search: string): Promise<string[]> {
+  const ctx = { org: currentOrg(), streamType: "traces", streamName: effectiveStream.value };
+  const timeRange =
+    props.startTime && props.endTime
+      ? { startTime: props.startTime, endTime: props.endTime }
+      : undefined;
+  return search.trim()
+    ? requestFieldValuesMatching(ctx, field, search, { timeRange })
+    : requestFieldValues(ctx, field, { timeRange });
+}
 
 // `instrument` is the only action id the preset emits. Send the user to
 // the in-app AI integrations page (the closest "set this up" surface) so
@@ -758,6 +825,8 @@ function syncFilterUrl() {
     else delete query.keyword;
     if (searchUser.value) query.user = searchUser.value;
     else delete query.user;
+    if (searchFilter.value) query.filter = searchFilter.value;
+    else delete query.filter;
     return query;
   });
 }
@@ -799,7 +868,8 @@ async function loadSessions(
   // An org switch invalidates the list (see the guard above); the search
   // belonged to the previous org's data, so it goes with it.
   if (loadedOrg.value && loadedOrg.value !== orgId) {
-    if (searchActive.value) searchKeyword.value = "";
+    searchKeyword.value = "";
+    searchFilter.value = "";
     searchUser.value = "";
   }
 
@@ -874,25 +944,19 @@ async function loadSessions(
     end,
     currentPage.value - 1,
     rowsPerPage.value,
-    agentFilterClause.value,
+    sessionFilter.value,
     activeSearch.value,
   );
 }
 
-// ── Search handlers ─────────────────────────────────────────────────────────
-// Live search, same pattern as LogStream.vue: the box's own `:debounce="300"`
-// settles typing into one value on `searchKeyword` (its v-model); this watch
-// is the ONLY re-fetch trigger — typing, the built-in clear (x) button, and
-// clearSearch() below all just change the ref and let this fire. No Enter /
-// Escape handling needed. `fetchPage` drops the response of any run a later
-// change supersedes.
-watch(searchKeyword, () => {
+watch([searchKeyword, searchFilter], () => {
   currentPage.value = 1;
   loadSessions(undefined, undefined, true);
 });
 
 function clearSearch() {
   searchKeyword.value = "";
+  searchFilter.value = "";
 }
 
 function clearUserFilter() {

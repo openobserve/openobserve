@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import { ref } from "vue";
+import type * as Vuex from "vuex";
 
 // Reactive state that tests can mutate to drive component rendering
 const mockSessions = ref<any[]>([]);
@@ -25,6 +26,7 @@ const mockSortBy = ref("end_time");
 const mockSortOrder = ref<"asc" | "desc">("desc");
 // Applied search term — module-scoped in the real composable, like the pagination.
 const mockSearchKeyword = ref("");
+const mockSearchFilter = ref("");
 const mockSearchUser = ref("");
 const mockAgents = ref<any[]>([]);
 const mockAgentsLoaded = ref(false);
@@ -59,6 +61,7 @@ vi.mock("./composables/useSessions", () => ({
     currentPage: mockCurrentPage,
     rowsPerPage: mockRowsPerPage,
     searchKeyword: mockSearchKeyword,
+    searchFilter: mockSearchFilter,
     searchUser: mockSearchUser,
     sortBy: mockSortBy,
     sortOrder: mockSortOrder,
@@ -75,6 +78,7 @@ const mockGetStreams = vi.fn();
 vi.mock("@/composables/useStreams", () => ({
   default: vi.fn(() => ({
     getStreams: mockGetStreams,
+    getStream: vi.fn(async () => ({ schema: [] })),
   })),
 }));
 
@@ -102,7 +106,8 @@ vi.mock("vue-router", () => ({
   useRoute: vi.fn(() => ({ name: "aiSessions", query: mockRouteQuery })),
 }));
 
-vi.mock("vuex", () => ({
+vi.mock("vuex", async (importOriginal) => ({
+  ...(await importOriginal<typeof Vuex>()),
   useStore: vi.fn(() => ({
     state: {
       selectedOrganization: { identifier: mockOrgId },
@@ -275,6 +280,7 @@ beforeEach(() => {
   mockCurrentPage.value = 1;
   mockRowsPerPage.value = 20;
   mockSearchKeyword.value = "";
+  mockSearchFilter.value = "";
   mockSearchUser.value = "";
   mockSortBy.value = "end_time";
   mockSortOrder.value = "desc";
@@ -616,6 +622,31 @@ describe("SessionsList — agent filter", () => {
       20,
       // supportAgent has no env: the env-less variant.
       `gen_ai_agent_id = 'agent-1' AND (gen_ai_agent_env IS NULL OR gen_ai_agent_env = '')`,
+      undefined,
+    );
+  });
+
+  it("ANDs a URL filter with the agent clause as one parenthesised term", async () => {
+    mockRouteQuery = {
+      type: "agent",
+      agent: "support-agent",
+      filter: "span_status = 'ERROR' OR duration > 5",
+    };
+    mockGetStreams.mockResolvedValue({
+      list: [{ name: "agent-stream", settings: { is_llm_stream: true } }],
+    });
+    mockListAgents.mockResolvedValue({ agents: [supportAgent] });
+
+    const wrapper = await mountComponent({ streamName: "", startTime: 1000, endTime: 2000 });
+    await refreshComponent(wrapper);
+
+    expect(mockFetchPage).toHaveBeenCalledWith(
+      "agent-stream",
+      1000,
+      2000,
+      0,
+      20,
+      `gen_ai_agent_id = 'agent-1' AND (gen_ai_agent_env IS NULL OR gen_ai_agent_env = '') AND (span_status = 'ERROR' OR duration > 5)`,
       undefined,
     );
   });

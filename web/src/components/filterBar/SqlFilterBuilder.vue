@@ -36,6 +36,7 @@ const props = withDefaults(defineProps<SqlFilterBuilderProps>(), {
   freeText: true,
   extraSuggestions: undefined,
   maxRows: 3,
+  appearance: "plain",
   dataTest: "sql-filter-builder",
 });
 const emit = defineEmits<SqlFilterBuilderEmits>();
@@ -134,7 +135,7 @@ defineExpose<SqlFilterBuilderExpose>({ activate: () => barRef.value?.activate() 
         :load-values="loadValues"
         :fields-loading="fieldsLoading"
         size="sm"
-        appearance="plain"
+        :appearance="appearance"
         :max-rows="maxRows"
         :data-test="`${dataTest}-bar`"
         @update:model-value="onTreeChange"

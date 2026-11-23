@@ -220,6 +220,8 @@ export interface SessionSearch {
 }
 const searchKeyword = ref("");
 const searchUser = ref("");
+/** Span WHERE expression from the filter bar; a session matches when one of its spans does. */
+const searchFilter = ref("");
 /** Hard cap on a search term; longer input is truncated, never rejected. */
 export const SESSION_SEARCH_MAX_LEN = 256;
 /** Trims and caps a raw search term. Empty result = no search. */
@@ -664,6 +666,7 @@ export function useSessions() {
     currentPage,
     rowsPerPage,
     searchKeyword,
+    searchFilter,
     searchUser,
     sortBy,
     sortOrder,
