@@ -17,20 +17,20 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeAssistant } from "@/components/ai-assistant/__tests__/fakeAssistant";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import aiToolsets from "@/services/ai_toolsets";
 
 import AssistantToolsetForm from "./AssistantToolsetForm.vue";
 import { settingsHarness } from "./assistantSettings.test-helpers";
 import en from "@/locales/languages/en-US.json";
 
-const { fake, toast, confirm } = vi.hoisted(() => ({
+const { fake, toast } = vi.hoisted(() => ({
   fake: {
     current: null as ReturnType<
       typeof import("@/components/ai-assistant/__tests__/fakeAssistant").fakeAssistant
     > | null,
   },
   toast: vi.fn(),
-  confirm: vi.fn(),
 }));
 
 vi.mock("@/composables/assistant", async (importOriginal) => ({
@@ -38,7 +38,6 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
   useAssistantCapability: () => fake.current!.handle,
 }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
-vi.mock("@/composables/useConfirmDialog", () => ({ useConfirmDialog: () => ({ confirm }) }));
 vi.mock("@/components/CodeQueryEditor.vue", () => ({ default: { render: () => null } }));
 vi.mock("@/services/ai_toolsets", () => ({
   default: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
@@ -50,13 +49,6 @@ const STORED = {
   kind: "mcp",
   description: "Pages people",
   data: { url: "https://pd.example/mcp", timeout_seconds: 20, headers: { Authorization: "***" } },
-};
-
-const CLI = {
-  id: "ts_2",
-  name: "kube",
-  kind: "cli",
-  data: { command: "kubectl", allowed_subcommands: ["get"], requires_confirmation: true, env: {} },
 };
 
 async function settle() {
@@ -148,25 +140,6 @@ describe("AssistantToolsetForm", () => {
     expect(w.find('[data-test="ai-toolset-save-btn"]').exists()).toBe(false);
     await w.find('[data-test="ai-toolset-form-back"]').trigger("click");
     expect(w.emitted("done")).toHaveLength(1);
-  });
-
-  it("asks before turning approval off on a saved CLI toolset", async () => {
-    vi.mocked(aiToolsets.get).mockResolvedValue({ data: CLI } as never);
-    confirm.mockResolvedValue(false);
-    const w = (wrapper = await mountForm({ editId: "ts_2" }));
-    expect(w.find('[data-test="ai-toolset-cli-approval-line"]').text()).toContain(
-      "Members approve the exact command",
-    );
-    await w.find('[data-test="ai-toolset-cli-approval-btn"]').trigger("click");
-    await settle();
-    expect(w.find('[data-test="ai-toolset-cli-approval-line"]').text()).toContain(
-      "runs this command without asking",
-    );
-    await save(w);
-    expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ title: `Let ${en.brand.autobot} run kubectl without asking?` }),
-    );
-    expect(aiToolsets.update).not.toHaveBeenCalled();
   });
 
   it("saves one of two toolsets whose names already clash", async () => {
@@ -284,11 +257,12 @@ describe("AssistantToolsetForm", () => {
     expect(vi.mocked(aiToolsets.update).mock.calls[0][2]).toMatchObject({ description: "" });
   });
 
-  it("hides the CLI presets on a saved toolset so they cannot replace stored credentials", async () => {
-    vi.mocked(aiToolsets.get).mockResolvedValue({ data: CLI } as never);
-    const w = (wrapper = await mountForm({ editId: "ts_2" }));
-    expect(w.find('[data-test="ai-toolset-cli-fields"]').exists()).toBe(true);
-    expect(w.find('[data-test="cli-preset-kubectl"]').exists()).toBe(false);
+  it("offers MCP and skill when adding a toolset", async () => {
+    const w = (wrapper = await mountForm({}));
+    expect(w.getComponent(OFormSelect).props("options")).toEqual([
+      expect.objectContaining({ value: "mcp" }),
+      expect.objectContaining({ value: "skill" }),
+    ]);
   });
 
   it("treats edit without an id as a load error, never a create form", async () => {

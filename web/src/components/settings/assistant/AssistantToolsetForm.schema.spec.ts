@@ -89,18 +89,14 @@ describe("toolset form schema and payload", () => {
     expect(issuesOf(values, { ...NONE, mergeSecrets: false })).toEqual([]);
   });
 
-  it("starts a CLI toolset with approval on and requires an allow-list", () => {
-    const values = toolsetFormDefaults();
-    expect(values.cli.requires_confirmation).toBe(true);
-    values.name = "kube";
-    values.kind = "cli";
-    values.cli.command = "kubectl";
-    expect(issuesOf(values)).toEqual([
-      "cli.allowed_subcommands_raw=assistant.toolsets.form.allowRequired",
-    ]);
-    values.cli.allowed_subcommands_raw = "get, logs";
+  it("loads and saves skill content", () => {
+    const values = toolsetFormOf(
+      { name: "triage", kind: "skill", data: { content: "## When to use" } },
+      true,
+    );
+    expect(values.kind).toBe("skill");
     expect(issuesOf(values)).toEqual([]);
-    expect(toolsetDataOf(values, true).allowed_subcommands).toEqual(["get", "logs"]);
+    expect(toolsetDataOf(values, true)).toEqual({ content: "## When to use" });
   });
 
   it("rejects a name another toolset already reaches the agent under", () => {
@@ -146,35 +142,5 @@ describe("toolset form schema and payload", () => {
     const removed = structuredClone(loaded);
     removed.mcp.headers.pop();
     expect(reenterReason(removed, loaded, true)).toBeNull();
-  });
-
-  it("counts a CLI command, allow-list or approval change as a new destination and keeps blocked commands", () => {
-    const record = {
-      id: "ts_2",
-      name: "kube",
-      kind: "cli",
-      data: {
-        command: "kubectl",
-        allowed_subcommands: ["get"],
-        blocked_subcommands: ["delete"],
-        requires_confirmation: true,
-        env: { KUBE_CONTEXT: "***" },
-      },
-    };
-    const loaded = toolsetFormOf(record, true);
-    expect(toolsetDataOf(loaded, true).blocked_subcommands).toEqual(["delete"]);
-    for (const change of [
-      (v: typeof loaded) => (v.cli.command = "kubectl2"),
-      (v: typeof loaded) => (v.cli.allowed_subcommands_raw = "get, logs"),
-      (v: typeof loaded) => (v.cli.requires_confirmation = false),
-    ]) {
-      const values = structuredClone(loaded);
-      change(values);
-      expect(reenterReason(values, loaded, true)).toBe("destination");
-    }
-    const timeout = structuredClone(loaded);
-    timeout.cli.timeout_seconds = 90;
-    expect(reenterReason(timeout, loaded, true)).toBeNull();
-    expect(toolsetDataOf(toolsetFormDefaults(), true)).not.toHaveProperty("blocked_subcommands");
   });
 });

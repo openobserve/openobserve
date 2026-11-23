@@ -910,8 +910,22 @@ export function sharedChat(token) {
 
 export const TOOLSETS = {
   toolsets: [
-    { id: "ts_1", name: "kubectl-readonly", kind: "cli", description: "Read-only kubectl access to prod", created_at: (NOW - 30 * 24 * H) * US, updated_at: (NOW - 2 * 24 * H) * US },
-    { id: "ts_2", name: "pagerduty", kind: "mcp", description: "PagerDuty MCP server", created_at: (NOW - 12 * 24 * H) * US, updated_at: (NOW - 12 * 24 * H) * US },
+    {
+      id: "ts_1",
+      name: "incident-triage",
+      kind: "skill",
+      description: "Steps for triaging incidents",
+      created_at: (NOW - 30 * 24 * H) * US,
+      updated_at: (NOW - 2 * 24 * H) * US,
+    },
+    {
+      id: "ts_2",
+      name: "pagerduty",
+      kind: "mcp",
+      description: "PagerDuty MCP server",
+      created_at: (NOW - 12 * 24 * H) * US,
+      updated_at: (NOW - 12 * 24 * H) * US,
+    },
   ],
 };
 
@@ -919,7 +933,7 @@ export const TOOLSETS = {
 export const TOOLSET_RECORDS = {
   ts_1: {
     ...TOOLSETS.toolsets[0],
-    data: { command: "kubectl", allowed_subcommands: ["get", "describe", "logs"], requires_confirmation: true, timeout_seconds: 30, max_output_bytes: 100000, env: { KUBE_CONTEXT: "***" }, credential_files: {} },
+    data: { content: "## Triage\n\nReview the recent alerts." },
   },
   ts_2: {
     ...TOOLSETS.toolsets[1],

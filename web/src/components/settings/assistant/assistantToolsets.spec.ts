@@ -22,18 +22,12 @@ import {
   healthOf,
   matchesToolset,
   parseToolsetRows,
-  runsWithoutApproval,
 } from "./assistantToolsets";
 
 const RAW = [
   { id: "1", name: "My_Tool", kind: "mcp", description: "Pages people", data: { url: "x" } },
   { id: "2", name: "my-tool", kind: "skill" },
-  {
-    id: "3",
-    name: "kube",
-    kind: "cli",
-    data: { command: "kubectl", requires_confirmation: false, allowed_subcommands: [] },
-  },
+  { id: "3", name: "custom", kind: "generic" },
 ];
 
 describe("assistantToolsets", () => {
@@ -51,12 +45,13 @@ describe("assistantToolsets", () => {
     for (const [name, agent] of vectors) expect(agentNameOf(name)).toBe(agent);
   });
 
-  it("drops rows with unknown kinds, oversize text or no id", () => {
+  it("drops rows with removed or unknown kinds, oversize text or no id", () => {
     const rows = parseToolsetRows([
       ...RAW,
       { id: "4", name: "x", kind: "rogue" },
       { name: "no-id", kind: "mcp" },
       { id: "5", name: "y".repeat(600), kind: "mcp" },
+      { id: "6", name: "old-toolset", kind: "cli" },
       "junk",
     ]);
     expect(rows.map((row) => row.id)).toEqual(["1", "2", "3"]);
@@ -96,11 +91,6 @@ describe("assistantToolsets", () => {
 
   it("flags both toolsets that reach the agent under one name", () => {
     expect([...clashingNames(parseToolsetRows(RAW))]).toEqual(["my-tool"]);
-  });
-
-  it("marks a CLI toolset with no approval and no allow-list", () => {
-    const rows = parseToolsetRows(RAW);
-    expect(rows.map(runsWithoutApproval)).toEqual([false, false, true]);
   });
 
   it("searches the displayed kind label, name and description", () => {

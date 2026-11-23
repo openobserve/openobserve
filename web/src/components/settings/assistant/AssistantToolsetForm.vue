@@ -123,15 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('aiToolset.timeoutSeconds')"
           data-test="ai-toolset-mcp-timeout"
         />
-        <AssistantToolsetSecretRows
-          :form="form"
-          field="mcp.headers"
-          kind="header"
-          :rows="headers"
-        />
+        <AssistantToolsetSecretRows :form="form" :rows="headers" />
       </template>
-
-      <AssistantToolsetCliFields v-if="kind === 'cli'" :form="form" :editing="isEdit" />
 
       <template v-if="kind === 'skill'">
         <div class="flex flex-wrap items-center gap-2">
@@ -190,7 +183,6 @@ import { computed, defineAsyncComponent, nextTick, ref, watch } from "vue";
 import { onBeforeRouteUpdate } from "vue-router";
 
 import { askLeaveGuard, useAssistantLeaveGuard, type LeaveGuard } from "@/composables/assistant";
-import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -218,7 +210,6 @@ import {
   type SecretRow,
   type ToolsetFormValues,
 } from "./AssistantToolsetForm.schema";
-import AssistantToolsetCliFields from "./AssistantToolsetCliFields.vue";
 import AssistantToolsetSecretRows from "./AssistantToolsetSecretRows.vue";
 import { agentNameOf, type ToolsetRow } from "./assistantToolsets";
 import { useAssistantSettingsPage } from "./useAssistantSettingsPage";
@@ -244,7 +235,6 @@ const emit = defineEmits<{ (e: "done"): void; (e: "forbidden"): void }>();
 
 const { t } = useI18nTyped();
 const page = useAssistantSettingsPage();
-const { confirm } = useConfirmDialog();
 // The org the form opened in is the one every request goes to.
 const org = page.org.value;
 const orgName = page.orgName.value;
@@ -259,7 +249,6 @@ const update = useMutation(() => updateToolsetMutation(org));
 
 const kindOptions = [
   { label: t("assistant.toolsets.kinds.mcp"), value: "mcp" },
-  { label: t("assistant.toolsets.kinds.cli"), value: "cli" },
   { label: t("assistant.toolsets.kinds.skill"), value: "skill" },
 ];
 
@@ -284,9 +273,6 @@ const form = useOForm<ToolsetFormValues>({
 
 const kind = form.useStore((s) => s.values.kind);
 const headers = form.useStore((s): SecretRow[] => s.values.mcp.headers);
-const secretCount = form.useStore(
-  (s) => s.values.mcp.headers.length + s.values.cli.env.length + s.values.cli.credFiles.length,
-);
 const values = form.useStore((s) => s.values);
 const skillContent = form.useStore((s) => s.values.skill.content ?? "");
 const typedName = form.useStore((s) => s.values.name);
@@ -297,7 +283,7 @@ const agentName = computed(() => (typedName.value ? agentNameOf(typedName.value)
 const skillError = computed(
   () => submitted.value && kind.value === "skill" && !skillContent.value.trim(),
 );
-const needsRetype = computed(() => isEdit && !props.mergeSecrets && secretCount.value > 0);
+const needsRetype = computed(() => isEdit && !props.mergeSecrets && headers.value.length > 0);
 const reenter = computed<ReenterReason | "refused" | null>(
   () => reenterReason(values.value, loaded.value, props.mergeSecrets) ?? forced.value,
 );
@@ -340,20 +326,6 @@ function setSkill(value: string) {
   form.setFieldValue("skill.content", value);
 }
 
-async function confirmApprovalOff(values: ToolsetFormValues): Promise<boolean> {
-  if (!isEdit || values.kind !== "cli" || values.cli.requires_confirmation) return true;
-  if (loaded.value?.cli.requires_confirmation !== true) return true;
-  return confirm({
-    title: t("assistant.toolsets.form.approvalOffTitle", { command: values.cli.command }),
-    message: t("assistant.toolsets.form.approvalOffMessage", {
-      allow: values.cli.allowed_subcommands_raw,
-    }),
-    confirmLabel: t("assistant.toolsets.form.approvalOffConfirm"),
-    confirmVariant: "destructive",
-    focusCancel: true,
-  });
-}
-
 /** Turns every kept secret into a required field and moves focus to the first one. */
 async function requireKeptSecrets(paths: string[]) {
   for (const path of paths) {
@@ -362,7 +334,7 @@ async function requireKeptSecrets(paths: string[]) {
   }
   await nextTick();
   const first = document.querySelector<HTMLElement>(
-    '[data-test="ai-toolset-form"] [data-state="replacing"] input, [data-test="ai-toolset-form"] textarea[data-test$="-editor-field"]',
+    '[data-test="ai-toolset-form"] [data-state="replacing"] input',
   );
   first?.focus();
 }
@@ -376,7 +348,6 @@ async function save(values: ToolsetFormValues) {
     await requireKeptSecrets(keptSecretPaths(values));
     return;
   }
-  if (!(await confirmApprovalOff(values))) return;
   const data = toolsetDataOf(values, props.mergeSecrets);
   try {
     if (props.editId) {
@@ -410,7 +381,7 @@ async function showSaveError(err: unknown, values: ToolsetFormValues) {
   }
   const message = typeof res?.data?.message === "string" ? res.data.message.slice(0, 500) : "";
   const field = res?.data?.field;
-  if (message && (field === "name" || field === "mcp.url" || field === "cli.command")) {
+  if (message && (field === "name" || field === "mcp.url")) {
     setServerFieldErrors(form, { [field]: raw(message) });
     return;
   }

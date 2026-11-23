@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { ToolsetKind } from "@/services/ai_toolsets";
 import type { I18nKey } from "@/types/i18n";
 
-export type ToolsetKindId = "mcp" | "cli" | "skill" | "generic";
+export type ToolsetKindId = ToolsetKind;
 
 export type ToolsetHealth = "ok" | "failing" | "never" | "disabled";
 
@@ -31,9 +32,6 @@ export interface ToolsetRow {
   failingSince?: number;
   lastError?: string;
   lastUsedAt?: number;
-  command?: string;
-  allowList: string[];
-  requiresConfirmation?: boolean;
 }
 
 export const MAX_TOOLSETS = 1000;
@@ -48,26 +46,11 @@ const SERVER_STATES: Record<string, ToolsetRow["health"]> = {
   never_used: "never",
 };
 
-const KINDS: ReadonlySet<string> = new Set(["mcp", "cli", "skill", "generic"]);
-
 export const KIND_LABEL_KEYS: Record<ToolsetKindId, I18nKey> = {
   mcp: "assistant.toolsets.kinds.mcp",
-  cli: "assistant.toolsets.kinds.cli",
   skill: "assistant.toolsets.kinds.skill",
   generic: "assistant.toolsets.kinds.generic",
 };
-
-/** Read-only verbs a preset fills in; anything wider is added by hand. */
-export const CLI_PRESETS = [
-  {
-    id: "kubectl",
-    command: "kubectl",
-    allow: "get, describe, logs, top",
-    env: [],
-    files: ["KUBECONFIG"],
-  },
-  { id: "gh", command: "gh", allow: "pr view, issue view, run view", env: ["GH_TOKEN"], files: [] },
-] as const;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
@@ -104,26 +87,17 @@ function parseToolsetRow(value: unknown): ToolsetRow | null {
   const id = text(value.id);
   const name = text(value.name);
   const kind = text(value.kind);
-  if (!id || !name || !kind || !KINDS.has(kind)) return null;
-  const data = isRecord(value.data) ? value.data : {};
+  if (!id || !name || !kind || !Object.hasOwn(KIND_LABEL_KEYS, kind)) return null;
   const row: ToolsetRow = {
     id,
     name,
     kind: kind as ToolsetKindId,
     description: text(value.description) ?? "",
     agentName: agentNameOf(name),
-    allowList: Array.isArray(data.allowed_subcommands)
-      ? data.allowed_subcommands.map(text).filter((v): v is string => !!v)
-      : [],
   };
   if (typeof value.enabled === "boolean") row.enabled = value.enabled;
   readStatus(row, value.status);
   row.lastUsedAt = time(value.last_used_at);
-  if (kind === "cli") {
-    row.command = text(data.command);
-    if (typeof data.requires_confirmation === "boolean")
-      row.requiresConfirmation = data.requires_confirmation;
-  }
   return row;
 }
 
@@ -151,11 +125,6 @@ export function hasToolsetHealth(rows: ToolsetRow[]): boolean {
 export function healthOf(row: ToolsetRow): ToolsetHealth {
   if (row.enabled === false) return "disabled";
   return row.health ?? "never";
-}
-
-/** A CLI toolset saved before approval defaulted on, with nothing to stop any subcommand. */
-export function runsWithoutApproval(row: ToolsetRow): boolean {
-  return row.kind === "cli" && row.requiresConfirmation === false && row.allowList.length === 0;
 }
 
 /** Agent names reached by more than one toolset, where one hides the other. */

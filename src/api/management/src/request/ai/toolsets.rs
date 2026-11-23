@@ -934,8 +934,6 @@ mod tests {
         assert_eq!(merged["headers"]["Authorization"], "Bearer typed-again");
     }
 
-
-
     #[tokio::test]
     async fn a_refused_save_is_a_typed_400_that_names_fields_never_values() {
         let mut incoming = redacted_round_trip();

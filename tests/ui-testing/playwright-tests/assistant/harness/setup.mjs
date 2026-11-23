@@ -487,7 +487,8 @@ async function toolsetRoute(route, state, m, [, id, test]) {
   if (m === "GET" && state.toolsetsStatus !== 200) return json(route, { code: state.toolsetsStatus, message: "toolsets unavailable" }, state.toolsetsStatus);
   const found = id && state.toolsets.find((t) => t.id === decodeURIComponent(id));
   if (m === "GET") {
-    if (!id) return json(route, { toolsets: state.toolsets.map(({ data, ...row }) => withHealth({ ...row, data: { allowed_subcommands: data?.allowed_subcommands, requires_confirmation: data?.requires_confirmation } })) });
+    if (!id)
+      return json(route, { toolsets: state.toolsets.map(({ data, ...row }) => withHealth(row)) });
     return found ? json(route, withHealth(found)) : json(route, { code: 404, message: "toolset not found" }, 404);
   }
   const body = request.postDataJSON() || {};
@@ -501,17 +502,19 @@ async function toolsetRoute(route, state, m, [, id, test]) {
   return json(route, m === "POST" ? { id: `ts_new_${state.toolsets.length - 1}` } : {});
 }
 
-/** The server keeps `***` only when no destination field and no other secret in the update changed. */
+/** The server keeps `***` only when the URL and other headers stay the same. */
 function keptSecretRefusal(stored, body) {
-  const SECRET = ["headers", "env", "credential_files"];
-  const DEST = ["url", "command", "allowed_subcommands", "blocked_subcommands", "requires_confirmation"];
   const incoming = body.data || {};
   const was = stored.data || {};
-  const maps = SECRET.filter((f) => incoming[f] && typeof incoming[f] === "object");
-  if (!maps.some((f) => Object.values(incoming[f]).includes("***"))) return null;
-  const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-  const fields = DEST.filter((f) => f in incoming && !same(incoming[f], was[f] ?? (f === "requires_confirmation" ? false : undefined)));
-  for (const f of maps) if (Object.entries(incoming[f]).some(([k, v]) => v !== "***" && was[f]?.[k] !== v)) fields.push(f);
+  const headers = incoming.headers;
+  if (!headers || typeof headers !== "object" || !Object.values(headers).includes("***"))
+    return null;
+  const fields = [];
+  if ("url" in incoming && (incoming.url ?? null) !== (was.url ?? null)) fields.push("url");
+  if (
+    Object.entries(headers).some(([key, value]) => value !== "***" && was.headers?.[key] !== value)
+  )
+    fields.push("headers");
   return fields.length ? fields : null;
 }
 

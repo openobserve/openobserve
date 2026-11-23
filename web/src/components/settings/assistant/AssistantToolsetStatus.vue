@@ -53,12 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`ai-toolset-${row.name}-clash`"
       />
     </OTooltip>
-    <OTag
-      v-if="unguarded"
-      variant="warning-soft"
-      :label="t('assistant.toolsets.unguarded')"
-      :data-test="`ai-toolset-${row.name}-unguarded`"
-    />
   </div>
 </template>
 
@@ -72,12 +66,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 
-import {
-  healthOf,
-  runsWithoutApproval,
-  type ToolsetHealth,
-  type ToolsetRow,
-} from "./assistantToolsets";
+import { healthOf, type ToolsetHealth, type ToolsetRow } from "./assistantToolsets";
 
 export interface ToolsetTestOutcome {
   ok: boolean;
@@ -113,7 +102,6 @@ const props = withDefaults(
 const { t } = useI18nTyped();
 
 const health = computed(() => healthOf(props.row));
-const unguarded = computed(() => runsWithoutApproval(props.row));
 const resultLabel = computed(() => {
   const result = props.result!;
   if (result.ok) return t("assistant.toolsets.status.okIn", { ms: result.durationMs ?? 0 });

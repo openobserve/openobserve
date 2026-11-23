@@ -103,8 +103,8 @@ test.describe("assistant settings tools", () => {
     await openTab(page, "toolsets");
     await expect(control(page, "ai-toolset-pagerduty-status")).toContainText("Failing since");
     await expect(control(page, "ai-toolset-pagerduty-last-error")).toHaveText("The MCP server refused the credentials.");
-    await expect(control(page, "ai-toolset-kubectl-readonly-status")).toHaveText("OK");
-    await control(page, "ai-toolset-kubectl-readonly-enabled").locator('[role="switch"]').click();
+    await expect(control(page, "ai-toolset-incident-triage-status")).toHaveText("OK");
+    await control(page, "ai-toolset-incident-triage-enabled").locator('[role="switch"]').click();
     await expect.poll(() => state.toolsetWrites.find((w) => w.method === "PATCH")?.body).toEqual({ enabled: false });
     await control(page, "ai-toolset-pagerduty-test").click();
     await expect(control(page, "ai-toolsets-announce")).toHaveText(
@@ -175,26 +175,6 @@ test.describe("assistant settings tools", () => {
     await control(page, "assistant-shell-leave-guard-discard").click();
     await expect(control(page, "settings-assistant-toolsets-tab")).toBeVisible({ timeout: 30_000 });
     expect(state.toolsetWrites).toEqual([]);
-  });
-
-  test("ADMIN-10 turning CLI approval off confirms with the command and allow-list", { tag: ["@mock"] }, async ({ context, page }) => {
-    await start(context, page);
-    await openTab(page, "toolsets", "&action=edit&id=ts_1");
-    const approval = control(page, "ai-toolset-cli-approval").locator('[role="switch"]');
-    await expect(approval).toHaveAttribute("aria-checked", "true", { timeout: 30_000 });
-    await approval.click();
-    await control(page, "ai-toolset-env-0-input").locator("input").fill("prod-east");
-    await control(page, "ai-toolset-save-btn").click();
-    const dialog = assistant.confirmDialog();
-    await expect(dialog).toContainText("kubectl");
-    await expect(dialog).toContainText("get, describe, logs");
-    await expect(dialog.locator('[data-test="o-dialog-secondary-btn"]')).toBeFocused();
-    await dialog.locator('[data-test="o-dialog-secondary-btn"]').click();
-    expect(state.toolsetWrites).toEqual([]);
-    await control(page, "ai-toolset-save-btn").click();
-    await dialog.locator('[data-test="o-dialog-primary-btn"]').click();
-    await expect.poll(() => state.toolsetWrites.length).toBe(1);
-    expect(state.toolsetWrites[0].body.data.requires_confirmation).toBe(false);
   });
 
   test("ADMIN-11 revoking a standing approval removes the row with a toast", { tag: ["@mock"] }, async ({ context, page }) => {

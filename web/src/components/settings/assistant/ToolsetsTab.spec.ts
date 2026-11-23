@@ -66,12 +66,7 @@ vi.mock("@/services/assistant", async (importOriginal) => {
 const ROWS = [
   { id: "1", name: "pagerduty", kind: "mcp", description: "Pages people" },
   { id: "2", name: "My_Tool", kind: "skill" },
-  {
-    id: "3",
-    name: "my-tool",
-    kind: "cli",
-    data: { command: "kubectl", requires_confirmation: false },
-  },
+  { id: "3", name: "my-tool", kind: "generic" },
 ];
 
 async function settle() {
@@ -142,13 +137,12 @@ describe("ToolsetsTab", () => {
     expect(link).not.toContain("text-text-link");
   });
 
-  it("marks both rows of a name clash and an unguarded CLI toolset", async () => {
+  it("marks both rows of a name clash", async () => {
     const { w } = await mountTab();
     wrapper = w;
     expect(w.find('[data-test="ai-toolset-My_Tool-clash"]').exists()).toBe(true);
     expect(w.find('[data-test="ai-toolset-my-tool-clash"]').exists()).toBe(true);
     expect(w.find('[data-test="ai-toolset-pagerduty-clash"]').exists()).toBe(false);
-    expect(w.find('[data-test="ai-toolset-my-tool-unguarded"]').exists()).toBe(true);
   });
 
   it("rolls the switch back and toasts when enabling fails", async () => {
