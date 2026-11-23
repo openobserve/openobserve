@@ -38,6 +38,9 @@ use crate::autoobserve::ports::SearchAdapter;
 /// Newest audited writes read per ask; a full page marks the answer partial.
 const ROWS: i64 = 200;
 const BODY_CHARS: usize = 2048;
+/// A cut body holds about 68 real pipeline ids, so more are short made-up ids; the cap keeps
+/// one bulk call from crowding the other changes out of the provider's records.
+const BULK_IDS: usize = 100;
 /// Past this many streams one prefix covers them all, so the statement stays short.
 const STREAM_PREFIXES: usize = 50;
 
@@ -56,16 +59,24 @@ pub enum Object {
         id: String,
         named: bool,
     },
-    /// `toggled` is an enable or disable, which keeps the stored config.
     Pipeline {
         id: Option<String>,
         name: Option<String>,
-        toggled: bool,
+        edit: PipelineEdit,
     },
     Alert {
         id: Option<String>,
         stream: Option<EntityRef>,
     },
+}
+
+/// A toggle (enable or disable) keeps the stored config; `Config` is a create, edit or delete.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PipelineEdit {
+    Config,
+    Toggle,
+    /// An id read from a bulk call's body, which answers 200 whether or not the id exists.
+    BulkToggle,
 }
 
 #[derive(Clone, Debug)]
@@ -124,13 +135,25 @@ pub fn change_of(method: &str, path: &str, query: &str, body: &str) -> Vec<Chang
     let method = method.to_ascii_uppercase();
     // One change per pipeline, so each is ranked against the streams it feeds.
     if let ("POST", [_, "pipelines", "bulk", "enable"]) = (method.as_str(), parts.as_slice()) {
-        return body_ids(body)
+        let ids = body_ids(body);
+        let mut seen = BTreeSet::new();
+        let changes: Vec<Change> = ids
             .iter()
+            .filter(|id| seen.insert(id.as_str()))
+            .take(BULK_IDS)
             .map(|id| Change {
                 kind: ChangeKind::PipelineChanged,
-                object: pipeline_id(id, true),
+                object: pipeline_id(id, PipelineEdit::BulkToggle),
             })
             .collect();
+        if changes.len() < ids.len() {
+            log::debug!(
+                "[autoobserve] bulk pipeline toggle: dropped {} of {} ids (repeats, or past {BULK_IDS})",
+                ids.len() - changes.len(),
+                ids.len()
+            );
+        }
+        return changes;
     }
     let (kind, object) = match (method.as_str(), parts.as_slice()) {
         (
@@ -165,17 +188,19 @@ pub fn change_of(method: &str, path: &str, query: &str, body: &str) -> Vec<Chang
                 Object::Pipeline {
                     id: body_field(body, "pipeline_id").filter(|id| kept && !id.is_empty()),
                     name: body_field(body, "name"),
-                    toggled: false,
+                    edit: PipelineEdit::Config,
                 },
             )
         }
-        ("DELETE", [_, "pipelines", id]) if *id != "bulk" => {
-            (ChangeKind::PipelineChanged, pipeline_id(id, false))
-        }
+        ("DELETE", [_, "pipelines", id]) if *id != "bulk" => (
+            ChangeKind::PipelineChanged,
+            pipeline_id(id, PipelineEdit::Config),
+        ),
         // Enabling a realtime pipeline can silence its source: it gets only rows written back.
-        ("PUT", [_, "pipelines", id, "enable"]) => {
-            (ChangeKind::PipelineChanged, pipeline_id(id, true))
-        }
+        ("PUT", [_, "pipelines", id, "enable"]) => (
+            ChangeKind::PipelineChanged,
+            pipeline_id(id, PipelineEdit::Toggle),
+        ),
         ("POST", ["v2", _, "alerts"]) => (
             ChangeKind::AlertChanged,
             Object::Alert {
@@ -316,7 +341,7 @@ fn record(
             let open = link("iam/ingestionTokens", &[]).filter(|_| named);
             (subject, name, Vec::new(), open)
         }
-        Object::Pipeline { id, name, toggled } => {
+        Object::Pipeline { id, name, edit } => {
             let named = a.target.clone().or(name);
             let created = id.is_none();
             let id = id.or_else(|| only_named(names, named.as_deref()?))?;
@@ -328,8 +353,14 @@ fn record(
                     let name = a.target.clone().unwrap_or_else(|| f.name.clone());
                     (subject, name, f.affects.clone(), open)
                 }
-                // A create, or a toggle of a pipeline not in `fed`, cannot have cut a stream off.
-                None if created || (toggled && names.contains_key(&id)) => return None,
+                // A create, or a toggle of a pipeline not in `fed`, cannot have cut a stream off;
+                // a single toggle of one gone since is kept: unlike a bulk id, it surely existed.
+                None if created
+                    || edit == PipelineEdit::BulkToggle
+                    || (edit == PipelineEdit::Toggle && names.contains_key(&id)) =>
+                {
+                    return None;
+                }
                 // Only the current config is stored, so what an edit cut off is unknown: org-wide.
                 None => {
                     let name = named.or_else(|| names.get(&id).cloned());
@@ -402,11 +433,11 @@ fn only_named(names: &BTreeMap<String, String>, name: &str) -> Option<String> {
     }
 }
 
-fn pipeline_id(id: &str, toggled: bool) -> Object {
+fn pipeline_id(id: &str, edit: PipelineEdit) -> Object {
     Object::Pipeline {
         id: Some(id.to_string()),
         name: None,
-        toggled,
+        edit,
     }
 }
 
@@ -512,14 +543,31 @@ mod tests {
         let pipeline = |id: Option<&str>, name: Option<&str>| Object::Pipeline {
             id: id.map(str::to_string),
             name: name.map(str::to_string),
-            toggled: false,
+            edit: PipelineEdit::Config,
         };
         let alert = |id: Option<&str>, stream: Option<EntityRef>| Object::Alert {
             id: id.map(str::to_string),
             stream,
         };
-        let toggle = |id| change(ChangeKind::PipelineChanged, pipeline_id(id, true));
-        let (p1, p2) = (toggle("p1"), toggle("p2"));
+        let toggle = |id| {
+            change(
+                ChangeKind::PipelineChanged,
+                pipeline_id(id, PipelineEdit::Toggle),
+            )
+        };
+        let bulk = |id| {
+            change(
+                ChangeKind::PipelineChanged,
+                pipeline_id(id, PipelineEdit::BulkToggle),
+            )
+        };
+        let (p1, p2) = (bulk("p1"), bulk("p2"));
+        let ids: Vec<String> = (0..=BULK_IDS).map(|i| format!("p{i}")).collect();
+        let many = serde_json::json!({ "ids": ids }).to_string();
+        let capped: Vec<Change> = ids[..BULK_IDS]
+            .iter()
+            .flat_map(|id| bulk(id.as_str()))
+            .collect();
         let alert_body = r#"{"name":"5xx","stream_type":"logs","stream_name":"app","query_condition":{"sql":"SELECT"#;
         let cases = [
             (
@@ -669,7 +717,21 @@ mod tests {
                 "acme/pipelines/bulk/enable",
                 "value=false",
                 r#"{"ids":["p1","p"#,
+                p1.clone(),
+            ),
+            (
+                "POST",
+                "acme/pipelines/bulk/enable",
+                "value=true",
+                r#"{"ids":["p1","p1"]}"#,
                 p1,
+            ),
+            (
+                "POST",
+                "acme/pipelines/bulk/enable",
+                "value=true",
+                &many,
+                capped,
             ),
             (
                 "POST",
@@ -761,8 +823,8 @@ mod tests {
         }
     }
 
-    /// Calls on other streams, other orgs, reads, acks, failed calls and calls outside the window
-    /// are dropped.
+    /// Calls on other streams, other orgs, reads, acks, failed calls, bulk toggles of pipelines the
+    /// org does not have and calls outside the window are dropped.
     #[tokio::test]
     async fn audit_rows_become_changes_that_touch_the_issue_streams() {
         let rows = vec![
@@ -785,6 +847,7 @@ mod tests {
                 "",
                 r#"{"name":"p9","nodes":[{"id":"#,
             ),
+            audit_row(134, "PUT", "acme/pipelines/p8/enable", "value=false", ""),
             audit_row(135, "PUT", "acme/pipelines", "", r#"{"pipeline_id":"p9"}"#),
             audit_row(136, "PUT", "acme/pipelines/p1/enable", "value=false", ""),
             audit_row(137, "DELETE", "acme/pipelines/p7", "", ""),
@@ -794,7 +857,7 @@ mod tests {
                 "POST",
                 "acme/pipelines/bulk/enable",
                 "value=true",
-                r#"{"ids":["p2","p9"]}"#,
+                r#"{"ids":["p2","p9","p404"]}"#,
             ),
             audit_row(140, "PUT", "v2/acme/alerts/a1", "", "{}"),
             audit_row(142, "DELETE", "v2/acme/alerts/a7", "", ""),
@@ -892,6 +955,12 @@ mod tests {
                 ),
                 (
                     135,
+                    ChangeKind::PipelineChanged,
+                    kinds::PIPELINE,
+                    Vec::new()
+                ),
+                (
+                    134,
                     ChangeKind::PipelineChanged,
                     kinds::PIPELINE,
                     Vec::new()
