@@ -674,10 +674,10 @@ describe("StarterPackDrawer", () => {
     expect(has(wrapper, "starter-pack-alert-setup")).toBe(false);
     expect(has(wrapper, "starter-pack-drawer-submit-btn")).toBe(false);
     expect(wrapper.get('[data-test="starter-pack-drawer-note"]').text()).toBe(
-      "Kubernetes · you can see this pack but not set it up",
+      "Kubernetes · you don't have access to set up this pack",
     );
     expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
-      "You can't set up packs in this org. Ask an admin to set it up.",
+      "You can't set up this pack in this org. Ask an admin.",
     );
   });
 
