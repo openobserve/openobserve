@@ -13,6 +13,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+/// Results a test hands an alert's next evaluation, so the scheduler runs without a search.
+#[cfg(all(test, feature = "enterprise"))]
+pub(crate) mod evaluation_stub {
+    use std::{
+        collections::HashMap,
+        sync::{LazyLock, Mutex},
+    };
+
+    use config::meta::alerts::TriggerEvalResults;
+
+    static RESULTS: LazyLock<Mutex<HashMap<String, TriggerEvalResults>>> =
+        LazyLock::new(Default::default);
+
+    pub(crate) fn set(alert_id: &str, results: TriggerEvalResults) {
+        RESULTS
+            .lock()
+            .unwrap()
+            .insert(alert_id.to_string(), results);
+    }
+
+    pub(super) fn take(alert_id: &str) -> Option<TriggerEvalResults> {
+        RESULTS.lock().unwrap().remove(alert_id)
+    }
+}
+
 use std::{
     collections::{HashMap, HashSet},
     str::FromStr,
@@ -3007,6 +3032,14 @@ impl AlertExt for Alert {
         (start_time, end_time): (Option<i64>, i64),
         trace_id: Option<String>,
     ) -> Result<TriggerEvalResults, anyhow::Error> {
+        #[cfg(all(test, feature = "enterprise"))]
+        if let Some(results) = self
+            .id
+            .as_ref()
+            .and_then(|id| evaluation_stub::take(&id.to_string()))
+        {
+            return Ok(results);
+        }
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
         } else if self.query_condition.query_type == config::meta::alerts::QueryType::Slo {
