@@ -297,6 +297,7 @@ async fn service_volumes(
             clear_cache: false,
             local_mode: None,
             agent_options: None,
+            raw_streams: None,
         };
         let trace_id = config::ider::generate_trace_id();
         let resp = match search_service::search(&trace_id, org_id, StreamType::Traces, None, &req)

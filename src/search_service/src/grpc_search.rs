@@ -74,6 +74,7 @@ pub async fn grpc_search(
             stream_type: stream_type.to_string(),
             user_id: user_id.clone(),
             request: req,
+            raw_streams: raw_streams_of(in_req.raw_streams.as_ref()),
         });
         let node = Arc::new(node) as _;
         let mut client = make_grpc_search_client(&trace_id, &mut request, &node, timeout).await?;
@@ -142,6 +143,7 @@ pub async fn grpc_search_multi(
                 stream_type: stream_type.to_string(),
                 user_id: user_id.clone(),
                 request: req,
+                raw_streams: Vec::new(),
             });
             let node = Arc::new(node) as _;
             let timeout = in_req.timeout as u64;
@@ -216,6 +218,7 @@ pub async fn grpc_search_partition(
                 stream_type: stream_type.to_string(),
                 request: req,
                 skip_max_query_range,
+                raw_streams: raw_streams_of(in_req.raw_streams.as_ref()),
             });
             let node = Arc::new(node) as _;
             let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
@@ -242,4 +245,10 @@ pub async fn grpc_search_partition(
     let response = json::from_slice::<search::SearchPartitionResponse>(&response.response)?;
 
     Ok(response)
+}
+
+fn raw_streams_of(raw_streams: Option<&search::RawStreams>) -> Vec<String> {
+    raw_streams
+        .map(search::RawStreams::to_vec)
+        .unwrap_or_default()
 }

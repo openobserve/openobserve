@@ -60,6 +60,15 @@ describe("buildReadonlyPermissions", () => {
     expect(perms).toEqual([{ object: "settings:_all_default", permission: "AllowGet" }]);
   });
 
+  it("never grants unredacted log reads", () => {
+    const perms = buildReadonlyPermissions(
+      [{ key: "logs_unredacted", visible: true }],
+      "default",
+      false,
+    );
+    expect(perms).toEqual([]);
+  });
+
   it("grants no reads on rum_analytics, whose OpenFGA type has no GET or LIST", () => {
     const perms = buildReadonlyPermissions(
       [{ key: "rum_analytics", visible: true }],

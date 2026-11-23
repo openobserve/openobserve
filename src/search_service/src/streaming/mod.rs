@@ -256,6 +256,8 @@ pub async fn process_search_stream_request(
     }
 
     req.query.query_fn = query_fn.clone();
+    crate::raw_streams::resolve_request(&trace_id, &org_id, stream_type, Some(&user_id), &mut req)
+        .await;
 
     let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await;
 
