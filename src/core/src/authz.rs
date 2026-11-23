@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[cfg(feature = "enterprise")]
 use std::collections::HashMap;
 #[cfg(any(feature = "enterprise", test))]
 use std::collections::HashSet;
@@ -325,6 +325,7 @@ impl StreamAccessChecker for FakeStreamChecker {
 
     async fn can_read_stream(&self, user_id: &str, stream: &TypedStream) -> bool {
         self.count(user_id, |calls| calls.streams += 1);
+        tokio::task::yield_now().await;
         let key = format!("{}/{}/{}", stream.org_id, stream.stream_type, stream.name);
         self.granted(user_id, key) || self.reads_all(user_id, &stream.org_id, stream.stream_type)
     }
@@ -336,6 +337,7 @@ impl StreamAccessChecker for FakeStreamChecker {
         wanted: &[StreamType],
     ) -> HashSet<StreamType> {
         self.count(user_id, |calls| calls.org_wide.push(wanted.to_vec()));
+        tokio::task::yield_now().await;
         if write_set(&self.org_wide_failures).remove(user_id) {
             return HashSet::new();
         }
@@ -491,13 +493,17 @@ impl StreamAccessChecker for OpenFgaStreamChecker {
     }
 }
 
+/// One answer per key, shared by every reader of that key while it is still in flight.
+#[cfg(feature = "enterprise")]
+type SharedAnswers<K> = std::sync::Mutex<HashMap<K, Arc<tokio::sync::OnceCell<bool>>>>;
+
 /// One request's stream reads for one user and org, so a stream named on many rows is checked once.
 #[cfg(feature = "enterprise")]
 #[derive(Default)]
 pub struct StreamReadMemo {
     unrestricted: tokio::sync::OnceCell<bool>,
-    org_wide: std::sync::Mutex<HashMap<StreamType, bool>>,
-    streams: std::sync::Mutex<HashMap<(StreamType, String), bool>>,
+    org_wide: SharedAnswers<StreamType>,
+    streams: SharedAnswers<(StreamType, String)>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -522,24 +528,23 @@ impl StreamReadMemo {
         if unrestricted {
             return true;
         }
-        let key = (stream_type, name.to_string());
-        if let Some(hit) = lock(&self.streams).get(&key) {
-            return *hit;
-        }
-        let allowed = (org_wide_grant_covers(name)
-            && self.org_wide(checker, user_id, org_id, stream_type).await)
-            || checker
-                .can_read_stream(
-                    user_id,
-                    &TypedStream {
-                        org_id: org_id.to_string(),
-                        stream_type,
-                        name: name.to_string(),
-                    },
-                )
-                .await;
-        lock(&self.streams).insert(key, allowed);
-        allowed
+        let cell = shared_cell(&self.streams, (stream_type, name.to_string()));
+        *cell
+            .get_or_init(|| async {
+                (org_wide_grant_covers(name)
+                    && self.org_wide(checker, user_id, org_id, stream_type).await)
+                    || checker
+                        .can_read_stream(
+                            user_id,
+                            &TypedStream {
+                                org_id: org_id.to_string(),
+                                stream_type,
+                                name: name.to_string(),
+                            },
+                        )
+                        .await
+            })
+            .await
     }
 
     async fn org_wide(
@@ -549,15 +554,15 @@ impl StreamReadMemo {
         org_id: &str,
         stream_type: StreamType,
     ) -> bool {
-        if let Some(hit) = lock(&self.org_wide).get(&stream_type) {
-            return *hit;
-        }
-        let wide = checker
-            .org_wide_readable(user_id, org_id, &[stream_type])
+        let cell = shared_cell(&self.org_wide, stream_type);
+        *cell
+            .get_or_init(|| async {
+                checker
+                    .org_wide_readable(user_id, org_id, &[stream_type])
+                    .await
+                    .contains(&stream_type)
+            })
             .await
-            .contains(&stream_type);
-        lock(&self.org_wide).insert(stream_type, wide);
-        wide
     }
 }
 
@@ -1177,9 +1182,14 @@ fn effective_role(org_id: &str, user_id: &str, role: String) -> String {
     }
 }
 
+/// The one cell of `key`, so concurrent readers of a key wait on a single Check.
 #[cfg(feature = "enterprise")]
-fn lock<T>(mutex: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|e| e.into_inner())
+fn shared_cell<K: Eq + std::hash::Hash>(
+    cells: &SharedAnswers<K>,
+    key: K,
+) -> Arc<tokio::sync::OnceCell<bool>> {
+    let mut cells = cells.lock().unwrap_or_else(|e| e.into_inner());
+    cells.entry(key).or_default().clone()
 }
 
 #[cfg(feature = "enterprise")]
@@ -1949,6 +1959,19 @@ mod tests {
                 .await
         );
         assert_eq!(checker.calls("u3"), CheckCalls::default());
+    }
+
+    // Concurrent readers of one stream share the Check still in flight.
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn stream_read_memo_shares_checks_in_flight() {
+        let checker = FakeStreamChecker::default();
+        let memo = StreamReadMemo::default();
+        let reads = (0..16).map(|_| memo.can_read(&checker, "u1", "o1", StreamType::Logs, "a"));
+        assert!(futures::future::join_all(reads).await.iter().all(|ok| !ok));
+        let calls = checker.calls("u1");
+        assert_eq!(calls.streams, 1);
+        assert_eq!(calls.org_wide.len(), 1);
     }
 
     #[tokio::test]
