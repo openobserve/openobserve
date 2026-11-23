@@ -36,8 +36,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   reasoning. The destructive action is copyable SQL, never an execution.
 -->
 <template>
-  <DbmPageChrome title-data-test="dbm-blocked-title" :tab-counts="tabCounts">
+  <DbmPageChrome
+    title-data-test="dbm-blocked-title"
+    :tab-counts="tabCounts"
+    :range="range"
+    :last-run-at="lastRunAt"
+    :loading="loading"
+    @date-change="onDateChange"
+    @refresh="onRefresh()"
+  >
     <div class="flex min-h-0 flex-1 flex-col">
+      <DbmFilterBar
+        v-model:search="search"
+        :placeholder="t('dbm.blocked.searchPlaceholder')"
+        search-data-test="dbm-blocked-search"
+        :filters="dimensionFilters"
+        @search="load"
+      >
+        <!-- Which question the table answers. Defaults to "who's stuck". -->
+        <OToggleGroup
+          v-model="perspective"
+          class="shrink-0"
+          mobile-dropdown
+          data-test="dbm-blocked-perspective"
+        >
+          <OToggleGroupItem value="waiting" size="sm" data-test="dbm-blocked-perspective-waiting">
+            {{ t("dbm.blocked.perspective.waiting") }}
+            <OTooltip side="bottom" :content="t('dbm.blocked.perspective.waitingHint')" />
+          </OToggleGroupItem>
+          <OToggleGroupItem value="blocking" size="sm" data-test="dbm-blocked-perspective-blocking">
+            {{ t("dbm.blocked.perspective.blocking") }}
+            <OTooltip side="bottom" :content="t('dbm.blocked.perspective.blockingHint')" />
+          </OToggleGroupItem>
+        </OToggleGroup>
+      </DbmFilterBar>
       <OTable
         :enable-column-resize="true"
         :data="tableRows"
@@ -64,71 +96,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @action="onRefresh()"
           />
         </template>
-        <template #toolbar>
-          <DbmTableToolbar
-            v-model:search="search"
-            :placeholder="t('dbm.blocked.searchPlaceholder')"
-            :debounce="400"
-            search-data-test="dbm-blocked-search"
-            @search="load"
-          >
-            <template #filters>
-              <DbmScopeFilters
-                class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-2/5"
-                :filters="dimensionFilters"
-                @clear="clearScope"
-              />
-            </template>
-            <!-- Which question the table answers. Defaults to "who's stuck". -->
-            <OToggleGroup
-              v-model="perspective"
-              class="shrink-0"
-              mobile-dropdown
-              data-test="dbm-blocked-perspective"
-            >
-              <OToggleGroupItem
-                value="waiting"
-                size="sm"
-                data-test="dbm-blocked-perspective-waiting"
-              >
-                {{ t("dbm.blocked.perspective.waiting") }}
-                <OTooltip side="bottom" :content="t('dbm.blocked.perspective.waitingHint')" />
-              </OToggleGroupItem>
-              <OToggleGroupItem
-                value="blocking"
-                size="sm"
-                data-test="dbm-blocked-perspective-blocking"
-              >
-                {{ t("dbm.blocked.perspective.blocking") }}
-                <OTooltip side="bottom" :content="t('dbm.blocked.perspective.blockingHint')" />
-              </OToggleGroupItem>
-            </OToggleGroup>
-          </DbmTableToolbar>
-        </template>
-
-        <template #toolbar-trailing>
-          <div class="flex items-center gap-1.5">
-            <DateTime
-              auto-apply
-              menu-align="end"
-              :default-type="range.type"
-              :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-              :default-relative-time="range.relativeTimePeriod ?? undefined"
-              data-test-name="dbm-blocked-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
-              @on:date-change="onDateChange"
-            />
-            <ORefreshButton
-              layout="inline"
-              variant="outline"
-              :loading="loading"
-              :last-run-at="lastRunAt"
-              data-test="dbm-blocked-refresh"
-              @click="onRefresh()"
-            />
-          </div>
-        </template>
-
         <template #subheader>
           <!-- The window's counts live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
@@ -142,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <DbmLockCoverageLine
             v-if="samples.length"
             :summary="coverageLine"
-            dot-class="bg-status-warning-text"
+            :variant="truncated ? 'warning' : 'info'"
             :trailing-label="checkedLabel"
             data-test="dbm-blocked-coverage"
           />
@@ -450,15 +417,12 @@ import { useStore } from "vuex";
 
 import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
+import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DateTime from "@/components/DateTime.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
-import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
-import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmTerminateSql from "@/components/dbm/DbmTerminateSql.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -1076,7 +1040,6 @@ const {
   filters: dimensionFilters,
   requestParams: scopeParams,
   queryParams: scopeQuery,
-  clear: clearScopeModels,
 } = useDbmScopeFilters({
   query: route.query,
   // Re-read on activation: this page is kept alive, so its setup-time seed
@@ -1106,13 +1069,6 @@ const {
     load();
   },
 });
-
-const clearScope = () => {
-  clearScopeModels();
-  search.value = "";
-  syncUrl();
-  load();
-};
 
 /**
  * Mirror the scope into the URL so it survives a tab switch, a reload and a

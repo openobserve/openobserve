@@ -48,16 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          nothing — copy in particular composes its summary from a row that is
          not there. The empty state below carries the only action that applies. -->
     <template v-if="hasQuery" #actions>
-      <DateTime
-        auto-apply
-        menu-align="end"
-        :default-type="range.type"
-        :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-        :default-relative-time="range.relativeTimePeriod ?? undefined"
-        data-test-name="dbm-detail-date-time"
-        class="h-8 max-md:[&_.date-time-label]:hidden"
-        @on:date-change="onDateChange"
-      />
       <OButton
         variant="outline"
         size="sm"
@@ -69,13 +59,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("dbm.detail.copySummary") }}
         <OTooltip side="bottom" :content="t('dbm.detail.copySummaryHint')" />
       </OButton>
-      <ORefreshButton
-        layout="inline"
-        variant="outline"
-        :loading="loading"
+      <DbmHeaderActions
+        :range="range"
         :last-run-at="lastRunAt"
-        data-test="dbm-detail-refresh"
-        @click="load()"
+        :loading="loading"
+        @date-change="onDateChange"
+        @refresh="load()"
       />
     </template>
 
@@ -521,6 +510,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the instrumented-callers-only disclaimer, and there is no client
            coverage to be stale about. -->
           <DbmCoverageLine
+            :window-start="current.startTime"
+            :window-end="current.endTime"
             v-if="traceVantage && (clientRowFound || !serverAnswering)"
             class="-mx-page-edge"
             :freshness="freshness"
@@ -1236,6 +1227,7 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 import DbmAppSourceLegend from "@/components/dbm/DbmAppSourceLegend.vue";
 import DbmAppSourceMarker from "@/components/dbm/DbmAppSourceMarker.vue";
+import DbmHeaderActions from "@/components/dbm/DbmHeaderActions.vue";
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmHistoryPanel from "@/components/dbm/DbmHistoryPanel.vue";
 import DbmQueryText from "@/components/dbm/DbmQueryText.vue";
@@ -1253,8 +1245,6 @@ import DbmLockEmptyState, {
 } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
-import DateTime from "@/components/DateTime.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";

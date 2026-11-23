@@ -42,9 +42,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   deliberately not gated on `ai_enabled`/`isEnterprise`: DBM is all-OSS.
 -->
 <template>
-  <DbmPageChrome title-data-test="dbm-table-health-title" :tab-counts="tabCounts">
+  <DbmPageChrome
+    title-data-test="dbm-table-health-title"
+    :tab-counts="tabCounts"
+    :range="range"
+    :last-run-at="lastRunAt"
+    :loading="loading"
+    @date-change="onDateChange"
+    @refresh="onRefresh()"
+  >
     <div class="flex min-h-0 flex-1 flex-col">
+      <DbmFilterBar
+        v-model:search="search"
+        :placeholder="t('dbm.tableHealth.searchPlaceholder')"
+        search-data-test="dbm-table-health-search"
+        :filters="dimensionFilters"
+      >
+        <template #trailing>
+          <div class="ms-auto flex min-w-0 items-center gap-1">
+            <OTableColumnToggle
+              :columns="columns"
+              :column-visibility="columnVisibility"
+              :has-resized-columns="tableRef?.hasResizedColumns ?? false"
+              @update:column-visibility="setColumnVisibility"
+              @reset:column-sizes="tableRef?.resetColumnSizes?.()"
+            />
+            <!-- "Nothing found" and "not collected for this engine" stay apart: the second is no all-clear. -->
+            <DbmToolbarNote
+              v-if="!loading && !collapsedRecommendations.length"
+              v-bind="recommendationsNote"
+            />
+            <DbmToolbarNote
+              v-if="caveats.length"
+              :text="t('dbm.tableHealth.aboutNumbers')"
+              :detail="raw(caveats.join(' '))"
+              data-test="dbm-table-health-disclosures"
+            />
+          </div>
+        </template>
+      </DbmFilterBar>
       <OTable
+        ref="tableRef"
         :enable-column-resize="true"
         :data="rows"
         :columns="columns"
@@ -59,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         table-id="dbm-table-health"
         :total-count-exact="!truncated"
         persist-columns
-        :column-visibility="defaultColumnVisibility"
+        :column-visibility="columnVisibility"
         data-test="dbm-table-health-table"
       >
         <template #error="{ message }">
@@ -118,59 +156,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :data-test="`dbm-table-health-dead-tup-pct-${row.rowKey}`"
           />
-        </template>
-
-        <template #toolbar>
-          <DbmTableToolbar
-            v-model:search="search"
-            :placeholder="t('dbm.tableHealth.searchPlaceholder')"
-            :debounce="400"
-            search-data-test="dbm-table-health-search"
-          >
-            <template #filters>
-              <DbmScopeFilters
-                class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-2/5"
-                :filters="dimensionFilters"
-                @clear="clearScope"
-              />
-            </template>
-            <div class="ms-auto flex min-w-0 items-center gap-3">
-              <!-- "Nothing found" and "not collected for this engine" stay apart: the second is no all-clear. -->
-              <DbmToolbarNote
-                v-if="!loading && !collapsedRecommendations.length"
-                v-bind="recommendationsNote"
-              />
-              <DbmToolbarNote
-                v-if="caveats.length"
-                :text="t('dbm.tableHealth.aboutNumbers')"
-                :detail="raw(caveats.join(' '))"
-                data-test="dbm-table-health-disclosures"
-              />
-            </div>
-          </DbmTableToolbar>
-        </template>
-
-        <template #toolbar-trailing>
-          <div class="flex items-center gap-1.5">
-            <DateTime
-              auto-apply
-              menu-align="end"
-              :default-type="range.type"
-              :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-              :default-relative-time="range.relativeTimePeriod ?? undefined"
-              data-test-name="dbm-table-health-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
-              @on:date-change="onDateChange"
-            />
-            <ORefreshButton
-              layout="inline"
-              variant="outline"
-              :loading="loading"
-              :last-run-at="lastRunAt"
-              data-test="dbm-table-health-refresh"
-              @click="onRefresh()"
-            />
-          </div>
         </template>
 
         <!-- The disclosures live here, always visible, never behind a hover.
@@ -272,20 +257,19 @@ import { computed, ref, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
+import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DateTime from "@/components/DateTime.vue";
-import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 // The shared in-cell magnitude bar from the core Table library — the same one
 // QueryDetailPage already uses. Preferred over the traces plugin's
 // ServiceCatalogBarCell, which is equivalent but lives under plugins/traces/
 // and would make this the first DBM view reaching across a plugin boundary.
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService from "@/services/db_monitoring";
@@ -435,6 +419,12 @@ const defaultColumnVisibility = {
   last_analyze: false,
   mod_since_analyze: false,
 };
+
+const tableRef = ref<{ hasResizedColumns?: boolean; resetColumnSizes?: () => void } | null>(null);
+const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("dbm-table-health");
+// Nothing persisted yet: start from the page defaults.
+if (!Object.keys(columnVisibility.value).length)
+  columnVisibility.value = { ...defaultColumnVisibility };
 
 const columns = computed<OTableColumnDef[]>(() => tableHealthColumns(t));
 
@@ -618,7 +608,6 @@ const {
   filters: dimensionFilters,
   requestParams: scopeParams,
   queryParams: scopeQuery,
-  clear: clearScopeModels,
 } = useDbmScopeFilters({
   query: route.query,
   // Re-read on activation: this page is kept alive, so its setup-time seed
@@ -647,13 +636,6 @@ const {
     load();
   },
 });
-
-const clearScope = () => {
-  clearScopeModels();
-  search.value = "";
-  syncUrl();
-  load();
-};
 
 /**
  * Mirror the scope into the URL so it survives a tab switch, a reload and a

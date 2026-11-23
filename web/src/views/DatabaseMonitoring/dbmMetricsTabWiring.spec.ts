@@ -72,8 +72,8 @@ describe("dbm metrics tab wiring", () => {
   it("renders a clearable control for every dimension the panels scope by", () => {
     // The applied-but-invisible rule (dbmEventTabScope.spec.ts): scope that
     // narrows the charts must be visible and clearable on the same page.
-    expect(page).toContain("DbmScopeFilters");
-    expect(page).toMatch(/@clear="clearScope"/);
+    expect(page).toContain("<DbmFilterBar");
+    expect(page).toContain(':filters="dimensionFilters"');
     expect(page).toContain("useDbmScopeFilters");
   });
 

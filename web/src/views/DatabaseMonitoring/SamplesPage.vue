@@ -41,7 +41,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   "everything is slow" — which demand different responses — look different.
 -->
 <template>
-  <DbmPageChrome title-data-test="dbm-samples-title" :tab-counts="tabCounts">
+  <DbmPageChrome
+    title-data-test="dbm-samples-title"
+    :tab-counts="tabCounts"
+    :range="range"
+    :last-run-at="lastRunAt"
+    :loading="loading"
+    @date-change="onDateChange"
+    @refresh="onRefresh()"
+  >
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- Scope lives ABOVE both tables, not inside either one's toolbar. It
            used to sit in the client table's `#toolbar`, so it unmounted with
@@ -53,60 +61,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Search rides UP here rather than the filter riding DOWN into a
            toolbar: both tables below own a toolbar and only one of them is
            mounted at a time, so a control in either would vanish with it.
-           One row, above both, serving whichever table is showing. -->
-      <div class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-1.5">
-        <DbmScopeFilters
-          class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-1/4"
-          :filters="dimensionFilters"
-          @clear="clearScope"
-        />
-        <div class="min-w-48 flex-1 max-lg:order-last max-lg:w-full">
-          <OSearchInput
-            :model-value="search"
-            :placeholder="t('dbm.samples.searchPlaceholder')"
-            clearable
-            :debounce="400"
-            data-test="dbm-samples-search"
-            @update:model-value="(v: unknown) => (search = typeof v === 'string' ? v : '')"
-          />
-        </div>
-        <DbmToolbarNote
-          v-if="!serverListShown"
-          class="ms-auto"
-          :text="t('dbm.samples.disclosureShort')"
-          :detail="t('dbm.samples.disclosureDetail')"
-          data-test="dbm-samples-disclosure"
-        />
-        <!-- The toolbar lives outside the table (it serves the fallback list too), so the column toggle does as well. -->
-        <OTableColumnToggle
-          v-if="!serverListShown"
-          :columns="columns"
-          :column-visibility="columnVisibility"
-          :has-resized-columns="tableRef?.hasResizedColumns ?? false"
-          @update:column-visibility="setColumnVisibility"
-          @reset:column-sizes="tableRef?.resetColumnSizes?.()"
-        />
-        <DateTime
-          auto-apply
-          menu-align="end"
-          :default-type="range.type"
-          :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-          :default-relative-time="range.relativeTimePeriod ?? undefined"
-          data-test-name="dbm-samples-date-time"
-          class="h-8 max-md:[&_.date-time-label]:hidden"
-          @on:date-change="onDateChange"
-        />
-        <!-- ms-auto: when the row wraps, refresh lands right-aligned instead of orphaned at the start. -->
-        <ORefreshButton
-          layout="inline"
-          variant="outline"
-          class="ms-auto"
-          :loading="loading"
-          :last-run-at="lastRunAt"
-          data-test="dbm-samples-refresh"
-          @click="onRefresh()"
-        />
-      </div>
+           One bar, above both, serving whichever table is showing. -->
+      <DbmFilterBar
+        v-model:search="search"
+        :placeholder="t('dbm.samples.searchPlaceholder')"
+        search-data-test="dbm-samples-search"
+        :filters="dimensionFilters"
+      >
+        <template #trailing>
+          <div v-if="!serverListShown" class="ms-auto flex items-center gap-1">
+            <!-- The toolbar lives outside the table (it serves the fallback list too), so the column toggle does as well. -->
+            <OTableColumnToggle
+              :columns="columns"
+              :column-visibility="columnVisibility"
+              :has-resized-columns="tableRef?.hasResizedColumns ?? false"
+              @update:column-visibility="setColumnVisibility"
+              @reset:column-sizes="tableRef?.resetColumnSizes?.()"
+            />
+            <DbmToolbarNote
+              :text="t('dbm.samples.disclosureShort')"
+              :detail="t('dbm.samples.disclosureDetail')"
+              data-test="dbm-samples-disclosure"
+            />
+          </div>
+        </template>
+      </DbmFilterBar>
 
       <!-- In fallback mode the client table UNMOUNTS: its tall empty-state
            checklist would otherwise consume the viewport and squeeze the
@@ -377,18 +356,16 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
+import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
-import DateTime from "@/components/DateTime.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
+import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
 import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
 import DbmLockEmptyState, {
   type DbmLockCheck,
   type DbmLockEmptyAction,
 } from "@/components/dbm/DbmLockEmptyState.vue";
 import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

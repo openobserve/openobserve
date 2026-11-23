@@ -122,15 +122,11 @@ describe("identity and scope stay outside the tabs", () => {
     const open = template.indexOf("#actions>");
     expect(open, "the page must have a header actions slot").toBeGreaterThan(-1);
     const actions = template.slice(open, template.indexOf("</template>", open));
-    for (const control of [
-      "dbm-detail-date-time",
-      "dbm-detail-copy-summary",
-      "dbm-detail-refresh",
-    ]) {
+    for (const control of ["DbmHeaderActions", "dbm-detail-copy-summary"]) {
       expect(actions, `${control} belongs to the page header`).toContain(control);
     }
     // And none of them leaked into a panel.
-    expect(at("dbm-detail-tabs")).toBeGreaterThan(template.indexOf("dbm-detail-date-time"));
+    expect(at("dbm-detail-tabs")).toBeGreaterThan(template.indexOf("DbmHeaderActions"));
   });
 });
 

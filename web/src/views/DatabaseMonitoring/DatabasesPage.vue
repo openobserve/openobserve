@@ -51,8 +51,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   from the parent they belong to.
 -->
 <template>
-  <DbmPageChrome title-data-test="dbm-databases-title" :tab-counts="tabCounts">
+  <DbmPageChrome
+    title-data-test="dbm-databases-title"
+    :tab-counts="tabCounts"
+    :range="range"
+    :last-run-at="lastRunAt"
+    :loading="loading"
+    @date-change="onDateChange"
+    @refresh="onRefresh()"
+  >
     <div class="flex min-h-0 flex-1 flex-col">
+      <!-- Types against a client list that is already loaded, so no debounce. -->
+      <DbmFilterBar
+        v-model:search="search"
+        :placeholder="t('dbm.databases.searchPlaceholder')"
+        search-data-test="dbm-databases-search"
+        :filters="dimensionFilters"
+        :debounce="0"
+      >
+        <template #coverage>
+          <DbmCoverageLine
+            :window-start="current.startTime"
+            :window-end="current.endTime"
+            :freshness="freshness"
+            :hits="rows"
+            :top-n-subset="topNSubset"
+            :error-count="errorCount"
+            exact-percentiles
+            :slowest-schema-speeds="showsSlowestSchemaSpeeds"
+            data-test="dbm-databases-coverage"
+          />
+        </template>
+      </DbmFilterBar>
       <OTable
         :data="treeRows"
         :columns="columns"
@@ -86,59 +116,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @action="onRefresh()"
           />
         </template>
-        <!-- ONE toolbar row, the same one Top queries uses. The engine select
-             is a dimension inside the shared filter popover rather than a bare
-             full-width select, so both tabs filter the same way. -->
-        <template #toolbar>
-          <DbmTableToolbar
-            v-model:search="search"
-            :placeholder="t('dbm.databases.searchPlaceholder')"
-            search-data-test="dbm-databases-search"
-          >
-            <template #filters>
-              <DbmScopeFilters
-                class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-2/5"
-                :filters="dimensionFilters"
-                @clear="clearScope"
-              />
-            </template>
-            <DbmCoverageLine
-              inline
-              class="ms-auto"
-              :freshness="freshness"
-              :hits="rows"
-              :top-n-subset="topNSubset"
-              :error-count="errorCount"
-              exact-percentiles
-              :slowest-schema-speeds="showsSlowestSchemaSpeeds"
-              data-test="dbm-databases-coverage"
-            />
-          </DbmTableToolbar>
-        </template>
-
-        <template #toolbar-trailing>
-          <div class="flex items-center gap-1.5">
-            <DateTime
-              auto-apply
-              menu-align="end"
-              :default-type="range.type"
-              :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-              :default-relative-time="range.relativeTimePeriod ?? undefined"
-              data-test-name="dbm-databases-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
-              @on:date-change="onDateChange"
-            />
-            <ORefreshButton
-              layout="inline"
-              variant="outline"
-              :loading="loading"
-              :last-run-at="lastRunAt"
-              data-test="dbm-databases-refresh"
-              @click="onRefresh()"
-            />
-          </div>
-        </template>
-
         <template #subheader>
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
@@ -462,15 +439,13 @@ import { useStore } from "vuex";
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
 import DbmInstanceHealthCell from "@/components/dbm/DbmInstanceHealthCell.vue";
+import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DateTime from "@/components/DateTime.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
-import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
+import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
-import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";

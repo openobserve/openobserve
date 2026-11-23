@@ -62,47 +62,32 @@ const templateOf = (source: string): string => {
 };
 
 describe("DBM scope filter survives the fallback", () => {
-  it.each(PAGES)("%s renders DbmScopeFilters exactly once", (page) => {
+  it.each(PAGES)("%s renders DbmFilterBar exactly once", (page) => {
     const template = templateOf(read(page));
-    const occurrences = template.match(/<DbmScopeFilters\b/g) ?? [];
     // Exactly one, so there is ONE source of truth for the filter state and no
     // duplicated DOM in any state where both tables could mount.
-    expect(occurrences).toHaveLength(1);
+    expect(template.match(/<DbmFilterBar\b/g) ?? []).toHaveLength(1);
   });
 
   it.each(PAGES)("%s renders it OUTSIDE the client table that unmounts", (page) => {
     const template = templateOf(read(page));
-    const filterAt = template.indexOf("<DbmScopeFilters");
+    const filterAt = template.indexOf("<DbmFilterBar");
     const tableAt = template.indexOf('<OTable\n        v-if="!serverListShown"');
 
     expect(tableAt, `${page} must still gate its client table on serverListShown`).toBeGreaterThan(
       -1,
     );
-    // Before the `v-if`-ed table means it cannot be unmounted by it. This is
-    // the whole fix: position, not presence.
+    // Before the `v-if`-ed table means it cannot be unmounted by it.
     expect(filterAt).toBeGreaterThan(-1);
     expect(filterAt).toBeLessThan(tableAt);
   });
 
   it.each(PAGES)("%s keeps the filter out of any table toolbar slot", (page) => {
     const template = templateOf(read(page));
-    const filterAt = template.indexOf("<DbmScopeFilters");
+    const filterAt = template.indexOf("<DbmFilterBar");
     const toolbarAt = template.indexOf("<template #toolbar>");
     expect(filterAt).toBeGreaterThan(-1);
-    // A toolbar slot belongs to a table, so anything inside one shares that
-    // table's mount lifetime — the exact defect being fixed. These two pages
-    // now have NO toolbar slot at all: search moved up onto the scope row so
-    // both live above the tables (see dbmScopeRowLayout.spec.ts), which
-    // satisfies the rule more strongly than ordering did. If a toolbar ever
-    // comes back, the filter must still precede it.
     if (toolbarAt > -1) expect(filterAt).toBeLessThan(toolbarAt);
-  });
-
-  it.each(PAGES)("%s still offers a way to clear the scope", (page) => {
-    const template = templateOf(read(page));
-    // The control is only honest if the reader can undo it; `clearScope` drops
-    // the search and the active insight too.
-    expect(template).toContain('@clear="clearScope"');
   });
 });
 

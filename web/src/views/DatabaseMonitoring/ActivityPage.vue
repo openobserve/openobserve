@@ -39,9 +39,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   one, which is why they occupy two columns and never one.
 -->
 <template>
-  <DbmPageChrome title-data-test="dbm-activity-title" :tab-counts="tabCounts">
+  <DbmPageChrome
+    title-data-test="dbm-activity-title"
+    :tab-counts="tabCounts"
+    :range="range"
+    :last-run-at="lastRunAt"
+    :loading="loading"
+    @date-change="onDateChange"
+    @refresh="onRefresh()"
+  >
     <div class="flex min-h-0 flex-1 flex-col">
+      <DbmFilterBar
+        v-model:search="search"
+        :placeholder="t('dbm.activity.searchPlaceholder')"
+        search-data-test="dbm-activity-search"
+        :filters="dimensionFilters"
+      >
+        <template #trailing>
+          <div class="ms-auto flex items-center gap-1">
+            <OTableColumnToggle
+              :columns="columns"
+              :column-visibility="columnVisibility"
+              :has-resized-columns="tableRef?.hasResizedColumns ?? false"
+              @update:column-visibility="setColumnVisibility"
+              @reset:column-sizes="tableRef?.resetColumnSizes?.()"
+            />
+            <DbmToolbarNote
+              :text="disclosureSummary"
+              :detail="disclosureDetail"
+              data-test="dbm-activity-disclosure"
+            />
+          </div>
+        </template>
+      </DbmFilterBar>
       <OTable
+        ref="tableRef"
         :enable-column-resize="true"
         :data="rows"
         :columns="columns"
@@ -55,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-global-filter="false"
         table-id="dbm-activity"
         persist-columns
-        :column-visibility="defaultColumnVisibility"
+        :column-visibility="columnVisibility"
         :total-count-exact="!truncated"
         data-test="dbm-activity-table"
         @row-click="onRowClick"
@@ -68,52 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @action="onRefresh()"
           />
         </template>
-        <template #toolbar>
-          <DbmTableToolbar
-            v-model:search="search"
-            :placeholder="t('dbm.activity.searchPlaceholder')"
-            :debounce="400"
-            search-data-test="dbm-activity-search"
-          >
-            <template #filters>
-              <DbmScopeFilters
-                class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-2/5"
-                :filters="dimensionFilters"
-                @clear="clearScope"
-              />
-            </template>
-            <DbmToolbarNote
-              class="ms-auto"
-              :text="disclosureSummary"
-              :detail="disclosureDetail"
-              data-test="dbm-activity-disclosure"
-            />
-          </DbmTableToolbar>
-        </template>
-
-        <template #toolbar-trailing>
-          <div class="flex items-center gap-1.5">
-            <DateTime
-              auto-apply
-              menu-align="end"
-              :default-type="range.type"
-              :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-              :default-relative-time="range.relativeTimePeriod ?? undefined"
-              data-test-name="dbm-activity-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
-              @on:date-change="onDateChange"
-            />
-            <ORefreshButton
-              layout="inline"
-              variant="outline"
-              :loading="loading"
-              :last-run-at="lastRunAt"
-              data-test="dbm-activity-refresh"
-              @click="onRefresh()"
-            />
-          </div>
-        </template>
-
         <template #subheader>
           <!-- Always rendered — `:loading` draws the skeleton — so arriving
                data never shifts the rows below it. -->
@@ -320,13 +306,12 @@ import { useRoute, useRouter } from "vue-router";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
-import DateTime from "@/components/DateTime.vue";
-import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
-import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
+import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -622,6 +607,12 @@ const columns = computed<OTableColumnDef<ActivityTableRow>[]>(() => [
 /** The identity columns are secondary to what the session is DOING. */
 const defaultColumnVisibility = { user: false, application: false };
 
+const tableRef = ref<{ hasResizedColumns?: boolean; resetColumnSizes?: () => void } | null>(null);
+const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("dbm-activity");
+// Nothing persisted yet: start from the page defaults.
+if (!Object.keys(columnVisibility.value).length)
+  columnVisibility.value = { ...defaultColumnVisibility };
+
 const stateTone = (state: string | null | undefined): string => {
   const s = (state ?? "").toLowerCase();
   if (s.startsWith("idle in transaction")) return "bg-status-warning-bg text-status-warning-text";
@@ -823,7 +814,6 @@ const {
   filters: dimensionFilters,
   requestParams: scopeParams,
   queryParams: scopeQuery,
-  clear: clearScopeModels,
 } = useDbmScopeFilters({
   query: route.query,
   // Re-read on activation: this page is kept alive, so its setup-time seed
@@ -851,13 +841,6 @@ const {
     load();
   },
 });
-
-const clearScope = () => {
-  clearScopeModels();
-  search.value = "";
-  syncUrl();
-  load();
-};
 
 /**
  * Mirror the scope into the URL so it survives a tab switch, a reload and a

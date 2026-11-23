@@ -40,8 +40,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       list is the HEALTHY normal and is rendered as reassurance.
 -->
 <template>
-  <DbmPageChrome title-data-test="dbm-deadlocks-title" :tab-counts="tabCounts">
+  <DbmPageChrome
+    title-data-test="dbm-deadlocks-title"
+    :tab-counts="tabCounts"
+    :range="range"
+    :last-run-at="lastRunAt"
+    :loading="loading"
+    @date-change="onDateChange"
+    @refresh="onRefresh()"
+  >
     <div class="flex min-h-0 flex-1 flex-col">
+      <DbmFilterBar
+        v-model:search="search"
+        :placeholder="t('dbm.deadlocks.searchPlaceholder')"
+        search-data-test="dbm-deadlocks-search"
+        :filters="dimensionFilters"
+        @search="load"
+      >
+        <!-- What a ROW means. Not a data-processing mode — the reader is
+             choosing between "name the bug" and "give me a timestamp". -->
+        <OToggleGroup
+          v-model="grouping"
+          class="shrink-0"
+          mobile-dropdown
+          data-test="dbm-deadlocks-grouping"
+        >
+          <OToggleGroupItem value="pairs" size="sm" data-test="dbm-deadlocks-grouping-pairs">
+            {{ t("dbm.deadlocks.grouping.pairs") }}
+            <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.pairsHint')" />
+          </OToggleGroupItem>
+          <OToggleGroupItem value="events" size="sm" data-test="dbm-deadlocks-grouping-events">
+            {{ t("dbm.deadlocks.grouping.events") }}
+            <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.eventsHint')" />
+          </OToggleGroupItem>
+        </OToggleGroup>
+      </DbmFilterBar>
       <OTable
         :enable-column-resize="true"
         :data="tableRows"
@@ -70,64 +103,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @action="onRefresh()"
           />
         </template>
-        <template #toolbar>
-          <DbmTableToolbar
-            v-model:search="search"
-            :placeholder="t('dbm.deadlocks.searchPlaceholder')"
-            :debounce="400"
-            search-data-test="dbm-deadlocks-search"
-            @search="load"
-          >
-            <template #filters>
-              <DbmScopeFilters
-                class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-2/5"
-                :filters="dimensionFilters"
-                @clear="clearScope"
-              />
-            </template>
-            <!-- What a ROW means. Not a data-processing mode — the reader is
-                 choosing between "name the bug" and "give me a timestamp". -->
-            <OToggleGroup
-              v-model="grouping"
-              class="shrink-0"
-              mobile-dropdown
-              data-test="dbm-deadlocks-grouping"
-            >
-              <OToggleGroupItem value="pairs" size="sm" data-test="dbm-deadlocks-grouping-pairs">
-                {{ t("dbm.deadlocks.grouping.pairs") }}
-                <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.pairsHint')" />
-              </OToggleGroupItem>
-              <OToggleGroupItem value="events" size="sm" data-test="dbm-deadlocks-grouping-events">
-                {{ t("dbm.deadlocks.grouping.events") }}
-                <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.eventsHint')" />
-              </OToggleGroupItem>
-            </OToggleGroup>
-          </DbmTableToolbar>
-        </template>
-
-        <template #toolbar-trailing>
-          <div class="flex items-center gap-1.5">
-            <DateTime
-              auto-apply
-              menu-align="end"
-              :default-type="range.type"
-              :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-              :default-relative-time="range.relativeTimePeriod ?? undefined"
-              data-test-name="dbm-deadlocks-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
-              @on:date-change="onDateChange"
-            />
-            <ORefreshButton
-              layout="inline"
-              variant="outline"
-              :loading="loading"
-              :last-run-at="lastRunAt"
-              data-test="dbm-deadlocks-refresh"
-              @click="onRefresh()"
-            />
-          </div>
-        </template>
-
         <template #subheader>
           <!-- The window's counts live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
@@ -178,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <DbmLockCoverageLine
             v-if="rows.length"
             :summary="coverageLine"
-            :dot-class="truncated ? 'bg-status-warning-text' : 'bg-status-success-text'"
+            :variant="truncated ? 'warning' : null"
             :trailing-label="readUpToLabel"
             data-test="dbm-deadlocks-coverage"
           />
@@ -434,17 +409,14 @@ import { useStore } from "vuex";
 
 import DbmDeadlockCycle from "@/components/dbm/DbmDeadlockCycle.vue";
 import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
+import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DateTime from "@/components/DateTime.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
-import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
-import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmLockEmptyState, {
   type DbmLockCheck,
   type DbmLockEmptyAction,
 } from "@/components/dbm/DbmLockEmptyState.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -1147,7 +1119,6 @@ const {
   filters: dimensionFilters,
   requestParams: scopeParams,
   queryParams: scopeQuery,
-  clear: clearScopeModels,
 } = useDbmScopeFilters({
   query: route.query,
   // Re-read on activation: this page is kept alive, so its setup-time seed
@@ -1176,13 +1147,6 @@ const {
     load();
   },
 });
-
-const clearScope = () => {
-  clearScopeModels();
-  search.value = "";
-  syncUrl();
-  load();
-};
 
 /**
  * Mirror the scope into the URL so it survives a tab switch, a reload and a

@@ -48,7 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sort and didn't would be a lie the UI tells by omission.
 -->
 <template>
-  <DbmPageChrome title-data-test="dbm-queries-title" :tab-counts="tabCounts">
+  <DbmPageChrome
+    title-data-test="dbm-queries-title"
+    :tab-counts="tabCounts"
+    :range="range"
+    :last-run-at="lastRunAt"
+    :loading="loading"
+    @date-change="onDateChange"
+    @refresh="onRefresh()"
+  >
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- Blocked queries emit no span until they finish, so a lock storm makes
            QPS FALL — and a falling line reads as recovery at the worst possible
@@ -80,41 +88,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            toolbar: both tables below own a toolbar and only one of them is
            mounted at a time, so a control in either would vanish with it.
            One row, above both, serving whichever table is showing. -->
-      <div class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-1.5">
-        <DbmScopeFilters
-          class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-1/4"
-          :filters="dimensionFilters"
-          :insight-chip="activeInsightChip"
-          @clear="clearScope"
-          @clear-insight="activeInsightId = null"
-        />
-        <div class="min-w-48 flex-1 max-lg:order-last max-lg:w-full">
-          <OSearchInput
-            :model-value="search"
-            :placeholder="t('dbm.queries.searchPlaceholder')"
-            clearable
-            :debounce="400"
-            data-test="dbm-queries-search"
-            @update:model-value="onSearchInput"
-          />
-        </div>
-        <!-- Off = real SQL only; on also includes the driver's connection bookkeeping. -->
-        <span
-          class="border-border-default rounded-default inline-flex shrink-0 items-center border px-2.5 py-2"
-          data-test="dbm-queries-stmt-class"
-        >
-          <OCheckbox
-            :model-value="stmtClass"
-            true-value="all"
-            false-value="query"
-            data-test="dbm-queries-stmt-class-checkbox"
-            size="sm"
-            :label="t('dbm.queries.stmtClass.overheadLabel')"
-            @update:model-value="onStmtClassChange"
-          />
-          <OTooltip side="bottom" :content="t('dbm.queries.stmtClass.allHint')" />
-        </span>
-
+      <DbmFilterBar
+        :search="search"
+        :placeholder="t('dbm.queries.searchPlaceholder')"
+        search-data-test="dbm-queries-search"
+        :filters="dimensionFilters"
+        :more-count="stmtClass === 'all' ? 1 : 0"
+        @update:search="onSearchInput"
+      >
         <!-- What every Δ and every insight is measured AGAINST (W5). Each rule
              line names the choice, so a number can always be traced to the
              comparison that produced it. -->
@@ -135,64 +116,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
-        <!-- Icons only: at 1280 any text here would take the filter chips' last room. Each follows the list on screen. -->
-        <DbmCoverageLine
-          v-if="!serverListShown"
-          inline
-          compact
-          :freshness="freshness"
-          :hits="rows"
-          :other="other"
-          :top-n-subset="topNSubset"
-          :error-count="errorCount"
-          :filter-label="narrowingFilterLabel"
-          data-test="dbm-queries-coverage"
-        />
-        <DbmCoverageLine
-          v-else
-          inline
-          compact
-          :freshness="freshness"
-          :hits="serverCoverageHits"
-          :top-n-subset="serverTruncated"
-          :filter-label="narrowingFilterLabel"
-          data-test="dbm-server-queries-coverage"
-        />
-        <DbmAppSourceLegend
-          v-if="hasAppSourcedRows && !serverListShown"
-          compact
-          data-test="dbm-queries-app-source-legend"
-        />
-        <!-- The toolbar lives outside the table (it serves the fallback list too), so the column toggle does as well. -->
-        <OTableColumnToggle
-          v-if="!serverListShown"
-          :columns="columns"
-          :column-visibility="columnVisibility"
-          :has-resized-columns="tableRef?.hasResizedColumns ?? false"
-          @update:column-visibility="setColumnVisibility"
-          @reset:column-sizes="tableRef?.resetColumnSizes?.()"
-        />
-        <DateTime
-          auto-apply
-          menu-align="end"
-          :default-type="range.type"
-          :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-          :default-relative-time="range.relativeTimePeriod ?? undefined"
-          data-test-name="dbm-queries-date-time"
-          class="h-8 max-md:[&_.date-time-label]:hidden"
-          @on:date-change="onDateChange"
-        />
-        <!-- ms-auto: when the row wraps, refresh lands right-aligned instead of orphaned at the start. -->
-        <ORefreshButton
-          layout="inline"
-          variant="outline"
-          class="ms-auto"
-          :loading="loading"
-          :last-run-at="lastRunAt"
-          data-test="dbm-queries-refresh"
-          @click="onRefresh()"
-        />
-      </div>
+        <template #more>
+          <!-- Off = real SQL only; on also includes the driver's connection bookkeeping. -->
+          <span class="inline-flex items-center" data-test="dbm-queries-stmt-class">
+            <OCheckbox
+              :model-value="stmtClass"
+              true-value="all"
+              false-value="query"
+              data-test="dbm-queries-stmt-class-checkbox"
+              size="sm"
+              :label="t('dbm.queries.stmtClass.overheadLabel')"
+              @update:model-value="onStmtClassChange"
+            />
+            <OTooltip side="bottom" :content="t('dbm.queries.stmtClass.allHint')" />
+          </span>
+        </template>
+
+        <template #trailing>
+          <DbmAppSourceLegend
+            v-if="hasAppSourcedRows && !serverListShown"
+            compact
+            data-test="dbm-queries-app-source-legend"
+          />
+          <!-- The toolbar lives outside the table (it serves the fallback list too), so the column toggle does as well. -->
+          <OTableColumnToggle
+            v-if="!serverListShown"
+            :columns="columns"
+            :column-visibility="columnVisibility"
+            :has-resized-columns="tableRef?.hasResizedColumns ?? false"
+            @update:column-visibility="setColumnVisibility"
+            @reset:column-sizes="tableRef?.resetColumnSizes?.()"
+          />
+        </template>
+        <template #coverage>
+          <DbmCoverageLine
+            :window-start="current.startTime"
+            :window-end="current.endTime"
+            v-if="!serverListShown"
+            :freshness="freshness"
+            :hits="rows"
+            :other="other"
+            :top-n-subset="topNSubset"
+            :error-count="errorCount"
+            :filter-label="narrowingFilterLabel"
+            data-test="dbm-queries-coverage"
+          />
+          <DbmCoverageLine
+            :window-start="current.startTime"
+            :window-end="current.endTime"
+            v-else
+            :freshness="freshness"
+            :hits="serverCoverageHits"
+            :top-n-subset="serverTruncated"
+            :filter-label="narrowingFilterLabel"
+            data-test="dbm-server-queries-coverage"
+          />
+        </template>
+      </DbmFilterBar>
 
       <!-- In fallback mode the client table UNMOUNTS: its tall empty-state
            checklist would otherwise consume the viewport and squeeze the
@@ -599,17 +579,15 @@ import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptySt
 import DbmInsightStrip from "@/components/dbm/DbmInsightStrip.vue";
 import DbmLoadCell from "@/components/dbm/DbmLoadCell.vue";
 import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
+import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
-import DateTime from "@/components/DateTime.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
+import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { copyToClipboard } from "@/utils/clipboard";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -1348,27 +1326,6 @@ const dimensionFilters = computed<DbmScopeFilter[]>(() => {
     ...(envFilter.value ? [{ ...env, options: [] }] : []),
     ...(serviceFilter.value ? [{ ...service, options: [] }] : []),
   ];
-});
-
-/**
- * The active insight, as a toolbar chip. Clicking an insight filters the table
- * IN PLACE, and this chip is what keeps that scope visible and removable — an
- * insight filter that left no trace would be a mode the user cannot see or
- * escape.
- */
-const activeInsightChip = computed(() => {
-  if (!activeInsightId.value) return null;
-  const insight = insights.value.find((i) => i.id === activeInsightId.value);
-  if (!insight) return null;
-  return {
-    dimension: t("dbm.filters.dimension.insight"),
-    label: t(`dbm.insights.${insight.id}.title`, insightTitleParams(insight)),
-  };
-});
-
-const insightTitleParams = (insight: DbmInsight) => ({
-  ratio: (insight.evidence.ratio ?? 0).toFixed(0),
-  multiplier: Math.round(insight.evidence.callsPerTrace ?? 0),
 });
 
 const requestParams = () => ({

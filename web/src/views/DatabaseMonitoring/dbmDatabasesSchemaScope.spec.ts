@@ -209,8 +209,8 @@ const DbmTableToolbarStub = defineComponent({
       h("div", slots.filters?.()),
 });
 
-const DbmScopeFiltersStub = defineComponent({
-  name: "DbmScopeFilters",
+const DbmFilterBarStub = defineComponent({
+  name: "DbmFilterBar",
   props: { filters: { type: Array as PropType<DbmScopeFilter[]>, default: () => [] } },
   setup: () => () => h("div"),
 });
@@ -226,7 +226,7 @@ const stubs = {
   OTable: OTableStub,
   DbmPageChrome: DbmPageChromeStub,
   DbmTableToolbar: DbmTableToolbarStub,
-  DbmScopeFilters: DbmScopeFiltersStub,
+  DbmFilterBar: DbmFilterBarStub,
   DbmRowActions: DbmRowActionsStub,
   DbmCoverageLine: true,
   DbmEmptyState: true,
@@ -283,7 +283,7 @@ const topRows = () => table().props("data") as TreeRow[];
 const serverRow = (instance: string) => topRows().find((row) => row.db_instance === instance)!;
 
 const setSchema = async (value: string | null) => {
-  const filters = wrapper!.findComponent(DbmScopeFiltersStub).props("filters") as DbmScopeFilter[];
+  const filters = wrapper!.findComponent(DbmFilterBarStub).props("filters") as DbmScopeFilter[];
   filters.find((filter) => filter.key === "namespace")!.onChange(value as string);
   await settle();
 };

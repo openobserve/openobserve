@@ -33,33 +33,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   activity feed, and vice versa.
 -->
 <template>
-  <DbmPageChrome title-data-test="dbm-metrics-title" :tab-counts="tabCounts">
+  <DbmPageChrome
+    title-data-test="dbm-metrics-title"
+    :tab-counts="tabCounts"
+    :range="range"
+    :last-run-at="lastRunAt"
+    :loading="loading"
+    @date-change="onDateChange"
+    @refresh="onRefresh()"
+  >
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- Above the rail and the charts, so it stays put while they scroll, as on every other tab. -->
-      <div
-        class="px-page-edge border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b py-1.5"
-        data-test="dbm-metrics-toolbar"
-      >
-        <DbmScopeFilters class="min-w-0 flex-1" :filters="dimensionFilters" @clear="clearScope" />
-        <DateTime
-          auto-apply
-          menu-align="end"
-          :default-type="range.type"
-          :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-          :default-relative-time="range.relativeTimePeriod ?? undefined"
-          data-test-name="dbm-metrics-date-time"
-          class="h-8 max-md:[&_.date-time-label]:hidden"
-          @on:date-change="onDateChange"
-        />
-        <ORefreshButton
-          layout="inline"
-          variant="outline"
-          :loading="loading"
-          :last-run-at="lastRunAt"
-          data-test="dbm-metrics-refresh"
-          @click="onRefresh()"
-        />
-      </div>
+      <DbmFilterBar :filters="dimensionFilters" />
       <div class="flex min-h-0 flex-1 max-md:flex-col">
         <!-- The metrics-explorer geometry: a slim jump rail beside the page's own
            scroll column, so any section is one click away instead of a scroll. -->
@@ -349,17 +334,15 @@ import { computed, defineAsyncComponent, onBeforeUnmount, ref, shallowRef } from
 import { useRoute, useRouter } from "vue-router";
 
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
-import DateTime from "@/components/DateTime.vue";
 import DbmMetricPanel from "@/components/dbm/DbmMetricPanel.vue";
 import DbmMetricsRail, { type DbmMetricsRailItem } from "@/components/dbm/DbmMetricsRail.vue";
+import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmSection from "@/components/dbm/DbmSection.vue";
 import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
 import { useDbmScopeFilters } from "@/composables/dbm/useDbmScopeFilters";
 import useStreams from "@/composables/useStreams";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -428,7 +411,6 @@ const {
   filters: dimensionFilters,
   requestParams: scopeParams,
   queryParams: scopeQuery,
-  clear: clearScopeModels,
 } = useDbmScopeFilters({
   query: route.query,
   liveQuery: () => route.query,
@@ -731,11 +713,6 @@ const notCollectingChecks = computed<DbmLockCheck[]>(() => [
       : t("dbm.metrics.notCollecting.checks.enabled.noDetail"),
   },
 ]);
-
-const clearScope = () => {
-  clearScopeModels();
-  syncUrl();
-};
 
 const syncUrl = () => {
   router

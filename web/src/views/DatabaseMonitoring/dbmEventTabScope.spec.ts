@@ -69,9 +69,9 @@ const templateOf = (source: string): string => {
 };
 
 describe("the event tabs render their scope, exactly once and outside the table", () => {
-  it.each(PAGES)("$file renders DbmScopeFilters exactly once", ({ file }) => {
+  it.each(PAGES)("$file renders DbmFilterBar exactly once", ({ file }) => {
     const template = templateOf(read(file));
-    const occurrences = template.match(/<DbmScopeFilters\b/g) ?? [];
+    const occurrences = template.match(/<DbmFilterBar\b/g) ?? [];
     // Exactly one, so there is ONE source of truth for the filter state and no
     // duplicated DOM in any state where two tables could mount.
     expect(occurrences).toHaveLength(1);
@@ -105,9 +105,9 @@ describe("the event tabs render their scope, exactly once and outside the table"
     ).not.toContain("v-if");
   });
 
-  it.each(PAGES)("$file offers a way to clear the scope", ({ file }) => {
-    // The control is only honest if the reader can undo what it applied.
-    expect(templateOf(read(file))).toContain('@clear="clearScope"');
+  it.each(PAGES)("$file hands its dimension filters to the bar", ({ file }) => {
+    // Every select carries an "All" option, so the reader can always undo what it applied.
+    expect(templateOf(read(file))).toContain(':filters="dimensionFilters"');
   });
 });
 
