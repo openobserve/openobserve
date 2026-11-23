@@ -451,18 +451,43 @@ describe("DashboardQueryEditor", () => {
       panelData.type = previousType;
     });
 
-    it("offers no second query for a treemap, which draws one measure", async () => {
+    it.each(["treemap", "funnel"])(
+      "offers no second query for a %s, which draws one measure",
+      async (type) => {
+        wrapper = createWrapper();
+        const panelData = wrapper.vm.dashboardPanelData.data;
+        const previousType = panelData.type;
+        const addButton = () => wrapper.find('[data-test="dashboard-panel-query-tab-add"]');
+        panelData.type = "line";
+        await wrapper.vm.$nextTick();
+        expect(addButton().exists()).toBe(true);
+
+        panelData.type = type;
+        await wrapper.vm.$nextTick();
+        expect(addButton().exists()).toBe(false);
+        panelData.type = previousType;
+      },
+    );
+
+    it.each([
+      ["treemap", "Treemap"],
+      ["funnel", "Funnel"],
+    ])("warns under the tabs while a %s has a second visible query", async (type, label) => {
       wrapper = createWrapper();
       const panelData = wrapper.vm.dashboardPanelData.data;
       const previousType = panelData.type;
-      const addButton = () => wrapper.find('[data-test="dashboard-panel-query-tab-add"]');
-      panelData.type = "line";
+      panelData.type = type;
+      // The mocked addQuery pushes onto the raw object, which computed values never see.
+      panelData.queries.push({ query: "", queryType: "sql", customQuery: true, config: {} });
       await wrapper.vm.$nextTick();
-      expect(addButton().exists()).toBe(true);
+      expect(wrapper.vm.multiQueryWarning).toBe(
+        `Only the first visible query is drawn for ${label}`,
+      );
 
-      panelData.type = "treemap";
+      panelData.queries[1].config.hide = true;
       await wrapper.vm.$nextTick();
-      expect(addButton().exists()).toBe(false);
+      expect(wrapper.vm.multiQueryWarning).toBeNull();
+      panelData.queries.pop();
       panelData.type = previousType;
     });
 

@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTabs>
         </div>
         <OButton
-          v-if="dashboardPanelData.data.type !== 'treemap'"
+          v-if="!isOneQueryChart(dashboardPanelData.data.type)"
           :aria-label="t('dashboard.newTab')"
           variant="ghost"
           size="icon"
@@ -428,6 +428,7 @@ import {
   queryRefs,
   substituteFormula,
 } from "@/utils/dashboard/promql/formula";
+import { isOneQueryChart, undrawnQueryCount } from "@/utils/dashboard/chartTypeGroups";
 
 // Minimal surface of UnifiedQueryEditor's exposed methods used here.
 interface QueryEditorInstance {
@@ -639,6 +640,13 @@ export default defineComponent({
       if (dashboardPanelData.data.type === "boxplot") {
         return t("dashboard.multiQueryWarning", {
           chartType: t("dashboard.chartSelection.boxplot"),
+        });
+      }
+
+      const type = dashboardPanelData.data.type;
+      if (isOneQueryChart(type) && undrawnQueryCount(dashboardPanelData.data.queries) > 0) {
+        return t("dashboard.oneQueryWarning", {
+          chartType: t(`dashboard.chartSelection.${type}`),
         });
       }
 
@@ -1202,6 +1210,7 @@ export default defineComponent({
       onUpdateToggle,
       addTab,
       addFormulaTab,
+      isOneQueryChart,
       currentQueryText,
       tabLabel,
       queryErrorText,
