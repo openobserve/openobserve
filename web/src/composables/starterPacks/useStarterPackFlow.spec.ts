@@ -485,6 +485,45 @@ describe("useStarterPackFlow", () => {
     expect(fake.previewPack).not.toHaveBeenCalled();
   });
 
+  it("counts the items a failed folder left unmade as failed, so they can be retried", async () => {
+    fake.installPack.mockResolvedValueOnce(
+      record({
+        status: "incomplete",
+        items: [
+          { kind: "folder", itemId: "alerts", status: "failed" },
+          { kind: "dashboard", itemId: "overview", status: "pending" },
+          { kind: "alert", itemId: "a1", status: "pending" },
+        ],
+      }),
+    );
+    const flow = setup();
+    expect(await flow.install()).toBe(false);
+    expect(flow.failed.value.map(({ itemId }) => itemId)).toEqual(["overview", "a1"]);
+    expect(flow.toCreate.value).toHaveLength(2);
+    fake.installPack.mockResolvedValueOnce(record());
+    expect(await flow.retry()).toBe(true);
+    expect(flow.failed.value).toHaveLength(0);
+  });
+
+  it("counts a failed folder that blocked nothing as the failure, so Retry is offered", async () => {
+    fake.installPack.mockResolvedValueOnce(
+      record({
+        status: "incomplete",
+        items: [
+          { kind: "folder", itemId: "alerts", status: "failed" },
+          { kind: "dashboard", itemId: "overview", status: "existing", id: "d1" },
+          { kind: "alert", itemId: "a1", status: "skipped" },
+        ],
+      }),
+    );
+    const flow = setup();
+    expect(await flow.install()).toBe(false);
+    expect(flow.failed.value.map(({ kind, itemId }) => [kind, itemId])).toEqual([
+      ["folder", "alerts"],
+    ]);
+    expect(flow.items.value.some(({ kind }) => kind === "folder")).toBe(false);
+  });
+
   it("refreshes the org's resources check after every install, undo and remove", async () => {
     const flow = setup();
     fake.installPack.mockResolvedValueOnce(record());

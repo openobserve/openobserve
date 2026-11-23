@@ -102,9 +102,26 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       featureState(store.state.zoConfig?.features, pack.nativeView.feature) === "enabled",
   );
 
-  const items = computed(() => (record.value?.items ?? []).filter(countsAsItem));
+  // A failed folder stops the run, so what it left pending failed with it and Retry redoes both.
+  const items = computed(() => {
+    const all = record.value?.items ?? [];
+    const blocked =
+      !running.value && all.some((item) => !countsAsItem(item) && item.status === "failed");
+    return all
+      .filter(countsAsItem)
+      .map((item) =>
+        blocked && item.status === "pending" ? { ...item, status: "failed" as const } : item,
+      );
+  });
   const made = computed(() => items.value.filter(({ status }) => status === "created"));
-  const failed = computed(() => items.value.filter(({ status }) => status === "failed"));
+  // A folder that blocked no item is the only failure left to show and retry.
+  const failed = computed(() => {
+    const rows = items.value.filter(({ status }) => status === "failed");
+    if (rows.length || running.value) return rows;
+    return (record.value?.items ?? []).filter(
+      (item) => !countsAsItem(item) && item.status === "failed",
+    );
+  });
   const skipped = computed(() => items.value.filter(({ status }) => status === "skipped"));
   const toCreate = computed(() =>
     items.value.filter((item) => item.status !== "existing" && notSkipped(item)),
