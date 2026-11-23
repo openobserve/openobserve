@@ -126,6 +126,7 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
   ): void;
   markInstalled(sourceId: string, packId?: string): void;
   markRemoved(packId: string): void;
+  clear(): void;
 } {
   const state = computed(() => stateOf(toValue(org)));
   const copy = computed(() => state.value.copy);
@@ -199,5 +200,14 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
     });
   };
 
-  return { copy, visible, count, show, saveFull, saveBuiltIn, markInstalled, markRemoved };
+  const clear = () => {
+    state.value.copy = null;
+    try {
+      window.localStorage.removeItem(matchesKey(toValue(org)));
+    } catch {
+      // The in-memory copy is gone for this tab either way.
+    }
+  };
+
+  return { copy, visible, count, show, saveFull, saveBuiltIn, markInstalled, markRemoved, clear };
 }

@@ -15,6 +15,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { ref } from "vue";
 import { createStore } from "vuex";
 
 import i18n from "@/locales";
@@ -34,6 +35,8 @@ const fake = vi.hoisted(() => ({
   checkResult: null as null | { checkedAt: number; sources: unknown[]; dismissed: number },
   checkState: "ready" as "ready" | "error",
   gateVisible: true,
+  gateRetired: null as any,
+  gateEnabled: null as null | (() => boolean),
   flows: {} as Record<string, Record<string, any>>,
   records: {} as Record<string, Record<string, any>>,
   matchers: [] as Array<Record<string, any>>,
@@ -43,7 +46,15 @@ const fake = vi.hoisted(() => ({
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/composables/starterPacks/usePackGate", async () => {
   const { computed } = await import("vue");
-  return { usePackGate: () => ({ visible: computed(() => fake.gateVisible) }) };
+  return {
+    usePackGate: (_org: string, enabled: () => boolean) => {
+      fake.gateEnabled = enabled;
+      return {
+        visible: computed(() => fake.gateVisible),
+        retired: computed(() => fake.gateRetired.value),
+      };
+    },
+  };
 });
 vi.mock("@/composables/starterPacks/useFindMore", async () => {
   const { ref } = await import("vue");
@@ -198,6 +209,8 @@ describe("StarterPackHeaderChip", () => {
     resetBrowserMatches();
     resetStarterPackPopups();
     fake.gateVisible = true;
+    fake.gateRetired = ref(false);
+    fake.gateEnabled = null;
     fake.checkResult = null;
     fake.checkState = "ready";
     fake.records = {};
@@ -476,5 +489,59 @@ describe("StarterPackHeaderChip", () => {
     save([K8S, HOSTS]);
     await flushPromises();
     expect(fake.flows.hosts.load).toHaveBeenCalledTimes(1);
+  });
+
+  describe("asks the gate only when it could show", () => {
+    it("asks nothing with no saved copy, and asks once a copy is saved", async () => {
+      const wrapper = render();
+      expect(fake.gateEnabled!()).toBe(false);
+      save([K8S]);
+      await flushPromises();
+      expect(fake.gateEnabled!()).toBe(true);
+      wrapper.unmount();
+    });
+
+    it("asks while a setup runs, even with no saved copy", async () => {
+      const wrapper = render();
+      fake.flows.kubernetes.running.value = true;
+      expect(fake.gateEnabled!()).toBe(true);
+      wrapper.unmount();
+    });
+
+    it("forgets the saved copy once the gate answers retired", async () => {
+      save([K8S]);
+      const wrapper = render();
+      fake.gateRetired.value = true;
+      await flushPromises();
+      expect(useBrowserMatches(ORG).copy.value).toBeNull();
+      expect(window.localStorage.length).toBe(0);
+      wrapper.unmount();
+    });
+
+    it("keeps the chip and the saved copy while a setup runs, retiring once it ends", async () => {
+      save([K8S]);
+      const wrapper = render();
+      fake.flows.kubernetes.running.value = true;
+      await flushPromises();
+      fake.gateRetired.value = true;
+      fake.gateVisible = false;
+      await flushPromises();
+      expect(find(wrapper, "header-starter-packs-btn").exists()).toBe(true);
+      expect(useBrowserMatches(ORG).copy.value).not.toBeNull();
+      fake.flows.kubernetes.running.value = false;
+      await flushPromises();
+      expect(find(wrapper, "header-starter-packs-btn").exists()).toBe(false);
+      expect(useBrowserMatches(ORG).copy.value).toBeNull();
+      wrapper.unmount();
+    });
+
+    it("keeps the saved copy while the gate does not answer retired", async () => {
+      save([K8S]);
+      fake.gateVisible = false;
+      const wrapper = render();
+      await flushPromises();
+      expect(useBrowserMatches(ORG).copy.value).not.toBeNull();
+      wrapper.unmount();
+    });
   });
 });

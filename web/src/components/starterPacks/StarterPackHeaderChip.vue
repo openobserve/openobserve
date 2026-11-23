@@ -47,15 +47,22 @@ const store = useStore();
 const org: string = store.state.selectedOrganization?.identifier ?? "";
 const matches = useBrowserMatches(org);
 const checker = useRefreshMatches(org);
-const gate = usePackGate(org);
 const popup = useStarterPackPopup(org);
 const { open: popupOpen, screen, packId } = popup;
 // Created here, in setup, so Home, the banner and the popup share one state per pack.
 const entries = packs().map((pack) => popup.entryOf(pack));
 
 const running = computed(() => entries.find(({ flow }) => flow.running.value) ?? null);
+// With nothing saved and nothing running the chip cannot show, so it asks the server nothing.
+const gate = usePackGate(org, () => matches.show.value || !!running.value);
+// A retired org stays retired, so dropping its copy keeps later page loads from asking again.
+watch(
+  () => gate.retired.value && !running.value,
+  (done) => done && matches.clear(),
+  { immediate: true },
+);
 const shown = computed(
-  () => !store.state.kioskMode && gate.visible.value && (matches.show.value || !!running.value),
+  () => !store.state.kioskMode && (!!running.value || (gate.visible.value && matches.show.value)),
 );
 
 const rail = computed<RailPack[]>(() => {

@@ -219,4 +219,17 @@ describe("useBrowserMatches", () => {
     expect(matches.visible.value).toEqual([NGINX, DOCKER]);
     expect("notNowOne" in matches).toBe(false);
   });
+
+  it("forgets an org's copy in memory and in storage, leaving other orgs alone", () => {
+    useBrowserMatches("a").saveFull(result([NGINX]), []);
+    useBrowserMatches("b").saveFull(result([DOCKER]), []);
+    const reader = useBrowserMatches("a");
+    useBrowserMatches("a").clear();
+    expect(reader.copy.value).toBeNull();
+    expect(reader.show.value).toBe(false);
+    expect(window.localStorage.getItem(matchesKey("a"))).toBeNull();
+    resetBrowserMatches();
+    expect(useBrowserMatches("a").copy.value).toBeNull();
+    expect(useBrowserMatches("b").copy.value?.sources).toEqual([DOCKER]);
+  });
 });
