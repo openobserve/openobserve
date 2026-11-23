@@ -709,6 +709,23 @@ describe("useStarterPacks", () => {
         expect(fake.state.dashboards.map(({ dashboard_id }) => dashboard_id)).toEqual(["other-d"]);
       });
 
+      it("links, never owns, an alert another install made after the plan", async () => {
+        fake.state.onRequest = (method, url) => {
+          if (method !== "post" || !url.includes("/kv/")) return;
+          if (fake.state.alerts.some(({ id }) => id === "theirs")) return;
+          const tags = ["pack:kubernetes", "library:k8s/one"];
+          fake.state.alerts.push({ id: "theirs", name: "k8s/one", folder_id: "elsewhere", tags });
+        };
+        const api = packs();
+        const record = await api.installPack(PACK);
+        fake.state.onRequest = null;
+
+        const one = record.items.find(({ itemId }) => itemId === "k8s/one");
+        expect(one).toMatchObject({ id: "theirs", status: "existing" });
+        await api.undoPack(PACK, record.installId);
+        expect(fake.state.alerts.map(({ id }) => id)).toEqual(["theirs"]);
+      });
+
       it("stops, removes its own record and creates nothing when the other started first", async () => {
         seedOther(1);
 
