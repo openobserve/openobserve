@@ -124,7 +124,7 @@ pub async fn resolve(
     let Some(user_id) = user_id else {
         return search::RawStreams::default();
     };
-    let protected = protected_streams(org_id, stream_type, sql);
+    let protected = protected_streams(org_id, stream_type, sql).await;
     if protected.is_empty() {
         return search::RawStreams::default();
     }
@@ -151,7 +151,7 @@ pub async fn may_read_unredacted(
     sql: &str,
     user_id: &str,
 ) -> bool {
-    let Some(protected) = protected_streams_checked(org_id, stream_type, sql) else {
+    let Some(protected) = protected_streams_checked(org_id, stream_type, sql).await else {
         return false;
     };
     if protected.is_empty() {
@@ -172,26 +172,30 @@ pub async fn may_read_unredacted(
 }
 
 /// Streams `sql` reads that carry search-time patterns, including ones whose patterns fail
-/// to build; none when the pattern manager is not ready, which redacts everything.
+/// to build; none when the patterns cannot be loaded, which redacts everything.
 #[cfg(all(feature = "enterprise", feature = "vectorscan"))]
-fn protected_streams(
+async fn protected_streams(
     org_id: &str,
     stream_type: StreamType,
     sql: &str,
 ) -> Vec<(StreamType, String)> {
-    protected_streams_checked(org_id, stream_type, sql).unwrap_or_default()
+    protected_streams_checked(org_id, stream_type, sql)
+        .await
+        .unwrap_or_default()
 }
 
-/// [`protected_streams`], but `None` when the pattern manager is not ready or `sql` does not parse.
+/// [`protected_streams`], but `None` when the patterns cannot be loaded or `sql` does not parse.
 #[cfg(all(feature = "enterprise", feature = "vectorscan"))]
-fn protected_streams_checked(
+async fn protected_streams_checked(
     org_id: &str,
     stream_type: StreamType,
     sql: &str,
 ) -> Option<Vec<(StreamType, String)>> {
     use config::meta::sql::{TableReferenceExt, resolve_stream_names_with_type};
 
-    let manager = o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER.get()?;
+    let manager = o2_enterprise::enterprise::re_patterns::get_pattern_manager()
+        .await
+        .ok()?;
     let streams = resolve_stream_names_with_type(sql).ok()?;
     let protected = streams
         .iter()
