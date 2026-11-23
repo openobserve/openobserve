@@ -33,7 +33,7 @@ function mountMenu(props: Record<string, unknown> = {}) {
 }
 
 const newTag = '[data-test="ai-playground-variables-new-tag"]';
-const trigger = '[data-test="ai-playground-variables-trigger"]';
+const trigger = '[data-test="ai-playground-variables-btn"]';
 
 async function openAndCloseDropdown(wrapper: ReturnType<typeof mountMenu>) {
   await wrapper.get('[data-test="trigger-slot"]').trigger("click");

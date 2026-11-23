@@ -88,7 +88,7 @@ describe("HomeChatHistory", () => {
   it("opens a chat from the keyboard", async () => {
     const { wrapper } = mountList();
     await flushPromises();
-    const row = wrapper.find('[data-test="home-chat-history-item-1"]');
+    const row = wrapper.find('[data-test="home-chat-history-item-open-1"]');
     expect(row.attributes("tabindex")).toBe("0");
     await row.trigger("keydown", { key: "Enter" });
     expect(wrapper.emitted("load-chat")).toEqual([[1]]);

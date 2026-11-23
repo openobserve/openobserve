@@ -161,7 +161,9 @@ function formatTime(ts: string): string {
     class="border-card-glass-border bg-card-glass-bg flex h-full w-[15em] shrink-0 flex-col overflow-hidden border-e border-e-[0.0625em] text-base"
   >
     <div class="flex shrink-0 items-center justify-between px-3 pt-[0.625em] pb-[0.375em]">
-      <span class="text-[0.8125em] font-semibold opacity-70">{{ t("chatHistory.title") }}</span>
+      <span class="text-text-secondary text-[0.8125em] font-semibold">{{
+        t("chatHistory.title")
+      }}</span>
       <span class="flex items-center gap-0.5">
         <OButton
           v-if="persistenceEnabled"
@@ -248,19 +250,23 @@ function formatTime(ts: string): string {
       <div
         v-for="chat in filtered"
         :key="chat.id"
-        class="group rounded-default hover:bg-interactive-hover-bg focus-visible:ring-accent/40 flex cursor-pointer items-center gap-1 px-2 py-[0.4375em] transition-[background] duration-[120ms] focus-visible:ring-2 focus-visible:outline-none"
+        class="group rounded-default hover:bg-interactive-hover-bg has-[[role=button]:focus-visible]:ring-accent/40 flex cursor-pointer items-center gap-1 px-2 py-[0.4375em] transition-[background] duration-[120ms] has-[[role=button]:focus-visible]:ring-2"
         :class="{
           'bg-surface-accent-active!': activeChatId === chat.id,
         }"
-        role="button"
-        tabindex="0"
-        :aria-current="activeChatId === chat.id ? 'true' : undefined"
         :data-test="`home-chat-history-item-${chat.id}`"
         @click="selectChat(chat.id)"
-        @keydown.enter="onRowKeydown($event, chat.id)"
-        @keydown.space="onRowKeydown($event, chat.id)"
       >
-        <div class="min-w-0 flex-1">
+        <!-- The open target is the title block, not the row, so Share and Delete are not nested in a button. -->
+        <div
+          class="min-w-0 flex-1 focus-visible:outline-none"
+          role="button"
+          tabindex="0"
+          :aria-current="activeChatId === chat.id ? 'true' : undefined"
+          :data-test="`home-chat-history-item-open-${chat.id}`"
+          @keydown.enter="onRowKeydown($event, chat.id)"
+          @keydown.space="onRowKeydown($event, chat.id)"
+        >
           <OTruncatedText
             as="div"
             class="text-text-body text-[0.8125em] leading-[1.35]"
