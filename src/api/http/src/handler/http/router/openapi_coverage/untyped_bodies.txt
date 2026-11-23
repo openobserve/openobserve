@@ -144,5 +144,3 @@ ent GET /api/{org_id}/traces/agent_signals | the handler answers serde_json::jso
 ent POST /api/{org_id}/traces/agent_signals/compare | the handler answers serde_json::json!({cost, error_diff, note}) built in place
 all GET /api/{org_id}/users/roles/all | o2_openfga role lookups, an enterprise type; OSS publishes this op too
 all GET /api/{org_id}/{stream_name}/traces/{trace_id}/dag | the handler builds a HashMap<&str, serde_json::Value>
-all GET /api/{org_id}/overview | core::overview::Overview nests a generic Section<T> over four section types that derive no schema
-all DELETE /api/{org_id}/service_streams/_reset | the handler answers serde_json::json!({deleted_count, message, note}) built in place

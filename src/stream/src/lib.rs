@@ -955,6 +955,18 @@ pub async fn stream_delete_inner(
     Ok(())
 }
 
+/// Whether a delete of `time_range` on this stream must cover whole days.
+/// On this release the partition level comes from the env only: a daily level stores each day of
+/// the stream type as one file, so a delete inside that day removes the whole day.
+pub async fn delete_range_needs_whole_days(
+    _org_id: &str,
+    stream_type: StreamType,
+    _stream_name: &str,
+    _time_range: &TimeRange,
+) -> Result<bool, infra::errors::Error> {
+    Ok(get_partition_time_level(stream_type) == PartitionTimeLevel::Daily)
+}
+
 pub async fn delete_stream_data_by_time_range(
     org_id: &str,
     stream_type: StreamType,

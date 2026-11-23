@@ -1180,8 +1180,6 @@ mod tests {
         }
     }
 
-    type ServiceView = Vec<(String, Vec<serde_json::Value>)>;
-
     fn sql(org: &str, text: &str) -> QuerySource {
         QuerySource::Sql {
             org_id: org.to_string(),

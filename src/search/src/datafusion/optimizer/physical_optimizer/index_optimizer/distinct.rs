@@ -21,7 +21,7 @@ use datafusion::{
         Result,
         tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
     },
-    physical_expr::{ScalarFunctionExpr, split_conjunction},
+    physical_expr::{ScalarFunctionExpr, expressions::Column, split_conjunction},
     physical_plan::{
         ExecutionPlan, PhysicalExpr, aggregates::AggregateExec, filter::FilterExec,
         projection::ProjectionExec, sorts::sort_preserving_merge::SortPreservingMergeExec,
@@ -126,7 +126,19 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
         } else if let Some(projection) = node.downcast_ref::<ProjectionExec>() {
             // Check ProjectionExec for the structure: [index_field]
             let exprs = projection.expr();
-            if exprs.len() == 1 {
+            // below the aggregate the distinct field must pass through under its own name, or
+            // the index is read for a different field than the one the query groups by
+            let renames_field = self.simple_distinct.as_ref().is_some_and(|(field, ..)| {
+                !field.is_empty()
+                    && exprs.first().is_some_and(|expr| {
+                        // a bare column only: a cast changes the values and their order
+                        expr.expr
+                            .downcast_ref::<Column>()
+                            .is_none_or(|column| column.name() != field)
+                            || expr.alias != *field
+                    })
+            });
+            if exprs.len() == 1 && !renames_field {
                 // First expression should be the index field
                 // We'll validate this in the AggregateExec
                 return Ok(TreeNodeRecursion::Continue);
@@ -144,8 +156,12 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
             if timestamp_filters.len() == 2
                 && (other_filters.is_empty()
                     || (other_filters.len() == 1
-                        && is_simple_str_match(other_filters[0])
-                            .is_some_and(|column| self.index_fields.contains(&column))))
+                        // the needle is matched against the distinct field's own terms
+                        && is_simple_str_match(other_filters[0]).is_some_and(|column| {
+                            self.simple_distinct
+                                .as_ref()
+                                .is_some_and(|(field, ..)| *field == column)
+                        })))
             {
                 return Ok(TreeNodeRecursion::Continue);
             }
@@ -233,6 +249,25 @@ mod tests {
                     10,
                     false,
                 )),
+            ),
+            // a subquery alias makes the group by field another column than the filter's
+            (
+                "select name from (select id as name from t where str_match(name, 'a') and _timestamp >= 175256100000000 and _timestamp < 17525610000000000) s group by name order by name asc limit 10",
+                None,
+            ),
+            (
+                "select name from (select id as name from t where _timestamp >= 175256100000000 and _timestamp < 17525610000000000) s group by name order by name asc limit 10",
+                None,
+            ),
+            // a cast below the aggregate changes the values the query groups and orders by
+            (
+                "select name from (select cast(name as bigint) as name from t where _timestamp >= 175256100000000 and _timestamp < 17525610000000000) s group by name order by name asc limit 10",
+                None,
+            ),
+            // str_match on another index field filters rows, not the distinct field's terms
+            (
+                "select name from t where str_match(id, 'a') and _timestamp >= 175256100000000 and _timestamp < 17525610000000000 group by name order by name asc limit 10",
+                None,
             ),
             (
                 "select id from t where _timestamp >= 175256100000000 and _timestamp < 17525610000000000 group by id order by id asc limit 10",

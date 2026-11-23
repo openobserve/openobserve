@@ -168,7 +168,6 @@ fn ack_response() -> openobserve_synthetics::job_api::AckResponse {
         usage_events: vec![],
         failing_environments: vec![],
         suppressed_by: None,
-        template: None,
     }
 }
 
@@ -184,7 +183,6 @@ fn anomaly_clone_answer() -> Value {
         enabled: true,
         name: "spike_copy".to_string(),
         description: None,
-        template: None,
         query_mode: "filters".to_string(),
         filters: Some(json!([])),
         custom_sql: None,
