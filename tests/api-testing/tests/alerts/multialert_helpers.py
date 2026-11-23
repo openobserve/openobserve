@@ -30,11 +30,25 @@ STREAM = "alerts_p0_stream"
 SINK = "alerts_notify_sink"  # dogfood destination target — this instance's own ingest
 TMPL = "auto_p0_tmpl"
 DEST = "auto_p0_dest"
+SECOND_US = 1_000_000
+DAY_US = 24 * 3600 * SECOND_US
 
 
 def uniq(prefix: str) -> str:
     """Unique, human-readable name so parallel/repeat runs never collide."""
     return f"{prefix}_{int(time.time() * 1000):x}{''.join(random.choice('0123456789abcdef') for _ in range(4))}"
+
+
+def now_us() -> int:
+    return int(time.time() * SECOND_US)
+
+
+def lease_spec(ends_in_s: float, reason: str = "api lease test", origin_ref: str | None = None) -> dict[str, Any]:
+    """The `lease` of a create request: a temporary alert disabled `ends_in_s` from now."""
+    spec: dict[str, Any] = {"ends_at_us": now_us() + int(ends_in_s * SECOND_US), "reason": reason}
+    if origin_ref is not None:
+        spec["origin_ref"] = origin_ref
+    return spec
 
 
 # ---- canonical payloads (mirror alerts-api-helpers.js) ----------------------
@@ -176,6 +190,37 @@ class AlertsClient:
     def list_alerts_filtered(self, query: str) -> dict:
         """GET v2 /alerts?<query> — returns the raw envelope (has .list)."""
         return self._v2("GET", f"alerts?{query}").json()
+
+    def list_item(self, name: str) -> dict | None:
+        """The list row of the alert named `name`, found by a server-side name filter, not page 1."""
+        r = self._v2("GET", f"alerts?folder=default&alert_name_substring={name}&page_size=100")
+        rows = (r.json().get("list") or []) if r.status_code == 200 else []
+        return next((a for a in rows if a.get("name") == name), None)
+
+    def enable_alert(self, alert_id: str, value: bool) -> requests.Response:
+        return self._v2("PATCH", f"alerts/{alert_id}/enable?value={str(value).lower()}&folder=default")
+
+    # -- leases: temporary alerts and timed creates_incident -----------------
+    def alert_leases(self, alert_id: str, state: str | None = None) -> requests.Response:
+        qs = f"?state={state}" if state else ""
+        return self._v2("GET", f"alerts/{alert_id}/leases{qs}")
+
+    def org_alert_leases(self, state: str | None = None) -> requests.Response:
+        qs = f"?state={state}" if state else ""
+        return self._v2("GET", f"alert_leases{qs}")
+
+    def set_creates_incident(self, alert_id: str, body: dict) -> requests.Response:
+        return self._v2("PATCH", f"alerts/{alert_id}/creates_incident", json=body)
+
+    def lease_action(self, alert_id: str, lease_id: str, action: str, body: dict | None = None) -> requests.Response:
+        """POST .../leases/{lease_id}/{action}; action is `end`, `extend` or `keep`."""
+        return self._v2("POST", f"alerts/{alert_id}/leases/{lease_id}/{action}", json=body)
+
+    def incidents_for(self, alert_id: str) -> list[dict]:
+        """Incidents whose alert groups include `alert_id` ([] when the incidents API does not answer)."""
+        r = self._v2("GET", "alerts/incidents?limit=1000")
+        found = (r.json().get("incidents") or []) if r.status_code == 200 else []
+        return [i for i in found if any(g.get("alert_id") == alert_id for g in i.get("alert_groups") or [])]
 
     def delete_alerts(self, ids: list[str]) -> None:
         """Best-effort delete of the given alert_ids (used in teardown)."""
