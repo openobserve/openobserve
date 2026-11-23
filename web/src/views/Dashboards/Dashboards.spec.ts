@@ -958,6 +958,46 @@ describe("Dashboards.vue", () => {
       expect(findDialog("dashboard-confirm-dialog").props("warningMessage")).toBeUndefined();
     });
 
+    it("shows the clicked delete action loading until the reports warning is ready", async () => {
+      let resolveReports: (value: { data: [] }) => void = () => {};
+      listReports.mockReturnValue(new Promise((resolve) => (resolveReports = resolve)));
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      const opening = wrapper.vm.showDeleteDialogFn({ row: { id: "d1", name: "cpu-overview" } });
+      await nextTick();
+
+      expect(wrapper.vm.deleteLoadingId).toBe("d1");
+      expect(wrapper.vm.confirmDeleteDialog).toBe(false);
+      wrapper.vm.showDeleteDialogFn({ row: { id: "d2", name: "mem-overview" } });
+      expect(wrapper.vm.selectedDelete.id).toBe("d1");
+
+      resolveReports({ data: [] });
+      await opening;
+
+      expect(wrapper.vm.deleteLoadingId).toBeNull();
+      expect(wrapper.vm.confirmDeleteDialog).toBe(true);
+    });
+
+    it("shows the bulk delete button loading until the reports warning is ready", async () => {
+      let resolveReports: (value: { data: [] }) => void = () => {};
+      listReports.mockReturnValue(new Promise((resolve) => (resolveReports = resolve)));
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      const opening = wrapper.vm.openBulkDeleteDialog();
+      await nextTick();
+
+      expect(wrapper.vm.bulkDeleteLoading).toBe(true);
+      expect(wrapper.vm.confirmBulkDelete).toBe(false);
+
+      resolveReports({ data: [] });
+      await opening;
+
+      expect(wrapper.vm.bulkDeleteLoading).toBe(false);
+      expect(wrapper.vm.confirmBulkDelete).toBe(true);
+    });
+
     it("still opens the delete dialog when reports cannot be listed", async () => {
       listReports.mockRejectedValue({ response: { status: 403 } });
       wrapper = shallowMount(Dashboards, {

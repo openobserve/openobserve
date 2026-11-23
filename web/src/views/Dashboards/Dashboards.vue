@@ -336,6 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="max-md:hidden"
                     data-test="dashboard-delete"
                     data-row-action="delete"
+                    :loading="deleteLoadingId === row.id"
                     @click.stop="showDeleteDialogFn({ row })"
                   >
                     <OTooltip side="bottom" :content="t('dashboard.delete')" />
@@ -760,6 +761,7 @@ export default defineComponent({
     const route = useRoute();
     const orgData: any = ref(store.state.selectedOrganization);
     const confirmDeleteDialog = ref<boolean>(false);
+    const deleteLoadingId = ref<string | null>(null);
     const selectedDelete = ref<DashboardRow | null>(null);
     const activeFolderId = ref<string | null>(null);
     // Set once the onMounted landing decision has run; folder-selection events
@@ -1596,8 +1598,11 @@ export default defineComponent({
     };
 
     const showDeleteDialogFn = async (props: any) => {
+      if (deleteLoadingId.value !== null) return;
       selectedDelete.value = props.row;
+      deleteLoadingId.value = props.row.id;
       await loadReportsForDelete();
+      deleteLoadingId.value = null;
       confirmDeleteDialog.value = true;
     };
 
@@ -1883,7 +1888,10 @@ export default defineComponent({
     };
 
     const openBulkDeleteDialog = async () => {
+      if (bulkDeleteLoading.value) return;
+      bulkDeleteLoading.value = true;
       await loadReportsForDelete();
+      bulkDeleteLoading.value = false;
       confirmBulkDelete.value = true;
     };
 
@@ -2100,6 +2108,7 @@ export default defineComponent({
       routeToViewD,
       showDeleteDialogFn,
       confirmDeleteDialog,
+      deleteLoadingId,
       filterQuery,
 
       deleteDashboard,
