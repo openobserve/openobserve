@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Validation schema for AddAiToolset.vue. The form is keyed on `kind`
-// (mcp / cli / skill): a few fields are always validated (name, kind) and the
+// (mcp / skill): a few fields are always validated (name, kind) and the
 // rest are conditional on the selected kind. Built as a base object +
 // `superRefine` (rather than a discriminated union) so all kind-specific fields
 // can coexist in one flat record — the template only renders the subset for the
@@ -16,7 +16,7 @@ import { z } from "zod";
 // Name char rule: letters, digits, hyphen, underscore.
 export const aiToolsetNameRegex = /^[a-zA-Z0-9_-]+$/;
 
-// One row of a key/value secret list (mcp headers, cli env vars). All fields are
+// One row of a key/value secret list (mcp headers). All fields are
 // free-form and optional (a blank starter row is valid — only non-empty rows are
 // persisted on save). `visible` is the per-row password-visibility UI flag; it is
 // form-owned bookkeeping excluded from the saved payload.
@@ -24,14 +24,6 @@ export const secretRowSchema = z.object({
   key: z.string().optional(),
   value: z.string().optional(),
   visible: z.boolean().optional(),
-});
-
-// One row of a credential file (cli). `key` is the env-var name; `value` is the
-// file content edited in a Monaco editor (bridged into the form — Monaco has no
-// OForm* equivalent).
-export const credFileRowSchema = z.object({
-  key: z.string().optional(),
-  value: z.string().optional(),
 });
 
 export const makeAddAiToolsetSchema = (t: (_key: string) => string) =>
@@ -55,18 +47,6 @@ export const makeAddAiToolsetSchema = (t: (_key: string) => string) =>
         headers: z.array(secretRowSchema).optional().default([]),
       }),
 
-      // ── CLI fields (command validated only when kind === "cli") ───────────
-      // `env` + `credFiles` are form-owned dynamic array-fields (no validation).
-      cli: z.object({
-        command: z.string().optional(),
-        allowed_subcommands_raw: z.string().optional(),
-        timeout_seconds: z.coerce.number().optional(),
-        max_output_bytes: z.coerce.number().optional(),
-        requires_confirmation: z.boolean().optional(),
-        env: z.array(secretRowSchema).optional().default([]),
-        credFiles: z.array(credFileRowSchema).optional().default([]),
-      }),
-
       // ── Skill fields (content validated only when kind === "skill") ───────
       // The editor is a Monaco widget (no OForm* equivalent) bridged into the
       // form via setFieldValue, so the value is form-owned and the required rule
@@ -78,7 +58,7 @@ export const makeAddAiToolsetSchema = (t: (_key: string) => string) =>
     .superRefine((val, ctx) => {
       // mcp.url required when kind === "mcp". Bare empty check (NO trim): a
       // whitespace-only url is accepted. (Note the asymmetry: skill.content below
-      // DOES trim; url/command do not.)
+      // DOES trim; url does not.)
       if (val.kind === "mcp" && !String(val.mcp?.url ?? "")) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -86,17 +66,8 @@ export const makeAddAiToolsetSchema = (t: (_key: string) => string) =>
           message: t("aiToolset.mcpUrlRequired"),
         });
       }
-      // cli.command required when kind === "cli". Bare empty check (NO trim): a
-      // whitespace-only command is accepted.
-      if (val.kind === "cli" && !String(val.cli?.command ?? "")) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["cli", "command"],
-          message: t("aiToolset.cliCommandRequired"),
-        });
-      }
       // skill.content required when kind === "skill". Trim IS applied here —
-      // unlike url/command above.
+      // unlike url above.
       if (val.kind === "skill" && !String(val.skill?.content ?? "").trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -116,14 +87,5 @@ export const addAiToolsetDefaults = (): AddAiToolsetForm => ({
   kind: "mcp",
   description: "",
   mcp: { url: "", timeout_seconds: 30, headers: [] },
-  cli: {
-    command: "",
-    allowed_subcommands_raw: "",
-    timeout_seconds: 30,
-    max_output_bytes: 100000,
-    requires_confirmation: false,
-    env: [],
-    credFiles: [],
-  },
   skill: { content: "" },
 });
