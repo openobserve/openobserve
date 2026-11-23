@@ -1033,7 +1033,7 @@ const confirmDone = () => {
             class="px-4 pt-1 pb-3.5"
             :flow="flow"
             :routed-to="routedTo"
-            :turn-on="outcome.turnOn"
+            :turn-on="outcome.turnOn && !outcome.failure"
           />
         </OStep>
         <OStep
