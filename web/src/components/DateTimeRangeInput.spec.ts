@@ -139,6 +139,31 @@ describe("DateTimeRangeInput", () => {
     );
   });
 
+  it("refreshes the selected row when clicked after two minutes", async () => {
+    create();
+    await typeInBar("15M");
+    const commitTime = NOW.getTime() + 120_000;
+    vi.setSystemTime(commitTime);
+    el("date-time-range-reading-0")!.click();
+    expect(applied()[0].rolling).toEqual({ value: 15, unit: "m" });
+    expect(applied()[0].endUs).toBeGreaterThanOrEqual(commitTime * 1000);
+    expect(applied()[0].endUs).toBeLessThanOrEqual(Date.now() * 1000);
+  });
+
+  it("links invalid and blocked input to the visible message", async () => {
+    create();
+    for (const text of ["unreadable", "200h"]) {
+      await typeInBar(text);
+      const field = barInput()!;
+      expect(field.getAttribute("aria-invalid")).toBe("true");
+      const description = document.getElementById(field.getAttribute("aria-describedby") ?? "");
+      expect(description?.textContent).toContain(el("date-time-range-message")!.textContent);
+    }
+    await typeInBar("2h");
+    expect(barInput()!.hasAttribute("aria-invalid")).toBe(false);
+    expect(barInput()!.hasAttribute("aria-describedby")).toBe(false);
+  });
+
   it.each([
     ["en-us", "en-US", "Month first, as in your language", "Day first", Date.UTC(2026, 2, 4)],
     ["vi", "vi-VN", "Day first, as in your language", "Month first", Date.UTC(2026, 3, 3)],
@@ -196,11 +221,9 @@ describe("DateTimeRangeInput", () => {
 
     expect(first.defaultPrevented).toBe(true);
     expect(barInput()!.value).toBe("");
-    expect(wrapper!.emitted("escape-empty")).toBeUndefined();
 
     const second = await press(barInput(), "Escape");
     expect(second.defaultPrevented).toBe(false);
-    expect(wrapper!.emitted("escape-empty")).toHaveLength(1);
   });
 
   it("tells the host when its text blocks Apply", async () => {

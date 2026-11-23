@@ -173,6 +173,70 @@ describe("DateTime typed range bar", () => {
     expect(historyWrites()).toBe(1);
   });
 
+  it.each(["Enter", "Apply"])("uses the time of %s for the end of 'since 9am'", async (action) => {
+    vi.setSystemTime(new Date("2026-10-08T10:00:00Z"));
+    create({ autoApply: false });
+    await openMenu(wrapper!);
+    await typeInBar("since 9am");
+    expect(barState()).toBe("valid");
+
+    const commitTime = micros("2026-10-08T10:02:00Z");
+    vi.setSystemTime(commitTime / 1000);
+    if (action === "Enter") await press(barInput(), "Enter");
+    else el("date-time-apply-btn")!.click();
+    await flushPromises();
+
+    const change = lastChange(wrapper!);
+    expect(change.startTime).toBe(micros("2026-10-08T09:00:00Z"));
+    expect(Number(change.endTime)).toBeGreaterThanOrEqual(commitTime);
+    expect(Number(change.endTime)).toBeLessThanOrEqual(Date.now() * 1000);
+  });
+
+  it("keeps the panel open when the typed range exceeds its limit at Apply", async () => {
+    vi.setSystemTime(new Date("2026-10-08T09:59:00Z"));
+    create({ autoApply: false, queryRangeRestrictionInHour: 1 });
+    await openMenu(wrapper!);
+    await typeInBar("since 9am");
+    expect(barState()).toBe("valid");
+    const before = changes(wrapper!).length;
+
+    vi.setSystemTime(new Date("2026-10-08T10:01:00Z"));
+    el("date-time-apply-btn")!.click();
+    await flushPromises();
+
+    expect(changes(wrapper!)).toHaveLength(before);
+    expect(barState()).toBe("blocked");
+    expect(wrapper!.vm.menuOpen).toBe(true);
+  });
+
+  it("keeps unfinished text across a host write and shows the host range after clearing", async () => {
+    create({ autoApply: true, defaultType: "absolute" });
+    await openMenu(wrapper!);
+    await typeInBar("since");
+    el("date-time-absolute-tab")!.focus();
+
+    const start = micros("2026-10-08T01:00:00Z");
+    const end = micros("2026-10-08T02:00:00Z");
+    wrapper!.vm.setAbsoluteTime(start, end);
+    await flushPromises();
+    expect(barInput()!.value).toBe("since");
+    expect(wrapper!.vm.appliedRange).toEqual({ startUs: start, endUs: end });
+
+    await typeInBar("");
+    expect(el("date-time-range-resolved")!.textContent).toContain("01:00 → 02:00");
+  });
+
+  it("clears the draft on Escape and closes the panel on the next Escape", async () => {
+    create();
+    await openMenu(wrapper!);
+    await typeInBar("2h");
+    await press(barInput(), "Escape");
+    expect(barInput()!.value).toBe("");
+    expect(wrapper!.vm.menuOpen).toBe(true);
+    await press(barInput(), "Escape");
+    expect(wrapper!.vm.menuOpen).toBe(false);
+  });
+
   it("emits hide once when a typed range is applied", async () => {
     create({ autoApply: true });
     await openMenu(wrapper!);

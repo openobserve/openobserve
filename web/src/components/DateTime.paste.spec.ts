@@ -18,6 +18,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import DateTime from "@/components/DateTime.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import * as rangeInput from "@/composables/useTimeRangeInput";
 import { MAX_RANGE_TEXT_UNITS } from "@/utils/date";
 import { barInput, el, typeInBar } from "@/test/unit/helpers/dateTimePicker";
 
@@ -82,6 +83,7 @@ describe("DateTime paste", () => {
     wrapper?.unmount();
     wrapper = null;
     document.body.innerHTML = "";
+    vi.restoreAllMocks();
     Reflect.deleteProperty(navigator.clipboard, "readText");
     Reflect.deleteProperty(navigator, "platform");
   });
@@ -120,6 +122,28 @@ describe("DateTime paste", () => {
     expect(wrapper!.vm.selectedDate).toMatchObject({ from: "2026/10/27", to: "2026/10/27" });
     expect(lastEmit()).toMatchObject({ startTime: START_US, endTime: END_US });
   });
+
+  it.each([true, false])(
+    "shows only the gate refusal during paste with autoApply=%s",
+    async (autoApply) => {
+      const picker = createWrapper({ autoApply, maxDate: "2026/10/28" });
+      await openMenu();
+      const before = (picker.emitted("on:date-change") ?? []).length;
+      const read = rangeInput.readPickerText;
+      vi.spyOn(rangeInput, "readPickerText").mockImplementationOnce(async (...args) => {
+        const reading = await read(...args);
+        await picker.setProps({ maxDate: "2026/10/26" });
+        return reading;
+      });
+
+      await picker.vm.onPickerPaste(pasteEvent(PAYLOAD));
+      await flushPromises();
+      expect(picker.emitted("on:date-change")).toHaveLength(before);
+      expect(el("date-time-gate-message")!.textContent).toContain("after the latest date");
+      expect(picker.vm.menuOpen).toBe(true);
+      expect(toastMock).not.toHaveBeenCalled();
+    },
+  );
 
   it("leaves a paste into one of the picker's own fields alone", async () => {
     createWrapper();
@@ -372,6 +396,10 @@ describe("DateTime paste review fixes", () => {
     await flushPromises();
 
     expect(wrapper!.vm.relativeValue).toBe(30);
+    expect(toastMock).toHaveBeenCalledExactlyOnceWith({
+      variant: "success",
+      message: "Date range pasted",
+    });
     expect(barInput()!.value).toBe("");
     el<HTMLButtonElement>("date-time-apply-btn")!.click();
     await flushPromises();

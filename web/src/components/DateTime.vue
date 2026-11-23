@@ -869,7 +869,7 @@ export default defineComponent({
       if (gateReason.value === null || typeof startTime !== "number" || typeof endTime !== "number")
         return saveDate("absolute");
       stageAbsolute(startTime, endTime);
-      saveDate("absolute", "host");
+      return saveDate("absolute", "host");
     };
 
     // if initial timezone is provided
@@ -1165,7 +1165,8 @@ export default defineComponent({
       () => {
         const source = hostFieldWrite ? "host" : "user";
         hostFieldWrite = false;
-        if (!isSeedingAbsolute) rangeInput.value?.clear();
+        const keepText = source === "host" && menuOpen.value && rangeInput.value?.hasText;
+        if (!isSeedingAbsolute && !keepText) rangeInput.value?.clear();
         if (
           props.autoApply &&
           selectedType.value === "absolute" &&
@@ -1585,12 +1586,13 @@ export default defineComponent({
       // The cached verdict can be older than the clock, so the bounds about to be sent are checked.
       if (source === "user") {
         const gate = gateCheck(date.startTime, date.endTime, rangeLimits.value);
-        if (gate.reason !== null) return;
+        if (gate.reason !== null) return false;
         date.endTime = gate.endUs;
       }
       markApplied(date);
       if (source === "user") liveLabel.value = appliedDisplayValue.value;
       emitDate(date, dateType || selectedType.value);
+      return true;
     };
 
     function formatDate(d: Date) {
@@ -1922,6 +1924,7 @@ export default defineComponent({
     });
 
     const rangeInput = ref<{
+      hasText: boolean;
       setText: (text: string, source: "typed" | "paste") => void;
       clear: () => void;
       focus: () => void;
@@ -2100,8 +2103,9 @@ export default defineComponent({
         stageReading(reading);
         // The bar's older text would otherwise win when Apply submits it first.
         rangeInput.value?.clear();
-        if (props.autoApply) applyAndClose();
-        toast({ variant: "success", message: t("common.dateRangePasted") });
+        gateNow.value = Date.now();
+        const accepted = props.autoApply ? applyAndClose() : gateReason.value === null;
+        if (accepted) toast({ variant: "success", message: t("common.dateRangePasted") });
       } else if (showRangeInput.value && rangeInput.value) {
         rangeInput.value.setText(text, "paste");
       } else {
@@ -2743,19 +2747,21 @@ export default defineComponent({
     };
 
     const applyAndClose = () => {
-      if (gateReason.value !== null) return;
+      gateNow.value = Date.now();
+      if (gateReason.value !== null) return false;
       commitPendingDay();
-      saveDate(null);
+      if (!saveDate(null)) return false;
       recordAbsoluteRange();
       // Already recorded above, so the close below must not add the same range to Recent again.
       rangeKeyAtOpen = absoluteRangeKey();
       closeMenu();
+      return true;
     };
 
     // A valid reading in the bar is what Apply applies; with an empty bar it applies the panels.
     const onApplyClick = () => {
-      if (rangeInput.value?.submit()) return;
-      applyAndClose();
+      if (rangeInput.value?.hasText) rangeInput.value.submit();
+      else applyAndClose();
     };
 
     const applyCalendarItem = (id: string) => {

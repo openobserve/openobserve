@@ -250,6 +250,9 @@ export function useTimeRangeInput(opts: TimeRangeInputOptions) {
   const text = ref("");
   const source = ref<InputSource>("typed");
   const nowUs = ref(nowMicros());
+  const refreshNow = () => {
+    nowUs.value = nowMicros();
+  };
   const pack = shallowRef<TimeRangePack>(EN_US_TIME_RANGE_PACK);
   // The locale whose load produced the current pack; a failed load leaves English in its place.
   const packLocale = ref<TimeRangeLocale>("en-us");
@@ -298,8 +301,8 @@ export function useTimeRangeInput(opts: TimeRangeInputOptions) {
     (future) => {
       stopFutureTick();
       if (!future) return;
-      nowUs.value = nowMicros();
-      futureTick = setInterval(() => (nowUs.value = nowMicros()), US_PER_S / US_PER_MS);
+      refreshNow();
+      futureTick = setInterval(refreshNow, US_PER_S / US_PER_MS);
     },
     { immediate: true },
   );
@@ -316,7 +319,7 @@ export function useTimeRangeInput(opts: TimeRangeInputOptions) {
 
   /** Reads `next`, or with `null` refuses an oversize paste and reports too-long over the kept text. */
   const setText = (next: string | null, from: InputSource = "typed") => {
-    nowUs.value = nowMicros();
+    refreshNow();
     source.value = from;
     refused.value = next === null || next.length > MAX_RANGE_TEXT_UNITS;
     if (next !== null && !refused.value) text.value = next;
@@ -341,5 +344,17 @@ export function useTimeRangeInput(opts: TimeRangeInputOptions) {
     stopFutureTick();
   });
 
-  return { text, source, result, examples, nowUs, pack, ready, announcing, setText, clear };
+  return {
+    text,
+    source,
+    result,
+    examples,
+    nowUs,
+    pack,
+    ready,
+    announcing,
+    refreshNow,
+    setText,
+    clear,
+  };
 }

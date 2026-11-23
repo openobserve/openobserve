@@ -96,13 +96,13 @@ const emit = defineEmits<{
   apply: [reading: TimeRangeReading];
   dirty: [blocksApply: boolean];
   valid: [hasReading: boolean];
-  "escape-empty": [];
   copy: [];
   paste: [];
 }>();
 
 const { t } = useI18nTyped();
 const listId = useId();
+const statusId = `${listId}-status`;
 const input = ref<InstanceType<typeof OInput> | null>(null);
 const root = ref<HTMLElement | null>(null);
 const highlighted = ref(-1);
@@ -524,13 +524,15 @@ const summary = computed(() => {
 });
 
 const isMessage = computed(() => state.value !== "empty" && state.value !== "valid");
+// A refused oversize paste keeps no text but still shows a message Apply must not bypass.
+const hasText = computed(() => bar.text.value !== "" || state.value !== "empty");
 const canApplyRow = (i: number) => i >= 0 && i < rows.value.length && !rows.value[i].blocked;
 const activeId = computed(() =>
   highlighted.value >= 0 ? `${listId}-${highlighted.value}` : undefined,
 );
 
 watch(
-  () => bar.text.value !== "" && state.value !== "valid",
+  () => hasText.value && state.value !== "valid",
   (blocksApply) => emit("dirty", blocksApply),
 );
 watch(
@@ -563,10 +565,6 @@ const onInput = (value: string | number) => {
   nextSource = "typed";
 };
 
-const applyRow = (i: number) => {
-  if (canApplyRow(i)) emit("apply", rows.value[i].reading);
-};
-
 // Enter before the locale's pack loads would apply an English reading of the text.
 let submitWhenReady = false;
 watch(bar.ready, (ready) => {
@@ -575,19 +573,28 @@ watch(bar.ready, (ready) => {
   submit();
 });
 
-/** Applies the valid reading or the highlighted row; false when there is nothing to apply. */
-const submit = (): boolean => {
-  if (!bar.ready.value && bar.text.value !== "") {
-    submitWhenReady = true;
+const submit = (row = highlighted.value): boolean => {
+  if (!bar.ready.value) {
+    if (row >= 0 && canApplyRow(row)) {
+      emit("apply", rows.value[row].reading);
+      return true;
+    }
+    submitWhenReady = hasText.value && row === -1;
+    return submitWhenReady;
+  }
+  const chosen = rows.value[row];
+  const previousState = state.value;
+  bar.refreshNow();
+  if (row >= 0) {
+    // Crossing a time boundary can replace the choices under a highlighted index.
+    if (state.value !== previousState || rows.value[row]?.label !== chosen?.label) return false;
+    if (chosen?.blocked || !canApplyRow(row)) return false;
+    emit("apply", rows.value[row].reading);
     return true;
   }
   const res = result.value;
-  if (res.state === "valid") {
-    emit("apply", res.reading);
-    return true;
-  }
-  if (!canApplyRow(highlighted.value)) return false;
-  applyRow(highlighted.value);
+  if (res.state !== "valid") return false;
+  emit("apply", res.reading);
   return true;
 };
 
@@ -614,11 +621,7 @@ const onKeydown = (event: KeyboardEvent) => {
     if (!rows.value.length) return;
     event.preventDefault();
     moveHighlight(event.key === "ArrowDown" ? 1 : -1);
-  } else if (event.key === "Escape") {
-    if (bar.text.value === "") {
-      emit("escape-empty");
-      return;
-    }
+  } else if (event.key === "Escape" && hasText.value) {
     event.preventDefault();
     event.stopPropagation();
     bar.clear();
@@ -634,6 +637,7 @@ onMounted(() => {
 });
 
 defineExpose({
+  hasText,
   setText: (text: string, source: InputSource) => {
     bar.setText(text, source);
     focus();
@@ -661,12 +665,13 @@ defineExpose({
       :placeholder="
         examplesText ? t('timeRangeInput.placeholder', { examples: examplesText }) : undefined
       "
-      :error="state === 'invalid'"
+      :error="state === 'invalid' || state === 'blocked'"
       autocomplete="off"
       class="min-w-0"
       role="combobox"
       aria-autocomplete="list"
       :aria-label="t('timeRangeInput.label')"
+      :aria-describedby="isMessage ? statusId : undefined"
       :aria-expanded="rows.length > 0"
       :aria-controls="rows.length ? listId : undefined"
       :aria-activedescendant="activeId"
@@ -682,7 +687,7 @@ defineExpose({
             size="icon"
             class="pointer-coarse:size-9"
             :aria-label="t('timeRangeInput.pressEnter')"
-            @click="submit"
+            @click="submit()"
           >
             <OShortcut keys="enter" size="sm" />
           </OButton>
@@ -698,6 +703,7 @@ defineExpose({
             : 'max-sm:flex-wrap max-sm:gap-y-0.5 max-sm:py-1'
         "
         data-test="date-time-range-status"
+        :id="statusId"
         :data-state="state"
         aria-live="polite"
         :aria-busy="bar.announcing.value"
@@ -827,7 +833,7 @@ defineExpose({
           row.blocked ? 'opacity-50' : 'hover:bg-surface-accent-hover cursor-pointer',
         ]"
         @mousedown.prevent
-        @click="applyRow(i)"
+        @click="submit(i)"
       >
         <span
           class="text-text-heading text-compact font-medium"
