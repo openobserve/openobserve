@@ -115,7 +115,6 @@ import {
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTemplateInput from "@/lib/forms/TemplateInput/OTemplateInput.vue";
@@ -201,7 +200,19 @@ const headerTitle = computed(() => {
   if (loadError.value) return t("synthetics.createBrowserTest.loadFailedTitle");
   return check.value.name || t("synthetics.createBrowserTest.untitledCheck");
 });
+const folderName = computed(() => {
+  const fid = check.value.folder;
+  if (!fid || fid === "default") return "";
+  return folders.value.find((f) => f.folderId === fid)?.name ?? "";
+});
 const { isMobile } = useBreakpoint();
+/** A phone has no room for the header's Used by button, so the count joins the subtitle. */
+const headerSubtitle = computed(() => {
+  const count = referencedByCount.value;
+  if (!isMobile.value || count === 0) return raw(folderName.value);
+  if (!folderName.value) return t("synthetics.journey.usedBy.subtitleNoFolder", { count }, count);
+  return t("synthetics.journey.usedBy.subtitle", { folder: folderName.value, count }, count);
+});
 /**
  * Where every exit from this wizard lands.
  *
@@ -1990,6 +2001,7 @@ function onClearResults() {
   <OPageLayout
     :title="raw(headerTitle)"
     class="bg-surface-base"
+    :subtitle="headerSubtitle"
     :back="{
       label: t('synthetics.newCheck.back'),
       to: backTo,
@@ -1997,12 +2009,6 @@ function onClearResults() {
     }"
     bleed
   >
-    <!-- A phone has no room for the header's Used by button, so its count rides beside the title. -->
-    <template v-if="isMobile && referencedByCount > 0" #status>
-      <OBadge size="sm" icon="account-tree" data-test="synthetics-journey-used-by-count">{{
-        t("synthetics.save.usedByCount", { count: referencedByCount }, referencedByCount)
-      }}</OBadge>
-    </template>
     <template v-if="referencedByCount > 0 || showStartControls" #actions>
       <JourneyUsedByPopover
         v-if="referencedByCount > 0"

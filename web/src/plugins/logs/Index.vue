@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="logPage"
     data-test="logs-page-container"
   >
-    <OPageHeader :title="t('menu.search')" title-data-test="logs-page-title" />
     <FirstDataPanel
       v-if="firstDataArrival"
       signal="logs"
@@ -776,7 +775,6 @@ import { useLogsHistoryRestore } from "@/composables/useLogs/useLogsHistoryResto
 import { takeRecentLanding } from "@/utils/queryHistory/routes";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
-import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import AnomalyOriginBanner from "@/components/alerts/AnomalyOriginBanner.vue";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import LogsNoStreamState from "@/plugins/logs/LogsNoStreamState.vue";
@@ -880,7 +878,6 @@ export default defineComponent({
     LogsNoEventsState,
     LogsNoDataState,
     FirstDataPanel,
-    OPageHeader,
     AnomalyOriginBanner,
     LogsNoStreamState,
     LogsDrillDownStreamSelect,

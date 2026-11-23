@@ -27,7 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       bleed
       :title="t('statusPages.editTitle')"
+      :subtitle="pageName ? raw(pageName) : undefined"
       :back="{ label: t('statusPages.back'), onClick: cancel, dataTest: 'status-page-editor-back' }"
+      title-overflow="truncate"
     >
       <template #actions>
         <OButton variant="danger-ghost" data-test="status-page-editor-cancel" @click="cancel">{{
@@ -321,7 +323,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import useSmartBack from "@/composables/useSmartBack";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -420,6 +421,7 @@ const orgLogoImg = computed<string>(() =>
 
 const loading = ref(true);
 const page = ref<StatusPageListItem | null>(null);
+const pageName = ref("");
 const rotating = ref(false);
 const currentSlug = ref("");
 const splitPct = ref(58);
@@ -597,6 +599,7 @@ async function load() {
     const res = await statusPagesService.get(orgIdentifier.value, id);
     const p = res.data as StatusPageListItem;
     page.value = p;
+    pageName.value = p.name;
     currentSlug.value = p.slug;
     form.reset(defaultsFromPage(p));
     components.value = ((res.data as any).components ?? []).map((c: any) => ({
@@ -706,19 +709,14 @@ async function rotateSlug() {
   }
 }
 
-function statusPagesListRoute() {
+function goBack() {
   const ctx = syntheticsNavContextFromRoute(route);
   if (!ctx.orgIdentifier && orgIdentifier.value) ctx.orgIdentifier = orgIdentifier.value;
-  return syntheticsListRoute(ctx, { section: "status-pages" });
+  router.push(syntheticsListRoute(ctx, { section: "status-pages" }));
 }
 
-function goBack() {
-  router.push(statusPagesListRoute());
-}
-
-const { goBack: backToList } = useSmartBack(statusPagesListRoute);
 async function cancel() {
-  if (await statusPageDraft.confirmLeave()) backToList();
+  if (await statusPageDraft.confirmLeave()) goBack();
 }
 
 // The images the page loaded with, so an unchanged one is left out of the draft.

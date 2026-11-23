@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="tracePage"
     style="min-height: auto"
   >
-    <OPageHeader :title="t('menu.traces')" title-data-test="traces-page-title" />
     <FirstDataPanel
       v-if="firstDataArrival"
       signal="traces"
@@ -369,7 +368,6 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
 import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
-import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import AnomalyOriginBanner from "@/components/alerts/AnomalyOriginBanner.vue";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";

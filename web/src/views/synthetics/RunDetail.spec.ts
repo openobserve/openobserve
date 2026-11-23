@@ -252,11 +252,11 @@ describe("RunDetail", () => {
     expect(wrapper.find('[data-test="synthetics-run-detail-status-badge"]').exists()).toBe(true);
   });
 
-  it("should render the info bar with 6 chips, the run's time among them on the page", () => {
+  it("should render the info bar with 5 chips", () => {
     const infoBar = wrapper.find('[data-test="synthetics-run-detail-info-bar"]');
     expect(infoBar.exists()).toBe(true);
     const chips = infoBar.findAll(":scope > div");
-    expect(chips.length).toBe(6);
+    expect(chips.length).toBe(5);
   });
 
   it("should render prev/next navigation buttons", () => {

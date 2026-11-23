@@ -427,8 +427,9 @@ onMounted(reload);
 
 <template>
   <OPageLayout
-    :title="t('siem.nav.sources')"
-    :about="t('siem.sources.subtitle')"
+    :title="t('siem.sources.title')"
+    :subtitle="t('siem.sources.subtitle')"
+    icon="cloud-upload"
     data-test="security-sources"
   >
     <SecurityNotices :notices="notices" data-test="security-sources-notices" />

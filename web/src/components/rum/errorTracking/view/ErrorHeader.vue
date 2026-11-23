@@ -22,25 +22,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <OPageHeader
-      :title="errorType"
-      title-data-test="error-header-error-type"
-      :back="{ label: t('rum.errorTracking'), to: errorListRoute, dataTest: 'back-button' }"
+      :back="{ onClick: () => router.back(), dataTest: 'back-button' }"
+      title-overflow="visible"
     >
-      <template #status>
-        <OTag
-          v-if="error.error_handling"
-          :label="raw(error.error_handling)"
-          :tone="isUnhandled ? 'err' : 'outline'"
-          size="sm"
-          data-test="error-header-handling-badge"
-        />
-        <OTag
-          v-if="error.source"
-          :label="raw(error.source)"
-          tone="neutral"
-          size="sm"
-          data-test="error-header-source-badge"
-        />
+      <template #title>
+        <span class="flex min-w-0 items-center gap-2">
+          <OTruncatedText data-test="error-header-error-type">{{ errorType }}</OTruncatedText>
+          <OTag
+            v-if="error.error_handling"
+            :label="raw(error.error_handling)"
+            :tone="isUnhandled ? 'err' : 'outline'"
+            size="sm"
+            class="shrink-0"
+            data-test="error-header-handling-badge"
+          />
+          <OTag
+            v-if="error.source"
+            :label="raw(error.source)"
+            tone="neutral"
+            size="sm"
+            class="shrink-0"
+            data-test="error-header-source-badge"
+          />
+        </span>
       </template>
 
       <template #actions>
@@ -98,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { computed } from "vue";
+import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
@@ -112,7 +117,6 @@ import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
-import { useOrgId } from "@/composables/query/useOrgId";
 import analytics from "@/services/product_analytics";
 
 const props = defineProps<{
@@ -120,13 +124,8 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18nTyped();
-const orgId = useOrgId();
+const router = useRouter();
 const { shareUrl } = useRum();
-
-const errorListRoute = computed(() => ({
-  name: "ErrorTracking",
-  query: { org_identifier: orgId.value },
-}));
 
 // "handled" is the only safe state — treat missing/other values as unhandled.
 const isUnhandled = computed(() => props.error.error_handling !== "handled");

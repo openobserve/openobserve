@@ -252,15 +252,18 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
   <OPageLayout data-test="synthetics-protocol-run-detail" bleed>
     <template #header v-if="!drawerMode">
       <OPageHeader
-        :title="raw(run?.monitorName)"
-        title-data-test="synthetics-protocol-run-title"
+        class=""
+        :subtitle="raw(run ? fmtTs(run.timestamp) : '')"
         :back="{
-          label: t('synthetics.results.title'),
+          label: t('synthetics.results.monitors'),
           to: backTo,
           dataTest: 'synthetics-protocol-run-back-btn',
         }"
       >
-        <template #status>
+        <template #title>
+          <span data-test="synthetics-protocol-run-title">{{ run?.monitorName || "" }}</span>
+        </template>
+        <template #title-trail>
           <OBadge v-if="run" :tone="statusMeta.variant" size="sm" :icon="statusMeta.icon">
             {{ statusMeta.label }}
           </OBadge>

@@ -18,14 +18,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="bg-surface-base"
     :title="t('logs.searchJobInspector.title')"
-    title-data-test="inspector-title"
     :back="{
-      label: t('menu.search'),
-      to: logsRoute,
+      label: t('logs.searchJobInspector.title'),
+      onClick: goBack,
       dataTest: 'inspector-close-button',
     }"
     bleed
   >
+    <template #title>
+      <span data-test="inspector-title">{{ t("logs.searchJobInspector.title") }}</span>
+    </template>
     <template #actions>
       <div
         v-if="profileData && !hasNoData"
@@ -499,10 +501,6 @@ export default defineComponent({
     const orgIdentifier = computed(
       () => (route.query.org_identifier as string) || store.state.selectedOrganization?.identifier,
     );
-    const logsRoute = computed(() => ({
-      name: "logs",
-      query: { org_identifier: orgIdentifier.value },
-    }));
     const startTime = computed(() =>
       route.query.start_time ? parseInt(route.query.start_time as string) : undefined,
     );
@@ -746,6 +744,10 @@ export default defineComponent({
       { flush: "sync" },
     );
 
+    const goBack = () => {
+      router.back();
+    };
+
     const copyTraceId = () => {
       copyToClipboard(traceId.value, t, {
         errorMessage: t("logs.searchJobInspector.failedToCopyTraceId"),
@@ -791,7 +793,7 @@ export default defineComponent({
       formatDuration,
       formatTimeRange,
       getResponseTimeLabel,
-      logsRoute,
+      goBack,
       showSqlDialog,
       showTraceIdDialog,
       copiedTraceId,

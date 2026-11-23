@@ -19,12 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-card-glass-bg"
     data-test="profiles-page"
     :title="t('profiles.title')"
-    :about="t('profiles.subtitle')"
+    :subtitle="t('profiles.subtitle')"
+    icon="memory"
     title-data-test="profiles-page-title"
     bleed
   >
-    <template #status>
-      <BetaBadge />
+    <template #title>
+      <span class="inline-flex items-center gap-2">
+        {{ t("profiles.title") }}
+        <BetaBadge />
+      </span>
     </template>
     <template #actions>
       <!-- Applies a picked window at once, as on Logs and Traces: Run query is the apply step. -->

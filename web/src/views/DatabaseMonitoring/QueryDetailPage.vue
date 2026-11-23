@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     :title="t('dbm.detail.title')"
     :back="{ label: backTarget.label, to: backTarget.to }"
+    icon="storage"
     title-data-test="dbm-detail-title"
     scroll
     bleed

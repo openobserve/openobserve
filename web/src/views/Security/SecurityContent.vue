@@ -944,7 +944,8 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
 <template>
   <OPageLayout
     :title="t('siem.content.title')"
-    :about="t('siem.content.subtitle')"
+    :subtitle="t('siem.content.subtitle')"
+    icon="menu-book"
     bleed
     :resizable="false"
     :sidebar-width="tab === 'rules' ? 256 : undefined"
@@ -963,7 +964,7 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
       </OButton>
     </template>
 
-    <template #header-tabs>
+    <template #subnav>
       <OTabs v-model="tab" data-test="security-content-tabs">
         <OTab name="rules" data-test="security-content-tab-rules">
           <span class="flex items-center gap-1.5">
@@ -984,33 +985,6 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
           </span>
         </OTab>
       </OTabs>
-    </template>
-
-    <template v-if="unfinished && canAuthor" #banner>
-      <OBanner tone="warn" data-test="security-content-bulk-resume">
-        {{
-          t(
-            "siem.content.bulk.resumeText",
-            { n: unfinished.pending.length },
-            unfinished.pending.length,
-          )
-        }}
-        <template #actions>
-          <OButton
-            variant="ghost"
-            data-test="security-content-bulk-discard"
-            @click="discardInstall"
-            >{{ t("siem.content.bulk.discard") }}</OButton
-          >
-          <OButton
-            variant="secondary"
-            :disabled="!resumeReady"
-            data-test="security-content-bulk-resume-run"
-            @click="resumeInstall"
-            >{{ t("siem.content.bulk.resume") }}</OButton
-          >
-        </template>
-      </OBanner>
     </template>
 
     <template v-if="tab === 'rules'" #sidebar>
@@ -1070,6 +1044,35 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
         class="mx-page-edge mt-2"
         data-test="security-content-notices"
       />
+      <OBanner
+        v-if="unfinished && canAuthor"
+        tone="warn"
+        class="mx-page-edge mt-2"
+        data-test="security-content-bulk-resume"
+      >
+        {{
+          t(
+            "siem.content.bulk.resumeText",
+            { n: unfinished.pending.length },
+            unfinished.pending.length,
+          )
+        }}
+        <template #actions>
+          <OButton
+            variant="ghost"
+            data-test="security-content-bulk-discard"
+            @click="discardInstall"
+            >{{ t("siem.content.bulk.discard") }}</OButton
+          >
+          <OButton
+            variant="secondary"
+            :disabled="!resumeReady"
+            data-test="security-content-bulk-resume-run"
+            @click="resumeInstall"
+            >{{ t("siem.content.bulk.resume") }}</OButton
+          >
+        </template>
+      </OBanner>
 
       <SecurityAccessLock
         v-if="accessDenials.length"

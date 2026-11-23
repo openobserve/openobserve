@@ -150,15 +150,12 @@ describe("SearchSchedulersList Component", () => {
   });
 
   describe("Navigation", () => {
-    it("goes back to Logs from the header's parent link", async () => {
-      // jsdom has no history to pop, so smart back lands on the Logs route.
-      await wrapper.find('[data-test="app-page-header-back"]').trigger("click");
+    it("should navigate back to logs on closeSearchHistory", async () => {
+      // Standalone route: close navigates to the Logs route (no history to pop in
+      // jsdom) instead of emitting to a parent overlay.
+      wrapper.vm.closeSearchHistory();
       await nextTick();
-      expect(wrapper.find('[data-test="app-page-header-back"]').text()).toBe("Logs");
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        name: "logs",
-        query: { org_identifier: store.state.selectedOrganization.identifier },
-      });
+      expect(mockRouter.push).toHaveBeenCalledWith({ name: "logs" });
     });
   });
 

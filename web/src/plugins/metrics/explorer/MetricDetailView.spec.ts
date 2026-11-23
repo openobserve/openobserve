@@ -79,12 +79,12 @@ const SERIES = { resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]]
 
 const OPageHeaderStub = {
   name: "OPageHeader",
-  props: ["title", "about", "back"],
+  props: ["title", "subtitle", "back"],
   template: `
     <header>
       <button data-test="detail-back" @click="back.onClick()" />
       <h1>{{ title }}</h1>
-      <slot name="status" />
+      <slot name="title-trail" />
       <slot name="actions" />
     </header>
   `,
@@ -1281,7 +1281,7 @@ describe("MetricDetailView", () => {
     it("labels the back button once with Back to, through the real header", async () => {
       wrapper = mountView({}, { realHeader: true });
       const back = wrapper.find('[data-test="metrics-detail-close"]');
-      expect(back.attributes("aria-label")).toBe("Back to Metrics");
+      expect(back.attributes("aria-label")).toBe("Back to metrics");
     });
 
     it("keeps Open in Visualize named when its label is hidden on a phone", () => {
@@ -1345,14 +1345,16 @@ describe("MetricDetailView", () => {
     const sel = (action: string) => `[data-test="metrics-explorer-card-${action}-${NAME}"]`;
     const HELP = "Time spent serving one request, by bucket.";
 
-    it("shows the metric's full help text behind the header's About button", () => {
+    it("shows the metric's full help text from an info button, announced in full", () => {
       wrapper = mountView({ card: { ...SELECTED, help: HELP } });
-      expect(wrapper.findComponent({ name: "OPageHeader" }).props("about")).toBe(HELP);
+      const help = wrapper.find(sel("help"));
+      expect(help.element.tagName).toBe("BUTTON");
+      expect(help.attributes("aria-label")).toContain(HELP);
     });
 
-    it("has no About text for a metric without help text", () => {
+    it("has no info button for a metric without help text", () => {
       wrapper = mountView();
-      expect(wrapper.findComponent({ name: "OPageHeader" }).props("about")).toBeUndefined();
+      expect(wrapper.find(sel("help")).exists()).toBe(false);
     });
 
     it("offers a labelled Configure function button on a configurable metric", async () => {

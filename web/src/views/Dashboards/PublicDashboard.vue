@@ -44,7 +44,7 @@
       <!-- The viewer may be anonymous or in another org, so the derived org would mislabel a shared dashboard. -->
       <OPageHeader
         :title="raw(config.title)"
-        :context="t('dashboard.header')"
+        icon="dashboard"
         title-data-test="dashboards-public-dashboard-title"
       >
         <template #actions>

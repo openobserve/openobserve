@@ -16,13 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="detail?.label || t('synthetics.privateLocations.detail.title')"
+    icon="location-on"
     :back="{
       label: t('synthetics.privateLocations.detail.back'),
       to: backTo,
     }"
     bleed
   >
-    <template #status>
+    <template #title-trail>
       <!-- "unknown" is the limit of what this region can see, not a state of
            the location, so it carries the explanation with it. -->
       <OTooltip

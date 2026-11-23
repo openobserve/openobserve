@@ -18,9 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <OPageLayout
+    overflow-first
     bleed
     :key="store.state.selectedOrganization.identifier"
     :title="t('dashboard.header')"
+    icon="dashboard"
+    :subtitle="showPublicLinks ? t('dashboard.publicLinks.pageSubtitle') : t('dashboard.subtitle')"
     :main-panel="false"
   >
     <template #actions>

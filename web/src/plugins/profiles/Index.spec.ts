@@ -160,7 +160,7 @@ describe("Profiles page", () => {
     },
     OPageLayout: {
       template:
-        "<div><slot name='status' /><slot name='actions' /><slot name='subnav' /><slot /></div>",
+        "<div><slot name='title' /><slot name='actions' /><slot name='subnav' /><slot /></div>",
     },
     OIcon: true,
     OTag: {

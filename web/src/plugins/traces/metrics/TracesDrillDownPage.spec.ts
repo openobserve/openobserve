@@ -48,11 +48,11 @@ describe("TracesDrillDownPage", () => {
     expect(wrapper.attributes("data-test")).toBe("traces-drill-down-page");
   });
 
-  it("should label the back button with the parent page, Traces", () => {
+  it("should label the back button Back to results", () => {
     wrapper = mountPage();
 
     expect(wrapper.find('[data-test="traces-drill-down-back-btn"]').attributes("aria-label")).toBe(
-      "Back to Traces",
+      "Back to results",
     );
   });
 

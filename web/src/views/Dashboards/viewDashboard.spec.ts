@@ -703,7 +703,7 @@ describe("ViewDashboard", () => {
           plugins: [i18n, store],
           config: { globalProperties: { store } },
           stubs: {
-            OPageLayout: { template: "<div><slot name='banner' /><slot /></div>" },
+            OPageLayout: { template: "<div><slot /></div>" },
             OBanner: { template: "<div><slot /><slot name='actions' /></div>" },
           },
         },
@@ -1849,9 +1849,7 @@ describe("ViewDashboard", () => {
           plugins: [i18n, store],
           renderStubDefaultSlot: true,
           stubs: {
-            OPageLayout: {
-              template: '<div><slot name="actions-overflow" /><slot name="actions" /></div>',
-            },
+            OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' },
             ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
           },
         },
@@ -1937,7 +1935,7 @@ describe("ViewDashboard", () => {
           stubs: {
             OPageLayout: {
               template:
-                '<div><slot name="status" /><slot name="actions-overflow" /><slot name="actions" /><slot name="banner" /><slot /></div>',
+                '<div><slot name="title" /><slot name="actions" /><slot name="actions-overflow" /><slot /></div>',
             },
             RenderDashboardCharts: RenderDashboardChartsStub,
             ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
@@ -2697,7 +2695,7 @@ describe("ViewDashboard", () => {
               name: "OPageLayout",
               props: ["headerClass"],
               template:
-                '<div><slot name="status" /><slot name="actions-overflow" /><slot name="actions" /><slot name="banner" /><slot /></div>',
+                '<div><slot name="title" /><slot name="actions" /><slot name="actions-overflow" /><slot /></div>',
             },
             RenderDashboardCharts: {
               name: "RenderDashboardCharts",

@@ -1289,8 +1289,9 @@ function widenTo(period: string) {
 
 <template>
   <OPageLayout
-    :title="t('siem.nav.events')"
-    :about="t('siem.events.subtitle')"
+    :title="t('siem.events.title')"
+    :subtitle="t('siem.events.subtitle')"
+    icon="manage-search"
     bleed
     resizable
     v-model:sidebar-width="sidebarWidth"

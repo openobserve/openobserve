@@ -481,9 +481,8 @@ const baseStubs = {
 // ── Missing component stubs required by OPageLayout ──────────────────────
 const pageLayoutStubs = {
   OPageLayout: {
-    template:
-      '<div><div data-test="page-status"><slot name="status" /></div><div data-test="page-actions"><slot name="actions" /></div><slot /></div>',
-    props: ["title", "back", "class", "bleed"],
+    template: '<div><div data-test="page-actions"><slot name="actions" /></div><slot /></div>',
+    props: ["title", "subtitle", "back", "class", "bleed"],
   },
 };
 
@@ -1820,7 +1819,8 @@ describe("CreateBrowserTest", () => {
   });
 
   describe("phone layout", () => {
-    const usedByChip = (w: VueWrapper) => w.find('[data-test="synthetics-journey-used-by-count"]');
+    const subtitle = (w: VueWrapper) =>
+      w.findComponent(pageLayoutStubs.OPageLayout).props("subtitle") as string;
 
     async function mountUsedBy(hidden: number) {
       mockGetFoldersListByType.mockResolvedValue([{ folderId: "folder-1", name: "Checkout" }]);
@@ -1833,21 +1833,21 @@ describe("CreateBrowserTest", () => {
       return mountValidEdit();
     }
 
-    it("on a phone the used-by count moves beside the title", async () => {
+    it("on a phone the used-by count moves into the subtitle", async () => {
       wrapper = await mountUsedBy(0);
-      expect(usedByChip(wrapper).exists()).toBe(false);
+      expect(subtitle(wrapper)).toBe("Checkout");
       wrapper.unmount();
 
       mockBreakpoint.mobile = true;
       wrapper = await mountUsedBy(0);
-      expect(usedByChip(wrapper).text()).toBe("Used by 1 test");
+      expect(subtitle(wrapper)).toBe("Checkout · used by 1 test");
       wrapper.unmount();
 
       wrapper = await mountUsedBy(2);
-      expect(usedByChip(wrapper).text()).toBe("Used by 3 tests");
+      expect(subtitle(wrapper)).toBe("Checkout · used by 3 tests");
     });
 
-    it("on a phone a test in the default folder shows the used-by count", async () => {
+    it("on a phone a test in the default folder shows the used-by count alone", async () => {
       mockBreakpoint.mobile = true;
       mockServiceReferencedBy.mockResolvedValue({
         data: {
@@ -1861,7 +1861,7 @@ describe("CreateBrowserTest", () => {
       wrapper = mountPage({ editId: "check-123" });
       await flushPromises();
 
-      expect(usedByChip(wrapper).text()).toBe("Used by 1 test");
+      expect(subtitle(wrapper)).toBe("Used by 1 test");
     });
   });
 

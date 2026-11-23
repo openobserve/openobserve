@@ -2,14 +2,17 @@
   <OPageLayout
     v-if="store.state.zoConfig.usage_enabled"
     :title="t('search_history.title')"
-    :back="{ label: t('menu.search'), to: logsRoute }"
+    icon="history"
+    :back="{ onClick: closeSearchHistory }"
     bleed
   >
-    <template #status>
-      <OTag type="streamType" :value="activeStreamType" />
-      <OTruncatedText v-if="activeStreamName" class="max-w-60 text-xs leading-normal">{{
-        activeStreamName
-      }}</OTruncatedText>
+    <template #subtitle>
+      <div class="flex min-w-0 items-center gap-2">
+        <OTag type="streamType" :value="activeStreamType" />
+        <OTruncatedText v-if="activeStreamName" class="leading-normal">{{
+          activeStreamName
+        }}</OTruncatedText>
+      </div>
     </template>
     <template #actions>
       <OButton
@@ -305,7 +308,6 @@ import {
   watch,
 } from "vue";
 import { useListViewState } from "@/composables/useListViewState";
-import useSmartBack from "@/composables/useSmartBack";
 import { timestampToTimezoneDate, b64EncodeUnicode, getUUID } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -362,16 +364,23 @@ export default defineComponent({
     OTimeCell,
     OPageLayout,
   },
+  methods: {
+    closeSearchHistory() {
+      // Go back to wherever the user came from (preserving that page's URL/state)
+      // instead of resetting to a bare /logs. Fall back to the Logs route when this
+      // page was the entry point (deep link / refresh) and there's no history to pop.
+      if (window.history.state?.back) {
+        this.$router.back();
+      } else {
+        this.$router.push({ name: "logs" });
+      }
+    },
+  },
   setup() {
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
     const { t } = useI18nTyped();
-    const logsRoute = computed(() => ({
-      name: "logs",
-      query: { org_identifier: store.state.selectedOrganization?.identifier },
-    }));
-    const { goBack: closeSearchHistory } = useSmartBack(() => logsRoute.value);
     const { isMobile } = useBreakpoint();
     const searchDateTimeRef = ref(null);
     const wrapText = ref(true);
@@ -798,8 +807,6 @@ export default defineComponent({
     return {
       isMobile,
       searchObj,
-      logsRoute,
-      closeSearchHistory,
       activeStreamType,
       activeStreamName,
       store,

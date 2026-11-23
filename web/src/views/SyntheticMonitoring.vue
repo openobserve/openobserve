@@ -18,8 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="relative"
     :title="t('synthetics.pageTitle')"
-    :about="t('synthetics.pageSubtitle')"
+    :subtitle="t('synthetics.pageSubtitle')"
+    icon="radar"
     bleed
+    tabs-below
   >
     <template #actions>
       <OButton

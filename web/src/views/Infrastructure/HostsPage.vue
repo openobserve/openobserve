@@ -471,7 +471,7 @@ const osToggleLabel = (slug: string) =>
 </script>
 
 <template>
-  <OPageLayout :title="t('menu.hosts')" bleed>
+  <OPageLayout :title="t('menu.hosts')" icon="dns" bleed>
     <template v-if="hostsState === 'detected'" #header-tabs>
       <OTabs :model-value="view" data-test="hosts-view-tabs" @change="onViewChange">
         <OTab

@@ -17,6 +17,7 @@ import { describe, expect, it, beforeAll, beforeEach, afterEach, vi } from "vite
 import { mount, flushPromises } from "@vue/test-utils";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import { getManager } from "@/lib/vue-shortcut-manager";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import config from "@/aws-exports";
@@ -144,7 +145,6 @@ describe("TraceDetails", () => {
           org_identifier: "default",
         },
         name: "traceDetails",
-        path: "/traces/trace-details",
       },
     } as any);
 
@@ -341,6 +341,8 @@ describe("TraceDetails", () => {
       const operationName = wrapper.find('[data-test="trace-details-operation-name"]');
 
       expect(operationName.classes()).toContain("truncate");
+      // The ellipsis only fires if the header also lets the title block shrink.
+      expect(wrapper.findComponent(OPageHeader).props("titleOverflow")).toBe("visible");
     });
 
     it("should display trace ID in toolbar", () => {

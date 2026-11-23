@@ -1331,7 +1331,8 @@ onMounted(() => {
 <template>
   <OPageLayout
     :title="t('siem.cases.title')"
-    :about="t('siem.cases.subtitle')"
+    :subtitle="t('siem.cases.subtitle')"
+    icon="assignment"
     bleed
     title-data-test="security-cases-title"
   >

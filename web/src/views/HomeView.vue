@@ -23,7 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          bottom divider reaches the card edges (like Data Sources / Pipelines) —
          a padded root insets the header and makes it read as a floating bar.
          Padding is reintroduced on the body wrapper below the header instead. -->
-    <OPageLayout :title="t('menu.home')" bleed>
+    <OPageLayout
+      :title="t('menu.home')"
+      :subtitle="t('home.subtitle')"
+      icon="home"
+      :tabs-below="tabOrder.length > 1"
+      bleed
+    >
       <template v-if="isMobile && activeHomeTab === 'ai' && !aiLocked" #actions>
         <OButton
           variant="secondary"

@@ -42,8 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? 'stickyHeader fullscreenHeader bg-surface-panel'
               : 'shrink-0'
         "
-        :title="dashboardTitle"
-        title-data-test="dashboard-name-title"
+        :subtitle="folderNameFromFolderId"
+        :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
         :back="
           !isFullscreen && store.state.printMode !== true
             ? {
@@ -54,12 +54,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : undefined
         "
       >
-        <template #status>
+        <template #title>
+          <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
           <OBadge
             v-if="isEditingLayout"
             tone="accent"
             size="sm"
             icon="edit"
+            class="ms-2 align-middle"
             data-test="dashboard-edit-badge"
             >{{ t("dashboard.layoutEdit.editing") }}</OBadge
           >
@@ -303,101 +305,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('dashboard.layoutEdit.saveTooltip')" shortcut="dashboardSave" />
             </OButton>
           </template>
-          <span
-            v-if="!isFullscreen && !isEditingLayout"
-            v-show="store.state.printMode !== true"
-            class="inline-flex items-center"
-          >
-            <ODropdown align="end" side="bottom" @close-auto-focus="onMoreOptionsClosed">
-              <template #trigger>
-                <OButton
-                  :icon-only="isMobile"
-                  variant="secondary"
-                  icon="more-horiz"
-                  :aria-label="
-                    hasSettingsDraft
-                      ? t('dashboard.moreOptionsSettingsDraft')
-                      : t('common.moreOptions')
-                  "
-                  data-test="dashboard-more-options-btn"
-                >
-                  <template v-if="!isMobile">{{ t("search.menuMore") }}</template>
-                  <OTooltip v-if="isMobile" :content="t('common.moreOptions')" />
-                  <EditorDraftDot
-                    v-if="hasSettingsDraft"
-                    corner
-                    :tooltip="false"
-                    data-test="dashboard-setting-btn-draft-dot"
-                  />
-                </OButton>
-              </template>
-              <ODropdownItem
-                data-test="dashboard-kiosk-btn"
-                icon="tv"
-                @select="kioskSetupChosen = true"
-              >
-                {{ t("dashboard.kiosk.tvMode") }}
-              </ODropdownItem>
-              <ODropdownItem
-                data-test="dashboard-print-menu-item"
-                icon="print"
-                @select="printDashboard"
-              >
-                {{ t("dashboard.print") }}
-              </ODropdownItem>
-              <ODropdownSeparator />
-              <ODropdownItem
-                data-test="export-dashboard"
-                icon="download"
-                shortcut="dashboardExport"
-                @select="exportDashboard"
-              >
-                {{ t("dashboard.export") }}
-              </ODropdownItem>
-              <ODropdownItem
-                data-test="view-dashboard-scheduled-reports"
-                :icon="reportsLocked ? 'lock' : 'description'"
-                :disabled="reportsLocked"
-                :disabled-reason="reportsLocked ? reportsLockedReason : null"
-                @select="openScheduledReports"
-              >
-                {{ t("dashboard.scheduledDashboards") }}
-              </ODropdownItem>
-              <ODropdownSeparator />
-              <ODropdownItem
-                data-test="dashboard-setting-btn"
-                icon="settings"
-                @select="openSettingsDialog"
-              >
-                {{ settingsButtonLabel }}
-              </ODropdownItem>
-              <ODropdownItem
-                data-test="dashboard-json-edit-btn"
-                icon="code"
-                @select="openJsonEditor"
-              >
-                {{ t("dashboard.editJson") }}
-              </ODropdownItem>
-              <ODropdownItem
-                data-test="dashboard-view-set-home-btn"
-                :icon="isHome(dashboardId) ? 'keep' : 'keep-outline'"
-                :description="isHome(dashboardId) ? null : t('dashboard.setAsHomeDesc')"
-                @select="toggleHomeDashboard"
-              >
-                {{ isHome(dashboardId) ? t("dashboard.removeFromHome") : t("dashboard.setAsHome") }}
-              </ODropdownItem>
-            </ODropdown>
-            <KioskSetupPopover
-              v-model:open="kioskSetupOpen"
-              :current-refresh-seconds="refreshInterval"
-              :min-refresh-seconds="store.state?.zoConfig?.min_auto_refresh_interval || 5"
-              @open="enterKiosk"
-            >
-              <template #trigger>
-                <span class="block size-0" aria-hidden="true" />
-              </template>
-            </KioskSetupPopover>
-          </span>
         </template>
 
         <template #actions-overflow>
@@ -487,6 +394,103 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 shortcut="dashboardFullscreen"
               />
             </OButton>
+            <span
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              class="inline-flex items-center"
+            >
+              <ODropdown align="end" side="bottom" @close-auto-focus="onMoreOptionsClosed">
+                <template #trigger>
+                  <OButton
+                    :icon-only="isMobile"
+                    variant="secondary"
+                    icon="more-horiz"
+                    :aria-label="
+                      hasSettingsDraft
+                        ? t('dashboard.moreOptionsSettingsDraft')
+                        : t('common.moreOptions')
+                    "
+                    data-test="dashboard-more-options-btn"
+                  >
+                    <template v-if="!isMobile">{{ t("search.menuMore") }}</template>
+                    <OTooltip v-if="isMobile" :content="t('common.moreOptions')" />
+                    <EditorDraftDot
+                      v-if="hasSettingsDraft"
+                      corner
+                      :tooltip="false"
+                      data-test="dashboard-setting-btn-draft-dot"
+                    />
+                  </OButton>
+                </template>
+                <ODropdownItem
+                  data-test="dashboard-kiosk-btn"
+                  icon="tv"
+                  @select="kioskSetupChosen = true"
+                >
+                  {{ t("dashboard.kiosk.tvMode") }}
+                </ODropdownItem>
+                <ODropdownItem
+                  data-test="dashboard-print-menu-item"
+                  icon="print"
+                  @select="printDashboard"
+                >
+                  {{ t("dashboard.print") }}
+                </ODropdownItem>
+                <ODropdownSeparator />
+                <ODropdownItem
+                  data-test="export-dashboard"
+                  icon="download"
+                  shortcut="dashboardExport"
+                  @select="exportDashboard"
+                >
+                  {{ t("dashboard.export") }}
+                </ODropdownItem>
+                <ODropdownItem
+                  data-test="view-dashboard-scheduled-reports"
+                  :icon="reportsLocked ? 'lock' : 'description'"
+                  :disabled="reportsLocked"
+                  :disabled-reason="reportsLocked ? reportsLockedReason : null"
+                  @select="openScheduledReports"
+                >
+                  {{ t("dashboard.scheduledDashboards") }}
+                </ODropdownItem>
+                <ODropdownSeparator />
+                <ODropdownItem
+                  data-test="dashboard-setting-btn"
+                  icon="settings"
+                  @select="openSettingsDialog"
+                >
+                  {{ settingsButtonLabel }}
+                </ODropdownItem>
+                <ODropdownItem
+                  data-test="dashboard-json-edit-btn"
+                  icon="code"
+                  @select="openJsonEditor"
+                >
+                  {{ t("dashboard.editJson") }}
+                </ODropdownItem>
+                <ODropdownItem
+                  data-test="dashboard-view-set-home-btn"
+                  :icon="isHome(dashboardId) ? 'keep' : 'keep-outline'"
+                  :description="isHome(dashboardId) ? null : t('dashboard.setAsHomeDesc')"
+                  @select="toggleHomeDashboard"
+                >
+                  {{
+                    isHome(dashboardId) ? t("dashboard.removeFromHome") : t("dashboard.setAsHome")
+                  }}
+                </ODropdownItem>
+              </ODropdown>
+              <KioskSetupPopover
+                v-model:open="kioskSetupOpen"
+                :current-refresh-seconds="refreshInterval"
+                :min-refresh-seconds="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+                @open="enterKiosk"
+              >
+                <template #trigger>
+                  <span class="block size-0" aria-hidden="true" />
+                </template>
+              </KioskSetupPopover>
+            </span>
           </template>
           <template v-if="isEditingLayout && isMobile">
             <OButton
@@ -523,29 +527,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </template>
 
-        <template #banner>
-          <OBanner
-            v-if="hasUnsavedConflict"
-            tone="warn"
-            data-test="dashboard-unsaved-conflict-banner"
-          >
-            {{
-              saveConflictState.myChange
-                ? t("dashboard.saveConflict.notSavedChange", { change: saveConflictState.myChange })
-                : t("dashboard.saveConflict.notSaved")
-            }}
-            <template #actions>
-              <OButton
-                variant="secondary"
-                data-test="dashboard-unsaved-conflict-resolve"
-                @click="resolveSaveConflict"
-              >
-                {{ t("dashboard.saveConflict.resolve") }}
-              </OButton>
-            </template>
-          </OBanner>
-        </template>
-
         <KioskStrip
           v-if="kioskMode && !playlistEmbed"
           :title="currentDashboardData.data?.title"
@@ -566,6 +547,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :note="playlistHolding.note"
           />
         </div>
+        <OBanner
+          v-if="hasUnsavedConflict"
+          tone="warn"
+          class="mx-page-edge mt-2 shrink-0"
+          data-test="dashboard-unsaved-conflict-banner"
+        >
+          {{
+            saveConflictState.myChange
+              ? t("dashboard.saveConflict.notSavedChange", { change: saveConflictState.myChange })
+              : t("dashboard.saveConflict.notSaved")
+          }}
+          <template #actions>
+            <OButton
+              variant="secondary"
+              data-test="dashboard-unsaved-conflict-resolve"
+              @click="resolveSaveConflict"
+            >
+              {{ t("dashboard.saveConflict.resolve") }}
+            </OButton>
+          </template>
+        </OBanner>
 
         <RenderDashboardCharts
           :frame="false"
@@ -919,8 +921,6 @@ export default defineComponent({
     const variablesManager = ref(null);
 
     let moment: any = () => {};
-
-    const dashboardTitle = computed(() => raw(currentDashboardData.data?.title));
 
     const folderNameFromFolderId = computed(() => {
       if (store.state.organizationData.folders.length === 0) {
@@ -3055,7 +3055,6 @@ export default defineComponent({
       discardForced,
       settleDiscard,
       folderNameFromFolderId,
-      dashboardTitle,
       showJsonEditorDialog,
       openJsonEditor,
       saveJsonDashboard,

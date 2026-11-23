@@ -38,15 +38,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <OPageHeader
         :title="raw(card.name)"
-        :about="card.help ? raw(card.help) : undefined"
+        :subtitle="card.help ? raw(card.help) : undefined"
         title-data-test="metrics-detail-title"
         :back="{
-          label: t('menu.metrics'),
+          label: t('metrics.explorer.detail.backTo'),
           onClick: () => $emit('close'),
           dataTest: 'metrics-detail-close',
         }"
       >
-        <template #status>
+        <template #title-trail>
           <OTag
             type="metricType"
             :value="card.typeFilterBucket"
@@ -66,6 +66,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-detail-unit"
             >{{ unitLabel }}</span
           >
+          <!-- The subtitle truncates and hides on a phone; this always holds the whole sentence. -->
+          <OButton
+            v-if="card.help"
+            icon-only
+            variant="ghost"
+            size="xs"
+            icon="info-outline"
+            class="shrink-0"
+            :aria-label="t('metrics.explorer.card.helpAria', { name: card.name, help: card.help })"
+            :data-test="`metrics-explorer-card-help-${card.name}`"
+          >
+            <OTooltip side="bottom">
+              <template #content
+                ><div class="whitespace-pre-wrap">{{ card.help }}</div></template
+              >
+            </OTooltip>
+          </OButton>
           <!-- The page sentence scrolls away with the overview; this header never does. -->
           <span
             class="inline-grid shrink-0 items-center justify-items-start"

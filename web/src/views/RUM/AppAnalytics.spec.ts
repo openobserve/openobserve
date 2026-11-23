@@ -37,7 +37,6 @@ import AnalyticsPaths from "@/components/rum/productAnalytics/AnalyticsPaths.vue
 import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import useProductAnalytics, {
   querySignature,
   resetProductAnalytics,
@@ -347,7 +346,9 @@ describe("AppAnalytics shell", () => {
 
   it("the SDK sampling caveat is reachable by keyboard (W30)", async () => {
     await mountAt("/product-analytics/overview?app=web&period=7d");
-    expect(wrapper!.find('[data-test="o-page-header-about"]').element.tagName).toBe("BUTTON");
+    expect(wrapper!.find('[data-test="rum-analytics-sdk-sampling"]').attributes("tabindex")).toBe(
+      "0",
+    );
   });
 
   it("names the icon-only refresh button (W20)", async () => {
@@ -521,13 +522,12 @@ describe("AppAnalytics shell", () => {
     expect(wrapper!.find('[data-test="rum-analytics-trust-caption"]').exists()).toBe(false);
     const tips = wrapper!.findAllComponents(OTooltip).map((c) => String(c.props("content") ?? ""));
     expect(tips.some((c) => /^Refresh · data through 2026/.test(c))).toBe(true);
-    expect(wrapper!.findComponent(OPageHeader).props("about")).toContain(
-      "Only sessions your RUM SDK keeps (sessionSampleRate)",
-    );
+    const sampling = wrapper!.find('[data-test="rum-analytics-sdk-sampling"]');
+    expect(sampling.attributes("aria-label")).toBe("Counts reflect sampled SDK sessions");
     expect(
       wrapper!
         .find('[data-test="rum-analytics-title"]')
-        .find('[data-test="o-page-header-about"]')
+        .find('[data-test="rum-analytics-sdk-sampling"]')
         .exists(),
     ).toBe(false);
   });

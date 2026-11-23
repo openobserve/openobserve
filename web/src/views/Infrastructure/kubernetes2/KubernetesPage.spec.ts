@@ -119,7 +119,6 @@ const layoutStub = defineComponent({
     return () =>
       h("div", {}, [
         h("div", { "data-test": "layout-actions" }, slots.actions?.()),
-        h("div", { "data-test": "layout-banner" }, slots.banner?.()),
         h("div", { "data-test": "layout-sidebar" }, slots.sidebar?.()),
         slots.default?.(),
       ]);

@@ -63,9 +63,9 @@ vi.mock("vue-router", () => ({
 vi.mock("@/lib/core/PageHeader/OPageHeader.vue", () => ({
   default: {
     name: "OPageHeader",
-    props: ["title", "titleDataTest", "back"],
+    props: ["subtitle", "back", "drawerMode"],
     template:
-      '<div data-test="app-page-header"><h1 :data-test="titleDataTest">{{ title }}</h1><slot name="status"></slot></div>',
+      '<div data-test="app-page-header"><slot name="title"></slot><slot name="title-trail"></slot></div>',
   },
 }));
 

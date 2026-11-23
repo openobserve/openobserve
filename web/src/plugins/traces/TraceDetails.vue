@@ -30,59 +30,114 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         v-if="showHeader"
-        class="trace-combined-header-wrapper bg-card-glass-bg shrink-0"
-        :class="isStandaloneMode ? '' : 'py-[0.2rem]'"
+        class="trace-combined-header-wrapper bg-card-glass-bg shrink-0 py-[0.2rem]"
       >
         <!-- Standalone (routed) header: shared OPageHeader -->
         <OPageHeader
           v-if="mode === 'standalone'"
-          :title="raw(traceTree[0]?.operationName) || t('traces.loadingTrace')"
-          title-data-test="trace-details-operation-name"
+          title-overflow="visible"
           :back="
             showBackButton
               ? {
-                  label: t('menu.traces'),
-                  to: tracesListRoute(),
                   onClick: handleBackOrClose,
                   dataTest: 'trace-details-back-btn',
                 }
               : undefined
           "
+          class=""
         >
-          <template #status>
-            <span class="inline-flex">
-              <OTag
-                type="logsResultChip"
-                value="neutral"
-                size="sm"
-                data-test="trace-details-spans-count"
-              >
-                <span data-test="span-count-text">
-                  {{ formatLargeNumber(effectiveSpanList.length) }}
-                  {{ t("traces.spansLabel") }}
+          <!-- Operation names run long (SQL, URLs); the default header title never shrinks, so it never ellipsises. -->
+          <template #title>
+            <OTruncatedText data-test="trace-details-operation-name" class="block">
+              {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
+            </OTruncatedText>
+          </template>
+
+          <template #subtitle>
+            <div class="text-2xs text-text-secondary flex items-center space-x-2 whitespace-nowrap">
+              <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
+              <div class="bg-text-label h-4 w-px py-0" />
+              <span class="me-1">
+                {{ t("traces.traceId") }}:
+                <span
+                  data-test="trace-details-trace-id"
+                  class="text-text-body font-mono"
+                  :title="effectiveTraceId"
+                >
+                  {{ effectiveTraceId }}
                 </span>
-              </OTag>
-              <OTooltip :content="raw(effectiveSpanList.length + ' ' + t('traces.spansLabel'))" />
-            </span>
-            <TraceErrorSpansMenu
-              v-if="errorSpans.length"
-              :errors="errorSpans"
-              compact
-              @select="selectErrorSpan"
-            />
-            <button
-              v-if="traceIssueList.length"
-              type="button"
-              class="inline-flex"
-              data-test="trace-details-issues-count"
-              @click="openIssue(traceIssueList[0].lastSpanId)"
-            >
-              <OTag type="logsResultChip" value="warn" size="sm">
-                <span>{{
-                  t("traceIssues.count", { n: traceIssueList.length }, traceIssueList.length)
-                }}</span>
-              </OTag>
-            </button>
+              </span>
+
+              <!-- Copy Trace ID Button -->
+              <OButton
+                icon-only
+                data-test="trace-details-copy-trace-id-btn"
+                variant="ghost"
+                icon="content-copy"
+                :title="t('traces.copyTraceId')"
+                @click="copyTraceId"
+              />
+
+              <!-- Session ID (LLM traces) -->
+              <template v-if="sessionId">
+                <div class="bg-text-label h-4 w-px py-0" />
+                <span class="me-1">
+                  {{ t("traces.traceDetails.sessionId") }}:
+                  <span
+                    data-test="trace-details-session-id"
+                    class="text-text-body font-mono"
+                    :title="sessionId"
+                  >
+                    {{ sessionId }}
+                  </span>
+                </span>
+                <OButton
+                  icon-only
+                  data-test="trace-details-copy-session-id-btn"
+                  variant="ghost"
+                  icon="content-copy"
+                  :title="t('traces.traceDetails.copySessionId')"
+                  @click="copySessionId"
+                />
+              </template>
+
+              <div class="bg-text-label h-4 w-px py-0" />
+              <!-- Span Count Badge -->
+              <span class="inline-flex">
+                <OTag
+                  type="logsResultChip"
+                  value="neutral"
+                  size="sm"
+                  data-test="trace-details-spans-count"
+                >
+                  <span data-test="span-count-text">
+                    {{ formatLargeNumber(effectiveSpanList.length) }}
+                    {{ t("traces.spansLabel") }}
+                  </span>
+                </OTag>
+                <OTooltip :content="raw(effectiveSpanList.length + ' ' + t('traces.spansLabel'))" />
+              </span>
+
+              <template v-if="errorSpans.length">
+                <div class="bg-text-label h-4 w-px py-0" />
+                <TraceErrorSpansMenu :errors="errorSpans" compact @select="selectErrorSpan" />
+              </template>
+              <template v-if="traceIssueList.length">
+                <div class="bg-text-label h-4 w-px py-0" />
+                <button
+                  type="button"
+                  class="inline-flex"
+                  data-test="trace-details-issues-count"
+                  @click="openIssue(traceIssueList[0].lastSpanId)"
+                >
+                  <OTag type="logsResultChip" value="warn" size="sm">
+                    <span>{{
+                      t("traceIssues.count", { n: traceIssueList.length }, traceIssueList.length)
+                    }}</span>
+                  </OTag>
+                </button>
+              </template>
+            </div>
           </template>
 
           <template #actions>
@@ -187,6 +242,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Shrinks with the host (a drawer, not the viewport): the counts wrap to a second row instead of running past the edge. -->
           <div class="flex min-w-0 flex-1 items-center space-x-4">
+            <!-- Back button -->
+            <OButton
+              v-if="isStandaloneMode && showBackButton"
+              icon-only
+              data-test="trace-details-back-btn"
+              variant="ghost"
+              class="me-1.5"
+              @click="handleBackOrClose"
+            >
+              <OIcon name="arrow-back" size="sm" />
+              <OTooltip
+                :content="
+                  areFiltersAdded ? t('traces.applyPendingFilters') : t('traces.backToTraces')
+                "
+              />
+            </OButton>
+
             <div class="flex w-full min-w-0 flex-wrap items-center gap-x-2.5! gap-y-1">
               <!-- Operation Name -->
               <OTruncatedText
@@ -362,7 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-border-default bg-card-glass-bg! flex items-center justify-between border-b bg-white py-0"
         >
           <div
-            class="trace-details-view-tabs ms-[0.325rem] flex min-w-0 items-center space-x-4 py-[0.325rem]"
+            class="trace-details-view-tabs ms-[0.325rem] flex items-center space-x-4 py-[0.325rem]"
           >
             <!--
               Tabs are data-driven from `traceTabs` so they can be dragged to
@@ -388,55 +460,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ "label" in tab ? raw(tab.label) : t(tab.labelKey) }}
               </OToggleGroupItem>
             </OToggleGroup>
-
-            <!-- The embedded header carries these itself; IDs truncate first so the controls never move. -->
-            <div
-              v-if="showHeader && isStandaloneMode"
-              class="text-2xs text-text-secondary flex min-w-0 items-center gap-2 whitespace-nowrap"
-              data-test="trace-details-identity"
-            >
-              <span class="shrink-0">{{
-                formatTimestamp(traceStartTime, store.state.timezone)
-              }}</span>
-              <div class="bg-text-label h-4 w-px shrink-0" />
-              <span class="flex min-w-0 items-center gap-1">
-                <span class="shrink-0">{{ t("traces.traceId") }}:</span>
-                <span
-                  data-test="trace-details-trace-id"
-                  class="text-text-body truncate font-mono"
-                  :title="effectiveTraceId"
-                  >{{ effectiveTraceId }}</span
-                >
-                <OButton
-                  icon-only
-                  data-test="trace-details-copy-trace-id-btn"
-                  variant="ghost"
-                  icon="content-copy"
-                  class="shrink-0"
-                  :title="t('traces.copyTraceId')"
-                  @click="copyTraceId"
-                />
-              </span>
-              <span v-if="sessionId" class="flex min-w-0 items-center gap-1">
-                <div class="bg-text-label h-4 w-px shrink-0" />
-                <span class="shrink-0">{{ t("traces.traceDetails.sessionId") }}:</span>
-                <span
-                  data-test="trace-details-session-id"
-                  class="text-text-body truncate font-mono"
-                  :title="sessionId"
-                  >{{ sessionId }}</span
-                >
-                <OButton
-                  icon-only
-                  data-test="trace-details-copy-session-id-btn"
-                  variant="ghost"
-                  icon="content-copy"
-                  class="shrink-0"
-                  :title="t('traces.traceDetails.copySessionId')"
-                  @click="copySessionId"
-                />
-              </span>
-            </div>
           </div>
 
           <div class="flex items-center gap-2 space-x-2 pe-[0.325rem]">
@@ -1002,13 +1025,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <FeatureLockExempt v-if="showBackButton" class="shrink-0">
         <OPageHeader
-          :title="t('routeTitles.traceDetails')"
-          :back="{
-            label: t('menu.traces'),
-            to: tracesListRoute(),
-            onClick: handleBackOrClose,
-            dataTest: 'trace-details-back-btn',
-          }"
+          :title="t('menu.traces')"
+          :back="{ onClick: handleBackOrClose, dataTest: 'trace-details-back-btn' }"
         />
       </FeatureLockExempt>
       <LicenseDeniedState :features="['traces']" />
@@ -3633,8 +3651,13 @@ export default defineComponent({
       window.open(route.href, "_blank");
     };
 
-    // Smart back pops history first: many AI Observability pages open this trace, and back must return to that one.
-    const tracesListRoute = () => {
+    // Real browser back when there's history to pop — this trace can be
+    // reached from many AI Observability pages (Sessions, Discovery, Queue
+    // Workbench, Experiments, Eval Jobs, LLM Insights) as well as the plain
+    // Traces search, and router.back() returns to whichever one it actually
+    // was, filters and all. The hand-built push below only fires as a
+    // fallback (direct link / reload, no history to pop).
+    const { goBack: backToTracesList } = useSmartBack(() => {
       const query = cloneDeep(router.currentRoute.value.query);
       delete query.trace_id;
 
@@ -3646,8 +3669,7 @@ export default defineComponent({
       }
 
       return { name: "traces", query: { ...query } };
-    };
-    const { goBack: backToTracesList } = useSmartBack(tracesListRoute);
+    });
 
     const routeToTracesList = () => {
       // Only navigate if in standalone mode
@@ -3835,7 +3857,6 @@ export default defineComponent({
       effectiveSpanList,
       // New event handlers
       handleBackOrClose,
-      tracesListRoute,
       handleDAGNodeClick,
       // Filter-from-trace-details
       areFiltersAdded,

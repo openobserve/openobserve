@@ -570,15 +570,16 @@ function nav(path: string, query: Record<string, string> = {}) {
 
 <template>
   <OPageLayout
-    :title="t('siem.nav.overview')"
-    :about="t('siem.overview.subtitle')"
+    :title="t('siem.overview.title')"
+    :subtitle="t('siem.overview.subtitle')"
+    icon="security"
     scroll
     pad-y
     title-data-test="security-overview-title"
   >
     <template v-if="securityAlpha" #title>
       <span class="inline-flex max-w-full min-w-0 items-center gap-2">
-        <span class="truncate">{{ t("siem.nav.overview") }}</span>
+        <span class="truncate">{{ t("siem.overview.title") }}</span>
         <BetaBadge stage="alpha" class="shrink-0" />
       </span>
     </template>

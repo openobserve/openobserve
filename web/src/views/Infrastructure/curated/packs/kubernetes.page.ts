@@ -440,6 +440,7 @@ const panel = (
 export const kubernetesPage: CuratedPageManifest = {
   id: "kubernetes",
   titleKey: "infra.workload.kubernetesTitle",
+  icon: "hub",
   contentVersion: 1,
   defaultRelativePeriod: "3h",
   stalenessThresholdUs: STALENESS_24H_US,

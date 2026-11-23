@@ -40,16 +40,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ════════ HEADER ════════ -->
     <template #header v-if="!drawerMode">
       <OPageHeader
+        class=""
         :title="raw(displayMonitorName)"
         title-data-test="synthetics-run-detail-title"
+        :subtitle="raw(currentRun.timestamp)"
         :back="{
-          label: t('synthetics.results.title'),
-          to: backTo,
+          label: t('synthetics.results.monitors'),
           onClick: goBack,
           dataTest: 'synthetics-run-detail-back-btn',
         }"
       >
-        <template #status>
+        <template #title-trail>
           <OBadge
             v-if="hasRunStatus"
             :tone="statusBadgeVariant"
@@ -70,9 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OTruncatedText class="block">{{ currentRun.url }}</OTruncatedText>
           </OBadge>
-        </template>
-        <template #actions>
-          <div class="flex">
+          <div class="ms-1 flex">
             <OButton
               icon-only
               :aria-label="t('common.previous')"
@@ -90,6 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="synthetics-run-detail-next-btn"
             />
           </div>
+        </template>
+        <template #actions>
           <OButton
             variant="secondary"
             icon="open-in-new"
@@ -1607,16 +1608,6 @@ interface InfoChip {
 
 const infoChips = computed<InfoChip[]>(() => [
   statusChip.value,
-  // The drawer shows the run's time in its own header.
-  ...(props.drawerMode
-    ? []
-    : [
-        {
-          label: t("synthetics.protocolRun.started"),
-          value: currentRun.value.timestamp,
-          icon: "calendar-month",
-        },
-      ]),
   {
     label: t("synthetics.results.duration"),
     value: fmtDur(currentRun.value.duration),

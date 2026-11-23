@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex h-full min-h-0 w-full flex-col" data-test="metrics-explorer">
-    <OPageHeader :title="t('menu.metrics')" title-data-test="metrics-explorer-title" />
     <AnomalyOriginBanner class="mx-1.5 mt-1.5 shrink-0" data-test="metrics-anomaly-origin-banner" />
     <!-- items-center: LabelFilterBar wraps its own chips internally (flex-wrap),
          so the row keeps every control on one centred line rather than items-start. -->
@@ -826,7 +825,6 @@ import { isEqual, debounce } from "lodash-es";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";
@@ -934,7 +932,6 @@ const ROW_HEIGHT = CARD_HEIGHT + ROW_GAP;
 export default defineComponent({
   name: "MetricsExplorer",
   components: {
-    OPageHeader,
     OPageHeaderStatus,
     OSkeleton,
     ODataAge,

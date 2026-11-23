@@ -197,12 +197,12 @@ describe("SecurityOverview", () => {
     awsConfig.isCloud = "true";
     const cloud = await mountView();
     expect(cloud.get('[data-test="alpha-badge"]').text()).toBe("Alpha");
-    expect(cloud.get('[data-test="security-overview-title"]').text()).toContain("Overview");
+    expect(cloud.get('[data-test="security-overview-title"]').text()).toContain("SOC Overview");
     cloud.unmount();
 
     awsConfig.isCloud = "false";
     const selfHosted = await mountView();
-    expect(selfHosted.get('[data-test="security-overview-title"]').text()).toBe("Overview");
+    expect(selfHosted.get('[data-test="security-overview-title"]').text()).toBe("SOC Overview");
     expect(selfHosted.find('[data-test="alpha-badge"]').exists()).toBe(false);
   });
 

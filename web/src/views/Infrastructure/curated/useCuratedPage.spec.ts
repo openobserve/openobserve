@@ -165,6 +165,7 @@ const PROBE_FIELDS: Record<string, string> = {
 const syntheticProbePage: any = {
   id: "synthetic",
   titleKey: "synthetic.title",
+  icon: "server",
   contentVersion: 1,
   defaultRelativePeriod: "3h",
   stalenessThresholdUs: 24 * 60 * 60 * 1_000_000,

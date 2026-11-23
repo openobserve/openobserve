@@ -3,7 +3,8 @@
     <OPageLayout
       v-if="!showSearchResults"
       :title="t('search_scheduler_job.title')"
-      :back="{ label: t('menu.search'), to: logsRoute }"
+      icon="schedule"
+      :back="{ onClick: closeSearchHistory }"
       bleed
     >
       <template #actions>
@@ -389,15 +390,22 @@ export default defineComponent({
     QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     OPageLayout,
   },
+  methods: {
+    closeSearchHistory() {
+      // Back to wherever the user came from, keeping that page's URL and state;
+      // a deep link or refresh has no history to pop, so it lands on Logs.
+      if (window.history.state?.back) {
+        this.$router.back();
+      } else {
+        this.$router.push({ name: "logs" });
+      }
+    },
+  },
   setup() {
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
     const { t } = useI18nTyped();
-    const logsRoute = computed(() => ({
-      name: "logs",
-      query: { org_identifier: store.state.selectedOrganization?.identifier },
-    }));
     const confirmDelete = ref(false);
     const toBeDeletedJob = ref({});
 
@@ -911,7 +919,6 @@ export default defineComponent({
     return {
       searchObj,
       store,
-      logsRoute,
       generateColumns,
       fetchSearchHistory,
       dataToBeLoaded,

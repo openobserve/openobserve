@@ -19,16 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       class="session-details bg-card-glass-bg"
       data-test="session-detail-header"
-      :title="t('routeTitles.sessionDetails')"
+      :title="t('traces.sessionDetail.pageTitle')"
       :back="{
         label: t('rum.sessions'),
-        to: sessionsListRoute,
+        onClick: goBack,
         dataTest: 'session-detail-back-btn',
       }"
       bleed
     >
       <!-- Session id pill (primary-tinted, copyable) — shows the full id -->
-      <template #status>
+      <template #title-trail>
         <span
           v-if="detail"
           class="rounded-default text-status-info-text bg-status-info-bg inline-flex flex-shrink-0 items-center gap-1.5 px-2 py-1 font-semibold"
@@ -1002,6 +1002,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, reactive, onMounted, nextTick, computed, defineAsyncComponent, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import useSmartBack from "@/composables/useSmartBack";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatDate } from "@/utils/date";
@@ -1974,8 +1975,13 @@ async function load() {
   }
 }
 
-// The header's back pops history when it can, so this only fires on a direct link and need not be exact.
-const sessionsListRoute = computed(() => {
+// Real history back, when there is one, instead of a hand-built push: the
+// list's own URL (filters, page, stream/agent mode) round-trips exactly as
+// the user left it, whichever of the several pages that open a session
+// (AI Sessions, Discovery, Queue Workbench) it actually was. The fallback
+// below only fires with no history to pop (direct link / reload), so it only
+// needs to be a SANE landing spot, not an exact one.
+const { goBack } = useSmartBack(() => {
   // When opened from the AI/LLM Sessions page, return there (stays in
   // the AI menu) instead of dropping into the Traces sessions tab.
   if (route.name === "aiSessionDetails") {

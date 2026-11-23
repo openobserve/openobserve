@@ -24,8 +24,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     :title="raw(monitorName)"
     data-test="synthetic-monitor-results-page"
+    :subtitle="raw(folderName)"
     :back="{
-      label: t('synthetics.tabs.checks'),
+      label: t('synthetics.results.monitors'),
       to: backTo,
     }"
     bleed
@@ -159,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -174,9 +175,14 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import MonitorRuns from "@/views/synthetics/MonitorRuns.vue";
 import RunDetail from "@/views/synthetics/RunDetail.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { getFoldersListByType } from "@/utils/commons";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import syntheticsService from "@/services/synthetics";
-import { syntheticsEditRoute, syntheticsListRoute } from "@/utils/synthetics/routes";
+import {
+  syntheticsEditRoute,
+  syntheticsFolderName,
+  syntheticsListRoute,
+} from "@/utils/synthetics/routes";
 
 defineOptions({ name: "SyntheticMonitorResults" });
 
@@ -230,7 +236,8 @@ function onEnvScopeChange(value: string) {
     if (shouldRefresh) runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
   });
 }
-// `?folder=` carries the folder ID; the server gates RBAC on it.
+// `?folder=` carries the folder ID (the server gates RBAC on it); the header
+// wants the name, so resolve it against the folder list Vuex already holds.
 const folderId = computed(() => String(route.query.folder ?? ""));
 const checkIdentity = computed(() =>
   JSON.stringify([
@@ -239,6 +246,12 @@ const checkIdentity = computed(() =>
     folderId.value,
     store.state.userInfo?.email,
   ]),
+);
+const folderName = computed(() =>
+  syntheticsFolderName(
+    store.state.organizationData?.foldersByType?.synthetics ?? [],
+    folderId.value,
+  ),
 );
 const monitorStatus = computed<"healthy" | "degraded" | "critical">(
   () => (route.query.status as any) || "degraded",
@@ -482,6 +495,13 @@ function openRunError(info: {
   drawerErrorRecord.value = info;
   drawerOpen.value = true;
 }
+
+onMounted(() => {
+  // Without the folder list the header subtitle falls back to the raw folder ID.
+  getFoldersListByType(store, "synthetics").catch((err) =>
+    console.error("[synthetics] failed to load folders", err),
+  );
+});
 
 let checkGeneration = 0;
 const captureCheckRequest = () => ({

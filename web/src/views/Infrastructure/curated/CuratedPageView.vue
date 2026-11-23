@@ -703,7 +703,7 @@ watch(
 </script>
 
 <template>
-  <OPageLayout :title="t(manifest.titleKey)" bleed>
+  <OPageLayout :title="t(manifest.titleKey)" :icon="manifest.icon" bleed>
     <template #actions>
       <div class="flex items-center gap-2">
         <ODateTimeRange

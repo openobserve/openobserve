@@ -453,7 +453,8 @@ function openDetections() {
 <template>
   <OPageLayout
     :title="t('siem.mitrePage.title')"
-    :about="t('siem.mitrePage.subtitle')"
+    :subtitle="t('siem.mitrePage.subtitle')"
+    icon="grid-on"
     scroll
     pad-y
     title-data-test="security-mitre-title"

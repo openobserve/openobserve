@@ -16,6 +16,7 @@
 // Curated page manifest types (design §4.1): no concept table here — the org's semantic field groups JSON is the dictionary (§3.3).
 
 import type { I18nKey } from "@/types/i18n";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { WorkloadId } from "@/composables/useWorkloadDetection";
 
 /**
@@ -158,6 +159,7 @@ export interface ScopePickerDef {
 export interface CuratedPageManifest {
   id: WorkloadId;
   titleKey: I18nKey;
+  icon: IconName;
   contentVersion: number;
   groups: RequirementGroup[];
   scopePickers: ScopePickerDef[];
