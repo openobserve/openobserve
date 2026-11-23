@@ -526,16 +526,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="h-8!"
               @on:date-change="updateDateTime"
             />
-            <OButton
+            <ORefreshButton
               data-test="service-graph-refresh-btn"
+              layout="inline"
               variant="outline"
-              size="icon-toolbar"
-              class="min-w-[1.875rem]!"
+              :loading="refreshLoading"
+              :last-run-at="refreshLastRunAt"
               @click="$emit('service-graph-refresh')"
-            >
-              <OIcon name="refresh" size="sm" />
-              <OTooltip :content="t('common.refresh')" />
-            </OButton>
+            />
             <OToggleGroup
               :model-value="searchObj.meta.serviceGraphVisualizationType"
               @update:model-value="onServiceGraphVisualizationChange($event)"
@@ -580,6 +578,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               calendar-presets
               class="me-1.5 h-8!"
               @on:date-change="updateDateTime"
+            />
+            <ORefreshButton
+              data-test="services-catalog-refresh-btn"
+              layout="inline"
+              variant="outline"
+              :loading="refreshLoading"
+              :last-run-at="refreshLastRunAt"
+              @click="$emit('services-catalog-refresh')"
             />
           </div>
         </div>
@@ -683,6 +689,7 @@ import {
   computed,
   toRef,
   shallowRef,
+  type PropType,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
@@ -700,6 +707,7 @@ import ShareButton from "@/components/common/ShareButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -779,6 +787,7 @@ export default defineComponent({
     OToggleGroupItem,
     OButton,
     OButtonGroup,
+    ORefreshButton,
     OIcon,
     ODropdown,
     ODropdownItem,
@@ -822,6 +831,15 @@ export default defineComponent({
     isLoading: {
       type: Boolean,
       default: false,
+    },
+    // The active Service Graph / Services Catalog tab's own load state, for the shared refresh button.
+    refreshLoading: {
+      type: Boolean,
+      default: false,
+    },
+    refreshLastRunAt: {
+      type: Number as PropType<number | null>,
+      default: null,
     },
   },
   methods: {
