@@ -41,6 +41,8 @@ const fake = vi.hoisted(() => ({
   records: {} as Record<string, Record<string, any>>,
   matchers: [] as Array<Record<string, any>>,
   loadGate: null as null | Promise<void>,
+  checkCalls: 0,
+  checkGate: null as null | Promise<void>,
 }));
 
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
@@ -66,6 +68,8 @@ vi.mock("@/composables/starterPacks/useFindMore", async () => {
         result,
         state,
         check: async () => {
+          fake.checkCalls += 1;
+          await fake.checkGate;
           result.value = fake.checkResult;
           state.value = fake.checkState;
         },
@@ -216,6 +220,59 @@ describe("StarterPackHeaderChip", () => {
     fake.records = {};
     fake.loadGate = null;
     fake.matchers = [];
+    fake.checkCalls = 0;
+    fake.checkGate = null;
+  });
+
+  describe("re-checks a stale copy on open", () => {
+    const saveAged = (sources: FindMoreSource[], ageMs: number) => {
+      const now = Date.now();
+      const clock = vi.spyOn(Date, "now").mockReturnValue(now - ageMs);
+      useBrowserMatches(ORG).saveFull({ checkedAt: 1, sources, dismissed: 0 }, []);
+      clock.mockRestore();
+    };
+
+    it("starts one check when the copy is older than 5 minutes", async () => {
+      saveAged([K8S], 6 * 60_000);
+      fake.checkResult = { checkedAt: 1, sources: [K8S], dismissed: 0 };
+      const wrapper = render();
+      await open(wrapper);
+      expect(fake.checkCalls).toBe(1);
+      wrapper.unmount();
+    });
+
+    it("does not check when the copy is under 5 minutes old", async () => {
+      saveAged([K8S], 4 * 60_000);
+      const wrapper = render();
+      await open(wrapper);
+      expect(fake.checkCalls).toBe(0);
+      wrapper.unmount();
+    });
+
+    it("does not start a second check while one runs", async () => {
+      saveAged([K8S], 6 * 60_000);
+      let finish = () => {};
+      fake.checkGate = new Promise<void>((resolve) => (finish = resolve));
+      const wrapper = render();
+      await open(wrapper);
+      useStarterPackPopup(ORG).open.value = false;
+      await flushPromises();
+      await open(wrapper);
+      expect(fake.checkCalls).toBe(1);
+      finish();
+      await flushPromises();
+      wrapper.unmount();
+    });
+
+    it("drops a pack whose stream is gone once the check returns", async () => {
+      saveAged([K8S, HOSTS], 6 * 60_000);
+      fake.checkResult = { checkedAt: 1, sources: [K8S], dismissed: 0 };
+      const wrapper = render();
+      await open(wrapper);
+      expect(railIds(wrapper)).toEqual(["kubernetes"]);
+      expect(find(wrapper, "header-starter-packs-count").text()).toBe("1");
+      wrapper.unmount();
+    });
   });
 
   it("stays hidden until a check has run, then shows the count of packs not set up", async () => {
