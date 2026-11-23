@@ -22,6 +22,8 @@ use common;
 #[cfg(feature = "enterprise")]
 use openobserve_core as service;
 
+#[cfg(feature = "enterprise")]
+pub mod domain_listener;
 pub mod handler;
 pub mod router;
 pub mod server;

@@ -16,9 +16,13 @@
 use std::{cmp::max, net::SocketAddr, time::Duration};
 
 use axum_tracing_opentelemetry::middleware::OtelAxumLayer;
+use tokio::sync::OnceCell;
 use tower_http::compression::CompressionLayer;
 
 use crate::handler::http::router::create_app_router;
+
+static SIGNALLED: OnceCell<()> = OnceCell::const_new();
+static OFFLINE: OnceCell<()> = OnceCell::const_new();
 
 /// Run the primary HTTP frontend.
 ///
@@ -52,7 +56,12 @@ pub async fn run(ui_routes: fn(&str) -> axum::Router) -> Result<(), anyhow::Erro
         app.layer(otel_layer())
     };
 
-    serve(haddr, app).await
+    #[cfg(feature = "enterprise")]
+    let listener = crate::domain_listener::spawn();
+    let served = serve(haddr, app).await;
+    #[cfg(feature = "enterprise")]
+    end_listener(listener, served.is_ok()).await;
+    served
 }
 
 /// Resolve the HTTP listen address from config.
@@ -142,7 +151,19 @@ fn otel_span_wanted(path: &str, enabled: bool) -> bool {
     enabled && !path.contains("/workflows/hooks/")
 }
 
+/// Resolves when the process is told to stop. The OS signals are listened to once, however many
+/// servers wait.
+pub(crate) async fn shutdown_started() {
+    SIGNALLED.get_or_init(wait_for_signal).await;
+}
+
+/// Resolves when the process is told to stop and this node has left the node list, which is
+/// done once per process, whichever server asks first.
 async fn shutdown_signal() {
+    OFFLINE.get_or_init(go_offline).await;
+}
+
+async fn wait_for_signal() {
     #[cfg(unix)]
     {
         use tokio::signal::unix::{SignalKind, signal};
@@ -174,7 +195,10 @@ async fn shutdown_signal() {
             _ = sigint.recv() =>   log::info!("ctrl-shutdown received"),
         }
     }
+}
 
+async fn go_offline() {
+    shutdown_started().await;
     // Before going offline: a peer takes the hook worker lock once this node leaves the node list.
     #[cfg(feature = "enterprise")]
     crate::service::workflows::http_trigger::worker::drain_on_shutdown().await;
@@ -182,6 +206,20 @@ async fn shutdown_signal() {
         log::error!("set offline failed: {e}");
     }
     log::info!("Node is offline");
+}
+
+/// Waits for the domain listener to finish draining after the main server stopped cleanly, and
+/// stops it at once when the main server never started.
+#[cfg(feature = "enterprise")]
+async fn end_listener(listener: Option<tokio::task::JoinHandle<()>>, drained: bool) {
+    let Some(listener) = listener else {
+        return;
+    };
+    if drained {
+        let _ = listener.await;
+    } else {
+        listener.abort();
+    }
 }
 
 #[cfg(test)]

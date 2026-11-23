@@ -1195,19 +1195,19 @@ pub struct StatusPageDomain {
     #[env_config(
         name = "ZO_STATUS_PAGE_DOMAIN_HEALTH_PORT",
         default = 5089,
-        help = "Readiness port of the domain listener, for Kubernetes and the load balancer health check."
+        help = "Port that answers the load balancer health check of the domain listener (200 when ready, 503 otherwise); no pod probe uses it. 0 turns it off."
     )]
     pub health_port: u16,
     #[env_config(
         name = "ZO_STATUS_PAGE_DOMAIN_PROXY_PROTOCOL",
         default = false,
-        help = "Require a PROXY protocol v2 header on the domain listener and its redirect port."
+        help = "Require a PROXY protocol header, version 1 or 2, on the domain listener and its redirect port. For a TCP proxy in front of the domain listener; unrelated to proxy mode."
     )]
     pub proxy_protocol: bool,
     #[env_config(
         name = "ZO_STATUS_PAGE_DOMAIN_PROXY_TRUSTED_CIDRS",
         default = "",
-        help = "Comma-separated CIDRs. With PROXY protocol on, connections from other sources are closed."
+        help = "Comma-separated CIDRs. With PROXY protocol on, connections from other sources are closed; an empty list trusts no source, so every connection is closed."
     )]
     pub proxy_trusted_cidrs: String,
     #[env_config(
