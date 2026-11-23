@@ -216,6 +216,9 @@ pub async fn save(
     request_body(content = inline(UpdateServiceAccountRequest), description = "Service Account data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = UpdateServiceAccountAnswer),
+        (status = 403, description = "Service accounts disabled, or a system service account", content_type = "application/json", body = MetaHttpResponse),
+        (status = 404, description = "Not a service account of this organization", content_type = "application/json", body = MetaHttpResponse),
+        (status = 500, description = "Failed to read the target account", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "update"})),
