@@ -24,46 +24,24 @@ const mountLine = (props: Record<string, unknown> = {}) =>
   mount(DbmLockCoverageLine, {
     props: {
       summary: raw("All 43 deadlocks in the window"),
-      dotClass: "bg-status-success-text",
+      variant: "info",
       dataTest: "dbm-deadlocks-coverage",
       ...props,
     },
   });
 
 describe("DbmLockCoverageLine", () => {
-  /**
-   * The band is what makes the claim read as part of the table frame rather
-   * than as a floating note: the table's own gutter, and a bottom border that
-   * closes it against the rows below.
-   */
-  it("sits in the table frame, aligned to its gutter", () => {
-    expect(mountLine().classes()).toEqual([
-      "border-border-subtle",
-      "bg-surface-base",
-      "text-text-secondary",
-      "text-2xs",
-      "px-page-edge",
-      "flex",
-      "shrink-0",
-      "items-center",
-      "gap-2",
-      "border-b",
-      "py-1",
-    ]);
+  it("carries its data-test and the variant the page resolved", () => {
     expect(mountLine().attributes("data-test")).toBe("dbm-deadlocks-coverage");
+    expect(mountLine().findComponent({ name: "OBanner" }).props("variant")).toBe("info");
+    expect(
+      mountLine({ variant: "warning" }).findComponent({ name: "OBanner" }).props("variant"),
+    ).toBe("warning");
   });
 
-  /**
-   * The dot is the at-a-glance verdict. A capped read is warning-toned, a
-   * complete one is not — and the two pages decide that on different facts, so
-   * the tone arrives already resolved.
-   */
-  it("wears the tone the page resolved", () => {
-    expect(mountLine().get("span").classes()).toEqual(
-      expect.arrayContaining(["size-1.5", "shrink-0", "rounded-full", "bg-status-success-text"]),
-    );
-    expect(mountLine({ dotClass: "bg-status-warning-text" }).get("span").classes()).toContain(
-      "bg-status-warning-text",
+  it("renders nothing for a complete all-good read", () => {
+    expect(mountLine({ variant: null }).find("[data-test='dbm-deadlocks-coverage']").exists()).toBe(
+      false,
     );
   });
 

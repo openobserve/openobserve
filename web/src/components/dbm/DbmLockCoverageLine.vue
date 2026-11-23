@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   DbmLockCoverageLine — what the two lock pages know about their own completeness.
 
-  A dot, a sentence, and — when there is one — a middot and a timestamp. Both
+  A banner with a sentence, and — when there is one — a middot and a timestamp. Both
   lock pages drew the identical twelve lines, differing only in what the dot is
   keyed on and which two strings go in.
 
@@ -29,32 +29,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   would mean one component with two disjoint data models and one shared name.
 -->
 <template>
-  <div
-    class="border-border-subtle bg-surface-base text-text-secondary text-2xs px-page-edge flex shrink-0 items-center gap-2 border-b py-1"
+  <OBanner
+    v-if="variant"
+    :variant="variant"
+    :icon="variant === 'warning' ? 'warning-amber' : 'info-outline'"
+    bar
+    dense
+    class="shrink-0"
     :data-test="dataTest"
   >
-    <span class="size-1.5 shrink-0 rounded-full" :class="dotClass"></span>
     <span>{{ summary }}</span>
     <template v-if="trailingLabel">
-      <span class="opacity-45">·</span>
+      <span class="opacity-45"> · </span>
       <span>{{ trailingLabel }}</span>
     </template>
-  </div>
+  </OBanner>
 </template>
 
 <script setup lang="ts">
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import type { I18nText } from "@/types/i18n";
 
 withDefaults(
   defineProps<{
     /** The claim: how much of the window this list actually covers. */
     summary: I18nText;
-    /**
-     * A capped read is warning-toned, a complete one is not. Passed as a class
-     * because the two pages decide it on different facts — deadlocks on whether
-     * the read hit its cap, blocked queries on there being a sample at all.
-     */
-    dotClass: string;
+    /** A capped read is a warning; `null` renders nothing, for a complete all-good read. */
+    variant: "warning" | "info" | null;
     /** When the read was taken, if the page knows. Absent renders no middot. */
     trailingLabel?: I18nText | null;
     dataTest: string;

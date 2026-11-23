@@ -39,7 +39,11 @@ const mountLine = (props: Record<string, unknown> = {}) =>
     global: { plugins: [i18n] },
   });
 
+// The long sentence, which sits behind the banner's Details button.
 const lineText = (wrapper: ReturnType<typeof mountLine>) =>
+  String((wrapper.vm as unknown as { summary: string }).summary);
+
+const bannerText = (wrapper: ReturnType<typeof mountLine>) =>
   wrapper.find("[data-test='dbm-coverage-text']").text();
 
 /** `data_through` set so the component computes exactly `minutes` of lag. */
@@ -208,51 +212,90 @@ describe("DbmCoverageLine", () => {
    */
   describe("the counted-up-to note never overstates freshness", () => {
     const trailer = (wrapper: ReturnType<typeof mountLine>) =>
-      wrapper.find("[data-test='dbm-coverage']").text();
+      String(wrapper.findComponent(DbmToolbarNote).props("detail"));
 
     it("claims only the last half-minute when the counting really is current", () => {
-      const wrapper = mountLine({ freshness: behindBy(0) });
+      const wrapper = mountLine({ inline: true, freshness: behindBy(0) });
       expect(trailer(wrapper)).toContain("last half-minute");
     });
 
     it("reports the real lag instead of half a minute when it is 25 minutes behind", () => {
-      const wrapper = mountLine({ freshness: behindBy(25) });
+      const wrapper = mountLine({ inline: true, freshness: behindBy(25) });
       expect(trailer(wrapper)).not.toContain("last half-minute");
       expect(trailer(wrapper)).toContain("25 minutes behind");
     });
 
     it("does not cry lag over a minute or two of ordinary rollup delay", () => {
-      const wrapper = mountLine({ freshness: behindBy(3) });
+      const wrapper = mountLine({ inline: true, freshness: behindBy(3) });
       expect(trailer(wrapper)).toContain("last half-minute");
       expect(trailer(wrapper)).not.toContain("behind");
     });
 
     /** The boundary itself is still ordinary delay; only PAST it is the claim false. */
     it("still claims the half-minute exactly at the ordinary-delay boundary", () => {
-      const wrapper = mountLine({ freshness: behindBy(4) });
+      const wrapper = mountLine({ inline: true, freshness: behindBy(4) });
       expect(trailer(wrapper)).toContain("last half-minute");
     });
 
     it("reports the lag one minute past the boundary", () => {
-      const wrapper = mountLine({ freshness: behindBy(5) });
+      const wrapper = mountLine({ inline: true, freshness: behindBy(5) });
       expect(trailer(wrapper)).not.toContain("last half-minute");
       expect(trailer(wrapper)).toContain("5 minutes behind");
     });
   });
 
-  describe("the legend slot", () => {
-    it("renders a legend on the line, beside the counted-up-to note", () => {
-      const wrapper = mount(DbmCoverageLine, {
-        props: { freshness: freshness(), hits: [{ total_time_ns: 1_000 }] },
-        slots: { legend: '<span data-test="probe-legend">key</span>' },
-        global: { plugins: [i18n] },
+  describe("the banner", () => {
+    const now = () => Date.now() * 1000;
+    const gapFresh = (fromMinAgo: number, toMinAgo: number) =>
+      freshness({
+        data_through: now() - fromMinAgo * 60_000_000,
+        tail_covers_from: now() - toMinAgo * 60_000_000,
+        tail_through: now(),
       });
-      const line = wrapper.get("[data-test='dbm-coverage-line']");
-      expect(line.find("[data-test='probe-legend']").exists()).toBe(true);
+    const banner = (w: ReturnType<typeof mountLine>) => w.findComponent({ name: "OBanner" });
+
+    it("renders nothing when all is well", () => {
+      expect(mountLine().find("[data-test='dbm-coverage']").exists()).toBe(false);
+      expect(
+        mountLine({ exactPercentiles: true }).find("[data-test='dbm-coverage']").exists(),
+      ).toBe(false);
     });
 
-    it("renders nothing extra without one", () => {
-      expect(mountLine().find("[data-test='probe-legend']").exists()).toBe(false);
+    it("renders nothing while empty", () => {
+      expect(
+        mountLine({ hits: [], freshness: behindBy(45) })
+          .find("[data-test='dbm-coverage']")
+          .exists(),
+      ).toBe(false);
+    });
+
+    it("warns with a short dated gap message clipped to the window", () => {
+      const w = mountLine({
+        freshness: gapFresh(300, 100),
+        windowStart: now() - 150 * 60_000_000,
+        windowEnd: now(),
+      });
+      expect(banner(w).props("variant")).toBe("warning");
+      expect(bannerText(w)).toMatch(/\(50 min\)\. Collection may have stopped\.$/);
+    });
+
+    it("ignores a gap that lies outside the window", () => {
+      const w = mountLine({
+        freshness: gapFresh(300, 100),
+        windowStart: now() - 60 * 60_000_000,
+        windowEnd: now(),
+      });
+      expect(lineText(w)).not.toContain("missing from this window");
+    });
+
+    it("warns when behind and informs on a subset", () => {
+      expect(banner(mountLine({ freshness: behindBy(45) })).props("variant")).toBe("warning");
+      expect(banner(mountLine({ filterLabel: "checkout-service" })).props("variant")).toBe("info");
+    });
+
+    it("keeps the long sentence behind a Details button", () => {
+      const w = mountLine({ freshness: behindBy(45) });
+      expect(w.find("[data-test='dbm-coverage-details']").exists()).toBe(true);
     });
   });
 
@@ -262,9 +305,7 @@ describe("DbmCoverageLine", () => {
     it("carries the same sentence as the line, as a note instead of a band", () => {
       const wrapper = mountLine({ inline: true });
       expect(wrapper.find("[data-test='dbm-coverage-line']").exists()).toBe(false);
-      expect(note(wrapper).props("text")).toBe(
-        mountLine().find("[data-test='dbm-coverage-text']").text(),
-      );
+      expect(note(wrapper).props("text")).toBe(lineText(mountLine()));
       expect(note(wrapper).props("tone")).toBe("neutral");
     });
 
@@ -277,17 +318,13 @@ describe("DbmCoverageLine", () => {
       expect(detail).toContain("Counted up to");
     });
 
-    it("turns amber when behind and red when data is missing", () => {
+    it("turns amber when behind or when data is missing", () => {
       expect(note(mountLine({ inline: true, freshness: behindBy(45) })).props("tone")).toBe(
         "warning",
       );
       expect(
         note(mountLine({ inline: true, freshness: freshness({ data_through: 0 }) })).props("tone"),
-      ).toBe("error");
-    });
-
-    it("passes compact through for a toolbar with no room for text", () => {
-      expect(note(mountLine({ inline: true, compact: true })).props("compact")).toBe(true);
+      ).toBe("warning");
     });
   });
 });
