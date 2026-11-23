@@ -26,6 +26,8 @@ import { featureState } from "@/utils/featureGate";
 import {
   StarterPackBusyError,
   StarterPackPermissionError,
+  copyName,
+  copyParts,
   leftOutIds,
   type PackChoices,
   type PackEmailFailure,
@@ -231,8 +233,12 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     (store.state.alertLibrary?.manifest as AlertLibraryManifest | null | undefined)?.alerts?.find(
       ({ id }) => id === itemId,
     )?.title;
-  const nameOf = (itemId: string) =>
-    preview.value?.names[itemId] ?? packNames[itemId] ?? libraryTitle(itemId) ?? itemId;
+  const nameOf = (itemId: string): string => {
+    const known = preview.value?.names[itemId] ?? packNames[itemId] ?? libraryTitle(itemId);
+    const copy = copyParts(itemId);
+    if (known || !copy) return known ?? itemId;
+    return copyName(nameOf(copy.copyOf), copy.stream);
+  };
 
   const planned = (kind: PackRecordItem["kind"]) =>
     (preview.value?.items ?? []).filter((item) => item.kind === kind && item.status !== "existing");
