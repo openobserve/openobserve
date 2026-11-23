@@ -1261,7 +1261,7 @@ pub struct DatabaseMonitoring {
 pub struct ServiceVersions {
     #[env_config(
         name = "ZO_SERVICE_VERSIONS_ENABLED",
-        default = true,
+        default = false,
         help = "Enable Service Versions: span stamping at ingest, the version registry flush and the service signals processor. false pauses all three and keeps every stored row and cursor; true resumes from the saved cursors."
     )]
     pub enabled: bool,
