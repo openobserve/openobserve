@@ -16258,6 +16258,7 @@
       "userId": "ID пользователя",
       "orgId": "ID организации",
       "orgName": "Организация",
+      "orgOption": "{name} ({id})",
       "role": "Роль",
       "noOrganizations": "Не состоит ни в одной организации",
       "ssoOnlyHint": "Действует, когда этот email входит через SSO"

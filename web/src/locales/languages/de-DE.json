@@ -16258,6 +16258,7 @@
       "userId": "Benutzer-ID",
       "orgId": "Organisations-ID",
       "orgName": "Organisation",
+      "orgOption": "{name} ({id})",
       "role": "Rolle",
       "noOrganizations": "Kein Mitglied einer Organisation",
       "ssoOnlyHint": "Gilt, wenn sich diese E-Mail über SSO anmeldet"

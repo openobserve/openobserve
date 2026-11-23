@@ -16258,6 +16258,7 @@
       "userId": "用户 ID",
       "orgId": "组织 ID",
       "orgName": "组织",
+      "orgOption": "{name} ({id})",
       "role": "角色",
       "noOrganizations": "不属于任何组织",
       "ssoOnlyHint": "在此邮箱通过 SSO 登录时生效"

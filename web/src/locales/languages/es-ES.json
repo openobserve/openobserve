@@ -16258,6 +16258,7 @@
       "userId": "ID de usuario",
       "orgId": "ID de organización",
       "orgName": "Organización",
+      "orgOption": "{name} ({id})",
       "role": "Rol",
       "noOrganizations": "No es miembro de ninguna organización",
       "ssoOnlyHint": "Se aplica cuando este correo inicia sesión mediante SSO"
