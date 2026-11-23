@@ -1071,6 +1071,45 @@ describe("StarterPackDrawer", () => {
       );
     });
 
+    const failEmailMe = async (failure: string) => {
+      mocks.destinations = [];
+      mocks.ensure.mockResolvedValue({ failure });
+      const flow = ready({ items: ref(ITEMS) });
+      const wrapper = await shown(flow);
+      await box(wrapper, "send-to").trigger("click");
+      flow.install = vi.fn(async () => {
+        flow.running.value = true;
+        await nextTick();
+        flow.made.value = ITEMS as never;
+        flow.toCreate.value = ITEMS as never;
+        flow.installed.value = true;
+        flow.running.value = false;
+        return true;
+      }) as never;
+      await submit(wrapper).trigger("click");
+      await flushPromises();
+      return wrapper;
+    };
+
+    it("says why the alerts were added off when Email me could not be created", async () => {
+      const wrapper = await failEmailMe("email");
+      expect(wrapper.get('[data-test="starter-pack-ready-email-failed"]').text()).toBe(
+        "Your email destination could not be created, so the alerts were added turned off.",
+      );
+    });
+
+    it("names a refused Email me as the reason the alerts were added off", async () => {
+      const wrapper = await failEmailMe("forbidden");
+      expect(wrapper.get('[data-test="starter-pack-ready-email-failed"]').text()).toBe(
+        "You can't add alert destinations in this org, so your email destination was not created and the alerts were added turned off.",
+      );
+    });
+
+    it("shows no Email me warning when the alerts were set up as asked", async () => {
+      const { wrapper } = await finish();
+      expect(has(wrapper, "starter-pack-ready-email-failed")).toBe(false);
+    });
+
     it("counts the pack alerts that were already here in the subtitle", async () => {
       const items = [
         ...ITEMS.slice(0, 3),

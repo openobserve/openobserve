@@ -15527,7 +15527,9 @@
       "pickDestination": "Choose a destination for Send to, or untick it"
     },
     "ready": {
-      "title": "{title} monitoring is ready"
+      "title": "{title} monitoring is ready",
+      "emailFailed": "Your email destination could not be created, so the alerts were added turned off.",
+      "emailForbidden": "You can't add alert destinations in this org, so your email destination was not created and the alerts were added turned off."
     },
     "popup": {
       "title": "Starter Packs",

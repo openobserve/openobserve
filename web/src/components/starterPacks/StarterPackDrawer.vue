@@ -1045,6 +1045,7 @@ const confirmDone = () => {
             :flow="flow"
             :clusters="clusters"
             mode="ready"
+            :alerts="outcome"
             @go="go"
             @retry="retry"
           />

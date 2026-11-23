@@ -73,6 +73,7 @@ const props = defineProps<{
   clusters: string[];
   /** Ready says how the setup went above the groups; View Pack shows the groups only. */
   mode: "ready" | "installed";
+  alerts?: ReadyAlerts;
 }>();
 const emit = defineEmits<{ go: [to: RouteLocationRaw]; retry: [] }>();
 
@@ -226,6 +227,13 @@ const toggleAll = (group: ViewGroup) => {
 };
 
 const failedCount = computed(() => flow.failed.value.length);
+const emailFailedNote = computed<I18nText | undefined>(() => {
+  const failure = props.alerts?.failure;
+  if (!failure) return undefined;
+  return failure === "forbidden"
+    ? t("starterPacks.ready.emailForbidden")
+    : t("starterPacks.ready.emailFailed");
+});
 const scope = computed(() => (pack.clusterScoped ? packScope(t, props.clusters) : ""));
 </script>
 
@@ -255,6 +263,14 @@ const scope = computed(() => (pack.clusterScoped ? packScope(t, props.clusters) 
         data-test="starter-pack-ready-partial-note"
         >{{ t("starterPacks.viewPack.partialNote") }}</OText
       >
+      <span
+        v-if="emailFailedNote"
+        class="flex items-start gap-2 text-xs"
+        data-test="starter-pack-ready-email-failed"
+      >
+        <OIcon name="warning" size="sm" class="text-status-warning-text mt-px shrink-0" />
+        <OText variant="meta" wrap>{{ emailFailedNote }}</OText>
+      </span>
     </div>
 
     <div class="flex flex-col gap-2 px-4 py-3">
