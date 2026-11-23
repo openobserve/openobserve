@@ -1801,20 +1801,31 @@ export default defineComponent({
       dashboards?: { dashboard: string }[];
     };
     const reportsForDelete = ref<ReportForDelete[]>([]);
+    const REPORTS_FOR_DELETE_TIMEOUT_MS = 5000;
 
     // Fetched fresh before the dialog opens, so a report created elsewhere is never missed or shown late.
     const loadReportsForDelete = async () => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      // A hung request must not block the delete, so the dialog opens without the warning.
+      const timedOut = new Promise<ReportForDelete[]>((resolve) => {
+        timer = setTimeout(() => resolve([]), REPORTS_FOR_DELETE_TIMEOUT_MS);
+      });
       try {
-        reportsForDelete.value = await queryClient.fetchQuery({
-          ...reportsQuery(
-            store.state.selectedOrganization.identifier,
-            { folder: undefined, isCache: undefined },
-            { silentForbidden: true },
-          ),
-          staleTime: 0,
-        });
+        reportsForDelete.value = await Promise.race([
+          queryClient.fetchQuery({
+            ...reportsQuery(
+              store.state.selectedOrganization.identifier,
+              { folder: undefined, isCache: undefined },
+              { silentForbidden: true },
+            ),
+            staleTime: 0,
+          }),
+          timedOut,
+        ]);
       } catch {
         reportsForDelete.value = [];
+      } finally {
+        clearTimeout(timer);
       }
     };
 

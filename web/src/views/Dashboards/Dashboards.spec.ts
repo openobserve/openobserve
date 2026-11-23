@@ -998,6 +998,25 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.confirmBulkDelete).toBe(true);
     });
 
+    it("opens the delete dialog without the warning when listing reports hangs", async () => {
+      listReports.mockReturnValue(new Promise(() => {}));
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        const opening = wrapper.vm.showDeleteDialogFn({ row: { id: "d1", name: "cpu-overview" } });
+        await vi.advanceTimersByTimeAsync(5000);
+        await opening;
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(wrapper.vm.confirmDeleteDialog).toBe(true);
+      expect(wrapper.vm.deleteLoadingId).toBeNull();
+      expect(findDialog("dashboard-confirm-dialog").props("warningMessage")).toBeUndefined();
+    });
+
     it("still opens the delete dialog when reports cannot be listed", async () => {
       listReports.mockRejectedValue({ response: { status: 403 } });
       wrapper = shallowMount(Dashboards, {

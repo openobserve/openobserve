@@ -530,26 +530,25 @@ async fn unlink_reports<C: ConnectionTrait>(
     txn: &C,
     dashboard_pk: &str,
 ) -> Result<Vec<(String, String)>, sea_orm::DbErr> {
-    let report_ids: Vec<String> = report_dashboards::Entity::find()
+    // A new link's foreign key waits on this lock, so no report gets linked while this runs.
+    dashboards::Entity::find_by_id(dashboard_pk)
+        .lock_exclusive()
+        .one(txn)
+        .await?;
+    // Two deletes of dashboards sharing a report would each count the other's link without it.
+    let report_ids: Vec<String> = reports::Entity::find()
         .select_only()
-        .column(report_dashboards::Column::ReportId)
+        .column(reports::Column::Id)
+        .inner_join(report_dashboards::Entity)
         .filter(report_dashboards::Column::DashboardId.eq(dashboard_pk))
+        .order_by_asc(reports::Column::Id)
+        .lock_exclusive()
         .into_tuple()
         .all(txn)
         .await?;
     if report_ids.is_empty() {
         return Ok(vec![]);
     }
-    // Two deletes of dashboards sharing a report would each count the other's link without it.
-    reports::Entity::find()
-        .select_only()
-        .column(reports::Column::Id)
-        .filter(reports::Column::Id.is_in(report_ids.clone()))
-        .order_by_asc(reports::Column::Id)
-        .lock_exclusive()
-        .into_tuple::<String>()
-        .all(txn)
-        .await?;
     report_dashboards::Entity::delete_many()
         .filter(report_dashboards::Column::DashboardId.eq(dashboard_pk))
         .exec(txn)
@@ -1095,6 +1094,31 @@ mod tests {
         assert_eq!(second, vec![("both".to_string(), "default".to_string())]);
         assert!(report_ids(&db).await.is_empty());
         assert!(links_of(&db, "both").await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn unlink_reports_reads_the_report_ids_under_row_locks_on_postgres() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_model(8, serde_json::json!({}))]])
+            .append_query_results([
+                Vec::<std::collections::BTreeMap<String, sea_orm::Value>>::new(),
+            ])
+            .into_connection();
+
+        assert!(unlink_reports(&db, "id-1").await.unwrap().is_empty());
+
+        let log: Vec<String> = db
+            .into_transaction_log()
+            .iter()
+            .map(|t| format!("{t:?}"))
+            .collect();
+        assert_eq!(log.len(), 2);
+        assert!(log[0].contains(r#"FROM \"dashboards\""#) && log[0].contains("FOR UPDATE"));
+        assert!(
+            log[1].contains(r#"INNER JOIN \"report_dashboards\""#) && log[1].contains("FOR UPDATE"),
+            "{}",
+            log[1]
+        );
     }
 
     #[tokio::test]
