@@ -13,9 +13,11 @@ const {
   ingestTraces,
   waitForServiceGraphData,
   countTopologyNodes,
-  SERVICE_GRAPH_MAX_WAIT_MS,
 } = require('../utils/service-graph-ingestion.js');
 const { ingestOtlpTraces, deleteStream, stringAttr } = require('../utils/traces-api.js');
+
+// Alpha shows edges 12-15 min after ingest on good nights; a slow night had none at 12.6 min and all of them by 23 min.
+const SERVICE_GRAPH_WAIT_MS = 25 * 60 * 1000;
 
 // Same scale as the node border, catalog row and side panel: Healthy < 1%, Degraded 1-5%, Warning >5-10%, Critical > 10%.
 const expectedHealth = (errorRate) => {
@@ -30,11 +32,11 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
 
   let pm;
   let topologyEmpty = false;
-  let topologyEmptyReason = 'no wait result';
+  let topologyEmptyReason = 'the node count was 0 after the edge wait succeeded';
 
   test.beforeAll(async ({ browser }, testInfo) => {
-    test.setTimeout(SERVICE_GRAPH_MAX_WAIT_MS + 180000);
-    // Every retry starts a new worker; this marker stops each one from repeating the full wait for a graph that never fills.
+    test.setTimeout(SERVICE_GRAPH_WAIT_MS + 180000);
+    // Every failed test or retry starts a new worker; this marker stops each one from repeating the full wait for a graph that has not filled.
     const emptyTopologyMarker = path.join(testInfo.project.outputDir, 'service-graph-empty-topology.marker');
     const context = await browser.newContext({
       storageState: 'playwright-tests/utils/auth/user.json',
@@ -43,9 +45,9 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
 
     try {
       if (fs.existsSync(emptyTopologyMarker)) {
-        testLogger.info('=== SERVICE GRAPH SETUP: an earlier worker found no topology; checking once ===');
-        topologyEmptyReason = `an earlier worker found none: ${fs.readFileSync(emptyTopologyMarker, 'utf8')}`;
+        testLogger.info('=== SERVICE GRAPH SETUP: an earlier wait timed out; checking once ===');
         topologyEmpty = (await countTopologyNodes(page)) === 0;
+        topologyEmptyReason = `an earlier wait ended with ${fs.readFileSync(emptyTopologyMarker, 'utf8')}, and one more check found 0 nodes`;
         return;
       }
 
@@ -60,17 +62,13 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
       // Ingest all traces
       await ingestTraces(page, allTraces, { delayMs: 50 });
       testLogger.info('Trace ingestion complete');
-      const ingestedAtMs = Date.now();
 
       testLogger.info('Waiting for service graph daemon to process data...');
       const waitResult = await waitForServiceGraphData(page, {
-        maxWaitMs: SERVICE_GRAPH_MAX_WAIT_MS,
+        maxWaitMs: SERVICE_GRAPH_WAIT_MS,
         pollIntervalMs: 10000,
         expectedMinEdges: 10,
-        ingestedAtMs,
-        streamName: 'default',
       });
-      topologyEmptyReason = waitResult.reason;
 
       if (waitResult.success) {
         testLogger.info(`Service graph data ready: ${waitResult.edges.length} edges found after ${waitResult.waitedMs}ms`);
@@ -78,15 +76,14 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
         testLogger.info('Waiting additional 30s for node creation to complete...');
         await new Promise(resolve => setTimeout(resolve, 30000));
       } else {
-        testLogger.warn(`Service graph data may be incomplete after ${waitResult.waitedMs}ms (${waitResult.reason}) - continuing with available data`);
+        testLogger.warn(`Service graph data may be incomplete after ${waitResult.waitedMs}ms - continuing with available data`);
+        topologyEmptyReason = waitResult.reason;
+        fs.mkdirSync(testInfo.project.outputDir, { recursive: true });
+        fs.writeFileSync(emptyTopologyMarker, waitResult.reason);
       }
 
       // Verify topology data is available
       topologyEmpty = (await countTopologyNodes(page)) === 0;
-      if (topologyEmpty) {
-        fs.mkdirSync(testInfo.project.outputDir, { recursive: true });
-        fs.writeFileSync(emptyTopologyMarker, topologyEmptyReason);
-      }
     } finally {
       await page.close();
       await context.close();
@@ -96,7 +93,7 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     // Failing here rather than in beforeAll keeps every test reported as failed instead of "did not run".
-    expect(topologyEmpty, `Service graph topology is empty after the service-graph wait: ${topologyEmptyReason}`).toBe(false);
+    expect(topologyEmpty, `Service graph topology is empty: ${topologyEmptyReason}`).toBe(false);
     pm = new PageManager(page);
     await navigateToBase(page);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});

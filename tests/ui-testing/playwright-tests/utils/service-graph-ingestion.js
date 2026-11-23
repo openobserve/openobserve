@@ -55,12 +55,6 @@ const ConnectionType = {
 
 // Default v4 cadence: 300 s cache delay + 60 s window + 60 s tick + 300 s identity learning + 60 s admission tick.
 const SERVICE_GRAPH_READY_FLOOR_MS = (300 + 60 + 60 + 300 + 60) * 1000;
-// One scheduler walks every org per tick, so on a busy env the daemon lags past any fixed floor; this caps the progress-driven wait.
-const SERVICE_GRAPH_MAX_WAIT_MS = 25 * 60 * 1000;
-// processed_up_to moves once per tick; this long without a move means the job is not running.
-const SERVICE_GRAPH_STALL_MS = 12 * 60 * 1000;
-// Pending client edges are admitted after GRACE_LEARN_CYCLES (2) learn passes, LEARN_INTERVAL_SECS (300) apart, plus one tick.
-const SERVICE_GRAPH_LEARN_GRACE_MS = (2 * 300 + 120) * 1000;
 
 // Production-grade service configuration matching telemetry-generator.py
 const SERVICES = {
@@ -2276,85 +2270,59 @@ function generateErrorRateTraces({
 // ============================================================================
 
 /**
- * Polls the topology API until `expectedMinEdges` edges appear; with `ingestedAtMs`, waits on the daemon's `meta.processed_up_to` instead of the clock.
- * @returns {{ success: boolean, edges: object[], waitedMs: number, reason: string, processedUpTo: number|null }}
+ * Wait for the service graph daemon to process traces
+ * Polls the topology API until edges appear or timeout
  */
 async function waitForServiceGraphData(page, {
   maxWaitMs = 90000,
   pollIntervalMs = 5000,
   expectedMinEdges = 1,
-  ingestedAtMs,
-  streamName,
-  stallMs = SERVICE_GRAPH_STALL_MS,
-  graceMs = SERVICE_GRAPH_LEARN_GRACE_MS,
 } = {}) {
   const headers = getHeaders();
   const baseUrl = getBaseUrl();
   const orgId = getOrgId();
-  const query = streamName ? `?stream_name=${encodeURIComponent(streamName)}` : '';
   const startTime = Date.now();
-  let edges = [];
-  let processedUpTo = null;
-  let lastAdvanceAt = startTime;
-  let caughtUpAt = null;
-  let reason = null;
+  let lastEdgeCount = 0;
+  let lastMeta = null;
+  let lastStatus = null;
 
-  while (!reason) {
+  while (Date.now() - startTime < maxWaitMs) {
     try {
       const response = await page.request.get(
-        `${baseUrl}/api/${orgId}/traces/service_graph/topology/current${query}`,
+        `${baseUrl}/api/${orgId}/traces/service_graph/topology/current`,
         { headers }
       );
 
-      if (response.status() === 200) {
+      lastStatus = response.status();
+      if (lastStatus === 200) {
         const data = await response.json().catch(() => null);
-        const body = data?.edges ? data : data?.data;
-        edges = body?.edges || [];
-        const polled = body?.meta?.processed_up_to;
-        if (Number.isFinite(polled) && (processedUpTo === null || polled > processedUpTo)) {
-          processedUpTo = polled;
-          lastAdvanceAt = Date.now();
+        const edges = data?.edges || data?.data?.edges || [];
+        lastEdgeCount = edges.length;
+        lastMeta = data?.meta || data?.data?.meta || null;
+
+        if (edges.length >= expectedMinEdges) {
+          testLogger.info('Service graph data available', {
+            edgeCount: edges.length,
+            waitedMs: Date.now() - startTime,
+          });
+          return { success: true, edges, waitedMs: Date.now() - startTime };
         }
-      } else {
-        testLogger.debug('Service graph poll non-200', { status: response.status() });
+
+        testLogger.debug('Polling service graph topology', {
+          currentEdges: edges.length,
+          expectedMinEdges,
+        });
       }
     } catch (e) {
       testLogger.debug('Service graph poll error', { error: e.message });
     }
 
-    const now = Date.now();
-    const waitedMs = now - startTime;
-    if (ingestedAtMs && caughtUpAt === null && processedUpTo !== null && processedUpTo * 1000 >= ingestedAtMs) {
-      caughtUpAt = now;
-    }
-    testLogger.info('Polling service graph topology', {
-      edges: edges.length,
-      expectedMinEdges,
-      processedUpTo,
-      behindIngestS: ingestedAtMs && processedUpTo !== null ? Math.round(ingestedAtMs / 1000 - processedUpTo) : null,
-      waitedMs,
-    });
-
-    if (edges.length >= expectedMinEdges) {
-      testLogger.info('Service graph data available', { edgeCount: edges.length, waitedMs });
-      return { success: true, edges, waitedMs, reason: `${edges.length} edges after ${Math.round(waitedMs / 1000)} s`, processedUpTo };
-    }
-
-    if (ingestedAtMs && caughtUpAt !== null && now - caughtUpAt >= graceMs) {
-      reason = `the service-graph daemon processed past the ingest time (processed_up_to ${processedUpTo}) but produced only ${edges.length} of ${expectedMinEdges} edges after ${Math.round((now - caughtUpAt) / 1000)} s more`;
-    } else if (ingestedAtMs && caughtUpAt === null && now - lastAdvanceAt >= stallMs) {
-      reason = processedUpTo === null
-        ? `meta.processed_up_to never appeared in ${Math.round(waitedMs / 60000)} min: the service-graph job is not running on this environment (check O2_SERVICE_GRAPH_ENABLED)`
-        : `the service-graph daemon stalled: processed_up_to stuck at ${processedUpTo} (${Math.round(ingestedAtMs / 1000 - processedUpTo)} s behind the ingest) for ${Math.round((now - lastAdvanceAt) / 60000)} min`;
-    } else if (waitedMs >= maxWaitMs) {
-      reason = `timed out after ${Math.round(waitedMs / 60000)} min with ${edges.length} of ${expectedMinEdges} edges (processed_up_to ${processedUpTo}${ingestedAtMs ? `, ingest ended at ${Math.round(ingestedAtMs / 1000)}` : ''})`;
-    } else {
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }
 
-  testLogger.warn('Service graph wait gave up', { reason });
-  return { success: false, edges, waitedMs: Date.now() - startTime, reason, processedUpTo };
+  const reason = `${lastEdgeCount} of ${expectedMinEdges} edges ${Math.round((Date.now() - startTime) / 1000)} s after ingest (last HTTP ${lastStatus}, last meta ${JSON.stringify(lastMeta)})`;
+  testLogger.warn('Service graph poll timed out', { maxWaitMs, reason });
+  return { success: false, edges: [], waitedMs: maxWaitMs, reason };
 }
 
 /**
@@ -2469,7 +2437,6 @@ module.exports = {
   ConnectionType,
   SERVICES,
   SERVICE_GRAPH_READY_FLOOR_MS,
-  SERVICE_GRAPH_MAX_WAIT_MS,
 
   // Core utilities
   generateHexId,
