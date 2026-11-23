@@ -21,9 +21,10 @@ use std::{
 };
 
 use config::{
+    DEFAULT_ORG,
     cluster::LOCAL_NODE,
     meta::{
-        pipeline::{Pipeline, PipelineKind},
+        pipeline::{Pipeline, PipelineDependencyItem, PipelineKind, components::NodeData},
         self_reporting::error::{ErrorData, ErrorSource, PipelineError as PipelineErrorReport},
         stream::StreamParams,
     },
@@ -736,6 +737,170 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Pipelines whose functions read enrichment table `table_org/table_name`, in every org it serves.
+pub async fn enrichment_table_readers(
+    table_org: &str,
+    table_name: &str,
+) -> Result<Vec<PipelineDependencyItem>, infra::errors::Error> {
+    let pipelines = if table_org == DEFAULT_ORG {
+        db_pipeline::list().await?
+    } else {
+        db_pipeline::list_by_org(table_org).await?
+    };
+    Ok(pipelines_reading_table(&pipelines, (table_org, table_name)))
+}
+
+/// Recompiles cached pipelines reading the table. [weak: a failed DB read keeps the old compile]
+pub async fn recompile_enrichment_table_readers(table_org: String, table_name: String) {
+    let table = (table_org.as_str(), table_name.as_str());
+    for pipeline_id in cached_enrichment_table_readers(table).await {
+        let pipeline = match db_pipeline::get_decoded_by_id(&pipeline_id).await {
+            Ok(Ok(pipeline)) => pipeline,
+            Ok(Err(row)) => {
+                forget_unreadable_pipeline(&row).await;
+                continue;
+            }
+            Err(e) => {
+                log::error!(
+                    "[Pipeline] error getting pipeline {pipeline_id} to recompile after enrichment table {table_org}/{table_name} changed: {e}"
+                );
+                continue;
+            }
+        };
+        if let config::meta::pipeline::components::PipelineSource::Realtime(stream_params) =
+            &pipeline.source
+            && pipeline.enabled
+            && let Some(error) =
+                recompile_cached_realtime_pipeline(&pipeline, stream_params, table).await
+        {
+            usage_reporting::publish_error(error).await;
+        }
+    }
+}
+
+/// The pipelines whose function nodes read `table`. [no-fail]
+fn pipelines_reading_table(
+    pipelines: &[Pipeline],
+    table: (&str, &str),
+) -> Vec<PipelineDependencyItem> {
+    pipelines
+        .iter()
+        .filter(|pl| {
+            pl.nodes.iter().any(|node| match &node.data {
+                NodeData::Function(func) => vrl_function_reads_table(&pl.org, &func.name, table),
+                _ => false,
+            })
+        })
+        .map(|pl| PipelineDependencyItem {
+            id: pl.id.clone(),
+            name: pl.name.clone(),
+        })
+        .collect()
+}
+
+/// Ids of cached realtime pipelines, in orgs that see the table, whose VRL reads it. [no-fail]
+async fn cached_enrichment_table_readers((table_org, table_name): (&str, &str)) -> Vec<String> {
+    let cached: Vec<(String, Vec<String>)> = STREAM_EXECUTABLE_PIPELINES
+        .read()
+        .await
+        .values()
+        .flatten()
+        .map(|pl| {
+            (
+                pl.id.clone(),
+                pl.function_names().map(String::from).collect(),
+            )
+        })
+        .collect();
+    let candidates: Vec<(String, String, Vec<String>)> = {
+        let id_to_org = PIPELINE_ID_TO_ORG.read().await;
+        cached
+            .into_iter()
+            .filter_map(|(id, functions)| {
+                let org = id_to_org.get(&id)?;
+                (org == table_org || table_org == DEFAULT_ORG).then(|| (id, org.clone(), functions))
+            })
+            .collect()
+    };
+    candidates
+        .into_iter()
+        .filter(|(_, org, functions)| {
+            functions
+                .iter()
+                .any(|name| vrl_function_reads_table(org, name, (table_org, table_name)))
+        })
+        .map(|(id, ..)| id)
+        .collect()
+}
+
+/// Whether org function `name` is VRL that compiles and reads `table`. [no-fail]
+fn vrl_function_reads_table(org: &str, name: &str, table: (&str, &str)) -> bool {
+    let Some(function) = transform::QUERY_FUNCTIONS.get(&format!("{org}/{name}")) else {
+        return false;
+    };
+    !function.is_js()
+        && transform::enrichment_tables_read(&function.function, org)
+            .is_ok_and(|reads| reads.iter().any(|(o, n)| (o.as_str(), n.as_str()) == table))
+}
+
+/// Swaps in a fresh compile, or keeps the old one and returns the one error to publish. [no-fail]
+async fn recompile_cached_realtime_pipeline(
+    pipeline: &Pipeline,
+    stream_params: &StreamParams,
+    (table_org, table_name): (&str, &str),
+) -> Option<ErrorData> {
+    match ExecutablePipeline::new_unreported(pipeline).await {
+        Ok(exec_pl) => {
+            if replace_cached_realtime_pipeline(stream_params, exec_pl).await {
+                BROKEN_REALTIME_PIPELINES.write().await.remove(&pipeline.id);
+            }
+            None
+        }
+        Err(e) => {
+            log::error!(
+                "[Pipeline] {}/{}: recompile after enrichment table {table_org}/{table_name} changed failed: {e}",
+                pipeline.org,
+                pipeline.id
+            );
+            Some(ErrorData {
+                _timestamp: chrono::Utc::now().timestamp_micros(),
+                stream_params: stream_params.clone(),
+                error_source: ErrorSource::Pipeline(PipelineErrorReport {
+                    pipeline_id: pipeline.id.clone(),
+                    pipeline_name: pipeline.name.clone(),
+                    error: Some(format!(
+                        "Failed to recompile after enrichment table {table_org}/{table_name} changed; the previous version keeps running"
+                    )),
+                    node_errors: HashMap::new(),
+                }),
+            })
+        }
+    }
+}
+
+/// Replaces only the cached compile of the same version, never a deleted or newer one. [no-fail]
+async fn replace_cached_realtime_pipeline(
+    stream_params: &StreamParams,
+    exec_pl: ExecutablePipeline,
+) -> bool {
+    let mapping = PIPELINE_STREAM_MAPPING.read().await;
+    let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
+    if mapping.get(&exec_pl.id) != Some(stream_params) {
+        return false;
+    }
+    let Some(cached) = stream_exec_pl
+        .get_mut(stream_params)
+        .and_then(|pls| pls.iter_mut().find(|pl| pl.id == exec_pl.id))
+    else {
+        return false;
+    };
+    if cached.version != exec_pl.version {
+        return false;
+    }
+    *cached = exec_pl;
+    true
+}
+
 #[derive(Debug)]
 enum PipelineTableEvent<'a> {
     Add(&'a Pipeline),
@@ -1245,5 +1410,218 @@ mod tests {
         let mut pipeline = realtime_pipeline("exec_legacy", &legacy);
         pipeline.org = "exec_org_a".to_string();
         assert!(ExecutablePipeline::new(&pipeline).await.is_ok());
+    }
+
+    fn put_enrichment_table(org: &str, name: &str) -> String {
+        let key = format!("{org}/enrichment_tables/{name}");
+        transform::enrichment::ENRICHMENT_TABLES.insert(
+            key.clone(),
+            transform::enrichment::StreamTable {
+                org_id: org.to_string(),
+                stream_name: name.to_string(),
+                data: Arc::new(vec![]),
+            },
+        );
+        key
+    }
+
+    /// Caches compiled realtime pipelines of `org`, each running the named function.
+    async fn cache_function_pipelines(
+        org: &str,
+        stream: &StreamParams,
+        pipelines: &[(&str, &str)],
+    ) {
+        for (id, function) in pipelines {
+            let pipeline = function_pipeline(id, stream, function);
+            let exec_pl = compile_realtime_pipeline(&pipeline, stream).await.unwrap();
+            upsert_realtime_pipeline_cache(id, stream, exec_pl).await;
+            PIPELINE_ID_TO_ORG
+                .write()
+                .await
+                .insert(id.to_string(), org.to_string());
+        }
+    }
+
+    async fn cached_ids(stream: &StreamParams) -> Vec<String> {
+        let mut ids: Vec<String> = get_executable_pipelines(stream)
+            .await
+            .into_iter()
+            .map(|pl| pl.id)
+            .collect();
+        ids.sort();
+        ids
+    }
+
+    async fn forget_function_pipelines(
+        org: &str,
+        stream: &StreamParams,
+        ids: &[&str],
+        functions: &[&str],
+    ) {
+        for name in functions {
+            transform::QUERY_FUNCTIONS.remove(&format!("{org}/{name}"));
+        }
+        let mut id_to_org = PIPELINE_ID_TO_ORG.write().await;
+        for id in ids {
+            id_to_org.remove(*id);
+        }
+        drop(id_to_org);
+        let mut broken = BROKEN_REALTIME_PIPELINES.write().await;
+        for id in ids {
+            broken.remove(*id);
+        }
+        drop(broken);
+        clear_realtime_cache_entries(ids, &[stream]).await;
+    }
+
+    async fn readers(org: &str, table: &str) -> Vec<String> {
+        cached_enrichment_table_readers((org, table)).await
+    }
+
+    #[tokio::test]
+    async fn a_put_swaps_in_the_readers_recompile_and_a_failed_one_keeps_the_old_with_one_error() {
+        let org = "et_put_org";
+        let stream = StreamParams::new(org, "et_put_stream", StreamType::Logs);
+        let table_key = put_enrichment_table(org, "et_geo");
+        put_vrl_function(
+            org,
+            "enrich",
+            ".geo = get_enrichment_table_record!(\"et_geo\", {\"ip\": .ip})\n.",
+        );
+        put_vrl_function(org, "plain", ".a = 1\n.");
+        cache_function_pipelines(
+            org,
+            &stream,
+            &[("et_reader", "enrich"), ("et_other", "plain")],
+        )
+        .await;
+        let reader = function_pipeline("et_reader", &stream, "enrich");
+        let table = (org, "et_geo");
+
+        assert_eq!(readers(org, "et_geo").await, vec!["et_reader".to_string()]);
+        assert!(readers(org, "et_ip").await.is_empty());
+        assert!(
+            recompile_cached_realtime_pipeline(&reader, &stream, table)
+                .await
+                .is_none()
+        );
+        assert_eq!(cached_ids(&stream).await, vec!["et_other", "et_reader"]);
+
+        // a removed table selects nothing, so a Delete recompiles nothing
+        transform::enrichment::ENRICHMENT_TABLES.remove(&table_key);
+        assert!(readers(org, "et_geo").await.is_empty());
+
+        // a failed recompile keeps the cached compile and yields exactly one fixed-shape error
+        let error = recompile_cached_realtime_pipeline(&reader, &stream, table)
+            .await
+            .expect("a failed recompile is reported");
+        assert_eq!(cached_ids(&stream).await, vec!["et_other", "et_reader"]);
+        assert_eq!(error.stream_params, stream);
+        let ErrorSource::Pipeline(report) = error.error_source else {
+            panic!("not a pipeline error");
+        };
+        assert_eq!(report.pipeline_id, "et_reader");
+        assert_eq!(
+            report.error.as_deref(),
+            Some(
+                "Failed to recompile after enrichment table et_put_org/et_geo changed; the previous version keeps running"
+            )
+        );
+        assert!(report.node_errors.is_empty());
+
+        forget_function_pipelines(
+            org,
+            &stream,
+            &["et_reader", "et_other"],
+            &["enrich", "plain"],
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn a_pipeline_whose_function_no_longer_compiles_is_never_selected() {
+        let org = "et_sel_org";
+        let stream = StreamParams::new(org, "et_sel_stream", StreamType::Logs);
+        let table_key = put_enrichment_table(org, "et_geo");
+        put_vrl_function(org, "tag", ".a = 1\n.");
+        cache_function_pipelines(org, &stream, &[("et_sel", "tag")]).await;
+        // the function no longer compiles, for a reason unrelated to any table
+        put_vrl_function(org, "tag", ".node = get_hostname!()\n.");
+
+        assert!(readers(org, "et_geo").await.is_empty());
+
+        transform::enrichment::ENRICHMENT_TABLES.remove(&table_key);
+        forget_function_pipelines(org, &stream, &["et_sel"], &["tag"]).await;
+    }
+
+    #[tokio::test]
+    async fn delete_readers_follow_the_table_each_org_resolves_including_a_shadowing_one() {
+        let (org_a, org_b) = ("et_shadow_org_a", "et_shadow_org_b");
+        let source = ".s = get_enrichment_table_record!(\"et_shadowed\", {\"k\": .k})\n.";
+        let keys = [
+            put_enrichment_table(org_a, "et_shadowed"),
+            put_enrichment_table(config::DEFAULT_ORG, "et_shadowed"),
+        ];
+        put_vrl_function(org_a, "lookup", source);
+        put_vrl_function(org_b, "lookup", source);
+        put_vrl_function(org_b, "plain", ".a = 1\n.");
+        let stream_a = StreamParams::new(org_a, "s", StreamType::Logs);
+        let stream_b = StreamParams::new(org_b, "s", StreamType::Logs);
+        let pipelines = [
+            function_pipeline("et_shadow_a", &stream_a, "lookup"),
+            function_pipeline("et_shadow_b", &stream_b, "lookup"),
+            function_pipeline("et_shadow_plain", &stream_b, "plain"),
+        ];
+        let ids = |table: (&str, &str)| -> Vec<String> {
+            pipelines_reading_table(&pipelines, table)
+                .into_iter()
+                .map(|pl| pl.id)
+                .collect()
+        };
+
+        // org A's own table shadows the default one for org A's pipeline
+        assert_eq!(ids((org_a, "et_shadowed")), vec!["et_shadow_a"]);
+        // the default table is read by every org without its own table of that name
+        assert_eq!(
+            ids((config::DEFAULT_ORG, "et_shadowed")),
+            vec!["et_shadow_b"]
+        );
+        assert!(ids((org_b, "et_shadowed")).is_empty());
+
+        for key in keys {
+            transform::enrichment::ENRICHMENT_TABLES.remove(&key);
+        }
+        for (org, name) in [(org_a, "lookup"), (org_b, "lookup"), (org_b, "plain")] {
+            transform::QUERY_FUNCTIONS.remove(&format!("{org}/{name}"));
+        }
+    }
+
+    #[tokio::test]
+    async fn a_recompile_never_resurrects_or_overwrites_a_newer_pipeline() {
+        let org = "et_gone_org";
+        let stream = StreamParams::new(org, "et_gone_stream", StreamType::Logs);
+        put_vrl_function(org, "plain", ".a = 1\n.");
+        cache_function_pipelines(org, &stream, &[("et_gone", "plain")]).await;
+        let pipeline = function_pipeline("et_gone", &stream, "plain");
+
+        // a newer version is cached while an older read is recompiled
+        let mut newer = pipeline.clone();
+        newer.version = 2;
+        let exec_pl = compile_realtime_pipeline(&newer, &stream).await.unwrap();
+        upsert_realtime_pipeline_cache("et_gone", &stream, exec_pl).await;
+        recompile_cached_realtime_pipeline(&pipeline, &stream, (org, "t")).await;
+        let versions: Vec<i32> = get_executable_pipelines(&stream)
+            .await
+            .iter()
+            .map(|pl| pl.version)
+            .collect();
+        assert_eq!(versions, vec![2]);
+
+        // deleted or disabled while its recompile was in flight
+        remove_realtime_pipeline_cache("et_gone").await;
+        recompile_cached_realtime_pipeline(&pipeline, &stream, (org, "t")).await;
+        assert!(cached_ids(&stream).await.is_empty());
+
+        forget_function_pipelines(org, &stream, &["et_gone"], &["plain"]).await;
     }
 }

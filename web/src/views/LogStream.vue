@@ -1125,7 +1125,8 @@ export default defineComponent({
         .catch((err: any) => {
           if (err.response.status != 403) {
             toast({
-              message: t("toastMessages.views.errorWhileDeletingStream"),
+              message:
+                err.response?.data?.message || t("toastMessages.views.errorWhileDeletingStream"),
               variant: "error",
             });
           }

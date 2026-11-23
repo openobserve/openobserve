@@ -530,6 +530,28 @@ describe("LogStream Component", () => {
       expect(wrapper.vm.confirmDelete).toBe(false);
     });
 
+    it("shows the server's reason when a delete is refused, else the generic error", async () => {
+      const dialog = () =>
+        wrapper.findAllComponents({ name: "ODialog" }).find((d: any) => d.props("open") === true)!;
+      const refusal = "Enrichment table 'test_stream' is read by 1 pipeline(s).";
+      mockStreamService.delete.mockRejectedValueOnce({
+        response: { status: 409, data: { message: refusal } },
+      });
+      await dialog().vm.$emit("click:primary");
+      await flushPromises();
+      expect(mockNotify).toHaveBeenLastCalledWith({ message: refusal, variant: "error" });
+
+      await wrapper.vm.confirmDeleteAction({ row: { name: "test_stream", stream_type: "logs" } });
+      await wrapper.vm.$nextTick();
+      mockStreamService.delete.mockRejectedValueOnce({ response: { status: 500, data: {} } });
+      await dialog().vm.$emit("click:primary");
+      await flushPromises();
+      expect(mockNotify).toHaveBeenLastCalledWith({
+        message: i18n.global.t("toastMessages.views.errorWhileDeletingStream"),
+        variant: "error",
+      });
+    });
+
     it("names the stream being deleted in the dialog message", () => {
       const message = wrapper.find('[data-test="log-stream-delete-dialog-message"]');
       expect(message.text()).toBe("Are you sure you want to delete the test_stream stream?");

@@ -336,7 +336,16 @@ async fn write_logs_by_stream(
         {
             log::warn!("stream [{org_id}/{stream_name}] is being deleted");
             stream_skipped = true;
-            continue; // skip
+            let columnar = columnar.take_if(|c| c.stream_name() == stream_name);
+            reject_stream_rows(
+                &stream_name,
+                &json_data,
+                columnar,
+                status,
+                (bulk::STREAM_BEING_DELETED, "stream is being deleted"),
+                response_order.as_deref_mut(),
+            );
+            continue;
         }
         // before the new-stream hooks, so a stream that cannot be stored is never announced
         if let Err(e) = schema::check_stream_key_len(org_id, StreamType::Logs, &stream_name) {
@@ -346,7 +355,7 @@ async fn write_logs_by_stream(
                 &json_data,
                 columnar,
                 status,
-                &e.to_string(),
+                (bulk::STREAM_NAME_TOO_LONG, &e.to_string()),
                 response_order.as_deref_mut(),
             );
             continue;
@@ -457,7 +466,7 @@ fn reject_stream_rows(
     json_data: &[(i64, Map<String, Value>)],
     columnar: Option<columnar::JsonColumnar>,
     status: &mut IngestionStatus,
-    reason: &str,
+    (err_type, reason): (&str, &str),
     response_order: Option<&mut BulkResponseOrder>,
 ) {
     match status {
@@ -488,7 +497,7 @@ fn reject_stream_rows(
                     String::new(),
                     None,
                     bulk_res,
-                    Some(bulk::STREAM_NAME_TOO_LONG.to_string()),
+                    Some(err_type.to_string()),
                     Some(reason.to_string()),
                 ) {
                     item.request_position = position;
@@ -928,7 +937,14 @@ mod tests {
         ];
 
         let mut record = IngestionStatus::Record(ingestion_common::RecordStatus::default());
-        reject_stream_rows("s", &rows, None, &mut record, "too long", None);
+        reject_stream_rows(
+            "s",
+            &rows,
+            None,
+            &mut record,
+            (bulk::STREAM_NAME_TOO_LONG, "too long"),
+            None,
+        );
         let IngestionStatus::Record(status) = record else {
             unreachable!()
         };
@@ -940,7 +956,14 @@ mod tests {
             errors: false,
             items: vec![],
         });
-        reject_stream_rows("s", &rows, None, &mut bulk, "too long", None);
+        reject_stream_rows(
+            "s",
+            &rows,
+            None,
+            &mut bulk,
+            (bulk::STREAM_NAME_TOO_LONG, "too long"),
+            None,
+        );
         let IngestionStatus::Bulk(bulk) = bulk else {
             unreachable!()
         };
@@ -954,6 +977,67 @@ mod tests {
         let error = bulk.items[0]["index"].error.as_ref().unwrap();
         assert_eq!(error.err_type, bulk::STREAM_NAME_TOO_LONG);
         assert_eq!(error.reason, "too long");
+    }
+
+    #[tokio::test]
+    async fn test_rows_of_a_deleting_stream_count_as_failed() {
+        let (org_id, stream) = ("deleting_org", "deleting_stream");
+        let key = infra::cache::deleting_streams::key(org_id, StreamType::Logs, stream, None);
+        infra::cache::deleting_streams::insert(key.clone(), 0);
+        let rows = vec![(0, Map::new()), (0, Map::new())];
+        let mut status = IngestionStatus::Record(ingestion_common::RecordStatus::default());
+        let skipped = write_logs_by_stream(
+            0,
+            org_id,
+            "",
+            (0, &Instant::now()),
+            UsageType::Json,
+            &mut status,
+            HashMap::from([(stream.to_string(), (rows, None))]),
+            HashMap::new(),
+            HashSet::new(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        infra::cache::deleting_streams::remove(&key);
+        assert!(skipped);
+        let IngestionStatus::Record(status) = status else {
+            unreachable!()
+        };
+        assert_eq!((status.successful, status.failed), (0, 2));
+        assert_eq!(status.error, "stream is being deleted");
+
+        infra::cache::deleting_streams::insert(key.clone(), 0);
+        let rows = vec![(0, Map::new())];
+        let mut status = IngestionStatus::Bulk(ingestion_common::BulkResponse {
+            took: 0,
+            errors: false,
+            items: vec![],
+        });
+        let skipped = write_logs_by_stream(
+            0,
+            org_id,
+            "",
+            (0, &Instant::now()),
+            UsageType::Bulk,
+            &mut status,
+            HashMap::from([(stream.to_string(), (rows, None))]),
+            HashMap::new(),
+            HashSet::new(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        infra::cache::deleting_streams::remove(&key);
+        assert!(skipped);
+        let IngestionStatus::Bulk(bulk) = status else {
+            unreachable!()
+        };
+        let error = bulk.items[0]["index"].error.as_ref().unwrap();
+        assert_eq!(error.err_type, bulk::STREAM_BEING_DELETED);
     }
 
     #[test]
@@ -1023,7 +1107,7 @@ mod tests {
             &rows,
             Some(columnar),
             &mut status,
-            "too long",
+            (bulk::STREAM_NAME_TOO_LONG, "too long"),
             Some(&mut order),
         );
         let IngestionStatus::Bulk(mut response) = status else {

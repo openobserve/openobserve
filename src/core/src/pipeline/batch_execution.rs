@@ -51,7 +51,7 @@ use tokio::sync::Mutex;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 use tokio_util::sync::CancellationToken;
 use transform::{
-    QUERY_FUNCTIONS, apply_vrl_fn, compile_vrl_function,
+    QUERY_FUNCTIONS, apply_vrl_fn_checked, compile_vrl_function,
     js::{JSRuntimeConfig, apply_js_fn, compile_js_function},
 };
 use usage_reporting::publish_error;
@@ -287,6 +287,7 @@ impl PipelineExt for Workflow {
 #[derive(Debug, Clone)]
 pub struct ExecutablePipeline {
     pub id: String,
+    pub version: i32,
     name: String,
     is_realtime: bool,
     source_node_id: String,
@@ -340,9 +341,38 @@ impl ExecutablePipeline {
     }
 
     pub async fn new(pipeline: &Pipeline) -> Result<Self> {
-        // No publish_error here: its stream params would name the other org.
+        match Self::compile(pipeline).await {
+            Ok(exec_pl) => Ok(exec_pl),
+            Err((report, e)) => {
+                if let Some(report) = report {
+                    let pipeline_error = PipelineError {
+                        pipeline_id: pipeline.id.to_string(),
+                        pipeline_name: pipeline.name.to_string(),
+                        error: Some(report),
+                        node_errors: HashMap::new(),
+                    };
+                    publish_error(ErrorData {
+                        _timestamp: Utc::now().timestamp_micros(),
+                        stream_params: pipeline.get_source_stream_params(),
+                        error_source: ErrorSource::Pipeline(pipeline_error),
+                    })
+                    .await;
+                }
+                Err(e)
+            }
+        }
+    }
+
+    /// [`Self::new`] without publishing its init error, for a caller that reports its own.
+    pub async fn new_unreported(pipeline: &Pipeline) -> Result<Self> {
+        Self::compile(pipeline).await.map_err(|(_, e)| e)
+    }
+
+    /// Compiles a pipeline; an error carries the init error text to report, if any.
+    async fn compile(pipeline: &Pipeline) -> Result<Self, (Option<String>, anyhow::Error)> {
+        // No report here: its stream params would name the other org.
         if let Some(refusal) = pipeline.cross_org_refusal() {
-            return Err(anyhow!("Init error: {refusal}"));
+            return Err((None, anyhow!("Init error: {refusal}")));
         }
         let node_map = pipeline
             .nodes
@@ -365,48 +395,23 @@ impl ExecutablePipeline {
             })
             .collect();
 
-        let function_map = match pipeline.register_functions().await {
-            Ok(function_map) => function_map,
-            Err(e) => {
-                let pipeline_error = PipelineError {
-                    pipeline_id: pipeline.id.to_string(),
-                    pipeline_name: pipeline.name.to_string(),
-                    error: Some(format!("Init error: failed to compile function: {e}")),
-                    node_errors: HashMap::new(),
-                };
-                publish_error(ErrorData {
-                    _timestamp: Utc::now().timestamp_micros(),
-                    stream_params: pipeline.get_source_stream_params(),
-                    error_source: ErrorSource::Pipeline(pipeline_error),
-                })
-                .await;
-                return Err(e);
-            }
-        };
-        let sorted_nodes = match topological_sort(&node_map) {
-            Ok(sorted) => sorted,
-            Err(e) => {
-                let pipeline_error = PipelineError {
-                    pipeline_id: pipeline.id.to_string(),
-                    pipeline_name: pipeline.name.to_string(),
-                    error: Some(
-                        "Init error: failed to sort pipeline nodes for execution".to_string(),
-                    ),
-                    node_errors: HashMap::new(),
-                };
-                publish_error(ErrorData {
-                    _timestamp: Utc::now().timestamp_micros(),
-                    stream_params: pipeline.get_source_stream_params(),
-                    error_source: ErrorSource::Pipeline(pipeline_error),
-                })
-                .await;
-                return Err(e);
-            }
-        };
+        let function_map = pipeline.register_functions().await.map_err(|e| {
+            (
+                Some(format!("Init error: failed to compile function: {e}")),
+                e,
+            )
+        })?;
+        let sorted_nodes = topological_sort(&node_map).map_err(|e| {
+            (
+                Some("Init error: failed to sort pipeline nodes for execution".to_string()),
+                e,
+            )
+        })?;
         let source_node_id = sorted_nodes[0].to_owned();
 
         Ok(Self {
             id: pipeline.id.to_string(),
+            version: pipeline.version,
             name: pipeline.name.to_string(),
             is_realtime: pipeline.source.is_realtime(),
             source_node_id,
@@ -503,6 +508,7 @@ impl ExecutablePipeline {
 
         Ok(Self {
             id: workflow.id.to_string(),
+            version: 0,
             name: workflow.name.to_string(),
             source_node_id,
             node_map,
@@ -1162,6 +1168,15 @@ impl ExecutablePipeline {
             .values()
             .filter(|exec_node| matches!(exec_node.node_data, NodeData::Function(_)))
             .count()
+    }
+
+    pub fn function_names(&self) -> impl Iterator<Item = &str> {
+        self.node_map
+            .values()
+            .filter_map(|exec_node| match &exec_node.node_data {
+                NodeData::Function(func_params) => Some(func_params.name.as_str()),
+                _ => None,
+            })
     }
 
     pub fn get_pipeline_id(&self) -> &str {
@@ -2046,7 +2061,7 @@ async fn process_function_node(
                         // Single record processing with VRL
 
                         let vrl_timer = Instant::now();
-                        let vrl_res = apply_vrl_fn(
+                        let (res, failure) = apply_vrl_fn_checked(
                             &mut vrl_runtime_state,
                             vrl_resolver,
                             record,
@@ -2054,9 +2069,15 @@ async fn process_function_node(
                             std::slice::from_ref(&stream_name),
                         );
                         *busy += vrl_timer.elapsed();
-                        record = match vrl_res {
-                            (res, None) => res,
-                            (res, Some(error)) => {
+                        record = match failure {
+                            None => res,
+                            // an intentional `abort` drops the row and is not an error
+                            Some(failure) if failure.is_aborted() => {
+                                count += 1;
+                                continue;
+                            }
+                            Some(failure) => {
+                                let error = failure.into_detail();
                                 let err_msg = format!(
                                     "FunctionNode VRL error: {}",
                                     error.get(0..500).unwrap_or(&error)
@@ -2169,7 +2190,7 @@ async fn process_function_node(
             CompiledFunctionRuntime::VRL(vrl_resolver, true) => {
                 // VRL result array processing
                 let vrl_arr_timer = Instant::now();
-                let vrl_arr_res = apply_vrl_fn(
+                let (res, failure) = apply_vrl_fn_checked(
                     &mut vrl_runtime_state,
                     vrl_resolver,
                     json::Value::Array(result_array_records),
@@ -2177,9 +2198,11 @@ async fn process_function_node(
                     std::slice::from_ref(&stream_name),
                 );
                 *busy += vrl_arr_timer.elapsed();
-                let result = match vrl_arr_res {
-                    (res, None) => res,
-                    (res, Some(error)) => {
+                let result = match failure {
+                    None => res,
+                    Some(failure) if failure.is_aborted() => return count,
+                    Some(failure) => {
+                        let error = failure.into_detail();
                         let err_msg = format!(
                             "FunctionNode VRL result array error: {}",
                             error.get(0..500).unwrap_or(&error)
@@ -2592,6 +2615,38 @@ async fn report_leaf_error(
     sent.is_err()
 }
 
+/// The pipeline error of a failed cross-type ingestion (`status` None: no response). [pure]
+fn cross_type_ingest_error(
+    (pipeline_id, pipeline_name): (&str, &str),
+    (node_id, node_type): (&str, &str),
+    source: StreamParams,
+    destination: &StreamParams,
+    status: Option<i32>,
+    timestamp: i64,
+) -> Option<ErrorData> {
+    let outcome = match status {
+        Some(200) => return None,
+        Some(code) => format!(" (status {code})"),
+        None => ": request error".to_string(),
+    };
+    let mut error = PipelineError::new(pipeline_id, pipeline_name);
+    error.add_node_error(
+        node_id.to_string(),
+        node_type.to_string(),
+        format!(
+            "cross-type ingestion to {}:{} failed{outcome}",
+            destination.stream_type, destination.stream_name
+        ),
+        None,
+        None,
+    );
+    Some(ErrorData {
+        _timestamp: timestamp,
+        stream_params: source,
+        error_source: ErrorSource::Pipeline(error),
+    })
+}
+
 async fn process_stream_node(
     stream_params: &StreamParams,
     metadata: ProcessMetadata,
@@ -2757,6 +2812,14 @@ async fn process_stream_node(
             let dest_stream_name = stream_params.stream_name.to_string();
             let org = metadata.org_id.to_string();
             let pl_name = metadata.pipeline_name.clone();
+            let pl_id = metadata.pipeline_id.clone();
+            let node_ref = (node.id.clone(), node.node_type());
+            let source = StreamParams::new(
+                &metadata.org_id,
+                &metadata.source_stream_name,
+                metadata.source_stream_type,
+            );
+            let destination = stream_params.clone();
             let node_idx = metadata.node_idx;
             let inv = inv_id.clone();
             log::debug!(
@@ -2771,11 +2834,12 @@ async fn process_stream_node(
                     ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
                     metadata: None,
                 };
-                match crate::ingestion::ingestion_service::ingest(req).await {
+                let status = match crate::ingestion::ingestion_service::ingest(req).await {
                     Ok(resp) if resp.status_code == 200 => {
                         log::debug!(
                             "[Pipeline] {pl_name} [inv={inv}]: cross-type ingestion successful to {dest_stream_type}:{dest_stream_name}, records: {record_count}",
                         );
+                        Some(resp.status_code)
                     }
                     Ok(resp) => {
                         log::error!(
@@ -2783,12 +2847,24 @@ async fn process_stream_node(
                             resp.status_code,
                             resp.message,
                         );
+                        Some(resp.status_code)
                     }
                     Err(e) => {
                         log::error!(
                             "[Pipeline] {pl_name} [inv={inv}]: cross-type ingestion error: {e}"
                         );
+                        None
                     }
+                };
+                if let Some(error) = cross_type_ingest_error(
+                    (&pl_id, &pl_name),
+                    (&node_ref.0, &node_ref.1),
+                    source,
+                    &destination,
+                    status,
+                    Utc::now().timestamp_micros(),
+                ) {
+                    publish_error(error).await;
                 }
             });
         }
@@ -3390,6 +3466,7 @@ mod tests {
         );
         let pipeline = ExecutablePipeline {
             id: "pipe-1".to_string(),
+            version: 0,
             name: "__eval__job".to_string(),
             is_realtime: false,
             source_node_id: "input".to_string(),
@@ -4204,6 +4281,138 @@ mod tests {
             error_rx.try_recv().is_err(),
             "exactly one error entry, not one per record"
         );
+    }
+
+    /// Runs a VRL function node over `records`; returns what it forwarded and the errors it sent.
+    async fn run_vrl_function_node(source: &str, records: Vec<Value>) -> (Vec<Value>, Vec<String>) {
+        let program = transform::compile_vrl_function(source, "org-1")
+            .unwrap()
+            .program;
+        let runtime = CompiledFunctionRuntime::VRL(
+            Box::new(VRLResultResolver {
+                program,
+                fields: vec![],
+            }),
+            config::meta::function::RESULT_ARRAY.is_match(source),
+        );
+        let node = ExecutableNode {
+            id: "fn-1".to_string(),
+            node_data: NodeData::Function(config::meta::pipeline::components::FunctionParams {
+                name: "f".to_string(),
+                after_flatten: false,
+                num_args: 0,
+                raw_fn: None,
+            }),
+            children: vec!["child-1".to_string()],
+            is_disabled: false,
+        };
+        let (input_tx, input_rx) = channel(8);
+        let (error_tx, mut error_rx) = channel(8);
+        let (child_tx, mut child_rx) = channel(8);
+        let channels = ProcessChannels {
+            receiver: input_rx,
+            child_senders: vec![child_tx],
+            result_sender: None,
+            error_sender: error_tx,
+            inputs_sender: None,
+            outputs_sender: None,
+        };
+        send_records(&input_tx, records).await;
+        drop(input_tx);
+        process_node(dummy_metadata(1), node, Some(runtime), channels, Vec::new())
+            .await
+            .unwrap();
+        let mut forwarded = vec![];
+        while let Ok(item) = child_rx.try_recv() {
+            forwarded.push(item.record);
+        }
+        let mut errors = vec![];
+        while let Ok((_, _, message, ..)) = error_rx.try_recv() {
+            errors.push(message);
+        }
+        (forwarded, errors)
+    }
+
+    #[tokio::test]
+    async fn test_vrl_abort_drops_the_row_without_an_error() {
+        let source = "if .drop == true { abort }\n.";
+        let (forwarded, errors) = run_vrl_function_node(
+            source,
+            vec![json::json!({"drop": true}), json::json!({"drop": false})],
+        )
+        .await;
+        assert_eq!(forwarded, vec![json::json!({"drop": false})]);
+        assert!(errors.is_empty(), "{errors:?}");
+    }
+
+    #[tokio::test]
+    async fn test_vrl_runtime_error_forwards_the_original_row_and_reports() {
+        let source = ".n = to_int!(.v)\n.";
+        let record = json::json!({"v": "not a number"});
+        let (forwarded, errors) = run_vrl_function_node(source, vec![record.clone()]).await;
+        assert_eq!(forwarded, vec![record]);
+        assert_eq!(errors.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_vrl_result_array_abort_drops_the_batch_without_an_error() {
+        let source = "#ResultArray#\nabort\n.";
+        let (forwarded, errors) =
+            run_vrl_function_node(source, vec![json::json!({"a": 1}), json::json!({"a": 2})]).await;
+        assert!(forwarded.is_empty(), "{forwarded:?}");
+        assert!(errors.is_empty(), "{errors:?}");
+    }
+
+    #[tokio::test]
+    async fn test_vrl_result_array_error_forwards_the_batch_and_reports() {
+        let source = "#ResultArray#\nx = string!(.[0].missing)\n.";
+        let records = vec![json::json!({"a": 1}), json::json!({"a": 2})];
+        let (forwarded, errors) = run_vrl_function_node(source, records.clone()).await;
+        assert_eq!(forwarded, records);
+        assert_eq!(errors.len(), 1);
+    }
+
+    #[test]
+    fn test_a_failed_cross_type_ingestion_is_reported_on_the_source_stream() {
+        let source = StreamParams::new("org-1", "src", StreamType::Logs);
+        let destination = StreamParams::new("org-1", "cpu", StreamType::Metrics);
+        let cases = [
+            (Some(200), None),
+            (
+                Some(500),
+                Some("cross-type ingestion to metrics:cpu failed (status 500)"),
+            ),
+            (
+                None,
+                Some("cross-type ingestion to metrics:cpu failed: request error"),
+            ),
+        ];
+        for (status, expected) in cases {
+            let error = cross_type_ingest_error(
+                ("pipe-1", "wf-1"),
+                ("leaf-1", "stream"),
+                source.clone(),
+                &destination,
+                status,
+                7,
+            );
+            let Some(expected) = expected else {
+                assert!(error.is_none(), "{status:?}");
+                continue;
+            };
+            let error = error.expect("a failure is reported");
+            assert_eq!((error._timestamp, &error.stream_params), (7, &source));
+            let ErrorSource::Pipeline(report) = error.error_source else {
+                panic!("not a pipeline error");
+            };
+            assert_eq!(
+                (report.pipeline_id.as_str(), report.pipeline_name.as_str()),
+                ("pipe-1", "wf-1")
+            );
+            let node = &report.node_errors["leaf-1"];
+            let messages: Vec<&str> = node.errors.iter().map(|(m, _)| m.as_str()).collect();
+            assert_eq!(messages, vec![expected]);
+        }
     }
 
     // --- new_from_workflow trigger-node selection ---

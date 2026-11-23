@@ -42,6 +42,7 @@ pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 pub const PIPELINE_EXEC_FAILED: &str = "pipeline_execution_failed";
 pub const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
+pub const STREAM_BEING_DELETED: &str = "stream_being_deleted";
 pub const ACTION_PARSE_FAILED: &str = "action_parse_failed";
 
 /// Request positions of one stream's `_bulk` actions, kept beside its records.

@@ -216,6 +216,9 @@ pub struct ScheduledTriggerData {
     /// field while a retry is in flight.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notified_destinations: Vec<String>,
+    /// Scheduled pipelines only: destination streams written for a window not yet advanced.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub written_destinations: Option<WindowLedger>,
     /// Phase-2: rendered chart id, reused across destinations and retries.
     ///
     /// RESERVED AND INTENTIONALLY UNUSED — no reader and no writer exists yet;
@@ -270,6 +273,7 @@ impl ScheduledTriggerData {
         // guarantees it cannot outlive its notification cycle and suppress
         // delivery on the NEXT firing.
         self.notified_destinations.clear();
+        self.written_destinations = None;
     }
 
     /// Forgets the delivery cycle, so the next firing pages as the alert's first.
@@ -286,6 +290,13 @@ impl ScheduledTriggerData {
     pub fn from_json_string(s: &str) -> Result<Self, serde_json::Error> {
         json::from_str(s)
     }
+}
+
+/// The destinations a scheduled pipeline run wrote for the window ending at `end`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct WindowLedger {
+    pub end: i64,
+    pub destinations: Vec<String>,
 }
 
 /// Super-cluster payload for an alert run that moved only the per-run fields of its job row.
@@ -530,6 +541,7 @@ mod tests {
             delivery_silenced_until: None,
             last_notified_level: None,
             notified_destinations: vec![],
+            written_destinations: None,
             chart_id: None,
             #[cfg(feature = "enterprise")]
             siem: None,
@@ -599,6 +611,7 @@ mod tests {
             delivery_silenced_until: None,
             last_notified_level: None,
             notified_destinations: vec![],
+            written_destinations: None,
             chart_id: None,
             #[cfg(feature = "enterprise")]
             siem: None,
@@ -797,6 +810,7 @@ mod tests {
             delivery_silenced_until: None,
             last_notified_level: None,
             notified_destinations: vec![],
+            written_destinations: None,
             chart_id: None,
             #[cfg(feature = "enterprise")]
             siem: None,

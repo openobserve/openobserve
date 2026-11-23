@@ -871,7 +871,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(db::session::watch());
     }
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_scheduler() {
-        tokio::task::spawn(enrichment_data::enrichment_table::runtime::watch());
+        tokio::task::spawn(enrichment_data::enrichment_table::runtime::watch(
+            openobserve_core::pipeline::db::recompile_enrichment_table_readers,
+        ));
     }
 
     tokio::task::yield_now().await;

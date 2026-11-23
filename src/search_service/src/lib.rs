@@ -516,26 +516,7 @@ pub async fn search_multi(
                         &stream_names,
                     );
                     vrl_errors.record_rows(row_count, err);
-                    ret_val
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .filter_map(|v| {
-                            if per_query_resp {
-                                let flattened_array = v
-                                    .as_array()
-                                    .unwrap()
-                                    .iter()
-                                    .map(|item| {
-                                        config::utils::flatten::flatten(item.clone()).unwrap()
-                                    })
-                                    .collect::<Vec<_>>();
-                                Some(serde_json::Value::Array(flattened_array))
-                            } else {
-                                flatten_vrl_result(v.clone())
-                            }
-                        })
-                        .collect()
+                    flatten_result_array(&ret_val, per_query_resp)?
                 } else {
                     multi_res
                         .hits
@@ -1203,6 +1184,29 @@ fn flatten_vrl_result(value: json::Value) -> Option<json::Value> {
     (!value.is_null()).then(|| config::utils::flatten::flatten(value).unwrap())
 }
 
+/// Flattens a `#ResultArray#` function's output, one array per query when `per_query_resp`. [pure]
+fn flatten_result_array(
+    ret_val: &json::Value,
+    per_query_resp: bool,
+) -> Result<Vec<json::Value>, Error> {
+    let expected_array = || Error::Message("Expected array".to_string());
+    let mut out = Vec::new();
+    for v in ret_val.as_array().ok_or_else(expected_array)? {
+        if per_query_resp {
+            let flattened_array = v
+                .as_array()
+                .ok_or_else(expected_array)?
+                .iter()
+                .map(|item| config::utils::flatten::flatten(item.clone()).unwrap())
+                .collect::<Vec<_>>();
+            out.push(json::Value::Array(flattened_array));
+        } else if let Some(flattened) = flatten_vrl_result(v.clone()) {
+            out.push(flattened);
+        }
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -1221,6 +1225,27 @@ mod tests {
     use hashbrown::HashMap;
 
     use super::*;
+
+    #[test]
+    fn test_result_array_output_that_is_not_an_array_is_an_error() {
+        let rows = json::json!([{"a": {"b": 1}}, null]);
+        assert_eq!(
+            flatten_result_array(&rows, false).unwrap(),
+            vec![json::json!({"a_b": 1})]
+        );
+        assert_eq!(
+            flatten_result_array(&json::json!([[{"a": {"b": 1}}]]), true).unwrap(),
+            vec![json::json!([{"a_b": 1}])]
+        );
+        for (ret_val, per_query_resp) in [
+            (json::json!({"a": 1}), false),
+            (json::json!({"a": 1}), true),
+            (json::json!([{"a": 1}]), true),
+        ] {
+            let err = flatten_result_array(&ret_val, per_query_resp).unwrap_err();
+            assert!(err.to_string().contains("Expected array"), "{err}");
+        }
+    }
 
     #[test]
     fn test_flatten_vrl_result_filters_null_and_preserves_nested_records() {
