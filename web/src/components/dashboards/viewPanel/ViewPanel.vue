@@ -107,7 +107,7 @@
               <OButton
                 :variant="refreshOptionsVariant"
                 size="icon-toolbar"
-                class="w-5!"
+                class="w-6!"
                 :disabled="disable"
                 :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
                 data-test="dashboard-viewpanel-refresh-options-btn"

@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   :variant="refreshOptionsVariant"
                   size="icon-toolbar"
-                  class="w-5"
+                  class="w-6"
                   :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
                   data-test="dashboard-refresh-options-btn"
                   icon-left="arrow-drop-down"
