@@ -104,7 +104,9 @@ const HOST_METRICS_IMPORT: PackSharedDashboard = {
   create: async (org) => {
     const result = await importHostMetricsDashboard(org);
     if (result.status === "error") throw failure(result);
-    return result.status === "created";
+    return result.status === "created"
+      ? { id: result.dashboardId, folderId: result.folderId }
+      : null;
   },
 };
 

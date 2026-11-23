@@ -280,7 +280,17 @@ export function useStarterPacks(org: string) {
     };
     const { shared } = dashboard;
     if (shared) {
-      return { lookup: () => shared.find(org), create: () => shared.create(org), snapshot, remove };
+      let made: FoundItem | null = null;
+      return {
+        // Another install's import carries the same title, so the one this call made wins.
+        lookup: async () => (made?.id ? made : shared.find(org)),
+        create: async () => {
+          made = await shared.create(org);
+          return made !== null;
+        },
+        snapshot,
+        remove,
+      };
     }
     let savedId: string | undefined;
     return {
@@ -901,7 +911,6 @@ export function useStarterPacks(org: string) {
     pack: StarterPack,
     item: PackRecordItem,
     items: PackRecordItem[],
-    adapter: PackItemAdapter,
     found: FoundItem,
     body: Record<string, any>,
   ): Promise<boolean> => {
@@ -911,7 +920,10 @@ export function useStarterPacks(org: string) {
       return own.every((tag) => tags.includes(tag));
     }
     if (item.kind !== "dashboard") return true;
-    if (isShared(pack, item)) return (await adapter.lookup())?.id === found.id;
+    // Two installs can each import it, so the shared title, not the first match, marks ours.
+    if (isShared(pack, item)) {
+      return body.title === pack.dashboards.find(({ id }) => id === item.itemId)?.title;
+    }
     const folderId = folderIdOf(items, "dashboards");
     if (!folderId || found.folderId !== folderId) return false;
     const rows = await readQuery(dashboardsByFolderQuery(org, folderId), true);
@@ -933,7 +945,7 @@ export function useStarterPacks(org: string) {
       } else {
         const body = (await adapter.snapshot(found)) as Record<string, any>;
         if (contentHash(body) !== item.sourceHash) return "changed";
-        if (!(await ownsItem(pack, item, items, adapter, found, body))) return "changed";
+        if (!(await ownsItem(pack, item, items, found, body))) return "changed";
       }
       await adapter.remove(found);
       return null;

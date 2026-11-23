@@ -1450,7 +1450,7 @@ describe("useStarterPacks", () => {
         create: vi.fn(async () => {
           seen = true;
           setupCardImport();
-          return false;
+          return null;
         }),
       };
       const [dashboard] = HOSTS.dashboards;
@@ -1458,6 +1458,27 @@ describe("useStarterPacks", () => {
       const record = await packs().installPack(pack);
       expect(shared.create).toHaveBeenCalledTimes(1);
       expect(dashboardItem(record)).toMatchObject({ status: "existing", id: "setup-card" });
+    });
+
+    it("keeps its own dashboard's id when another install creates one at the same time", async () => {
+      fake.state.onRequest = (method, url, body) => {
+        if (method !== "post" || !url.includes("/api/org/dashboards")) return;
+        fake.state.onRequest = null;
+        fake.state.dashboards.unshift({
+          dashboard_id: "other-host",
+          title: body.title,
+          folder_id: "default",
+          body,
+        });
+      };
+      const api = packs();
+      const record = await api.installPack(HOSTS);
+
+      expect(hostDashboards()).toHaveLength(2);
+      expect(dashboardItem(record)).toMatchObject({ status: "created" });
+      expect((dashboardItem(record) as { id?: string }).id).not.toBe("other-host");
+      await api.undoPack(HOSTS, record.installId);
+      expect(hostDashboards().map(({ dashboard_id }) => dashboard_id)).toEqual(["other-host"]);
     });
 
     it("links a dashboard the setup card imported after the plan, and never owns it", async () => {
