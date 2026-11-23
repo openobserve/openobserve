@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "삭제 시작 실패.",
       "organizationResurrected": "조직이 복원되었습니다.",
       "failedToResurrect": "복원 실패.",
+      "organizationBlocked": "조직이 차단되었습니다.",
+      "failedToBlock": "차단하지 못했습니다.",
+      "organizationUnblocked": "조직 차단이 해제되었습니다.",
+      "failedToUnblock": "차단을 해제하지 못했습니다.",
       "organizationUpdated": "조직이 성공적으로 업데이트되었습니다.",
       "organizationAdded": "조직이 성공적으로 추가되었습니다.",
       "requestCompleted": "요청이 성공적으로 완료되었습니다.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "{n}일 남음",
     "resurrect": "조직 복구",
     "statusActive": "활성",
-    "statusDeleting": "삭제 중"
+    "statusDeleting": "삭제 중",
+    "statusBlocked": "차단됨",
+    "block": "조직 차단",
+    "unblock": "조직 차단 해제",
+    "blockConfirmMessage": "{name}을(를) 차단하시겠습니까? 차단을 해제할 때까지 수집, 쿼리, 로그인을 받지 않습니다.",
+    "blockConfirmLabel": "차단"
   },
   "template": {
     "search": "템플릿 검색"
@@ -14979,6 +14988,12 @@
       "quickMuteTooltip": "알림에서 빠른 음소거",
       "endedLabel": "종료됨"
     },
+    "lease": {
+      "temporary": "{who}이(가) 생성한 임시 항목, {time}에 종료",
+      "incidentsOn": "{who}이(가) 인시던트 생성을 켬, {time}까지",
+      "incidentsOff": "{who}이(가) 인시던트 생성을 끔, {time}까지",
+      "why": "{label}. 이유: {reason}"
+    },
     "ack": {
       "acknowledge": "확인",
       "acknowledgeGroups": "모든 {count}개 발생 그룹 | 모든 {count}개 발생 그룹",
@@ -16217,6 +16232,36 @@
     "nodesDesc": "클러스터 노드 및 상태",
     "licenseDesc": "엔터프라이즈 라이선스 세부 정보",
     "organizationManagementDesc": "조직 생성 및 관리",
+    "userManagement": "사용자 관리",
+    "userManagementDesc": "모든 조직의 사용자를 찾아 차단합니다",
+    "userManagementPage": {
+      "subtitle": "모든 조직의 사용자와 SSO 차단 상태",
+      "searchPlaceholder": "이메일 또는 사용자 ID로 검색",
+      "allOrganizations": "모든 조직",
+      "filterByOrganization": "조직으로 필터링",
+      "email": "이메일",
+      "organizations": "조직",
+      "blockState": "차단 상태",
+      "orgCount": "{count}개 조직 | {count}개 조직",
+      "notBlocked": "차단되지 않음",
+      "blockedByEmail": "이메일로 차단됨",
+      "blockedByDomain": "도메인으로 차단됨",
+      "block": "차단",
+      "unblock": "차단 해제",
+      "blockConfirmTitle": "이 사용자를 차단하시겠습니까?",
+      "blockConfirmMessage": "{email}이(가) SSO 차단 목록에 추가되고 도메인 제한이 켜집니다.",
+      "blocked": "{email}이(가) 차단되었습니다",
+      "unblocked": "{email}의 차단이 해제되었습니다",
+      "updateFailed": "SSO 차단 목록을 업데이트할 수 없습니다",
+      "dormantRules": "도메인 제한이 꺼져 있으며, 켜면 저장된 규칙도 함께 적용됩니다. {page}에서 이 사용자를 차단하세요.",
+      "detailsTitle": "사용자 세부 정보",
+      "userId": "사용자 ID",
+      "orgId": "조직 ID",
+      "orgName": "조직",
+      "role": "역할",
+      "noOrganizations": "어떤 조직의 구성원도 아닙니다",
+      "ssoOnlyHint": "이 이메일이 SSO로 로그인할 때 적용됩니다"
+    },
     "queryManagement": "쿼리 관리",
     "scrapintervalLabel": "스크래핑 간격 (초) *",
     "logoLabel": "드래그 앤 드롭 로고 이미지",
@@ -16471,7 +16516,8 @@
       "noEmails": "아직 나열된 이메일 주소가 없습니다.",
       "removeDomain": "{domain} 제거",
       "removeEmail": "{email} 제거",
-      "saved": "SSO 설정이 저장되었습니다"
+      "saved": "SSO 설정이 저장되었습니다",
+      "blocksRemovedKeepsAllowRule": "차단이 제거되었습니다. {domain}의 허용 규칙은 유지됩니다."
     },
     "general": {
       "close": "닫기",
@@ -23833,6 +23879,7 @@
       "llmProviders": "LLM 공급자",
       "aiToolsets": "AI 툴셋",
       "orgManagement": "조직 관리",
+      "userManagement": "사용자 관리",
       "rumErrors": "RUM — 오류 추적",
       "rumSessions": "{product} — 세션",
       "sourceMaps": "RUM — 소스 맵",
@@ -23950,6 +23997,7 @@
       "llmProvidersRefresh": "목록 새로 고침",
       "aiToolsetsRefresh": "목록 새로 고침",
       "orgManagementRefresh": "목록 새로 고침",
+      "userManagementRefresh": "목록 새로 고침",
       "rumErrorsRefresh": "목록 새로 고침",
       "rumErrorsCopyUrl": "오류 추적 공유 URL 복사",
       "rumSessionsRefresh": "목록 새로 고침",

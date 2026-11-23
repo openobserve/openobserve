@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "Không thể bắt đầu xóa.",
       "organizationResurrected": "Tổ chức đã được phục hồi.",
       "failedToResurrect": "Không thể phục hồi.",
+      "organizationBlocked": "Đã chặn tổ chức.",
+      "failedToBlock": "Chặn thất bại.",
+      "organizationUnblocked": "Đã bỏ chặn tổ chức.",
+      "failedToUnblock": "Bỏ chặn thất bại.",
       "organizationUpdated": "Cập nhật tổ chức thành công.",
       "organizationAdded": "Thêm tổ chức thành công.",
       "requestCompleted": "Yêu cầu hoàn thành thành công.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "Còn {n} ngày",
     "resurrect": "Khôi phục tổ chức",
     "statusActive": "Hoạt động",
-    "statusDeleting": "Đang xóa"
+    "statusDeleting": "Đang xóa",
+    "statusBlocked": "Đã chặn",
+    "block": "Chặn tổ chức",
+    "unblock": "Bỏ chặn tổ chức",
+    "blockConfirmMessage": "Chặn {name}? Tổ chức sẽ không nhận dữ liệu nhập, truy vấn và đăng nhập cho đến khi được bỏ chặn.",
+    "blockConfirmLabel": "Chặn"
   },
   "template": {
     "search": "Tìm kiếm mẫu"
@@ -14979,6 +14988,12 @@
       "quickMuteTooltip": "Tạm tắt nhanh từ cảnh báo",
       "endedLabel": "đã kết thúc"
     },
+    "lease": {
+      "temporary": "Tạm thời, được tạo bởi {who}, kết thúc lúc {time}",
+      "incidentsOn": "Tạo sự cố được {who} bật cho đến {time}",
+      "incidentsOff": "Tạo sự cố được {who} tắt cho đến {time}",
+      "why": "{label}. Lý do: {reason}"
+    },
     "ack": {
       "acknowledge": "Tiếp nhận",
       "acknowledgeGroups": "Tất cả {count} nhóm đang kích hoạt | Tất cả {count} nhóm đang kích hoạt",
@@ -16217,6 +16232,36 @@
     "nodesDesc": "Các nút cụm và tình trạng của chúng",
     "licenseDesc": "Chi tiết giấy phép doanh nghiệp",
     "organizationManagementDesc": "Tạo và quản lý tổ chức",
+    "userManagement": "Quản lý người dùng",
+    "userManagementDesc": "Tìm người dùng trong mọi tổ chức và chặn họ",
+    "userManagementPage": {
+      "subtitle": "Người dùng của mọi tổ chức và trạng thái chặn SSO của họ",
+      "searchPlaceholder": "Tìm theo email hoặc ID người dùng",
+      "allOrganizations": "Tất cả tổ chức",
+      "filterByOrganization": "Lọc theo tổ chức",
+      "email": "Email",
+      "organizations": "Tổ chức",
+      "blockState": "Trạng thái chặn",
+      "orgCount": "{count} tổ chức | {count} tổ chức",
+      "notBlocked": "Không bị chặn",
+      "blockedByEmail": "Bị chặn theo email",
+      "blockedByDomain": "Bị chặn theo tên miền",
+      "block": "Chặn",
+      "unblock": "Bỏ chặn",
+      "blockConfirmTitle": "Chặn người dùng này?",
+      "blockConfirmMessage": "{email} sẽ được thêm vào danh sách chặn SSO và giới hạn tên miền sẽ được bật.",
+      "blocked": "Đã chặn {email}",
+      "unblocked": "Đã bỏ chặn {email}",
+      "updateFailed": "Không thể cập nhật danh sách chặn SSO",
+      "dormantRules": "Giới hạn tên miền đang tắt, và bật chúng sẽ đồng thời áp dụng các quy tắc đã lưu. Hãy chặn người dùng này từ {page}.",
+      "detailsTitle": "Chi tiết người dùng",
+      "userId": "ID người dùng",
+      "orgId": "ID tổ chức",
+      "orgName": "Tổ chức",
+      "role": "Vai trò",
+      "noOrganizations": "Không thuộc tổ chức nào",
+      "ssoOnlyHint": "Áp dụng khi email này đăng nhập qua SSO"
+    },
     "queryManagement": "Quản lý truy vấn",
     "scrapintervalLabel": "Khoảng thời gian thu thập (tính bằng giây) *",
     "logoLabel": "Kéo & Thả hình ảnh logo",
@@ -16471,7 +16516,8 @@
       "noEmails": "Chưa có địa chỉ email nào được liệt kê.",
       "removeDomain": "Xóa {domain}",
       "removeEmail": "Xóa {email}",
-      "saved": "Đã lưu cài đặt SSO"
+      "saved": "Đã lưu cài đặt SSO",
+      "blocksRemovedKeepsAllowRule": "Đã gỡ chặn. {domain} vẫn giữ quy tắc cho phép."
     },
     "general": {
       "close": "Đóng",
@@ -23833,6 +23879,7 @@
       "llmProviders": "Nhà cung cấp LLM",
       "aiToolsets": "Bộ công cụ AI",
       "orgManagement": "Quản lý tổ chức",
+      "userManagement": "Quản lý người dùng",
       "rumErrors": "RUM — Theo dõi lỗi",
       "rumSessions": "{product} — Phiên",
       "sourceMaps": "RUM — Bản đồ nguồn",
@@ -23950,6 +23997,7 @@
       "llmProvidersRefresh": "Làm mới danh sách",
       "aiToolsetsRefresh": "Làm mới danh sách",
       "orgManagementRefresh": "Làm mới danh sách",
+      "userManagementRefresh": "Làm mới danh sách",
       "rumErrorsRefresh": "Làm mới danh sách",
       "rumErrorsCopyUrl": "Sao chép URL chia sẻ theo dõi lỗi",
       "rumSessionsRefresh": "Làm mới danh sách",

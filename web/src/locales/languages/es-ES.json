@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "Error al iniciar la eliminación.",
       "organizationResurrected": "Organización restaurada.",
       "failedToResurrect": "Error al restaurar.",
+      "organizationBlocked": "Organización bloqueada.",
+      "failedToBlock": "Error al bloquear.",
+      "organizationUnblocked": "Organización desbloqueada.",
+      "failedToUnblock": "Error al desbloquear.",
       "organizationUpdated": "Organización actualizada exitosamente.",
       "organizationAdded": "Organización agregada exitosamente.",
       "requestCompleted": "Solicitud completada exitosamente.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "{n} días restantes",
     "resurrect": "Restaurar organización",
     "statusActive": "Activo",
-    "statusDeleting": "Eliminando"
+    "statusDeleting": "Eliminando",
+    "statusBlocked": "Bloqueada",
+    "block": "Bloquear organización",
+    "unblock": "Desbloquear organización",
+    "blockConfirmMessage": "¿Bloquear {name}? Dejará de aceptar ingesta, consultas e inicios de sesión hasta que se desbloquee.",
+    "blockConfirmLabel": "Bloquear"
   },
   "template": {
     "search": "Buscar plantilla"
@@ -14979,6 +14988,12 @@
       "quickMuteTooltip": "Silenciamiento rápido desde una alerta",
       "endedLabel": "finalizado"
     },
+    "lease": {
+      "temporary": "Temporal, creado por {who}, finaliza a las {time}",
+      "incidentsOn": "Creación de incidentes activada por {who} hasta {time}",
+      "incidentsOff": "Creación de incidentes desactivada por {who} hasta {time}",
+      "why": "{label}. Motivo: {reason}"
+    },
     "ack": {
       "acknowledge": "Reconocer",
       "acknowledgeGroups": "Todo el grupo disparado ({count}) | Todos los {count} grupos disparados",
@@ -16217,6 +16232,36 @@
     "nodesDesc": "Nodos del clúster y su estado",
     "licenseDesc": "Detalles de la licencia Enterprise",
     "organizationManagementDesc": "Crea y gestiona organizaciones",
+    "userManagement": "Gestión de usuarios",
+    "userManagementDesc": "Busca usuarios de todas las organizaciones y bloquéalos",
+    "userManagementPage": {
+      "subtitle": "Usuarios de todas las organizaciones y su estado de bloqueo SSO",
+      "searchPlaceholder": "Buscar por correo o ID de usuario",
+      "allOrganizations": "Todas las organizaciones",
+      "filterByOrganization": "Filtrar por organización",
+      "email": "Correo electrónico",
+      "organizations": "Organizaciones",
+      "blockState": "Estado de bloqueo",
+      "orgCount": "{count} organización | {count} organizaciones",
+      "notBlocked": "No bloqueado",
+      "blockedByEmail": "Bloqueado por correo",
+      "blockedByDomain": "Bloqueado por dominio",
+      "block": "Bloquear",
+      "unblock": "Desbloquear",
+      "blockConfirmTitle": "¿Bloquear a este usuario?",
+      "blockConfirmMessage": "{email} se añade a la lista de bloqueo de SSO y se activan las restricciones de dominio.",
+      "blocked": "{email} está bloqueado",
+      "unblocked": "{email} está desbloqueado",
+      "updateFailed": "No se pudo actualizar la lista de bloqueo de SSO",
+      "dormantRules": "Las restricciones de dominio están desactivadas y activarlas también aplicaría las reglas que contienen. Bloquea a este usuario desde {page}.",
+      "detailsTitle": "Detalles del usuario",
+      "userId": "ID de usuario",
+      "orgId": "ID de organización",
+      "orgName": "Organización",
+      "role": "Rol",
+      "noOrganizations": "No es miembro de ninguna organización",
+      "ssoOnlyHint": "Se aplica cuando este correo inicia sesión mediante SSO"
+    },
     "queryManagement": "Gestión de consultas",
     "scrapintervalLabel": "Intervalo de raspado (en segundos) *",
     "logoLabel": "Imagen de logotipo (arrastrar y soltar)",
@@ -16471,7 +16516,8 @@
       "noEmails": "Aún no hay direcciones de correo electrónico en la lista.",
       "removeDomain": "Eliminar {domain}",
       "removeEmail": "Eliminar {email}",
-      "saved": "Ajustes de SSO guardados"
+      "saved": "Ajustes de SSO guardados",
+      "blocksRemovedKeepsAllowRule": "Bloqueos eliminados. {domain} conserva su regla de permiso."
     },
     "general": {
       "close": "Cerrar",
@@ -23833,6 +23879,7 @@
       "llmProviders": "Proveedores de LLM",
       "aiToolsets": "Conjuntos de herramientas de IA",
       "orgManagement": "Administración de la organización",
+      "userManagement": "Gestión de usuarios",
       "rumErrors": "RUM — Seguimiento de errores",
       "rumSessions": "{product} — Sesiones",
       "sourceMaps": "RUM — Mapas de origen",
@@ -23950,6 +23997,7 @@
       "llmProvidersRefresh": "Actualizar lista",
       "aiToolsetsRefresh": "Actualizar lista",
       "orgManagementRefresh": "Actualizar lista",
+      "userManagementRefresh": "Actualizar lista",
       "rumErrorsRefresh": "Actualizar lista",
       "rumErrorsCopyUrl": "Copiar URL para compartir el seguimiento de errores",
       "rumSessionsRefresh": "Actualizar lista",
