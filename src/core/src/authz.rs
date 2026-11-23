@@ -44,6 +44,9 @@ use crate::auth::AuthExtractor;
 const MAX_SHORTCUT_ID_LEN: usize = 200;
 
 #[cfg(any(feature = "enterprise", test))]
+const MAX_CONCURRENT_CHECKS: usize = 16;
+
+#[cfg(any(feature = "enterprise", test))]
 pub const STREAM_ACCESS_HINT: &str = "Ask an org admin for read access to the listed streams, or change the query to streams you can read.";
 
 #[cfg(feature = "enterprise")]
@@ -780,17 +783,22 @@ pub async fn authorize_with(
     user_id: &str,
     sources: &[QuerySource],
 ) -> Result<(), StreamAccessDenied> {
-    use futures::future::join_all;
+    use futures::{StreamExt, stream};
 
     if !checker.enforces_rbac().await || checker.is_root(user_id).await {
         return Ok(());
     }
     let resolved = resolve_query_sources(sources);
     let orgs = source_orgs(&resolved);
-    let admin_flags = join_all(
+    // Futures are collected first: a lazy closure stream breaks the callers' Send proof
+    // (rust#100013).
+    let admin_flags = stream::iter(
         orgs.iter()
-            .map(|org| checker.is_root_or_admin(org, user_id)),
+            .map(|org| checker.is_root_or_admin(org, user_id))
+            .collect::<Vec<_>>(),
     )
+    .buffered(MAX_CONCURRENT_CHECKS)
+    .collect::<Vec<_>>()
     .await;
     let admin_orgs: HashSet<&str> = orgs
         .iter()
@@ -813,18 +821,25 @@ pub async fn authorize_with(
         .iter()
         .filter(|(org, ..)| !admin_orgs.contains(org.as_str()))
         .collect();
-    let (stream_ok, key_ok, dashboard_ok) = futures::join!(
-        join_all(streams.iter().map(|s| checker.can_read_stream(user_id, s))),
-        join_all(
+    let checks = streams
+        .iter()
+        .map(|s| checker.can_read_stream(user_id, s))
+        .chain(
             keys.iter()
-                .map(|(org, key)| checker.can_use_cipher_key(org, user_id, key))
-        ),
-        join_all(
+                .map(|(org, key)| checker.can_use_cipher_key(org, user_id, key)),
+        )
+        .chain(
             dashboards
                 .iter()
-                .map(|(org, folder, id)| checker.can_read_dashboard(org, user_id, folder, id))
-        ),
-    );
+                .map(|(org, folder, id)| checker.can_read_dashboard(org, user_id, folder, id)),
+        )
+        .collect::<Vec<_>>();
+    let mut stream_ok = stream::iter(checks)
+        .buffered(MAX_CONCURRENT_CHECKS)
+        .collect::<Vec<bool>>()
+        .await;
+    let dashboard_ok = stream_ok.split_off(streams.len() + keys.len());
+    let key_ok = stream_ok.split_off(streams.len());
 
     let mut denials: Vec<Denial> = streams
         .into_iter()
@@ -1253,7 +1268,10 @@ fn source_label(source: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::{
+        collections::HashSet,
+        sync::atomic::{AtomicUsize, Ordering},
+    };
 
     use super::*;
 
@@ -1267,6 +1285,9 @@ mod tests {
         org_wide: HashSet<(String, String, StreamType)>,
         org_wide_fails: bool,
         org_wide_asked: std::sync::Mutex<Vec<Vec<StreamType>>>,
+        overlap_checks: bool,
+        active_checks: AtomicUsize,
+        peak_checks: AtomicUsize,
     }
 
     impl FakeChecker {
@@ -1294,6 +1315,18 @@ mod tests {
         fn org_wide_asked(&self) -> Vec<Vec<StreamType>> {
             self.org_wide_asked.lock().unwrap().clone()
         }
+
+        async fn track_check(&self) {
+            if !self.overlap_checks {
+                return;
+            }
+            let active = self.active_checks.fetch_add(1, Ordering::SeqCst) + 1;
+            self.peak_checks.fetch_max(active, Ordering::SeqCst);
+            for _ in 0..(MAX_CONCURRENT_CHECKS - active % MAX_CONCURRENT_CHECKS) {
+                tokio::task::yield_now().await;
+            }
+            self.active_checks.fetch_sub(1, Ordering::SeqCst);
+        }
     }
 
     #[async_trait::async_trait]
@@ -1307,11 +1340,13 @@ mod tests {
         }
 
         async fn is_root_or_admin(&self, org_id: &str, user_id: &str) -> bool {
+            self.track_check().await;
             self.admins
                 .contains(&(user_id.to_string(), org_id.to_string()))
         }
 
         async fn can_read_stream(&self, user_id: &str, stream: &TypedStream) -> bool {
+            self.track_check().await;
             self.stream_checks
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let key = format!("{}/{}/{}", stream.org_id, stream.stream_type, stream.name);
@@ -1339,6 +1374,7 @@ mod tests {
         }
 
         async fn can_use_cipher_key(&self, org_id: &str, user_id: &str, key: &str) -> bool {
+            self.track_check().await;
             self.readable
                 .contains(&(user_id.to_string(), format!("{org_id}/key/{key}")))
         }
@@ -1350,6 +1386,7 @@ mod tests {
             folder: &str,
             dashboard_id: &str,
         ) -> bool {
+            self.track_check().await;
             self.readable.contains(&(
                 user_id.to_string(),
                 format!("{org_id}/dashboard/{folder}/{dashboard_id}"),
@@ -1388,6 +1425,119 @@ mod tests {
             .iter()
             .map(|s| format!("{}/{}", s.stream_type, s.name))
             .collect()
+    }
+
+    fn authorization_volume() -> (FakeChecker, Vec<QuerySource>, Vec<Denial>) {
+        let mut checker = FakeChecker {
+            overlap_checks: true,
+            ..Default::default()
+        };
+        let mut sources = Vec::new();
+        let mut stream_denials = Vec::new();
+        let mut key_denials = Vec::new();
+        let mut dashboard_denials = Vec::new();
+        for i in 0..100 {
+            let org = format!("org{i}");
+            let name = format!("stream{i}");
+            let key = format!("key{i}");
+            let folder = format!("folder{i}");
+            let id = format!("dashboard{i}");
+            sources.push(sql(
+                &org,
+                &format!("SELECT decrypt(body, '{key}') FROM {name}"),
+            ));
+            sources.push(QuerySource::Dashboard {
+                org_id: org.clone(),
+                folder: folder.clone(),
+                dashboard_id: id.clone(),
+            });
+            if i % 7 == 0 {
+                checker = checker.admin("u1", &org);
+            }
+            if i % 3 != 0 {
+                checker = checker.reads("u1", &format!("{org}/logs/{name}"));
+            } else if i % 7 != 0 {
+                stream_denials.push(Denial::Stream(TypedStream {
+                    org_id: org.clone(),
+                    stream_type: StreamType::Logs,
+                    name,
+                }));
+            }
+            if i % 4 != 0 {
+                checker = checker.reads("u1", &format!("{org}/key/{key}"));
+            } else if cfg!(feature = "enterprise") && i % 7 != 0 {
+                key_denials.push(Denial::CipherKey(key));
+            }
+            if i % 5 != 0 {
+                checker = checker.reads("u1", &format!("{org}/dashboard/{folder}/{id}"));
+            } else if i % 7 != 0 {
+                dashboard_denials.push(Denial::Dashboard { folder, id });
+            }
+        }
+        stream_denials.extend(key_denials);
+        stream_denials.extend(dashboard_denials);
+        (checker, sources, stream_denials)
+    }
+
+    #[tokio::test]
+    async fn authorize_with_preserves_denial_order_for_large_mixed_batches() {
+        let (checker, sources, expected) = authorization_volume();
+        let denied = authorize_with(&checker, "u1", &sources).await.unwrap_err();
+        assert_eq!(denied.denials, expected);
+    }
+
+    #[tokio::test]
+    async fn authorize_with_bounds_total_concurrent_checks() {
+        let (_, sources, _) = authorization_volume();
+        let checker = FakeChecker {
+            overlap_checks: true,
+            ..Default::default()
+        };
+        assert!(authorize_with(&checker, "u1", &sources).await.is_err());
+        let peak = checker.peak_checks.load(Ordering::SeqCst);
+        assert!(peak <= 16, "peak concurrent checks: {peak}");
+        assert!(peak > 1, "checks must overlap: {peak}");
+        assert_eq!(checker.active_checks.load(Ordering::SeqCst), 0);
+        assert_eq!(checker.stream_checks(), 100);
+    }
+
+    #[tokio::test]
+    async fn authorize_with_shares_one_bound_across_kinds() {
+        let per_kind = MAX_CONCURRENT_CHECKS / 2 + 2;
+        assert!(per_kind < MAX_CONCURRENT_CHECKS && 2 * per_kind > MAX_CONCURRENT_CHECKS);
+        let checker = FakeChecker {
+            overlap_checks: true,
+            ..Default::default()
+        };
+        let mut sources = Vec::new();
+        let mut expected = Vec::new();
+        let mut dashboard_denials = Vec::new();
+        for i in 0..per_kind {
+            let name = format!("stream{i}");
+            let folder = format!("folder{i}");
+            let id = format!("dashboard{i}");
+            sources.push(sql("o1", &format!("SELECT * FROM {name}")));
+            sources.push(QuerySource::Dashboard {
+                org_id: "o1".to_string(),
+                folder: folder.clone(),
+                dashboard_id: id.clone(),
+            });
+            expected.push(Denial::Stream(TypedStream {
+                org_id: "o1".to_string(),
+                stream_type: StreamType::Logs,
+                name,
+            }));
+            dashboard_denials.push(Denial::Dashboard { folder, id });
+        }
+        expected.extend(dashboard_denials);
+
+        let denied = authorize_with(&checker, "u1", &sources).await.unwrap_err();
+        assert_eq!(
+            checker.peak_checks.load(Ordering::SeqCst),
+            MAX_CONCURRENT_CHECKS
+        );
+        assert_eq!(checker.active_checks.load(Ordering::SeqCst), 0);
+        assert_eq!(denied.denials, expected);
     }
 
     #[test]

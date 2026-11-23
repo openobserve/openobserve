@@ -33,6 +33,8 @@ use super::{
 };
 use crate::auth::check_permissions;
 
+const MAX_CONCURRENT_CHECKS: usize = 16;
+
 #[derive(Clone, Copy)]
 pub enum MatchOutput {
     Preview,
@@ -146,7 +148,7 @@ pub async fn individually_readable(
         Ok(Some(objects)) => granted_ids(&ofga_type, org, &objects, rows),
         // No list filtering configured: the per-row check the GET route runs decides.
         Ok(None) => {
-            let checks = rows.into_iter().map(|(id, folder_id)| async move {
+            let checks = bounded_checks(rows, |(id, folder_id)| async move {
                 check_permissions(
                     &id,
                     org,
@@ -161,11 +163,7 @@ pub async fn individually_readable(
                 .await
                 .then_some(id)
             });
-            futures::future::join_all(checks)
-                .await
-                .into_iter()
-                .flatten()
-                .collect()
+            checks.await.into_iter().flatten().collect()
         }
         Err(e) => {
             log::warn!("[downtimes] individual grants of {user_id} in {org} unreadable: {e}");
@@ -180,7 +178,7 @@ pub async fn retain_listable_folders(
     user_id: &str,
     folder_ids: impl IntoIterator<Item = String>,
 ) -> HashSet<String> {
-    let checks = folder_ids.into_iter().map(|folder_id| async move {
+    let checks = bounded_checks(folder_ids, |folder_id| async move {
         check_permissions(
             &folder_id,
             org,
@@ -195,11 +193,7 @@ pub async fn retain_listable_folders(
         .await
         .then_some(folder_id)
     });
-    futures::future::join_all(checks)
-        .await
-        .into_iter()
-        .flatten()
-        .collect()
+    checks.await.into_iter().flatten().collect()
 }
 
 /// Moves the folder tuple; writing a tuple that exists fails, so an unchanged folder is skipped.
@@ -211,6 +205,17 @@ pub async fn reparent(id: &str, from: &str, to: &str) {
     let folder = get_ofga_type("downtime_folders");
     set_parent_relation(id, &downtime, to, &folder).await;
     remove_parent_relation(id, &downtime, from, &folder).await;
+}
+
+async fn bounded_checks<T, F, Fut>(items: impl IntoIterator<Item = T>, check: F) -> Vec<Fut::Output>
+where
+    F: FnMut(T) -> Fut,
+    Fut: Future,
+{
+    stream::iter(items.into_iter().map(check))
+        .buffered(MAX_CONCURRENT_CHECKS)
+        .collect::<Vec<_>>()
+        .await
 }
 
 async fn can_read(org: &str, user_id: &str, module: TargetModule, id: &str, folder: &str) -> bool {
@@ -255,7 +260,7 @@ where
                 }
             }))
             // Ordered completion keeps the first readable entries when checks finish out of order.
-            .buffered(16)
+            .buffered(MAX_CONCURRENT_CHECKS)
             .boxed();
             while let Some((id, permitted)) = checks.next().await {
                 results.push((id, permitted));
@@ -472,6 +477,41 @@ fn verb(method: &str) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{super::matching::Item, *};
+
+    #[tokio::test]
+    async fn bounded_checks_preserves_join_all_answers_and_order() {
+        let check = |item: usize| async move {
+            for _ in 0..(16 - item % 16) {
+                tokio::task::yield_now().await;
+            }
+            (item, item % 3 != 0)
+        };
+        let expected = futures::future::join_all((0..100).map(check)).await;
+        assert_eq!(bounded_checks(0..100, check).await, expected);
+    }
+
+    #[tokio::test]
+    async fn bounded_checks_limits_concurrent_checks() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let active = AtomicUsize::new(0);
+        let peak = AtomicUsize::new(0);
+        let results = bounded_checks(0..100, |item| {
+            let (active, peak) = (&active, &peak);
+            async move {
+                let count = active.fetch_add(1, Ordering::SeqCst) + 1;
+                peak.fetch_max(count, Ordering::SeqCst);
+                tokio::task::yield_now().await;
+                active.fetch_sub(1, Ordering::SeqCst);
+                item % 3 != 0
+            }
+        })
+        .await;
+        assert_eq!(results.len(), 100);
+        assert!(peak.load(Ordering::SeqCst) <= 16);
+        assert!(peak.load(Ordering::SeqCst) > 1);
+        assert_eq!(active.load(Ordering::SeqCst), 0);
+    }
 
     fn visibility_inventory() -> Inventory {
         let items = || {
