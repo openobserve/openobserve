@@ -15,17 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <span
-    class="flex max-w-80 min-w-0 items-center gap-1 text-xs"
+  <!-- Icon only: the caveat is read once, then the label would only take toolbar room. -->
+  <button
+    type="button"
+    class="rounded-default hover:bg-surface-subtle flex size-7 shrink-0 items-center justify-center"
     :class="TONE_TEXT[tone]"
+    :aria-label="text"
     :data-test="dataTest"
   >
     <OTooltip side="bottom" :content="detail ?? text" />
-    <OIcon :name="icon ?? TONE_ICON[tone]" size="sm" class="shrink-0" />
-    <span v-if="!compact" class="min-w-0 truncate max-xl:hidden" :data-test="`${dataTest}-text`">
-      {{ text }}
-    </span>
-  </span>
+    <OIcon :name="icon ?? TONE_ICON[tone]" size="sm" />
+  </button>
 </template>
 
 <script setup lang="ts">
@@ -50,20 +50,17 @@ const TONE_ICON: Record<DbmToolbarNoteTone, IconName> = {
 
 withDefaults(
   defineProps<{
-    /** The short form, always one line; hidden below xl so it never starves the filter chips beside it. */
+    /** The short form: the button's accessible name, and the tooltip when there is no detail. */
     text: I18nText;
     detail?: I18nText;
     tone?: DbmToolbarNoteTone;
     icon?: IconName;
-    /** Icon only at every width, for a toolbar with no room left for text. */
-    compact?: boolean;
     dataTest?: string;
   }>(),
   {
     detail: undefined,
     tone: "neutral",
     icon: undefined,
-    compact: false,
     dataTest: "dbm-toolbar-note",
   },
 );
