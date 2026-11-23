@@ -260,7 +260,10 @@ mod tests {
     use super::*;
     use crate::table::{
         entity::status_page_custom_domains as domains,
-        migration::m20260825_000001_create_status_page_custom_domains as create_domains,
+        migration::{
+            m20260825_000001_create_status_page_custom_domains as create_domains,
+            m20261226_000001_status_page_domain_store as store,
+        },
     };
 
     /// The table as the release before this one left it.
@@ -294,8 +297,10 @@ mod tests {
         .unwrap();
     }
 
+    /// The entity reads `cname_label`, so the next migration's column comes with this one's.
     async fn migrate(db: &DatabaseConnection) {
         Migration.up(&SchemaManager::new(db)).await.unwrap();
+        store::Migration.up(&SchemaManager::new(db)).await.unwrap();
     }
 
     async fn row(db: &DatabaseConnection, id: &str) -> domains::Model {

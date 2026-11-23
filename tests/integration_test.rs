@@ -1816,6 +1816,7 @@ mod tests {
             last_checked_at: None,
             created_at: now,
             updated_at: now,
+            cname_label: Some(infra::table::status_pages::new_cname_label()),
             ..Default::default()
         };
         let conn = infra::db::get_orm_client_rw().await;
@@ -3117,7 +3118,8 @@ mod tests {
             .query_one(Statement::from_string(
                 conn.get_database_backend(),
                 "SELECT COUNT(*) AS n FROM pg_stat_activity WHERE datname = current_database() \
-                 AND wait_event_type = 'Lock' AND query LIKE 'DELETE FROM \"status_page%'",
+                 AND wait_event_type = 'Lock' AND (query LIKE 'DELETE FROM \"status_page%' \
+                 OR query LIKE 'SELECT \"status_pages\".\"id\" FROM \"status_pages\" %FOR UPDATE%')",
             ))
             .await
             .unwrap()
@@ -3814,6 +3816,7 @@ mod tests {
                 last_checked_at: None,
                 created_at: now,
                 updated_at: now,
+                cname_label: Some(infra::table::status_pages::new_cname_label()),
                 ..Default::default()
             };
             let conn = infra::db::get_orm_client_rw().await;

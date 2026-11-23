@@ -197,10 +197,18 @@ pub async fn rotate_slug(org_id: &str, id: &str) -> Result<String, anyhow::Error
 
 pub async fn delete_page(org_id: &str, id: &str) -> Result<bool, anyhow::Error> {
     let deleted = table::delete_page(infra::db::get_orm_client_rw().await, org_id, id).await?;
-    if deleted {
+    if deleted.existed {
         emit_delete(org_id, "status_pages", id).await;
     }
-    Ok(deleted)
+    emit_cert_changes(&deleted.hostnames).await;
+    Ok(deleted.existed)
+}
+
+/// Tells every node that these hostnames lost their certificate, after the commit that deleted
+/// it. Only an installation with built-in TLS on has a store to tell.
+pub async fn emit_cert_changes(_hostnames: &[String]) {
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::status_pages::cert_store::announce_changed(_hostnames).await;
 }
 
 /// Bulk component replace. **R-1 (top build risk):** every mapped check is

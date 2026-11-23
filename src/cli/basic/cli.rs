@@ -42,7 +42,7 @@ macro_rules! arg {
 }
 
 fn create_cli_app() -> Command {
-    Command::new("openobserve")
+    let app = Command::new("openobserve")
         .version(config::VERSION)
         .about(clap::crate_description!())
         .arg(arg!("config", 'c', "config", "Path to config file"))
@@ -160,6 +160,29 @@ fn create_cli_app() -> Command {
                 arg!("file", 'f', "file", "path to a `.ttv` file (e.g. data/.../index/.../{id}.ttv)", true),
                 arg!("raw", 'r', "raw", "also print the raw tantivy meta.json", false).action(ArgAction::SetTrue),
             ]),
+        ]);
+    #[cfg(feature = "enterprise")]
+    let app = app.subcommand(import_status_page_domain_cert_command());
+    app
+}
+
+#[cfg(feature = "enterprise")]
+fn import_status_page_domain_cert_command() -> Command {
+    Command::new("import-status-page-domain-cert")
+        .about("import a certificate and its key for the holder of a status page custom domain")
+        .args([
+            Arg::new("domain")
+                .long("domain")
+                .help("hostname of the custom domain")
+                .required(true),
+            Arg::new("cert")
+                .long("cert")
+                .help("PEM file with the certificate chain, leaf first")
+                .required(true),
+            Arg::new("key")
+                .long("key")
+                .help("PEM file with the private key")
+                .required(true),
         ])
 }
 
@@ -568,6 +591,16 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let files = files.iter().map(|f| f.to_string()).collect::<Vec<_>>();
             super::http::consistent_hash(files).await?;
         }
+        #[cfg(feature = "enterprise")]
+        "import-status-page-domain-cert" => {
+            if !o2_enterprise::enterprise::status_pages::cert_store::enabled() {
+                return Err(anyhow::anyhow!(
+                    "built-in TLS is off: set ZO_STATUS_PAGE_DOMAIN_TARGET, and run no super cluster"
+                ));
+            }
+            infra::init().await?;
+            import_status_page_domain_cert(&command).await?;
+        }
         "query-optimiser" => {
             let stream_name = command
                 .get_one::<String>("stream-name")
@@ -612,6 +645,37 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
 
     println!("command {name} execute successfully");
     Ok(true)
+}
+
+/// Reads both PEM files and stores the certificate; the key goes no further than the store.
+#[cfg(feature = "enterprise")]
+async fn import_status_page_domain_cert(command: &clap::ArgMatches) -> Result<(), anyhow::Error> {
+    let value = |id: &str| {
+        command
+            .get_one::<String>(id)
+            .ok_or_else(|| anyhow::anyhow!("please set --{id}"))
+    };
+    let read = |id: &str| -> Result<String, anyhow::Error> {
+        let path = value(id)?;
+        std::fs::read_to_string(path).map_err(|e| anyhow::anyhow!("cannot read {path}: {e}"))
+    };
+    let domain = value("domain")?;
+    let imported = o2_enterprise::enterprise::status_pages::cert_import::import_pem(
+        domain,
+        &read("cert")?,
+        &read("key")?,
+    )
+    .await?;
+    let until = chrono::Utc
+        .timestamp_micros(imported.not_after)
+        .single()
+        .map_or_else(|| imported.not_after.to_string(), |t| t.to_rfc3339());
+    println!(
+        "imported the certificate of {} (sha256 {}), valid until {until}; running nodes serve it \
+         after their next compare, within a minute",
+        imported.hostname, imported.fingerprint
+    );
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1098,6 +1162,70 @@ mod tests {
     fn test_missing_required_argument() {
         let app = create_test_app();
         let result = app.try_get_matches_from(["openobserve", "migrate-meta"]);
+        assert!(result.is_err());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_import_status_page_domain_cert_command_parsing() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from([
+                "openobserve",
+                "import-status-page-domain-cert",
+                "--domain",
+                "status.example.com",
+                "--cert",
+                "chain.pem",
+                "--key",
+                "key.pem",
+            ])
+            .unwrap();
+
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "import-status-page-domain-cert");
+        assert_eq!(
+            sub_matches.get_one::<String>("domain").unwrap(),
+            "status.example.com"
+        );
+        assert_eq!(sub_matches.get_one::<String>("cert").unwrap(), "chain.pem");
+        assert_eq!(sub_matches.get_one::<String>("key").unwrap(), "key.pem");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_import_status_page_domain_cert_needs_all_three_arguments() {
+        for missing in ["--domain", "--cert", "--key"] {
+            let mut args = vec!["openobserve", "import-status-page-domain-cert"];
+            for (flag, value) in [
+                ("--domain", "status.example.com"),
+                ("--cert", "chain.pem"),
+                ("--key", "key.pem"),
+            ] {
+                if flag != missing {
+                    args.extend([flag, value]);
+                }
+            }
+
+            let result = create_test_app().try_get_matches_from(args);
+
+            assert!(result.is_err(), "{missing} is required");
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn test_import_status_page_domain_cert_is_not_a_command_without_enterprise() {
+        let result = create_test_app().try_get_matches_from([
+            "openobserve",
+            "import-status-page-domain-cert",
+            "--domain",
+            "status.example.com",
+            "--cert",
+            "chain.pem",
+            "--key",
+            "key.pem",
+        ]);
         assert!(result.is_err());
     }
 

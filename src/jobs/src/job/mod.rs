@@ -707,6 +707,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "cpu-profiling")]
     tokio::task::spawn(openobserve_core::self_profiles::run());
 
+    // A router can run the domain listener, so the certificate store loads before the return below.
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::status_pages::cert_store::spawn_tasks();
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
@@ -1961,6 +1965,26 @@ mod tests {
         assert!(
             self_profiles < router_return,
             "single-role routers must run the self-profiles loop"
+        );
+    }
+
+    #[test]
+    fn the_certificate_store_is_spawned_before_the_router_return() {
+        let source = include_str!("mod.rs");
+        let init = source
+            .split("pub async fn init()")
+            .nth(1)
+            .and_then(|rest| rest.split("mod tests {").next())
+            .expect("init() body");
+        let store = init
+            .find("status_pages::cert_store::spawn_tasks();")
+            .expect("init() must call cert_store::spawn_tasks()");
+        let router_return = init
+            .find("if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role()")
+            .expect("router return in init()");
+        assert!(
+            store < router_return,
+            "single-role routers serve custom domains and need the store"
         );
     }
 

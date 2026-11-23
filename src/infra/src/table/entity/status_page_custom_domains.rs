@@ -38,6 +38,9 @@ pub struct Model {
     pub proof_failed_since: Option<i64>,
     /// When a non-holder claim is released; NULL for a holder.
     pub expires_at: Option<i64>,
+    /// The claim's CNAME label: 16 characters of `a-z2-7`, unique across all claims, kept on
+    /// release. NULL only on a row an older build inserted, until repair fills it.
+    pub cname_label: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

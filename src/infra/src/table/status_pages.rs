@@ -34,9 +34,9 @@ use sea_orm::{
 
 use super::entity::{
     status_page_audit_log, status_page_check_snoozes, status_page_component_checks,
-    status_page_components, status_page_custom_domains, status_page_notice_components,
-    status_page_notice_updates, status_page_notices, status_page_snapshots, status_pages,
-    synthetics_checks,
+    status_page_components, status_page_custom_domains, status_page_domain_certs,
+    status_page_notice_components, status_page_notice_updates, status_page_notices,
+    status_page_snapshots, status_pages, synthetics_checks,
 };
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
@@ -69,6 +69,9 @@ pub const HOLDER_RECHECK_MICROS: i64 = 6 * MICROS_PER_HOUR;
 pub const EXPIRED_LISTED_MICROS: i64 = 30 * 24 * MICROS_PER_HOUR;
 /// A repair pass completes at most this many claims; the next tick takes the rest.
 const REPAIR_BATCH: u64 = 200;
+/// A claim's CNAME label: 16 lowercase base32 characters, because DNS ignores case.
+const CNAME_LABEL_LEN: usize = 16;
+const CNAME_LABEL_ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
 
 /// What a new claim became; only `Created` wrote a row.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -77,6 +80,14 @@ pub enum ClaimInsert {
     HostnameTaken,
     CapReached,
     PageGone,
+}
+
+/// What deleting a page removed: whether the page row existed, and the hostnames of the holders
+/// its claims released, whose certificates went in the same transaction.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct PageDeleted {
+    pub existed: bool,
+    pub hostnames: Vec<String>,
 }
 
 /// The columns the auto-incident engine needs per mapped check —
@@ -700,13 +711,13 @@ pub async fn update_page(model: &status_pages::Model) -> Result<(), errors::Erro
     Ok(())
 }
 
-/// Delete a page (org-scoped), its components/mappings and, in the same transaction, its claims.
-/// Returns whether the page existed.
+/// Delete a page (org-scoped), its components/mappings and, in the same transaction, its claims
+/// and the certificates of the holders among them.
 pub async fn delete_page<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
     id: &str,
-) -> Result<bool, errors::Error> {
+) -> Result<PageDeleted, errors::Error> {
     let txn = conn.begin().await?;
     let comp_ids: Vec<String> = status_page_components::Entity::find()
         .select_only()
@@ -733,14 +744,27 @@ pub async fn delete_page<C: ConnectionTrait + TransactionTrait>(
         .filter(status_pages::Column::OrgId.eq(org_id))
         .exec(&txn)
         .await?;
-    release_page_claims(&txn, org_id, id, config::utils::time::now_micros()).await?;
+    let hostnames =
+        release_page_claims(&txn, org_id, id, config::utils::time::now_micros()).await?;
     txn.commit().await?;
-    Ok(res.rows_affected > 0)
+    Ok(PageDeleted {
+        existed: res.rows_affected > 0,
+        hostnames,
+    })
 }
 
 /// Hard-deletes an org's status-page rows, children first; deleting its domains frees their claims.
-pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    let txn = get_orm_client_rw().await.begin().await?;
+/// The org's certificate rows go in the same transaction; their hostnames come back.
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<String>, errors::Error> {
+    delete_by_org_in(get_orm_client_rw().await, org_id).await
+}
+
+/// [`delete_by_org`] on the caller's connection, in one transaction.
+pub async fn delete_by_org_in<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<Vec<String>, errors::Error> {
+    let txn = conn.begin().await?;
     status_page_audit_log::Entity::delete_many()
         .filter(status_page_audit_log::Column::OrgId.eq(org_id))
         .exec(&txn)
@@ -769,6 +793,41 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
         .filter(status_page_components::Column::OrgId.eq(org_id))
         .exec(&txn)
         .await?;
+    // Pages first, as a claim insert locks them, so no claim commits after the scan below; then
+    // claims, as a release does, so the claim and certificate locks never wait in a cycle.
+    status_pages::Entity::find()
+        .select_only()
+        .column(status_pages::Column::Id)
+        .filter(status_pages::Column::OrgId.eq(org_id))
+        .order_by_asc(status_pages::Column::Id)
+        .lock_exclusive()
+        .into_tuple::<String>()
+        .all(&txn)
+        .await?;
+    status_page_custom_domains::Entity::find()
+        .select_only()
+        .column(status_page_custom_domains::Column::Id)
+        .filter(status_page_custom_domains::Column::OrgId.eq(org_id))
+        .order_by_asc(status_page_custom_domains::Column::Id)
+        .lock_exclusive()
+        .into_tuple::<String>()
+        .all(&txn)
+        .await?;
+    let mut hostnames: Vec<String> = Vec::new();
+    if super::status_page_domains::certs_enabled() {
+        // The page and claim locks above keep any claim, grant or import for this org out.
+        hostnames = status_page_domain_certs::Entity::find()
+            .select_only()
+            .column(status_page_domain_certs::Column::Hostname)
+            .filter(status_page_domain_certs::Column::OrgId.eq(org_id))
+            .into_tuple()
+            .all(&txn)
+            .await?;
+        status_page_domain_certs::Entity::delete_many()
+            .filter(status_page_domain_certs::Column::OrgId.eq(org_id))
+            .exec(&txn)
+            .await?;
+    }
     status_page_custom_domains::Entity::delete_many()
         .filter(status_page_custom_domains::Column::OrgId.eq(org_id))
         .exec(&txn)
@@ -784,7 +843,7 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
         .exec(&txn)
         .await?;
     txn.commit().await?;
-    Ok(())
+    Ok(hostnames)
 }
 
 /// A page's components with each one's mapped check ids, for the admin detail
@@ -1124,14 +1183,19 @@ pub async fn replace_components(
     Ok(())
 }
 
-/// Inserts a claim unless the hostname, the org's cap or the page forbids it. Locking the org's
-/// pages makes its concurrent creates, and a page deletion, run one at a time.
+/// Inserts a claim unless the hostname, the org's cap or the page forbids it, or it has no label.
+/// Locking the org's pages makes its concurrent creates, and a page deletion, run one at a time.
 pub async fn insert_domain_claim<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     model: &status_page_custom_domains::Model,
     second_claim_allowed: bool,
     org_cap: u64,
 ) -> Result<ClaimInsert, errors::Error> {
+    if model.cname_label.is_none() {
+        return Err(errors::Error::Message(
+            "a custom domain claim needs a cname label".to_string(),
+        ));
+    }
     let txn = conn.begin().await?;
     lock_hostname(&txn, &model.domain).await?;
     let pages: Vec<String> = status_pages::Entity::find()
@@ -1168,6 +1232,15 @@ pub async fn insert_domain_claim<C: ConnectionTrait + TransactionTrait>(
         .await?;
     txn.commit().await?;
     Ok(ClaimInsert::Created)
+}
+
+/// A new claim's CNAME label: 16 characters of `a-z2-7` from the OS random source, 80 bits, so
+/// no two claims share one in practice and the unique index settles the rest.
+pub fn new_cname_label() -> String {
+    config::utils::rand::os_random_bytes(CNAME_LABEL_LEN)
+        .into_iter()
+        .map(|b| char::from(CNAME_LABEL_ALPHABET[usize::from(b & 31)]))
+        .collect()
 }
 
 /// A page's unreleased claims, plus the ones that expired in the last 30 days.
@@ -1367,6 +1440,7 @@ pub async fn extend_claim_expiry<C: ConnectionTrait>(
 }
 
 /// Releases one claim in the caller's transaction and returns its hostname when it was the holder.
+/// The holder's certificate row goes with it; the caller emits the cert event after commit.
 pub async fn release_domain_in<C: ConnectionTrait>(
     txn: &C,
     org_id: &str,
@@ -1380,21 +1454,22 @@ pub async fn release_domain_in<C: ConnectionTrait>(
     }
 }
 
-/// Releases an org's claim in its own transaction. Returns whether an unreleased claim existed.
+/// Releases an org's claim in its own transaction. `None` when no unreleased claim existed;
+/// otherwise the hostname when the claim was the holder, whose certificate went with it.
 pub async fn release_domain<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
     id: &str,
     at: i64,
     reason: i32,
-) -> Result<bool, errors::Error> {
+) -> Result<Option<Option<String>>, errors::Error> {
     let txn = conn.begin().await?;
     let Some(claim) = find_unreleased_claim(&txn, org_id, id).await? else {
-        return Ok(false);
+        return Ok(None);
     };
-    release_claim(&txn, &claim, at, reason).await?;
+    let hostname = release_claim(&txn, &claim, at, reason).await?;
     txn.commit().await?;
-    Ok(true)
+    Ok(Some(hostname))
 }
 
 /// Releases every non-holder whose expiry has passed; returns how many.
@@ -1645,7 +1720,9 @@ async fn lock_hostname<C: ConnectionTrait>(txn: &C, domain: &str) -> Result<(), 
     Ok(())
 }
 
-/// Sets both release marks and clears `held_domain`; the hostname comes back when it was held.
+/// Sets both release marks and clears `held_domain`; the hostname comes back when it was held,
+/// and the holder's certificate row is deleted. `cname_label` stays, so no claim ever gets it
+/// again.
 async fn release_claim<C: ConnectionTrait>(
     txn: &C,
     claim: &status_page_custom_domains::Model,
@@ -1656,7 +1733,17 @@ async fn release_claim<C: ConnectionTrait>(
         .filter(status_page_custom_domains::Column::Id.eq(&claim.id))
         .filter(unreleased());
     let released = update.exec(txn).await?.rows_affected > 0;
-    Ok(released.then(|| claim.held_domain.clone()).flatten())
+    let Some(hostname) = claim.held_domain.as_ref().filter(|_| released) else {
+        return Ok(None);
+    };
+    if super::status_page_domains::certs_enabled() {
+        status_page_domain_certs::Entity::delete_many()
+            .filter(status_page_domain_certs::Column::Hostname.eq(hostname))
+            .filter(status_page_domain_certs::Column::ClaimId.eq(&claim.id))
+            .exec(txn)
+            .await?;
+    }
+    Ok(Some(hostname.clone()))
 }
 
 async fn release_page_claims<C: ConnectionTrait>(
@@ -1664,17 +1751,18 @@ async fn release_page_claims<C: ConnectionTrait>(
     org_id: &str,
     page_id: &str,
     at: i64,
-) -> Result<(), errors::Error> {
+) -> Result<Vec<String>, errors::Error> {
     let claims = live_claims()
         .filter(status_page_custom_domains::Column::OrgId.eq(org_id))
         .filter(status_page_custom_domains::Column::StatusPageId.eq(page_id))
         .lock_exclusive()
         .all(txn)
         .await?;
+    let mut hostnames = Vec::new();
     for claim in &claims {
-        release_claim(txn, claim, at, RELEASED_PAGE_DELETED).await?;
+        hostnames.extend(release_claim(txn, claim, at, RELEASED_PAGE_DELETED).await?);
     }
-    Ok(())
+    Ok(hostnames)
 }
 
 /// A claim an older build marked verified has no holder yet: grant it, or fail it when another
@@ -1762,7 +1850,7 @@ async fn seal_legacy_releases<C: ConnectionTrait>(conn: &C) -> Result<(), errors
 }
 
 /// The survivor of a legacy verification is granted by the guarded repair; claims with no expiry
-/// get one.
+/// get one; claims an older build inserted get their label.
 async fn promote_and_expire<C: ConnectionTrait>(conn: &C, now: i64) -> Result<(), errors::Error> {
     use status_page_custom_domains::Column;
     complete_old_verifications(conn, now).await?;
@@ -1775,6 +1863,32 @@ async fn promote_and_expire<C: ConnectionTrait>(conn: &C, now: i64) -> Result<()
         .filter(Column::HeldDomain.is_null())
         .filter(Column::ExpiresAt.is_null());
     start_expiry.exec(conn).await?;
+    give_missing_labels(conn).await
+}
+
+/// A pod of the previous release inserts claims without a label. Each write names the unlabeled
+/// row, so no label changes; one that collides waits for the next tick.
+async fn give_missing_labels<C: ConnectionTrait>(conn: &C) -> Result<(), errors::Error> {
+    use status_page_custom_domains::Column;
+    let unlabeled: Vec<String> = live_claims()
+        .select_only()
+        .column(Column::Id)
+        .filter(Column::CnameLabel.is_null())
+        .order_by_asc(Column::CreatedAt)
+        .order_by_asc(Column::Id)
+        .limit(REPAIR_BATCH)
+        .into_tuple()
+        .all(conn)
+        .await?;
+    for id in unlabeled {
+        let give = live_claim_update(&id)
+            .filter(Column::CnameLabel.is_null())
+            .set(status_page_custom_domains::ActiveModel {
+                cname_label: Set(Some(new_cname_label())),
+                ..Default::default()
+            });
+        run_claim_update(conn, give).await?;
+    }
     Ok(())
 }
 
@@ -2100,6 +2214,7 @@ mod tests {
 
     /// Two orgs, each with a page, and the claim table as the real migrations leave it.
     async fn claims_db() -> DatabaseConnection {
+        super::super::status_page_domains::force_certs_for_tests(true);
         let db = snapshot_db().await;
         let backend = db.get_database_backend();
         let components =
@@ -2112,6 +2227,24 @@ mod tests {
         db
     }
 
+    #[tokio::test]
+    async fn with_built_in_tls_off_no_certificate_query_runs_on_release_or_org_deletion() {
+        let db = org_deletion_db().await;
+        super::super::status_page_domains::force_certs_for_tests(false);
+        add(&db, "a", "org-a", "pa", HOST).await;
+        grant_domain(&db, "a", T0).await.unwrap();
+        add_cert(&db, HOST, Some(("a", "org-a"))).await;
+
+        let released = release_domain(&db, "org-a", "a", T0 + 1, RELEASED_BY_ORG)
+            .await
+            .unwrap();
+        let hostnames = delete_by_org_in(&db, "org-a").await.unwrap();
+
+        assert_eq!(released, Some(Some(HOST.to_string())));
+        assert!(hostnames.is_empty());
+        assert_eq!(cert_hosts(&db).await, [HOST.to_string()]);
+    }
+
     fn claim(id: &str, org_id: &str, page_id: &str, domain: &str) -> claims::Model {
         claims::Model {
             id: id.to_string(),
@@ -2119,11 +2252,259 @@ mod tests {
             status_page_id: page_id.to_string(),
             domain: domain.to_string(),
             verification_token: format!("o2v_{id}"),
+            cname_label: Some(new_cname_label()),
             created_at: T0,
             updated_at: T0,
             expires_at: Some(T0 + CLAIM_TTL_MICROS),
             ..Default::default()
         }
+    }
+
+    async fn add_cert(db: &DatabaseConnection, hostname: &str, claim: Option<(&str, &str)>) {
+        status_page_domain_certs::Model {
+            hostname: hostname.to_string(),
+            claim_id: claim.map(|(id, _)| id.to_string()),
+            org_id: claim.map(|(_, org)| org.to_string()),
+            ca_directory: String::new(),
+            cert_chain: "chain".to_string(),
+            private_key: "sealed".to_string(),
+            fingerprint: format!("fp-{hostname}"),
+            previous_fingerprint: None,
+            not_before: T0,
+            not_after: T0 + 30 * DAY,
+            renew_at: None,
+            source: "imported".to_string(),
+            created_at: T0,
+            updated_at: T0,
+        }
+        .into_active_model()
+        .insert(db)
+        .await
+        .unwrap();
+    }
+
+    async fn cert_hosts(db: &DatabaseConnection) -> Vec<String> {
+        let mut hosts: Vec<String> = status_page_domain_certs::Entity::find()
+            .select_only()
+            .column(status_page_domain_certs::Column::Hostname)
+            .into_tuple()
+            .all(db)
+            .await
+            .unwrap();
+        hosts.sort();
+        hosts
+    }
+
+    async fn org_deletion_db() -> DatabaseConnection {
+        let db = claims_db().await;
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(status_page_audit_log::Entity),
+            schema.create_table_from_entity(status_page_check_snoozes::Entity),
+            schema.create_table_from_entity(status_page_notice_components::Entity),
+            schema.create_table_from_entity(status_page_notice_updates::Entity),
+            schema.create_table_from_entity(status_page_notices::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        db
+    }
+
+    #[test]
+    fn a_new_label_is_sixteen_characters_of_a_to_z_and_2_to_7_and_never_repeats() {
+        let labels: HashSet<String> = (0..500).map(|_| new_cname_label()).collect();
+
+        assert_eq!(labels.len(), 500);
+        for label in &labels {
+            assert_eq!(label.len(), 16, "{label}");
+            assert!(
+                label
+                    .bytes()
+                    .all(|b| matches!(b, b'a'..=b'z' | b'2'..=b'7')),
+                "{label}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_claim_without_a_label_is_refused_and_writes_nothing() {
+        let db = claims_db().await;
+        let unlabeled = claims::Model {
+            cname_label: None,
+            ..claim("a", "org-a", "pa", HOST)
+        };
+
+        let inserted = insert_domain_claim(&db, &unlabeled, true, 20).await;
+
+        assert!(inserted.is_err());
+        let written = claims::Entity::find_by_id("a").one(&db).await.unwrap();
+        assert!(written.is_none());
+    }
+
+    #[tokio::test]
+    async fn release_keeps_the_label_and_no_claim_can_take_it_afterwards() {
+        let db = claims_db().await;
+        add(&db, "a", "org-a", "pa", HOST).await;
+        let label = row(&db, "a")
+            .await
+            .cname_label
+            .expect("a claim has a label");
+        grant_domain(&db, "a", T0).await.unwrap();
+
+        release_domain(&db, "org-a", "a", T0 + 1, RELEASED_BY_ORG)
+            .await
+            .unwrap();
+
+        assert_eq!(row(&db, "a").await.cname_label, Some(label.clone()));
+        let reuse = claims::Model {
+            cname_label: Some(label),
+            ..claim("b", "org-b", "pb", HOST)
+        };
+        assert!(insert_domain_claim(&db, &reuse, true, 20).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn repair_fills_a_missing_label_and_changes_no_existing_one() {
+        let db = claims_db().await;
+        add(&db, "labeled", "org-a", "pa", HOST).await;
+        let kept = row(&db, "labeled").await.cname_label;
+        for (id, host) in [("old", "old.example.com"), ("old2", "old2.example.com")] {
+            let unlabeled = claims::Model {
+                cname_label: None,
+                ..claim(id, "org-a", "pa", host)
+            };
+            let inserted = claims::Entity::insert(unlabeled.into_active_model())
+                .exec(&db)
+                .await;
+            inserted.unwrap();
+        }
+        let gone = claims::Model {
+            cname_label: None,
+            ..claim("gone", "org-b", "pb", "gone.example.com")
+        };
+        claims::Entity::insert(gone.into_active_model())
+            .exec(&db)
+            .await
+            .unwrap();
+        release_domain(&db, "org-b", "gone", T0, RELEASED_BY_ORG)
+            .await
+            .unwrap();
+
+        repair_claims(&db, T0 + 1).await.unwrap();
+        let first = row(&db, "old").await.cname_label;
+        repair_claims_settling_duplicates(&db, T0 + 2)
+            .await
+            .unwrap();
+
+        let first = first.expect("repair gave the claim a label");
+        assert_eq!(first.len(), 16);
+        assert!(
+            first
+                .bytes()
+                .all(|b| matches!(b, b'a'..=b'z' | b'2'..=b'7'))
+        );
+        assert_eq!(row(&db, "old").await.cname_label, Some(first.clone()));
+        let second = row(&db, "old2").await.cname_label.expect("filled too");
+        assert_ne!(second, first);
+        assert_eq!(row(&db, "labeled").await.cname_label, kept);
+        assert_eq!(
+            row(&db, "gone").await.cname_label,
+            None,
+            "released rows stay as they were"
+        );
+    }
+
+    #[tokio::test]
+    async fn release_deletes_the_holders_certificate_row_with_the_claim_in_one_transaction() {
+        let db = claims_db().await;
+        add(&db, "a", "org-a", "pa", HOST).await;
+        add(&db, "other", "org-b", "pb", "other.example.com").await;
+        grant_domain(&db, "a", T0).await.unwrap();
+        grant_domain(&db, "other", T0).await.unwrap();
+        add_cert(&db, HOST, Some(("a", "org-a"))).await;
+        add_cert(&db, "other.example.com", Some(("other", "org-b"))).await;
+        add_cert(&db, "domains.example.com", None).await;
+
+        let txn = db.begin().await.unwrap();
+        let named = release_domain_in(&txn, "org-a", "a", T0 + 1, RELEASED_BY_ORG)
+            .await
+            .unwrap();
+        txn.rollback().await.unwrap();
+
+        assert_eq!(named.as_deref(), Some(HOST));
+        assert_eq!(
+            cert_hosts(&db).await.len(),
+            3,
+            "a rolled back release deletes nothing"
+        );
+        assert_eq!(holder_of(&db, HOST).await.as_deref(), Some("a"));
+        let released = release_domain(&db, "org-a", "a", T0 + 2, RELEASED_BY_ORG)
+            .await
+            .unwrap();
+        assert_eq!(released, Some(Some(HOST.to_string())));
+        assert_eq!(
+            cert_hosts(&db).await,
+            ["domains.example.com", "other.example.com"].map(String::from)
+        );
+    }
+
+    #[tokio::test]
+    async fn page_deletion_deletes_the_certificates_of_its_holders_and_returns_their_hostnames() {
+        let db = claims_db().await;
+        add(&db, "held", "org-a", "pa", HOST).await;
+        add(&db, "pending", "org-a", "pa", "pending.example.com").await;
+        add(&db, "elsewhere", "org-a", "pa2", "elsewhere.example.com").await;
+        grant_domain(&db, "held", T0).await.unwrap();
+        grant_domain(&db, "elsewhere", T0).await.unwrap();
+        add_cert(&db, HOST, Some(("held", "org-a"))).await;
+        add_cert(&db, "elsewhere.example.com", Some(("elsewhere", "org-a"))).await;
+
+        let deleted = delete_page(&db, "org-a", "pa").await.unwrap();
+
+        assert_eq!(
+            deleted,
+            PageDeleted {
+                existed: true,
+                hostnames: vec![HOST.to_string()]
+            }
+        );
+        assert_eq!(cert_hosts(&db).await, ["elsewhere.example.com".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn org_deletion_deletes_the_orgs_certificate_rows_and_returns_their_hostnames() {
+        let db = org_deletion_db().await;
+        add(&db, "a1", "org-a", "pa", HOST).await;
+        add(&db, "a2", "org-a", "pa2", "second.example.com").await;
+        add(&db, "b", "org-b", "pb", "other.example.com").await;
+        add_cert(&db, HOST, Some(("a1", "org-a"))).await;
+        add_cert(&db, "second.example.com", Some(("a2", "org-a"))).await;
+        add_cert(&db, "other.example.com", Some(("b", "org-b"))).await;
+        add_cert(&db, "domains.example.com", None).await;
+
+        let mut hostnames = delete_by_org_in(&db, "org-a").await.unwrap();
+
+        hostnames.sort();
+        assert_eq!(hostnames, ["second.example.com", HOST].map(String::from));
+        assert_eq!(
+            cert_hosts(&db).await,
+            ["domains.example.com", "other.example.com"].map(String::from)
+        );
+        assert!(
+            claims::Entity::find_by_id("a1")
+                .one(&db)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            claims::Entity::find_by_id("b")
+                .one(&db)
+                .await
+                .unwrap()
+                .is_some()
+        );
     }
 
     async fn add(db: &DatabaseConnection, id: &str, org_id: &str, page_id: &str, domain: &str) {
@@ -2341,6 +2722,7 @@ mod tests {
             release_domain(&db, "org-a", "a", T0 + 1, RELEASED_BY_ORG)
                 .await
                 .unwrap()
+                .is_some()
         );
 
         let released = row(&db, "a").await;
@@ -2350,9 +2732,10 @@ mod tests {
         assert_eq!(released.held_domain, None);
         assert_eq!(holder_of(&db, HOST).await, None);
         assert!(
-            !release_domain(&db, "org-a", "a", T0 + 2, RELEASED_BY_ORG)
+            release_domain(&db, "org-a", "a", T0 + 2, RELEASED_BY_ORG)
                 .await
                 .unwrap()
+                .is_none()
         );
     }
 
@@ -2668,7 +3051,7 @@ mod tests {
         add(&db, "elsewhere", "org-a", "pa2", "elsewhere.example.com").await;
         grant_domain(&db, "held", T0).await.unwrap();
 
-        assert!(delete_page(&db, "org-a", "pa").await.unwrap());
+        assert!(delete_page(&db, "org-a", "pa").await.unwrap().existed);
 
         for id in ["held", "pending"] {
             let released = row(&db, id).await;
@@ -3130,6 +3513,82 @@ mod tests {
             .unwrap();
         txn.commit().await.unwrap();
         assert_eq!(competing.await.unwrap(), ClaimInsert::HostnameTaken);
+        pg.drop_schema().await;
+    }
+
+    #[tokio::test]
+    async fn postgres_org_cleanup_waits_for_a_claim_being_created_and_removes_its_certificate() {
+        let Some(pg) = postgres().await else {
+            return;
+        };
+        super::super::status_page_domains::force_certs_for_tests(true);
+        let backend = pg.db.get_database_backend();
+        let schema = Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(status_page_components::Entity),
+            schema.create_table_from_entity(status_page_audit_log::Entity),
+            schema.create_table_from_entity(status_page_check_snoozes::Entity),
+            schema.create_table_from_entity(status_page_notice_components::Entity),
+            schema.create_table_from_entity(status_page_notice_updates::Entity),
+            schema.create_table_from_entity(status_page_notices::Entity),
+            schema.create_table_from_entity(status_page_snapshots::Entity),
+            schema.create_table_from_entity(status_page_component_checks::Entity),
+        ] {
+            pg.db.execute(backend.build(&table)).await.unwrap();
+        }
+        let (org, page) = (config::ider::generate(), config::ider::generate());
+        insert_org_page(&pg.db, &org, &page).await;
+        let host = format!("{}.pg.example.com", config::ider::generate());
+        let id = config::ider::generate();
+        // A create that has locked the org's pages and has not inserted its claim yet.
+        let txn = pg.db.begin().await.unwrap();
+        status_pages::Entity::find()
+            .filter(status_pages::Column::OrgId.eq(&org))
+            .lock_exclusive()
+            .all(&txn)
+            .await
+            .unwrap();
+        let pid = backend_pid(&txn).await;
+
+        let cleanup = delete_by_org_in(&pg.db, &org);
+        tokio::pin!(cleanup);
+        tokio::select! {
+            done = &mut cleanup => panic!("the cleanup finished while a create held the pages: {done:?}"),
+            () = pg.wait_until_blocked_by(pid) => {}
+        }
+        let held = claims::Model {
+            held_domain: Some(host.clone()),
+            verification_state: VERIFIED,
+            ..claim(&id, &org, &page, &host)
+        };
+        claims::Entity::insert(held.into_active_model())
+            .exec(&txn)
+            .await
+            .unwrap();
+        status_page_domain_certs::Model {
+            hostname: host.clone(),
+            claim_id: Some(id),
+            org_id: Some(org.clone()),
+            ca_directory: String::new(),
+            cert_chain: "chain".to_string(),
+            private_key: "sealed".to_string(),
+            fingerprint: "fp".to_string(),
+            previous_fingerprint: None,
+            not_before: T0,
+            not_after: T0 + DAY,
+            renew_at: None,
+            source: "imported".to_string(),
+            created_at: T0,
+            updated_at: T0,
+        }
+        .into_active_model()
+        .insert(&txn)
+        .await
+        .unwrap();
+        txn.commit().await.unwrap();
+
+        assert_eq!(cleanup.await.unwrap(), vec![host]);
+        assert!(cert_hosts(&pg.db).await.is_empty());
         pg.drop_schema().await;
     }
 

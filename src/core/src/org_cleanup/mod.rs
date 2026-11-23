@@ -1485,9 +1485,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     crate::db::workflows::evict_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/workflows_cache: {e}"))?;
-    status_pages::delete_by_org(org_id)
+    let cert_hostnames = status_pages::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/status_pages: {e}"))?;
+    crate::status_pages::emit_cert_changes(&cert_hostnames).await;
     // folders are safe to delete after dashboards, annotations, reports, and prompts are gone
     crate::db::folders::delete_by_org(org_id)
         .await
