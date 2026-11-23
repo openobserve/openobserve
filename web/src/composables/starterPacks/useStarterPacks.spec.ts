@@ -711,6 +711,51 @@ describe("useStarterPacks", () => {
         expect(counts()).toEqual(EMPTY);
       });
 
+      it("stops when the other wrote its record while this one was still planning", async () => {
+        let now = 1_000;
+        vi.spyOn(Date, "now").mockImplementation(() => (now += 1));
+        const other = { packId: "kubernetes", installId: "zz", status: "installing", items: [] };
+        fake.state.onRequest = (method, url) => {
+          if (method !== "get" || !url.includes("/folders/") || fake.state.kv.has(otherKey)) return;
+          const row = {
+            ...other,
+            installedAt: Date.now() * 1000,
+            installedBy: "first@example.com",
+          };
+          fake.state.kv.set(otherKey, JSON.stringify(row));
+        };
+
+        const error = await packs()
+          .installPack(PACK)
+          .catch((caught) => caught);
+        vi.restoreAllMocks();
+
+        expect(error).toBeInstanceOf(StarterPackBusyError);
+        expect(counts()).toEqual(EMPTY);
+      });
+
+      it("never resumes an unfinished setup someone else started", async () => {
+        const theirs = {
+          packId: "kubernetes",
+          installId: "other",
+          status: "incomplete",
+          installedAt: Number.MAX_SAFE_INTEGER,
+          installedBy: "first@example.com",
+          items: [],
+        };
+        fake.state.kv.set(otherKey, JSON.stringify(theirs));
+
+        const error = await packs()
+          .installPack(PACK)
+          .catch((caught) => caught);
+
+        expect(error).toBeInstanceOf(StarterPackBusyError);
+        expect(error.installedBy).toBe("first@example.com");
+        expect(JSON.parse(fake.state.kv.get(otherKey)!)).toEqual(theirs);
+        expect([...fake.state.kv.keys()]).toEqual([otherKey]);
+        expect(counts()).toEqual(EMPTY);
+      });
+
       it("carries on when the other started later", async () => {
         seedOther(Number.MAX_SAFE_INTEGER);
         const record = await packs().installPack(PACK);

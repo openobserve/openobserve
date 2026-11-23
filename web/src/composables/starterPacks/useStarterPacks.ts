@@ -798,9 +798,14 @@ export function useStarterPacks(org: string) {
   ): Promise<PackInstallRecord> => {
     const { entries } = await loadEntries(sourcePack);
 
-    const interrupted = (await records.list(sourcePack.id)).find(
+    const me = store.state.userInfo?.email ?? "";
+    const unfinished = (await records.list(sourcePack.id)).filter(
       ({ status }) => status === "installing" || status === "incomplete",
     );
+    // Only whoever started a setup may finish it, so another's unfinished one blocks this run.
+    const interrupted = unfinished.find(({ installedBy }) => (installedBy ?? "") === me);
+    const theirs = unfinished[0];
+    if (!interrupted && theirs) throw new StarterPackBusyError(theirs.installedBy ?? "");
     const pack = withFolder(sourcePack, interrupted?.folderName ?? folderName);
     // A resumed record still lists items the current plan leaves out; only made ones stay.
     const excluded = (item: PackRecordItem) =>
@@ -817,15 +822,13 @@ export function useStarterPacks(org: string) {
           destination: undefined,
           ...choice,
           status: "installing",
-          installedAt: Date.now() * 1000,
           items: interrupted.items.filter(kept),
         }
       : {
           packId: pack.id,
           installId: getUUID(),
           status: "installing",
-          installedAt: Date.now() * 1000,
-          installedBy: store.state.userInfo?.email ?? "",
+          installedBy: me,
           version: pack.version,
           catalogVersion: catalogVersion(),
           ...(repairs.length ? { repairs } : {}),
@@ -835,6 +838,8 @@ export function useStarterPacks(org: string) {
           ...choice,
           items: (await planItems(pack, entries, copies)).filter((item) => !excluded(item)),
         };
+    // Stamped after planning, so the order the race check reads is the order of the writes.
+    record.installedAt = Date.now() * 1000;
     await writeFirstRecord(record);
     // A resumed record was already the pack's active one, so only a fresh one can lose the race.
     if (!interrupted) await stopIfNotFirst(record);

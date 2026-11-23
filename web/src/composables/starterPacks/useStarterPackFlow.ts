@@ -68,10 +68,13 @@ export const isOrgAdmin = (state: Record<string, any>): boolean => {
 export const canManageInstall = (state: Record<string, any>, record: PackInstallRecord | null) =>
   isOrgAdmin(state) || (!!record?.installedBy && record.installedBy === state.userInfo?.email);
 
-const newestRecord = (rows: PackInstallRecord[]): PackInstallRecord | null => {
+// Only its starter can finish a setup, so their own unfinished one is the one to show.
+const newestRecord = (rows: PackInstallRecord[], me: string): PackInstallRecord | null => {
   const live = rows.filter((row) => row.status !== "removed");
-  const unfinished = live.find((row) => row.status !== "complete");
-  if (unfinished) return unfinished;
+  const unfinished = live.filter((row) => row.status !== "complete");
+  const resumable =
+    unfinished.find(({ installedBy }) => (installedBy ?? "") === me) ?? unfinished[0];
+  if (resumable) return resumable;
   return [...live].sort((a, b) => (b.installedAt ?? 0) - (a.installedAt ?? 0))[0] ?? null;
 };
 
@@ -81,6 +84,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const router = useRouter();
   const { installPack, previewPack, undoPack, removePack, listInstalls } = useStarterPacks(org);
 
+  const myEmail = (): string => store.state.userInfo?.email ?? "";
   const record = shallowRef<PackInstallRecord | null>(null);
   const loaded = ref(false);
   const loadFailed = ref(false);
@@ -138,6 +142,11 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const interrupted = computed(
     () => !running.value && !!record.value && record.value.status !== "complete",
   );
+  /** Who started the unfinished setup when it was not this user, or "" when its record names no one. */
+  const interruptedBy = computed(() => {
+    const by = record.value?.installedBy ?? "";
+    return interrupted.value && by !== myEmail() ? by : null;
+  });
   const installed = computed(() => record.value?.status === "complete");
   const alertsTotal = computed(
     () => items.value.filter(({ kind, status }) => kind === "alert" && status === "created").length,
@@ -158,7 +167,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const load = async () => {
     loadFailed.value = false;
     try {
-      record.value = newestRecord(await listInstalls(pack.id));
+      record.value = newestRecord(await listInstalls(pack.id), myEmail());
       if (record.value) await readAlertsOn();
     } catch (error) {
       // A retry cannot get past a refusal, so it reads as ask an admin, not as a failed load.
@@ -394,6 +403,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     installFailed,
     installed,
     interrupted,
+    interruptedBy,
     itemRoute,
     items,
     land,
