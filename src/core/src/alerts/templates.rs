@@ -294,8 +294,14 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
                 // body/title) so existing installs pick up the correction —
                 // but only when the reseed gate says to (revision-gated, see
                 // `should_apply_prebuilt`).
-                let drifted = existing.body != template.body
-                    || existing.template_type != template.template_type;
+                // A ticketing or webhook row that still holds the old fallback body keeps it:
+                // the shipped body adds fields that change what the receiving system creates.
+                let drifted = (existing.body != template.body
+                    || existing.template_type != template.template_type)
+                    && !config::prebuilt_loader::is_kept_legacy_body(
+                        &template.name,
+                        &existing.body,
+                    );
                 if should_apply_prebuilt(shipped_rev, applied_rev, drifted) && drifted {
                     // Preserve the stored id so this is an update, not an insert.
                     template.id = existing.id;
