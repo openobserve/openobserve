@@ -1432,8 +1432,10 @@ export default defineComponent({
     };
 
     // check if filter has cycle
-    const isFilterHasCycle = async () => {
+    const isFilterHasCycle = async (value: AddSettingVariableForm) => {
       try {
+        // The form keeps a custom text typed before switching back to Builder; only what Save sends can loop.
+        const current = buildVariablePayload(value);
         // need all variables to check for cycle
         // get all variables data.
         let variablesData: any = JSON.parse(
@@ -1449,13 +1451,11 @@ export default defineComponent({
             (variable: any) => variable.name == props.variableName,
           );
 
-          // Update the variable data in the list (use a plain snapshot of the
-          // current form values — variableData is a getter view, not a clone).
-          variablesData[variableIndex] = JSON.parse(JSON.stringify(form.state.values));
+          variablesData[variableIndex] = current;
         }
         // else, it's a new variable.
         else {
-          variablesData.push(JSON.parse(JSON.stringify(form.state.values)));
+          variablesData.push(current);
         }
 
         // now, need to check whether filter has cycle or not
@@ -1508,7 +1508,7 @@ export default defineComponent({
       }
 
       // check if filter has cycle
-      if (await isFilterHasCycle()) {
+      if (await isFilterHasCycle(value)) {
         // filter has cycle, so show error and return
         return;
       }

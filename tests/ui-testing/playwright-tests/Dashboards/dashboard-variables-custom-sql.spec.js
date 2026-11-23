@@ -230,6 +230,26 @@ test.describe("Query Values variables - Custom SQL", { tag: ["@dashboards", "@da
     await expect(qv.previewEmpty).toBeVisible();
   });
 
+  test("a looping custom query left behind by switching back to Builder does not block Save", async ({ page }) => {
+    const qv = new PageManager(page).dashboardQueryVariable;
+    const env = fx.queryValuesVariable("env", {
+      stream_type: "logs", stream: S, field: "k8s_namespace", max_record_size: null,
+      filter: [{ name: "service_name", operator: "=", value: "$svc" }],
+    });
+    const id = await startCustomVariable(qv, { variables: [env] });
+    await qv.fillQuery(`SELECT DISTINCT service_name FROM "${S}" WHERE k8s_namespace = '$env'`);
+    const cycleError = page.locator('[data-test="dashboard-variable-query-cycle-error"]');
+    await qv.expectSaveBlocked(cycleError);
+    await expect(cycleError).toHaveText("env and svc depend on each other.");
+
+    await qv.setMode("auto");
+    await qv.setAutoSource("logs", S, "service_name");
+    await qv.save();
+    const svc = await fx.getVariable(id, "svc");
+    expect(svc.query_data.field).toBe("service_name");
+    expect(svc.query_data).not.toHaveProperty("query");
+  });
+
   test("a custom query that uses its own variable is blocked with a plain message", async ({ page }) => {
     const qv = new PageManager(page).dashboardQueryVariable;
     await startCustomVariable(qv);

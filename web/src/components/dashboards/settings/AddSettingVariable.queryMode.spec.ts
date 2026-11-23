@@ -19,9 +19,10 @@ import { createStore } from "vuex";
 import i18n from "@/locales";
 import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
 
-const { getDashboard, labelValues } = vi.hoisted(() => ({
+const { getDashboard, labelValues, updateVariable } = vi.hoisted(() => ({
   getDashboard: vi.fn(),
   labelValues: vi.fn(),
+  updateVariable: vi.fn(),
 }));
 
 vi.mock("vue-router", () => ({
@@ -30,7 +31,7 @@ vi.mock("vue-router", () => ({
 vi.mock("@/utils/commons", () => ({
   getDashboard,
   addVariable: vi.fn(),
-  updateVariable: vi.fn(),
+  updateVariable,
 }));
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
@@ -97,6 +98,7 @@ const click = async (wrapper: any, dataTest: string) => {
 describe("AddSettingVariable with the real query editor", () => {
   beforeEach(() => {
     labelValues.mockReset();
+    updateVariable.mockReset();
   });
 
   it("opens a saved auto PromQL variable, switches to custom with the prefilled query and previews it", async () => {
@@ -216,6 +218,38 @@ describe("AddSettingVariable with the real query editor", () => {
     await click(wrapper, "dashboard-variable-query-language-sql");
 
     expect(editorText(wrapper)).toBe(`SELECT DISTINCT "job" FROM "up" WHERE "env" = 'prod'`);
+    wrapper.unmount();
+  });
+
+  it("checks the Builder settings for a loop once a typed custom query is left behind", async () => {
+    const env = {
+      name: "env",
+      type: "query_values",
+      query_data: {
+        stream_type: "logs",
+        stream: "app",
+        field: "env",
+        filter: [{ name: "service", operator: "=", value: "$svc" }],
+      },
+    };
+    const svc = {
+      name: "svc",
+      type: "query_values",
+      query_data: { stream_type: "logs", stream: "app", field: "service", filter: [] },
+    };
+    const wrapper = await mountForm(svc, [env]);
+    const vm = wrapper.vm as any;
+    await click(wrapper, "dashboard-variable-query-mode-custom");
+    vm.setFormField("query_data.query", "SELECT service FROM app WHERE env = '$env'");
+    await vm.onSubmit(vm.variableData);
+    expect(vm.filterCycleError).toBe("env and svc depend on each other.");
+    expect(updateVariable).not.toHaveBeenCalled();
+
+    await click(wrapper, "dashboard-variable-query-mode-auto");
+    await vm.onSubmit(vm.variableData);
+    await flushPromises();
+    expect(vm.filterCycleError).toBe("");
+    expect(updateVariable).toHaveBeenCalledTimes(1);
     wrapper.unmount();
   });
 });
