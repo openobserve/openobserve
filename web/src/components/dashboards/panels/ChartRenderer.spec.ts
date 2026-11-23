@@ -1555,6 +1555,31 @@ describe("ChartRenderer", () => {
       });
     });
 
+    it("keeps the legend selection when the pointer leaves the panel", async () => {
+      const echarts = await import("echarts/core");
+      const chart = (echarts.init as any).mock.results.at(-1).value;
+      const selected = { "Series 1": true, "Series 2": false };
+      chart.getOption.mockReturnValue({ legend: [{ selected }] });
+      chart.setOption.mockClear();
+      chart.dispatchAction.mockClear();
+
+      mockHoveredSeriesState.value.panelId = -1;
+      await flushPromises();
+
+      const restore = chart.dispatchAction.mock.calls.findIndex(
+        ([action]: any[]) => action?.type === "restore",
+      );
+      expect(restore).toBeGreaterThanOrEqual(0);
+      const reapply = chart.setOption.mock.calls.findIndex(
+        ([option]: any[]) => option?.legend?.[0]?.selected,
+      );
+      expect(reapply).toBeGreaterThanOrEqual(0);
+      expect(chart.setOption.mock.calls[reapply][0].legend[0].selected).toEqual(selected);
+      expect(chart.setOption.mock.invocationCallOrder[reapply]).toBeGreaterThan(
+        chart.dispatchAction.mock.invocationCallOrder[restore],
+      );
+    });
+
     const isolateFirstSlice = async (options: any) => {
       const echarts = await import("echarts/core");
       wrapper.unmount();
