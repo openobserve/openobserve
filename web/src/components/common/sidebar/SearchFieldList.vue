@@ -13,6 +13,7 @@
         :page-size-options="[50]"
         :expanded-ids="expandedIds"
         :loading="loading"
+        keyboard
         @update:current-page="currentPage = $event"
         @update:expanded-ids="onExpandedIdsChange"
         @update:search="searchTerm = $event"

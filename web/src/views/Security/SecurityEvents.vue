@@ -1428,6 +1428,7 @@ function widenTo(period: string) {
         :show-pagination="false"
         :expanded-ids="expandedField ? [expandedField] : []"
         :search-placeholder="t('siem.events.searchFields')"
+        keyboard
         data-test="security-events-fields"
         @row-click="onFieldClick"
       >

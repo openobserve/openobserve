@@ -30,7 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { inject, useSlots } from "vue";
+import { FIELD_ROW_HAS_ACTIONS_KEY } from "./OFieldList.types";
+
 defineProps<{
   highlight?: boolean;
 }>();
+
+if (useSlots().actions) inject(FIELD_ROW_HAS_ACTIONS_KEY, null)?.();
 </script>

@@ -1,6 +1,10 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { InjectionKey } from "vue";
 import type { I18nText } from "@/types/i18n";
+
+/** A row that hosts its own action buttons reports it, so the list stops naming rows buttons. */
+export const FIELD_ROW_HAS_ACTIONS_KEY: InjectionKey<() => void> = Symbol("fieldRowHasActions");
 
 export interface FieldItem {
   name: string;

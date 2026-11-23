@@ -15,7 +15,9 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
+import { h } from "vue";
 import OFieldList from "./OFieldList.vue";
+import OFieldRow from "./OFieldRow.vue";
 
 const FIELDS = [
   { name: "Pages", isGroup: true, groupName: "Pages" },
@@ -46,6 +48,22 @@ describe("OFieldList keyboard", () => {
     await rows()[1].trigger("keydown", { key: " " });
     const picked = wrapper.emitted("row-click")?.map((args) => (args[0] as { name: string }).name);
     expect(picked).toEqual(["/a", "/b"]);
+  });
+
+  it("names a picker row a button, but not a row that hosts its own actions", async () => {
+    wrapper = mount(OFieldList, { props: { fields: FIELDS, keyboard: true } });
+    expect(rows()[0].attributes("role")).toBe("button");
+    wrapper.unmount();
+    wrapper = mount(OFieldList, {
+      props: { fields: FIELDS, keyboard: true },
+      slots: {
+        "field-row": ({ row }: { row: { name: string } }) =>
+          h(OFieldRow, null, { default: () => row.name, actions: () => h("button", "Add") }),
+      },
+    });
+    await wrapper.vm.$nextTick();
+    expect(rows()[0].attributes("role")).toBeUndefined();
+    expect(rows()[0].attributes("tabindex")).toBe("0");
   });
 
   it("moves focus between rows with the arrow keys", async () => {

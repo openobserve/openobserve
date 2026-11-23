@@ -69,7 +69,7 @@
                 keyboard,
             }"
             :tabindex="keyboard ? 0 : undefined"
-            :role="keyboard ? 'button' : undefined"
+            :role="rowRole"
             :aria-disabled="row.disabled ? 'true' : undefined"
             :data-test="`o-field-list-row-${row.name}`"
             :draggable="draggable && isDragEnabled(row, row._index ?? 0) && isDragArmed()"
@@ -110,7 +110,7 @@
             </div>
             <div
               v-if="$slots['field-actions']"
-              class="o-field-list__actions border-field-list-actions-border rounded-default bg-field-list-actions-bg invisible absolute top-1/2 right-1 flex shrink-0 -translate-y-1/2 items-stretch overflow-hidden border opacity-0 transition-[opacity,visibility] duration-[120ms] ease-[ease] group-hover:visible group-hover:opacity-100 max-md:visible max-md:opacity-100"
+              class="o-field-list__actions border-field-list-actions-border rounded-default bg-field-list-actions-bg pointer-events-none absolute top-1/2 right-1 flex shrink-0 -translate-y-1/2 items-stretch overflow-hidden border opacity-0 transition-opacity duration-[120ms] ease-[ease] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-visible:pointer-events-auto group-focus-visible:opacity-100 group-has-focus-visible:pointer-events-auto group-has-focus-visible:opacity-100 max-md:pointer-events-auto max-md:opacity-100"
             >
               <slot name="field-actions" :row="row" :index="row._index" />
             </div>
@@ -136,12 +136,12 @@
 
 <script setup lang="ts">
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import { computed, ref, watch } from "vue";
+import { computed, provide, ref, useSlots, watch } from "vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldRow from "./OFieldRow.vue";
 import OFieldLabel from "./OFieldLabel.vue";
-import { type FieldItem } from "./OFieldList.types";
+import { FIELD_ROW_HAS_ACTIONS_KEY, type FieldItem } from "./OFieldList.types";
 import useDragHandle from "@/composables/useDragHandle";
 
 const props = withDefaults(
@@ -278,6 +278,14 @@ const paginatedFields = computed(() => {
   const start = (internalCurrentPage.value - 1) * props.pageSize;
   return filteredFields.value.slice(start, start + props.pageSize);
 });
+
+// A button cannot contain buttons, so rows that host actions stay focusable without the role.
+const slots = useSlots();
+const rowsHaveActions = ref(false);
+provide(FIELD_ROW_HAS_ACTIONS_KEY, () => (rowsHaveActions.value = true));
+const rowRole = computed(() =>
+  props.keyboard && !rowsHaveActions.value && !slots["field-actions"] ? "button" : undefined,
+);
 
 const isFirstPage = computed(() => internalCurrentPage.value <= 1);
 const isLastPage = computed(() => internalCurrentPage.value >= totalPages.value);
