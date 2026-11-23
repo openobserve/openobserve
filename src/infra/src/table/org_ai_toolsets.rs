@@ -37,7 +37,7 @@ use crate::{
 pub struct ListFilter {
     /// Case-insensitive substring match on the `name` column (`LIKE '%val%'`).
     pub name: Option<String>,
-    /// Exact match on the `kind` column (e.g. `"mcp"`, `"cli"`, `"skill"`).
+    /// Exact match on the `kind` column (e.g. `"mcp"`, `"skill"`).
     pub kind: Option<String>,
 }
 
@@ -49,7 +49,7 @@ pub struct OrgToolset {
     pub id: String,
     pub org: String,
     pub name: String,
-    /// One of: `mcp`, `cli`, `skill`, `generic`.
+    /// One of: `mcp`, `skill`, `generic`.
     pub kind: String,
     pub description: Option<String>,
     /// Kind-specific plaintext JSON payload. `None` when no config is needed.

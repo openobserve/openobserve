@@ -155,7 +155,7 @@ describe("AddAiToolset drafts", () => {
     wrapper = null;
   });
 
-  it("never writes header, env or credential file values to storage", async () => {
+  it("never writes header values to storage", async () => {
     await mountPage();
     await edit({
       name: "ops_mcp",
@@ -164,23 +164,20 @@ describe("AddAiToolset drafts", () => {
         { key: "Authorization", value: "Bearer s3cr3t", visible: false },
         { key: "X-Tenant", value: "tenant-42", visible: true },
       ],
-      "cli.env": [{ key: "GH_TOKEN", value: "ghp_abcdef", visible: false }],
-      "cli.credFiles": [{ key: "KUBECONFIG", value: "apiVersion: v1\ntoken: kube-secret" }],
     });
     window.dispatchEvent(new Event("pagehide"));
 
     const stored = localStorage.getItem(editorDraftKey(newScope)) ?? "";
     expect(stored).toContain("X-Tenant");
     expect(stored).toContain("https://mcp.example.com/");
-    for (const secret of ["s3cr3t", "tenant-42", "ghp_abcdef", "kube-secret"]) {
+    for (const secret of ["s3cr3t", "tenant-42"]) {
       expect(stored).not.toContain(secret);
     }
     expect(stored).not.toContain("visible");
 
     await remount();
     const note = byTest("editor-draft-credentials-not-saved")?.textContent ?? "";
-    expect(note).toContain("environment variable GH_TOKEN");
-    expect(note).toContain("credential file KUBECONFIG");
+    expect(note).toContain("Authorization header");
   });
 
   it("names a header value with no header name in lowercase, as part of the sentence", async () => {
@@ -386,42 +383,38 @@ describe("AddAiToolset drafts", () => {
     await flushPromises();
     expect(aiToolsetsService.create).not.toHaveBeenCalled();
 
-    await edit({ kind: "cli", "cli.command": "kubectl" });
+    await edit({ kind: "skill", "skill.content": "# Ops" });
     await form().handleSubmit();
     await flushPromises();
     expect(aiToolsetsService.create).toHaveBeenCalledTimes(1);
   });
 
-  it("marks a not-kept credential file under its editor until it is filled again", async () => {
-    vi.mocked(aiToolsetsService.get).mockResolvedValue({
+  it("restores a draft of the removed CLI kind as an MCP toolset that saves", async () => {
+    writeEditorDraft(newScope, {
       data: {
-        id: "ts1",
         name: "kube_cli",
         kind: "cli",
         description: "",
-        data: {
-          command: "kubectl",
-          timeout_seconds: 30,
-          max_output_bytes: 100000,
-          env: {},
-          credential_files: { KUBECONFIG: "apiVersion: v1" },
-        },
+        mcp: { url: "", timeout_seconds: 30, headers: [] },
+        cli: { command: "kubectl", env: [{ key: "GH_TOKEN", value: "" }], credFiles: [] },
+        skill: { content: "" },
       },
-    } as never);
-    await mountPage({ action: "edit", id: "ts1" });
-    await edit({ "cli.credFiles[0].value": "apiVersion: v2" });
-    window.dispatchEvent(new Event("pagehide"));
-
-    await remount({ action: "edit", id: "ts1" });
-    expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain("KUBECONFIG");
+      redactedPaths: ["/cli/env/0/value"],
+      changedRedactedPaths: ["/cli/env/0/value"],
+    });
+    await mountPage();
     click("editor-draft-continue");
     await flushPromises();
-    expect(byTest("ai-toolset-cred-file-reenter-0")).not.toBeNull();
-    expect(byTest("ai-toolset-cred-file-reenter-0")?.classList).toContain("text-status-error-text");
 
-    await edit({ "cli.credFiles[0].value": "apiVersion: v3" });
+    expect(form().state.values.kind).toBe("mcp");
+    expect(form().state.values).not.toHaveProperty("cli");
+    await edit({ "mcp.url": "https://mcp.example.com/" });
+    await form().handleSubmit();
     await flushPromises();
-    expect(byTest("ai-toolset-cred-file-reenter-0")).toBeNull();
+    expect(aiToolsetsService.create).toHaveBeenCalledWith(
+      ORG,
+      expect.objectContaining({ name: "kube_cli", kind: "mcp" }),
+    );
   });
 
   it("Cancel asks; Keep draft returns to the list with a dot on Add, Discard drops it", async () => {

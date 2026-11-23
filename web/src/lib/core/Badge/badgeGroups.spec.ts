@@ -148,16 +148,6 @@ describe("badgeGroups", () => {
     expect(r.dot).toBe(false);
   });
 
-  it("resolves cliPreset to its uniform fallback colour (pill, md) for any value", () => {
-    for (const v of ["kubectl", "gh", "anything"]) {
-      const r = resolveBadge("cliPreset", v);
-      expect(r.variant, v).toBe("primary-soft");
-      expect(r.shape, v).toBe("pill");
-      expect(r.size, v).toBe("md");
-      expect(r.dot, v).toBe(false);
-    }
-  });
-
   it("resolves destinationKind 1:1 (prebuilt→primary, custom→default, pill)", () => {
     expect(resolveBadge("destinationKind", "prebuilt").variant).toBe("primary");
     expect(resolveBadge("destinationKind", "custom").variant).toBe("default");
