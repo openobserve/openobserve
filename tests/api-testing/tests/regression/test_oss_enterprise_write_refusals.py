@@ -1,7 +1,7 @@
 """The open source build refuses enterprise-only writes before it reads the request  [#16471, #16860].
 
-The UI locks model pricing, pipeline remote destinations and the enterprise-only admin routes in the open
-source build, but the API used to save model prices and remote pipeline nodes (pipeline destinations are
+The UI locks pipeline remote destinations and the enterprise-only admin routes in the open
+source build, but the API used to save remote pipeline nodes (pipeline destinations are
 covered by helpers/workflow/pages/destination_page.py), and to answer a bad body on
 the enterprise stubs with 400/415/422 (as if the feature worked) before its 403. The enterprise build is
 unchanged, so every test here skips there.
@@ -16,7 +16,6 @@ import pytest
 from support.client import OpenObserveClient
 
 REMOTE_REFUSAL = "Remote destinations are not supported in the open source version"
-OSS_REFUSAL = "Not supported in the open source version"
 BAD_BODIES = [
     pytest.param({"data": "{not json", "headers": {"Content-Type": "application/json"}}, id="bad-json"),
     pytest.param({"json": {}}, id="empty-object"),
@@ -27,7 +26,6 @@ STUBS = [
     ("POST", "api/v2/{org}/downtimes", 403, "Not Supported"),
     ("PUT", "api/{org}/alerts/deduplication/semantic-groups", 403, "Enterprise feature not available"),
     ("POST", "api/{org}/organizations/assume_service_account", 501, "only available in the enterprise version"),
-    ("POST", "api/{org}/llm/models", 403, OSS_REFUSAL),
 ]
 
 
@@ -45,15 +43,6 @@ def test_enterprise_stub_refuses_before_reading_the_body(client: OpenObserveClie
     resp = client.request(method, path.format(org=client.org), prefix="", **body)
     assert resp.status_code == status, f"{method} {path}: {resp.status_code} {resp.text[:300]}"
     assert message in resp.text, f"{method} {path}: {resp.text[:300]}"
-
-
-def test_model_pricing_reads_stay_open_and_refresh_is_refused(client: OpenObserveClient):
-    listed = client.get("llm/models")
-    assert listed.status_code == 200, f"{listed.status_code} {listed.text[:200]}"
-    assert isinstance(listed.json(), list), listed.text[:200]
-    refresh = client.post("llm/models/refresh-built-in")
-    assert refresh.status_code == 403, f"{refresh.status_code} {refresh.text[:200]}"
-    assert OSS_REFUSAL in refresh.text, refresh.text[:200]
 
 
 def test_pipeline_with_a_remote_node_is_refused(client: OpenObserveClient):

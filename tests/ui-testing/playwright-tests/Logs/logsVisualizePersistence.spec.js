@@ -587,4 +587,41 @@ test.describe("Logs Visualization State Persistence testcases", () => {
 
     testLogger.info('Direct Visualize navigation emitted no SELECT * toast');
   });
+  // ===== Visualize keeps the logs query's filters (ENT#493, ENT#2734) =====
+
+  test("Visualize from a SQL query keeps its NOT IN condition (ENT#493)", {
+    tag: ['@logs-visualize-persistence', '@all', '@logs', '@P1', '@bug-ent493']
+  }, async ({ page }) => {
+    const sql = `SELECT * FROM "e2e_automate" WHERE kubernetes_namespace_name NOT IN ('ovnb-ns-a', 'ovnb-ns-b')`;
+    await pm.logsPage.openLogsWithSqlQuery('e2e_automate', sql);
+    await pm.logsPage.applyQueryAndWaitForSearchResponse();
+
+    const visualizeSql = pm.logsPage.collectVisualizeSql();
+    await pm.logsPage.clickVisualizeToggle();
+    await pm.logsPage.expectVisualizeTabContentVisible();
+    // Pre-fix the generated chart query dropped the NOT IN, so the chart counted the excluded rows too.
+    await expect.poll(() => visualizeSql.join('\n'), { timeout: 30000 })
+      .toMatch(/kubernetes_namespace_name\s+NOT IN\s*\(\s*'ovnb-ns-a'\s*,\s*'ovnb-ns-b'\s*\)/i);
+  });
+
+  test("Visualize from a non-SQL filter keeps it in the chart query and Logs keeps the query (ENT#2734)", {
+    tag: ['@logs-visualize-persistence', '@all', '@logs', '@P1', '@bug-ent2734']
+  }, async ({ page }) => {
+    const filter = "kubernetes_namespace_name = 'monitoring'";
+    const query = encodeURIComponent(Buffer.from(filter).toString('base64'));
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}&stream_type=logs&stream=e2e_automate&period=15m&sql_mode=false&query=${query}`);
+    await pm.logsPage.getQueryEditorTextWhenReady(filter);
+    await pm.logsPage.applyQueryAndWaitForSearchResponse();
+
+    const visualizeSql = pm.logsPage.collectVisualizeSql();
+    await pm.logsPage.clickVisualizeToggle();
+    await pm.logsPage.expectVisualizeTabContentVisible();
+    await expect.poll(() => visualizeSql.join('\n'), { timeout: 30000 })
+      .toMatch(/kubernetes_namespace_name\s*=\s*'monitoring'/i);
+
+    await pm.logsPage.clickLogsToggle();
+    // Pre-fix the filter vanished from the editor after the round trip.
+    const editor = await pm.logsPage.getQueryEditorTextWhenReady('monitoring', 15000);
+    expect(editor).toContain(filter);
+  });
 });

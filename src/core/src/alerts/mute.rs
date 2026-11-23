@@ -30,6 +30,7 @@ use config::{
     },
     utils::time::now_micros,
 };
+use infra::table::downtimes::IdleRun;
 use o2_enterprise::enterprise::downtimes::{MAX_NAME_LEN, schedule};
 
 use crate::{
@@ -156,18 +157,19 @@ pub async fn extend(
     })
 }
 
-/// Ends a quick mute of this alert now.
+/// Ends a quick mute of this alert now; with `idle`, only while no run of it can race the end.
 pub async fn unmute(
     target: &AckTarget,
     downtime_id: &str,
     version: Option<i64>,
     actor: &str,
+    idle: Option<IdleRun<'_>>,
 ) -> Result<Downtime, MuteError> {
     downtimes::ensure_enabled()?;
     ack::authorize(target, actor, Act::Mute)
         .await
         .map_err(MuteError::from)?;
-    let after = end_seen_quick_mute(target, downtime_id, version, actor).await?;
+    let after = end_seen_quick_mute(target, downtime_id, version, actor, idle).await?;
     lifecycle::on_view_changed(&target.org_id, &target.alert_id, single_group(&after)).await;
     Ok(after)
 }
@@ -178,11 +180,12 @@ async fn end_seen_quick_mute(
     downtime_id: &str,
     version: Option<i64>,
     actor: &str,
+    idle: Option<IdleRun<'_>>,
 ) -> Result<Downtime, MuteError> {
     let row = quick_mute_of(target, downtime_id).await?;
     // The shape check ignores the groups, so a mute widened since the list loaded needs this.
     check_seen_version(version, &row)?;
-    Ok(downtimes::cancel_quick_mute(&target.org_id, actor, row).await?)
+    Ok(downtimes::cancel_quick_mute(&target.org_id, actor, row, idle).await?)
 }
 
 /// Cancels the Until-it-clears mutes a clear ends (§6.3), before anything reads downtimes for it.
@@ -672,9 +675,12 @@ mod tests {
         let now = now_micros();
         let conn = infra::db::get_orm_client_rw().await;
         let mut versions = BTreeMap::new();
-        for id in ["stale", "current", "absent"] {
+        // Rows are keyed by id alone, so a fixed id would move another test's row into this org.
+        let id_of = |name: &str| format!("{org}_{name}");
+        for name in ["stale", "current", "absent"] {
+            let id = id_of(name);
             let mut mute = row(None, None);
-            mute.id = id.to_string();
+            mute.id = id.clone();
             mute.org = org.clone();
             mute.schedule.starts_at = now - HOUR;
             mute.schedule.ends_at = Some(now + HOUR);
@@ -682,16 +688,16 @@ mod tests {
             infra::table::downtimes::put_with(conn, &mute)
                 .await
                 .unwrap();
-            let stored = infra::table::downtimes::get_rw(&org, id)
+            let stored = infra::table::downtimes::get_rw(&org, &id)
                 .await
                 .unwrap()
                 .unwrap();
-            versions.insert(id, stored.version);
+            versions.insert(name, stored.version);
         }
-        let live = |id: &'static str| {
-            let org = org.clone();
+        let live = |name: &'static str| {
+            let (org, id) = (org.clone(), id_of(name));
             async move {
-                let stored = infra::table::downtimes::get_rw(&org, id)
+                let stored = infra::table::downtimes::get_rw(&org, &id)
                     .await
                     .unwrap()
                     .unwrap();
@@ -699,7 +705,14 @@ mod tests {
             }
         };
 
-        let refused = end_seen_quick_mute(&on, "stale", Some(versions["stale"] - 1), "ops").await;
+        let refused = end_seen_quick_mute(
+            &on,
+            &id_of("stale"),
+            Some(versions["stale"] - 1),
+            "ops",
+            None,
+        )
+        .await;
         assert!(
             matches!(
                 refused,
@@ -711,13 +724,19 @@ mod tests {
         );
         assert!(live("stale").await, "a refused unmute leaves the mute live");
 
-        let ended = end_seen_quick_mute(&on, "current", Some(versions["current"]), "ops")
-            .await
-            .unwrap();
+        let ended = end_seen_quick_mute(
+            &on,
+            &id_of("current"),
+            Some(versions["current"]),
+            "ops",
+            None,
+        )
+        .await
+        .unwrap();
         assert!(ended.cancelled_at.is_some());
         assert!(!live("current").await);
 
-        end_seen_quick_mute(&on, "absent", None, "ops")
+        end_seen_quick_mute(&on, &id_of("absent"), None, "ops", None)
             .await
             .unwrap();
         assert!(

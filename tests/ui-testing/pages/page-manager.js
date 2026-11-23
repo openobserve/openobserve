@@ -19,6 +19,7 @@ import DashboardMaxQueryRange from "./dashboardPages/dashboard-max-query-range";
 import DashboardNotices from "./dashboardPages/dashboard-notices.js";
 import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
 import DashboardCellExplorerPage from "./dashboardPages/dashboard-cell-explorer";
+import DashboardTreemap from "./dashboardPages/dashboard-treemap.js";
 import DashboardLegendsCopy from "./dashboardPages/dashboard-legends-copy";
 import DashboardFilter from "./dashboardPages/dashboard-filter";
 import DashboardImport from "./dashboardPages/dashboard-import.js";
@@ -167,6 +168,11 @@ const SecuritySeed = require("./securityPages/securitySeed.js");
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
 import { LogsToolbarPinsPage } from "./logsPages/logsToolbarPinsPage.js";
 import { SearchHistoryPage } from "./logsPages/searchHistoryPage.js";
+import { LogsSavedViewsMenuPage } from "./logsPages/logsSavedViewsMenuPage.js";
+import { LogsRecentSearchesPage } from "./logsPages/logsRecentSearchesPage.js";
+import { LogsAutoRefreshPage } from "./logsPages/logsAutoRefreshPage.js";
+import { AlertPromqlEditorDialogPage } from "./alertsPages/alertPromqlEditorDialogPage.js";
+import { TraceFlameGraphPage } from "./tracesPages/traceFlameGraphPage.js";
 import UnflattenedPage from "./logsPages/unflattened.js";
 
 // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
@@ -205,6 +211,7 @@ class PageManager {
     this.dashboardFolder = new DashboardFolder(page);
     this.dashboardFavorites = new DashboardFavorites(page);
     this.dashboardPanelActions = new DashboardactionPage(page);
+    this.dashboardTreemap = new DashboardTreemap(page);
     this.dashboardPanelConfigs = new DashboardPanelConfigs(page);
     this.dashboardPanelEdit = new DashboardPanel(page);
     this.dashboardSetting = new DashboardSetting(page);
@@ -299,6 +306,11 @@ class PageManager {
     this.logsPage = new LogsPage(page);
     this.logsToolbarPinsPage = new LogsToolbarPinsPage(page);
     this.searchHistoryPage = new SearchHistoryPage(page);
+    this.logsSavedViewsMenuPage = new LogsSavedViewsMenuPage(page);
+    this.logsRecentSearchesPage = new LogsRecentSearchesPage(page);
+    this.logsAutoRefreshPage = new LogsAutoRefreshPage(page);
+    this.alertPromqlEditorDialogPage = new AlertPromqlEditorDialogPage(page);
+    this.traceFlameGraphPage = new TraceFlameGraphPage(page);
     this.streamsPage = new StreamsPage(page);
     this.alertTemplatesPage = new AlertTemplatesPage(page);
     this.alertDestinationsPage = new AlertDestinationsPage(page);

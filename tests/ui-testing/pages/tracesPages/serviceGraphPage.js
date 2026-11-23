@@ -23,6 +23,7 @@ export class ServiceGraphPage {
     this.dateTimePicker = '[data-test="service-graph-date-time-picker"]';
     this.refreshButton = '[data-test="service-graph-refresh-btn"]';
     this.chartContainer = '[data-test="service-graph-chart"]';
+    this.streamSelector = '[data-test="service-graph-stream-selector"]';
 
     // ===== VIEW TOGGLE BUTTONS (page header #subnav — button with .selected class) =====
     this.graphViewTab = '[data-test="service-graph-graph-view-btn"]';
@@ -517,6 +518,26 @@ export class ServiceGraphPage {
     return await table.locator('tbody tr').count();
   }
 
+  /** Waits for the side panel's first operation row to show `count`, then clicks it to hand off to Traces. */
+  async openFirstOperationTraces(nodeName, count) {
+    const row = this.page.locator(`${this.operationsTable} tbody tr`).first();
+    await expect(
+      row,
+      `${nodeName} must list its operations from the stream`,
+    ).toBeVisible({ timeout: 30000 });
+    await expect(row).toContainText(String(count));
+    // A row click hands off with no column filter; the per-column hover buttons add errors or latency bounds.
+    await row.locator("td").first().click();
+    await this.page.waitForURL(/\/traces\?/, { timeout: 15000 });
+  }
+
+  /** Opens `nodeName`'s side panel and hands its first operation (expected to count `count`) off to Traces. */
+  async viewTracesFromFirstOperation(nodeName, count) {
+    await this.clickNodeByName(nodeName);
+    await this.expectSidePanelServiceName(nodeName);
+    await this.openFirstOperationTraces(nodeName, count);
+  }
+
   async closeSidePanel() {
     await this.page.locator(this.sidePanelCloseBtn).click();
     await this.page.locator(this.sidePanel)
@@ -714,4 +735,25 @@ export class ServiceGraphPage {
       path: `test-results/screenshots/${name}-${Date.now()}.png`,
     });
   }
+  async expectStreamSelectorVisible(timeout = 30000) {
+    await expect(this.page.locator(this.streamSelector)).toBeVisible({ timeout });
+  }
+
+  /** Returns a live list of the stream_name of every topology response from now on. */
+  trackTopologyStreams() {
+    const streams = [];
+    // Responses, not requests: a load still in flight makes the component skip the next one.
+    this.page.on('response', (res) => {
+      if (res.url().includes('/traces/service_graph/topology/current')) {
+        streams.push(new URL(res.url()).searchParams.get('stream_name'));
+      }
+    });
+    return streams;
+  }
+
+  async selectStreamFromDropdown(streamName) {
+    await this.page.locator(this.streamSelector).click();
+    await this.page.getByRole('option', { name: streamName, exact: true }).click();
+  }
+
 }

@@ -245,4 +245,69 @@ describe("buildPrefillFromPatterns", () => {
       );
     });
   });
+
+  describe("patterns that share a long prefix", () => {
+    const A = "core event seq=<:NUM> info from <*> status 500";
+    const B = "core event seq=<:NUM> warn from <*> status 404";
+    const SHARED = "core event seq=<:NUM> info from <*>";
+
+    it("builds the include query from every distinguishing term", () => {
+      const p = buildPrefillFromPatterns(
+        patterns({ templates: [A], allTemplates: [A, B], mode: "include" }),
+      );
+
+      expect(p.sql).toBe(
+        "SELECT count(*) AS cnt FROM 'k8s_logs' WHERE match_all('core event seq=') AND match_all('info from') AND match_all('status 500')",
+      );
+    });
+
+    it("checks against all templates, not only the visible ones", () => {
+      const p = buildPrefillFromPatterns(
+        patterns({ templates: [A], allTemplates: [A, B], mode: "exclude" }),
+      );
+
+      expect(p.sql).toBe(
+        "SELECT count(*) AS cnt FROM 'k8s_logs' WHERE NOT (match_all('core event seq=') AND match_all('info from') AND match_all('status 500'))",
+      );
+    });
+
+    it("treats a pattern nothing separates from the others as unusable", () => {
+      const p = buildPrefillFromPatterns(
+        patterns({
+          templates: [SHARED],
+          allTemplates: [SHARED, A],
+          mode: "include",
+          requirePatterns: true,
+        }),
+      );
+
+      expect(p.warnings).toEqual([
+        { key: "patternsShared", level: "warning", params: { count: 1 } },
+        { key: "patternsShared", level: "blocking", params: { count: 1 } },
+        { key: "broadMatch", level: "warning" },
+      ]);
+    });
+
+    it("words the shared-pattern warning with the dropped count", () => {
+      expect(enUS.alerts.prefill.warnings.patternsShared.replace("{count}", "2")).toBe(
+        "2 of the selected patterns share all their text with other patterns, so the alert filter leaves them out.",
+      );
+    });
+
+    it("names the shared patterns dropped from a multi-pattern exclude, apart from textless ones", () => {
+      const p = buildPrefillFromPatterns(
+        patterns({
+          templates: [A, SHARED, "<*> <*>"],
+          allTemplates: [A, B, SHARED, "<*> <*>"],
+          mode: "exclude",
+        }),
+      );
+
+      expect(p.warnings).toEqual([
+        { key: "noConstants", level: "warning" },
+        { key: "patternsShared", level: "warning", params: { count: 1 } },
+        { key: "broadMatch", level: "warning" },
+      ]);
+    });
+  });
 });

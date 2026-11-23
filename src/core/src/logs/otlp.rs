@@ -1939,6 +1939,7 @@ mod tests {
             "_o2_autoobserve_health",
             "_o2_service_verdicts",
             "_o2_service_requests_total",
+            "_o2_sessionreplay_resources",
         ] {
             let err = handle_request(
                 0,
