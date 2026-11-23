@@ -243,7 +243,7 @@ Rule of thumb (O1): **Tooltip = hint, Dropdown = action menu, Popover = small se
 **Import:** `@/lib/overlay/Popover/OPopover.vue`
 **Use when:** Floating content that isn't a list of actions — filter forms, pickers, info cards, mini editors. Keeps normal Tab order; arrow keys belong to the content. Non-modal by default. Descendant overlays (OSelect / OCombobox / nested dropdowns) opened inside won't dismiss it.
 **Don't use for:** A menu of actions (use **ODropdown** for menu semantics); a passive text hint (use **OTooltip**); a large modal task (use **ODialog**/**ODrawer**).
-**Key props:** `open` (boolean, `v-model:open`) · `size` (`"sm"|"md"|"lg"` — default `"md"`; 260 filter editor, 320 columns and About, 440 share or kiosk setup; `auto` is reserved for library composites such as the 664 date-time range) · `title` (optional head, 13 px semibold; also the accessible name) · `reserveHeight` (a rem length, e.g. `"20rem"` — the body keeps the tallest state's height, so switching content never resizes it, O4) · `modal` (boolean — default `false`) · `side` · `align` (default `"start"`) · `hideWhenDetached` · `ariaLabel` · `contentClass` (padding only — never a width; the lint rejects one)
+**Key props:** `open` (boolean, `v-model:open`) · `size` (`"sm"|"md"|"lg"` — default `"md"`; 260 filter editor, 320 columns, 440 share or kiosk setup; `auto` is reserved for library composites such as the 664 date-time range) · `title` (optional head, 13 px semibold; also the accessible name) · `reserveHeight` (a rem length, e.g. `"20rem"` — the body keeps the tallest state's height, so switching content never resizes it, O4) · `modal` (boolean — default `false`) · `side` · `align` (default `"start"`) · `hideWhenDetached` · `ariaLabel` · `contentClass` (padding only — never a width; the lint rejects one)
 **Rules:** fixed width from `size`, anchored once and never re-anchored while open (O3, O4). A filterable list keeps its width and shows "No matches" in place instead of shrinking. More than about four fields, or a decision, is a dialog (O1). Never open a dialog from a popover (O8).
 **Slots:** `trigger` (as-child), `default` (content; padded `p-3` when there is a `title` or `#footer`), `footer` (actions, right-aligned)
 **Emits:** `update:open` (boolean)
@@ -268,9 +268,7 @@ paragraph capped to the viewport.
 ```
 
 Use `align="start"` when the button sits at the start of its row; an `OTooltip` is
-not a substitute — it is hover-only and never opens on touch. A page's own
-explanation is not built by hand: pass it as the header's `about` prop, which
-renders this recipe beside the title (H2).
+not a substitute — it is hover-only and never opens on touch.
 
 **Filter-popover recipe.** A "Filters" / "Narrow results" popover is not a loose
 stack of selects — build it as **one panel you fill in and dismiss**: a title, a
@@ -435,11 +433,11 @@ unfiltered page spends one button and a filtered one shows its scope as chips).
 ### OTabs
 
 **Import:** `@/lib/navigation/Tabs/OTabs.vue`
-**Use when:** Peer pages or sections (N2): page tabs on their own 40 px row under the header (H8), compact tabs (32 px) inside a drawer or panel. Owns the active-tab state; pair with OTabPanels/OTabPanel, or give each OTab a `to` for route tabs.
+**Use when:** Peer pages or sections (N2): page tabs (40 px) in the page header's tab row, compact tabs (32 px) inside a drawer or panel. Owns the active-tab state; pair with OTabPanels/OTabPanel, or give each OTab a `to` for route tabs.
 **Don't use for:** A linear wizard (use **OStepper**); a view or object-type switch (use **OToggleGroup**); narrowing a list by state such as Firing or Paused, which is a filter (F6).
 **Key props:** `modelValue` (`string | number`, required, `v-model`) · `size` (`"page"|"compact"`, default `"page"`: 40 or 32 px) · `orientation` (`"horizontal"|"vertical"`; vertical items are 32 px, 28 compact) · `bordered` (boolean) · `reorderable` (boolean; OTabs reports the move, the parent owns the order) · `collapseLabels` (boolean)
 **Behaviour:** tabs always start at the content edge. Past six tabs a horizontal, non-reorderable strip folds the rest into one "More ▾" tab (N2); the row never wraps. `dense`, `align`, `mobile-arrows` and `breakpoint` are gone (`local/o2-controls-api`).
-**Page tabs:** put the strip in `OPageLayout`'s `#header-tabs` (`#tabs` on a bare `OPageHeader`). The header gives it its own 40 px row under the 56 px band, draws the row's divider under the active bar and starts the first label at the content edge; it never sits after the title, and the title never takes the active tab's name (H8). The header has no inline-tabs mode (`tabs-below` is gone, `local/o2-page-header-api`).
+**Page tabs:** put the strip in `OPageLayout`'s `#header-tabs` (`#tabs` on a bare `OPageHeader`) and pass **`tabs-below`**, so it gets the full-width row under the title; without it the strip renders inline beside the title and shifts with the title's width (house rule 1).
 **Slots:** `default` (OTab children)
 **Emits:** `update:modelValue`, `change`, `reorder` (`{ from, to, before }`)
 **Family:** OTab, OTabPanels, OTabPanel.
@@ -449,7 +447,7 @@ unfiltered page spends one button and a filtered one shows its scope as chips).
 ### OTab
 
 **Import:** `@/lib/navigation/Tabs/OTab.vue`
-**Use when:** One tab inside OTabs. One font weight (500) in every state: selecting changes only the colour and the 2 px accent bar, so nothing moves (H8, P3).
+**Use when:** One tab inside OTabs. One font weight (500) in every state: selecting changes only the colour and the 2 px accent bar, so nothing moves (P3).
 **Key props:** `name` (required) · `label` (`I18nText`) · `icon` · `count` (number; tabular, capped at "999+" and always as wide as "999+"; `null` reserves the width while it loads) · `countTone` (`"default"|"error"`; error only when the count is the exception, C3) · `locked` + `lockedLabel` (lock glyph and its screen-reader text) · `dirty` (unsaved dot) · `disabled` · `tooltip` · `to` (RouteLocationRaw: a route tab that navigates on click and selects itself while `route.name === name`; replaces ORouteTab)
 **Removed:** `disable` → `disabled`, `suffixIcon="lock"` → `locked`, `suffixLabel` → `lockedLabel`, an OTag/OBadge count in the slot → `count`. Never set a height or font weight on a tab by class (`local/o2-control-height`).
 **Slots:** `default` (custom trigger content), `icon`, `trailing` (controls beside the trigger)

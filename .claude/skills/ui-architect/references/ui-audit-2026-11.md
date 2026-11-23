@@ -16,7 +16,7 @@ and drift as fixes land: re-measure before quoting one.
 | Everywhere | 126 raw buttons and 260 clickable divs | KB4 | components.md |
 | Everywhere | 118 hand-built copy buttons; no shared Copy component | P2 | components.md |
 | Everywhere | Field stacks use six gap values; toolbars twelve | L4 | composition.md §2 |
-| Everywhere | Back built 12 ways; 19 raw router.back(); no breadcrumb component | H4 N3 | composition.md |
+| Everywhere | Back built 12 ways; 19 raw router.back(); no breadcrumb component | N3 | composition.md |
 | Everywhere | Save in 8 kinds of place; 10 in Settings | V2 | composition.md · screens-settings-iam.md |
 | Everywhere | 63 of 159 list pages keep filters only in memory | F11 | composition.md |
 | Everywhere | 27 drawer widths (19 in vw); dialogs 480–1,080 | O3 | composition.md §4 |
@@ -59,7 +59,7 @@ and drift as fixes land: re-measure before quoting one.
 | Settings | Four unsaved-change behaviours; most settings pages unguarded | V3 V5 | screens-settings-iam.md §0 |
 | Settings | Form pages start at x = 335, list pages at x = 331 | L1 L3 | screens-settings-iam.md §0 |
 | Settings | Section headings in about 9 size and weight pairs | T1 | screens-settings-iam.md §4 |
-| Settings | Names differ across rail, header and tab (BYOB, Running queries, Nodes) | H7 | screens-settings-iam.md §0 |
+| Settings | Names differ across rail, header and tab (BYOB, Running queries, Nodes) | P2 | screens-settings-iam.md §0 |
 | Settings, IAM | Token disable and token generation run without a confirmation | V8 | screens-settings-iam.md §0 |
 | IAM | Update user grows 319 → 511 px and re-centres | O4 | screens-settings-iam.md §0 |
 | AI | Small creates are drawers here and dialogs elsewhere; dialogs 480–1,024, drawers 432–1,224 | O2 O3 | screens-ai-infra-security.md §6 |
@@ -67,9 +67,9 @@ and drift as fixes land: re-measure before quoting one.
 | AI | Five column headers clipped under the sticky Actions column | D7 | screens-ai-infra-security.md §6 |
 | AI, Security | Time range in four forms with five different defaults | F8 | screens-ai-infra-security.md §6 |
 | Security | Raw "Request failed with status code 404"; solid red banner on Fleet | K6 | screens-ai-infra-security.md §6 |
-| AutoObserve | Custom header with 24–30 px titles and a "← Back" text link | H1 T2 | screens-ai-infra-security.md §6 |
+| AutoObserve | Custom header with 24–30 px titles and a "← Back" text link | T2 | screens-ai-infra-security.md §6 |
 | Copy | About 100 Title Case strings and uppercase labels | T5 | all screen surveys |
-| Copy | New, Create and Add mixed for the same action | H6 W2 | screens-settings-iam.md · screens-respond.md |
+| Copy | New, Create and Add mixed for the same action | W2 | screens-settings-iam.md · screens-respond.md |
 
 ## Bugs found during the survey
 

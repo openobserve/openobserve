@@ -325,7 +325,7 @@ of the frame). Four kinds in one component (K5), each telling the one next step:
 
 | `kind` | Says | Action |
 | --- | --- | --- |
-| `first-run` (default) | What this is and why you would use it | One primary, the header's words: "New alert" (H6) |
+| `first-run` (default) | What this is and why you would use it | One primary, the header's words: "New alert" (W2) |
 | `filtered` | No rows match; which filters are on | Clear filters (default label) (F5) |
 | `denied` | No access, and who can grant it (`contact`) | None, or "Request access" |
 | `error` | What failed, in plain words (K6) | Retry (default label, refresh icon) |

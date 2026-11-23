@@ -12,25 +12,11 @@ recurring class of bug or drift in this codebase.
 > below and a guideline disagree, the guideline wins; each rule cites the ids it
 > implements.
 
-### 1. Every page header is `OPageHeader`, the stacked v2 header (H1–H8)
+### 1. Every page/module header is `OPageHeader`
 
-**What.** The top of any routed view is rendered by `OPageHeader` (or
-`OPageLayout`, which renders it), never a hand-rolled `<div class="header">…<h1>…`
-or a bespoke `q-toolbar`. The header is the one described in
-[header-spec.md](header-spec.md):
-
-- one 56 px band; on the left a **context line** (12 px, secondary) above the
-  **title** (16 px semibold); page actions on the right (H1);
-- the context line names the container: the rail group on grouped pages, the org
-  on the others, and a "‹ Parent" link on detail, editor and import pages. That
-  link is the Back affordance (H4);
-- **no icon tile and no subtitle paragraph** (H2). Explanations open from an About
-  (ⓘ) popover beside the title;
-- **no single-line breadcrumb trail and no boxed back button** (H4);
-- tabs on **their own row** under the header, never after the title; one font
-  weight for every tab state; the title never changes when a tab is clicked (H8);
-- actions: up to two secondary, one primary, then ⋯ More (H3); the create action
-  is "New <object>", label only (H6).
+**What.** The top of any routed view or module screen (title + icon + actions,
+optionally peer tabs and a back button) is rendered by `OPageHeader`, never a
+hand-rolled `<div class="header">…<h1>…` or a bespoke `q-toolbar`.
 
 ```vue
 <script setup lang="ts">
@@ -39,7 +25,11 @@ import OButton from "@/lib/core/Button/OButton.vue";
 </script>
 
 <template>
-  <OPageHeader :title="t('dashboard.header')">
+  <OPageHeader
+    :title="t('dashboard.header')"
+    icon="dashboard"
+    :subtitle="t('dashboard.subtitle')"
+  >
     <template #actions>
       <OButton variant="primary" @click="addDashboard">
         {{ t("dashboard.add") }}
@@ -49,42 +39,55 @@ import OButton from "@/lib/core/Button/OButton.vue";
 </template>
 ```
 
-**Why.** People aim for tabs and actions by position (H8). A header that changes
-height, a title that moves with an icon tile or a breadcrumb's length, or tabs
-that slide when the title changes all make every click need a second look. The
-rail already shows the area's icon, and a subtitle is read once and then costs a
-line forever (H2). Every hand-built header re-litigates title size, back-button
-placement and the tab underline, and drifts.
+**Why.** `OPageHeader` encodes a single header contract used app-wide: row 1 is
+a fixed-height band (icon tile + `<h1>` + right-aligned actions, with the
+`subtitle` tagline under the title); row 2 is the full-width peer-tab strip.
+Tabs and a tagline coexist — most module index pages carry both. Every
+hand-built header silently re-litigates title font size, icon tile geometry,
+back-button placement, and the tab underline — and drifts. Reusing the component
+keeps the title's X/Y position identical as a user navigates list → detail →
+edit, which is the whole point.
 
 **How.**
-- The component is `OPageHeader` (`web/src/lib/core/PageHeader/OPageHeader.vue`,
-  types in `OPageHeader.types.ts`), usually reached through `OPageLayout`'s props.
-  The stacked anatomy is [header-spec.md](header-spec.md) (H1–H8).
-- **There is no `icon` and no `subtitle`** (H2). Real help goes in `about` (an ⓘ
-  "About this page" popover beside the title); filler is dropped.
-- The context line is derived from the route (the rail group, else the org);
-  `context` overrides it only where the derivation is wrong. `back`
-  (`{ label, to | onClick, dataTest }`) turns it into the "‹ Parent" link (H4):
-  `label` is the parent's own name, `to` is its route (the href, and where Back
-  lands from a deep link), and a click is smart back (N3). `onClick` only for an
-  in-page parent with no route; a handler that must do work first navigates with
-  `useSmartBack`, never `router.back()`. There is no breadcrumb prop and there will
-  not be one.
-- **Peer tabs** go in `#tabs` (`#header-tabs` on `OPageLayout`): always their own
-  40 px row under the band (H8). More than six tabs: the rest go in a "More ▾"
-  tab (N2).
-- `titleDataTest` puts a `data-test` on the `<h1>`. A `#title` slot is only for an
-  inline-edited name and owns its overflow; a text title truncates with a tooltip
-  and never wraps. Status chips go in `#status` (H5).
-- Put page actions in `#actions` (primary) and `#actions-overflow` (secondaries,
-  rendered first and folded into ⋯ More under 640 px), using O2 components. Do not
-  add your own `border-b`, height or padding around the header — it owns its
-  chrome and the one 16 px gutter (L3). `local/o2-page-header-api` enforces all of
-  this in `lint:ci`.
+- The component is `OPageHeader`, at
+  `web/src/lib/core/PageHeader/OPageHeader.vue`. Its full API — props, slots, and
+  the one-row-content contract — is documented in this rule (below), so you can
+  use it correctly without opening the file.
+- Props: `title`, `subtitle`, `icon` (an `IconName` from
+  `@/lib/core/Icon/OIcon.icons`), `back` (`{ label, to | onClick, dataTest }`),
+  `tabsBelow`, `titleDataTest` (a `data-test` on the `<h1>`, so a page needn't
+  take over the `#title` slot just to attach a test hook), and `titleOverflow`
+  (`"truncate"` default | `"visible"` — pass `"visible"` when `#title` hosts an
+  interactive control, or the `<h1>`'s `overflow:hidden` swallows its focus ring).
+  `overflowFirst` renders `#actions-overflow` before `#actions` on desktop, so a
+  trailing primary CTA stays last; `titleMinWidth` keeps the title at least 10rem
+  wide for a `#title-trail` that competes for the row.
+  There is **no breadcrumb prop** — `OPageHeader` has no breadcrumb affordance
+  and no `BreadcrumbItem` type exists; a sub-page uses `back` instead.
+- Slots: `title-prefix`, `title`, `subtitle`, `title-trail`, `actions`,
+  `actions-overflow` (secondaries: inline on desktop, behind one "More" button
+  below md), `tabs`, `back`.
+- **Peer tabs need `tabs-below` — the slot alone is not enough.** `#tabs`
+  (`#header-tabs` on `OPageLayout`) defaults to rendering the strip *inline
+  beside the title*, which is the wrong place for Level-2 section nav: the title
+  block is `shrink-0`, so the strip's x-position moves with the title's width
+  and shifts under the cursor as you navigate between siblings. Pass
+  `tabs-below` to get the full-width row-2 strip every module uses. The four
+  alerting pages shipped inline for exactly this reason — nothing failed, they
+  just didn't look like the rest of the app.
+- **The header `icon` must be the SAME `IconName` the page's nav entry
+  declares** — see [navigation-menus](navigation-menus.md#icon-parity).
+- Put page actions in `#actions` using O2 components. Do not add your own
+  `border-b`, height, or padding around it — the header owns its own chrome.
+- **The header's create CTA is label-only — no `+` icon.** Write
+  `<OButton variant="primary">New alert</OButton>`, never `icon="add"`. This
+  applies to every New/Add/Create button in `#actions`, on list and detail pages
+  alike. See *No `+` on a text button* below.
 - **Do not** style `OPageHeader` from the outside with utility classes or a
-  wrapper. If it cannot express what a page needs, change `OPageHeader`.
+  wrapper trying to change its internals. If it can't express what a page needs,
+  that's a change to `OPageHeader` itself, not a per-page override.
 
-#### No `+` on a text button (B4, H6)
+#### No `+` on a text button (B4)
 
 An icon goes on a text button only when it adds meaning the word lacks: menu
 chevron ▾, external link ↗, download, upload, copy, run (B4). So:

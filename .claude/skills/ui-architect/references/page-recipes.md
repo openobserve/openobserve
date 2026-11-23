@@ -24,48 +24,28 @@ feel like one product.
 
 ## Every page = OPageHeader + body
 
-Any routed view is an `OPageLayout` (rule 1): the stacked `OPageHeader` on top,
-then the page body, all inside a **full-height flex column** so the header stays
-put and only the body scrolls. The header is [header-spec.md](header-spec.md):
+Any routed view is: an `OPageHeader` (rule 1) on top, then the page body below
+it, all inside a **full-height flex column** so the header stays put and only the
+body scrolls.
 
-- **One 56 px band on every page** (H1): a 16 px context line over a 24 px title,
-  actions on the right. The band never wraps and nothing in it is sized by its
-  content, so the title sits at the same x and y on every page.
-- **The context line names the container** (H4), derived for you from the route
-  through the rail's nav model (`navGroups.ts` + MainLayout's links): the rail
-  group ("Reliability", "Data", "Infra", "Experience", "Settings", "Dashboards")
-  or the org on ungrouped pages. Override it with `:context` only where the
-  derivation is wrong (an `OPageHeader` inside a panel). Detail, editor and import
-  pages pass **`:back="{ label, to }"`**: the line becomes a real "‹ Parent" link,
-  and Back is smart (N3) — see the detail recipe below.
-- **The title is the page or object name** (`:title`) and never changes on a tab
-  click (H8). Long titles truncate with a tooltip. A `#title` slot is only for an
-  inline-edited name control; it owns its overflow.
-- **A status chip or count follows the title in `#status`** (H5): "3 firing",
-  "Paused", a Beta badge.
-- **Actions** (H3): the primary (New / Add / Create) and anything that must never
-  fold go in **`#actions`**; secondary page actions (Import, Export) go in
-  **`#actions-overflow`**, which renders *before* `#actions` and folds into ⋯ More
-  under 640 px (R2). Never in the table toolbar. See
-  [responsive.md](responsive.md#page-shell-the-header-stays-on-one-row).
-- **The create CTA is "New <object>", label only** (H6) — no `+`, here or on any
-  other text button (B4). A text button carries an icon only for ▾, ↗, download,
+- **Primary page action** (New / Add / Create) goes in the header's
+  **`#actions`** slot; page-level secondary actions (Import, Export, an overflow
+  `ODropdown`) go in **`#actions-overflow`** — inline on desktop, behind one ⋮ on
+  phones (add `overflow-first` so they keep their place before the CTA). Never in the
+  table toolbar. See [responsive.md](responsive.md#page-shell-the-header-stays-on-one-row).
+- **The create CTA is label-only — no `icon="add"`.** Secondary header actions
+  keep their semantic icons (Import → `upload-file`). No other text button carries
+  a `+` either (B4): a text button carries an icon only for ▾, ↗, download,
   upload, copy or run. See
-  [house-rules § No `+` on a text button](house-rules.md#no--on-a-text-button-b4-h6).
-- **Peer tabs** go in `#header-tabs` (`#tabs` on a bare `OPageHeader`): always their
-  own 40 px row under the band, the first label at the content edge (H8, N2). Only
-  peer-page navigation belongs there, never a filter or a toggle (F6).
-- **No icon and no subtitle** (H2): `icon`, `subtitle` and `#subtitle` are gone. Help
-  that the title cannot say goes in **`:about`**, an ⓘ "About this page" popover
-  beside the title; filler is dropped.
-- **A lasting page condition** (quota, read-only, partial data) is one `OBanner` in
-  **`#banner`**, directly under the header and tabs (K3), never a notice inside a
-  padded body.
+  [house-rules § No `+` on a text button](house-rules.md#no--on-a-text-button-b4).
+- **Peer tabs** go in `#header-tabs` with **`tabs-below`** (rule 1). Only peer-page
+  navigation belongs there, never a filter or a toggle (F6).
 - The header owns its own chrome: its divider and the one 16 px gutter (L3). Never
-  wrap it in a bordered or padded div and never put `px-*` or `border-b` on it.
-- `local/o2-page-header-api` (in `lint:ci`) rejects the removed props and slots,
-  a hand-built back button beside the header, `router.back()` in a page with a
-  header, and an `<h1>` in a view.
+  wrap it in a bordered or padded div and never put `px-*` or `border-b` on it, so
+  the header aligns with the app frame while the table below runs flush (see the
+  skeleton next).
+- The subtitle/description is the **`subtitle`** prop (there is **no**
+  `description` prop on `OPageHeader`).
 
 ---
 
@@ -90,7 +70,12 @@ title and the table's first column share one grid line:
 
 ```vue
 <template>
-  <OPageLayout :title="t('channels.title')" bleed>
+  <OPageLayout
+    :title="t('channels.title')"
+    icon="notifications"
+    :subtitle="t('channels.subtitle')"
+    bleed
+  >
     <template #actions>
       <OButton variant="primary" data-test="channels-new" @click="create">
         {{ t("channels.new") }}
@@ -456,21 +441,13 @@ visible data.
 A detail or create/edit screen that is the page's *primary* task (not a small
 form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
 
-- `OPageLayout` with a **back** target, `:back="{ label: t('<parent title key>'), to: parentRoute }"`,
-  so the context line reads "‹ Parent" (H4). `label` is the parent page's own
-  name (H7), never "Back". The link's href is `to`, so it opens in a new tab like
-  any link; a click is smart (N3): it pops history when there is an in-app entry,
-  so the list comes back exactly as the user left it, and pushes `to` from a deep
-  link. Pass `onClick` instead of `to` only for an in-page parent with no route
-  (closing an editor mode); a handler that must do work first navigates with
-  `useSmartBack`, never `router.back()`.
-- The title is the item's name; its status chip goes in `#status` (H5). Never a
-  hand-built back button or a "← Back" text link beside the header (H4).
+- `OPageHeader` with a **back** target (`:back="{ label, to }"`) so the leading
+  icon tile becomes a Back button, and the title reflects the item.
 - Body = the form, built with `OForm` + a colocated Zod schema (see
   [forms-validation.md](forms-validation.md)). Save/Cancel sit in the sticky
   footer of the form column (V2), Cancel then primary (O7), default size.
-- Sub-sections use `OCard` (`title`, `#actions`, `#footer`); the editor's peer
-  tabs go in `#header-tabs`, their own row under the header (H8).
+- Sub-sections use `OCard` (`title`, `#actions`, `#footer`); tabs within the editor
+  use the `OTabs` family or the header's `#tabs` slot.
 
 ---
 
@@ -479,7 +456,7 @@ form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
 An always-editable page of saved values (Settings › General, Organization
 parameters, Password policy): no edit mode, no dialog, one Save for the page.
 
-- The shell supplies the header (`OPageHeader`: the title, with the page's one-line help behind `about`); the
+- The shell supplies the header (`OPageHeader`, title + one-line subtitle); the
   page adds no second title.
 - `OForm validate-on="leave"` with a colocated schema; list fields that are
   checked together in `coupled`.
@@ -535,10 +512,8 @@ Components: [forms-specialized.md](forms-specialized.md) § OSaveBar + useLeaveG
 
 - [ ] `OPageLayout bleed` skeleton: the header carries the one 16 px gutter (L3),
       no `px-*` or `border-b` on it, no page padding, the table runs **flush**.
-- [ ] Stacked header (H1): context line derived from the route, title = the page
-      name, **no icon and no subtitle** (H2, help in `:about`); primary
-      **New <object>** action in `#actions`, **label only, no `+`** (H6, B4);
-      peer tabs in `#header-tabs` (H8).
+- [ ] `OPageHeader` on top (description via **`subtitle`** prop); primary
+      **New** action in `#actions`, **label-only — no `icon="add"`** (B4).
 - [ ] Filters + **search** (`OSearchInput`) in `#toolbar`; OTable draws no
       search box and has no frame props.
 - [ ] **Refresh** is one `ORefreshButton` in `#toolbar-trailing` showing the

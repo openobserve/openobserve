@@ -226,7 +226,7 @@ More than three actions in a header or toolbar: the extras go into ⋯ More, fre
 
 **Import:** `@/lib/core/RefreshButton/ORefreshButton.vue`
 **Use when:** Refreshing any list, explorer or panel. One control, last in the toolbar (F1, F9): a `secondary` button with ↻ and the data age ("2m ago", absolute time in the tooltip), plus an optional auto-refresh menu segment.
-**Don't use for:** Retry after an error — that is a text button in the error state (K5). Never `primary`, never beside the create action in the page header (H3). No OButton with a refresh icon and its own "checked just now" text.
+**Don't use for:** Retry after an error — that is a text button in the error state (K5). Never `primary`, never beside the create action in the page header (F1). No OButton with a refresh icon and its own "checked just now" text.
 **Key props:**
 
 - `lastRunAt` (`number | null`, default `null`) — epoch ms of the last completed read; drives the data age (hidden below 1024 px)

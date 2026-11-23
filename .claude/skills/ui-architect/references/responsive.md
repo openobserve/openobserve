@@ -58,14 +58,16 @@ change — justify it or gate it.
 
 ## Page shell: the header stays on one row
 
-`OPageLayout` / `OPageHeader` handle the phone header: the band is a fixed 56 px at
-every width and never wraps (H1), the title truncates with a tooltip, and the tabs
-keep their own row.
+`OPageLayout` / `OPageHeader` handle the phone header: the decorative module icon and
+the subtitle drop below md, the title truncates, and below lg the row may wrap
+(desktop keeps its fixed `h-15` row so `h-full` slot content — inline tabs, dividers —
+spans it).
 
 - **Primary actions in `#actions`, secondary ones in `#actions-overflow`.** The
-  overflow slot renders before `#actions` (the usual "Import · Export · New" order)
-  and folds into one ⋯ More, after the primary, under 640 px (R2), so the title
-  keeps its room.
+  overflow slot renders inline on desktop and collapses behind one ⋮ "More" button
+  below md, so the primary CTA keeps the title row. Add **`overflow-first`** when the
+  secondaries sit *before* the primary on desktop (the usual "Import · Export · New"
+  order) — without it they render after `#actions`.
 - **Never reorder the laptop toolbar by moving a control between slots.** If a
   secondary control sits between primaries on desktop, render it twice:
   `v-if="!isMobile"` at its desktop position in `#actions`, `v-if="isMobile"` in
