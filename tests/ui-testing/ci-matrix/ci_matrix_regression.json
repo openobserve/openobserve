@@ -65,7 +65,8 @@
       "dashboard-2188-gauge-edit-layout.spec.js",
       "dashboard-cache-browser-refresh.spec.js",
       "dashboard-save-validation-message-11283.spec.js",
-      "dashboard-14479-variable-name-prefix.spec.js"
+      "dashboard-14479-variable-name-prefix.spec.js",
+      "dashboard-16901-multi-query-empty-first.spec.js"
     ],
     "disabled": []
   },
