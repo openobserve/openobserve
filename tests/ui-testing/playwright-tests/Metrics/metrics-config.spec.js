@@ -53,7 +53,8 @@ test.describe("Metrics Configuration Tests", () => {
     const datePicker = await pm.metricsPage.getDateTimePicker();
 
     if (await datePicker.isVisible().catch(() => false)) {
-      await datePicker.click();
+      await pm.metricsPage.openDateTimePicker();
+      await expect(await pm.metricsPage.getPresetOptionByText('Last 1 hour')).toBeVisible({ timeout: 10000 });
 
       const presets = [
         'Last 5 minutes',
@@ -70,11 +71,9 @@ test.describe("Metrics Configuration Tests", () => {
           testLogger.info(`Found preset: ${preset}`);
           foundPreset = true;
           if (preset === 'Last 1 hour') {
-            // Clicking the preset triggers an immediate popover close + Vue re-render,
-            // which can detach the button mid-click. Use force:true to bypass the
-            // element-stability retry loop.
-            await presetOption.click({ force: true });
+            await presetOption.click();
             testLogger.info('Selected "Last 1 hour" preset');
+            await pm.metricsPage.closeDateTimePickerIfOpen();
             break;
           }
         }
