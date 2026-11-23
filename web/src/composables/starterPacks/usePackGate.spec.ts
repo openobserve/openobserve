@@ -16,11 +16,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { VueQueryPlugin } from "@tanstack/vue-query";
-import { defineComponent, h } from "vue";
+import { defineComponent, h, ref } from "vue";
 
 import { queryClient } from "@/composables/query/queryClient";
+import alerts from "@/services/alerts";
+import dashboards from "@/services/dashboards";
+import http from "@/services/http";
 import kv from "@/services/kv";
 import organizations from "@/services/organizations";
+
+vi.mock("@/services/http", () => ({ default: vi.fn() }));
 
 import { PACKS_RETIRED_KEY, packsRetired, resetPackGate, usePackGate } from "./usePackGate";
 
@@ -29,14 +34,15 @@ const summary = (alerts: number, dashboards: number) => ({
   total_dashboards: dashboards,
 });
 
-const notFound = () => Object.assign(new Error("missing"), { response: { status: 404 } });
+const noFlag = () => ({ data: [] });
+const flagSet = () => ({ data: [PACKS_RETIRED_KEY] });
 
-function setup() {
+function setup(enabled?: () => boolean) {
   let gate!: ReturnType<typeof usePackGate>;
   const wrapper = mount(
     defineComponent({
       setup() {
-        gate = usePackGate("org1");
+        gate = usePackGate("org1", enabled);
         return () => h("div");
       },
     }),
@@ -70,19 +76,78 @@ describe("usePackGate", () => {
     queryClient.clear();
   });
 
-  it("shows packs while the counts and the flag are unknown", () => {
+  it("hides packs while the counts or the flag are still loading", async () => {
     vi.spyOn(organizations, "get_organization_summary").mockReturnValue(new Promise(() => {}));
-    vi.spyOn(kv, "get").mockReturnValue(new Promise(() => {}));
+    vi.spyOn(kv, "list").mockResolvedValue(noFlag() as never);
     const { gate, wrapper } = setup();
+    expect(gate.visible.value).toBe(false);
+    await flushPromises();
+    expect(gate.visible.value).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("hides packs while the flag is still loading for a small org", async () => {
+    vi.spyOn(organizations, "get_organization_summary").mockResolvedValue({
+      data: summary(1, 1),
+    } as never);
+    vi.spyOn(kv, "list").mockReturnValue(new Promise(() => {}));
+    const { gate, wrapper } = setup();
+    await flushPromises();
+    expect(gate.visible.value).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("shows packs once a small org's counts and flag have answered", async () => {
+    vi.spyOn(organizations, "get_organization_summary").mockResolvedValue({
+      data: summary(1, 1),
+    } as never);
+    vi.spyOn(kv, "list").mockResolvedValue(noFlag() as never);
+    const { gate, wrapper } = setup();
+    await flushPromises();
     expect(gate.visible.value).toBe(true);
     wrapper.unmount();
   });
+
+  it.each([
+    [
+      "a dashboard",
+      () => dashboards.create("org1", {}, "default"),
+      summary(11, 10),
+      summary(11, 11),
+    ],
+    [
+      "an alert",
+      () => alerts.create_by_alert_id("org1", {}, "default"),
+      summary(10, 11),
+      summary(11, 11),
+    ],
+  ])(
+    "hides packs as soon as creating %s takes the org past both counts",
+    async (_n, create, before, after) => {
+      vi.mocked(http).mockReturnValue({ post: vi.fn().mockResolvedValue({ data: {} }) } as never);
+      vi.spyOn(organizations, "get_organization_summary")
+        .mockResolvedValueOnce({ data: before } as never)
+        .mockResolvedValue({ data: after } as never);
+      vi.spyOn(kv, "list").mockResolvedValue(noFlag() as never);
+      vi.spyOn(kv, "set").mockResolvedValue({ data: "" } as never);
+      const { gate, wrapper } = setup();
+      await flushPromises();
+      expect(gate.visible.value).toBe(true);
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      await create();
+      vi.advanceTimersByTime(1_000);
+      vi.useRealTimers();
+      await flushPromises();
+      expect(gate.visible.value).toBe(false);
+      wrapper.unmount();
+    },
+  );
 
   it("hides packs and writes the org flag once the org passes both counts", async () => {
     vi.spyOn(organizations, "get_organization_summary").mockResolvedValue({
       data: summary(12, 15),
     } as never);
-    vi.spyOn(kv, "get").mockRejectedValue(notFound());
+    vi.spyOn(kv, "list").mockResolvedValue(noFlag() as never);
     const set = vi.spyOn(kv, "set").mockResolvedValue({ data: "" } as never);
     const { gate, wrapper } = setup();
     await flushPromises();
@@ -97,13 +162,13 @@ describe("usePackGate", () => {
       data: summary(30, 30),
     } as never);
     let answer!: (value: unknown) => void;
-    vi.spyOn(kv, "get").mockReturnValue(new Promise((done) => (answer = done)) as never);
+    vi.spyOn(kv, "list").mockReturnValue(new Promise((done) => (answer = done)) as never);
     const set = vi.spyOn(kv, "set").mockResolvedValue({ data: "" } as never);
     const { gate, wrapper } = setup();
     await flushPromises();
     expect(gate.visible.value).toBe(false);
     expect(set).not.toHaveBeenCalled();
-    answer({ data: "1" });
+    answer(flagSet());
     await flushPromises();
     expect(set).not.toHaveBeenCalled();
     wrapper.unmount();
@@ -113,11 +178,11 @@ describe("usePackGate", () => {
     vi.spyOn(organizations, "get_organization_summary").mockResolvedValue({
       data: summary(1, 1),
     } as never);
-    const get = vi.spyOn(kv, "get").mockResolvedValue({ data: "1" } as never);
+    const list = vi.spyOn(kv, "list").mockResolvedValue(flagSet() as never);
     const set = vi.spyOn(kv, "set");
     const { gate, wrapper } = setup();
     await flushPromises();
-    expect(get).toHaveBeenCalledWith("org1", PACKS_RETIRED_KEY);
+    expect(list).toHaveBeenCalledWith("org1", PACKS_RETIRED_KEY);
     expect(gate.visible.value).toBe(false);
     expect(set).not.toHaveBeenCalled();
     wrapper.unmount();
@@ -127,7 +192,7 @@ describe("usePackGate", () => {
     vi.spyOn(organizations, "get_organization_summary").mockResolvedValue({
       data: summary(20, 20),
     } as never);
-    vi.spyOn(kv, "get").mockRejectedValue(notFound());
+    vi.spyOn(kv, "list").mockResolvedValue(noFlag() as never);
     const set = vi.spyOn(kv, "set").mockRejectedValue(new Error("403"));
     const { gate, wrapper } = setup();
     await flushPromises();
@@ -139,12 +204,81 @@ describe("usePackGate", () => {
   it("keeps showing packs when the counts and the flag fail to load", async () => {
     queryClient.setDefaultOptions({ queries: { retry: false } });
     vi.spyOn(organizations, "get_organization_summary").mockRejectedValue(new Error("down"));
-    vi.spyOn(kv, "get").mockRejectedValue(new Error("down"));
+    vi.spyOn(kv, "list").mockRejectedValue(new Error("down"));
     const set = vi.spyOn(kv, "set");
     const { gate, wrapper } = setup();
     await flushPromises();
     expect(gate.visible.value).toBe(true);
     expect(set).not.toHaveBeenCalled();
     wrapper.unmount();
+  });
+
+  it("reads a missing flag from the key list as not retired, without a single-key read", async () => {
+    vi.spyOn(organizations, "get_organization_summary").mockResolvedValue({
+      data: summary(1, 1),
+    } as never);
+    const list = vi.spyOn(kv, "list").mockResolvedValue(noFlag() as never);
+    const get = vi.spyOn(kv, "get");
+    const { gate, wrapper } = setup();
+    await flushPromises();
+    expect(list).toHaveBeenCalledWith("org1", PACKS_RETIRED_KEY);
+    expect(get).not.toHaveBeenCalled();
+    expect(gate.visible.value).toBe(true);
+    expect(gate.retired.value).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("does not count a longer key the prefix list also returns", async () => {
+    vi.spyOn(organizations, "get_organization_summary").mockResolvedValue({
+      data: summary(1, 1),
+    } as never);
+    vi.spyOn(kv, "list").mockResolvedValue({
+      data: [`${PACKS_RETIRED_KEY}_old`, "starter_pack_retiredX"],
+    } as never);
+    vi.spyOn(kv, "set").mockResolvedValue({ data: "" } as never);
+    const { gate, wrapper } = setup();
+    await flushPromises();
+    expect(gate.visible.value).toBe(true);
+    expect(gate.retired.value).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("makes no request while disabled, then reads once enabled", async () => {
+    const counts = vi.spyOn(organizations, "get_organization_summary").mockResolvedValue({
+      data: summary(1, 1),
+    } as never);
+    const list = vi.spyOn(kv, "list").mockResolvedValue(noFlag() as never);
+    const on = ref(false);
+    const { gate, wrapper } = setup(() => on.value);
+    await flushPromises();
+    expect(counts).not.toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
+    expect(gate.visible.value).toBe(false);
+    on.value = true;
+    await flushPromises();
+    expect(counts).toHaveBeenCalledTimes(1);
+    expect(list).toHaveBeenCalledTimes(1);
+    expect(gate.visible.value).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("answers retired from the flag or the counts, never from a failed read", async () => {
+    vi.spyOn(organizations, "get_organization_summary").mockResolvedValue({
+      data: summary(1, 1),
+    } as never);
+    vi.spyOn(kv, "list").mockResolvedValue(flagSet() as never);
+    const flagged = setup();
+    await flushPromises();
+    expect(flagged.gate.retired.value).toBe(true);
+    flagged.wrapper.unmount();
+
+    queryClient.clear();
+    queryClient.setDefaultOptions({ queries: { retry: false } });
+    vi.spyOn(organizations, "get_organization_summary").mockRejectedValue(new Error("down"));
+    vi.spyOn(kv, "list").mockRejectedValue(new Error("down"));
+    const failed = setup();
+    await flushPromises();
+    expect(failed.gate.retired.value).toBe(false);
+    failed.wrapper.unmount();
   });
 });

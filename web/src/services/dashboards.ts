@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { refreshOrgSummarySoon } from "./orgSummaryRefresh";
 import analytics from "./product_analytics";
 
 const dashboards = {
@@ -44,9 +45,14 @@ const dashboards = {
     return http().get(`/api/${organization}/dashboards`, { params });
   },
   create: (organization: string, data: any, folderId?: string) => {
-    return http().post(`/api/${organization}/dashboards?folder=${folderId ?? "default"}`, data, {
-      headers: { "Content-Type": "application/json; charset=UTF-8" },
-    });
+    return http()
+      .post(`/api/${organization}/dashboards?folder=${folderId ?? "default"}`, data, {
+        headers: { "Content-Type": "application/json; charset=UTF-8" },
+      })
+      .then((res) => {
+        refreshOrgSummarySoon(organization);
+        return res;
+      });
   },
   delete: (organization: string, dashboardID: string, folderId?: string) => {
     return http().delete(

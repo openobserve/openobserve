@@ -29,8 +29,10 @@ vi.mock("./http", () => ({
 
 import http from "./http";
 import analytics from "./product_analytics";
+import { refreshOrgSummarySoon } from "./orgSummaryRefresh";
 
 vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("./orgSummaryRefresh", () => ({ refreshOrgSummarySoon: vi.fn() }));
 
 describe("Dashboards Service", () => {
   let mockHttp: any;
@@ -740,6 +742,20 @@ describe("Dashboards Service", () => {
       await expect(dashboards.move_Dashboard("test-org", ["d1"], "a", "b")).rejects.toThrow("boom");
 
       expect(analytics.track).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("org summary refresh", () => {
+    it("asks for a summary refresh after a create succeeds", async () => {
+      await dashboards.create("test-org", {});
+      expect(refreshOrgSummarySoon).toHaveBeenCalledTimes(1);
+      expect(refreshOrgSummarySoon).toHaveBeenCalledWith("test-org");
+    });
+
+    it("asks for no refresh when a create fails", async () => {
+      mockHttp.post.mockRejectedValue(new Error("boom"));
+      await expect(dashboards.create("test-org", {})).rejects.toThrow("boom");
+      expect(refreshOrgSummarySoon).not.toHaveBeenCalled();
     });
   });
 });

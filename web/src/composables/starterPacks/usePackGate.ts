@@ -17,7 +17,7 @@ import { computed, watch } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 
 import { ruleCount } from "@/composables/useOrgResources";
-import { kvValueQuery, setKvMutation } from "@/services/kv.queries";
+import { kvKeysQuery, setKvMutation } from "@/services/kv.queries";
 import { orgSummaryQuery } from "@/services/organizations.queries";
 
 /** Org flag beside the other `starter_pack_*` keys; once set, packs never show again. */
@@ -39,9 +39,15 @@ export const packsRetired = (flag: string | null | undefined, summary: any): boo
 };
 
 /** The one gate every pack surface reads: chip, Home section, banner and Data sources row. */
-export function usePackGate(org: string) {
-  const summary = useQuery(() => orgSummaryQuery(org));
-  const flag = useQuery(() => kvValueQuery(org, PACKS_RETIRED_KEY));
+export function usePackGate(org: string, enabled: () => boolean = () => true) {
+  const summary = useQuery(() => ({ ...orgSummaryQuery(org), enabled: enabled() }));
+  // The key list answers 200 for a missing flag where a single-key read logs a 404.
+  const flag = useQuery(() => ({
+    ...kvKeysQuery(org, PACKS_RETIRED_KEY),
+    enabled: enabled(),
+    // The backend prefix match is a LIKE, so a longer key can come back too.
+    select: (keys: string[]) => (keys.includes(PACKS_RETIRED_KEY) ? "1" : null),
+  }));
   const setKv = useMutation(() => setKvMutation(org));
 
   const retired = computed(() => packsRetired(flag.data.value, summary.data.value));
@@ -64,5 +70,7 @@ export function usePackGate(org: string) {
     { immediate: true },
   );
 
-  return { visible: computed(() => !retired.value) };
+  // A failed read leaves status "error", not "pending", so packs still show when a count cannot load.
+  const loading = computed(() => summary.isPending.value || flag.isPending.value);
+  return { visible: computed(() => !loading.value && !retired.value), retired };
 }
