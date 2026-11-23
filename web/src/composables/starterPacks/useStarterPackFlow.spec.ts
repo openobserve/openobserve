@@ -63,7 +63,12 @@ const record = (over: Partial<PackInstallRecord> = {}): PackInstallRecord => ({
 
 const setup = (state: Record<string, unknown> = {}, pack: StarterPack = PACK) => {
   const store = createStore({
-    state: { userInfo: { email: "me@x", role: "editor" }, zoConfig: { features: {} }, ...state },
+    state: {
+      userInfo: { email: "me@x", role: "editor" },
+      zoConfig: { features: {} },
+      alertLibrary: { manifest: null },
+      ...state,
+    },
   });
   let flow!: ReturnType<typeof useStarterPackFlow>;
   mount(

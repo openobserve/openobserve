@@ -17,14 +17,13 @@ import http from "./http";
 
 const kvPath = (org: string, key: string) => `/api/${org}/kv/${encodeURIComponent(key)}`;
 
-// Starter packs read KV in the background on every page and show their own refusal.
+// List, get and set skip the global access notice, since their callers handle a refusal themselves.
 const kv = {
   list: (org: string, prefix: string) =>
     http().get(`/api/${org}/kv`, { params: { prefix }, silentForbidden: true }),
   // A string response type stops axios parsing a stored value on the way in.
   get: (org: string, key: string) =>
     http().get(kvPath(org, key), { responseType: "text", silentForbidden: true }),
-  // Callers report a refused write themselves.
   set: (org: string, key: string, value: string) =>
     http().post(kvPath(org, key), value, {
       headers: { "Content-Type": "text/plain" },
