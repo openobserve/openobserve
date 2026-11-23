@@ -51,6 +51,9 @@ const mode = computed<"loading" | "select" | "email" | "none">(() => {
   if (props.destinations.length) return "select";
   return props.smtpOff ? "none" : "email";
 });
+// Setup creates no Email me for off alerts, so the choice must not read as kept.
+const emailHeld = computed(() => mode.value === "email" && !turnOn.value);
+const sendShown = computed(() => sendTo.value && !emailHeld.value);
 const options = computed(() =>
   (props.destinations ?? []).map(({ name, label }) => ({ label, value: name })),
 );
@@ -77,16 +80,17 @@ const pickDestination = (value: unknown) => {
     <div class="flex flex-col gap-1.5">
       <div class="flex min-h-8 items-center gap-3" data-test="starter-pack-alert-setup-send-to-row">
         <OCheckbox
-          v-model="sendTo"
+          :model-value="sendShown"
           size="md"
-          :disabled="mode === 'none'"
+          :disabled="mode === 'none' || emailHeld"
           :aria-label="t('starterPacks.alertStep.sendTo')"
           data-test="starter-pack-alert-setup-send-to"
+          @update:model-value="sendTo = !!$event"
         >
           <template #label>
             <span
               v-if="mode === 'email'"
-              :class="['block min-w-0 truncate', sendTo ? 'text-text-body' : 'text-text-muted']"
+              :class="['block min-w-0 truncate', sendShown ? 'text-text-body' : 'text-text-muted']"
               data-test="starter-pack-alert-setup-send-to-label"
             >
               <i18n-t
