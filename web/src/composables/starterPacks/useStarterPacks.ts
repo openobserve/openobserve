@@ -934,7 +934,7 @@ export function useStarterPacks(org: string) {
     }
     if (item.kind !== "dashboard") return true;
     const { title, shared } = pack.dashboards.find(({ id }) => id === item.itemId) ?? {};
-    // Two installs can each import it, so the shared title, not the first match, marks ours.
+    // Ownership is the stored id; a renamed shared dashboard is no longer the pack's to delete.
     if (shared && body.title !== title) return false;
     const folderId = shared ? shared.folderId : folderIdOf(items, "dashboards");
     if (!folderId || found.folderId !== folderId) return false;

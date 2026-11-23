@@ -424,10 +424,10 @@ describe("useStarterPackFlow", () => {
     const pack = { ...PACK, alerts: ["lib/cpu"] } as unknown as StarterPack;
     const manifest = { alerts: [{ id: "lib/cpu", title: "High CPU" }] };
     const flow = setup({ alertLibrary: { manifest } }, pack);
-    expect(flow.nameOf("lib/cpu@edge")).toBe("High CPU · edge");
+    expect(flow.nameOf("lib/cpu@edge")).toBe("High CPU (edge)");
     fake.previewPack.mockResolvedValueOnce({ items: [], names: {}, notIncluded: [] });
     await flow.loadPreview();
-    expect(flow.nameOf("lib/cpu@edge")).toBe("High CPU · edge");
+    expect(flow.nameOf("lib/cpu@edge")).toBe("High CPU (edge)");
   });
 
   const refused = Object.assign(new Error("http"), { response: { status: 403 } });
