@@ -16014,8 +16014,10 @@
         "searchSuffixesAria": "Search suffix filters",
         "searchTypesAria": "Search type filters",
         "facetAria": "{label}, {count} metrics",
+        "facetAriaUnchecked": "{label}, {count} with data, {unchecked} not checked yet",
         "noPrefixMatch": "No prefixes match.",
         "noSuffixMatch": "No suffixes match.",
+        "uncheckedTooltip": "{count} with data · {unchecked} not checked yet",
         "noTypeMatch": "No types match."
       },
       "views": {

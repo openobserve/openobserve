@@ -3614,4 +3614,187 @@ describe("useMetricsExplorerGrid", () => {
       expect(grid.filteredCards.value).toHaveLength(25);
     });
   });
+
+  describe("facet counts with data on count only CHECKED metrics (#17163)", () => {
+    const gauge = (name: string) => ({
+      name,
+      stream_type: "metrics",
+      metrics_meta: { metric_type: "Gauge", metric_family_name: name, help: "", unit: "" },
+      stats: { doc_num: 100 },
+    });
+    // A–Z, the first page (INITIAL_PAGE_SIZE = 8) is alpha_* + beta_*; delta_*, omega_*, zeta_* and solo sit past it.
+    const ORG = [
+      ...["a", "b", "c", "d", "e"].map((s) => gauge(`alpha_${s}`)),
+      ...["a", "b", "c"].map((s) => gauge(`beta_${s}`)),
+      ...["a", "b"].map((s) => gauge(`delta_${s}`)),
+      ...["a", "b", "c", "d"].map((s) => gauge(`zeta_${s}`)),
+      ...["a", "b"].map((s) => ({
+        ...gauge(`omega_${s}_info`),
+        metrics_meta: {
+          metric_type: "Info",
+          metric_family_name: `omega_${s}_info`,
+          help: "",
+          unit: "",
+        },
+      })),
+      gauge("solo"),
+    ];
+
+    const orgGrid = async () => {
+      getStreamsMock.mockResolvedValue({ list: ORG });
+      return setup();
+    };
+    const facet = (list: any[], id: string) => {
+      const row = list.find((f: any) => f.id === id);
+      return row && { count: row.count, unchecked: row.unchecked };
+    };
+    const answer = async (grid: any, name: string, result: any) => {
+      await landPreview(grid.requestPreview(cardNamed(grid, name)), result);
+      inFlight.length = 0;
+    };
+
+    it("a prefix nobody has queried is 0 confirmed, all unchecked — not a definite count", async () => {
+      const grid = await orgGrid();
+      expect(grid.pageSlice.value.map((c: any) => c.name)).not.toContain("zeta_a");
+      expect(facet(grid.prefixFacets.value, "zeta")).toEqual({ count: 0, unchecked: 4 });
+    });
+
+    it("mixed answers read as a floor until every metric is checked, then settle", async () => {
+      const grid = await orgGrid();
+      await answer(grid, "zeta_a", SERIES);
+      await answer(grid, "zeta_b", SERIES);
+      await answer(grid, "zeta_c", NO_SERIES);
+      expect(facet(grid.prefixFacets.value, "zeta")).toEqual({ count: 2, unchecked: 1 });
+
+      await answer(grid, "zeta_d", NO_SERIES);
+      expect(facet(grid.prefixFacets.value, "zeta")).toEqual({ count: 2, unchecked: 0 });
+    });
+
+    it("a prefix whose every query settled empty is a plain 0", async () => {
+      const grid = await orgGrid();
+      for (const s of ["a", "b"]) await answer(grid, `delta_${s}`, NO_SERIES);
+      expect(facet(grid.prefixFacets.value, "delta")).toEqual({ count: 0, unchecked: 0 });
+    });
+
+    it("a failed query counts as checked, since its card still shows in the grid", async () => {
+      const grid = await orgGrid();
+      const preview = grid.requestPreview(cardNamed(grid, "delta_a"));
+      await flush();
+      inFlight.splice(0, inFlight.length).forEach((q) => q.fail({ message: "boom" }));
+      await preview.catch(() => {});
+      expect(facet(grid.prefixFacets.value, "delta")).toEqual({ count: 1, unchecked: 1 });
+    });
+
+    it("a variant a card cannot draw counts as checked, since its card still shows in the grid", async () => {
+      const grid = await orgGrid();
+      grid.setOverride("omega_a_info", { variantId: "series" });
+      await grid.requestPreview(cardNamed(grid, "omega_a_info"));
+      expect(grid.previews.value["omega_a_info"].status).toBe("unavailable");
+      expect(facet(grid.prefixFacets.value, "omega")).toEqual({ count: 1, unchecked: 1 });
+    });
+
+    it("an answer served from the panel cache counts as checked", async () => {
+      const first = await orgGrid();
+      await answer(first, "zeta_a", SERIES);
+      const [key, value, cacheTimeRange] = savePanelCacheMock.mock.calls.at(-1)!;
+
+      getPanelCacheMock.mockResolvedValue({ key, value, cacheTimeRange });
+      const reloaded = await orgGrid();
+      inFlight.length = 0;
+      await reloaded.requestPreview(cardNamed(reloaded, "zeta_a"));
+      await flush();
+      expect(inFlight).toHaveLength(0);
+      expect(reloaded.previews.value["zeta_a"].status).toBe("done");
+      expect(facet(reloaded.prefixFacets.value, "zeta")).toEqual({ count: 1, unchecked: 3 });
+    });
+
+    it('with "All" on, counts are every eligible metric and nothing is unchecked', async () => {
+      const grid = await orgGrid();
+      await answer(grid, "zeta_a", NO_SERIES);
+      grid.hideEmptyPanels.value = false;
+      expect(facet(grid.prefixFacets.value, "zeta")).toEqual({ count: 4, unchecked: 0 });
+      expect(facet(grid.suffixFacets.value, "d")).toEqual({ count: 2, unchecked: 0 });
+    });
+
+    it("sorts settled rows by count, then unchecked rows A–Z, with misc last", async () => {
+      const grid = await orgGrid();
+      for (const s of ["a", "b", "c"]) await answer(grid, `beta_${s}`, SERIES);
+      for (const s of ["a", "b"]) await answer(grid, `delta_${s}`, SERIES);
+      // alpha has data on one card but is still a floor, so it ranks with the unchecked rows.
+      await answer(grid, "alpha_a", SERIES);
+      expect(grid.prefixFacets.value.map((f: any) => f.id)).toEqual([
+        "beta",
+        "delta",
+        "alpha",
+        "omega",
+        "zeta",
+        "misc",
+      ]);
+    });
+
+    it("suffix facets carry the same confirmed / unchecked split and order", async () => {
+      const grid = await orgGrid();
+      expect(facet(grid.suffixFacets.value, "d")).toEqual({ count: 0, unchecked: 2 });
+      await answer(grid, "alpha_e", SERIES);
+      expect(facet(grid.suffixFacets.value, "e")).toEqual({ count: 1, unchecked: 0 });
+      await answer(grid, "alpha_d", NO_SERIES);
+      expect(facet(grid.suffixFacets.value, "d")).toEqual({ count: 0, unchecked: 1 });
+      expect(grid.suffixFacets.value[0].id).toBe("e");
+    });
+
+    it("ticking a prefix pulls its metrics into the swept slice, so its row settles", async () => {
+      const grid = await orgGrid();
+      grid.selectedPrefixes.value = new Set(["zeta"]);
+      await flush();
+      expect(grid.pageSlice.value.map((c: any) => c.name)).toEqual([
+        "zeta_a",
+        "zeta_b",
+        "zeta_c",
+        "zeta_d",
+      ]);
+
+      // No manual sweep: the debounced slice watch is what queries the ticked prefix.
+      await new Promise((r) => setTimeout(r, SWEEP_DEBOUNCE_MS + 50));
+      const asked = new Set<string>();
+      for (let round = 0, quiet = 0; round < 50 && quiet < 5; round++) {
+        await flush();
+        quiet = inFlight.length ? 0 : quiet + 1;
+        for (const q of inFlight.splice(0, inFlight.length)) {
+          asked.add(q.query.match(/[a-z]+_[a-z]+/)?.[0] ?? q.query);
+          q.complete(NO_SERIES);
+        }
+      }
+      expect([...asked].sort()).toEqual(["zeta_a", "zeta_b", "zeta_c", "zeta_d"]);
+      expect(facet(grid.prefixFacets.value, "zeta")).toEqual({ count: 0, unchecked: 0 });
+    });
+
+    it("a new window forgets what was checked, like it forgets emptiness", async () => {
+      const grid = await orgGrid();
+      await answer(grid, "zeta_a", SERIES);
+      expect(facet(grid.prefixFacets.value, "zeta")).toEqual({ count: 1, unchecked: 3 });
+
+      grid.setTimeRange({ start_time: NOW_US - 2 * HOUR_US, end_time: NOW_US });
+      expect(facet(grid.prefixFacets.value, "zeta")).toEqual({ count: 0, unchecked: 4 });
+    });
+
+    it("an org switch forgets what was checked", async () => {
+      const grid = await orgGrid();
+      await answer(grid, "zeta_a", SERIES);
+      grid.onOrgChange();
+      expect(facet(grid.prefixFacets.value, "zeta")).toEqual({ count: 0, unchecked: 4 });
+    });
+
+    it("a window change that keeps charts keeps only the slice's checks", async () => {
+      const grid = await orgGrid();
+      await answer(grid, "alpha_a", SERIES);
+      await answer(grid, "zeta_a", SERIES);
+
+      grid.setTimeRange(
+        { start_time: NOW_US - 2 * HOUR_US, end_time: NOW_US },
+        { keepPreviews: true, windowChanged: true },
+      );
+      expect(facet(grid.prefixFacets.value, "alpha")).toEqual({ count: 1, unchecked: 4 });
+      expect(facet(grid.prefixFacets.value, "zeta")).toEqual({ count: 0, unchecked: 4 });
+    });
+  });
 });

@@ -71,12 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="min-w-0 flex-1"
           :model-value="selected.has(facet.id)"
           :data-test="`metrics-explorer-${mode}-facet-${facet.id}`"
-          :aria-label="
-            t('metrics.explorer.facets.facetAria', {
-              label: facet.label,
-              count: facet.count,
-            })
-          "
+          :aria-label="facetAria(facet)"
           @update:model-value="toggle(facet.id)"
         >
           <template #label>
@@ -91,8 +86,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="xs"
           shape="rounded"
           :data-test="`metrics-explorer-${mode}-count-${facet.id}`"
-          >{{ facet.count }}</OTag
-        >
+          >{{ chipText(facet) }}
+          <OTooltip
+            v-if="facet.unchecked"
+            :content="
+              t('metrics.explorer.facets.uncheckedTooltip', {
+                count: facet.count,
+                unchecked: facet.unchecked,
+              })
+            "
+        /></OTag>
       </div>
 
       <div
@@ -124,6 +127,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 /** A rail facet. Counts are recomputed by the caller against the OTHER active
  *  filters, so this component only ever renders them. */
@@ -131,6 +135,8 @@ export interface Facet {
   id: string;
   label: I18nText;
   count: number;
+  /** Metrics in the facet not queried yet, so `count` is a floor ("With data" only). */
+  unchecked?: number;
 }
 
 const props = defineProps<{
@@ -198,11 +204,23 @@ const visibleFacets = computed(() => {
     //
     // A SELECTED facet stays visible even at count 0 — hiding it would strand
     // the selection with no way to switch it back off from the rail.
-    if (facet.count === 0 && !props.selected.has(facet.id)) return false;
+    if (facet.count === 0 && !facet.unchecked && !props.selected.has(facet.id)) return false;
 
     return true;
   });
 });
+
+const facetAria = (facet: Facet): string =>
+  facet.unchecked
+    ? t("metrics.explorer.facets.facetAriaUnchecked", {
+        label: facet.label,
+        count: facet.count,
+        unchecked: facet.unchecked,
+      })
+    : t("metrics.explorer.facets.facetAria", { label: facet.label, count: facet.count });
+
+const chipText = (facet: Facet): string =>
+  facet.unchecked ? `${facet.count}+` : String(facet.count);
 
 const toggle = (id: string) => {
   const next = new Set(props.selected);

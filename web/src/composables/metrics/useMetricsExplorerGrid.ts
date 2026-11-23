@@ -106,6 +106,14 @@ export type ExplorerSort = "a-z" | "z-a" | "dashboards" | "alerts";
 /** Narrows the grid to metrics that some object of this kind reads. */
 export type UsageFilter = "dashboards" | "alerts" | "slos";
 
+/** A facet row: `count` metrics confirmed to have data, `unchecked` not queried yet ("With data" only). */
+export interface FacetTally {
+  id: string;
+  label: I18nText;
+  count: number;
+  unchecked: number;
+}
+
 /** The org's usage counts, fetched at most once per org in a session: a full scan of the org. */
 const orgUsageCache = new Map<string, Promise<Record<string, MetricUsageCounts>>>();
 
@@ -746,6 +754,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const emptyMetrics = ref<Set<string>>(new Set());
   /** Slice cards whose sweep request has settled in this window, preview or not. */
   const sweptNames = ref<Set<string>>(new Set());
+  /** Metrics whose query settled in this window (data, no data, or error); facets count only these as having data. */
+  const checkedMetrics = ref<Set<string>>(new Set());
 
   /**
    * Metrics whose settled-empty preview has already spent its one bounded
@@ -772,7 +782,13 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    */
   let previewsEpoch = 0;
 
+  const markChecked = (name: string) => {
+    if (checkedMetrics.value.has(name)) return;
+    checkedMetrics.value = new Set(checkedMetrics.value).add(name);
+  };
+
   const markEmptiness = (name: string, isEmpty: boolean) => {
+    markChecked(name);
     if (emptyMetrics.value.has(name) === isEmpty) return;
     const next = new Set(emptyMetrics.value);
     if (isEmpty) next.add(name);
@@ -965,27 +981,54 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * Facet counts answer "how many more would this add", so each is recomputed
    * against every OTHER active filter.
    */
-  const prefixFacets = computed<PrefixGroup[]>(() => {
-    const eligible = cards.value.filter((c) => passesExcept(c, "prefix"));
-    const counts = new Map<string, number>();
+  const prefixEligible = computed(() => cards.value.filter((c) => passesExcept(c, "prefix")));
+  const suffixEligible = computed(() => cards.value.filter((c) => passesExcept(c, "suffix")));
+
+  /** With "With data" on, a card that has not been queried yet is not known to have data, so it is tallied apart. */
+  const tallyFacet = (eligible: MetricCard[], groupOf: (name: string) => string) => {
+    const counts = new Map<string, { count: number; unchecked: number }>();
+    const onlyChecked = hideEmptyPanels.value;
     for (const card of eligible) {
-      const id = prefixOf(card.name);
-      counts.set(id, (counts.get(id) ?? 0) + 1);
+      const id = groupOf(card.name);
+      const entry = counts.get(id) ?? { count: 0, unchecked: 0 };
+      if (!onlyChecked || card.unsupported || checkedMetrics.value.has(card.name)) entry.count++;
+      else entry.unchecked++;
+      counts.set(id, entry);
     }
+    return counts;
+  };
+
+  const facetOrder = (a: FacetTally, b: FacetTally): number => {
+    const aOpen = a.unchecked > 0;
+    if (aOpen !== b.unchecked > 0) return aOpen ? 1 : -1;
+    // A row still waiting on checks has no settled count to rank by.
+    if (aOpen) return a.label.localeCompare(b.label);
+    return b.count - a.count || a.label.localeCompare(b.label);
+  };
+
+  const prefixFacets = computed<(PrefixGroup & FacetTally)[]>(() => {
+    const counts = tallyFacet(prefixEligible.value, prefixOf);
     return prefixAssignment.value.groups
-      .map((g) => ({ ...g, count: counts.get(g.id) ?? 0 }))
+      .map((g) => ({
+        ...g,
+        count: counts.get(g.id)?.count ?? 0,
+        unchecked: counts.get(g.id)?.unchecked ?? 0,
+      }))
       .sort((a, b) =>
-        a.id === "misc"
-          ? 1
-          : b.id === "misc"
-            ? -1
-            : b.count - a.count || a.label.localeCompare(b.label),
+        a.id === MISC_GROUP_ID ? 1 : b.id === MISC_GROUP_ID ? -1 : facetOrder(a, b),
       );
   });
 
-  const suffixFacets = computed<SuffixGroup[]>(() => {
-    const eligible = cards.value.filter((c) => passesExcept(c, "suffix"));
-    return computeSuffixGroups(eligible.map((c) => c.name));
+  const suffixFacets = computed<(SuffixGroup & FacetTally)[]>(() => {
+    const eligible = suffixEligible.value;
+    const counts = tallyFacet(eligible, suffixOf);
+    return computeSuffixGroups(eligible.map((c) => c.name))
+      .map((g) => ({
+        ...g,
+        count: counts.get(g.id)?.count ?? 0,
+        unchecked: counts.get(g.id)?.unchecked ?? 0,
+      }))
+      .sort(facetOrder);
   });
 
   const typeFacets = computed(() => {
@@ -1884,7 +1927,11 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // dialog tile would re-fetch what the card already had.
     const points = pointsFor(card);
     const { defaults, resolved } = effectiveVariant(card, points);
-    if (!resolved || !resolved.queries.length) return;
+    // Neither path below marks the card empty, so the grid shows it and the facets count it.
+    if (!resolved || !resolved.queries.length) {
+      markChecked(card.name);
+      return;
+    }
 
     // The RESOLVED variant, not the card's default: a ⚙ override can select a
     // variant that has nothing previewable about it (an info metric's label
@@ -1907,6 +1954,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         footerLabel: resolved.footerLabel,
       };
       rememberPreview(card.name);
+      markChecked(card.name);
       return;
     }
 
@@ -2186,6 +2234,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         cachedTimeRange: existing?.cachedTimeRange ?? null,
         footerLabel: resolved.footerLabel,
       };
+      markChecked(card.name);
     }
   };
 
@@ -2266,6 +2315,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     previewSteps.clear();
     previewOrder = [];
     emptyMetrics.value = new Set();
+    checkedMetrics.value = new Set();
     emptyRecheckedCards.value = new Set();
     pageGeneration++;
     sweptNames.value = new Set();
@@ -2793,6 +2843,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     sweptNames.value = new Set();
     // The slice's answers hold the grid still until its sweep settles; off-slice answers cannot be rechecked.
     emptyMetrics.value = new Set([...emptyMetrics.value].filter((name) => slice.has(name)));
+    checkedMetrics.value = new Set([...checkedMetrics.value].filter((name) => slice.has(name)));
   };
 
   /** `windowChanged` with `keepPreviews`: a new window, drawn over the previous charts (ruling 10). */
@@ -2827,6 +2878,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // window, so its answers still hold; clearing there would un-hide every
     // no-data card on each auto-refresh tick just to re-hide it a moment later.
     emptyMetrics.value = new Set();
+    checkedMetrics.value = new Set();
     resetWindowCaches(opts?.keepPage);
   };
 
@@ -2872,6 +2924,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // meaning what it says.
     previewOrder = [];
     emptyMetrics.value = new Set();
+    checkedMetrics.value = new Set();
     emptyRecheckedCards.value = new Set();
     pageGeneration++;
     sweptNames.value = new Set();
