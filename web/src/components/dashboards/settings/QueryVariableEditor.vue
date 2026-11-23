@@ -440,7 +440,7 @@ const runSql = (request: SqlVariableQueryRequest) => {
 
 const setField = (name: string, value: unknown) => form.setFieldValue(name, value);
 
-// An empty result names no columns, so it cannot prove the picked ones gone; they stay until a run with rows.
+// An empty or failed run names no columns, so it cannot prove the picked ones gone; they stay until a run with rows.
 const syncColumnFields = (columns: string[]) => {
   if (!columns.length) return;
   const valueField = queryData.value?.value_field;
@@ -448,15 +448,6 @@ const syncColumnFields = (columns: string[]) => {
     setField("query_data.value_field", defaultSqlValueColumn(columns));
   const labelField = queryData.value?.label_field;
   if (labelField && !columns.includes(labelField)) setField("query_data.label_field", "");
-};
-
-// Columns picked against an earlier result are unverified once the query fails, so they are not kept.
-const clearColumnFields = () => {
-  preview.columns = [];
-  preview.rows = [];
-  preview.options = [];
-  setField("query_data.value_field", "");
-  setField("query_data.label_field", "");
 };
 
 // The editor commits typed text after a debounce, so a click right after typing reads the editor itself.
@@ -500,7 +491,9 @@ const runPreview = async () => {
     if (run !== previewRun || error instanceof QueryVariableCancelledError) return;
     preview.state = "error";
     preview.error = getQueryVariableErrorMessage(error);
-    clearColumnFields();
+    preview.columns = [];
+    preview.rows = [];
+    preview.options = [];
   }
 };
 

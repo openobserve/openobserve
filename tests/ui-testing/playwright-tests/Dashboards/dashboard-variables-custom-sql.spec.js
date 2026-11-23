@@ -230,6 +230,27 @@ test.describe("Query Values variables - Custom SQL", { tag: ["@dashboards", "@da
     await expect(qv.previewEmpty).toBeVisible();
   });
 
+  test("a failed Run preview keeps the picked value and label columns", async ({ page }) => {
+    const qv = new PageManager(page).dashboardQueryVariable;
+    const id = await startCustomVariable(qv);
+    await qv.fillQuery(ERRORS_QUERY);
+    await qv.runPreview();
+    await qv.selectValueColumn("service_id");
+    await qv.selectLabelColumn("service_name");
+
+    await qv.fillQuery(ERRORS_QUERY.replace("service_id", "service_idd"));
+    await qv.runPreview();
+    await expect(qv.previewError).toBeVisible();
+    await expect(qv.valueFieldTrigger).toHaveText(/service_id\b/);
+    await expect(qv.labelFieldTrigger).toContainText("service_name");
+
+    await qv.fillQuery(ERRORS_QUERY);
+    await qv.runPreview();
+    await qv.save();
+    const svc = await fx.getVariable(id, "svc");
+    expect([svc.query_data.value_field, svc.query_data.label_field]).toEqual(["service_id", "service_name"]);
+  });
+
   test("a looping custom query left behind by switching back to Builder does not block Save", async ({ page }) => {
     const qv = new PageManager(page).dashboardQueryVariable;
     const env = fx.queryValuesVariable("env", {

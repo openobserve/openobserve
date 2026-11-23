@@ -323,21 +323,31 @@ describe("QueryVariableEditor", () => {
     wrapper.unmount();
   });
 
-  it("clears the value and label columns once a preview fails", async () => {
+  it("keeps the picked columns through a failed preview, so fixing a typo keeps them", async () => {
     streamRespondsWith([{ service_id: "svc-0", service_name: "checkout" }]);
     const wrapper = mountEditor({
       query: "SELECT service_id, service_name FROM logs",
-      label_field: "service_name",
+      value_field: "service_name",
+      label_field: "service_id",
     });
     await flushPromises();
     await runPreview(wrapper);
-    expect(formOf(wrapper).state.values.query_data.value_field).toBe("service_id");
 
     streamRespondsWith({ error: "No field named service_idd" });
     await runPreview(wrapper);
+    const fields = () => formOf(wrapper).state.values.query_data;
+    expect([fields().value_field, fields().label_field]).toEqual(["service_name", "service_id"]);
+    const valuePicker = wrapper
+      .findAllComponents({ name: "OFormSelect" })
+      .find((select: any) => select.props("name") === "query_data.value_field");
+    expect(valuePicker?.props("options")).toEqual([
+      { label: "service_name", value: "service_name" },
+      { label: "service_id", value: "service_id" },
+    ]);
 
-    expect(formOf(wrapper).state.values.query_data.value_field).toBe("");
-    expect(formOf(wrapper).state.values.query_data.label_field).toBe("");
+    streamRespondsWith([{ service_id: "svc-0", service_name: "checkout" }]);
+    await runPreview(wrapper);
+    expect([fields().value_field, fields().label_field]).toEqual(["service_name", "service_id"]);
     wrapper.unmount();
   });
 
