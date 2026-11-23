@@ -122,6 +122,10 @@ async fn open_issues(deps: &Deps, org: &str, now: i64) -> anyhow::Result<Vec<Iss
     let listed = incidents::list(org, page, None).await?.items;
     for view in &mut issues {
         view.incident = incidents::incident_of(org, &view.issue, &listed);
+        view.issue.recovered_us = incidents::recovery_of(org, &view.issue, &listed);
+        if view.closed.is_none() {
+            view.closed = context::closed_of(deps, org, &view.issue).await;
+        }
     }
     Ok(issues)
 }

@@ -249,12 +249,14 @@ describe("SettingsIndex", () => {
         (i: any) => i.dataTest === "organization-management-tab",
       );
       const syntheticsItem = items.find((i: any) => i.key === "synthetics_locations");
+      const userManagementItem = items.find((i: any) => i.dataTest === "user-management-tab");
 
       expect(queryItem?.visible).toBe(true);
       expect(nodesItem?.visible).toBe(true);
       expect(domainItem?.visible).toBe(true);
       expect(orgManagementItem?.visible).toBe(true);
       expect(syntheticsItem?.visible).toBe(true);
+      expect(userManagementItem?.visible).toBe(true);
     });
 
     describe("license-gated items", () => {
@@ -549,6 +551,8 @@ describe("SettingsIndex", () => {
         (i: any) => i.dataTest === "organization-management-tab",
       );
       expect(orgManagementItem?.visible).toBe(false);
+      const userManagementItem = items.find((i: any) => i.dataTest === "user-management-tab");
+      expect(userManagementItem?.visible).toBe(false);
     });
   });
 
