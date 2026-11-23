@@ -3,7 +3,7 @@
 import testLogger from "../../playwright-tests/utils/test-logger.js";
 import { answerPanelLeaveIfShown } from "./panel-leave-dialog.js";
 
-// Longer than the 600ms live-preview debounce plus the panel loader's 50ms, so an idle Apply has no run queued behind it.
+// Longer than the 600ms live-preview debounce plus the panel loader's 50ms; with no list open, an idle Apply then has no run queued.
 const LIVE_PREVIEW_QUIET_MS = 1500;
 
 export default class DashboardCreate {
@@ -643,10 +643,11 @@ export default class DashboardCreate {
   /** Applies once no live-preview run is queued or in flight, and resolves when the applied run has finished. */
   async applyAfterLivePreview() {
     await this.waitForLivePreviewQuiet();
-    await Promise.all([
+    const [response] = await Promise.all([
       this.page.waitForResponse((res) => new URL(res.url()).pathname.endsWith("/_search_stream"), { timeout: 60000 }),
       this.applyButton(),
     ]);
+    if (!response.ok()) throw new Error(`Apply search answered ${response.status()}`);
     await this.applyQueryBtnIdle.waitFor({ state: "visible", timeout: 60000 });
   }
 }

@@ -220,7 +220,8 @@ async function waitForStreamData(page, streamName, expectedMinCount = 1, maxWait
 
       if (response.status() === 200) {
         const data = await response.json().catch(() => null);
-        const count = data?.hits?.[0]?.count || data?.total || 0;
+        // total is the number of hits, so a zero count would read as one row.
+        const count = data?.hits?.[0]?.count ?? 0;
 
         if (count >= expectedMinCount) {
           testLogger.debug('Stream data indexed', { streamName, count, waitedMs: Date.now() - startTime });

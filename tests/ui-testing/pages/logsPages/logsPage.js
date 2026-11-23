@@ -11538,7 +11538,6 @@ export class LogsPage {
         testLogger.info('Query plan dialog is hidden');
     }
 
-    /** Close the query execution plan dialog with its close button. */
     async closeQueryPlanDialog() {
         // The closing More options menu holds focus, and its refocused trigger opens a tooltip over the dialog.
         await expect(this.page.locator(this.explainQueryMenuBtn)).toBeHidden({ timeout: 10000 });
@@ -11585,7 +11584,7 @@ export class LogsPage {
         await this.clearAndFillQueryEditor(sql);
         await this.waitForSearchQueryCommitted(sql);
         await expect.poll(() => this._isSqlModeEnabledViaVue(), { timeout: 15000 }).toBe(true);
-        // SQL that names another stream reloads the schemas, which cancels a run started meanwhile.
+        // A run started while a stream is still loading is cancelled.
         await expect.poll(() => this._mutateSearchObj((searchObj) => searchObj.loadingStream), { timeout: 30000 }).toBe(false);
     }
 
