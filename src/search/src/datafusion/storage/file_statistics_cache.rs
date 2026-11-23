@@ -158,8 +158,11 @@ impl FileStatisticsCache {
 
     /// Drops the least recently read entries, 5% of them per round, until under `max_bytes`.
     fn evict(&self, max_bytes: usize) {
+        // Another thread is evicting; the next insert still over the limit evicts again.
+        let Some(_evicting) = self.evicting.try_lock() else {
+            return;
+        };
         let start = Instant::now();
-        let _evicting = self.evicting.lock();
         if self.current_memory.load(Ordering::Relaxed) > max_bytes as i64 {
             log::warn!(
                 "FileStatisticsCache is full ({} bytes > {} bytes), evicting least recently read entries",
@@ -784,6 +787,29 @@ mod tests {
             );
         }
         assert!(cache.lookup("cold_9", 30).is_some());
+    }
+
+    #[test]
+    fn test_evict_does_not_wait_for_a_running_eviction() {
+        let cache = Arc::new(FileStatisticsCache::new());
+        put(&cache, object_meta("a", 64), unknown_stats(vec![]));
+        let held = cache.evicting.lock();
+        let (done, finished) = std::sync::mpsc::channel();
+        let evictor = cache.clone();
+        std::thread::spawn(move || {
+            evictor.evict(0);
+            done.send(()).unwrap();
+        });
+        assert!(
+            finished
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .is_ok(),
+            "evict waited for the running eviction"
+        );
+        assert_eq!(cache.len(), 1);
+        drop(held);
+        cache.evict(0);
+        assert!(cache.is_empty());
     }
 
     #[test]

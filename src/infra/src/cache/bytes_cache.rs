@@ -101,8 +101,11 @@ impl BytesCache {
     }
 
     fn evict(&self) {
+        // Another thread is evicting; the next insert still over the limit evicts again.
+        let Some(_evicting) = self.evicting.try_lock() else {
+            return;
+        };
         let start = Instant::now();
-        let _evicting = self.evicting.lock();
         if self.current_memory.load(Ordering::Relaxed) > self.max_bytes as i64 {
             let (removed_total, removed_count) = self.drop_coldest();
             metrics::BYTES_CACHE_MEMORY_SIZE
@@ -166,6 +169,8 @@ fn entry_size(key: &str, value: &Bytes) -> i64 {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
 
     #[test]
@@ -255,6 +260,27 @@ mod tests {
         assert!(cache.lookup("old-1", 31).is_some());
         assert!(cache.lookup("new-0", 31).is_some());
         assert!(!cache.evicted.take("never-cached"));
+    }
+
+    #[test]
+    fn test_put_does_not_wait_for_a_running_eviction() {
+        let cache = std::sync::Arc::new(BytesCache::new(0, "test".to_string()));
+        let held = cache.evicting.lock();
+        let (done, finished) = std::sync::mpsc::channel();
+        let writer = cache.clone();
+        std::thread::spawn(move || {
+            writer.put("a".to_string(), Bytes::from_static(b"x"));
+            done.send(()).unwrap();
+        });
+        assert!(
+            finished.recv_timeout(Duration::from_secs(5)).is_ok(),
+            "put waited for the running eviction"
+        );
+        assert!(cache.get("a").is_some());
+        drop(held);
+        cache.put("b".to_string(), Bytes::from_static(b"y"));
+        assert!(cache.get("a").is_none());
+        assert!(cache.get("b").is_none());
     }
 
     #[test]

@@ -178,7 +178,10 @@ impl TantivyResultCache {
 
     /// Drops the least recently read 10% of `max_entries`.
     fn evict(&self) {
-        let _evicting = self.evicting.lock();
+        // Another thread is evicting; the next insert still over the limit evicts again.
+        let Some(_evicting) = self.evicting.try_lock() else {
+            return;
+        };
         if self.readers.len() < self.max_entries {
             return;
         }
@@ -361,6 +364,28 @@ mod tests {
         assert!(cache.lookup("cold_1", 31).is_some());
         assert!(cache.lookup("new", 31).is_some());
         assert!(!cache.evicted.take("never_cached"));
+    }
+
+    #[test]
+    fn test_put_does_not_wait_for_a_running_eviction() {
+        let cache = Arc::new(TantivyResultCache::new(1));
+        cache.put("key1".to_string(), create_test_count_result());
+        let held = cache.evicting.lock();
+        let (done, finished) = std::sync::mpsc::channel();
+        let writer = cache.clone();
+        std::thread::spawn(move || {
+            writer.put("key2".to_string(), create_test_count_result());
+            done.send(()).unwrap();
+        });
+        assert!(
+            finished.recv_timeout(Duration::from_secs(5)).is_ok(),
+            "put waited for the running eviction"
+        );
+        assert_eq!(cache.len(), 2);
+        drop(held);
+        cache.put("key3".to_string(), create_test_count_result());
+        assert!(cache.get("key1").is_none());
+        assert!(cache.get("key3").is_some());
     }
 
     #[test]
