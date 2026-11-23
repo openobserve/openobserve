@@ -417,6 +417,24 @@ describe("StarterPackDrawer", () => {
       });
     });
 
+    it("says Creating, never on, while alerts run off because Email me failed", async () => {
+      mocks.destinations = [];
+      mocks.ensure.mockResolvedValue({ failure: "email" });
+      const flow = ready();
+      const wrapper = await shown(flow);
+      await box(wrapper, "send-to").trigger("click");
+      flow.install = vi.fn(async () => {
+        flow.toCreate.value = [{ kind: "alert", itemId: "a1", status: "pending" }] as never;
+        flow.running.value = true;
+        return new Promise<boolean>(() => {});
+      }) as never;
+      await submit(wrapper).trigger("click");
+      await flushPromises();
+      expect(wrapper.get('[data-test="starter-pack-progress-alerts-note"]').text()).toBe(
+        "Creating",
+      );
+    });
+
     it("disables Send to with a note and keeps Turn on ticked when there is nothing to send to", async () => {
       mocks.destinations = [];
       mocks.state.zoConfig = { smtp_enabled: false };
