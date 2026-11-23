@@ -16,6 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
+import { createMemoryHistory, createRouter } from "vue-router";
 
 import i18n from "@/locales";
 
@@ -30,18 +31,31 @@ vi.mock("@/composables/starterPacks/usePackCatalog", () => ({
 
 import StarterPackCatalogGate from "./StarterPackCatalogGate.vue";
 
+const blank = { template: "<div />" };
+let router: ReturnType<typeof createRouter>;
+
 const render = async (props: Record<string, unknown> = {}) => {
   const wrapper = mount(StarterPackCatalogGate, {
     props: { org: "default", ...props },
     slots: { default: '<div data-test="gated-content" />' },
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n, router] },
   });
   await flushPromises();
   return wrapper;
 };
 
 describe("StarterPackCatalogGate", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/", component: blank },
+        { path: "/logs", component: blank },
+        { path: "/alerts", component: blank },
+      ],
+    });
+    await router.push("/");
+    await router.isReady();
     fake.ids = ["kubernetes"];
     fake.state = ref("idle");
     fake.load = vi.fn(async () => {
@@ -96,5 +110,31 @@ describe("StarterPackCatalogGate", () => {
     expect(
       (await render({ requires: "kubernetes" })).find('[data-test="gated-content"]').exists(),
     ).toBe(false);
+  });
+
+  it("retries a failed load on the next page", async () => {
+    fake.load = vi.fn(async () => {
+      fake.state.value = "error";
+      return false;
+    });
+    const wrapper = await render();
+    expect(fake.load).toHaveBeenCalledTimes(1);
+
+    fake.load = vi.fn(async () => {
+      fake.state.value = "ready";
+      return true;
+    });
+    await router.push("/logs");
+    await flushPromises();
+    expect(fake.load).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('[data-test="gated-content"]').exists()).toBe(true);
+  });
+
+  it("does not reload a loaded catalog on every page", async () => {
+    await render();
+    await router.push("/logs");
+    await router.push("/alerts");
+    await flushPromises();
+    expect(fake.load).toHaveBeenCalledTimes(1);
   });
 });

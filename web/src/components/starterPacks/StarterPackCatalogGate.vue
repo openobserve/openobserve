@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, watch } from "vue";
+import { useRoute } from "vue-router";
 import {
   loadPackCatalog,
   packById,
@@ -39,6 +40,14 @@ const ready = computed(
 );
 
 watch(() => props.org, load, { immediate: true });
+// Retried on the next page rather than on a timer, so a down server is not polled.
+const route = useRoute();
+watch(
+  () => route?.path,
+  () => {
+    if (packCatalogState.value === "error") load();
+  },
+);
 </script>
 
 <template>
