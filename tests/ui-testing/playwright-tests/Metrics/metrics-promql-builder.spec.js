@@ -600,8 +600,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 12. Verify panel exists on the dashboard
     const panelBar = builder.getPanelBarByTitle(panelTitle);
-    const panelVisible = await panelBar.isVisible({ timeout: 10000 }).catch(() => false);
-    expect(panelVisible).toBe(true);
+    await expect(panelBar).toBeVisible({ timeout: 30000 });
     testLogger.info(`Panel "${panelTitle}" visible on dashboard`);
 
     // 13. Cleanup: navigate back to dashboard list and delete the dashboard
@@ -1080,8 +1079,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // Verify the panel is visible on the dashboard
     const panelBar = builder.getPanelBarByTitle(panelTitle);
-    const panelVisible = await panelBar.isVisible({ timeout: 10000 }).catch(() => false);
-    expect(panelVisible).toBe(true);
+    await expect(panelBar).toBeVisible({ timeout: 30000 });
     testLogger.info('Panel visible on dashboard');
 
     // 10. Edit the panel — click dropdown menu and select Edit
