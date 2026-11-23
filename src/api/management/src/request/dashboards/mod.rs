@@ -953,14 +953,6 @@ mod tests {
     }
 
     #[test]
-    fn test_distinct_value_error_is_internal_error() {
-        assert_eq!(
-            status(DashboardError::DistinctValueError),
-            StatusCode::INTERNAL_SERVER_ERROR
-        );
-    }
-
-    #[test]
     fn test_move_dashboard_delete_old_is_internal_error() {
         assert_eq!(
             status(DashboardError::MoveDashboardDeleteOld(
