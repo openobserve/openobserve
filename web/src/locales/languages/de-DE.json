@@ -23913,19 +23913,12 @@
       "verifying": "Überprüfung läuft...",
       "verifyFailed": "Überprüfung fehlgeschlagen",
       "deleteTitle": "Diese Domain entfernen?",
-      "deleteBody": "Die Domain {name} wird nicht mehr auf diese Statusseite verweisen.",
       "deleting": "Domain wird entfernt...",
       "deleted": "Domain entfernt",
       "deleteFailed": "Domain konnte nicht entfernt werden",
       "state": {
         "pending": "Ausstehend",
-        "verified": "Verifiziert",
-        "failed": "Fehlgeschlagen"
-      },
-      "failureReason": {
-        "0": "TXT-Eintrag nicht gefunden",
-        "1": "TXT-Eintrag gefunden, aber der Wert stimmt nicht überein",
-        "2": "DNS-Auflösung fehlgeschlagen"
+        "verified": "Verifiziert"
       },
       "txtNameLabel": "Eintragsname",
       "txtValueLabel": "Eintragswert",
@@ -23933,9 +23926,7 @@
       "copyTxtValue": "Eintragswert kopieren",
       "txtNameCopied": "Eintragsname kopiert",
       "txtValueCopied": "Eintragswert kopiert",
-      "nextStepVerify": "Die Überprüfung läuft automatisch alle {seconds} Sekunden. Sie können auch jetzt überprüfen.",
-      "nextStepCname": "Sobald sie verifiziert wurde, richten Sie {domain} per CNAME auf den Host dieser App, damit er Ihre Statusseite ausliefert.",
-      "serving": "Verifiziert. Diese Domain stellt nun Ihre Statusseite bereit, solange ihr CNAME auf den Host dieser App zeigt."
+      "nextStepVerify": "Die Überprüfung läuft automatisch alle {seconds} Sekunden. Sie können auch jetzt überprüfen."
     },
     "preview": {
       "title": "Vorschau",

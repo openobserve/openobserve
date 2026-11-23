@@ -23913,19 +23913,12 @@
       "verifying": "A verificar...",
       "verifyFailed": "Falha na verificação",
       "deleteTitle": "Remover este domínio?",
-      "deleteBody": "O domínio {name} deixará de ser resolvido para esta página de estado.",
       "deleting": "A remover domínio...",
       "deleted": "Domínio removido",
       "deleteFailed": "Falha ao remover domínio",
       "state": {
         "pending": "Pendente",
-        "verified": "Verificado",
-        "failed": "Falhou"
-      },
-      "failureReason": {
-        "0": "Registo TXT não encontrado",
-        "1": "Registo TXT encontrado, mas o valor não corresponde",
-        "2": "Falha na resolução de DNS"
+        "verified": "Verificado"
       },
       "txtNameLabel": "Nome do registo",
       "txtValueLabel": "Valor do registo",
@@ -23933,9 +23926,7 @@
       "copyTxtValue": "Copiar valor do registo",
       "txtNameCopied": "Nome do registo copiado",
       "txtValueCopied": "Valor do registo copiado",
-      "nextStepVerify": "A verificação é executada automaticamente a cada {seconds} segundos. Também pode verificar agora.",
-      "nextStepCname": "Após a verificação, aponte {domain} para o OpenObserve com um CNAME para o host desta aplicação, para que sirva a sua página de estado.",
-      "serving": "Verificado. Este domínio agora serve a sua página de estado, desde que o seu CNAME aponte para o host desta aplicação."
+      "nextStepVerify": "A verificação é executada automaticamente a cada {seconds} segundos. Também pode verificar agora."
     },
     "preview": {
       "title": "Pré-visualização",

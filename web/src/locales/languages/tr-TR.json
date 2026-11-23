@@ -23913,19 +23913,12 @@
       "verifying": "Doğrulanıyor...",
       "verifyFailed": "Doğrulama başarısız oldu",
       "deleteTitle": "Bu alan adı kaldırılsın mı?",
-      "deleteBody": "{name} alan adı artık bu durum sayfasına çözümlenmeyecek.",
       "deleting": "Alan adı kaldırılıyor...",
       "deleted": "Alan adı kaldırıldı",
       "deleteFailed": "Alan adı kaldırılamadı",
       "state": {
         "pending": "Beklemede",
-        "verified": "Doğrulandı",
-        "failed": "Başarısız"
-      },
-      "failureReason": {
-        "0": "TXT kaydı bulunamadı",
-        "1": "TXT kaydı bulundu, ancak değer eşleşmiyor",
-        "2": "DNS çözümlemesi başarısız oldu"
+        "verified": "Doğrulandı"
       },
       "txtNameLabel": "Kayıt adı",
       "txtValueLabel": "Kayıt değeri",
@@ -23933,9 +23926,7 @@
       "copyTxtValue": "Kayıt değerini kopyala",
       "txtNameCopied": "Kayıt adı kopyalandı",
       "txtValueCopied": "Kayıt değeri kopyalandı",
-      "nextStepVerify": "Doğrulama her {seconds} saniyede bir otomatik olarak çalışır. Ayrıca şimdi doğrulayabilirsiniz.",
-      "nextStepCname": "Doğrulandıktan sonra, {domain} alan adını OpenObserve'e yönlendirmek için bu uygulamanın ana bilgisayarına bir CNAME ekleyin, böylece durum sayfanızı sunar.",
-      "serving": "Doğrulandı. Bu alan adı, CNAME'i bu uygulamanın ana bilgisayarını gösterdiği sürece durum sayfanızı sunar."
+      "nextStepVerify": "Doğrulama her {seconds} saniyede bir otomatik olarak çalışır. Ayrıca şimdi doğrulayabilirsiniz."
     },
     "preview": {
       "title": "Canlı önizleme",

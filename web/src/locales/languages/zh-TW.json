@@ -23908,19 +23908,12 @@
       "verifying": "驗證中...",
       "verifyFailed": "驗證失敗",
       "deleteTitle": "移除這個網域？",
-      "deleteBody": "網域 {name} 將不再解析至此狀態頁面。",
       "deleting": "正在移除網域...",
       "deleted": "網域已移除",
       "deleteFailed": "移除網域失敗",
       "state": {
         "pending": "待處理",
-        "verified": "已驗證",
-        "failed": "失敗"
-      },
-      "failureReason": {
-        "0": "找不到 TXT 記錄",
-        "1": "找到 TXT 記錄，但值不符合",
-        "2": "DNS 解析失敗"
+        "verified": "已驗證"
       },
       "txtNameLabel": "記錄名稱",
       "txtValueLabel": "記錄值",
@@ -23928,9 +23921,7 @@
       "copyTxtValue": "複製記錄值",
       "txtNameCopied": "已複製記錄名稱",
       "txtValueCopied": "已複製記錄值",
-      "nextStepVerify": "驗證會每 {seconds} 秒自動執行。您也可以立即驗證。",
-      "nextStepCname": "驗證成功後，請使用 CNAME 將 {domain} 指向此應用程式的主機，以由 OpenObserve 提供您的狀態頁面。",
-      "serving": "已驗證。只要此網域的 CNAME 指向此應用程式的主機，此網域即可提供您的狀態頁面。"
+      "nextStepVerify": "驗證會每 {seconds} 秒自動執行。您也可以立即驗證。"
     },
     "preview": {
       "title": "即時預覽",

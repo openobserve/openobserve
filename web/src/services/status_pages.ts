@@ -115,9 +115,33 @@ export interface CreateDomainResponse {
 
 // 0 pending, 1 verified, 2 failed.
 export type DomainVerificationState = 0 | 1 | 2;
-// 0 record-missing, 1 value-mismatch, 2 dns-resolution-failed.
-export type DomainFailureReason = 0 | 1 | 2 | null;
+// 0 record missing, 1 value mismatch, 2 DNS lookup failed, 3 held by another organization, 4 proof lost.
+export type DomainFailureReason = 0 | 1 | 2 | 3 | 4 | null;
 
+// What a custom domain is shown as. The server sends `pending`, `verified`, `not_serving` and
+// `expired` today; the rest arrive with certificate serving.
+export type DomainServingState =
+  | "pending"
+  | "verified"
+  | "waiting_for_dns"
+  | "setting_up"
+  | "ready"
+  | "serving"
+  | "delayed"
+  | "not_serving"
+  | "expired";
+
+// When each fact behind a domain's state was last seen, in microseconds.
+export interface DomainEvidence {
+  proof_checked_at: number | null;
+  proof_failed_since: number | null;
+  dns_checked_at: number | null;
+  probe_checked_at: number | null;
+  ca_validated_at: number | null;
+  probe_mode: string | null;
+}
+
+// Times are microseconds.
 export interface StatusPageDomain {
   id: string;
   domain: string;
@@ -126,9 +150,25 @@ export interface StatusPageDomain {
   verified_at: number | null;
   last_checked_at: number | null;
   created_at: number;
-  // Served only while unverified; the record is public DNS data, not a secret.
-  txt_name: string | null;
-  verification_token: string | null;
+  // The ownership record. It is public DNS data, not a secret, and it must stay in DNS.
+  txt_name: string;
+  verification_token: string;
+  cname_target: string | null;
+  app_host: string | null;
+  is_holder: boolean;
+  serving_state: DomainServingState;
+  // Why the claim is in `serving_state`; null before the first check.
+  reason: string | null;
+  warning: string | null;
+  warning_at: number | null;
+  expires_at: number | null;
+  released_at: number | null;
+  certificate_expires_at: number | null;
+  next_action_at: number | null;
+  state_computed_at: number | null;
+  evidence: DomainEvidence;
+  can_check_again: boolean;
+  acts: "customer" | "operator" | null;
 }
 
 const statusPagesService = {

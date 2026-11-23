@@ -23913,19 +23913,12 @@
       "verifying": "Weryfikowanie...",
       "verifyFailed": "Weryfikacja nie powiodła się",
       "deleteTitle": "Usunąć tę domenę?",
-      "deleteBody": "Domena {name} przestanie wskazywać na tę stronę statusu.",
       "deleting": "Usuwanie domeny...",
       "deleted": "Domena usunięta",
       "deleteFailed": "Nie udało się usunąć domeny",
       "state": {
         "pending": "Oczekująca",
-        "verified": "Zweryfikowana",
-        "failed": "Nieudana"
-      },
-      "failureReason": {
-        "0": "Nie znaleziono rekordu TXT",
-        "1": "Znaleziono rekord TXT, ale wartość się nie zgadza",
-        "2": "Rozpoznawanie DNS nie powiodło się"
+        "verified": "Zweryfikowana"
       },
       "txtNameLabel": "Nazwa rekordu",
       "txtValueLabel": "Wartość rekordu",
@@ -23933,9 +23926,7 @@
       "copyTxtValue": "Kopiuj wartość rekordu",
       "txtNameCopied": "Skopiowano nazwę rekordu",
       "txtValueCopied": "Skopiowano wartość rekordu",
-      "nextStepVerify": "Weryfikacja jest uruchamiana automatycznie co {seconds} s. Możesz też zweryfikować teraz.",
-      "nextStepCname": "Po weryfikacji ustaw dla {domain} rekord CNAME wskazujący na host tej aplikacji, aby serwowała Twoją stronę statusu.",
-      "serving": "Zweryfikowano. Ta domena obsługuje teraz Twoją stronę statusu, o ile jej rekord CNAME wskazuje na host tej aplikacji."
+      "nextStepVerify": "Weryfikacja jest uruchamiana automatycznie co {seconds} s. Możesz też zweryfikować teraz."
     },
     "preview": {
       "title": "Podgląd",

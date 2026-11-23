@@ -23913,19 +23913,12 @@
       "verifying": "검증 중...",
       "verifyFailed": "검증 실패",
       "deleteTitle": "이 도메인을 제거할까요?",
-      "deleteBody": "{name} 도메인은 더 이상 이 상태 페이지로 연결되지 않습니다.",
       "deleting": "도메인 제거 중...",
       "deleted": "도메인이 제거됨",
       "deleteFailed": "도메인 제거 실패",
       "state": {
         "pending": "대기 중",
-        "verified": "검증됨",
-        "failed": "실패"
-      },
-      "failureReason": {
-        "0": "TXT 레코드를 찾을 수 없음",
-        "1": "TXT 레코드를 찾았지만 값이 일치하지 않음",
-        "2": "DNS 조회 실패"
+        "verified": "검증됨"
       },
       "txtNameLabel": "레코드 이름",
       "txtValueLabel": "레코드 값",
@@ -23933,9 +23926,7 @@
       "copyTxtValue": "레코드 값 복사",
       "txtNameCopied": "레코드 이름이 복사됨",
       "txtValueCopied": "레코드 값이 복사됨",
-      "nextStepVerify": "검증은 {seconds}초마다 자동으로 실행됩니다. 지금 검증할 수도 있습니다.",
-      "nextStepCname": "검증이 완료되면 CNAME으로 {domain}을(를) 이 앱의 호스트에 연결하여 OpenObserve가 상태 페이지를 제공하게 하세요.",
-      "serving": "검증됨. 이 도메인의 CNAME이 이 앱의 호스트를 가리키는 한, 이 도메인은 이제 상태 페이지를 제공합니다."
+      "nextStepVerify": "검증은 {seconds}초마다 자동으로 실행됩니다. 지금 검증할 수도 있습니다."
     },
     "preview": {
       "title": "미리보기",

@@ -90,18 +90,22 @@ export function noticeStateBadge(state: number): {
   }
 }
 
-// verification_state: 0 pending, 1 verified, 2 failed.
-export function domainStateBadge(state: number): {
+// A null label key means the state has no label yet: show its raw name.
+export function domainStateBadge(servingState: string): {
   variant: BadgeVariant;
-  labelKey: I18nKey;
+  labelKey: I18nKey | null;
 } {
-  switch (state) {
-    case 1:
-      return { variant: "success-outline", labelKey: "statusPages.domains.state.verified" };
-    case 2:
-      return { variant: "error-outline", labelKey: "statusPages.domains.state.failed" };
-    default:
+  switch (servingState) {
+    case "pending":
       return { variant: "default-outline", labelKey: "statusPages.domains.state.pending" };
+    case "verified":
+      return { variant: "success-outline", labelKey: "statusPages.domains.state.verified" };
+    case "not_serving":
+      return { variant: "error-outline", labelKey: "statusPages.domains.state.notServing" };
+    case "expired":
+      return { variant: "warning-outline", labelKey: "statusPages.domains.state.expired" };
+    default:
+      return { variant: "default-soft", labelKey: null };
   }
 }
 

@@ -23911,29 +23911,42 @@
       "verifying": "Verifying...",
       "verifyFailed": "Verification failed",
       "deleteTitle": "Remove this domain?",
-      "deleteBody": "The {name} domain will stop resolving to this status page.",
+      "releaseBody": "Releasing {name} frees it for any organization to claim with a new TXT record.",
       "deleting": "Removing domain...",
       "deleted": "Domain removed",
       "deleteFailed": "Failed to remove domain",
       "state": {
         "pending": "Pending",
         "verified": "Verified",
-        "failed": "Failed"
+        "notServing": "Not serving",
+        "expired": "Expired"
       },
-      "failureReason": {
-        "0": "TXT record not found",
-        "1": "TXT record found, but the value doesn't match",
-        "2": "DNS resolution failed"
+      "reason": {
+        "recordMissing": "TXT record not found",
+        "valueMismatch": "TXT record found, but the value doesn't match",
+        "dnsLookupFailed": "DNS lookup failed. We will check again shortly.",
+        "heldByAnotherOrg": "Another organization has already proven ownership of this domain. To claim it, remove the other _o2-verify values from DNS, or ask the other organization to release it.",
+        "proofLost": "The TXT record is no longer in DNS. Add it back to claim this domain again.",
+        "proofLostSince": "The TXT record has been missing since {time}. Add it back to claim this domain again.",
+        "orgBlocked": "This organization is blocked, so this domain is not served.",
+        "notLicensed": "Custom domains are not included in this license, so this domain is not served.",
+        "planRequired": "Custom domains need a paid plan. Upgrade to serve this domain again.",
+        "cloudNotEnabled": "Custom domains are being set up for this region. Your claim is kept. You do not need to do anything.",
+        "proxyMode": "Point this domain at your reverse proxy. OpenObserve cannot check whether it serves."
       },
+      "addPlanRequired": "Custom domains need a paid plan. Upgrade to add a domain.",
+      "expiredNote": "Expired. Add it again.",
+      "expiresAt": "This claim expires on {date} unless it is verified.",
+      "keepRecord": "Keep this record in DNS. It is how OpenObserve knows you own this domain.",
+      "txtMissingWarning": "The ownership TXT record is missing from DNS. Add it back, or another organization can take this domain.",
+      "cnameInstruction": "Point {domain} at {target} with a CNAME record.",
       "txtNameLabel": "Record name",
       "txtValueLabel": "Record value",
       "copyTxtName": "Copy record name",
       "copyTxtValue": "Copy record value",
       "txtNameCopied": "Record name copied",
       "txtValueCopied": "Record value copied",
-      "nextStepVerify": "Verification runs automatically every {seconds} seconds. You can also verify now.",
-      "nextStepCname": "Once verified, point {domain} at OpenObserve with a CNAME to this app's host so it serves your status page.",
-      "serving": "Verified. This domain now serves your status page, as long as its CNAME points at this app's host."
+      "nextStepVerify": "Verification runs automatically every {seconds} seconds. You can also verify now."
     },
     "preview": {
       "title": "Preview",
