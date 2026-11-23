@@ -240,7 +240,7 @@ export const copyParts = (itemId: string): { copyOf: string; stream: string } | 
   return at > 0 ? { copyOf: itemId.slice(0, at), stream: itemId.slice(at + 1) } : null;
 };
 
-export const copyName = (base: string, stream: string) => `${base} · ${stream}`;
+export const copyName = (base: string, stream: string) => `${base} (${stream})`;
 
 export interface PackCandidate {
   stream: string;
