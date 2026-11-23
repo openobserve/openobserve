@@ -39,7 +39,7 @@ use std::{
 
 use config::meta::{cluster::RoleGroup, search as meta_search, stream::StreamType};
 use parking_lot::Mutex;
-use tokio::sync::{OnceCell, Semaphore};
+use tokio::sync::{OnceCell, Semaphore, SemaphorePermit};
 
 use self::payload::ChartPayload;
 
@@ -55,6 +55,8 @@ const ANOMALY_CHART_TTL: Duration = Duration::from_secs(60);
 const ANOMALY_BUILD_TIMEOUT: Duration = Duration::from_secs(5);
 /// An anomaly send waits this long for a render permit, then goes out without the chart.
 const ANOMALY_RENDER_WAIT: Duration = Duration::from_secs(2);
+/// A normal render takes milliseconds; past this the caller goes on without a chart.
+pub const RENDER_TIMEOUT: Duration = Duration::from_secs(5);
 /// A 24 h lookback of 1-minute buckets is 1,440 rows. Smaller buckets keep the newest rows
 /// (newest first), which hold the alert's moment; the chart shows about 60 points anyway.
 const ANOMALY_SERIES_ROWS: i64 = 5000;
@@ -486,23 +488,43 @@ pub fn base_is_local(base: &str) -> bool {
 /// Send-time render (email CID / discord upload): bounded by the same
 /// per-node semaphore as fetch-side renders; at capacity the send proceeds
 /// chartless.
-pub fn try_render_png(p: &ChartPayload) -> Option<Vec<u8>> {
-    let Ok(_permit) = render_semaphore().try_acquire() else {
+pub async fn try_render_png(p: &ChartPayload) -> Option<Vec<u8>> {
+    let Ok(permit) = render_semaphore().try_acquire() else {
         return render_busy();
     };
-    render_send_png(p)
+    render_send_png(p, permit).await
 }
 
 /// The anomaly send's render: it waits up to [`ANOMALY_RENDER_WAIT`] for a permit.
 pub async fn render_png_waiting(p: &ChartPayload, anomaly_id: &str) -> Option<Vec<u8>> {
-    let Ok(Ok(_permit)) =
+    let Ok(Ok(permit)) =
         tokio::time::timeout(ANOMALY_RENDER_WAIT, render_semaphore().acquire()).await
     else {
         log::warn!("[ALERT_CHART] anomaly {anomaly_id} render busy, sending without chart");
         chart_event("render_busy");
         return None;
     };
-    render_send_png(p)
+    render_send_png(p, permit).await
+}
+
+/// Renders off the async runtime, bounded by [`RENDER_TIMEOUT`]. Blocking work cannot be
+/// cancelled, so the permit stays with the task: a render past the timeout keeps its slot.
+pub async fn render_png_bounded(
+    p: ChartPayload,
+    permit: SemaphorePermit<'static>,
+) -> anyhow::Result<Vec<u8>> {
+    let task = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        render::render_png(&p)
+    });
+    match tokio::time::timeout(RENDER_TIMEOUT, task).await {
+        Ok(Ok(rendered)) => rendered,
+        Ok(Err(e)) => Err(anyhow::anyhow!("render task failed: {e}")),
+        Err(_) => {
+            chart_event("render_timeout");
+            Err(anyhow::anyhow!("render timed out after {RENDER_TIMEOUT:?}"))
+        }
+    }
 }
 
 pub(crate) fn chart_event(event: &str) {
@@ -517,8 +539,8 @@ fn render_busy() -> Option<Vec<u8>> {
     None
 }
 
-fn render_send_png(p: &ChartPayload) -> Option<Vec<u8>> {
-    match render::render_png(p) {
+async fn render_send_png(p: &ChartPayload, permit: SemaphorePermit<'static>) -> Option<Vec<u8>> {
+    match render_png_bounded(p.clone(), permit).await {
         Ok(png) => {
             config::metrics::ALERT_CHART_EVENTS_TOTAL
                 .with_label_values(&["rendered_send"])
@@ -1222,7 +1244,7 @@ mod tests {
             .await
             .unwrap();
         let started = Instant::now();
-        assert!(try_render_png(&p).is_none());
+        assert!(try_render_png(&p).await.is_none());
         // It never waits: a wait would last the whole ANOMALY_RENDER_WAIT.
         assert!(started.elapsed() < ANOMALY_RENDER_WAIT);
         let release = tokio::spawn(async move {
