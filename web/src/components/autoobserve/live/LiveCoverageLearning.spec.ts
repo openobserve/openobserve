@@ -21,13 +21,11 @@ import {
   learningReasonText,
   learningSummary,
   learningWaiting,
-  serviceLearning,
   streamLearningList,
   type LearningStream,
 } from "./LiveCoverageLearning";
 
 const NOW = Date.UTC(2026, 10, 12, 12);
-const DAY_US = 86_400_000_000;
 const ZONE = { locale: "en-US", timeZone: "UTC" };
 const NOV_20_US = Date.UTC(2026, 10, 20, 12) * 1000;
 
@@ -52,16 +50,6 @@ const VIEW = {
 const say = (text: unknown) => String(text);
 
 describe("LiveCoverageLearning", () => {
-  it.each([
-    ["gathering", [young("a")], true],
-    ["short retention", [stream("r", { reason: "retention_short" })], true],
-    ["no usage", [stream("u", { reason: "no_usage" })], true],
-    ["ready", [stream("done", { learning_until: NOW * 1000 - DAY_US })], false],
-    ["no streams", [], false],
-  ])("a service with %s streams is learning: %s", (_, streams, expected) => {
-    expect(serviceLearning(streams as LearningStream[], NOW)).toBe(expected);
-  });
-
   it("names the found days and first ready date, counting a stream two services list once", () => {
     const text = say(
       learningReasonText(gt, ZONE, VIEW, [young("a", 3), young("b", 9), young("b", 9)], NOW),

@@ -158,6 +158,8 @@ pub async fn submit_job(
         };
 
         req.use_cache = get_use_cache_from_request(&query);
+        // search jobs never refresh the shared result cache
+        req.clear_cache = false;
 
         // update timeout
         if req.timeout == 0 {
@@ -635,6 +637,9 @@ pub async fn retry_job(
         if let Some(res) = check_permissions(&model, &org_id, &user_id).await {
             return res;
         }
+        if let Some(res) = check_job_owner(&model, &org_id, &user_id).await {
+            return res;
+        }
         if let Some(res) = check_license(&model) {
             return res;
         }
@@ -673,6 +678,9 @@ async fn cancel_job_inner(org_id: &str, job_id: &str, user_id: &str) -> Response
 
     // check permissions
     if let Some(res) = check_permissions(&job, org_id, user_id).await {
+        return res;
+    }
+    if let Some(res) = check_job_owner(&job, org_id, user_id).await {
         return res;
     }
 
@@ -787,6 +795,18 @@ async fn check_permissions(job: &JobModel, org_id: &str, user_id: &str) -> Optio
     None
 }
 
+// Search-jobs RBAC is org-level, so it cannot keep one user from changing another's job.
+#[cfg(feature = "enterprise")]
+async fn check_job_owner(job: &JobModel, org_id: &str, user_id: &str) -> Option<Response> {
+    if job.user_id == user_id || openobserve_core::users::is_org_admin(org_id, user_id).await {
+        return None;
+    }
+    Some(MetaHttpResponse::forbidden(format!(
+        "[Job_Id: {}] Only the job owner or an org admin can change this search job",
+        job.id
+    )))
+}
+
 /// The job's streams, refused now when one is protected, as its querier would refuse it.
 #[cfg(feature = "enterprise")]
 fn job_stream_names(sql: &str, trace_id: &str) -> Result<Vec<String>, Response> {
@@ -803,8 +823,15 @@ fn job_stream_names(sql: &str, trace_id: &str) -> Result<Vec<String>, Response> 
 
 #[cfg(all(test, feature = "enterprise"))]
 mod tests {
+    use config::meta::user::{UserRole, UserType};
+
     use super::*;
     use crate::common::meta::http::ERROR_HEADER;
+
+    const OWNER: &str = "owner@search-jobs.test";
+    const ADMIN: &str = "admin@search-jobs.test";
+    const OTHER: &str = "other@search-jobs.test";
+    const ROOT: &str = "root@search-jobs.test";
 
     fn refusal(sql: &str) -> (StatusCode, String) {
         let res = job_stream_names(sql, "t").expect_err("refused");
@@ -825,6 +852,157 @@ mod tests {
         assert_eq!(
             job_stream_names(r#"SELECT * FROM "default""#, "t").ok(),
             Some(vec!["default".to_string()])
+        );
+    }
+
+    async fn meta_store() -> bool {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return false;
+        }
+        ONCE.get_or_init(|| async {
+            std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+        true
+    }
+
+    fn cache_member(org: &str, email: &str, role: UserRole) {
+        common::infra::config::USERS.insert(
+            email.to_string(),
+            infra::table::users::UserRecord {
+                email: email.to_string(),
+                password: String::new(),
+                salt: String::new(),
+                first_name: String::new(),
+                last_name: String::new(),
+                password_ext: None,
+                user_type: UserType::Internal,
+                is_root: role == UserRole::Root,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
+            },
+        );
+        common::infra::config::ORG_USERS.insert(
+            format!("{org}/{email}"),
+            infra::table::org_users::OrgUserRecord {
+                role,
+                token: String::new(),
+                rum_token: None,
+                org_id: org.to_string(),
+                email: email.to_string(),
+                created_at: 0,
+                allow_static_token: false,
+            },
+        );
+    }
+
+    /// A fresh org whose members can all read every stream, since OpenFGA is off in tests.
+    fn org_with_members() -> String {
+        let org = format!("sj_owner_{}", config::ider::uuid());
+        cache_member(&org, OWNER, UserRole::User);
+        cache_member(&org, OTHER, UserRole::User);
+        cache_member(&org, ADMIN, UserRole::Admin);
+        cache_member(config::DEFAULT_ORG, ROOT, UserRole::Root);
+        org
+    }
+
+    async fn job_of(org: &str, owner: &str, status: i64) -> String {
+        let payload = r#"{"query":{"sql":"SELECT * FROM \"app\"","start_time":0,"end_time":1}}"#;
+        let trace_id = config::ider::generate_trace_id();
+        let id = submit(&trace_id, org, owner, "logs", r#"["app"]"#, payload, 0, 1)
+            .await
+            .unwrap();
+        if status == 3 {
+            cancel_job_by_job_id(&id).await.unwrap();
+        }
+        assert_eq!(stored_status(org, &id).await, status);
+        id
+    }
+
+    async fn stored_status(org: &str, id: &str) -> i64 {
+        get(id, org).await.unwrap().status
+    }
+
+    fn path(org: &str, id: &str) -> Path<(String, String)> {
+        Path((org.to_string(), id.to_string()))
+    }
+
+    fn as_user(user: &str) -> Headers<UserEmail> {
+        Headers(UserEmail {
+            user_id: user.to_string(),
+        })
+    }
+
+    #[tokio::test]
+    async fn a_non_owner_non_admin_cannot_cancel_retry_or_delete_a_job() {
+        if !meta_store().await {
+            return;
+        }
+        let org = org_with_members();
+        let pending = job_of(&org, OWNER, 0).await;
+        let cancelled = job_of(&org, OWNER, 3).await;
+
+        let res = cancel_job(path(&org, &pending), as_user(OTHER)).await;
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+        let res = delete_job(path(&org, &pending), as_user(OTHER)).await;
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+        assert_eq!(stored_status(&org, &pending).await, 0);
+
+        let res = retry_job(path(&org, &cancelled), as_user(OTHER)).await;
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+        assert_eq!(stored_status(&org, &cancelled).await, 3);
+    }
+
+    // No querier runs in tests, so cancel answers 400 after it has already cancelled the row.
+    #[tokio::test]
+    async fn the_owner_an_org_admin_and_root_can_cancel_retry_and_delete_a_job() {
+        if !meta_store().await {
+            return;
+        }
+        let org = org_with_members();
+        for caller in [OWNER, ADMIN, ROOT] {
+            let id = job_of(&org, OWNER, 0).await;
+            let res = cancel_job(path(&org, &id), as_user(caller)).await;
+            assert_ne!(res.status(), StatusCode::FORBIDDEN, "{caller} cancel");
+            assert_eq!(stored_status(&org, &id).await, 3, "{caller} cancel");
+
+            let res = retry_job(path(&org, &id), as_user(caller)).await;
+            assert_eq!(res.status(), StatusCode::OK, "{caller} retry");
+            assert_eq!(stored_status(&org, &id).await, 0, "{caller} retry");
+
+            let res = delete_job(path(&org, &id), as_user(caller)).await;
+            assert_eq!(res.status(), StatusCode::OK, "{caller} delete");
+            assert_eq!(stored_status(&org, &id).await, 4, "{caller} delete");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_non_owner_with_stream_read_still_reads_status_and_result() {
+        if !meta_store().await {
+            return;
+        }
+        let org = org_with_members();
+        let id = job_of(&org, OWNER, 0).await;
+
+        let res = get_status(path(&org, &id), as_user(OTHER)).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        let query = config::meta::search::PaginationQuery {
+            from: None,
+            size: None,
+        };
+        let res = get_job_result(path(&org, &id), Query(query), as_user(OTHER)).await;
+        assert_eq!(
+            res.status(),
+            StatusCode::NOT_FOUND,
+            "a pending job has no result yet"
         );
     }
 }

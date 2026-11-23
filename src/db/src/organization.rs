@@ -32,7 +32,7 @@ use config::{
     },
 };
 use infra::{
-    coordinator::org_status::{STATUS_DELETED, STATUS_DELETING, STATUS_PENDING_DELETION},
+    coordinator::org_status::{STATUS_DELETED, STATUS_DELETING, is_blocking_status},
     db::{delete_from_db_coordinator, put_into_db_coordinator},
     errors::{self, Error},
     table::organizations,
@@ -130,13 +130,18 @@ pub async fn stream_retention_days(
     stream_name: &str,
     stream_days: i64,
 ) -> Result<i64, Error> {
-    match stream_type {
-        StreamType::Index => index_stream_retention_days(org_id, stream_name).await,
-        StreamType::Metadata => {
-            metadata_stream_retention_days(org_id, stream_name, stream_days).await
-        }
-        _ => data_stream_retention_days(org_id, stream_type, stream_days).await,
-    }
+    retention_days(org_id, stream_type, stream_name, stream_days, None).await
+}
+
+/// [`stream_retention_days`] as it resolves under `org` in place of the stored org defaults.
+pub async fn stream_retention_days_under(
+    org: &DataRetentionDefaults,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    stream_days: i64,
+) -> Result<i64, Error> {
+    retention_days(org_id, stream_type, stream_name, stream_days, Some(org)).await
 }
 
 /// The global levels alone, for a caller that only estimates and can live with a failed org read.
@@ -450,7 +455,7 @@ pub async fn list_with_created_at(
         .collect())
 }
 
-/// Orgs whose row and this node's status cache are both clear of pending, deleting and deleted.
+/// Orgs whose row and this node's status cache are both clear of every refused status.
 pub async fn list_unblocked() -> Result<Vec<Organization>, anyhow::Error> {
     let filter = organizations::ListFilter {
         exclude_deleted: true,
@@ -462,9 +467,7 @@ pub async fn list_unblocked() -> Result<Vec<Organization>, anyhow::Error> {
     Ok(orgs
         .into_iter()
         .filter(|org| {
-            ![STATUS_PENDING_DELETION, STATUS_DELETING, STATUS_DELETED]
-                .contains(&org.status.as_str())
-                && !crate::org_status::is_blocked(&org.identifier)
+            !is_blocking_status(&org.status) && !crate::org_status::is_blocked(&org.identifier)
         })
         .map(to_organization)
         .collect())
@@ -642,15 +645,36 @@ async fn apply_event(ev: db::Event) {
     }
 }
 
+/// `proposed` stands in for the stored org defaults, which are read when it is `None`.
+async fn retention_days(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    stream_days: i64,
+    proposed: Option<&DataRetentionDefaults>,
+) -> Result<i64, Error> {
+    match stream_type {
+        StreamType::Index => index_stream_retention_days(org_id, stream_name, proposed).await,
+        StreamType::Metadata => {
+            metadata_stream_retention_days(org_id, stream_name, stream_days, proposed).await
+        }
+        _ => data_stream_retention_days(org_id, stream_type, stream_days, proposed).await,
+    }
+}
+
 async fn data_stream_retention_days(
     org_id: &str,
     stream_type: StreamType,
     stream_days: i64,
+    proposed: Option<&DataRetentionDefaults>,
 ) -> Result<i64, Error> {
     if stream_days > 0 {
         return Ok(stream_days.min(MAX_DATA_RETENTION_DAYS));
     }
-    let org = org_retention_defaults(org_id).await?;
+    let org = match proposed {
+        Some(org) => *org,
+        None => org_retention_defaults(org_id).await?,
+    };
     Ok(default_retention_days(
         stream_type,
         &org,
@@ -659,7 +683,11 @@ async fn data_stream_retention_days(
 }
 
 /// An index stream has no value of its own: it expires with the stream it was derived from.
-async fn index_stream_retention_days(org_id: &str, index_stream: &str) -> Result<i64, Error> {
+async fn index_stream_retention_days(
+    org_id: &str,
+    index_stream: &str,
+    proposed: Option<&DataRetentionDefaults>,
+) -> Result<i64, Error> {
     let Some((source, source_type)) = index_stream_source(index_stream) else {
         log::warn!(
             "[RETENTION] index stream {org_id}/{index_stream} has no recognizable source, keeping it"
@@ -668,9 +696,9 @@ async fn index_stream_retention_days(org_id: &str, index_stream: &str) -> Result
     };
     let source_days = stored_retention_days(org_id, source, source_type).await?;
     if source_type == StreamType::Metadata {
-        return metadata_stream_retention_days(org_id, source, source_days).await;
+        return metadata_stream_retention_days(org_id, source, source_days, proposed).await;
     }
-    data_stream_retention_days(org_id, source_type, source_days).await
+    data_stream_retention_days(org_id, source_type, source_days, proposed).await
 }
 
 /// A derived metadata stream has no default of its own: it expires with the stream it describes.
@@ -678,15 +706,17 @@ async fn metadata_stream_retention_days(
     org_id: &str,
     metadata_stream: &str,
     stream_days: i64,
+    proposed: Option<&DataRetentionDefaults>,
 ) -> Result<i64, Error> {
+    let metadata = StreamType::Metadata;
     if stream_days > 0 {
-        return data_stream_retention_days(org_id, StreamType::Metadata, stream_days).await;
+        return data_stream_retention_days(org_id, metadata, stream_days, proposed).await;
     }
     let Some((source, source_type)) = metadata_stream_source(metadata_stream) else {
-        return data_stream_retention_days(org_id, StreamType::Metadata, 0).await;
+        return data_stream_retention_days(org_id, metadata, 0, proposed).await;
     };
     let source_days = stored_retention_days(org_id, source, source_type).await?;
-    data_stream_retention_days(org_id, source_type, source_days).await
+    data_stream_retention_days(org_id, source_type, source_days, proposed).await
 }
 
 /// A stream with no stored schema has no value; a failed read is an error, never a default.
@@ -1067,6 +1097,7 @@ mod tests {
             ("deleting", "deleting"),
             ("deleted", "deleted"),
             ("cached", "active"),
+            ("blocked", "blocked"),
         ]
         .map(|(suffix, status)| (format!("{base}_{suffix}"), status));
         for (org, status) in &orgs {
@@ -1298,6 +1329,31 @@ mod tests {
                 .unwrap(),
             5
         );
+    }
+
+    #[tokio::test]
+    async fn a_proposed_org_default_only_moves_the_streams_that_follow_it() {
+        let org = "proposed_defaults_org";
+        let inherits = std::sync::Arc::new(config::meta::stream::StreamSettings::default());
+        infra::schema::put_stream_settings(format!("{org}/traces/app"), inherits).await;
+        let defaults = |metrics| DataRetentionDefaults {
+            traces: 30,
+            metrics,
+            ..Default::default()
+        };
+        let days = |metrics, stream_type, stream| async move {
+            stream_retention_days_under(&defaults(metrics), org, stream_type, stream, 0)
+                .await
+                .unwrap()
+        };
+        // a metadata stream derived from traces keeps the traces value when only metrics drops
+        for metrics in [30, 3] {
+            assert_eq!(
+                days(metrics, StreamType::Metadata, "trace_time_index_app").await,
+                30
+            );
+            assert_eq!(days(metrics, StreamType::Metrics, "cpu").await, metrics);
+        }
     }
 
     #[tokio::test]

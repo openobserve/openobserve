@@ -97,7 +97,6 @@ vi.mock("./patternUtils", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {
     ...actual,
-    extractConstantsFromPattern: vi.fn(),
     escapeForMatchAll: vi.fn((s: string) => s),
   };
 });
@@ -107,7 +106,6 @@ vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }))
 // -- Import after mocks --
 import { usePatternActions } from "./usePatternActions";
 import analytics from "@/services/product_analytics";
-import { extractConstantsFromPattern } from "./patternUtils";
 
 describe("usePatternActions", () => {
   beforeEach(() => {
@@ -207,11 +205,17 @@ describe("usePatternActions", () => {
   });
 
   describe("addPatternToSearch", () => {
+    const setPatterns = (templates: string[]) => {
+      mockPatternsState.value = {
+        patterns: { patterns: templates.map((template) => ({ template })), statistics: {} },
+      };
+    };
+
     it("should build filter from constants and set addToFilter", () => {
-      vi.mocked(extractConstantsFromPattern).mockReturnValue(["User logged in", "from address"]);
+      setPatterns(["User logged in <*> from address <:IP>", "Disk is full on <*>"]);
       const { addPatternToSearch } = usePatternActions();
 
-      addPatternToSearch({ template: "User <*> from <:IP>" }, "include");
+      addPatternToSearch({ template: "User logged in <*> from address <:IP>" }, "include");
 
       expect(mockSearchObj.data.stream.addToFilter).toBe(
         "match_all('User logged in') AND match_all('from address')",
@@ -220,10 +224,10 @@ describe("usePatternActions", () => {
     });
 
     it("should wrap with NOT for exclude action", () => {
-      vi.mocked(extractConstantsFromPattern).mockReturnValue(["User logged in"]);
+      setPatterns(["User logged in <*> ok", "Disk is full on <*>"]);
       const { addPatternToSearch } = usePatternActions();
 
-      addPatternToSearch({ template: "User <*> from <:IP>" }, "exclude");
+      addPatternToSearch({ template: "User logged in <*> ok" }, "exclude");
 
       expect(mockSearchObj.data.stream.addToFilter).toBe("NOT match_all('User logged in')");
       expect(analytics.track).toHaveBeenCalledWith("log_patterns_filter_applied", {
@@ -233,10 +237,10 @@ describe("usePatternActions", () => {
     });
 
     it("should wrap multiple clauses with NOT (...) for exclude action", () => {
-      vi.mocked(extractConstantsFromPattern).mockReturnValue(["User logged in", "from address"]);
+      setPatterns(["User logged in <*> from address <:IP>", "Disk is full on <*>"]);
       const { addPatternToSearch } = usePatternActions();
 
-      addPatternToSearch({ template: "User <*> from <:IP>" }, "exclude");
+      addPatternToSearch({ template: "User logged in <*> from address <:IP>" }, "exclude");
 
       expect(mockSearchObj.data.stream.addToFilter).toBe(
         "NOT (match_all('User logged in') AND match_all('from address'))",
@@ -244,7 +248,7 @@ describe("usePatternActions", () => {
     });
 
     it("should show warning and skip when no constants found", () => {
-      vi.mocked(extractConstantsFromPattern).mockReturnValue([]);
+      setPatterns(["<*>"]);
       const { addPatternToSearch } = usePatternActions();
 
       addPatternToSearch({ template: "<*>" }, "include");
@@ -252,6 +256,62 @@ describe("usePatternActions", () => {
       expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
       expect(mockSearchObj.data.stream.addToFilter).toBe("");
       expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    describe("patterns that share a long prefix", () => {
+      const A = "core event seq=<:NUM> info from <*> status 500";
+      const B = "core event seq=<:NUM> warn from <*> status 404";
+
+      it("includes the short words that tell the pattern apart", () => {
+        setPatterns([A, B]);
+        const { addPatternToSearch } = usePatternActions();
+
+        addPatternToSearch({ template: A }, "include");
+
+        expect(mockSearchObj.data.stream.addToFilter).toBe(
+          "match_all('core event seq=') AND match_all('info from') AND match_all('status 500')",
+        );
+      });
+
+      it("excludes by the same distinguishing terms", () => {
+        setPatterns([A, B]);
+        const { addPatternToSearch } = usePatternActions();
+
+        addPatternToSearch({ template: A }, "exclude");
+
+        expect(mockSearchObj.data.stream.addToFilter).toBe(
+          "NOT (match_all('core event seq=') AND match_all('info from') AND match_all('status 500'))",
+        );
+      });
+
+      it("warns and applies nothing when no term separates the pattern", () => {
+        const X = "core event seq=<:NUM> info from <*>";
+        setPatterns([X, A]);
+        const { addPatternToSearch, filterBlockedReason } = usePatternActions();
+
+        expect(filterBlockedReason({ template: X })).toBe("shared");
+        expect(filterBlockedReason({ template: A })).toBeNull();
+        addPatternToSearch({ template: X }, "include");
+
+        expect(mockToast).toHaveBeenCalledWith({
+          variant: "warning",
+          message: "logs.patternList.noDistinctTextTooltip",
+        });
+        expect(mockSearchObj.data.stream.addToFilter).toBe("");
+      });
+
+      it("reports no constant text, with its own message, for an all-wildcard template", () => {
+        setPatterns(["<*> <*>", A]);
+        const { addPatternToSearch, filterBlockedReason } = usePatternActions();
+
+        expect(filterBlockedReason({ template: "<*> <*>" })).toBe("none");
+        addPatternToSearch({ template: "<*> <*>" }, "exclude");
+
+        expect(mockToast).toHaveBeenCalledWith({
+          variant: "warning",
+          message: "logs.patternList.noMatchTerms",
+        });
+      });
     });
   });
 
@@ -295,7 +355,6 @@ describe("usePatternActions", () => {
     const PROBE = "Health probe succeeded for endpoint <*>";
 
     beforeEach(() => {
-      vi.mocked(extractConstantsFromPattern).mockReturnValue(["Connection refused to upstream"]);
       mockSearchObj.data.stream.selectedStream = ["test-stream"];
       mockSearchObj.meta.sqlMode = false;
       mockSearchObj.data.query = "";

@@ -18,6 +18,7 @@ import {
   ANOMALY_EXPECTED_ALIAS,
   ANOMALY_FLAGGED_ALIAS,
   ANOMALY_LOWER_ALIAS,
+  ANOMALY_MODEL_ALIAS,
   ANOMALY_THRESHOLD_ALIAS,
   ANOMALY_UPPER_ALIAS,
   ANOMALY_VALUE_ALIAS,
@@ -37,6 +38,8 @@ export interface AnomalyBandRow {
   upper: number | null;
   event: number | null;
   threshold: number | null;
+  /** The model that judged the bucket's latest reading. */
+  modelVersion: number | null;
 }
 
 export interface AnomalyBandLabels {
@@ -161,6 +164,7 @@ export function withGapBreaks(rows: AnomalyBandRow[], intervalMs: number | null)
       upper: null,
       event: null,
       threshold: null,
+      modelVersion: null,
     };
     return [gap, row];
   });
@@ -189,6 +193,7 @@ export function toAnomalyBandRows(hits: Array<Record<string, unknown>>): Anomaly
       upper: toNumber(hit[ANOMALY_UPPER_ALIAS]),
       event: toNumber(hit[ANOMALY_EVENT_ALIAS]),
       threshold: toNumber(hit[ANOMALY_THRESHOLD_ALIAS]),
+      modelVersion: toNumber(hit[ANOMALY_MODEL_ALIAS]),
     }))
     .filter((row) => row.tsMs > 0)
     .sort((a, b) => a.tsMs - b.tsMs);

@@ -61,7 +61,7 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"})),
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"description": "List the versions of one service, newest first, with when each was first and last seen, its image and the deploys that brought it in. Use it to see what changed in a service.", "category": "traces"}))
     )
 )]
 pub async fn list(
@@ -116,7 +116,7 @@ pub async fn list(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"})),
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"description": "List services with their newest and serving versions and the verdict of their latest deploy. Use it to find which services changed version recently.", "category": "traces"}))
     )
 )]
 pub async fn services(
@@ -168,7 +168,7 @@ pub async fn services(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"})),
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"description": "List the deploys (version rollouts) of one service in a time range, oldest first, each with its previous version and regression verdict. Use it to check recent changes before an incident.", "category": "traces"}))
     )
 )]
 pub async fn deploys(
@@ -220,7 +220,7 @@ pub async fn deploys(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"})),
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"description": "Get the stored regression verdicts of a service deploy or version: whether the new version regressed errors or latency against the previous one.", "category": "traces"}))
     )
 )]
 pub async fn verdicts(
@@ -313,7 +313,7 @@ pub async fn delete(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "post"})),
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"description": "Compare a service version with its baseline version on error rate and latency (traces) or web vitals (RUM). Read-only; use it to test whether a deploy caused a regression.", "category": "traces"}))
     )
 )]
 pub async fn compare(

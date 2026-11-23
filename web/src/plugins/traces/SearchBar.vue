@@ -83,7 +83,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="insights-button"
             variant="outline"
             size="xs"
-            :disabled="searchObj.loading"
+            :disabled="
+              searchObj.loading ||
+              !(searchObj.data.queryResults?.total || searchObj.data.queryResults?.hits?.length)
+            "
             focusable-unavailable
             @click="$emit('drill-down')"
           >
@@ -447,6 +450,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="icon-md"
             shortcut-id="tracesCopyUrl"
+            :disabled="!!shareReason"
+            :tooltip="shareReason || undefined"
           />
           <ODropdown side="bottom" align="end">
             <template #trigger>
@@ -547,15 +552,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="h-8.5!"
               @on:date-change="updateDateTime"
             />
-            <OButton
+            <ORefreshButton
               data-test="service-graph-refresh-btn"
+              layout="inline"
               variant="outline"
-              size="icon-md"
+              size="header"
+              :loading="refreshLoading"
+              :last-run-at="refreshLastRunAt"
               @click="$emit('service-graph-refresh')"
-            >
-              <OIcon name="refresh" size="sm" />
-              <OTooltip :content="t('common.refresh')" />
-            </OButton>
+            />
             <OToggleGroup
               :model-value="searchObj.meta.serviceGraphVisualizationType"
               @update:model-value="onServiceGraphVisualizationChange($event)"
@@ -600,6 +605,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               calendar-presets
               class="h-8.5!"
               @on:date-change="updateDateTime"
+            />
+            <ORefreshButton
+              data-test="services-catalog-refresh-btn"
+              layout="inline"
+              variant="outline"
+              size="header"
+              :loading="refreshLoading"
+              :last-run-at="refreshLastRunAt"
+              @click="$emit('services-catalog-refresh')"
             />
           </div>
         </div>
@@ -646,6 +660,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :fields="filterBuilderFields"
             :load-values="loadFilterBuilderValues"
             :fields-loading="searchObj.loadingStream"
+            :free-text="false"
             :extra-suggestions="recentFilterSection"
             data-test="traces-search-bar-filter-builder"
             @update:query="(sql: string) => onFilterBuilderQuery(sql) && searchData()"
@@ -681,6 +696,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :suggestions="effectiveSuggestions"
           :field-value-resolver="resolveFieldValues"
           :recent-queries="recentQueries"
+          :full-text-search="false"
+          :values-time-range="valuesWindow"
           :debounce-time="100"
           :filter-mode="!searchObj.meta.sqlMode"
           :hide-nl-toggle="!isAiEnabled"
@@ -757,6 +774,7 @@ import {
   computed,
   toRef,
   shallowRef,
+  type PropType,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
@@ -774,6 +792,7 @@ import ShareButton from "@/components/common/ShareButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -803,14 +822,12 @@ import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { pageValuesSetting, pageValuesWindow } from "@/composables/fieldValueStore";
 import useStreams from "@/composables/useStreams";
-import {
-  applyFilterTerm,
-  replaceExistingFieldCondition,
-  removeFieldCondition,
-} from "@/utils/traces/filterUtils";
+import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import {
   isDatetimeChanged,
+  tracesQueryNotRun,
   tracesRunIsStaged,
   tracesToolbarLayout,
   TRACES_TOOLBAR_WIDTHS,
@@ -823,6 +840,7 @@ import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
 import { useFilterBuilderPreference } from "@/components/filterBar/useFilterBuilderPreference";
 import { useFilterBarGrowth } from "@/components/filterBar/useFilterBarGrowth";
 import { toFilterFields } from "@/utils/query/filterBar";
+import { getConsumableRelativeTime } from "@/utils/date";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import savedViewsService from "@/services/saved_views";
@@ -861,6 +879,7 @@ export default defineComponent({
     OToggleGroupItem,
     OButton,
     OButtonGroup,
+    ORefreshButton,
     OIcon,
     ODropdown,
     ODropdownItem,
@@ -906,6 +925,15 @@ export default defineComponent({
     isLoading: {
       type: Boolean,
       default: false,
+    },
+    // The active Service Graph / Services Catalog tab's own load state, for the shared refresh button.
+    refreshLoading: {
+      type: Boolean,
+      default: false,
+    },
+    refreshLastRunAt: {
+      type: Number as PropType<number | null>,
+      default: null,
     },
   },
   methods: {
@@ -960,6 +988,10 @@ export default defineComponent({
       if (typeof applied !== "string") return false;
       return String(searchObj.data.editorValue ?? "").trim() !== applied.trim();
     });
+    // The URL already carries the staged edit, so a link before Run would share a query nobody ran.
+    const shareReason = computed(() =>
+      tracesQueryNotRun(searchObj) ? t("search.autoRunPersistNeedsRun") : null,
+    );
     const recentListActive = ref(false);
     const { enabled: recentSearchesEnabled } = useRecentSearches();
     const recentList = useRecentSearchesList("traces", recentListActive);
@@ -1052,7 +1084,19 @@ export default defineComponent({
       updateFieldKeywords,
       updateStreamKeywords,
       resolveFieldValues,
+      setValuesTimeRange,
     } = useSqlSuggestions();
+
+    const currentValuesWindow = () =>
+      pageValuesWindow(searchObj.data.datetime ?? {}, getConsumableRelativeTime);
+    setValuesTimeRange(currentValuesWindow);
+    // A lookup keeps the function it began with, so a new one tells a lookup in flight the range changed.
+    watch(
+      () => pageValuesSetting(searchObj.data.datetime ?? {}),
+      () => setValuesTimeRange(() => currentValuesWindow()),
+    );
+    // The editor reads only whether a range is set and whether it was cut, so the clock need not refresh this.
+    const valuesWindow = computed(currentValuesWindow);
 
     const { builderOn: filterBuilderOn, toggle: toggleFilterBuilder } =
       useFilterBuilderPreference("o2.traces.queryInput");
@@ -1321,24 +1365,6 @@ export default defineComponent({
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(current);
       // Only trigger search if not explicitly skipped
       if (!skipSearch && store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
-        emit("searchdata");
-      }
-    };
-
-    // Remove all conditions for a given field from the editor value.
-    // Used by parent (Index.vue) to clear the error-only filter on toggle-off.
-    const removeFilterByField = (fieldName: string) => {
-      // The whole editor value is the where clause — never split it on "|", the
-      // split is quote-unaware and would corrupt match_all('text | error').
-      const value = searchObj.data.editorValue as string;
-      const newValue = replaceExistingFieldCondition(value, fieldName, "")
-        .replace(/\s*\band\b\s*$/i, "")
-        .replace(/^\s*\band\b\s*/i, "")
-        .replace(/\s+and\s+and\s+/gi, " and ")
-        .trim();
-      searchObj.data.editorValue = newValue;
-      if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(newValue);
-      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
         emit("searchdata");
       }
     };
@@ -1776,6 +1802,7 @@ export default defineComponent({
       onFilterBuilderFocus,
       showRunQueryPending,
       recentQueries,
+      valuesWindow,
       recentExamples,
       onRecentEditorEdit,
       dismissRecentFocus,
@@ -1818,9 +1845,9 @@ export default defineComponent({
       onErrorOnlyToggle,
       updateNewDateTime,
       tracesShareURL,
+      shareReason,
       config,
       applyFilters,
-      removeFilterByField,
       serviceGraphVisualizationTabs,
       serviceGraphLayoutOptions,
       onServiceGraphVisualizationChange,

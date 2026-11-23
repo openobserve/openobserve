@@ -34,6 +34,14 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
     process_msg(msg).await
 }
 
+/// A move out or a remembered pair verdict another region wrote.
+pub(crate) async fn process_membership(msg: Message) -> Result<()> {
+    let msg = msg.try_into().map_err(|e| {
+        infra::errors::Error::Message(format!("[INCIDENTS] Failed to deserialize membership: {e}"))
+    })?;
+    o2_enterprise::enterprise::alerts::incident_membership::apply_replicated(msg).await
+}
+
 pub(crate) async fn process_unmute(msg: Message) -> Result<()> {
     let IncidentUnmuteMessage {
         org_id,
@@ -96,19 +104,30 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
             alert_name,
             alert_fired_at,
             correlation_reason,
+            labels,
+            severity,
         } => {
             log::debug!(
                 "[SUPER_CLUSTER:incidents] Add alert to org_id={org_id} incident id={incident_id} alert={alert_id}",
             );
-            alert_incidents::add_alert_to_incident(
-                &incident_id,
-                &alert_id,
-                &alert_name,
-                "internal",
-                alert_fired_at,
-                &correlation_reason,
-            )
-            .await?;
+            let alert = alert_incidents::FirstAlert {
+                alert_id: &alert_id,
+                alert_name: &alert_name,
+                alert_kind: "internal",
+                correlation_reason: &correlation_reason,
+                labels: labels.as_deref(),
+                severity: severity.as_deref(),
+            };
+            let at = alert_fired_at;
+            let linked =
+                alert_incidents::add_labelled_alert_to_incident(&incident_id, &alert, at).await?;
+            if linked == alert_incidents::Linked::Separated {
+                // The origin placed it before it saw the separation: it goes where the origin's
+                // copy of the move takes it, or stays where the origin put it.
+                let moved = alert_incidents::moved_out_to(&org_id, &incident_id, &alert_id).await?;
+                let target = moved.as_deref().unwrap_or(&incident_id);
+                alert_incidents::add_placed_alert_to_incident(&org_id, target, &alert, at).await?;
+            }
         }
         IncidentMessage::ResolveAlert {
             org_id,
@@ -123,6 +142,15 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
             // An older node sends no onset, and then every open firing of the alert resolves.
             let (id, alert) = (&incident_id, &alert_id);
             alert_incidents::resolve_firings_fired_by(id, alert, onset, resolved_at).await?;
+            // Named before the origin saw the move: the firings recover where the move took them,
+            // which resolves as the origin's copy of the move leaves it.
+            if !alert_incidents::has_member(id, alert).await?
+                && let Some(moved) = alert_incidents::moved_out_to(&org_id, id, alert).await?
+            {
+                alert_incidents::resolve_firings_fired_by(&moved, alert, onset, resolved_at)
+                    .await?;
+                alert_incidents::resolve_if_recovered(&org_id, &moved, false).await?;
+            }
         }
     }
     Ok(())
@@ -130,7 +158,10 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use infra::table::entity::{alert_incident_alerts, alert_incidents as incident_rows};
+    use infra::table::entity::{
+        alert_incident_alerts, alert_incidents as incident_rows, alert_pair_verdicts, alert_states,
+        incident_events,
+    };
     use sea_orm::{ConnectionTrait, Schema};
 
     use super::*;
@@ -151,6 +182,9 @@ mod tests {
                 for mut table in [
                     schema.create_table_from_entity(incident_rows::Entity),
                     schema.create_table_from_entity(alert_incident_alerts::Entity),
+                    schema.create_table_from_entity(incident_events::Entity),
+                    schema.create_table_from_entity(alert_pair_verdicts::Entity),
+                    schema.create_table_from_entity(alert_states::Entity),
                 ] {
                     conn.execute(backend.build(table.if_not_exists()))
                         .await
@@ -205,6 +239,134 @@ mod tests {
             resolved_at: RECOVERED,
             onset,
         }
+    }
+
+    #[tokio::test]
+    async fn a_remote_firing_and_recovery_of_a_separated_alert_land_where_its_origin_holds_it() {
+        use config::meta::alerts::incidents::{InferredBy, SplitNote};
+
+        meta_store().await;
+        let split = SplitNote {
+            alert_id: "moved".to_string(),
+            alert_name: "moved".to_string(),
+            inferred_by: InferredBy::Ai,
+            reason: "Different service.".to_string(),
+        };
+        let settled = LATER + 1;
+        // (moved out here, recovered before the move, its incident re-keyed by a later firing).
+        // Only remembered: nothing moves it out of the incident its origin put it in.
+        let cases = [
+            (true, false, false),
+            (true, true, false),
+            (true, false, true),
+            (false, false, false),
+        ];
+        let mut landed = Vec::new();
+        for (moved_here, recovered, rekeyed) in cases {
+            let org = format!("separated_{}", config::ider::uuid());
+            let pair = |opener: &str| alert_pair_verdicts::Model {
+                org_id: org.clone(),
+                alert_a: "moved".to_string(),
+                alert_b: opener.to_string(),
+                verdict: infra::table::incident_membership::SEPARATE.to_string(),
+                reason: "Different service.".to_string(),
+                decided_by: "ai".to_string(),
+                signal: None,
+                expires_at: i64::MAX,
+            };
+            let incident =
+                alert_incidents::create(&org, "P2", serde_json::json!({}), "Primary", ONSET, None);
+            let incident = incident.await.unwrap();
+            for (alert, at) in [("opener", ONSET), ("moved", ONSET + 1)] {
+                alert_incidents::add_alert_to_incident(
+                    &incident.id,
+                    alert,
+                    alert,
+                    "internal",
+                    at,
+                    "t",
+                )
+                .await
+                .unwrap();
+            }
+            if recovered {
+                let resolved =
+                    alert_incidents::resolve_alert_firings(&incident.id, "moved", RECOVERED);
+                resolved.await.unwrap();
+            }
+            let held_in = if moved_here {
+                let removal = alert_incidents::remove_member(
+                    &org,
+                    &incident.id,
+                    &split,
+                    Some(&pair),
+                    None,
+                    None,
+                );
+                removal.await.unwrap().unwrap().moved_to
+            } else {
+                let remembered = infra::table::incident_membership::put_pair(pair("opener"));
+                remembered.await.unwrap();
+                incident.id.clone()
+            };
+            if rekeyed {
+                let dims = serde_json::json!({"service": "other"});
+                let upgrade = alert_incidents::upgrade_incident_group_values(
+                    &org,
+                    &held_in,
+                    dims,
+                    "Primary",
+                    1,
+                    ONSET + 1,
+                );
+                upgrade.await.unwrap();
+            }
+            let placed = process_msg(IncidentMessage::AddAlert {
+                org_id: org.clone(),
+                incident_id: incident.id.clone(),
+                alert_id: "moved".to_string(),
+                alert_name: "moved".to_string(),
+                alert_fired_at: LATER,
+                correlation_reason: "t".to_string(),
+                labels: None,
+                severity: Some("P3".to_string()),
+            })
+            .await;
+            let recovery = process_msg(IncidentMessage::ResolveAlert {
+                org_id: org.clone(),
+                incident_id: incident.id.clone(),
+                alert_id: "moved".to_string(),
+                resolved_at: settled,
+                onset: Some(LATER),
+            })
+            .await;
+            let held = alert_incidents::find_incident_with_firing(&org, "moved", LATER);
+            let held = held.await.unwrap().map(|incident| incident.id);
+            let status = alert_incidents::get_rw(&org, &held_in).await.unwrap();
+            landed.push((
+                placed.is_ok() && recovery.is_ok(),
+                held.as_deref() == Some(held_in.as_str()),
+                resolved_by_firing(&held_in).await,
+                status.map(|incident| incident.status),
+            ));
+        }
+        let resolved = Some("resolved".to_string());
+        let moved = |first: i64| {
+            let firings = vec![(ONSET + 1, Some(first)), (LATER, Some(settled))];
+            (true, true, firings, resolved.clone())
+        };
+        let remembered = vec![
+            (ONSET, None),
+            (ONSET + 1, Some(settled)),
+            (LATER, Some(settled)),
+        ];
+        let want = vec![
+            moved(settled),
+            moved(RECOVERED),
+            moved(settled),
+            (true, true, remembered, Some("open".to_string())),
+        ];
+        assert_eq!(landed, want);
     }
 
     #[tokio::test]

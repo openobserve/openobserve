@@ -20,6 +20,8 @@ import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
 
 import { b64DecodeUnicode } from "@/utils/zincutils";
+import { resolveUrlViewToggle } from "@/composables/useLogs/logsViewToggle";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { applyTimezone } from "@/utils/storage";
 
 import useNotifications from "@/composables/useNotifications";
@@ -547,7 +549,11 @@ const useLogs = (t: TranslateFn) => {
       Object.prototype.hasOwnProperty.call(queryParams, "logs_visualize_toggle") &&
       queryParams.logs_visualize_toggle != ""
     ) {
-      searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
+      searchObj.meta.logsVisualizeToggle = resolveUrlViewToggle(
+        queryParams.logs_visualize_toggle,
+        checkFeatureAccess("logPatterns", buildFeatureGateContext(store.state.zoConfig)).allowed,
+        queryParams.stream_type,
+      );
     }
 
     //here we restore the fn editor state from the url query params
@@ -640,7 +646,7 @@ const useLogs = (t: TranslateFn) => {
 
   const getFilterExpressionByFieldType = (
     field: string | number,
-    field_value: string | number | boolean,
+    field_value: string | number | boolean | null | undefined,
     action: string,
   ) => {
     let operator = action == "include" ? "=" : "!=";
@@ -666,19 +672,17 @@ const useLogs = (t: TranslateFn) => {
         fieldType = fieldTypeList[field];
       }
 
-      if (field_value === "null" || field_value === "" || field_value === null) {
-        operator = action == "include" ? "is" : "is not";
-        field_value = "null";
-      }
       const quotedField =
         searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(String(field)) : field;
-      let expression =
-        field_value == "null"
-          ? `${quotedField} ${operator} ${field_value}`
-          : `${quotedField} ${operator} ${sqlLiteral(field_value)}`;
-
       const isNumericType = (type: string) => ["int64", "float64"].includes(type.toLowerCase());
       const isBooleanType = (type: string) => type.toLowerCase() === "boolean";
+      const isTyped = isNumericType(fieldType) || isBooleanType(fieldType);
+
+      // "" and the text "null" are values a string holds; a number or boolean shown as "" is missing.
+      if (field_value === null || field_value === undefined || (isTyped && field_value === "")) {
+        return `${quotedField} ${action == "include" ? "is" : "is not"} null`;
+      }
+      let expression = `${quotedField} ${operator} ${sqlLiteral(field_value)}`;
 
       if (isNumericType(fieldType)) {
         expression = `${quotedField} ${operator} ${field_value}`;

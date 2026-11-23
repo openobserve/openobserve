@@ -45,20 +45,22 @@ const TIMEOUT: Duration = Duration::from_secs(5);
 const HIT_TTL: Duration = Duration::from_secs(600);
 // Spans can land after the record's first log, so an empty answer is retried soon.
 const MISS_TTL: Duration = Duration::from_secs(30);
+// A failed search is retried later, not on every firing.
+const FAIL_TTL: Duration = Duration::from_secs(60);
 const CACHE_SIZE: NonZeroUsize = NonZeroUsize::new(4_096).unwrap();
 const MAX_SERVICES: usize = 50;
 
 static CACHE: LazyLock<Mutex<Lookups>> =
     LazyLock::new(|| Mutex::new(Lookups(LruCache::new(CACHE_SIZE))));
 
-/// Org, record dimensions, candidate keys, streams read, window, the service, location and
-/// evidence alias lists and the record's complete identity sets, so any regrouping misses.
+/// Org, record dimensions, candidate keys, streams read, a fixed window, the service, location
+/// and evidence alias lists and the record's complete identity sets, so any regrouping misses.
 type CacheKey = (
     String,
     Vec<(String, String)>,
     Vec<String>,
     Vec<String>,
-    (i64, i64),
+    Option<(i64, i64)>,
     [Mapping; 3],
     Vec<Vec<String>>,
 );
@@ -94,15 +96,35 @@ pub struct Scope<'a> {
     /// Only streams the caller may read; the cache keys on them as the caller's permission scope.
     pub streams: &'a [String],
     pub window: (i64, i64),
+    /// The hour before now, whose lookups hold whatever the minute until their TTL.
+    pub recent: bool,
 }
 
-/// Recent lookups with the time each was read.
-struct Lookups(LruCache<CacheKey, (Instant, Option<String>)>);
+/// Whose access the span vote reads under; alert evaluation has no user, so it reads every stream.
+#[cfg(feature = "enterprise")]
+#[derive(Clone, Copy, Debug)]
+pub enum Reader<'a> {
+    System,
+    User(&'a str),
+}
+
+/// Which spans may vote for the record's service.
+#[cfg(feature = "enterprise")]
+#[derive(Clone, Copy, Debug)]
+pub enum Spans {
+    Skip,
+    /// The hour before now.
+    Recent,
+    Window((i64, i64)),
+}
+
+/// Recent lookups with the time each was read and how long it holds.
+struct Lookups(LruCache<CacheKey, (Instant, Duration, Option<String>)>);
 
 impl Lookups {
     fn get(&mut self, key: &CacheKey, now: Instant) -> Option<Option<String>> {
-        let (at, service) = self.0.get(key)?;
-        if now.duration_since(*at) < ttl(service.as_ref()) {
+        let (at, ttl, service) = self.0.get(key)?;
+        if now.duration_since(*at) < *ttl {
             return Some(service.clone());
         }
         self.0.pop(key);
@@ -110,14 +132,14 @@ impl Lookups {
     }
 
     /// A late empty answer never replaces a record that a concurrent lookup resolved.
-    fn put(&mut self, key: CacheKey, now: Instant, service: Option<String>) {
-        let resolved = |(at, held): &(Instant, Option<String>)| {
-            held.is_some() && now.duration_since(*at) < HIT_TTL
+    fn put(&mut self, key: CacheKey, now: Instant, ttl: Duration, service: Option<String>) {
+        let resolved = |(at, held_ttl, held): &(Instant, Duration, Option<String>)| {
+            held.is_some() && now.duration_since(*at) < *held_ttl
         };
         if service.is_none() && self.0.peek(&key).is_some_and(resolved) {
             return;
         }
-        self.0.put(key, (now, service));
+        self.0.put(key, (now, ttl, service));
     }
 }
 
@@ -300,7 +322,148 @@ pub async fn service_for_record(
     vote(&CACHE, &Live(scope.org), scope, &record, candidates, groups).await
 }
 
-/// [`resolve`], cached per window, stream set and alias mapping.
+/// `correlate` at `location` once, with the one location service whose spans carry the `record`'s
+/// own dimensions.
+#[cfg(feature = "enterprise")]
+pub async fn correlate_from_source(
+    org_id: &str,
+    reader: Reader<'_>,
+    location: &HashMap<String, String>,
+    record: &HashMap<String, String>,
+    spans: Spans,
+    identity: &ServiceIdentityConfig,
+    groups: &[FieldAlias],
+) -> anyhow::Result<Option<config::meta::service_streams::CorrelationResponse>> {
+    use o2_enterprise::enterprise::service_streams::{SourceIdentity, storage::correlate};
+    let span_window = match spans {
+        Spans::Skip => None,
+        Spans::Recent => Some((window(None, None, config::utils::time::now_micros()), true)),
+        Spans::Window(range) => Some((range, false)),
+    };
+    // Only service_optional orgs rank by the source, so only they read spans.
+    let spans_vote = identity.service_optional && has_instance_dims(record, identity, groups);
+    let candidate_services = match span_window.filter(|_| spans_vote) {
+        Some(span_window) => span_candidate(
+            org_id,
+            reader,
+            location,
+            record,
+            span_window,
+            identity,
+            groups,
+        )
+        .await
+        .into_iter()
+        .collect(),
+        None => Vec::new(),
+    };
+    let source = SourceIdentity {
+        candidate_services,
+        service: record
+            .get(SERVICE_DIMENSION)
+            .map(|value| value.trim())
+            .filter(|value| !value.is_empty())
+            .map(String::from),
+        dims: record.clone(),
+    };
+    correlate(org_id, location, identity, groups, Some(&source)).await
+}
+
+/// The location's service that the spans `reader` may read vote for; a failure gives none.
+#[cfg(feature = "enterprise")]
+async fn span_candidate(
+    org_id: &str,
+    reader: Reader<'_>,
+    location: &HashMap<String, String>,
+    record: &HashMap<String, String>,
+    (window, recent): ((i64, i64), bool),
+    identity: &ServiceIdentityConfig,
+    groups: &[FieldAlias],
+) -> Option<String> {
+    use o2_enterprise::enterprise::service_streams::storage::location_candidates;
+    // The span vote runs a search, so a refused search leaves correlate its other ranks.
+    search_service::check_org_search_allowed(org_id).ok()?;
+    let started = Instant::now();
+    let located = location_candidates(org_id, location, identity, groups)
+        .await
+        .inspect_err(|e| log::warn!("[correlation] location candidates failed org={org_id}: {e}"))
+        .ok()?;
+    // One candidate needs no vote: correlate names it anyway.
+    if located.len() < 2 {
+        return None;
+    }
+    let names: Vec<String> = located.iter().map(|c| c.service.clone()).collect();
+    let readable = match reader {
+        Reader::System => None,
+        Reader::User(user_id) => {
+            let wanted = located.iter().flat_map(|c| c.trace_streams.iter().cloned());
+            Some(readable_trace_streams(org_id, user_id, wanted.collect()).await)
+        }
+    };
+    let streams = searchable_trace_streams(
+        located.iter().map(|c| c.trace_streams.as_slice()),
+        |stream| readable.as_ref().is_none_or(|r| r.contains(stream)),
+    );
+    // Spans the caller may not read must not name the service, even indirectly.
+    if streams.is_empty() {
+        return None;
+    }
+    let scope = Scope {
+        org: org_id,
+        streams: &streams,
+        window,
+        recent,
+    };
+    let found = service_for_record(&scope, record, identity, groups, &names).await;
+    log::debug!(
+        "[correlation] span vote org={org_id} candidates={} streams={} found={found:?} took={:?}",
+        names.len(),
+        streams.len(),
+        started.elapsed()
+    );
+    found
+}
+
+/// The trace `streams` the user may read, by the per-stream check the search path applies.
+#[cfg(feature = "enterprise")]
+async fn readable_trace_streams(
+    org_id: &str,
+    user_id: &str,
+    streams: Vec<String>,
+) -> HashSet<String> {
+    use config::meta::service_streams::{RelatedStreams, StreamInfo};
+    let related = RelatedStreams {
+        logs: vec![],
+        traces: streams.into_iter().map(StreamInfo::new).collect(),
+        metrics: vec![],
+        profiles: vec![],
+    };
+    let checker = crate::authz::active_checker();
+    crate::authz::readable_related_streams(checker.as_ref(), user_id, org_id, related)
+        .await
+        .traces
+        .into_iter()
+        .map(|info| info.stream_name)
+        .collect()
+}
+
+/// Each distinct candidate trace stream `may_read` keeps, sorted so equal sets look up alike.
+#[cfg(any(feature = "enterprise", test))]
+fn searchable_trace_streams<'a>(
+    candidate_streams: impl IntoIterator<Item = &'a [String]>,
+    may_read: impl Fn(&str) -> bool,
+) -> Vec<String> {
+    candidate_streams
+        .into_iter()
+        .flatten()
+        .filter(|stream| may_read(stream))
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+/// [`resolve`], cached per fixed window, stream set and alias mapping.
 async fn vote(
     cache: &Mutex<Lookups>,
     source: &impl TraceSource,
@@ -334,7 +497,7 @@ async fn vote(
         record.cache_entries(),
         keys.into_iter().collect(),
         streams.clone(),
-        window,
+        (!scope.recent).then_some(window),
         mapping,
         record.set_ids(),
     );
@@ -347,20 +510,28 @@ async fn vote(
         return held;
     }
     let org = scope.org;
-    let (service, searches) =
-        resolve(org, record, candidates, &streams, window, groups, source).await?;
-    log::debug!(
-        "[correlation] record lookup org={org} searches={searches} service={service:?} took={:?}",
-        started.elapsed()
-    );
+    let (service, ttl) =
+        match resolve(org, record, candidates, &streams, window, groups, source).await {
+            Some((service, searches)) => {
+                log::debug!(
+                    "[correlation] record lookup org={org} searches={searches} service={service:?} \
+                     took={:?}",
+                    started.elapsed()
+                );
+                // A firing's last hour already holds the spans that would name its service.
+                let held = service.is_some() || scope.recent;
+                (service, if held { HIT_TTL } else { MISS_TTL })
+            }
+            None => (None, FAIL_TTL),
+        };
     cache
         .lock()
         .expect("record services cache")
-        .put(key, Instant::now(), service.clone());
+        .put(key, Instant::now(), ttl, service.clone());
     service
 }
 
-/// [`lookup`] under the timeout; `None` after a failure, which is logged and never cached.
+/// [`lookup`] under the timeout; `None` after a failure, which is logged.
 async fn resolve(
     org: &str,
     record: &Record,
@@ -474,10 +645,6 @@ fn leaders<'a>(votes: impl Iterator<Item = &'a String>) -> Vec<&'a String> {
         .filter(|(_, n)| *n == top)
         .map(|(key, _)| key)
         .collect()
-}
-
-fn ttl(service: Option<&String>) -> Duration {
-    if service.is_some() { HIT_TTL } else { MISS_TTL }
 }
 
 /// The semantic group `key` names: a group id, else the group listing it as a field.
@@ -971,7 +1138,7 @@ mod tests {
                 vec![],
             ),
             (
-                "a search error names nobody and is not cached",
+                "a search error names nobody and is held, not searched on every call",
                 with(&[("k8s-pod-name", "q-0")]),
                 o2,
                 true,
@@ -988,6 +1155,7 @@ mod tests {
                 org: "org",
                 streams: &listed,
                 window: (0, WINDOW_US),
+                recent: false,
             };
             assert_eq!(
                 has_instance_dims(&dims, &identity(), &groups()),
@@ -1000,7 +1168,10 @@ mod tests {
             let searched = fake.searched.into_inner().unwrap();
             assert_eq!(searched, want_searched, "{name}");
             if fail {
-                assert!(cache.into_inner().unwrap().0.is_empty(), "{name}");
+                let again = Fake::new(false);
+                let held = vote(&cache, &again, &scope, &record, &candidates, &groups()).await;
+                assert_eq!(held, None, "{name}");
+                assert!(again.searched.into_inner().unwrap().is_empty(), "{name}");
             }
         }
     }
@@ -1019,28 +1190,28 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_lookup_is_reused_only_for_its_own_window_and_stream_list() {
+    async fn a_lookup_is_reused_for_its_window_or_any_recent_minute_and_its_stream_list() {
         let mut cache = Lookups(LruCache::new(CACHE_SIZE));
         let key: CacheKey = (
             "org".into(),
             vec![("rack".into(), "r12".into())],
             vec!["ingest".into()],
             vec!["traces".into()],
-            (0, 1),
+            Some((0, 1)),
             Default::default(),
             vec![],
         );
         let t0 = Instant::now();
         let at = |secs| t0 + Duration::from_secs(secs);
-        cache.put(key.clone(), t0, None);
+        cache.put(key.clone(), t0, MISS_TTL, None);
         assert_eq!(cache.get(&key, at(10)), Some(None), "a fresh miss is held");
         assert_eq!(
             cache.get(&key, at(31)),
             None,
             "spans that land later are read"
         );
-        cache.put(key.clone(), at(31), Some("ingest".into()));
-        cache.put(key.clone(), at(32), None);
+        cache.put(key.clone(), at(31), HIT_TTL, Some("ingest".into()));
+        cache.put(key.clone(), at(32), FAIL_TTL, None);
         assert_eq!(
             cache.get(&key, at(33)),
             Some(Some("ingest".to_string())),
@@ -1055,35 +1226,55 @@ mod tests {
         // A caller who may not read `edge` passes a shorter list.
         let fewer = ["traces", "crowd"].map(String::from).to_vec();
         let span = 300_000_000;
-        // (case, window, streams passed, window searched)
-        for (case, window, streams, want) in [
+        let minute = 60_000_000;
+        // (case, window, recent, streams passed, window searched)
+        for (case, window, recent, streams, want) in [
             (
                 "a first open reads spans",
                 (0, span),
+                false,
                 &fewer,
                 Some((0, span)),
             ),
             (
                 "a reopen of the same window is cached",
                 (0, span),
+                false,
                 &fewer,
                 None,
             ),
             (
                 "another window reads again",
                 (3 * span, 4 * span),
+                false,
                 &fewer,
                 Some((3 * span, 4 * span)),
             ),
             (
                 "a caller who may read more streams reads again",
                 (0, span),
+                false,
                 &all,
                 Some((0, span)),
             ),
             (
                 "the shorter list keeps its own entry",
                 (0, span),
+                false,
+                &fewer,
+                None,
+            ),
+            (
+                "a firing reads the hour before now",
+                (0, WINDOW_US),
+                true,
+                &fewer,
+                Some((0, WINDOW_US)),
+            ),
+            (
+                "the same record firing a minute later is cached",
+                (minute, WINDOW_US + minute),
+                true,
                 &fewer,
                 None,
             ),
@@ -1093,11 +1284,28 @@ mod tests {
                 org: "org",
                 streams,
                 window,
+                recent,
             };
             let got = vote(&cache, &fake, &scope, &record, &candidates, &groups()).await;
             assert_eq!(got.as_deref(), Some("ingest"), "{case}");
             let searched = fake.windows.into_inner().unwrap().first().copied();
             assert_eq!(searched, want, "{case}");
         }
+    }
+
+    #[test]
+    fn only_trace_streams_the_caller_may_read_reach_the_span_lookup() {
+        let shop = vec!["shop".to_string(), "shared".to_string()];
+        let billing = vec!["billing_secret".to_string(), "shared".to_string()];
+        let candidates = [shop.as_slice(), billing.as_slice()];
+        assert_eq!(
+            searchable_trace_streams(candidates, |stream| stream != "billing_secret"),
+            vec!["shared".to_string(), "shop".to_string()],
+            "an unreadable stream is dropped before the lookup"
+        );
+        assert!(
+            searchable_trace_streams(candidates, |_| false).is_empty(),
+            "a caller who may read none gives the lookup no streams"
+        );
     }
 }

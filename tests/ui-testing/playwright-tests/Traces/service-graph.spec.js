@@ -15,6 +15,7 @@ const {
   countTopologyNodes,
   SERVICE_GRAPH_READY_FLOOR_MS,
 } = require('../utils/service-graph-ingestion.js');
+const { ingestOtlpTraces, deleteStream, stringAttr } = require('../utils/traces-api.js');
 
 const SERVICE_GRAPH_WAIT_MS = SERVICE_GRAPH_READY_FLOOR_MS + 120000;
 
@@ -548,5 +549,50 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     }
     testLogger.info(`Circular edges found: ${circularEdgesFound}/3`);
     expect(circularEdgesFound).toBeGreaterThanOrEqual(1);
+  });
+});
+
+test.describe('Service Graph stream switch refetches the topology (ENT#1282)', { tag: '@enterprise' }, () => {
+  test.describe.configure({ mode: 'serial' });
+  const secondStream = `ovn_b_sg_${Date.now().toString(36)}`;
+
+  test.beforeAll(async ({ request }) => {
+    const now = Date.now() * 1e6;
+    const traceId = [...Array(32)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
+    await ingestOtlpTraces(request, secondStream, {
+      resourceSpans: [{
+        resource: { attributes: [stringAttr('service.name', 'ovn-b-sg-svc')] },
+        scopeSpans: [{ scope: { name: 'ovn-b' }, spans: [{
+          traceId, spanId: 'a1b2c3d4e5f60718', name: 'GET /ovn', kind: 2,
+          startTimeUnixNano: String(now), endTimeUnixNano: String(now + 5e6),
+        }] }],
+      }],
+    });
+  });
+
+  test.afterAll(async ({ request }) => {
+    await deleteStream(request, secondStream).catch(() => {});
+  });
+
+  test('switching the stream dropdown fetches that stream topology without re-clicking Graph View, and switching back refetches the first', {
+    tag: ['@bug-ent1282', '@serviceGraph', '@P2'],
+  }, async ({ page }) => {
+    // The topology endpoint can take tens of seconds on a loaded runner.
+    test.setTimeout(480000);
+    await navigateToBase(page);
+    const pm = new PageManager(page);
+    const topology = pm.serviceGraphPage.trackTopologyStreams();
+    await pm.serviceGraphPage.navigateToServiceGraphUrl('default');
+    await pm.serviceGraphPage.expectStreamSelectorVisible();
+    await expect.poll(() => topology.includes('default'), { timeout: 120000 }).toBe(true);
+
+    // Pre-fix the topology was only refetched after clicking Graph View again.
+    const before = topology.length;
+    await pm.serviceGraphPage.selectStreamFromDropdown(secondStream);
+    await expect.poll(() => topology.slice(before), { timeout: 120000 }).toContain(secondStream);
+
+    const back = topology.length;
+    await pm.serviceGraphPage.selectStreamFromDropdown('default');
+    await expect.poll(() => topology.slice(back), { timeout: 120000 }).toContain('default');
   });
 });

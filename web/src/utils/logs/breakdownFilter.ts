@@ -16,20 +16,40 @@
 // Same list as the alerts condition builder (utils/alerts/conditionsFormatter.ts).
 const STRING_TYPES = ["String", "Utf8", "LargeUtf8", "Utf8View"];
 
-// The (empty) series sums NULL and "" rows. Only a string column holds "", and
-// '' against any other type fails the query, so a non-string field matches NULL
-// only. An unknown type keeps the string form.
+// Only a string column holds "", and '' against another type fails the query,
+// so a non-string field checks NULL alone; an unknown type keeps both checks.
+export const emptyValueConditions = (
+  field: string,
+  action: "include" | "exclude",
+  quote: (f: string) => string,
+  fieldType?: string,
+): string[] => {
+  const quoted = quote(field);
+  const isNull = action === "include" ? `${quoted} is null` : `${quoted} is not null`;
+  if (fieldType && !STRING_TYPES.includes(fieldType)) return [isNull];
+  return [isNull, action === "include" ? `${quoted} = ''` : `${quoted} != ''`];
+};
+
+/** With several streams selected, a field any of them types as a non-string checks NULL alone. */
+export const emptyValueFieldType = (
+  field: string,
+  listedType: string | undefined,
+  streams: { name: string; schema?: { name: string; type: string }[] }[],
+  selected: string[],
+): string | undefined =>
+  streams
+    .filter((stream) => selected.includes(stream.name))
+    .flatMap((stream) => (stream.schema ?? []).filter((f) => f.name === field).map((f) => f.type))
+    .find((type) => !STRING_TYPES.includes(type)) ?? listedType;
+
+// The (empty) series counts NULL and "" rows together, so its filter matches both.
 export const getEmptyBreakdownFilter = (
   field: string,
   action: "include" | "exclude",
   quote: (f: string) => string,
   fieldType?: string,
 ): string => {
-  const quoted = quote(field);
-  if (fieldType && !STRING_TYPES.includes(fieldType)) {
-    return action === "include" ? `${quoted} is null` : `${quoted} is not null`;
-  }
-  return action === "include"
-    ? `(${quoted} is null OR ${quoted} = '')`
-    : `(${quoted} is not null AND ${quoted} != '')`;
+  const conditions = emptyValueConditions(field, action, quote, fieldType);
+  const joined = conditions.join(action === "include" ? " OR " : " AND ");
+  return conditions.length > 1 ? `(${joined})` : joined;
 };

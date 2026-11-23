@@ -15,35 +15,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-wrap items-center gap-x-2 gap-y-1" data-test="ao-confidence-meter">
-    <span class="text-text-secondary text-xs font-medium">{{
-      t("autoobserve.issueLive.confidence.label")
-    }}</span>
-    <span
-      class="flex items-center gap-0.5"
-      role="meter"
-      aria-valuemin="0"
-      aria-valuemax="3"
-      :aria-valuenow="level"
-      :aria-valuetext="bandText"
-      :aria-label="t('autoobserve.issueLive.confidence.label')"
+  <div
+    :class="clamp ? 'flex min-w-0 flex-col gap-1' : 'flex flex-wrap items-center gap-x-2 gap-y-1'"
+    data-test="ao-confidence-meter"
+  >
+    <div
+      :class="
+        clamp
+          ? 'flex h-4 min-w-0 items-center gap-x-2 overflow-hidden whitespace-nowrap'
+          : 'contents'
+      "
     >
+      <span class="text-text-secondary shrink-0 text-xs font-medium">{{
+        t("autoobserve.issueLive.confidence.label")
+      }}</span>
       <span
-        v-for="i in 3"
-        :key="i"
-        class="h-1.5 w-6 rounded-full"
-        :class="i <= level ? 'bg-accent' : 'bg-surface-tint-neutral'"
-        data-test="ao-confidence-segment"
-      />
-    </span>
-    <span class="text-text-heading text-xs font-semibold" data-test="ao-confidence-band">{{
-      bandText
-    }}</span>
-    <span v-if="band && !calibrated" class="text-text-secondary text-xs">{{
-      t("autoobserve.issueLive.confidence.uncalibrated")
-    }}</span>
+        class="flex shrink-0 items-center gap-0.5"
+        role="meter"
+        aria-valuemin="0"
+        aria-valuemax="3"
+        :aria-valuenow="level"
+        :aria-valuetext="bandText"
+        :aria-label="t('autoobserve.issueLive.confidence.label')"
+      >
+        <span
+          v-for="i in 3"
+          :key="i"
+          class="h-1.5 rounded-full"
+          :class="[clamp ? 'w-4' : 'w-6', i <= level ? 'bg-accent' : 'bg-surface-tint-neutral']"
+          data-test="ao-confidence-segment"
+        />
+      </span>
+      <span
+        class="text-text-heading shrink-0 text-xs font-semibold"
+        data-test="ao-confidence-band"
+        >{{ bandText }}</span
+      >
+      <OTruncatedText v-if="band && !calibrated && clamp" class="text-text-secondary text-xs">{{
+        t("autoobserve.issueLive.confidence.uncalibrated")
+      }}</OTruncatedText>
+      <span v-else-if="band && !calibrated" class="text-text-secondary text-xs">{{
+        t("autoobserve.issueLive.confidence.uncalibrated")
+      }}</span>
+    </div>
+    <OTruncatedText
+      v-if="reason && clamp"
+      class="text-text-secondary text-xs"
+      data-test="ao-confidence-reason"
+      >{{ reason }}</OTruncatedText
+    >
     <span
-      v-if="reason"
+      v-else-if="reason"
       class="text-text-secondary basis-full text-xs"
       data-test="ao-confidence-reason"
       >{{ reason }}</span
@@ -53,13 +75,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import type { RcaBand } from "@/services/incidents";
 
 const props = withDefaults(
   // A null band is an unscored incident: the meter stays empty and the reason says why.
-  defineProps<{ band: RcaBand | null; calibrated?: boolean; reason?: string | null }>(),
-  { calibrated: false, reason: null },
+  defineProps<{
+    band: RcaBand | null;
+    calibrated?: boolean;
+    reason?: string | null;
+    clamp?: boolean;
+  }>(),
+  { calibrated: false, reason: null, clamp: false },
 );
 
 const { t } = useI18nTyped();

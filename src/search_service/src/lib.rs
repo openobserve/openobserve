@@ -37,7 +37,7 @@ use config::{
             ai_chat::AI_CHAT_EVENTS_STREAM,
             usage::{RequestStats, UsageType},
         },
-        sql::{OrderBy, resolve_stream_names},
+        sql::resolve_stream_names,
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
     utils::{base64, json, schema::filter_source_by_partition_key, time::now_micros},
@@ -419,6 +419,7 @@ pub async fn search_multi(
                 } else {
                     multi_res.hits.extend(res.hits);
                 }
+                merge_function_errors(&mut multi_res.function_error, res.function_error);
             }
             Err(e) => {
                 log::error!("search_multi: search error: {e:?}");
@@ -465,8 +466,18 @@ pub async fn search_multi(
         match program {
             Some(program) => {
                 report_function_usage = true;
-                if apply_over_hits {
-                    let (ret_val, err) = transform::apply_vrl_fn(
+                let mut vrl_errors = transform::VrlRunErrors::default();
+                let out: Vec<serde_json::Value> = if apply_over_hits {
+                    let row_count = if per_query_resp {
+                        multi_res
+                            .hits
+                            .iter()
+                            .map(|v| v.as_array().map_or(1, |a| a.len()))
+                            .sum()
+                    } else {
+                        multi_res.hits.len()
+                    };
+                    let (ret_val, err) = transform::apply_vrl_fn_checked(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
@@ -476,9 +487,7 @@ pub async fn search_multi(
                         org_id,
                         &stream_names,
                     );
-                    if let Some(e) = err {
-                        log::error!("[trace_id {trace_id}] Error applying vrl function: {e}");
-                    }
+                    vrl_errors.record_rows(row_count, err);
                     ret_val
                         .as_array()
                         .unwrap()
@@ -500,12 +509,12 @@ pub async fn search_multi(
                         })
                         .collect()
                 } else {
-                    let mut error = "".to_string();
-                    let res = multi_res
+                    multi_res
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, err) = transform::apply_vrl_fn(
+                            let rows = hit.as_array().map_or(1, |a| a.len());
+                            let (ret_val, err) = transform::apply_vrl_fn_checked(
                                 &mut runtime,
                                 &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),
@@ -515,17 +524,16 @@ pub async fn search_multi(
                                 org_id,
                                 &stream_names,
                             );
-                            if let Some(e) = err {
-                                error = e;
-                            }
+                            vrl_errors.record_rows(rows, err);
                             flatten_vrl_result(ret_val)
                         })
-                        .collect();
-                    if !error.is_empty() {
-                        log::error!("[trace_id {trace_id}] Error applying vrl function: {error}");
-                    }
-                    res
+                        .collect()
+                };
+                if let Some(msg) = vrl_errors.message() {
+                    log::error!("[trace_id {trace_id}] Error applying vrl function: {msg}");
+                    multi_res.function_error.push(msg);
                 }
+                out
             }
             None => multi_res.hits,
         }
@@ -609,7 +617,6 @@ pub async fn search_partition(
         streaming_aggs: false,
         streaming_id: None,
         is_histogram_eligible: ctx.is_histogram_eligible,
-        non_ts_order_by_cols: vec![],
     };
 
     let total_secs = estimated_secs(trace_id, &ctx, role_group, resp.original_size).await?;
@@ -626,27 +633,20 @@ pub async fn search_partition(
         return Ok(resp);
     }
 
-    if ctx.detect_non_ts_order_by() {
-        resp.non_ts_order_by_cols = ctx
-            .sql
-            .order_by
-            .iter()
-            .map(|(col, dir)| (col.clone(), matches!(dir, OrderBy::Desc)))
-            .collect();
-        if cfg.limit.disable_partitions_for_non_ts_order_by {
-            log::info!(
-                "[trace_id {trace_id}] search_partition: non-ts ORDER BY, disabling partitions (circuit breaker)"
-            );
-            resp.partitions = vec![[req.start_time, req.end_time]];
-            return Ok(resp);
-        }
-    }
-
     let (streaming_aggs, streaming_id, cache_strategy) =
         prepare_streaming_aggregate(trace_id, req, &ctx, use_cache).await?;
     resp.streaming_output = streaming_aggs;
     resp.streaming_aggs = streaming_aggs;
     resp.streaming_id = streaming_id;
+
+    // The agg cache can still decline a ranked histogram, e.g. on huge cardinality.
+    if ctx.is_ranked_by_non_ts && !streaming_aggs {
+        log::info!(
+            "[trace_id {trace_id}] search_partition: return single partition because the leading ORDER BY is not the time column"
+        );
+        resp.partitions = vec![[req.start_time, req.end_time]];
+        return Ok(resp);
+    }
 
     if let Some(strategy) = cache_strategy {
         resp.partitions = strategy.to_time_partitions(ctx.sql_order_by);
@@ -971,6 +971,16 @@ pub async fn match_source(
     true
 }
 
+/// Child warnings (e.g. a failing query function) must reach the caller even when the child
+/// is not partial.
+pub fn merge_function_errors(acc: &mut Vec<String>, child: Vec<String>) {
+    for err in child {
+        if !acc.contains(&err) {
+            acc.push(err);
+        }
+    }
+}
+
 pub fn server_internal_error(error: impl ToString) -> Error {
     Error::ErrorCode(ErrorCodes::ServerInternalError(error.to_string()))
 }
@@ -1159,6 +1169,16 @@ fn flatten_vrl_result(value: json::Value) -> Option<json::Value> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_merge_function_errors_keeps_non_partial_child_error_once() {
+        let msg = "Query function failed on 1 of 2 rows: boom".to_string();
+        let mut acc = vec![];
+        merge_function_errors(&mut acc, vec![msg.clone()]);
+        merge_function_errors(&mut acc, vec![msg.clone(), "other".to_string()]);
+        merge_function_errors(&mut acc, vec![]);
+        assert_eq!(acc, vec![msg, "other".to_string()]);
+    }
+
     use std::sync::Arc;
 
     use arrow_schema::{DataType, Field, Schema};

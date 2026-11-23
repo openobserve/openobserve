@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
+    ref="rootEl"
     data-test="alert-triggers-table"
     class="alert-triggers-table flex h-full flex-col overflow-hidden"
   >
@@ -34,6 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :table-id="tableId"
       :show-global-filter="false"
       @row-click="onRowClick"
+      @pagination-change="refitLabels"
+      @sort-change="refitLabels"
+      @update:column-sizes="refitLabels"
     >
       <template #empty>
         <div data-test="no-triggers-message" class="py-8 text-center">
@@ -50,8 +54,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-alert_fired_at="{ row }">
-        <span data-test="fired-at-timestamp" class="text-xs">
+        <span v-if="formatTime !== null" data-test="fired-at-timestamp" class="text-xs">
           {{ formatTimestamp(row.alert_fired_at) }}
+        </span>
+        <span v-else data-test="fired-at-timestamp" class="text-xs">
+          <OTimeCell
+            :value="row.alert_fired_at"
+            unit="us"
+            mode="relative"
+            :now="now"
+            :timezone="store.state.timezone"
+            :empty-label="raw('—')"
+          />
         </span>
       </template>
 
@@ -74,21 +88,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-labels="{ row }">
-        <OTruncatedText
-          v-if="row.labels && Object.keys(row.labels).length"
-          as="div"
-          class="flex flex-wrap gap-1"
-          :tooltip="labelsText(row.labels)"
+        <div
+          v-if="labelPairs(row.labels).length"
+          data-test="trigger-labels"
+          class="flex min-w-0 flex-nowrap items-center gap-1"
         >
-          <OTag
-            v-for="(value, key) in row.labels"
-            :key="key"
-            data-test="trigger-label-chip"
-            variant="default-outline"
+          <div
+            data-label-fit
+            :data-row="row.created_at"
+            class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
           >
-            {{ key }}={{ value }}
-          </OTag>
-        </OTruncatedText>
+            <OTag
+              v-for="pair in labelPairs(row.labels)"
+              :key="pair"
+              data-test="trigger-label-chip"
+              variant="default-outline"
+              class="max-w-full min-w-0"
+            >
+              <OTruncatedText :tooltip="hiddenLabels[row.created_at] ? false : undefined">
+                {{ pair }}
+              </OTruncatedText>
+            </OTag>
+          </div>
+          <span v-if="hiddenLabels[row.created_at]" data-test="trigger-label-more" class="shrink-0">
+            <OTag variant="default-outline">{{ raw(`+${hiddenLabels[row.created_at]}`) }}</OTag>
+            <OTooltip :content="labelsText(row.labels)" side="top" />
+          </span>
+        </div>
         <span v-else class="text-text-secondary text-xs">—</span>
       </template>
 
@@ -156,18 +182,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType, computed, ref } from "vue";
+import {
+  defineComponent,
+  PropType,
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  watch,
+  ref,
+} from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import { formatToReadable } from "@/utils/date";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { useNow } from "@/composables/useNow";
+
+// gap-1 between chips; room kept for the "+N" tag; a cut chip narrower than this reads as noise.
+const LABEL_GAP_PX = 4;
+const MORE_TAG_PX = 36;
+const MIN_CUT_CHIP_PX = 72;
+
 import incidentsService, { type ExternalAlertPayload } from "@/services/incidents";
 
 interface IncidentAlert {
@@ -192,6 +234,7 @@ export default defineComponent({
     OButton,
     ODialog,
     OTruncatedText,
+    OTimeCell,
   },
   props: {
     triggers: {
@@ -211,6 +254,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    showCorrelationReason: {
+      type: Boolean,
+      default: true,
+    },
     formatTime: {
       type: Function as PropType<(us: number) => string>,
       default: null,
@@ -224,6 +271,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18nTyped();
     const store = useStore();
+    const now = useNow();
 
     const allColumns = computed<OTableColumnDef[]>(() => [
       {
@@ -233,9 +281,9 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.name,
+        size: 260,
         minSize: 160,
-        meta: { align: "left", flex: true },
+        meta: { align: "left" },
       },
       {
         id: "detected_source",
@@ -255,7 +303,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 220,
-        meta: { align: "left" },
+        meta: { align: "left", flex: true },
       },
       {
         id: "alert_fired_at",
@@ -286,19 +334,26 @@ export default defineComponent({
       },
     ]);
 
-    // A page that hides empty columns drops Labels with no labels and the action column with no payloads.
     const columns = computed(() => {
-      if (!props.hideEmptyColumns) return allColumns.value;
-      const labels = props.triggers.some((row) => row.labels && Object.keys(row.labels).length);
-      const payloads = props.triggers.some((row) => row.alert_kind === "external");
-      return allColumns.value.filter(
-        (c) => (c.id !== "labels" || labels) && (c.id !== "actions" || payloads),
-      );
+      const shown = props.showCorrelationReason
+        ? allColumns.value
+        : allColumns.value.filter((c) => c.id !== "correlation_reason");
+      if (!props.hideEmptyColumns) return shown;
+      const filled: Record<string, boolean> = {
+        detected_source: props.triggers.some(
+          (row) =>
+            (row.alert_kind === "external" && !!row.detected_source) ||
+            row.alert_kind === "autoobserve",
+        ),
+        labels: props.triggers.some((row) => row.labels && Object.keys(row.labels).length),
+        actions: props.triggers.some((row) => row.alert_kind === "external"),
+      };
+      return shown.filter((c) => filled[c.id] ?? true);
     });
 
     const formatTimestamp = (timestamp: number) => {
       if (!timestamp) return raw("N/A");
-      return props.formatTime ? raw(props.formatTime(timestamp)) : formatToReadable(timestamp);
+      return raw(props.formatTime?.(timestamp) ?? "");
     };
 
     const getReasonTooltip = (reason: string) => {
@@ -320,13 +375,72 @@ export default defineComponent({
       emit("row-click", row.alert_name);
     };
 
-    // The chips hold no separators in their text, so the cut-cell tooltip spells them out.
-    const labelsText = (labels: Record<string, string>) =>
-      raw(
-        Object.entries(labels)
-          .map(([key, value]) => `${key}=${value}`)
-          .join(", "),
-      );
+    // Sorted by key: the server sends labels in no fixed order, so rows would lead with different keys.
+    const labelPairs = (labels?: Record<string, string> | null) =>
+      Object.entries(labels ?? {})
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => `${key}=${value}`);
+
+    const labelsText = (labels?: Record<string, string> | null) =>
+      raw(labelPairs(labels).join(", "));
+
+    // Whole chips first, then one cut to the room left (when readable), then "+N" for the rest.
+    const rootEl = ref<HTMLElement | null>(null);
+    const hiddenLabels = ref<Record<string, number>>({});
+    const fitLabels = () => {
+      const next: Record<string, number> = {};
+      rootEl.value?.querySelectorAll<HTMLElement>("[data-label-fit]").forEach((box) => {
+        const chips = Array.from(box.children) as HTMLElement[];
+        const cell = box.parentElement;
+        // A hidden cell measures zero; fitting it then would hide every chip.
+        if (!chips.length || !cell?.clientWidth) return;
+        chips.forEach((chip) => {
+          chip.style.display = "";
+          chip.style.maxWidth = "";
+          chip.style.flexShrink = "0";
+        });
+        let used = 0;
+        let shown = 0;
+        for (let i = 0; i < chips.length; i++) {
+          const rest = chips.length - i - 1;
+          const room = cell.clientWidth - used - (rest ? MORE_TAG_PX + LABEL_GAP_PX : 0);
+          if (chips[i].offsetWidth <= room) {
+            used += chips[i].offsetWidth + LABEL_GAP_PX;
+            shown++;
+            continue;
+          }
+          if (i === 0 || room >= MIN_CUT_CHIP_PX) {
+            chips[i].style.maxWidth = `${Math.max(0, room)}px`;
+            chips[i].style.flexShrink = "1";
+            shown++;
+          }
+          break;
+        }
+        chips.slice(shown).forEach((chip) => (chip.style.display = "none"));
+        if (chips.length > shown) next[box.dataset.row ?? ""] = chips.length - shown;
+      });
+      const now = hiddenLabels.value;
+      const same =
+        Object.keys(next).length === Object.keys(now).length &&
+        Object.entries(next).every(([key, n]) => now[key] === n);
+      if (!same) hiddenLabels.value = next;
+    };
+    let fitObserver: ResizeObserver | null = null;
+    onMounted(() => {
+      nextTick(() => fitLabels());
+      if (typeof ResizeObserver !== "undefined" && rootEl.value) {
+        fitObserver = new ResizeObserver(() => fitLabels());
+        fitObserver.observe(rootEl.value);
+      }
+    });
+    // Cells re-render inside the table (paging, sorting, column resize), so this component does not
+    // see their updates; the table's events bump this version to refit after its render.
+    const layoutVersion = ref(0);
+    const refitLabels = () => layoutVersion.value++;
+    watch([hiddenLabels, () => props.triggers, layoutVersion], () => fitLabels(), {
+      flush: "post",
+    });
+    onBeforeUnmount(() => fitObserver?.disconnect());
 
     const payloadDialogOpen = ref(false);
     const payloadLoading = ref(false);
@@ -359,12 +473,18 @@ export default defineComponent({
     };
 
     return {
+      rootEl,
+      hiddenLabels,
+      refitLabels,
+      now,
       raw,
       t,
+      store,
       columns,
       formatTimestamp,
       getReasonTooltip,
       onRowClick,
+      labelPairs,
       labelsText,
       payloadDialogOpen,
       payloadLoading,

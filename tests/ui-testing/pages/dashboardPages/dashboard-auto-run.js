@@ -73,6 +73,11 @@ export default class DashboardAutoRun {
     await pinAutoQuery(this.page, enabled);
   }
 
+  // For surfaces that open an API-created dashboard outside setupDashboard, such as the pinned Home tab.
+  trackRuns() {
+    this.panelRuns = trackPanelRuns(this.page);
+  }
+
   // Dashboard and panels come from the API; the variables under test are created through the Settings UI.
   async setupDashboard({ name, panels, variable, multiSelect = false, variableOptions = {}, dependents = [], reloadAfterCreate = false }) {
     const id = await createDashboard(`${name}_${Date.now()}_${Math.floor(Math.random() * 1e4)}`, { panels });

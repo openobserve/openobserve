@@ -26,12 +26,13 @@ pub const STATUS_DELETING: &str = "deleting";
 pub const STATUS_PENDING_DELETION: &str = "pending_deletion";
 pub const STATUS_ACTIVE: &str = "active";
 pub const STATUS_DELETED: &str = "deleted";
+pub const STATUS_BLOCKED: &str = "blocked";
 
-/// True for pending, deleting and tombstoned statuses, which every gate treats as gone.
+/// True for blocked, pending, deleting and tombstoned statuses, which every gate refuses.
 pub fn is_blocking_status(status: &str) -> bool {
     matches!(
         status,
-        STATUS_PENDING_DELETION | STATUS_DELETING | STATUS_DELETED
+        STATUS_BLOCKED | STATUS_PENDING_DELETION | STATUS_DELETING | STATUS_DELETED
     )
 }
 
@@ -50,6 +51,11 @@ pub async fn emit_deleted_event(org_id: &str) -> Result<(), Error> {
     emit_status_event(org_id, STATUS_DELETED).await
 }
 
+/// Sends a coordinator event indicating that an operator blocked an org.
+pub async fn emit_blocked_event(org_id: &str) -> Result<(), Error> {
+    emit_status_event(org_id, STATUS_BLOCKED).await
+}
+
 async fn emit_status_event(org_id: &str, status: &str) -> Result<(), Error> {
     let coordinator = super::get_coordinator().await;
     let key = format!("{ORG_STATUS_KEY_PREFIX}{org_id}");
@@ -62,4 +68,22 @@ async fn emit_status_event(org_id: &str, status: &str) -> Result<(), Error> {
 /// Modeled as a Delete on the org's status key (no status = not blocked).
 pub async fn emit_evict_event(org_id: &str) -> Result<(), Error> {
     super::emit_delete(&format!("{ORG_STATUS_KEY_PREFIX}{org_id}")).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_blocked_is_refused_with_the_deletion_statuses() {
+        let refused = [
+            STATUS_ACTIVE,
+            STATUS_BLOCKED,
+            STATUS_PENDING_DELETION,
+            STATUS_DELETING,
+            STATUS_DELETED,
+        ]
+        .map(is_blocking_status);
+        assert_eq!(refused, [false, true, true, true, true]);
+    }
 }

@@ -136,7 +136,6 @@ export interface TestResult {
   timestamp?: number;
   error?: string;
   statusCode?: number;
-  responseBody?: string;
   /** The test issue a Jira destination created. */
   issue?: { key: string; url: string };
   /** The test sent a generic sample, so it checked the connection and not the template. */

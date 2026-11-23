@@ -1297,7 +1297,8 @@ pub async fn apply_replicated_streaks<C: ConnectionTrait>(
 
 /// For a message from an older producer: marks the row unsigned and moves its recovery stamp past
 /// `now`, whatever `run_ts` the row holds. The stamp never goes down, so no mark armed before this
-/// can match again. Safe to run twice.
+/// can match again. Safe to run twice. Moves `updated_at`, so the status page rebuilder reads the
+/// row again and drops the hold at its next tick.
 async fn void_recovery_stamp<C: ConnectionTrait>(
     conn: &C,
     id: &str,
@@ -1311,6 +1312,7 @@ async fn void_recovery_stamp<C: ConnectionTrait>(
             Expr::col(Column::StatusRecoveredAt).add(1),
         )
         .col_expr(Column::StatusStreakSig, Expr::value(UNSIGNED))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
         .filter(Column::Id.eq(id))
         .filter(Column::StatusRecoveredAt.gt(now))
         .exec(conn)
@@ -1318,6 +1320,7 @@ async fn void_recovery_stamp<C: ConnectionTrait>(
     Entity::update_many()
         .col_expr(Column::StatusRecoveredAt, Expr::value(now + 1))
         .col_expr(Column::StatusStreakSig, Expr::value(UNSIGNED))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
         .filter(Column::Id.eq(id))
         .filter(Column::StatusRecoveredAt.lte(now))
         .exec(conn)
@@ -1350,11 +1353,21 @@ async fn apply_replicated_recovery<C: ConnectionTrait>(
 
 /// After the job cluster claim moves to this cluster: moves every recovery stamp past `now` and
 /// disarms every false alarm hold, so no hold from the old owner can match a new stamp. Safe to
-/// run twice. A marked failure that still goes on then opens a new incident.
+/// run twice, and safe to run on two nodes at once. A marked failure that still goes on then
+/// opens a new incident.
+///
+/// The signature covers the stamp. A failing row moves in one update that also signs it for its
+/// new stamp when it was signed, so a false alarm mark made right after the reset can hold, and
+/// no reader or overlapping reset sees the new stamp with the old signature. Rows that do not
+/// fail move in bulk: no hold applies to them, so their signature does not matter until the next
+/// run signs them again.
 pub async fn reset_false_alarm_holds<C: ConnectionTrait>(
     conn: &C,
     now: i64,
 ) -> Result<(), errors::Error> {
+    for row in failing_stamp_rows(conn).await? {
+        move_failing_row(conn, Some(row), now).await?;
+    }
     // Two updates, so no SQL dialect needs GREATEST. The order matters: the second one sets
     // values that the first one would move again.
     Entity::update_many()
@@ -1363,16 +1376,149 @@ pub async fn reset_false_alarm_holds<C: ConnectionTrait>(
             Expr::col(Column::StatusRecoveredAt).add(1),
         )
         .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::StatusDownRuns.eq(0))
         .filter(Column::StatusRecoveredAt.gt(now))
         .exec(conn)
         .await?;
     Entity::update_many()
         .col_expr(Column::StatusRecoveredAt, Expr::value(now + 1))
         .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::StatusDownRuns.eq(0))
         .filter(Column::StatusRecoveredAt.lte(now))
         .exec(conn)
         .await?;
-    super::status_pages::disarm_false_alarm_holds(conn).await
+    // A row that started to fail after the first read kept its old stamp in both bulk updates.
+    for row in failing_stamp_rows(conn).await? {
+        if row.recovered_at <= now {
+            move_failing_row(conn, Some(row), now).await?;
+        }
+    }
+    super::status_pages::disarm_false_alarm_holds(conn).await?;
+    Ok(())
+}
+
+/// The columns that one stamp move reads and compares.
+#[derive(Clone, Debug)]
+pub(crate) struct StampRow {
+    pub(crate) id: String,
+    down_runs: i32,
+    up_runs: i32,
+    run_ts: i64,
+    run_class: i32,
+    pub(crate) recovered_at: i64,
+    sig: i64,
+}
+
+type StampTuple = (String, i32, i32, i64, i32, i64, i64);
+
+fn stamp_query() -> sea_orm::Select<Entity> {
+    Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .column(Column::StatusDownRuns)
+        .column(Column::StatusUpRuns)
+        .column(Column::StatusRunTs)
+        .column(Column::LastRunClass)
+        .column(Column::StatusRecoveredAt)
+        .column(Column::StatusStreakSig)
+}
+
+fn stamp_row(
+    (id, down_runs, up_runs, run_ts, run_class, recovered_at, sig): StampTuple,
+) -> StampRow {
+    StampRow {
+        id,
+        down_runs,
+        up_runs,
+        run_ts,
+        run_class,
+        recovered_at,
+        sig,
+    }
+}
+
+async fn failing_stamp_rows<C: ConnectionTrait>(conn: &C) -> Result<Vec<StampRow>, errors::Error> {
+    Ok(stamp_query()
+        .filter(Column::StatusDownRuns.gt(0))
+        .into_tuple::<StampTuple>()
+        .all(conn)
+        .await?
+        .into_iter()
+        .map(stamp_row)
+        .collect())
+}
+
+pub(crate) async fn read_stamp_row<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+) -> Result<Option<StampRow>, errors::Error> {
+    Ok(stamp_query()
+        .filter(Column::Id.eq(id))
+        .into_tuple::<StampTuple>()
+        .one(conn)
+        .await?
+        .map(stamp_row))
+}
+
+/// Moves the stamp of one row the way [`reset_false_alarm_holds`] does, in one update that keeps
+/// the row signed if it was signed and leaves it unsigned otherwise. The update applies only to
+/// the values it read. If another write came first, it reads the row again and retries, so an
+/// overlapping reset moves the stamp once more and signs the final value. After a few lost races
+/// it gives up and leaves the row as the other writer left it.
+pub(crate) async fn move_failing_row<C: ConnectionTrait>(
+    conn: &C,
+    first: Option<StampRow>,
+    now: i64,
+) -> Result<(), errors::Error> {
+    let Some(mut row) = first else {
+        return Ok(());
+    };
+    let id = row.id.clone();
+    for _ in 0..5 {
+        let moved = if row.recovered_at > now {
+            row.recovered_at + 1
+        } else {
+            now + 1
+        };
+        let signed = row.sig
+            == streak_sig(
+                row.down_runs,
+                row.up_runs,
+                row.run_ts,
+                row.run_class,
+                row.recovered_at,
+            );
+        let sig = if signed {
+            streak_sig(row.down_runs, row.up_runs, row.run_ts, row.run_class, moved)
+        } else {
+            UNSIGNED
+        };
+        let res = Entity::update_many()
+            .col_expr(Column::StatusRecoveredAt, Expr::value(moved))
+            .col_expr(Column::StatusStreakSig, Expr::value(sig))
+            // A rebuilder that read the row before this write must read it again.
+            .col_expr(
+                Column::UpdatedAt,
+                Expr::value(config::utils::time::now_micros().max(now + 1)),
+            )
+            .filter(Column::Id.eq(id.as_str()))
+            .filter(Column::StatusDownRuns.eq(row.down_runs))
+            .filter(Column::StatusUpRuns.eq(row.up_runs))
+            .filter(Column::StatusRunTs.eq(row.run_ts))
+            .filter(Column::LastRunClass.eq(row.run_class))
+            .filter(Column::StatusRecoveredAt.eq(row.recovered_at))
+            .filter(Column::StatusStreakSig.eq(row.sig))
+            .exec(conn)
+            .await?;
+        if res.rows_affected > 0 {
+            return Ok(());
+        }
+        match read_stamp_row(conn, &id).await? {
+            Some(r) => row = r,
+            None => return Ok(()),
+        }
+    }
+    Ok(())
 }
 
 /// The alert bookkeeping a completed run needs in order to decide whether to

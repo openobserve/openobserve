@@ -58,13 +58,18 @@ pub mod external_alerts;
 pub mod incident_title;
 #[cfg(feature = "enterprise")]
 pub mod incidents;
+pub mod leases;
 pub mod lifecycle;
+#[cfg(feature = "enterprise")]
+pub mod membership_provider;
 #[cfg(feature = "enterprise")]
 pub mod mute;
 pub mod notifications;
 mod prom_rule;
 #[cfg(feature = "enterprise")]
 pub mod rca_live;
+#[cfg(feature = "enterprise")]
+pub mod rca_recheck;
 #[cfg(feature = "enterprise")]
 pub mod rca_resume;
 #[cfg(feature = "enterprise")]

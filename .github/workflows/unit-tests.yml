@@ -13,7 +13,8 @@ on:
   merge_group:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
+  # A label that changes nothing here only mirrors results, so it must neither replace nor queue behind a real run.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","ci-full-ui-tests"]'), github.event.label.name)) && '-mirror' || '' }}
   # Only a new commit cancels: a cancelled same-SHA run leaves a failed required summary that a newer run cannot clear.
   cancel-in-progress: ${{ github.event_name != 'pull_request' || github.event.action == 'synchronize' }}
 
@@ -28,7 +29,8 @@ env:
 jobs:
   check_changes:
     # Paid CI runs only on PRs carrying the 'ready-for-ci' label; the merge queue runs unit tests on the merged code.
-    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) }}
+    # Other labels change nothing here, so they skip every paid job and the required checks mirror the last real result.
+    if: ${{ (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) && !(contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","ci-full-ui-tests"]'), github.event.label.name)) }}
     name: check_changes
     runs-on: ubuntu-latest
     permissions:
@@ -179,7 +181,7 @@ jobs:
           toolchain: nightly-2026-10-24
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@3a3daafd3b7f23b8f65d9f5ba2db203fb59b79e2 # v2.90.2
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -248,7 +250,7 @@ jobs:
           toolchain: nightly-2026-10-24
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@3a3daafd3b7f23b8f65d9f5ba2db203fb59b79e2 # v2.90.2
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -500,17 +502,36 @@ jobs:
 
   ui_code_quality:
     needs: [check_changes]
-    if: needs.check_changes.outputs.has_ui_changes == 'true'
-    runs-on:
-      labels: eks-openobserve-standard-8
+    # Required check: a label-only run must mirror the last real result, since a skipped run would pass over a failure.
+    if: ${{ !cancelled() && (((contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","ci-full-ui-tests"]'), github.event.label.name)) && contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) || (needs.check_changes.result == 'success' && needs.check_changes.outputs.has_ui_changes == 'true')) }}
+    runs-on: ${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","ci-full-ui-tests"]'), github.event.label.name)) && 'ubuntu-latest' || 'eks-openobserve-standard-8' }}
     permissions:
       contents: read
+      checks: read
+      actions: read
+    env:
+      LABEL_NOISE: ${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","ci-full-ui-tests"]'), github.event.label.name)) }}
 
     steps:
+      - name: Check out the mirror action
+        if: env.LABEL_NOISE == 'true'
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/actions/mirror-check-result
+          persist-credentials: false
+      - name: Mirror the last real result
+        if: env.LABEL_NOISE == 'true'
+        uses: ./.github/actions/mirror-check-result
+        with:
+          check-name: ui_code_quality
+          # No UI change skips this job on a real run, and that skip is its passing verdict.
+          skipped-is-result: "true"
       - name: Clone the current repo
+        if: env.LABEL_NOISE != 'true'
         uses: actions/checkout@v5
 
       - name: Setup Node.js
+        if: env.LABEL_NOISE != 'true'
         uses: actions/setup-node@v5
         with:
           node-version: 24
@@ -518,35 +539,43 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
+        if: env.LABEL_NOISE != 'true'
         working-directory: web
         run: npm ci
 
       # Cheapest first, so a failure skips the slower steps.
       - name: Check token-file purity (token files contain tokens only)
+        if: env.LABEL_NOISE != 'true'
         working-directory: web
         run: npm run lint:token-purity
 
       - name: Check for undefined CSS custom properties
+        if: env.LABEL_NOISE != 'true'
         working-directory: web
         run: npm run lint:tokens
 
       - name: Lint styles (stylelint — bans legacy --o2-* tokens)
+        if: env.LABEL_NOISE != 'true'
         working-directory: web
         run: npm run lint:styles
 
       - name: Check design-consistency ratchet (strict — hardcoded/arbitrary/raw-token, no slack)
+        if: env.LABEL_NOISE != 'true'
         working-directory: web
         run: npm run lint:design:strict
 
       - name: Lint frontend code
+        if: env.LABEL_NOISE != 'true'
         working-directory: web
         run: npm run lint:ci
 
       - name: Prettier format check (any unformatted file fails)
+        if: env.LABEL_NOISE != 'true'
         working-directory: web
         run: npm run format:check
 
       - name: Type-check (any error fails)
+        if: env.LABEL_NOISE != 'true'
         working-directory: web
         env:
           # vue-tsc now peaks near 9GB of heap on this project; a lower ceiling
@@ -556,11 +585,28 @@ jobs:
 
   unit_tests_summary:
     runs-on: ubuntu-latest
-    permissions: {}
+    permissions:
+      contents: read
+      checks: read
+      actions: read
     needs: [check_changes, backend_unit_tests, ui_unit_tests, ui_code_quality]
     if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
+    env:
+      LABEL_NOISE: ${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","ci-full-ui-tests"]'), github.event.label.name)) }}
     steps:
+      - name: Check out the mirror action
+        if: env.LABEL_NOISE == 'true'
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/actions/mirror-check-result
+          persist-credentials: false
+      - name: Mirror the last real result
+        if: env.LABEL_NOISE == 'true'
+        uses: ./.github/actions/mirror-check-result
+        with:
+          check-name: unit_tests_summary
       - name: Check test results
+        if: env.LABEL_NOISE != 'true'
         run: |
           if [ "${{ needs.check_changes.result }}" != "success" ]; then
             echo "check_changes job did not succeed: ${{ needs.check_changes.result }}"

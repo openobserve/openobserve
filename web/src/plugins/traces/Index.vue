@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mx-2.5 mt-2.5 shrink-0"
       @dismiss="firstDataArrival = null"
     />
+    <AnomalyOriginBanner class="mx-2.5 mt-2.5 shrink-0" data-test="traces-anomaly-origin-banner" />
     <div id="tracesSecondLevel" class="h-full min-h-0 flex-1">
       <OSplitter
         :class="[
@@ -77,8 +78,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:searchMode="onSearchModeChange"
               @apply-saved-view="onApplySavedView"
               @recent-restore="onRecentRestore"
+              :refresh-loading="activeHealthView?.loading ?? false"
+              :refresh-last-run-at="activeHealthView?.lastRunAt ?? null"
               @service-graph-refresh="serviceGraphRef?.refresh()"
-              @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
+              @services-catalog-refresh="servicesCatalogRef?.refresh()"
               @filter-builder-growth="filterBuilderGrowth = $event"
               @drill-down="searchResultRef?.openComparison()"
             />
@@ -320,7 +323,11 @@ import {
   generateTraceContext,
 } from "@/utils/zincutils";
 import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
-import { tracesRunIsStaged, tracesSearchRunSignature } from "./tracesSearchBar.utils";
+import {
+  tracesQueryNotRun,
+  tracesRunIsStaged,
+  tracesSearchRunSignature,
+} from "./tracesSearchBar.utils";
 import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import analytics from "@/services/product_analytics";
@@ -340,6 +347,11 @@ import {
   type FieldGroupingConfig,
 } from "@/composables/useServiceCorrelation";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import {
+  isRequiredCondition,
+  mergeFilterTerm,
+  removeRequiredCondition,
+} from "@/utils/traces/filterUtils";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
@@ -354,6 +366,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
 import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
+import AnomalyOriginBanner from "@/components/alerts/AnomalyOriginBanner.vue";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
@@ -442,6 +455,14 @@ const searchResultRef = ref<any>(null);
 const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
+// The toolbar's one refresh button shows whichever of these two tabs is open.
+const activeHealthView = computed(() =>
+  activeTab.value === "service-graph"
+    ? serviceGraphRef.value
+    : activeTab.value === "services-catalog"
+      ? servicesCatalogRef.value
+      : null,
+);
 const splitterModel = ref(90);
 const fieldValues = ref({});
 
@@ -784,6 +805,33 @@ function dropKeptCount(results: any) {
   searchObj.meta.resultGrid.showPagination = false;
 }
 
+// Everything the count query reads, so a failed count only ever keeps the total of the same query.
+function countKeyOf(): string {
+  const dt = searchObj.data.datetime;
+  const range = dt.type === "relative" ? dt.relativeTimePeriod : `${dt.startTime}-${dt.endTime}`;
+  return [selectedStreamName.value, searchObj.meta.searchMode, builtWhereClause, range].join(
+    "\u0000",
+  );
+}
+
+// Only a count that arrived, or one kept from it, carries over; a placeholder total is not a count.
+function keptTotalOf(results: any): number | undefined {
+  if (!results) return undefined;
+  return results.countLanded ? results.total : (results.lastTotal ?? undefined);
+}
+
+// A failed count keeps the last count of this query, never the page size; only a kept count is a failed refresh.
+function keepLastCount(results: any): boolean {
+  if (results.lastTotal == null) {
+    results.countFailed = true;
+    return false;
+  }
+  searchObj.meta.refreshFailedAt = Date.now();
+  results.total = results.lastTotal;
+  searchObj.meta.resultGrid.showPagination = results.lastTotal > 0;
+  return true;
+}
+
 function fetchTracesCount() {
   const queryReq = searchObj.data.queryPayload;
   const results = searchObj.data.queryResults;
@@ -843,12 +891,18 @@ function fetchTracesCount() {
           results.total = count;
           results.errorCount = hits[0]?.error_count ?? 0;
           searchObj.meta.resultGrid.showPagination = count > 0;
+          results.countLanded = true;
           landed = true;
         }
       },
       error: (_payload: any, err: any) => {
-        // The count is a best-effort badge; the main search reports its own failures.
         console.warn("Failed to fetch traces count", err);
+        // A count that already landed stands; an error after it must not replace it.
+        const current =
+          !landed &&
+          searchObj.data.queryResults === results &&
+          currentCountTraceId === countTraceId;
+        if (current && keepLastCount(results)) landed = true;
         settle();
       },
       complete: (_payload: any) => {
@@ -965,12 +1019,16 @@ async function getQueryData(
       const sameDataset = dataset === countedDataset;
       countedDataset = dataset;
       if (!sameDataset) searchObj.meta.resultGrid.showPagination = false;
+      const previous = searchObj.data.queryResults;
+      const countKey = countKeyOf();
       // Reset hits for a fresh search
       searchObj.data.queryResults = {
         hits: [],
         total: null,
         countPending: true,
-        errorCount: sameDataset ? searchObj.data.queryResults?.errorCount : undefined,
+        errorCount: sameDataset ? previous?.errorCount : undefined,
+        countKey,
+        lastTotal: previous?.countKey === countKey ? keptTotalOf(previous) : undefined,
         from: 0,
         size: queryReq.query.size,
         took: 0,
@@ -1046,11 +1104,24 @@ async function getQueryData(
     // avoiding the costly full re-sort that `ORDER BY start_time` forces.
     const orderByCol =
       validSortCol === "start_time" ? store.state.zoConfig.timestamp_column : validSortCol;
+    // Pages are separate queries, so equal sort values need a stable order;
+    // the time sort stays single-key to keep the backend's time-ordered scan.
+    const tieBreaks =
+      orderByCol === store.state.zoConfig.timestamp_column
+        ? ""
+        : ["trace_id", "span_id"]
+            .filter(
+              (col) =>
+                col !== orderByCol &&
+                (schemaFieldNames.length === 0 || schemaFieldNames.includes(col)),
+            )
+            .map((col) => `, ${col} ASC`)
+            .join("");
 
     const spansQueryReq = (() => {
       if (!isSpansMode) return null;
       const whereClause = combinedFilter ? ` WHERE ${combinedFilter}` : "";
-      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${orderByCol} ${sortOrd}`;
+      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${orderByCol} ${sortOrd}${tieBreaks}`;
       return {
         query: {
           sql: b64EncodeUnicode(spansSql),
@@ -1890,6 +1961,8 @@ function restoreUrlQueryParams() {
 
   if (queryParams.query) {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
+  } else if (queryParams.stream) {
+    searchObj.data.editorValue = "";
   }
 
   searchObj.meta.searchMode = supportedTraceSearchMode(queryParams.tab);
@@ -1971,14 +2044,15 @@ const onMetricsEditorFilterRun = (text: string) => {
   if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
-// Handler for Error Only toggle — only adds/removes span_status condition,
-// leaving all other filters (field sidebar, duration, etc.) intact.
 const onErrorOnlyToggled = (value: boolean) => {
-  if (value) {
-    searchBarRef.value?.applyFilters(["span_status = 'ERROR'"]);
-  } else {
-    searchBarRef.value?.removeFilterByField("span_status");
-  }
+  const filter = searchObj.data.editorValue ?? "";
+  // On ANDs onto the whole filter, so it holds under a top-level OR; off cuts only that condition, not the user's own.
+  const text = value
+    ? mergeFilterTerm("span_status = 'ERROR'", filter)
+    : removeRequiredCondition(filter, "span_status", "'ERROR'");
+  searchObj.data.editorValue = text;
+  searchBarRef.value?.setEditorValue?.(text);
+  if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
 // Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
@@ -2340,8 +2414,9 @@ const activeExcludeFilterValues = computed((): Record<string, string[]> => {
   return result;
 });
 
-const showErrorOnly = computed(
-  () => activeIncludeFilterValues.value["span_status"]?.includes("ERROR") ?? false,
+// Errors-only means every result is an error, so a span_status = 'ERROR' under an OR does not count.
+const showErrorOnly = computed(() =>
+  isRequiredCondition(searchObj.data.editorValue ?? "", "span_status", "'ERROR'"),
 );
 
 const searchData = (record = true) => {
@@ -2725,7 +2800,14 @@ const tracesShortcuts = [
   },
   {
     id: "tracesCopyUrl",
-    handler: () => copyTracesUrl(t),
+    // The shortcut copies without the Share button, so it applies the button's gate itself.
+    handler: () => {
+      if (tracesQueryNotRun(searchObj)) {
+        toast({ variant: "warning", message: t("search.autoRunPersistNeedsRun") });
+        return;
+      }
+      copyTracesUrl(t);
+    },
   },
   {
     id: "tracesNextRow",

@@ -307,6 +307,36 @@ export class TracesPage {
     }).toPass({ timeout: 30000, intervals: [500, 1000, 2000] });
   }
 
+  /** Holds every stream-list and schema response until the returned release() runs, so Traces is still loading when the user leaves. */
+  async holdStreamResponses() {
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const held = [];
+    const delivered = [];
+    const pattern = /\/api\/[^/]+\/streams(\?|\/[^/]+\/schema|$)/;
+    await this.page.route(pattern, async (route) => {
+      held.push(route.request().url());
+      let done;
+      delivered.push(new Promise((resolve) => { done = resolve; }));
+      await gate;
+      // fetch + fulfill, so release() resolves only once the page has every held response.
+      await route.fetch().then((response) => route.fulfill({ response })).catch(() => {});
+      done();
+    });
+    return {
+      held,
+      release: async () => {
+        release();
+        await Promise.all(delivered);
+        await this.page.unroute(pattern);
+      },
+    };
+  }
+
+  async clickLogsMenuItem() {
+    await this.page.locator('[data-test="menu-link-\\/logs-item"]').click();
+  }
+
   async validateTracesPage() {
 
     await expect(this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]')).toBeDefined();
@@ -1746,6 +1776,19 @@ export class TracesPage {
     }
     testLogger.info('Traces share URL captured', { url: sharedUrl });
     return sharedUrl;
+  }
+
+  async expectShareLinkDisabled(message) {
+    await expect(
+      this.page.locator(this.shareLinkButton),
+      message,
+    ).toBeDisabled();
+  }
+
+  async expectSpansFoundCount(count, timeout = 60000) {
+    await expect(
+      this.page.locator(this.tracesCountBadge).first(),
+    ).toContainText(`${count} Spans Found`, { timeout });
   }
 
   async clickShareLinkButton() {
@@ -3199,6 +3242,34 @@ export class TracesPage {
     return { requests, stop: () => this.page.off('request', onRequest) };
   }
 
+  // Traces searches are a span-list SQL POST or a traces/latest GET whose `filter` param carries the editor text.
+  /** Live list of the filter text (latest GET) or decoded SQL (UI span-list POST, no counts) of each `stream` search sent from now on. */
+  trackTraceSearchFilters(stream) {
+    const sent = [];
+    this.page.on('request', (req) => {
+      const url = new URL(req.url());
+      if (url.pathname.endsWith(`/${stream}/traces/latest_stream`) || url.pathname.endsWith(`/${stream}/traces/latest`)) {
+        sent.push(url.searchParams.get('filter') ?? '');
+        return;
+      }
+      if (req.method() !== 'POST' || !/\/_search(_stream)?$/.test(url.pathname) || url.searchParams.get('type') !== 'traces') return;
+      if (url.searchParams.get('is_ui_histogram') === 'true') return;
+      let sql = '';
+      try {
+        const body = JSON.parse(req.postData() || '{}');
+        const q = body.query && typeof body.query === 'object' ? body.query : body;
+        const raw = String(q.sql ?? '');
+        sql = body.encoding === 'base64'
+          ? Buffer.from(raw.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '='), 'base64').toString('utf8')
+          : raw;
+      } catch {
+        /* non-JSON body */
+      }
+      if (url.searchParams.get('search_type') === 'ui' && sql.includes(stream) && !/count\s*\(/i.test(sql)) sent.push(sql);
+    });
+    return sent;
+  }
+
   async applySavedView(viewName) {
     await this.applySavedViewFromMoreMenu(viewName);
   }
@@ -3536,6 +3607,34 @@ export class TracesPage {
       await this.clickTraceTreeSpanByOperationName(operationName),
       `span "${operationName}" must be on the waterfall`,
     ).toBe(true);
+  }
+
+  async selectWaterfallSpanById(spanId) {
+    expect(await this.openTraceDetailsTab('waterfall'), 'the waterfall tab must exist').toBe(true);
+    const selectBtn = this.page.locator(`[data-test="trace-tree-span-select-btn-${spanId}"]`);
+    await expect(selectBtn, `span ${spanId} must be on the waterfall`).toBeVisible({ timeout: 30000 });
+    await selectBtn.click();
+  }
+
+  async openSidebarErrorTab() {
+    const tab = this.page.locator('[data-test="trace-details-sidebar-tabs-error"]').filter({ visible: true }).first();
+    await expect(tab, 'the span sidebar must offer an Error tab').toBeVisible({ timeout: 15000 });
+    await tab.click();
+  }
+
+  async expectSidebarErrorSummaryContains(text) {
+    const summary = this.page.locator('[data-test="trace-details-sidebar-error-summary"]').filter({ visible: true });
+    await expect(summary.filter({ hasText: text }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectSidebarErrorTitle(text) {
+    const title = this.page.locator('[data-test="trace-details-sidebar-error-summary-title"]').filter({ visible: true });
+    await expect(title.filter({ hasText: text }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectSidebarErrorMessage(text) {
+    const message = this.page.locator('[data-test="trace-details-sidebar-error-summary-message"]').filter({ visible: true }).first();
+    await expect(message).toHaveText(text, { timeout: 15000 });
   }
 
   /** The flame graph is a canvas; its depth-0 bar is the root span and spans the full chart width at the top. */

@@ -2798,6 +2798,7 @@ async fn trigger_rca_for_alert_firing(
             alert_name: Some(alert_name.clone()),
             stream: Some(stream_name.clone()),
             dimensions,
+            evidence: None,
         };
 
         // The turn's finalizer delivers the report to `oncall_subjects` or releases them.
@@ -6706,10 +6707,15 @@ async fn handle_backfill_triggers(
 
                 // Initiate deletion for all streams
                 let mut deletion_job_ids = Vec::new();
-                let mut failed = false;
-                let mut error_msg = String::new();
+                // every range is validated before any deletion is queued: a queued one stays
+                let (start, end) = (config.start_time, config.end_time);
+                let ranges =
+                    validated_deletion_ranges(&org_id, &destination_streams, start, end).await;
+                let mut error_msg = ranges.as_ref().err().cloned().unwrap_or_default();
+                let mut failed = ranges.is_err();
 
-                for (idx, stream) in destination_streams.iter().enumerate() {
+                let validated = destination_streams.iter().zip(ranges.unwrap_or_default());
+                for (idx, (stream, range)) in validated.enumerate() {
                     log::debug!(
                         "[BACKFILL trace_id {trace_id}] [job_id: {}] Initiating deletion for stream {}/{} ({}/{})",
                         job_id,
@@ -6719,14 +6725,7 @@ async fn handle_backfill_triggers(
                         destination_streams.len()
                     );
 
-                    match initiate_stream_deletion(
-                        &trigger.org,
-                        stream,
-                        config.start_time,
-                        config.end_time,
-                    )
-                    .await
-                    {
+                    match initiate_stream_deletion(&trigger.org, stream, &range).await {
                         Ok(deletion_job_id) => {
                             deletion_job_ids.push(deletion_job_id.clone());
                             log::debug!(
@@ -7555,40 +7554,66 @@ fn get_destination_stream_from_pipeline(
     }
 }
 
-/// Helper function to initiate stream deletion
+/// The deletion range of every destination, or the reason the first unsafe one is refused.
+async fn validated_deletion_ranges(
+    org_id: &str,
+    streams: &[StreamParams],
+    start_time: i64,
+    end_time: i64,
+) -> Result<Vec<(String, String)>, String> {
+    let mut ranges = Vec::with_capacity(streams.len());
+    for stream in streams {
+        let range = match crate::alerts::backfill::delete_covers_daily_days(
+            org_id, stream, start_time, end_time,
+        )
+        .await
+        {
+            Ok(whole_days) => deletion_range(start_time, end_time, whole_days),
+            Err(e) => Err(e),
+        };
+        ranges.push(range.map_err(|e| {
+            let msg = format!(
+                "Failed to initiate deletion for stream {}/{}: {e}",
+                stream.stream_type, stream.stream_name
+            );
+            log::error!("[BACKFILL] [org_id: {org_id}] {msg}");
+            msg
+        })?);
+    }
+    Ok(ranges)
+}
+
+/// Only a logs delete outside a daily day is sent by the hour; every other one is sent by date.
+fn deletion_range(
+    start_time: i64,
+    end_time: i64,
+    whole_days: bool,
+) -> Result<(String, String), anyhow::Error> {
+    use chrono::TimeZone;
+
+    let format = if whole_days {
+        "%Y-%m-%d"
+    } else {
+        "%Y-%m-%dT%H:00:00Z"
+    };
+    let formatted = |micros: i64, name: &str| {
+        Utc.timestamp_micros(micros)
+            .single()
+            .map(|ts| ts.format(format).to_string())
+            .ok_or_else(|| anyhow::anyhow!("Invalid {name}"))
+    };
+    Ok((
+        formatted(start_time, "start_time")?,
+        formatted(end_time, "end_time")?,
+    ))
+}
+
+/// Queues the deletion of one validated range.
 async fn initiate_stream_deletion(
     org_id: &str,
     stream: &StreamParams,
-    start_time: i64,
-    end_time: i64,
+    (time_range_start, time_range_end): &(String, String),
 ) -> Result<String, anyhow::Error> {
-    use chrono::TimeZone;
-    use config::meta::stream::StreamType;
-
-    // Convert microseconds to formatted time range strings
-    let time_range_start = {
-        let ts = Utc
-            .timestamp_micros(start_time)
-            .single()
-            .ok_or_else(|| anyhow::anyhow!("Invalid start_time"))?;
-        if stream.stream_type == StreamType::Logs {
-            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
-        } else {
-            ts.format("%Y-%m-%d").to_string()
-        }
-    };
-    let time_range_end = {
-        let ts = Utc
-            .timestamp_micros(end_time)
-            .single()
-            .ok_or_else(|| anyhow::anyhow!("Invalid end_time"))?;
-        if stream.stream_type == StreamType::Logs {
-            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
-        } else {
-            ts.format("%Y-%m-%d").to_string()
-        }
-    };
-
     // Create deletion job using existing retention service
     let (key, _created) = crate::db::compact::retention::delete_stream(
         org_id,

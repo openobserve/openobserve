@@ -64,6 +64,18 @@ pub struct AlertSummaryRow {
 pub struct WriteGuard {
     pub written_us: Option<i64>,
     pub fence: Option<KvFence>,
+    /// The `updated_at` the save swaps in, so its caller knows its own write's time; None is now.
+    pub writes_us: Option<i64>,
+    /// A pending `alert_leases` row the save must still hold unclaimed; see [`CreateStamp`].
+    pub pending_lease: Option<String>,
+}
+
+/// How a create stamps its row: `updated_at` starts at `writes_us`, and the insert lands only
+/// while the pending lease row is unclaimed, so a sweeper that let it go never sees it land later.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CreateStamp {
+    pub writes_us: i64,
+    pub pending_lease: Option<String>,
 }
 
 /// A kv row of the alert's org that the save swaps from `expected` to `written` in its transaction.
@@ -375,7 +387,27 @@ pub async fn create<C: TransactionTrait>(
     alert: MetaAlert,
     use_given_id: bool,
 ) -> Result<MetaAlert, errors::Error> {
+    create_stamped(conn, org_id, folder_id, alert, use_given_id, None).await
+}
+
+/// [`create`] stamped as [`CreateStamp`] says; with a pending lease it already gave up on,
+/// writes nothing and fails.
+pub async fn create_stamped<C: TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: &str,
+    alert: MetaAlert,
+    use_given_id: bool,
+    stamp: Option<CreateStamp>,
+) -> Result<MetaAlert, errors::Error> {
     let txn = conn.begin().await?;
+    if let Some(lease) = stamp.as_ref().and_then(|s| s.pending_lease.as_deref())
+        && !super::alert_leases::hold_pending_in(&txn, lease).await?
+    {
+        return Err(errors::Error::Message(
+            "the change's pending lease was let go".to_string(),
+        ));
+    }
 
     // Get the destination folder.
     let Some(folder_m) =
@@ -404,6 +436,9 @@ pub async fn create<C: TransactionTrait>(
         ..Default::default()
     };
     update_mutable_fields(&mut alert_am, alert)?;
+    if let Some(stamp) = &stamp {
+        alert_am.updated_at = Set(Some(stamp.writes_us));
+    }
 
     // Triggered and satisfied timestamps should always be initialized
     // to None so overwrite any value that might have been set already.
@@ -465,6 +500,9 @@ pub async fn update_where<C: TransactionTrait + ConnectionTrait>(
     // Update fields using values from the given alert.
     let mut alert_am: alerts::ActiveModel = alert_m.into();
     update_mutable_fields(&mut alert_am, alert)?;
+    if let Some(us) = guard.as_ref().and_then(|g| g.writes_us) {
+        alert_am.updated_at = Set(Some(us));
+    }
 
     // Update the folder if a new parent folder was provided.
     if let Some(folder_m) = maybe_folder_m {
@@ -485,6 +523,11 @@ pub async fn update_where<C: TransactionTrait + ConnectionTrait>(
             if !swap.await? {
                 return Ok(None);
             }
+        }
+        if let Some(lease) = guard.pending_lease.as_deref()
+            && !super::alert_leases::hold_pending_in(&txn, lease).await?
+        {
+            return Ok(None);
         }
         write = write.filter(match guard.written_us {
             Some(us) => alerts::Column::UpdatedAt.eq(us),
@@ -513,6 +556,22 @@ pub async fn delete_by_id<C: ConnectionTrait>(
         .exec(conn)
         .await?;
     Ok(())
+}
+
+/// Deletes the alert only while `updated_at` holds `written_us`; false when it moved or is gone.
+pub async fn delete_by_id_where<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+    written_us: i64,
+) -> Result<bool, errors::Error> {
+    let res = alerts::Entity::delete_many()
+        .filter(alerts::Column::Org.eq(org_id))
+        .filter(alerts::Column::Id.eq(alert_id.to_string()))
+        .filter(alerts::Column::UpdatedAt.eq(written_us))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected == 1)
 }
 
 /// Lists alerts; a row this version cannot read is logged and skipped.
@@ -2711,8 +2770,15 @@ pub(super) mod tests {
             let (_, kept) = get_by_id(db, ORG, ksuid).await.unwrap().unwrap();
             assert_eq!(kept.pending_period_sec, 300);
             let fresh = last_written_us(db, ORG, &id).await.unwrap();
-            let saved = update_where(db, ORG, None, ours, Some(guard(fresh))).await;
+            let stamp = fresh.unwrap() + 1;
+            let stamped = WriteGuard {
+                writes_us: Some(stamp),
+                ..guard(fresh)
+            };
+            let saved = update_where(db, ORG, None, ours, Some(stamped)).await;
             assert_eq!(saved.unwrap().unwrap().pending_period_sec, 120);
+            let written = last_written_us(db, ORG, &id).await.unwrap();
+            assert_eq!(written, Some(stamp), "the save wrote the caller's time");
         }
 
         #[tokio::test]
@@ -2755,6 +2821,8 @@ pub(super) mod tests {
             WriteGuard {
                 written_us,
                 fence: None,
+                writes_us: None,
+                pending_lease: None,
             }
         }
 
@@ -2784,6 +2852,8 @@ pub(super) mod tests {
                     expected: expected.to_vec(),
                     written: b"written".to_vec(),
                 }),
+                writes_us: None,
+                pending_lease: None,
             };
             let read = last_written_us(db, ORG, &id).await.unwrap();
             let taken_back =

@@ -37,7 +37,6 @@ use config::{
         search::{HashFileRequest, HashFileResponse},
         slack::DisabledReason,
         stream::DataRetentionDefaults,
-        user::UserRole,
     },
     stats::{CacheStats, CacheStatsAsync},
     utils::{base64, json},
@@ -245,6 +244,10 @@ struct ConfigResponse<'a> {
     model_pricing_enabled: bool,
     online_evals_enabled: bool,
     anomaly_detection_enabled: bool,
+    /// O2_AUTOOBSERVE_CONTEXT_ENABLED, only while O2_AUTOOBSERVE_ENABLED is on.
+    autoobserve_context_enabled: bool,
+    /// O2_AUTOOBSERVE_AI_EVIDENCE_ENABLED; off, the drawers hide the engine step too.
+    autoobserve_next_step_enabled: bool,
     composite_alerts_available: bool,
     synthetics_enabled: bool,
     /// Hides the publish button and the Public links view when the feature is off.
@@ -527,7 +530,7 @@ pub async fn zo_config(
         None => false,
     };
     let is_org_admin = match &user_email {
-        Some(Headers(user)) => org_admin(&org_id, &user.user_id).await,
+        Some(Headers(user)) => openobserve_core::users::is_org_admin(&org_id, &user.user_id).await,
         None => false,
     };
     #[cfg(feature = "enterprise")]
@@ -593,6 +596,14 @@ pub async fn zo_config(
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Enterprise builds have it unless O2_ANOMALY_DETECTION_DISABLED turns it off.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
+    let autoobserve_context_enabled = enterprise_value!(
+        false,
+        o2_enterprise::enterprise::autoobserve::context::enabled()
+    );
+    let autoobserve_next_step_enabled = enterprise_value!(
+        false,
+        o2_enterprise::enterprise::autoobserve::next_step::enabled()
+    );
     let composite_alerts_available = config::get_config().alert_composite.writes_enabled;
     let online_evals_enabled = enterprise_value!(
         false,
@@ -627,10 +638,9 @@ pub async fn zo_config(
 
     let usage_enabled = enterprise_value!(false, true);
 
-    // Usage calculations need data at most 10 minutes old.
     let usage_publish_interval = enterprise_value!(
         cfg.common.usage_publish_interval,
-        (10 * 60).min(cfg.common.usage_publish_interval)
+        config::enterprise_usage_publish_interval(&cfg)
     );
 
     #[cfg(feature = "cloud")]
@@ -784,6 +794,8 @@ pub async fn zo_config(
         model_pricing_enabled: cfg.common.model_pricing_enabled,
         online_evals_enabled,
         anomaly_detection_enabled,
+        autoobserve_context_enabled,
+        autoobserve_next_step_enabled,
         composite_alerts_available,
         synthetics_enabled,
         public_dashboards_enabled: cfg.public_dashboards.enabled,
@@ -896,13 +908,6 @@ async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
 /// The search inspector is enterprise-only, so OSS never offers it even to root.
 fn search_inspector_for_edition(permitted: bool) -> bool {
     cfg!(feature = "enterprise") && permitted
-}
-
-async fn org_admin(org_id: &str, user_id: &str) -> bool {
-    is_root_user(user_id)
-        || openobserve_core::users::get_user(Some(org_id), user_id)
-            .await
-            .is_some_and(|u| matches!(u.role, UserRole::Root | UserRole::Admin))
 }
 
 /// Only enterprise builds run the transitions reaper; 0 tells the UI nothing is ever dropped.
@@ -2308,10 +2313,34 @@ mod tests {
         assert!(all_cache_modules(true).contains(&"downtimes"));
     }
 
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn with_downtimes_off_a_cache_reload_loads_no_downtime() {
+        use config::meta::folder::{DEFAULT_FOLDER, Folder, FolderType};
+        crate::request::security::tests::meta_store().await;
+        // Other tests fill the process-wide cache, so only this test's own org is asked about.
+        let org = format!("reload_off_{}", config::utils::time::now_micros());
+        let folder = Folder {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: DEFAULT_FOLDER.to_string(),
+            description: String::new(),
+            icon: None,
+        };
+        infra::table::folders::get_or_create(&org, folder, FolderType::Downtimes)
+            .await
+            .unwrap();
+        let row: config::meta::downtimes::Downtime = serde_json::from_value(serde_json::json!({
+            "id": org, "org": org, "name": "stored", "targets": [],
+            "schedule": { "repeat": "none", "starts_at": 0, "timezone": "UTC", "duration_secs": 60 },
+            "created_by": "root@example.com", "created_at": 0,
+            "updated_by": "root@example.com", "updated_at": 0
+        }))
+        .unwrap();
+        infra::table::downtimes::put_with(infra::db::get_orm_client_rw().await, &row)
+            .await
+            .unwrap();
         reload_downtimes(false).await.unwrap();
-        assert!(db::downtimes::all_cached().is_empty());
+        assert!(db::downtimes::list_cached(&org).is_empty());
     }
 
     #[test]

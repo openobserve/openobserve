@@ -23,7 +23,7 @@
 use axum::{
     Json,
     extract::Path,
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use common::meta::http::HttpResponse as MetaHttpResponse;
@@ -80,8 +80,22 @@ fn licensed_only(ctx: &str) -> Response {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn list_pages(Path(org_id): Path<String>) -> Response {
-    match openobserve_core::status_pages::list_pages_view(&org_id).await {
+pub async fn list_pages(Path(org_id): Path<String>, headers: HeaderMap) -> Response {
+    let Some(user_id) = user_id_of(&headers) else {
+        return MetaHttpResponse::bad_request("invalid user_id header");
+    };
+    let permitted = match openobserve_api_common::auth::validator::list_objects_for_user(
+        &org_id,
+        user_id,
+        "GET",
+        "status_page",
+    )
+    .await
+    {
+        Ok(list) => list,
+        Err(e) => return MetaHttpResponse::forbidden(e.to_string()),
+    };
+    match openobserve_core::status_pages::list_pages_view(&org_id, permitted.as_deref()).await {
         Ok(resp) => MetaHttpResponse::json(resp),
         Err(e) => map_err("list_pages", e),
     }
@@ -825,5 +839,61 @@ async fn audit(org_id: &str, actor: &str, action: &str, notice_id: Option<&str>)
         openobserve_core::status_pages::write_audit(org_id, actor, action, notice_id).await
     {
         tracing::error!("[status_pages] audit write failed for {action}: {e}");
+    }
+}
+
+/// The middleware writes `user_id` as raw bytes, which `Headers<UserEmail>` drops when non-ASCII.
+/// Read it exactly: the route check ran against that identity, so the list must too.
+fn user_id_of(headers: &HeaderMap) -> Option<&str> {
+    std::str::from_utf8(headers.get("user_id")?.as_bytes()).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::http::{HeaderValue, Request};
+
+    use super::*;
+
+    fn parts_with_user_id(user_id: &str) -> axum::http::request::Parts {
+        // The same write `auth_middleware` makes.
+        let value = HeaderValue::from_str(user_id).unwrap();
+        let request = Request::builder()
+            .header("user_id", value)
+            .body(())
+            .unwrap();
+        request.into_parts().0
+    }
+
+    #[test]
+    fn the_listing_user_is_read_whatever_the_address_holds() {
+        for user_id in [
+            "root@example.com",
+            "jos\u{e9}@example.com",
+            "\u{5f20}\u{4f1f}@example.cn",
+        ] {
+            let parts = parts_with_user_id(user_id);
+            assert_eq!(user_id_of(&parts.headers), Some(user_id));
+        }
+        assert_eq!(user_id_of(&HeaderMap::new()), None);
+    }
+
+    #[test]
+    fn the_listing_user_is_refused_when_the_header_is_not_utf8() {
+        let mut headers = HeaderMap::new();
+        headers.insert("user_id", HeaderValue::from_bytes(b"root\xff").unwrap());
+        assert_eq!(user_id_of(&headers), None);
+    }
+
+    #[test]
+    fn the_listing_user_keeps_the_exact_identity_the_route_checked() {
+        // A different account from `root@example.com`, whose id starts with U+00A0.
+        for user_id in [
+            "\u{a0}root@example.com",
+            "root@example.com ",
+            " root@example.com",
+        ] {
+            let parts = parts_with_user_id(user_id);
+            assert_eq!(user_id_of(&parts.headers), Some(user_id));
+        }
     }
 }

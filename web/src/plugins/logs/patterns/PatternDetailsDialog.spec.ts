@@ -16,9 +16,11 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import PatternDetailsDialog from "./PatternDetailsDialog.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { PATTERN_VOLUME_CACHE } from "./usePatternVolume";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
+import enUS from "@/locales/languages/en-US.json";
 import analytics from "@/services/product_analytics";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
@@ -46,6 +48,13 @@ const ODrawerStub = {
 // reka-ui button does not always project a DOM `disabled` attribute), and
 // click events still fire the bound @click handler.
 const TooltipStub = { template: "<div><slot /></div>" };
+
+const ContentTooltipStub = {
+  name: "OTooltip",
+  props: ["content", "disabled"],
+  template:
+    '<div data-test-stub="o-tooltip" :data-disabled="String(!!disabled)" :data-content="content"><slot /></div>',
+};
 
 const OButtonStub = {
   name: "OButton",
@@ -175,6 +184,97 @@ describe("PatternDetailsDialog", () => {
         "include",
       ]);
       expect(wrapper.emitted("update:modelValue")![0]).toEqual([false]);
+    });
+
+    it("shows a dash with the reason for Occurrences when the volume has no distinct filter", () => {
+      const w = mount(PatternDetailsDialog, {
+        props: { modelValue: true, selectedPattern: mockSelectedPattern, totalPatterns },
+        global: {
+          ...globalConfig,
+          provide: {
+            store,
+            [PATTERN_VOLUME_CACHE as symbol]: {
+              request: () => Promise.resolve(),
+              get: () => ({
+                buckets: null,
+                total: null,
+                intervalSecs: null,
+                loading: false,
+                unavailableReason: "none",
+              }),
+            },
+          },
+        },
+      });
+      const occurrences = w.find('[data-test="pattern-detail-occurrences"]');
+      expect(occurrences.text()).toBe("—");
+      expect(occurrences.attributes("title")).toBe(enUS.logs.patternList.noMatchTerms);
+      w.unmount();
+    });
+
+    describe("include/exclude availability", () => {
+      const mountWith = (filterBlockedReason?: "none" | "shared" | null) =>
+        mount(PatternDetailsDialog, {
+          props: {
+            modelValue: true,
+            selectedPattern: mockSelectedPattern,
+            totalPatterns,
+            ...(filterBlockedReason === undefined ? {} : { filterBlockedReason }),
+          },
+          global: {
+            ...globalConfig,
+            stubs: { ...globalConfig.stubs, OButton, OTooltip: ContentTooltipStub },
+          },
+        });
+      const IDS = ["include", "exclude", "create-alert"] as const;
+      const btn = (w: any, id: string) => w.find(`[data-test="pattern-detail-${id}-btn"]`);
+      const reasonOf = (w: any, id: string) =>
+        w.find(`#${btn(w, id).attributes("aria-describedby")}`).text();
+      const tooltipOf = (w: any, id: string) =>
+        btn(w, id).find('[data-test-stub="o-tooltip"]').attributes("data-content");
+
+      it("leaves all three buttons available when nothing is blocked", () => {
+        const w = mountWith();
+        for (const id of IDS) {
+          expect(btn(w, id).attributes("aria-disabled")).toBeUndefined();
+          expect(btn(w, id).attributes("aria-describedby")).toBeUndefined();
+          expect(btn(w, id).find('[data-test-stub="o-tooltip"]').exists()).toBe(false);
+        }
+        w.unmount();
+      });
+
+      it.each([
+        ["shared", enUS.logs.patternList.noDistinctTextTooltip],
+        ["none", enUS.logs.patternList.noMatchTerms],
+      ] as const)(
+        "keeps all three buttons focusable, unavailable and described by the %s reason",
+        (reason, text) => {
+          const w = mountWith(reason);
+          for (const id of IDS) {
+            expect(btn(w, id).attributes("aria-disabled")).toBe("true");
+            expect(btn(w, id).attributes("disabled")).toBeUndefined();
+            expect(reasonOf(w, id)).toBe(text);
+            expect(tooltipOf(w, id)).toBe(text);
+          }
+          w.unmount();
+        },
+      );
+
+      it("emits nothing from any blocked button", async () => {
+        const w = mountWith("shared");
+        for (const id of IDS) await btn(w, id).trigger("click");
+        expect(w.emitted("add-to-search")).toBeUndefined();
+        expect(w.emitted("create-alert")).toBeUndefined();
+        expect(w.emitted("update:modelValue")).toBeUndefined();
+        w.unmount();
+      });
+
+      it("emits create-alert when the filter is not blocked", async () => {
+        const w = mountWith(null);
+        await btn(w, "create-alert").trigger("click");
+        expect(w.emitted("create-alert")).toHaveLength(1);
+        w.unmount();
+      });
     });
 
     it("emits add-to-search 'exclude' on exclude click", async () => {

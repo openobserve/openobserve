@@ -7,6 +7,7 @@ export class RouteGuardPage {
         // The removed demo rendered its own heading; the URL alone is not the tell.
         this.emptyStateDemoHeading = page.getByText('Empty states', { exact: false });
         this.notFoundHeading = page.getByText('Page not found', { exact: false });
+        this.enterpriseLockedPage = page.locator('[data-test="enterprise-feature-locked"]');
     }
 
     /** Navigate to an app route under /web, carrying the org identifier. */
@@ -37,6 +38,13 @@ export class RouteGuardPage {
     /** A removed route falls through to the 404 view rather than changing the URL. */
     async expectNotFoundRendered() {
         await expect(this.notFoundHeading.first()).toBeVisible({ timeout: 15000 });
+    }
+
+    /** The shared upgrade screen for `featureKey`, showing that feature's own pitch. */
+    async expectEnterpriseLocked(featureKey, pitch) {
+        await expect(this.page).toHaveURL(new RegExp(`/enterprise-locked\\?feature=${featureKey}(&|$)`), { timeout: 15000 });
+        await expect(this.enterpriseLockedPage).toBeVisible({ timeout: 15000 });
+        await expect(this.enterpriseLockedPage).toContainText(pitch);
     }
 
     currentUrl() {

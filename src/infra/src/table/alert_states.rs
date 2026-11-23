@@ -22,10 +22,13 @@
 use config::meta::{
     alerts::{
         dispatch::DeliveryEpisode,
-        grouping::{GroupPlan, ReapedGroup},
+        grouping::{GroupPlan, GroupTouch, ReapedGroup, TouchedGroupPlan},
         level::AlertLevel,
         recovery::ClosedGroupEpisode,
-        state::{AlertState, EvalLedgerWrite, ROLLUP_GROUP_KEY, StateTransition, StateUpdate},
+        state::{
+            AlertState, EvalLedgerWrite, ROLLUP_GROUP_KEY, RunStamps, StateTouch, StateTransition,
+            StateUpdate,
+        },
     },
     self_reporting::usage::RunOutcome,
 };
@@ -311,6 +314,29 @@ pub async fn persist_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
     Ok(())
 }
 
+/// Applies a replicated [`StateTouch`]; false when the rollup row is missing or already newer.
+pub async fn touch(touch: &StateTouch) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
+    touch_with(client, touch).await
+}
+
+/// [`touch`] against a caller-supplied connection. [strong]
+pub async fn touch_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    touch: &StateTouch,
+) -> Result<bool, errors::Error> {
+    let txn = conn.begin().await?;
+    if !stamp_rollup(&txn, &touch.alert_id, &touch.stamps).await? {
+        txn.commit().await?;
+        return Ok(false);
+    }
+    if let Some(write) = touch.ledger.as_ref() {
+        crate::table::alert_eval_intervals::record_evaluation_with(&txn, write).await?;
+    }
+    txn.commit().await?;
+    Ok(true)
+}
+
 /// Persist one grouped evaluation's entire [`GroupPlan`] in a **single
 /// transaction** (§7.2).
 ///
@@ -343,69 +369,31 @@ pub async fn persist_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTr
     alert_id: &str,
     mode: PlanApply,
 ) -> Result<GroupPlanWrite, errors::Error> {
-    let txn = conn.begin().await?;
+    write_group_plan(conn, plan, None, alert_id, mode).await
+}
 
-    // §5.3 opt-out race: this evaluation may have read the alert BEFORE a save
-    // turned `multi_alert` off, in which case its group rows would be written
-    // after the save-time cleanup already ran — resurrecting exactly the rows
-    // the toggle promised to remove. Re-reading the flag inside the plan's own
-    // transaction is what makes "the group table empties on save" hold: past
-    // this point, no in-flight evaluation can put rows back.
-    if !multi_alert_still_enabled(&txn, alert_id).await? {
-        txn.commit().await?;
-        log::debug!(
-            "alert {alert_id}: per-group alerting was turned off mid-evaluation; dropping this \
-             evaluation's group writes"
-        );
-        return Ok(GroupPlanWrite::default());
-    }
+/// Applies a replicated [`TouchedGroupPlan`] as a replica applies a full plan, then stamps the
+/// group rows the plan left out.
+pub async fn persist_touched_group_plan(
+    touched: &TouchedGroupPlan,
+) -> Result<GroupPlanWrite, errors::Error> {
+    let client = get_orm_client_rw().await;
+    persist_touched_group_plan_with(client, touched).await
+}
 
-    // Before the upserts: they move `level_at`, which is the close's version guard.
-    let mut closed = Vec::with_capacity(plan.closed_episodes.len());
-    for close in &plan.closed_episodes {
-        if close_group_episode(&txn, alert_id, close, mode != PlanApply::Replica).await? {
-            closed.push(close.clone());
-        } else if mode == PlanApply::Sweep {
-            txn.rollback().await?;
-            return Ok(GroupPlanWrite::default());
-        }
-    }
-
-    for update in &plan.updates {
-        write_update(&txn, update).await?;
-    }
-
-    // Evicted rows are deleted outright with NO transition (M-6): an eviction
-    // is bookkeeping, not a level change — the group may well still be firing,
-    // so a recovery row would be a lie.
-    let mut evicted_firing = Vec::new();
-    if !plan.evicted.is_empty() {
-        evicted_firing = firing_groups_with(&txn, alert_id, Some(&plan.evicted)).await?;
-        alert_states::Entity::delete_many()
-            .filter(alert_states::Column::AlertId.eq(alert_id))
-            .filter(alert_states::Column::GroupKey.is_in(plan.evicted.clone()))
-            .exec(&txn)
-            .await?;
-    }
-
-    let mut reaped = Vec::new();
-    for reap in &plan.reaped {
-        if reap_group(&txn, alert_id, reap).await? {
-            reaped.push(reap.clone());
-        }
-    }
-
-    if mode == PlanApply::Replica {
-        converge_episodes(&txn, alert_id, plan).await?;
-    }
-
-    txn.commit().await?;
-    Ok(GroupPlanWrite {
-        written: true,
-        evicted_firing,
-        closed,
-        reaped,
-    })
+/// [`persist_touched_group_plan`] against a caller-supplied connection. [strong]
+pub async fn persist_touched_group_plan_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    touched: &TouchedGroupPlan,
+) -> Result<GroupPlanWrite, errors::Error> {
+    write_group_plan(
+        conn,
+        &touched.plan,
+        Some(&touched.touch),
+        &touched.alert_id,
+        PlanApply::Replica,
+    )
+    .await
 }
 
 /// `(group_key, firing_started_at)` of the alert's group rows mid-firing, optionally only `keys`.
@@ -831,6 +819,150 @@ async fn converge_episodes<C: sea_orm::ConnectionTrait>(
         }
     }
     Ok(())
+}
+
+/// One plan in one transaction; a replica's `touch` stamps the group rows the plan left out.
+async fn write_group_plan<C: sea_orm::ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    plan: &GroupPlan,
+    touch: Option<&GroupTouch>,
+    alert_id: &str,
+    mode: PlanApply,
+) -> Result<GroupPlanWrite, errors::Error> {
+    let txn = conn.begin().await?;
+
+    // §5.3 opt-out race: a save may have turned `multi_alert` off after this evaluation read the
+    // alert; re-reading it in the plan's own transaction keeps the cleared rows from coming back.
+    if !multi_alert_still_enabled(&txn, alert_id).await? {
+        txn.commit().await?;
+        log::debug!(
+            "alert {alert_id}: per-group alerting was turned off mid-evaluation; dropping this \
+             evaluation's group writes"
+        );
+        return Ok(GroupPlanWrite::default());
+    }
+
+    // Before the upserts: they move `level_at`, which is the close's version guard.
+    let mut closed = Vec::with_capacity(plan.closed_episodes.len());
+    for close in &plan.closed_episodes {
+        if close_group_episode(&txn, alert_id, close, mode != PlanApply::Replica).await? {
+            closed.push(close.clone());
+        } else if mode == PlanApply::Sweep {
+            txn.rollback().await?;
+            return Ok(GroupPlanWrite::default());
+        }
+    }
+
+    // Before the upserts, so a row the plan carries ends with the plan's own stamps.
+    if let Some(touch) = touch {
+        stamp_observed_groups(&txn, alert_id, touch, &plan.reaped).await?;
+        if let Some(stamps) = touch.rollup.as_ref() {
+            stamp_rollup(&txn, alert_id, stamps).await?;
+        }
+    }
+
+    for update in &plan.updates {
+        write_update(&txn, update).await?;
+    }
+
+    // Evicted rows go with NO transition (M-6): an eviction is bookkeeping, not a level change,
+    // and the group may still be firing, so a recovery row would be a lie.
+    let mut evicted_firing = Vec::new();
+    if !plan.evicted.is_empty() {
+        evicted_firing = firing_groups_with(&txn, alert_id, Some(&plan.evicted)).await?;
+        alert_states::Entity::delete_many()
+            .filter(alert_states::Column::AlertId.eq(alert_id))
+            .filter(alert_states::Column::GroupKey.is_in(plan.evicted.clone()))
+            .exec(&txn)
+            .await?;
+    }
+
+    let mut reaped = Vec::new();
+    for reap in &plan.reaped {
+        if reap_group(&txn, alert_id, reap).await? {
+            reaped.push(reap.clone());
+        }
+    }
+
+    if mode == PlanApply::Replica {
+        converge_episodes(&txn, alert_id, plan).await?;
+    }
+
+    txn.commit().await?;
+    Ok(GroupPlanWrite {
+        written: true,
+        evicted_firing,
+        closed,
+        reaped,
+    })
+}
+
+/// Sets the rollup row's run stamps; false when the row is missing or holds a later evaluation.
+async fn stamp_rollup<C: sea_orm::ConnectionTrait>(
+    txn: &C,
+    alert_id: &str,
+    stamps: &RunStamps,
+) -> Result<bool, errors::Error> {
+    use sea_orm::sea_query::Expr;
+
+    let written = alert_states::Entity::update_many()
+        .col_expr(
+            alert_states::Column::LastOutcomeAt,
+            Expr::value(Some(stamps.last_outcome_at)),
+        )
+        .col_expr(alert_states::Column::LevelAt, Expr::value(stamps.level_at))
+        .col_expr(
+            alert_states::Column::LastSeen,
+            Expr::value(stamps.last_seen),
+        )
+        .filter(alert_states::Column::AlertId.eq(alert_id))
+        .filter(alert_states::Column::GroupKey.eq(ROLLUP_GROUP_KEY))
+        .filter(not_evaluated_after(stamps.last_outcome_at))
+        .exec(txn)
+        .await?
+        .rows_affected;
+    Ok(written > 0)
+}
+
+/// Marks the group rows seen since the touch's floor as seen at its time, except those it names
+/// as unobserved and those the plan reaps, whose guard matches on `level_at`.
+async fn stamp_observed_groups<C: sea_orm::ConnectionTrait>(
+    txn: &C,
+    alert_id: &str,
+    touch: &GroupTouch,
+    reaped: &[ReapedGroup],
+) -> Result<(), errors::Error> {
+    use sea_orm::sea_query::Expr;
+
+    let skipped: Vec<&str> = touch
+        .unobserved
+        .iter()
+        .map(String::as_str)
+        .chain(reaped.iter().map(|reap| reap.group_key.as_str()))
+        .collect();
+    let mut stmt = alert_states::Entity::update_many()
+        .col_expr(
+            alert_states::Column::LastOutcomeAt,
+            Expr::value(Some(touch.at)),
+        )
+        .col_expr(alert_states::Column::LevelAt, Expr::value(Some(touch.at)))
+        .col_expr(alert_states::Column::LastSeen, Expr::value(Some(touch.at)))
+        .filter(alert_states::Column::AlertId.eq(alert_id))
+        .filter(alert_states::Column::GroupKey.ne(ROLLUP_GROUP_KEY))
+        .filter(alert_states::Column::LastSeen.gte(touch.seen_since))
+        .filter(not_evaluated_after(touch.at));
+    if !skipped.is_empty() {
+        stmt = stmt.filter(alert_states::Column::GroupKey.is_not_in(skipped));
+    }
+    stmt.exec(txn).await?;
+    Ok(())
+}
+
+/// Rows a stamp at `at` may move: the queue redelivers, and an old stamp must not set time back.
+fn not_evaluated_after(at: i64) -> sea_orm::Condition {
+    sea_orm::Condition::any()
+        .add(alert_states::Column::LastOutcomeAt.is_null())
+        .add(alert_states::Column::LastOutcomeAt.lte(at))
 }
 
 /// The guarded delivery-columns write; `false` when the episode had moved on and it was dropped.
@@ -1379,6 +1511,9 @@ mod tests {
 
     const CUTOFF: i64 = 1_750_000_000_000_000;
     const HOUR_US: i64 = 3_600_000_000;
+    const SEEN: &str = "host=seen";
+    const GONE: &str = "host=gone";
+    const AHEAD: &str = "host=ahead";
 
     /// One database a retention test runs against; a Postgres arm drops its schema when done.
     struct Backend {
@@ -3092,5 +3227,409 @@ mod tests {
             "postgres arm ran: {}",
             std::thread::current().name().unwrap_or("?")
         );
+    }
+
+    fn stamps(last_outcome_at: i64, level_at: i64, last_seen: i64) -> RunStamps {
+        RunStamps {
+            last_outcome_at,
+            level_at: Some(level_at),
+            last_seen: Some(last_seen),
+        }
+    }
+
+    fn touch_at(stamps: RunStamps) -> StateTouch {
+        StateTouch {
+            alert_id: "alert-1".to_string(),
+            stamps,
+            ledger: None,
+        }
+    }
+
+    async fn stamps_of(db: &sea_orm::DatabaseConnection, group_key: &str) -> RunStamps {
+        let row = get_with(db, "alert-1", group_key).await.unwrap().unwrap();
+        RunStamps {
+            last_outcome_at: row.last_outcome_at.unwrap(),
+            level_at: row.level_at,
+            last_seen: row.last_seen,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_touch_sets_the_rollup_stamps_verbatim_and_records_its_ledger_entry() {
+        for backend in touch_backends().await {
+            let db = &backend.conn;
+            persist_with(db, &update_at(ROLLUP_GROUP_KEY, 1_000), None)
+                .await
+                .unwrap();
+            let mut touch = touch_at(stamps(2_000, 1_000, 2_000));
+            touch.ledger = Some(ledger_write_at(2_000));
+
+            assert!(touch_with(db, &touch).await.unwrap(), "{}", backend.name);
+
+            assert_eq!(
+                stamps_of(db, ROLLUP_GROUP_KEY).await,
+                stamps(2_000, 1_000, 2_000)
+            );
+            assert_eq!(count_intervals(db).await, 1);
+            backend.done().await;
+        }
+    }
+
+    /// A run that computed no level carries none; the replica must not keep an older one.
+    #[tokio::test]
+    async fn a_touch_writes_an_absent_stamp_as_absent() {
+        let db = db().await;
+        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        let absent = RunStamps {
+            last_outcome_at: 2_000,
+            level_at: None,
+            last_seen: None,
+        };
+
+        assert!(touch_with(&db, &touch_at(absent.clone())).await.unwrap());
+
+        assert_eq!(stamps_of(&db, ROLLUP_GROUP_KEY).await, absent);
+    }
+
+    #[tokio::test]
+    async fn a_touch_lands_on_a_row_that_was_never_evaluated() {
+        let db = db().await;
+        let never_evaluated = StateUpdate {
+            state: Some(AlertState::empty("alert-1", ROLLUP_GROUP_KEY)),
+            transition: None,
+        };
+        persist_with(&db, &never_evaluated, None).await.unwrap();
+
+        assert!(
+            touch_with(&db, &touch_at(stamps(2_000, 2_000, 2_000)))
+                .await
+                .unwrap()
+        );
+
+        assert_eq!(
+            stamps_of(&db, ROLLUP_GROUP_KEY).await,
+            stamps(2_000, 2_000, 2_000)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_touch_for_an_alert_without_a_rollup_row_writes_nothing() {
+        let db = db().await;
+        let mut touch = touch_at(stamps(2_000, 2_000, 2_000));
+        touch.ledger = Some(ledger_write_at(2_000));
+
+        assert!(!touch_with(&db, &touch).await.unwrap());
+
+        assert_eq!(count_states(&db).await, 0);
+        assert_eq!(count_intervals(&db).await, 0);
+    }
+
+    #[tokio::test]
+    async fn a_touch_older_than_the_row_is_refused_and_an_equal_one_is_applied() {
+        for backend in touch_backends().await {
+            let db = &backend.conn;
+            persist_with(db, &update_at(ROLLUP_GROUP_KEY, 3_000), None)
+                .await
+                .unwrap();
+            let mut older = touch_at(stamps(2_000, 2_000, 2_000));
+            older.ledger = Some(ledger_write_at(2_000));
+
+            assert!(!touch_with(db, &older).await.unwrap(), "{}", backend.name);
+            assert_eq!(
+                stamps_of(db, ROLLUP_GROUP_KEY).await,
+                stamps(3_000, 3_000, 3_000)
+            );
+            assert_eq!(count_intervals(db).await, 0);
+
+            assert!(
+                touch_with(db, &touch_at(stamps(3_000, 2_500, 3_000)))
+                    .await
+                    .unwrap()
+            );
+            assert_eq!(
+                stamps_of(db, ROLLUP_GROUP_KEY).await,
+                stamps(3_000, 2_500, 3_000)
+            );
+            backend.done().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn a_touch_changes_no_other_column_and_no_group_row() {
+        let db = db().await;
+        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_at(G, 1_000), None).await.unwrap();
+        let mut expected = get_with(&db, "alert-1", ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .unwrap();
+        expected.last_outcome_at = Some(2_000);
+        expected.level_at = Some(2_000);
+        expected.last_seen = Some(2_000);
+
+        touch_with(&db, &touch_at(stamps(2_000, 2_000, 2_000)))
+            .await
+            .unwrap();
+
+        let rollup = get_with(&db, "alert-1", ROLLUP_GROUP_KEY).await.unwrap();
+        assert_eq!(rollup, Some(expected));
+        assert_eq!(stamps_of(&db, G).await, stamps(1_000, 1_000, 1_000));
+    }
+
+    #[tokio::test]
+    async fn a_touch_whose_ledger_write_fails_leaves_the_stamps_alone() {
+        let db = db_without_the_ledger_table().await;
+        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        let mut touch = touch_at(stamps(2_000, 2_000, 2_000));
+        touch.ledger = Some(ledger_write_at(2_000));
+
+        touch_with(&db, &touch).await.unwrap_err();
+
+        assert_eq!(
+            stamps_of(&db, ROLLUP_GROUP_KEY).await,
+            stamps(1_000, 1_000, 1_000)
+        );
+    }
+
+    /// PostgreSQL (when `ZO_META_POSTGRES_DSN` is set) and SQLite, with every table a touch uses.
+    async fn touch_backends() -> Vec<Backend> {
+        use sea_orm::{ConnectionTrait, Schema};
+
+        let mut out = Vec::new();
+        if let Some((admin, schema, mut pools)) = postgres_pools(1).await {
+            let conn = pools.remove(0);
+            let backend = conn.get_database_backend();
+            let tables = Schema::new(backend);
+            for stmt in [
+                tables.create_table_from_entity(alert_states::Entity),
+                tables.create_table_from_entity(crate::table::entity::folders::Entity),
+                tables.create_table_from_entity(alerts::Entity),
+                tables.create_table_from_entity(crate::table::entity::alert_eval_intervals::Entity),
+            ] {
+                conn.execute(backend.build(&stmt)).await.unwrap();
+            }
+            out.push(Backend {
+                name: "postgres",
+                conn,
+                pg: Some((admin, schema)),
+            });
+        }
+        out.push(Backend {
+            name: "sqlite",
+            conn: db().await,
+            pg: None,
+        });
+        out
+    }
+
+    /// A rollup and four group rows at 1_000, except `AHEAD`, which a later evaluation wrote.
+    async fn seed_group_rows(db: &sea_orm::DatabaseConnection) {
+        for (key, at) in [
+            (ROLLUP_GROUP_KEY, 1_000),
+            (SEEN, 1_000),
+            (G, 1_000),
+            (GONE, 1_000),
+            (AHEAD, 5_000),
+        ] {
+            persist_with(db, &update_at(key, at), None).await.unwrap();
+        }
+    }
+
+    /// `G` changed and travels as a full row; every other group but `GONE` was seen at 2_000.
+    fn touched_plan(rollup: Option<RunStamps>) -> TouchedGroupPlan {
+        let mut changed = update_at(G, 2_000);
+        changed.state.as_mut().unwrap().level_at = Some(1_999);
+        TouchedGroupPlan {
+            alert_id: "alert-1".to_string(),
+            plan: GroupPlan {
+                updates: vec![changed],
+                ..Default::default()
+            },
+            touch: GroupTouch {
+                at: 2_000,
+                seen_since: 1_000,
+                unobserved: vec![GONE.to_string()],
+                rollup,
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn a_touched_plan_for_an_alert_that_is_missing_or_opted_out_writes_nothing() {
+        for opted_out_alert in [false, true] {
+            let db = db().await;
+            if opted_out_alert {
+                insert_alert(&db, "alert-1", false).await;
+            }
+            seed_group_rows(&db).await;
+
+            let write = persist_touched_group_plan_with(&db, &touched_plan(None))
+                .await
+                .unwrap();
+
+            assert!(!write.written);
+            assert_eq!(stamps_of(&db, SEEN).await, stamps(1_000, 1_000, 1_000));
+            assert_eq!(stamps_of(&db, G).await, stamps(1_000, 1_000, 1_000));
+        }
+    }
+
+    #[tokio::test]
+    async fn a_touched_plan_stamps_every_group_row_it_does_not_name_as_unobserved() {
+        for backend in touch_backends().await {
+            let db = &backend.conn;
+            insert_alert(db, "alert-1", true).await;
+            seed_group_rows(db).await;
+
+            let write = persist_touched_group_plan_with(db, &touched_plan(None))
+                .await
+                .unwrap();
+
+            assert!(write.written, "{}", backend.name);
+            assert_eq!(stamps_of(db, SEEN).await, stamps(2_000, 2_000, 2_000));
+            assert_eq!(stamps_of(db, GONE).await, stamps(1_000, 1_000, 1_000));
+            assert_eq!(
+                stamps_of(db, AHEAD).await,
+                stamps(5_000, 5_000, 5_000),
+                "a row a later evaluation already wrote must not move back"
+            );
+            backend.done().await;
+        }
+    }
+
+    /// A row older than `seen_since` is one the evaluating region dropped; keeping it fresh
+    /// would hide it from the reaper after a region switch.
+    #[tokio::test]
+    async fn a_touched_plan_leaves_a_row_last_seen_before_its_floor_alone() {
+        let db = db().await;
+        insert_alert(&db, "alert-1", true).await;
+        seed_group_rows(&db).await;
+        persist_with(&db, &update_at("host=stranded", 400), None)
+            .await
+            .unwrap();
+
+        persist_touched_group_plan_with(&db, &touched_plan(None))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            get_with(&db, "alert-1", "host=stranded")
+                .await
+                .unwrap()
+                .unwrap()
+                .last_seen,
+            Some(400)
+        );
+    }
+
+    /// The reap guard matches on `level_at`, so a stamp must never move a row the plan reaps.
+    #[tokio::test]
+    async fn a_touched_plan_still_reaps_a_row_it_does_not_name_as_unobserved() {
+        let db = db().await;
+        insert_alert(&db, "alert-1", true).await;
+        seed_group_rows(&db).await;
+        let mut touched = touched_plan(None);
+        touched.plan.reaped = vec![ReapedGroup {
+            group_key: SEEN.to_string(),
+            prev_level_at: Some(1_000),
+        }];
+
+        let write = persist_touched_group_plan_with(&db, &touched)
+            .await
+            .unwrap();
+
+        assert_eq!(write.reaped.len(), 1);
+        assert_eq!(get_with(&db, "alert-1", SEEN).await.unwrap(), None);
+    }
+
+    /// A replica closes by episode id alone, so a close whose `level_at` guard is stale lands.
+    #[tokio::test]
+    async fn a_touched_plan_is_applied_as_a_replica_applies_a_full_plan() {
+        let db = group_db_with_episode("ep-1").await;
+        let touched = TouchedGroupPlan {
+            alert_id: "alert-1".to_string(),
+            plan: close_plan(close_of("ep-1", 42)),
+            touch: GroupTouch {
+                at: 2_000,
+                seen_since: 1_000,
+                unobserved: vec![],
+                rollup: None,
+            },
+        };
+
+        let write = persist_touched_group_plan_with(&db, &touched)
+            .await
+            .unwrap();
+
+        assert_eq!(write.closed.len(), 1);
+        assert_eq!(row(&db).await.episode_id, None);
+    }
+
+    #[tokio::test]
+    async fn a_row_in_the_touched_plan_ends_with_the_plans_values() {
+        let db = db().await;
+        insert_alert(&db, "alert-1", true).await;
+        seed_group_rows(&db).await;
+
+        persist_touched_group_plan_with(&db, &touched_plan(None))
+            .await
+            .unwrap();
+
+        assert_eq!(stamps_of(&db, G).await, stamps(2_000, 1_999, 2_000));
+    }
+
+    #[tokio::test]
+    async fn a_touched_plan_stamps_the_rollup_only_when_it_carries_rollup_stamps() {
+        let db = db().await;
+        insert_alert(&db, "alert-1", true).await;
+        seed_group_rows(&db).await;
+
+        persist_touched_group_plan_with(&db, &touched_plan(None))
+            .await
+            .unwrap();
+        assert_eq!(
+            stamps_of(&db, ROLLUP_GROUP_KEY).await,
+            stamps(1_000, 1_000, 1_000)
+        );
+
+        persist_touched_group_plan_with(&db, &touched_plan(Some(stamps(2_000, 1_000, 2_000))))
+            .await
+            .unwrap();
+        assert_eq!(
+            stamps_of(&db, ROLLUP_GROUP_KEY).await,
+            stamps(2_000, 1_000, 2_000)
+        );
+    }
+
+    /// The transition table is missing, so the plan's own row fails after the stamps ran.
+    #[tokio::test]
+    async fn a_touched_plan_that_fails_leaves_the_stamps_alone() {
+        use sea_orm::{ConnectionTrait, Schema};
+
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(alert_states::Entity),
+            schema.create_table_from_entity(crate::table::entity::folders::Entity),
+            schema.create_table_from_entity(alerts::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        insert_alert(&db, "alert-1", true).await;
+        let mut seen = update_at(SEEN, 1_000);
+        seen.transition = None;
+        persist_with(&db, &seen, None).await.unwrap();
+
+        persist_touched_group_plan_with(&db, &touched_plan(None))
+            .await
+            .unwrap_err();
+
+        assert_eq!(stamps_of(&db, SEEN).await, stamps(1_000, 1_000, 1_000));
     }
 }
