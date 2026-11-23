@@ -16253,6 +16253,7 @@
       "userId": "ID người dùng",
       "orgId": "ID tổ chức",
       "orgName": "Tổ chức",
+      "orgOption": "{name} ({id})",
       "role": "Vai trò",
       "noOrganizations": "Không thuộc tổ chức nào",
       "ssoOnlyHint": "Áp dụng khi email này đăng nhập qua SSO"

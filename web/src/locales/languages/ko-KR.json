@@ -16253,6 +16253,7 @@
       "userId": "사용자 ID",
       "orgId": "조직 ID",
       "orgName": "조직",
+      "orgOption": "{name} ({id})",
       "role": "역할",
       "noOrganizations": "어떤 조직의 구성원도 아닙니다",
       "ssoOnlyHint": "이 이메일이 SSO로 로그인할 때 적용됩니다"

@@ -16248,6 +16248,7 @@
       "userId": "使用者 ID",
       "orgId": "組織 ID",
       "orgName": "組織",
+      "orgOption": "{name} ({id})",
       "role": "角色",
       "noOrganizations": "不屬於任何組織",
       "ssoOnlyHint": "在此電子郵件透過 SSO 登入時生效"

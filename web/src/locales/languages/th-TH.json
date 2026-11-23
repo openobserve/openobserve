@@ -16251,6 +16251,7 @@
       "userId": "ID ผู้ใช้",
       "orgId": "ID องค์กร",
       "orgName": "องค์กร",
+      "orgOption": "{name} ({id})",
       "role": "บทบาท",
       "noOrganizations": "ไม่ได้เป็นสมาชิกขององค์กรใด",
       "ssoOnlyHint": "มีผลเมื่ออีเมลนี้ลงชื่อเข้าใช้ผ่าน SSO"

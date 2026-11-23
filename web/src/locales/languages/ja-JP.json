@@ -16253,6 +16253,7 @@
       "userId": "ユーザー ID",
       "orgId": "組織 ID",
       "orgName": "組織",
+      "orgOption": "{name} ({id})",
       "role": "ロール",
       "noOrganizations": "どの組織にも所属していません",
       "ssoOnlyHint": "このメールアドレスが SSO でサインインするときに適用されます"

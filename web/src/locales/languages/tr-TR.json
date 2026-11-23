@@ -16253,6 +16253,7 @@
       "userId": "Kullanıcı kimliği",
       "orgId": "Kuruluş kimliği",
       "orgName": "Kuruluş",
+      "orgOption": "{name} ({id})",
       "role": "Rol",
       "noOrganizations": "Hiçbir kuruluşun üyesi değil",
       "ssoOnlyHint": "Bu e-posta SSO ile oturum açtığında geçerlidir"

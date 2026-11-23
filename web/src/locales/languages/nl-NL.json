@@ -16253,6 +16253,7 @@
       "userId": "Gebruikers-ID",
       "orgId": "Organisatie-ID",
       "orgName": "Organisatie",
+      "orgOption": "{name} ({id})",
       "role": "Rol",
       "noOrganizations": "Geen lid van een organisatie",
       "ssoOnlyHint": "Geldt wanneer dit e-mailadres zich via SSO aanmeldt"
