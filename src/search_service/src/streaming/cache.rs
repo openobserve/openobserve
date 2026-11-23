@@ -585,8 +585,7 @@ pub async fn write_partial_results_to_cache(
     }
 }
 
-/// Usage timing for a cache hit: `took_ms` in seconds, and 0 queue wait because the
-/// cached `wait_in_queue` belongs to the query that filled the cache.
+/// Cache hit: seconds, and 0 queue wait since the cached wait belongs to the filling query.
 fn cache_hit_usage_timing(took_ms: usize) -> (f64, Option<usize>) {
     (took_ms as f64 / 1000.0, Some(0))
 }
