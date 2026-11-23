@@ -1,11 +1,11 @@
-const { expect } = require('@playwright/test');
+const { expect, request } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../../playwright-tests/utils/cloud-auth.js');
 
 // Root reads search-time protected streams unredacted, so self-hosted runs verify as this user.
 const READER_EMAIL = 'sdr_e2e_reader@example.com';
 const READER_PASSWORD = 'SdrE2eReaderPass#123';
-let readerHeaders = null;
+let readerApi = null;
 
 /**
  * SDR (Sensitive Data Redaction) verification.
@@ -54,15 +54,15 @@ export class SDRVerificationPage {
   }
 
   /**
-   * Headers of a non-root admin without the `logs_unredacted` grant, created once per worker.
-   * A cloud run already searches as a regular user, so it keeps its own credentials.
+   * A non-root admin without the grant, on its own context: the server prefers the page's root
+   * session cookie over an Authorization header. A cloud run already searches as a regular user.
    */
-  async readerHeaders() {
+  async readerApi() {
     if (isCloudEnvironment()) {
-      return getAuthHeaders();
+      return { api: this.page.request, headers: getAuthHeaders() };
     }
-    if (readerHeaders) {
-      return readerHeaders;
+    if (readerApi) {
+      return readerApi;
     }
     const baseUrl = process.env['ZO_BASE_URL'];
     const orgName = getOrgIdentifier();
@@ -82,8 +82,9 @@ export class SDRVerificationPage {
       testLogger.info(`SDR reader create returned HTTP ${response.status()} — ${body.slice(0, 200)}`);
     }
     const token = Buffer.from(`${READER_EMAIL}:${READER_PASSWORD}`).toString('base64');
-    readerHeaders = { Authorization: `Basic ${token}`, 'Content-Type': 'application/json' };
-    return readerHeaders;
+    const headers = { Authorization: `Basic ${token}`, 'Content-Type': 'application/json' };
+    readerApi = { api: await request.newContext(), headers };
+    return readerApi;
   }
 
   /**
@@ -100,7 +101,7 @@ export class SDRVerificationPage {
   async fetchRecordsByMarker(streamName, marker, minCount = 1, streamType = 'logs') {
     expect(marker, 'SDR verification requires an ingest marker — pass the value returned by ingestMultipleFields/ingestSingleLog').toBeTruthy();
 
-    const headers = await this.readerHeaders();
+    const { api, headers } = await this.readerApi();
     const baseUrl = process.env['ZO_BASE_URL'];
     const orgName = getOrgIdentifier();
     const sql = `SELECT * FROM "${streamName}" WHERE sdr_test_id = '${marker}' ORDER BY _timestamp DESC`;
@@ -117,7 +118,7 @@ export class SDRVerificationPage {
       };
 
       try {
-        const response = await this.page.request.post(
+        const response = await api.post(
           `${baseUrl}/api/${orgName}/_search?type=${streamType}`,
           { headers, data: searchPayload, timeout: 15000 }
         );
