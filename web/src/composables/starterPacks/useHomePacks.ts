@@ -68,7 +68,7 @@ function useHomePack(org: string, pack: StarterPack, active: () => boolean) {
     if (flow.interrupted.value) return "interrupted";
     if (flow.record.value && !flow.running.value) return "installed";
     // A role refused the pack's reads is often refused the match's too, and Retry cannot fix that.
-    if (flow.forbidden.value) return "forbidden";
+    if (flow.forbidden.value || matcher.forbidden.value) return "forbidden";
     if (flow.loadFailed.value || matcher.state.value === "error") return "error";
     if (matcher.state.value === "checking") return "loading";
     if (matcher.state.value === "matched") return "offer";

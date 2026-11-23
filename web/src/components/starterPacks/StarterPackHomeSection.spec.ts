@@ -70,6 +70,7 @@ const matcherDouble = (state = "matched", streams = ["k8s_events"]) => {
   const check = vi.fn();
   return {
     state: ref(state),
+    forbidden: ref(false),
     clusters: ref<string[]>([]),
     streams: ref(streams),
     streamTypes: ref<Record<string, string>>({}),

@@ -116,6 +116,7 @@ export function useStarterPackMatcher(
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
   const library = STARTER_PACKS_ENABLED ? useAlertLibrary() : null;
   const state = ref<PackMatchState>("checking");
+  const forbidden = ref(false);
   const clusters = ref<string[]>([]);
   const streams = ref<string[]>([]);
   const streamTypes = ref<Record<string, string>>({});
@@ -247,11 +248,15 @@ export function useStarterPackMatcher(
       clusters.value = seen;
       streams.value = found;
       streamTypes.value = types;
+      forbidden.value = false;
       state.value = next;
-    } catch {
+    } catch (error: any) {
       if (run !== generation || stopped) return;
       // A failed re-check of a pack already matched keeps the good result other surfaces show.
-      if (state.value !== "matched") state.value = "error";
+      if (state.value !== "matched") {
+        forbidden.value = error?.response?.status === 403;
+        state.value = "error";
+      }
     }
     schedule();
   }
@@ -280,5 +285,16 @@ export function useStarterPackMatcher(
 
   onScopeDispose(stop);
 
-  return { state, clusters, streams, streamTypes, waitedLong, check, checkShared, retry, stop };
+  return {
+    state,
+    forbidden,
+    clusters,
+    streams,
+    streamTypes,
+    waitedLong,
+    check,
+    checkShared,
+    retry,
+    stop,
+  };
 }
