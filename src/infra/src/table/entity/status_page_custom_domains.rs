@@ -20,7 +20,8 @@ pub struct Model {
     /// 0 pending, 1 verified, 2 failed.
     pub verification_state: i32,
     /// 0 record-missing, 1 value-mismatch, 2 dns-resolution-failed, 3 held by another org,
-    /// 4 proof lost. Set only when `verification_state = 2`.
+    /// 4 proof lost, 5 points at the app host, 6 no CNAME, 7 CNAME elsewhere. On a holder, only
+    /// the reason of the negative answer that started its clock.
     pub verification_failure_reason: Option<i32>,
     pub verified_at: Option<i64>,
     /// Set on release instead of a row delete; a row is released if this or `release_seal` is set.
@@ -34,7 +35,8 @@ pub struct Model {
     pub release_seal: Option<i64>,
     /// 1 released by the org, 2 expired without a proof, 3 page deleted.
     pub release_reason: Option<i32>,
-    /// First negative answer for a holder; cleared when the proof is found again.
+    /// First negative answer for a holder, the start of its 72 hours; cleared when the proof is
+    /// found again.
     pub proof_failed_since: Option<i64>,
     /// When a non-holder claim is released; NULL for a holder.
     pub expires_at: Option<i64>,

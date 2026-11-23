@@ -594,9 +594,10 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         #[cfg(feature = "enterprise")]
         "import-status-page-domain-cert" => {
             if !o2_enterprise::enterprise::status_pages::cert_store::enabled() {
-                return Err(anyhow::anyhow!(
-                    "built-in TLS is off: set ZO_STATUS_PAGE_DOMAIN_TARGET, and run no super cluster"
-                ));
+                return Err(
+                    o2_enterprise::enterprise::status_pages::cert_import::ImportError::Disabled
+                        .into(),
+                );
             }
             infra::init().await?;
             import_status_page_domain_cert(&command).await?;

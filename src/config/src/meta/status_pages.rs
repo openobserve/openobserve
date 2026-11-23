@@ -466,19 +466,19 @@ pub struct CreateDomainRequest {
     pub domain: String,
 }
 
-/// The DNS TXT record the admin needs to create — `txt_name`/`txt_value`
-/// spelled out because the raw `domain` + `verification_token` pairing isn't
-/// self-explanatory to a non-engineer reading it off an API response.
+/// The one DNS record the admin must create. Proxy mode: `txt_name` and `txt_value`, a TXT record.
+/// Built-in TLS: `cname_target`, the target of a CNAME at the domain. The other fields are null.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct CreateDomainResponse {
     pub id: String,
     pub domain: String,
-    pub txt_name: String,
-    pub txt_value: String,
+    pub txt_name: Option<String>,
+    pub txt_value: Option<String>,
+    pub cname_target: Option<String>,
 }
 
-/// What a custom domain is shown as. This release produces `Pending`, `Verified`, `NotServing`
-/// and `Expired`; the others belong to certificate serving.
+/// What a custom domain is shown as. Proxy mode and off produce `Pending`, `Verified`,
+/// `NotServing` and `Expired`; `WaitingForDns` and `SettingUp` come with built-in TLS.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DomainServingState {
@@ -520,15 +520,15 @@ pub struct DomainAdminView {
     /// 0 pending, 1 verified, 2 failed.
     pub verification_state: i32,
     /// 0 record-missing, 1 value-mismatch, 2 dns-resolution-failed, 3 held by another
-    /// organization, 4 proof lost.
+    /// organization, 4 proof lost, 5 points at the app host, 6 no CNAME, 7 CNAME elsewhere.
     pub verification_failure_reason: Option<i32>,
     pub verified_at: Option<i64>,
     pub last_checked_at: Option<i64>,
     pub created_at: i64,
-    /// The ownership TXT record. It is not a secret (proving ownership means publishing it in
-    /// public DNS) and it must stay in DNS, so it is shown in every state.
-    pub txt_name: String,
-    pub verification_token: String,
+    /// Proxy mode only: the TXT record `<txt_name> TXT <verification_token>` that proves
+    /// ownership. Public by design, and it must stay in DNS. Null with built-in TLS and while off.
+    pub txt_name: Option<String>,
+    pub verification_token: Option<String>,
     /// The claim holds the hostname; only a holder is routed.
     pub is_holder: bool,
     pub serving_state: DomainServingState,
@@ -540,7 +540,9 @@ pub struct DomainAdminView {
     /// When a claim that holds nothing is released.
     pub expires_at: Option<i64>,
     pub released_at: Option<i64>,
+    /// Built-in TLS only: the target of the claim's CNAME, `<label>.<domain target>`.
     pub cname_target: Option<String>,
+    /// Built-in TLS only: the host of `ZO_WEB_URL`, which the CNAME must not name.
     pub app_host: Option<String>,
     pub certificate_expires_at: Option<i64>,
     pub next_action_at: Option<i64>,

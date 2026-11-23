@@ -48,12 +48,20 @@ pub const VERIFICATION_PENDING: i32 = 0;
 pub const VERIFIED: i32 = 1;
 pub const VERIFICATION_FAILED: i32 = 2;
 
-/// `verification_failure_reason` of a failed claim.
+/// `verification_failure_reason` of a failed claim; 2 to 4 belong to both proofs.
+/// The TXT proof: the record is not in DNS.
 pub const FAILURE_RECORD_MISSING: i32 = 0;
+/// The TXT proof: the name has records, none of them the claim's token.
 pub const FAILURE_VALUE_MISMATCH: i32 = 1;
 pub const FAILURE_DNS_LOOKUP: i32 = 2;
 pub const FAILURE_HELD_BY_ANOTHER_ORG: i32 = 3;
 pub const FAILURE_PROOF_LOST: i32 = 4;
+/// The CNAME chain names the app host.
+pub const FAILURE_POINTS_AT_APP_HOST: i32 = 5;
+/// The name has no CNAME.
+pub const FAILURE_NO_CNAME: i32 = 6;
+/// The CNAME chain names something that is not the claim's label.
+pub const FAILURE_CNAME_ELSEWHERE: i32 = 7;
 
 /// `release_reason` of a released claim.
 pub const RELEASED_BY_ORG: i32 = 1;
@@ -65,6 +73,12 @@ const MICROS_PER_HOUR: i64 = 3_600 * 1_000_000;
 pub const CLAIM_TTL_MICROS: i64 = 7 * 24 * MICROS_PER_HOUR;
 /// A holder's proof is checked again this often.
 pub const HOLDER_RECHECK_MICROS: i64 = 6 * MICROS_PER_HOUR;
+/// A holder lapses at a negative answer this long after its first one.
+pub const PROOF_LAPSE_AFTER_MICROS: i64 = 72 * MICROS_PER_HOUR;
+/// A holder whose own proof was found more recently than this is not displaced.
+pub const DISPLACEMENT_HOLD_DOWN_MICROS: i64 = MICROS_PER_HOUR;
+/// A claim that lost its hostname cannot displace a holder until this long after its proof failed.
+pub const REDISPLACEMENT_HOLD_MICROS: i64 = 24 * MICROS_PER_HOUR;
 /// How long an expired claim stays in its page's list.
 pub const EXPIRED_LISTED_MICROS: i64 = 30 * 24 * MICROS_PER_HOUR;
 /// A repair pass completes at most this many claims; the next tick takes the rest.
@@ -80,6 +94,60 @@ pub enum ClaimInsert {
     HostnameTaken,
     CapReached,
     PageGone,
+}
+
+/// The ownership proof a failure reason belongs to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FailureProof {
+    Txt,
+    Cname,
+}
+
+impl FailureProof {
+    /// `None` for the reasons both proofs share, and for any other number.
+    pub fn of(reason: i32) -> Option<Self> {
+        match reason {
+            FAILURE_RECORD_MISSING | FAILURE_VALUE_MISMATCH => Some(Self::Txt),
+            FAILURE_POINTS_AT_APP_HOST | FAILURE_NO_CNAME | FAILURE_CNAME_ELSEWHERE => {
+                Some(Self::Cname)
+            }
+            _ => None,
+        }
+    }
+
+    fn reasons(self) -> &'static [i32] {
+        match self {
+            Self::Txt => &[FAILURE_RECORD_MISSING, FAILURE_VALUE_MISMATCH],
+            Self::Cname => &[
+                FAILURE_POINTS_AT_APP_HOST,
+                FAILURE_NO_CNAME,
+                FAILURE_CNAME_ELSEWHERE,
+            ],
+        }
+    }
+
+    fn other(self) -> Self {
+        match self {
+            Self::Txt => Self::Cname,
+            Self::Cname => Self::Txt,
+        }
+    }
+}
+
+/// What a holder's negative answer did to its row.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HolderProofFailure {
+    /// The 72 hours were up and the holder lost its hostname.
+    Lapsed,
+    /// The clock started, or started again because it belonged to the other proof.
+    Started,
+    /// The clock was already running.
+    Running,
+    /// The row is released or holds nothing; nothing was written.
+    NotHolder,
+    /// Another check kept winning the race: the row still holds its hostname, so this check writes
+    /// nothing and the next tick decides again.
+    Contended,
 }
 
 /// What deleting a page removed: whether the page row existed, and the hostnames of the holders
@@ -1274,8 +1342,9 @@ pub async fn get_domain_by_id<C: ConnectionTrait>(
         .await?)
 }
 
-/// Unreleased claims due a check: non-holders on every tick, holders every 6 hours. A claim the
-/// repair has not completed is a non-holder, so it is due too. Released claims are never due.
+/// Unreleased claims due a check: non-holders and holders with a running clock on every tick,
+/// other holders every 6 hours. A claim the repair has not completed is a non-holder, so it is due
+/// too. Released claims are never due.
 pub async fn list_domains_due_for_check<C: ConnectionTrait>(
     conn: &C,
     now: i64,
@@ -1294,9 +1363,15 @@ pub async fn list_domains_due_for_check<C: ConnectionTrait>(
                 .add(checked_before(now)),
         )
         .add(
-            Condition::all()
-                .add(Column::HeldDomain.is_not_null())
-                .add(checked_before(now - HOLDER_RECHECK_MICROS)),
+            Condition::all().add(Column::HeldDomain.is_not_null()).add(
+                Condition::any()
+                    .add(
+                        Condition::all()
+                            .add(Column::ProofFailedSince.is_not_null())
+                            .add(checked_before(now)),
+                    )
+                    .add(checked_before(now - HOLDER_RECHECK_MICROS)),
+            ),
         );
     Ok(status_page_custom_domains::Entity::find()
         .filter(unreleased())
@@ -1346,21 +1421,12 @@ pub async fn displace_holder<C: ConnectionTrait + TransactionTrait>(
 ) -> Result<bool, errors::Error> {
     use status_page_custom_domains::Column;
     let txn = conn.begin().await?;
-    let lapse = live_claim_update(holder_id)
-        .filter(Column::HeldDomain.eq(host))
-        .filter(verified_at_is(holder_verified_at))
-        .set(status_page_custom_domains::ActiveModel {
-            verification_state: Set(VERIFICATION_FAILED),
-            verification_failure_reason: Set(Some(FAILURE_PROOF_LOST)),
-            held_domain: Set(None),
-            expires_at: Set(Some(now + CLAIM_TTL_MICROS)),
-            updated_at: Set(now),
-            ..Default::default()
-        })
-        .col_expr(
-            Column::ProofFailedSince,
-            first_set(Column::ProofFailedSince, now),
-        );
+    let lapse = lapsed_holder(
+        live_claim_update(holder_id)
+            .filter(Column::HeldDomain.eq(host))
+            .filter(verified_at_is(holder_verified_at)),
+        now,
+    );
     if !run_claim_update(&txn, lapse).await? {
         return Ok(false);
     }
@@ -1396,20 +1462,132 @@ pub async fn fail_domain<C: ConnectionTrait>(
     run_claim_update(conn, update).await
 }
 
-/// A holder's check got a negative answer: only the first failure time is kept, nothing lapses.
+/// A holder's check got a negative answer for the proof of `reason` (0, 1, 5, 6 or 7). Each
+/// outcome is one guarded statement, so two checks of one holder cannot both start the clock; a
+/// write that another check made invalid is decided again.
 pub async fn record_holder_proof_failure<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    reason: i32,
+    now: i64,
+    lapse_allowed: bool,
+) -> Result<HolderProofFailure, errors::Error> {
+    use status_page_custom_domains::Column;
+    for _ in 0..3 {
+        if let Some(outcome) = holder_failure_once(conn, id, reason, now, lapse_allowed).await? {
+            return Ok(outcome);
+        }
+    }
+    // Every guarded write missed: either the row is gone, or a concurrent check keeps changing it
+    // while it still holds the hostname. The two are not the same answer.
+    let still_holder = status_page_custom_domains::Entity::find_by_id(id)
+        .filter(unreleased())
+        .filter(Column::HeldDomain.is_not_null())
+        .count(conn)
+        .await?
+        > 0;
+    Ok(if still_holder {
+        HolderProofFailure::Contended
+    } else {
+        HolderProofFailure::NotHolder
+    })
+}
+
+/// `None` when the clock changed between the statements, so the transition is stale.
+async fn holder_failure_once<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    reason: i32,
+    now: i64,
+    lapse_allowed: bool,
+) -> Result<Option<HolderProofFailure>, errors::Error> {
+    use status_page_custom_domains::Column;
+    let proof = FailureProof::of(reason)
+        .ok_or_else(|| errors::Error::Message(format!("{reason} is not a proof failure reason")))?;
+    let holder = || live_claim_update(id).filter(Column::HeldDomain.is_not_null());
+    if lapse_allowed {
+        let lapse = lapsed_holder(
+            holder()
+                .filter(Column::VerificationFailureReason.is_in(proof.reasons().iter().copied()))
+                .filter(Column::ProofFailedSince.lte(now - PROOF_LAPSE_AFTER_MICROS)),
+            now,
+        )
+        .col_expr(Column::LastCheckedAt, Expr::value(now));
+        if run_claim_update(conn, lapse).await? {
+            return Ok(Some(HolderProofFailure::Lapsed));
+        }
+    }
+    let restart = holder()
+        .filter(
+            Condition::any()
+                .add(Column::ProofFailedSince.is_null())
+                .add(Column::VerificationFailureReason.is_null())
+                .add(
+                    Column::VerificationFailureReason
+                        .is_in(proof.other().reasons().iter().copied()),
+                ),
+        )
+        .set(status_page_custom_domains::ActiveModel {
+            proof_failed_since: Set(Some(now)),
+            verification_failure_reason: Set(Some(reason)),
+            last_checked_at: Set(Some(now)),
+            updated_at: Set(now),
+            ..Default::default()
+        });
+    if run_claim_update(conn, restart).await? {
+        return Ok(Some(HolderProofFailure::Started));
+    }
+    let mut keep_reasons: Vec<i32> = proof.reasons().to_vec();
+    keep_reasons.extend([
+        FAILURE_DNS_LOOKUP,
+        FAILURE_HELD_BY_ANOTHER_ORG,
+        FAILURE_PROOF_LOST,
+    ]);
+    let keep = holder()
+        .filter(Column::ProofFailedSince.is_not_null())
+        .filter(Column::VerificationFailureReason.is_in(keep_reasons))
+        .set(status_page_custom_domains::ActiveModel {
+            verification_failure_reason: Set(Some(reason)),
+            last_checked_at: Set(Some(now)),
+            updated_at: Set(now),
+            ..Default::default()
+        });
+    Ok(run_claim_update(conn, keep)
+        .await?
+        .then_some(HolderProofFailure::Running))
+}
+
+/// Clears the clock and the reason of every unreleased holder: custom domains are off.
+pub async fn clear_holder_proof_failures<C: ConnectionTrait>(
+    conn: &C,
+) -> Result<u64, errors::Error> {
+    use status_page_custom_domains::Column;
+    let update = status_page_custom_domains::Entity::update_many()
+        .filter(unreleased())
+        .filter(Column::HeldDomain.is_not_null())
+        .filter(
+            Condition::any()
+                .add(Column::ProofFailedSince.is_not_null())
+                .add(Column::VerificationFailureReason.is_not_null()),
+        )
+        .set(cleared_clock());
+    Ok(update.exec(conn).await?.rows_affected)
+}
+
+/// Clears one holder's clock and reason and moves its check time, so it leaves the head of the
+/// next batch: its org is not served.
+pub async fn clear_holder_proof_failure<C: ConnectionTrait>(
     conn: &C,
     id: &str,
     now: i64,
 ) -> Result<bool, errors::Error> {
-    use status_page_custom_domains::Column;
     let update = live_claim_update(id)
-        .filter(Column::HeldDomain.is_not_null())
-        .set(checked_at(now))
-        .col_expr(
-            Column::ProofFailedSince,
-            first_set(Column::ProofFailedSince, now),
-        );
+        .filter(status_page_custom_domains::Column::HeldDomain.is_not_null())
+        .set(status_page_custom_domains::ActiveModel {
+            last_checked_at: Set(Some(now)),
+            updated_at: Set(now),
+            ..cleared_clock()
+        });
     run_claim_update(conn, update).await
 }
 
@@ -1640,6 +1818,36 @@ fn checked_at(now: i64) -> status_page_custom_domains::ActiveModel {
     status_page_custom_domains::ActiveModel {
         last_checked_at: Set(Some(now)),
         updated_at: Set(now),
+        ..Default::default()
+    }
+}
+
+/// What a holder's lapse writes: it fails with "proof lost", frees its hostname and starts its 7
+/// days. The first failure time stays.
+fn lapsed_holder(
+    update: UpdateMany<status_page_custom_domains::Entity>,
+    now: i64,
+) -> UpdateMany<status_page_custom_domains::Entity> {
+    use status_page_custom_domains::Column;
+    update
+        .set(status_page_custom_domains::ActiveModel {
+            verification_state: Set(VERIFICATION_FAILED),
+            verification_failure_reason: Set(Some(FAILURE_PROOF_LOST)),
+            held_domain: Set(None),
+            expires_at: Set(Some(now + CLAIM_TTL_MICROS)),
+            updated_at: Set(now),
+            ..Default::default()
+        })
+        .col_expr(
+            Column::ProofFailedSince,
+            first_set(Column::ProofFailedSince, now),
+        )
+}
+
+fn cleared_clock() -> status_page_custom_domains::ActiveModel {
+    status_page_custom_domains::ActiveModel {
+        proof_failed_since: Set(None),
+        verification_failure_reason: Set(None),
         ..Default::default()
     }
 }
@@ -2653,7 +2861,9 @@ mod tests {
         add(&db, "a", "org-a", "pa", HOST).await;
         add(&db, "b", "org-b", "pb", HOST).await;
         grant_domain(&db, "a", T0).await.unwrap();
-        record_holder_proof_failure(&db, "a", T0 + 5).await.unwrap();
+        record_holder_proof_failure(&db, "a", FAILURE_RECORD_MISSING, T0 + 5, true)
+            .await
+            .unwrap();
 
         let displaced = displace_holder(&db, "a", "b", HOST, Some(T0), T0 + 9).await;
         assert!(displaced.unwrap());
@@ -2782,7 +2992,7 @@ mod tests {
         let writers = [
             grant_domain(&db, "gone", T0 + 2).await,
             fail_domain(&db, "gone", FAILURE_VALUE_MISMATCH, T0 + 2).await,
-            record_holder_proof_failure(&db, "gone", T0 + 2).await,
+            clear_holder_proof_failure(&db, "gone", T0 + 2).await,
             record_resolver_error(&db, "gone", T0 + 2).await,
             extend_claim_expiry(&db, "gone", T0 + 2).await,
             displace_holder(&db, "gone", "claimant", HOST, Some(T0), T0 + 2).await,
@@ -2793,6 +3003,14 @@ mod tests {
             writers.iter().all(|w| matches!(w, Ok(false))),
             "{writers:?}"
         );
+        assert_eq!(row(&db, "gone").await, before);
+        assert_eq!(
+            record_holder_proof_failure(&db, "gone", FAILURE_RECORD_MISSING, T0 + 2, true)
+                .await
+                .unwrap(),
+            HolderProofFailure::NotHolder
+        );
+        clear_holder_proof_failures(&db).await.unwrap();
         assert_eq!(row(&db, "gone").await, before);
         assert_eq!(
             row(&db, "claimant").await.verification_state,
@@ -3257,31 +3475,371 @@ mod tests {
         );
     }
 
+    /// A holder of `HOST` with a running clock of `reason`, started at `since`.
+    async fn holder_with_clock(db: &DatabaseConnection, reason: Option<i32>, since: Option<i64>) {
+        add(db, "a", "org-a", "pa", HOST).await;
+        grant_domain(db, "a", T0).await.unwrap();
+        let update = live_claim_update("a").set(claims::ActiveModel {
+            proof_failed_since: Set(since),
+            verification_failure_reason: Set(reason),
+            ..Default::default()
+        });
+        update.exec(db).await.unwrap();
+    }
+
+    async fn failure(
+        db: &DatabaseConnection,
+        reason: i32,
+        now: i64,
+        allowed: bool,
+    ) -> HolderProofFailure {
+        record_holder_proof_failure(db, "a", reason, now, allowed)
+            .await
+            .unwrap()
+    }
+
     #[tokio::test]
-    async fn a_holders_negative_answer_records_the_first_failure_once_and_lapses_nothing() {
+    async fn the_first_negative_answer_starts_the_clock_and_the_next_keeps_it() {
+        for (reason, next) in [
+            (FAILURE_RECORD_MISSING, FAILURE_VALUE_MISMATCH),
+            (FAILURE_NO_CNAME, FAILURE_CNAME_ELSEWHERE),
+        ] {
+            let db = claims_db().await;
+            add(&db, "a", "org-a", "pa", HOST).await;
+            grant_domain(&db, "a", T0).await.unwrap();
+
+            assert_eq!(
+                failure(&db, reason, T0 + 10, true).await,
+                HolderProofFailure::Started
+            );
+            assert_eq!(
+                failure(&db, next, T0 + 20, true).await,
+                HolderProofFailure::Running
+            );
+
+            let holder = row(&db, "a").await;
+            assert_eq!(holder.proof_failed_since, Some(T0 + 10));
+            assert_eq!(holder.verification_failure_reason, Some(next));
+            assert_eq!(holder.last_checked_at, Some(T0 + 20));
+            assert_eq!(
+                (holder.verification_state, holder.held_domain.as_deref()),
+                (VERIFIED, Some(HOST))
+            );
+            assert!(grant_domain(&db, "a", T0 + 30).await.unwrap());
+            let granted = row(&db, "a").await;
+            assert_eq!(
+                (
+                    granted.proof_failed_since,
+                    granted.verification_failure_reason
+                ),
+                (None, None),
+                "the proof is back"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn the_clock_lapses_the_holder_at_72_hours_and_not_at_71() {
+        for (reason, other) in [
+            (FAILURE_RECORD_MISSING, FAILURE_VALUE_MISMATCH),
+            (FAILURE_NO_CNAME, FAILURE_POINTS_AT_APP_HOST),
+        ] {
+            let db = claims_db().await;
+            add(&db, "a", "org-a", "pa", HOST).await;
+            grant_domain(&db, "a", T0).await.unwrap();
+            failure(&db, reason, T0 + 10, true).await;
+            let hour = PROOF_LAPSE_AFTER_MICROS / 72;
+
+            let at_71 = T0 + 10 + 71 * hour;
+            assert_eq!(
+                failure(&db, other, at_71, true).await,
+                HolderProofFailure::Running
+            );
+            let at_72 = T0 + 10 + PROOF_LAPSE_AFTER_MICROS;
+            assert_eq!(
+                failure(&db, reason, at_72, true).await,
+                HolderProofFailure::Lapsed
+            );
+
+            let lapsed = row(&db, "a").await;
+            assert_eq!(lapsed.held_domain, None);
+            assert_eq!(lapsed.verification_state, VERIFICATION_FAILED);
+            assert_eq!(lapsed.verification_failure_reason, Some(FAILURE_PROOF_LOST));
+            assert_eq!(lapsed.expires_at, Some(at_72 + CLAIM_TTL_MICROS));
+            assert_eq!(
+                lapsed.proof_failed_since,
+                Some(T0 + 10),
+                "the clock is kept"
+            );
+            assert_eq!(holder_of(&db, HOST).await, None);
+        }
+    }
+
+    #[tokio::test]
+    async fn an_old_clock_with_lapse_not_allowed_is_running_and_lapses_nothing() {
+        let db = claims_db().await;
+        holder_with_clock(&db, Some(FAILURE_NO_CNAME), Some(T0)).await;
+        let late = T0 + 10 * PROOF_LAPSE_AFTER_MICROS;
+
+        assert_eq!(
+            failure(&db, FAILURE_NO_CNAME, late, false).await,
+            HolderProofFailure::Running
+        );
+
+        let holder = row(&db, "a").await;
+        assert_eq!(holder.held_domain.as_deref(), Some(HOST));
+        assert_eq!(holder.proof_failed_since, Some(T0));
+        assert_eq!(holder.last_checked_at, Some(late));
+    }
+
+    #[tokio::test]
+    async fn a_clock_of_the_other_proof_or_of_no_proof_starts_again_and_never_lapses() {
+        let old = T0 - 30 * DAY;
+        let now = T0 + 10;
+        let cases = [
+            (Some(FAILURE_NO_CNAME), FAILURE_RECORD_MISSING),
+            (Some(FAILURE_CNAME_ELSEWHERE), FAILURE_VALUE_MISMATCH),
+            (Some(FAILURE_RECORD_MISSING), FAILURE_NO_CNAME),
+            (Some(FAILURE_VALUE_MISMATCH), FAILURE_POINTS_AT_APP_HOST),
+            (None, FAILURE_RECORD_MISSING),
+            (None, FAILURE_NO_CNAME),
+        ];
+        for (stored, reason) in cases {
+            let db = claims_db().await;
+            holder_with_clock(&db, stored, Some(old)).await;
+
+            assert_eq!(
+                failure(&db, reason, now, true).await,
+                HolderProofFailure::Started,
+                "{stored:?} then {reason}"
+            );
+
+            let holder = row(&db, "a").await;
+            assert_eq!(holder.proof_failed_since, Some(now));
+            assert_eq!(holder.verification_failure_reason, Some(reason));
+            assert_eq!(holder.held_domain.as_deref(), Some(HOST));
+            assert_eq!(
+                failure(&db, reason, now + PROOF_LAPSE_AFTER_MICROS - 1, true).await,
+                HolderProofFailure::Running
+            );
+            assert_eq!(
+                failure(&db, reason, now + PROOF_LAPSE_AFTER_MICROS, true).await,
+                HolderProofFailure::Lapsed
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_clock_of_the_same_proof_is_never_restarted() {
+        let db = claims_db().await;
+        holder_with_clock(&db, Some(FAILURE_RECORD_MISSING), Some(T0)).await;
+
+        assert_eq!(
+            failure(&db, FAILURE_VALUE_MISMATCH, T0 + DAY, true).await,
+            HolderProofFailure::Running
+        );
+        assert_eq!(row(&db, "a").await.proof_failed_since, Some(T0));
+    }
+
+    #[tokio::test]
+    async fn a_released_row_and_a_non_holder_are_not_holders_and_nothing_is_written() {
+        let db = claims_db().await;
+        add(&db, "a", "org-a", "pa", HOST).await;
+        add(&db, "b", "org-b", "pb", HOST).await;
+        grant_domain(&db, "a", T0).await.unwrap();
+        let non_holder = row(&db, "b").await;
+
+        for reason in [FAILURE_RECORD_MISSING, FAILURE_NO_CNAME] {
+            let answer = record_holder_proof_failure(&db, "b", reason, T0 + 5, true).await;
+            assert_eq!(answer.unwrap(), HolderProofFailure::NotHolder);
+        }
+        assert_eq!(row(&db, "b").await, non_holder);
+        release_domain(&db, "org-a", "a", T0 + 6, RELEASED_BY_ORG)
+            .await
+            .unwrap();
+        let released = row(&db, "a").await;
+        assert_eq!(
+            failure(&db, FAILURE_RECORD_MISSING, T0 + 7, true).await,
+            HolderProofFailure::NotHolder
+        );
+        assert_eq!(row(&db, "a").await, released);
+    }
+
+    #[tokio::test]
+    async fn a_reason_that_is_not_a_proof_failure_is_an_error_and_writes_nothing() {
+        let db = claims_db().await;
+        holder_with_clock(&db, None, None).await;
+        let before = row(&db, "a").await;
+
+        for reason in [
+            FAILURE_DNS_LOOKUP,
+            FAILURE_HELD_BY_ANOTHER_ORG,
+            FAILURE_PROOF_LOST,
+            99,
+        ] {
+            let answer = record_holder_proof_failure(&db, "a", reason, T0 + 1, true).await;
+            assert!(answer.is_err(), "{reason}");
+        }
+        assert_eq!(row(&db, "a").await, before);
+    }
+
+    #[tokio::test]
+    async fn two_checks_of_one_healthy_holder_start_the_clock_once() {
         let db = claims_db().await;
         add(&db, "a", "org-a", "pa", HOST).await;
         grant_domain(&db, "a", T0).await.unwrap();
 
-        record_holder_proof_failure(&db, "a", T0 + 10)
-            .await
-            .unwrap();
-        record_holder_proof_failure(&db, "a", T0 + 20)
-            .await
-            .unwrap();
+        let (first, second) = tokio::join!(
+            record_holder_proof_failure(&db, "a", FAILURE_NO_CNAME, T0 + 5, true),
+            record_holder_proof_failure(&db, "a", FAILURE_NO_CNAME, T0 + 6, true),
+        );
 
-        let holder = row(&db, "a").await;
-        assert_eq!(holder.proof_failed_since, Some(T0 + 10));
-        assert_eq!(holder.last_checked_at, Some(T0 + 20));
-        assert_eq!(
-            (holder.verification_state, holder.held_domain.as_deref()),
-            (VERIFIED, Some(HOST))
-        );
+        let answers = [first.unwrap(), second.unwrap()];
+        let started = answers
+            .iter()
+            .filter(|a| **a == HolderProofFailure::Started)
+            .count();
+        assert_eq!(started, 1, "{answers:?}");
         assert!(
-            grant_domain(&db, "a", T0 + 30).await.unwrap(),
-            "the proof is found again"
+            answers.contains(&HolderProofFailure::Running),
+            "{answers:?}"
         );
-        assert_eq!(row(&db, "a").await.proof_failed_since, None);
+    }
+
+    #[test]
+    fn a_reason_belongs_to_one_proof_or_to_both() {
+        let proofs: Vec<_> = (0..=8).map(FailureProof::of).collect();
+        use FailureProof::{Cname, Txt};
+        assert_eq!(
+            proofs,
+            [
+                Some(Txt),
+                Some(Txt),
+                None,
+                None,
+                None,
+                Some(Cname),
+                Some(Cname),
+                Some(Cname),
+                None
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn the_clears_change_only_unreleased_holders_and_the_single_one_only_its_row() {
+        let db = claims_db().await;
+        add(&db, "a", "org-a", "pa", HOST).await;
+        add(&db, "b", "org-b", "pb", "b.example.com").await;
+        add(&db, "c", "org-a", "pa", "c.example.com").await;
+        add(&db, "pending", "org-b", "pb", "d.example.com").await;
+        for (id, reason) in [
+            ("a", FAILURE_NO_CNAME),
+            ("b", FAILURE_RECORD_MISSING),
+            ("c", FAILURE_NO_CNAME),
+        ] {
+            grant_domain(&db, id, T0).await.unwrap();
+            record_holder_proof_failure(&db, id, reason, T0 + 1, true)
+                .await
+                .unwrap();
+        }
+        fail_domain(&db, "pending", FAILURE_RECORD_MISSING, T0 + 1)
+            .await
+            .unwrap();
+        release_domain(&db, "org-a", "c", T0 + 2, RELEASED_BY_ORG)
+            .await
+            .unwrap();
+        let (pending, released) = (row(&db, "pending").await, row(&db, "c").await);
+
+        assert!(clear_holder_proof_failure(&db, "a", T0 + 9).await.unwrap());
+        let one = row(&db, "a").await;
+        assert_eq!(
+            (one.proof_failed_since, one.verification_failure_reason),
+            (None, None)
+        );
+        assert_eq!(one.last_checked_at, Some(T0 + 9), "it moves the check time");
+        assert_eq!(
+            row(&db, "b").await.proof_failed_since,
+            Some(T0 + 1),
+            "only its row"
+        );
+
+        assert_eq!(clear_holder_proof_failures(&db).await.unwrap(), 1);
+        let all = row(&db, "b").await;
+        assert_eq!(
+            (all.proof_failed_since, all.verification_failure_reason),
+            (None, None)
+        );
+        assert_eq!(all.held_domain.as_deref(), Some("b.example.com"));
+        assert_eq!(
+            row(&db, "pending").await,
+            pending,
+            "a non-holder is not a holder"
+        );
+        assert_eq!(
+            row(&db, "c").await,
+            released,
+            "a released holder is left alone"
+        );
+        assert_eq!(clear_holder_proof_failures(&db).await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn the_clear_of_a_healthy_holder_still_moves_its_check_time() {
+        let db = claims_db().await;
+        add(&db, "a", "org-a", "pa", HOST).await;
+        grant_domain(&db, "a", T0).await.unwrap();
+
+        assert!(clear_holder_proof_failure(&db, "a", T0 + 9).await.unwrap());
+
+        assert_eq!(row(&db, "a").await.last_checked_at, Some(T0 + 9));
+    }
+
+    #[tokio::test]
+    async fn grant_leaves_the_reason_and_the_clock_null() {
+        let db = claims_db().await;
+        add(&db, "a", "org-a", "pa", HOST).await;
+
+        grant_domain(&db, "a", T0).await.unwrap();
+
+        let granted = row(&db, "a").await;
+        assert_eq!(
+            (
+                granted.proof_failed_since,
+                granted.verification_failure_reason
+            ),
+            (None, None)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_failing_holder_is_due_on_the_next_tick_and_a_healthy_one_after_six_hours() {
+        let db = claims_db().await;
+        add(&db, "failing", "org-a", "pa", "a.example.com").await;
+        add(&db, "healthy", "org-b", "pb", "b.example.com").await;
+        for id in ["failing", "healthy"] {
+            grant_domain(&db, id, T0).await.unwrap();
+        }
+        record_holder_proof_failure(&db, "failing", FAILURE_NO_CNAME, T0 + 5, true)
+            .await
+            .unwrap();
+        record_resolver_error(&db, "healthy", T0 + 5).await.unwrap();
+
+        assert_eq!(due_ids(&db, T0 + 5).await, Vec::<String>::new());
+        assert_eq!(due_ids(&db, T0 + 6).await, ["failing".to_string()]);
+        let later = T0 + 5 + HOLDER_RECHECK_MICROS;
+        assert_eq!(due_ids(&db, later).await, ["failing".to_string()]);
+        assert_eq!(
+            due_ids(&db, later + 1).await,
+            ["failing", "healthy"].map(String::from)
+        );
+    }
+
+    #[test]
+    fn the_holds_and_the_lapse_are_one_hour_a_day_and_three_days() {
+        assert_eq!(DISPLACEMENT_HOLD_DOWN_MICROS, 3_600_000_000);
+        assert_eq!(REDISPLACEMENT_HOLD_MICROS, 24 * 3_600_000_000);
+        assert_eq!(PROOF_LAPSE_AFTER_MICROS, 72 * 3_600_000_000);
     }
 
     #[tokio::test]
@@ -3361,7 +3919,9 @@ mod tests {
         old_update_domain(&db, &verified).await;
         let snapshot = row(&db, "a").await;
         grant_domain(&db, "a", T0 + 5).await.unwrap();
-        record_holder_proof_failure(&db, "a", T0 + 6).await.unwrap();
+        record_holder_proof_failure(&db, "a", FAILURE_RECORD_MISSING, T0 + 6, true)
+            .await
+            .unwrap();
         let before = row(&db, "a").await;
 
         complete_claims(&db, &[snapshot], T0 + 9).await.unwrap();

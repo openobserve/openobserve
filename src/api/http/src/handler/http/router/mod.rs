@@ -3200,7 +3200,10 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
     // wraps routes that exist at call time, so this has to come after the
     // "/" redirect, "/web" mount, and base_uri trailing-slash redirect above
     // or a custom domain's Host falls through to those unchecked.
-    if config::get_config().synthetics.enabled {
+    if status_pages::public::host_layer_wanted(
+        config::get_config().synthetics.enabled,
+        status_pages::public::host_boundary_needed(),
+    ) {
         outer = outer.layer(middleware::from_fn(
             status_pages::public::host_route_middleware,
         ));

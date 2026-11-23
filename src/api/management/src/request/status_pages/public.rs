@@ -23,6 +23,7 @@
 
 use std::{
     collections::HashMap,
+    hash::Hash,
     sync::{Arc, LazyLock, RwLock},
     time::{Duration, Instant},
 };
@@ -59,6 +60,9 @@ const UNLOCK_COOKIE_NAME: &str = "o2_sp_unlock";
 /// A password JSON body is a few hundred bytes; the by-host route bypasses the router's own limit.
 #[cfg(feature = "enterprise")]
 const AUTH_BODY_LIMIT: usize = 4096;
+/// Nothing on the main listener ends a slow body, so the by-host unlock read has its own end.
+#[cfg(feature = "enterprise")]
+const AUTH_BODY_DEADLINE: Duration = Duration::from_secs(5);
 const AUTH_MAX_ATTEMPTS: u32 = 5;
 /// Per page across all addresses, so many addresses cannot multiply the per-address limit.
 const AUTH_PAGE_MAX_ATTEMPTS: u32 = 50;
@@ -77,13 +81,13 @@ static CACHE: LazyLock<Vec<Shard>> = LazyLock::new(|| {
 });
 /// Per-address read-route counters.
 static READ_RPM: LazyLock<ShardedCounters> = LazyLock::new(Default::default);
-/// Password attempts, keyed by "{ip}|{slug}".
+/// Password attempts, keyed by "{ip}|{scope}": the scope is the route's slug or proxy page id.
 static AUTH_ATTEMPTS: LazyLock<ShardedCounters> = LazyLock::new(Default::default);
-/// Password attempts per page, keyed by the slug alone.
+/// Password attempts per page, keyed by the page id: the slug and custom-domain routes share it.
 static AUTH_PAGE_ATTEMPTS: LazyLock<ShardedCounters> = LazyLock::new(Default::default);
 static VERIFY_SLOTS: Semaphore = Semaphore::const_new(AUTH_VERIFY_SLOTS);
 
-type Shard = RwLock<HashMap<String, CacheEntry>>;
+type Shard = RwLock<HashMap<CacheKey, CacheEntry>>;
 
 /// What the cache knows about a slug; a password page's payload is never cached (R-7).
 #[derive(Clone)]
@@ -172,12 +176,21 @@ pub async fn snapshot(
     ip: Option<Extension<RealIp>>,
     headers: HeaderMap,
 ) -> Response {
+    snapshot_lookup(Lookup::slug(slug), ip, headers).await
+}
+
+/// The snapshot of any lookup: the public route passes a slug, proxy dispatch an identity.
+async fn snapshot_lookup(
+    lookup: Lookup,
+    ip: Option<Extension<RealIp>>,
+    headers: HeaderMap,
+) -> Response {
     if read_rate_limited(ip.map(|e| e.0)) {
         return too_many();
     }
-    match resolve(&slug).await {
+    match resolve(&lookup).await {
         Cached::Public(e) => json_ok(&e.body, e.noindex),
-        Cached::Password => serve_password_page(&slug, &headers).await,
+        Cached::Password => serve_password_page(&lookup, &headers).await,
         Cached::Unbuilt => building(),
         Cached::Missing => not_found(),
         Cached::Unavailable => unavailable(),
@@ -187,12 +200,17 @@ pub async fn snapshot(
 /// GET /status/{slug} — the static visitor shell; only the slug's kind is needed, and the cache has
 /// it.
 pub async fn page(Path(slug): Path<String>, ip: Option<Extension<RealIp>>) -> Response {
+    page_lookup(Lookup::slug(slug), ip).await
+}
+
+/// The visitor shell of any lookup.
+async fn page_lookup(lookup: Lookup, ip: Option<Extension<RealIp>>) -> Response {
     if read_rate_limited(ip.map(|e| e.0)) {
         return too_many();
     }
     // A password page's shell is never shared-cached lest a CDN interfere with the per-visitor
     // unlock flow.
-    let cache = match resolve(&slug).await {
+    let cache = match resolve(&lookup).await {
         Cached::Public(_) | Cached::Unbuilt => "public, max-age=30",
         Cached::Password => "no-store, private",
         Cached::Missing => return not_found(),
@@ -222,17 +240,27 @@ pub async fn auth(
     ip: Option<Extension<RealIp>>,
     Json(body): Json<AuthBody>,
 ) -> Response {
+    auth_lookup(Lookup::slug(slug), ip, Json(body)).await
+}
+
+/// The unlock of any lookup. The cookie is scoped to `lookup.scope()`: the slug of a public route,
+/// or the page id of a proxy-mode holder, which is cookie-safe and survives a slug rotation.
+async fn auth_lookup(
+    lookup: Lookup,
+    ip: Option<Extension<RealIp>>,
+    Json(body): Json<AuthBody>,
+) -> Response {
     // R-5: the address's budget is spent before any lookup, the page's before any Argon2 work.
     let ip = client_ip(ip.map(|e| e.0));
-    if !address_allowed(&ip, &slug) {
+    if !address_allowed(&ip, &lookup.scope()) {
         return too_many();
     }
     if !config::get_config().synthetics.enabled {
         return unauthorized();
     }
     let conn = get_orm_client_ro().await;
-    // Unknown slug and wrong password are the same 401.
-    let page = match active_page_by_slug(conn, &slug).await {
+    // Unknown page and wrong password are the same 401.
+    let page = match active_page(conn, &lookup).await {
         Ok(Some(page)) => page,
         Ok(None) => return unauthorized(),
         Err(()) => return unavailable(),
@@ -240,7 +268,14 @@ pub async fn auth(
     let (Some(hash), 2) = (page.password_hash, page.visibility) else {
         return unauthorized();
     };
-    unlock_response(&VERIFY_SLOTS, &slug, hash, body.password).await
+    unlock_response(
+        &VERIFY_SLOTS,
+        &page.id,
+        &lookup.scope(),
+        hash,
+        body.password,
+    )
+    .await
 }
 
 // Badges are scoped to a PUBLISHED page's overall state only — never a raw check/monitor id (Uptime
@@ -269,7 +304,7 @@ pub async fn badge(Path(slug): Path<String>, ip: Option<Extension<RealIp>>) -> R
     if read_rate_limited(ip.map(|e| e.0)) {
         return too_many();
     }
-    let e = match resolve(&slug).await {
+    let e = match resolve(&Lookup::slug(slug)).await {
         Cached::Public(e) => e,
         Cached::Unavailable => return unavailable(),
         _ => return not_found(),
@@ -330,7 +365,7 @@ pub async fn feed(Path(slug): Path<String>, ip: Option<Extension<RealIp>>) -> Re
     if read_rate_limited(ip.map(|e| e.0)) {
         return too_many();
     }
-    let e = match resolve(&slug).await {
+    let e = match resolve(&Lookup::slug(slug)).await {
         Cached::Public(e) => e,
         Cached::Unavailable => return unavailable(),
         _ => return not_found(),
@@ -377,49 +412,79 @@ pub async fn feed(Path(slug): Path<String>, ip: Option<Extension<RealIp>>) -> Re
         .unwrap_or_else(|_| not_found())
 }
 
-/// Runs ahead of all normal routing (see `create_app_router`'s top-level
-/// `.layer`) because a custom domain and OpenObserve's own UI/API answer at
-/// the exact same paths (`/` included) — Host is the only thing that tells
-/// them apart, and axum's router can't branch on it. Intercepts ONLY when the
-/// incoming Host matches a domain someone has actually claimed (any
-/// verification state); every other request — in particular the app's own
-/// real hostname, `localhost`, or an IP — falls through to normal routing
-/// completely untouched, so this can never regress ordinary traffic. Only a
-/// `verification_state = 1` claim resolves to tenant data; a claimed-but-
-/// unverified or released domain still gets intercepted (so it never reaches
-/// the app's own UI either — see `domain_not_connected`), it just doesn't get
-/// served *content*, per the design's ownership-gate rule. Licensed (Custom
-/// Domains is an enterprise sub-feature of status pages); the OSS build never
-/// looks up a Host, so no unlicensed OSS deployment can be domain-routed to.
+/// Runs ahead of all normal routing, because Host alone tells a custom domain from the app. In
+/// proxy mode only the app's and operational authorities fall through; the rest never reach it.
 #[cfg(feature = "enterprise")]
 pub async fn host_route_middleware(
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    use config::meta::feature::Feature;
+    use o2_enterprise::enterprise::status_pages::host_routing::resolve_host_route;
+
+    let cfg = config::get_config();
+    if !cfg.synthetics.enabled {
+        if !host_boundary_needed() {
+            return next.run(request).await;
+        }
+        return serve_boundary(request, next).await;
+    }
+    let authority = request_authority(request.headers(), request.uri());
+    // Keeps the app's own traffic off the meta store; read per request so a config reload applies.
+    if own_host_of(&cfg.common.web_url).as_deref() == Some(normalize_host(&authority).as_str()) {
+        return next.run(request).await;
+    }
+    let method = request.method().as_str().to_owned();
+    let decision = resolve_host_route(&authority, &method, request.uri().path()).await;
+    let licensed = o2_enterprise::enterprise::license::check_features(&[Feature::Synthetics]);
+    serve_decision(decision, licensed, request, next).await
+}
+
+/// Proxy mode is on, so the host boundary is installed whether or not synthetics is enabled.
+#[cfg(feature = "enterprise")]
+pub fn host_boundary_needed() -> bool {
+    o2_enterprise::enterprise::status_pages::host_routing::host_boundary_active()
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn host_boundary_needed() -> bool {
+    false
+}
+
+/// Whether the router installs the host layer: with synthetics on, or when proxy mode needs the
+/// boundary whatever synthetics says.
+pub fn host_layer_wanted(synthetics_enabled: bool, boundary_needed: bool) -> bool {
+    synthetics_enabled || boundary_needed
+}
+
+/// The proxy boundary with no page to serve: app and operational authorities reach the app, any
+/// other authority gets the neutral 404.
+#[cfg(feature = "enterprise")]
+async fn serve_boundary(request: axum::extract::Request, next: axum::middleware::Next) -> Response {
+    use o2_enterprise::enterprise::status_pages::host_routing::boundary_only_decision;
+
+    let decision = boundary_only_decision(&request_authority(request.headers(), request.uri()));
+    serve_decision(decision, true, request, next).await
+}
+
+#[cfg(feature = "enterprise")]
+async fn serve_decision(
+    decision: o2_enterprise::enterprise::status_pages::host_routing::HostRouteDecision,
+    licensed: bool,
     request: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> Response {
     use axum::response::IntoResponse;
     use config::meta::feature::Feature;
     use o2_enterprise::enterprise::status_pages::host_routing::{
-        HostRouteDecision, PageRoute, resolve_host_route,
+        HostRouteDecision, PageRoute, PageTarget,
     };
 
-    let cfg = config::get_config();
-    if !cfg.synthetics.enabled {
-        return next.run(request).await;
-    }
-    let Some(host) = host_header(request.headers()) else {
-        return next.run(request).await;
-    };
-    // Keeps the app's own traffic off the meta store; read per request so a config reload applies.
-    if own_host_of(&cfg.common.web_url).as_deref() == Some(host.as_str()) {
-        return next.run(request).await;
-    }
-    let method = request.method().as_str().to_owned();
-    match resolve_host_route(&host, &method, request.uri().path()).await {
+    match decision {
         HostRouteDecision::Fallthrough => next.run(request).await,
         HostRouteDecision::NotConnected => domain_not_connected(),
-        HostRouteDecision::Page { .. }
-            if !o2_enterprise::enterprise::license::check_features(&[Feature::Synthetics]) =>
-        {
+        HostRouteDecision::Unavailable => unavailable(),
+        HostRouteDecision::Page { .. } if !licensed => {
             let err = infra::errors::ErrorCodes::LicenseFeatureNotEntitled(
                 <&str>::from(Feature::Synthetics).to_owned(),
             );
@@ -429,19 +494,28 @@ pub async fn host_route_middleware(
             )
                 .into_response()
         }
-        HostRouteDecision::Page { slug, route } => {
+        HostRouteDecision::Page { target, route } => {
             // The RealIp layer sits outside this one, so the resolved visitor IP is already on the
             // request.
             let ip = request.extensions().get::<RealIp>().copied().map(Extension);
+            let lookup = match target {
+                PageTarget::Slug(slug) => Lookup::slug(slug),
+                PageTarget::Identity(identity) => {
+                    Lookup::identity(identity.org_id, identity.page_id)
+                }
+            };
             match route {
                 PageRoute::Snapshot => {
-                    snapshot(Path(slug), ip, request.into_parts().0.headers).await
+                    snapshot_lookup(lookup, ip, request.into_parts().0.headers).await
                 }
-                PageRoute::Auth => match auth_body(request).await {
-                    Some(body) => auth(Path(slug), ip, Json(body)).await,
-                    None => unauthorized(),
+                PageRoute::Auth => match auth_body(request.into_body(), AUTH_BODY_DEADLINE).await {
+                    Ok(Some(body)) => auth_lookup(lookup, ip, Json(body)).await,
+                    Ok(None) => unauthorized(),
+                    Err(_) => StatusCode::REQUEST_TIMEOUT.into_response(),
                 },
-                PageRoute::Shell => page(Path(slug), ip).await,
+                PageRoute::Shell => page_lookup(lookup, ip).await,
+                PageRoute::Redirect => redirect_to_root(request.uri().query()),
+                PageRoute::NotFound => domain_not_connected(),
             }
         }
     }
@@ -455,30 +529,87 @@ pub async fn host_route_middleware(
     next.run(request).await
 }
 
-fn shard_for(slug: &str) -> &'static Shard {
-    let mut h: usize = 0;
-    for b in slug.bytes() {
-        h = h.wrapping_mul(31).wrapping_add(b as usize);
+/// What a public route asks for: the slug from the request path, or the identity proxy dispatch
+/// resolved for a holder. Only the proxy path builds `Identity`, so a public path can never name
+/// one, and the unlock cookie is scoped to `scope()`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Lookup {
+    Slug(String),
+    #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+    Identity {
+        org_id: String,
+        page_id: String,
+    },
+}
+
+impl Lookup {
+    fn slug(slug: String) -> Self {
+        Self::Slug(slug)
     }
+
+    #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+    fn identity(org_id: String, page_id: String) -> Self {
+        Self::Identity { org_id, page_id }
+    }
+
+    /// The cache key: a typed entry, so a decoded public slug can never address the entry of a
+    /// proxy-only identity, whatever characters the path contains.
+    fn cache_key(&self) -> CacheKey {
+        match self {
+            Self::Slug(slug) => CacheKey::Slug(slug.clone()),
+            Self::Identity { page_id, .. } => CacheKey::Identity(page_id.clone()),
+        }
+    }
+
+    /// The unlock cookie's scope: cookie-safe, and stable across a slug rotation.
+    fn scope(&self) -> String {
+        match self {
+            Self::Slug(slug) => slug.clone(),
+            Self::Identity { page_id, .. } => page_id.clone(),
+        }
+    }
+
+    /// The page id of a `pub fn`-visible slug that the enterprise resolver named; a slug has none.
+    #[cfg(test)]
+    fn identity_of(&self) -> Option<(&str, &str)> {
+        match self {
+            Self::Slug(_) => None,
+            Self::Identity { org_id, page_id } => Some((org_id, page_id)),
+        }
+    }
+}
+
+/// What a cache entry belongs to: a public slug, or a proxy dispatch identity. The two are
+/// different keys even when their strings are equal, so a path cannot reach an identity's entry.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+enum CacheKey {
+    Slug(String),
+    Identity(String),
+}
+
+fn shard_for(key: &CacheKey) -> &'static Shard {
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    key.hash(&mut h);
+    let h = std::hash::Hasher::finish(&h) as usize;
     &CACHE[h % CACHE_SHARDS]
 }
 
 /// A fresh entry's kind and org, or None on a miss/expiry; a hit is a read lock and an Arc clone.
-fn cache_get(slug: &str) -> Option<(Cached, Option<String>)> {
-    let guard = shard_for(slug).read().ok()?;
-    let e = guard.get(slug)?;
+fn cache_get(key: &CacheKey) -> Option<(Cached, Option<String>)> {
+    let guard = shard_for(key).read().ok()?;
+    let e = guard.get(key)?;
     (e.at.elapsed() < CACHE_TTL).then(|| (e.kind.clone(), e.org_id.clone()))
 }
 
-fn cache_put(slug: &str, kind: Cached, org_id: Option<String>) {
-    let Ok(mut guard) = shard_for(slug).write() else {
+fn cache_put(key: &CacheKey, kind: Cached, org_id: Option<String>) {
+    let Ok(mut guard) = shard_for(key).write() else {
         return;
     };
     if guard.len() >= CACHE_MAX_PER_SHARD {
         make_room(&mut guard);
     }
     guard.insert(
-        slug.to_owned(),
+        key.clone(),
         CacheEntry {
             kind,
             org_id,
@@ -488,7 +619,7 @@ fn cache_put(slug: &str, kind: Cached, org_id: Option<String>) {
 }
 
 /// Drops expired entries, then the oldest, so memory stays hard-bounded regardless of TTL.
-fn make_room(shard: &mut HashMap<String, CacheEntry>) {
+fn make_room(shard: &mut HashMap<CacheKey, CacheEntry>) {
     shard.retain(|_, e| e.at.elapsed() < CACHE_TTL);
     while shard.len() >= CACHE_MAX_PER_SHARD {
         let Some(oldest) = shard
@@ -502,26 +633,26 @@ fn make_room(shard: &mut HashMap<String, CacheEntry>) {
     }
 }
 
-/// The cache's answer for a slug, doing the miss-time DB reads at most once per TTL.
-async fn resolve(slug: &str) -> Cached {
+/// The cache's answer for a lookup, doing the miss-time DB reads at most once per TTL.
+async fn resolve(lookup: &Lookup) -> Cached {
     resolve_with(
-        slug,
-        |slug| async move { load(&slug).await },
+        lookup,
+        |lookup| async move { load(&lookup).await },
         |org_id| async move { db::org_status::read_active(&org_id).await },
     )
     .await
 }
 
 /// `resolve` over injectable reads; a failed read answers `Unavailable` and caches nothing.
-async fn resolve_with<L, LF, A, AF, E>(slug: &str, load: L, read_active: A) -> Cached
+async fn resolve_with<L, LF, A, AF, E>(lookup: &Lookup, load: L, read_active: A) -> Cached
 where
-    L: FnOnce(String) -> LF,
+    L: FnOnce(Lookup) -> LF,
     LF: Future<Output = Result<(Cached, Option<String>), ()>>,
     A: FnOnce(String) -> AF,
     AF: Future<Output = Result<bool, E>>,
     E: std::fmt::Display,
 {
-    if let Some((kind, org_id)) = cache_get(slug) {
+    if let Some((kind, org_id)) = cache_get(&lookup.cache_key()) {
         let Some(org_id) = org_id else {
             return kind;
         };
@@ -535,20 +666,20 @@ where
             }
         };
     }
-    let Ok((kind, org_id)) = load(slug.to_string()).await else {
+    let Ok((kind, org_id)) = load(lookup.clone()).await else {
         return Cached::Unavailable;
     };
-    cache_put(slug, kind.clone(), org_id);
+    cache_put(&lookup.cache_key(), kind.clone(), org_id);
     kind
 }
 
-/// The two point-reads behind a miss: the page by slug, then its snapshot for a public page.
-async fn load(slug: &str) -> Result<(Cached, Option<String>), ()> {
+/// The two point-reads behind a miss: the page itself, then its snapshot for a public page.
+async fn load(lookup: &Lookup) -> Result<(Cached, Option<String>), ()> {
     if !config::get_config().synthetics.enabled {
         return Ok((Cached::Missing, None));
     }
     let conn = get_orm_client_ro().await;
-    let Some(page) = active_page_by_slug(conn, slug).await? else {
+    let Some(page) = active_page(conn, lookup).await? else {
         return Ok((Cached::Missing, None));
     };
     let kind = match page.visibility {
@@ -581,15 +712,22 @@ async fn public_kind(
 }
 
 /// The page when it exists and its org is active; `Err` when either read failed, already logged.
-async fn active_page_by_slug(
+async fn active_page(
     conn: &sea_orm::DatabaseConnection,
-    slug: &str,
+    lookup: &Lookup,
 ) -> Result<Option<entity::status_pages::Model>, ()> {
-    let page = match table::get_page_by_slug(conn, slug).await {
+    let key = lookup.cache_key();
+    let found = match lookup {
+        Lookup::Slug(slug) => table::get_page_by_slug(conn, slug).await,
+        Lookup::Identity { org_id, page_id } => {
+            table::get_page_by_id_in(conn, org_id, page_id).await
+        }
+    };
+    let page = match found {
         Ok(Some(page)) => page,
         Ok(None) => return Ok(None),
         Err(e) => {
-            log::error!("[status_pages] cannot read page {slug}: {e}");
+            log::error!("[status_pages] cannot read page {key:?}: {e}");
             return Err(());
         }
     };
@@ -607,14 +745,14 @@ async fn active_page_by_slug(
 
 /// R-7: the unlock check and both reads happen per request, off the cache, and the response is
 /// `no-store`.
-async fn serve_password_page(slug: &str, headers: &HeaderMap) -> Response {
+async fn serve_password_page(lookup: &Lookup, headers: &HeaderMap) -> Response {
     // Locked visitors get the uniform 404 from the cache alone: a protected page's existence is not
     // an oracle.
     let Some(cookie) = unlock_cookie(headers) else {
         return not_found();
     };
     let conn = get_orm_client_ro().await;
-    let page = match active_page_by_slug(conn, slug).await {
+    let page = match active_page(conn, lookup).await {
         Ok(Some(page)) => page,
         Ok(None) => return not_found(),
         Err(()) => return unavailable(),
@@ -623,7 +761,7 @@ async fn serve_password_page(slug: &str, headers: &HeaderMap) -> Response {
         return not_found();
     };
     let pwv = openobserve_core::status_pages::pw_version(hash);
-    if !openobserve_core::status_pages::verify_unlock_cookie(cookie, slug, &pwv).await {
+    if !openobserve_core::status_pages::verify_unlock_cookie(cookie, &lookup.scope(), &pwv).await {
         return not_found();
     }
     password_page_response(&page, table::get_snapshot(conn, &page.id).await).await
@@ -739,26 +877,27 @@ fn read_rate_limited(ip: Option<RealIp>) -> bool {
     rpm != 0 && READ_RPM.over_budget(&client_ip(ip), READ_WINDOW, rpm)
 }
 
-/// Spends one attempt of this address's budget for the page.
-fn address_allowed(ip: &str, slug: &str) -> bool {
-    !AUTH_ATTEMPTS.over_budget(&format!("{ip}|{slug}"), AUTH_WINDOW, AUTH_MAX_ATTEMPTS)
+/// Spends one attempt of this address's budget for the unlock scope, before any lookup.
+fn address_allowed(ip: &str, scope: &str) -> bool {
+    !AUTH_ATTEMPTS.over_budget(&format!("{ip}|{scope}"), AUTH_WINDOW, AUTH_MAX_ATTEMPTS)
 }
 
-/// Spends one attempt of the page's budget across all addresses; only a confirmed password page
-/// is charged, so a slug spray cannot fill its table.
-fn page_allowed(slug: &str) -> bool {
-    !AUTH_PAGE_ATTEMPTS.over_budget(slug, AUTH_WINDOW, AUTH_PAGE_MAX_ATTEMPTS)
+/// Spends one attempt of the page's budget across all addresses and routes; only a confirmed
+/// password page is charged, so a slug spray cannot fill its table.
+fn page_allowed(page_id: &str) -> bool {
+    !AUTH_PAGE_ATTEMPTS.over_budget(page_id, AUTH_WINDOW, AUTH_PAGE_MAX_ATTEMPTS)
 }
 
-/// The unlock cookie for a right password. The page budget and then the slot are spent only now,
-/// with a password page confirmed; a wrong password or an unsignable cookie is the same 401.
+/// The unlock cookie for `scope`. The budget of `page_id`, then the slot, are spent only now, with
+/// a password page confirmed; a wrong password or an unsignable cookie is the same 401.
 async fn unlock_response(
     slots: &'static Semaphore,
-    slug: &str,
+    page_id: &str,
+    scope: &str,
     hash: String,
     password: String,
 ) -> Response {
-    if !page_allowed(slug) {
+    if !page_allowed(page_id) {
         return too_many();
     }
     let Ok(slot) = slots.try_acquire() else {
@@ -769,7 +908,7 @@ async fn unlock_response(
         return unauthorized();
     };
     let Some(cookie) =
-        openobserve_core::status_pages::issue_unlock_cookie(slug, &pwv, UNLOCK_COOKIE_TTL_SECS)
+        openobserve_core::status_pages::issue_unlock_cookie(scope, &pwv, UNLOCK_COOKIE_TTL_SECS)
             .await
     else {
         return unauthorized();
@@ -903,20 +1042,29 @@ fn not_found() -> Response {
         .unwrap_or_default()
 }
 
-/// Reads the by-host unlock body under an explicit cap: this layer answers before the router's
-/// `DefaultBodyLimit`, so without one it would be the only unbounded read on the public plane.
+/// Reads the by-host unlock body under an explicit cap and deadline: this layer answers before
+/// the router's `DefaultBodyLimit`. `None` is a body over the cap or one that is not the form.
 #[cfg(feature = "enterprise")]
-async fn auth_body(request: axum::extract::Request) -> Option<AuthBody> {
-    let bytes = axum::body::to_bytes(request.into_body(), AUTH_BODY_LIMIT)
-        .await
-        .ok()?;
-    serde_json::from_slice(&bytes).ok()
+async fn auth_body(
+    body: Body,
+    deadline: Duration,
+) -> Result<Option<AuthBody>, tokio::time::error::Elapsed> {
+    let read = axum::body::to_bytes(body, AUTH_BODY_LIMIT);
+    let bytes = tokio::time::timeout(deadline, read).await?;
+    Ok(bytes
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
 }
 
+/// `Host` as received, else the URI authority an HTTP/2 request carries; empty without either.
 #[cfg(feature = "enterprise")]
-fn host_header(headers: &HeaderMap) -> Option<String> {
-    let host = headers.get(header::HOST)?.to_str().ok()?;
-    Some(normalize_host(host))
+fn request_authority(headers: &HeaderMap, uri: &axum::http::Uri) -> String {
+    let host = headers
+        .get(header::HOST)
+        .and_then(|host| host.to_str().ok());
+    host.or_else(|| uri.authority().map(|authority| authority.as_str()))
+        .unwrap_or_default()
+        .to_owned()
 }
 
 #[cfg(feature = "enterprise")]
@@ -944,6 +1092,20 @@ fn domain_not_connected() -> Response {
         .body(Body::from(
             "This domain isn't connected to a status page yet.",
         ))
+        .unwrap_or_default()
+}
+
+/// A permanent redirect to the root of the same host, with the query kept.
+#[cfg(feature = "enterprise")]
+fn redirect_to_root(query: Option<&str>) -> Response {
+    let location = match query {
+        Some(query) => format!("/?{query}"),
+        None => "/".to_string(),
+    };
+    Response::builder()
+        .status(StatusCode::MOVED_PERMANENTLY)
+        .header(header::LOCATION, location)
+        .body(Body::empty())
         .unwrap_or_default()
 }
 
@@ -979,6 +1141,10 @@ mod tests {
         }
     }
 
+    fn slug_key(slug: &str) -> CacheKey {
+        CacheKey::Slug(slug.to_owned())
+    }
+
     fn cache_control(resp: &Response) -> Option<&str> {
         resp.headers()
             .get(header::CACHE_CONTROL)
@@ -986,8 +1152,12 @@ mod tests {
     }
 
     fn prime(slug: &str, kind: Cached, at: Instant) {
-        shard_for(slug).write().unwrap().insert(
-            slug.to_owned(),
+        prime_key(CacheKey::Slug(slug.to_owned()), kind, at);
+    }
+
+    fn prime_key(key: CacheKey, kind: Cached, at: Instant) {
+        shard_for(&key).write().unwrap().insert(
+            key,
             CacheEntry {
                 kind,
                 org_id: None,
@@ -1101,16 +1271,20 @@ mod tests {
 
     #[tokio::test]
     async fn an_unreadable_org_status_is_unavailable_and_keeps_the_cached_page() {
-        cache_put("t-unreadable-org", public_entry("{}"), Some("t-org".into()));
+        cache_put(
+            &slug_key("t-unreadable-org"),
+            public_entry("{}"),
+            Some("t-org".into()),
+        );
         let kind = resolve_with(
-            "t-unreadable-org",
+            &slug_lookup("t-unreadable-org"),
             |_| async { Ok((Cached::Missing, None)) },
             |_| async { Err::<bool, _>("db down") },
         )
         .await;
         assert!(matches!(kind, Cached::Unavailable));
         assert!(matches!(
-            cache_get("t-unreadable-org"),
+            cache_get(&slug_key("t-unreadable-org")),
             Some((Cached::Public(_), Some(_)))
         ));
     }
@@ -1118,16 +1292,20 @@ mod tests {
     #[tokio::test]
     async fn a_failed_read_on_a_miss_caches_nothing() {
         let kind = resolve_with(
-            "t-failed-miss",
+            &slug_lookup("t-failed-miss"),
             |_| async { Err(()) },
             |_| async { Ok::<_, String>(true) },
         )
         .await;
         assert!(matches!(kind, Cached::Unavailable));
         assert!(
-            cache_get("t-failed-miss").is_none(),
+            cache_get(&slug_key("t-failed-miss")).is_none(),
             "a failed read was cached"
         );
+    }
+
+    fn slug_lookup(slug: &str) -> Lookup {
+        Lookup::slug(slug.to_owned())
     }
 
     fn page_model(id: &str) -> entity::status_pages::Model {
@@ -1162,7 +1340,7 @@ mod tests {
         let slug = "t-failed-snapshot";
         let page = page_model(slug);
         let kind = resolve_with(
-            slug,
+            &slug_lookup(slug),
             |_| async move {
                 public_kind(&page, Err::<Option<_>, _>("db down"))
                     .await
@@ -1173,7 +1351,7 @@ mod tests {
         .await;
         assert!(matches!(kind, Cached::Unavailable));
         assert!(
-            cache_get(slug).is_none(),
+            cache_get(&slug_key(slug)).is_none(),
             "a failed snapshot read was cached"
         );
     }
@@ -1236,10 +1414,13 @@ mod tests {
         let slug = "t-expired";
         let stale = Instant::now() - CACHE_TTL - Duration::from_secs(1);
         prime(slug, public_entry("{}"), stale);
-        assert!(cache_get(slug).is_none());
+        assert!(cache_get(&slug_key(slug)).is_none());
         let resp = snapshot(Path(slug.into()), None, HeaderMap::new()).await;
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-        assert!(matches!(cache_get(slug), Some((Cached::Missing, None))));
+        assert!(matches!(
+            cache_get(&slug_key(slug)),
+            Some((Cached::Missing, None))
+        ));
     }
 
     #[tokio::test]
@@ -1247,14 +1428,16 @@ mod tests {
         use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
 
         let (slug, org) = ("t-cached-blocked", "cachedblockedorg");
-        shard_for(slug).write().unwrap().insert(
-            slug.to_owned(),
-            CacheEntry {
-                kind: public_entry("{}"),
-                org_id: Some(org.to_owned()),
-                at: Instant::now(),
-            },
+        prime_key(
+            CacheKey::Slug(slug.to_owned()),
+            public_entry("{}"),
+            Instant::now(),
         );
+        shard_for(&CacheKey::Slug(slug.to_owned()))
+            .write()
+            .unwrap()
+            .entry(CacheKey::Slug(slug.to_owned()))
+            .and_modify(|entry| entry.org_id = Some(org.to_owned()));
         ORG_STATUS_CACHE.insert(org.to_owned(), OrgStatus::Deleting);
         let resp = snapshot(Path(slug.into()), None, HeaderMap::new()).await;
         ORG_STATUS_CACHE.remove(org);
@@ -1263,10 +1446,10 @@ mod tests {
 
     #[test]
     fn a_full_shard_makes_room_before_inserting() {
-        let mut shard = HashMap::new();
+        let mut shard: HashMap<CacheKey, CacheEntry> = HashMap::new();
         for i in 0..CACHE_MAX_PER_SHARD {
             shard.insert(
-                format!("s{i}"),
+                CacheKey::Slug(format!("s{i}")),
                 CacheEntry {
                     kind: Cached::Missing,
                     org_id: None,
@@ -1336,15 +1519,16 @@ mod tests {
     #[tokio::test]
     async fn the_page_budget_trips_across_addresses_each_within_its_own() {
         static NO_SLOTS: Semaphore = Semaphore::const_new(0);
-        let slug = "t-page-budget";
+        let (page_id, scope) = ("t-page-budget", "t-page-budget-slug");
         for host in 0..AUTH_PAGE_MAX_ATTEMPTS.div_ceil(AUTH_MAX_ATTEMPTS) {
             for _ in 0..AUTH_MAX_ATTEMPTS {
-                assert!(address_allowed(&format!("198.51.100.{host}"), slug));
-                assert!(page_allowed(slug));
+                assert!(address_allowed(&format!("198.51.100.{host}"), scope));
+                assert!(page_allowed(page_id));
             }
         }
-        assert!(address_allowed("198.51.100.200", slug));
-        let resp = unlock_response(&NO_SLOTS, slug, SESAME_HASH.into(), "open sesame".into()).await;
+        assert!(address_allowed("198.51.100.200", scope));
+        let hash = SESAME_HASH.into();
+        let resp = unlock_response(&NO_SLOTS, page_id, scope, hash, "open sesame".into()).await;
         assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
         assert_eq!(resp.headers(), too_many().headers());
         assert_eq!(
@@ -1353,6 +1537,32 @@ mod tests {
             "the existing too_many() answer"
         );
         assert!(page_allowed("t-page-budget-other"));
+    }
+
+    // The slug route and a custom domain name the same page id with different scopes: one budget.
+    #[tokio::test]
+    async fn a_page_reached_by_slug_and_by_custom_domain_shares_one_attempt_budget() {
+        async fn unlock(page_id: &str, scope: &str) -> Response {
+            static NO_SLOTS: Semaphore = Semaphore::const_new(0);
+            let hash = SESAME_HASH.into();
+            unlock_response(&NO_SLOTS, page_id, scope, hash, "open sesame".into()).await
+        }
+        let (page_id, slug) = ("t-shared-budget", "t-shared-budget-slug");
+        for i in 0..AUTH_PAGE_MAX_ATTEMPTS {
+            let resp = unlock(page_id, if i % 2 == 0 { slug } else { page_id }).await;
+            assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS, "attempt {i}");
+            assert_eq!(resp.headers(), busy().headers(), "attempt {i}");
+        }
+        for scope in [slug, page_id] {
+            let resp = unlock(page_id, scope).await;
+            assert_eq!(resp.headers(), too_many().headers(), "scope {scope}");
+        }
+        let resp = unlock("t-shared-budget-other", slug).await;
+        assert_eq!(
+            resp.headers(),
+            busy().headers(),
+            "another page keeps its own budget"
+        );
     }
 
     // The slug is unprimed and unknown: the sixth attempt is the 429 it always was, before any
@@ -1377,6 +1587,7 @@ mod tests {
         let resp = unlock_response(
             &NO_SLOTS,
             "t-busy",
+            "t-busy-slug",
             SESAME_HASH.into(),
             "open sesame".into(),
         )
@@ -1389,8 +1600,14 @@ mod tests {
     #[tokio::test]
     async fn a_wrong_password_is_the_uniform_401_through_the_blocking_path() {
         static SLOTS: Semaphore = Semaphore::const_new(1);
-        let resp =
-            unlock_response(&SLOTS, "t-wrong", SESAME_HASH.into(), "open sesamE".into()).await;
+        let resp = unlock_response(
+            &SLOTS,
+            "t-wrong",
+            "t-wrong-slug",
+            SESAME_HASH.into(),
+            "open sesamE".into(),
+        )
+        .await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
         assert!(resp.headers().get(header::SET_COOKIE).is_none());
         assert_eq!(body_text(resp).await, "Wrong password.");
@@ -1457,8 +1674,9 @@ mod tests {
             .block_on(async {
                 static SLOTS: Semaphore = Semaphore::const_new(1);
                 assert_eq!(config::get_config().auth.alert_chart_signing_key, KEY);
-                let (slug, password) = ("t-right", "open sesame");
-                let resp = unlock_response(&SLOTS, slug, SESAME_HASH.into(), password.into()).await;
+                let (page_id, slug, password) = ("t-right-page", "t-right", "open sesame");
+                let hash = SESAME_HASH.into();
+                let resp = unlock_response(&SLOTS, page_id, slug, hash, password.into()).await;
                 assert_eq!(resp.status(), StatusCode::OK);
                 let set = resp.headers()[header::SET_COOKIE].to_str().unwrap();
                 let cookie = set.split(';').next().unwrap();
@@ -1466,7 +1684,7 @@ mod tests {
                 let pwv = openobserve_core::status_pages::pw_version(SESAME_HASH);
                 let verify = openobserve_core::status_pages::verify_unlock_cookie;
                 assert!(verify(cookie, slug, &pwv).await, "the issued cookie");
-                assert!(!verify(cookie, "t-other", &pwv).await, "bound to its slug");
+                assert!(!verify(cookie, page_id, &pwv).await, "bound to its scope");
             });
     }
 
@@ -1665,5 +1883,346 @@ mod tests {
             .map(|e| e.to_string())
             .collect();
         assert!(errors.is_empty(), "{answer}: {errors:?}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    mod host_route {
+        use axum::{Router, http::Request, middleware, routing::get};
+        use o2_enterprise::enterprise::status_pages::host_routing::{HostRouteDecision, PageRoute};
+        use tower::ServiceExt;
+
+        use super::*;
+
+        const APP_ROUTES: [&str; 5] = ["/web/", "/api/default/orgs", "/metrics", "/healthz", "/"];
+
+        /// An app whose every route answers "app", behind the decision the resolver would give.
+        fn app(decision: fn() -> HostRouteDecision) -> Router {
+            let mut router = Router::new();
+            for path in APP_ROUTES {
+                router = router.route(path, get(|| async { "app" }));
+            }
+            router.layer(middleware::from_fn(move |request, next| async move {
+                serve_decision(decision(), true, request, next).await
+            }))
+        }
+
+        async fn call(router: Router, uri: &str) -> Response {
+            let request = Request::get(uri).body(Body::empty()).unwrap();
+            router.oneshot(request).await.unwrap()
+        }
+
+        fn page(route: PageRoute) -> HostRouteDecision {
+            use o2_enterprise::enterprise::status_pages::host_routing::PageTarget;
+            HostRouteDecision::Page {
+                target: PageTarget::Slug("acme".to_string()),
+                route,
+            }
+        }
+
+        #[tokio::test]
+        async fn a_redirect_is_a_301_to_the_root_with_the_original_query() {
+            let router = app(|| page(PageRoute::Redirect));
+            for (uri, location) in [
+                ("/status/acme?a=1", "/?a=1"),
+                ("/status?a=1&b=2", "/?a=1&b=2"),
+                ("/status/acme", "/"),
+            ] {
+                let response = call(router.clone(), uri).await;
+                assert_eq!(response.status(), StatusCode::MOVED_PERMANENTLY, "{uri}");
+                assert_eq!(response.headers()[header::LOCATION], location, "{uri}");
+            }
+        }
+
+        #[tokio::test]
+        async fn not_found_answers_the_neutral_404_and_never_the_app() {
+            let response = call(app(|| page(PageRoute::NotFound)), "/healthz").await;
+
+            assert_eq!(response.status(), StatusCode::NOT_FOUND);
+            let body = body_text(response).await;
+            assert_eq!(body, "This domain isn't connected to a status page yet.");
+        }
+
+        #[tokio::test]
+        async fn unavailable_answers_503_with_retry_after() {
+            let response = call(app(|| HostRouteDecision::Unavailable), "/healthz").await;
+
+            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+            assert!(response.headers().contains_key(header::RETRY_AFTER));
+            assert_ne!(body_text(response).await, "app");
+        }
+
+        #[tokio::test]
+        async fn not_connected_never_reaches_the_app_on_any_of_its_routes() {
+            let router = app(|| HostRouteDecision::NotConnected);
+            for path in APP_ROUTES {
+                let response = call(router.clone(), path).await;
+                assert_eq!(response.status(), StatusCode::NOT_FOUND, "{path}");
+                assert_ne!(body_text(response).await, "app", "{path}");
+            }
+        }
+
+        #[tokio::test]
+        async fn the_app_and_operational_authorities_reach_the_apps_routes() {
+            let router = app(|| HostRouteDecision::Fallthrough);
+            for path in APP_ROUTES {
+                let response = call(router.clone(), path).await;
+                assert_eq!(response.status(), StatusCode::OK, "{path}");
+                assert_eq!(body_text(response).await, "app", "{path}");
+            }
+        }
+
+        #[tokio::test]
+        async fn a_page_without_the_license_is_the_license_error_not_the_page() {
+            let router =
+                Router::new()
+                    .route("/", get(|| async { "app" }))
+                    .layer(middleware::from_fn(|request, next| async move {
+                        serve_decision(page(PageRoute::Redirect), false, request, next).await
+                    }));
+
+            let response = call(router, "/").await;
+
+            assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        }
+
+        #[test]
+        fn the_authority_is_the_host_header_else_the_uri_authority_and_empty_without_either() {
+            let origin_form: axum::http::Uri = "/".parse().unwrap();
+            let absolute: axum::http::Uri = "https://Status.Example.com:8443/x".parse().unwrap();
+            let mut headers = HeaderMap::new();
+            assert_eq!(request_authority(&headers, &origin_form), "");
+            assert_eq!(
+                request_authority(&headers, &absolute),
+                "Status.Example.com:8443"
+            );
+            headers.insert(header::HOST, "[::1]:5080".parse().unwrap());
+            assert_eq!(request_authority(&headers, &absolute), "[::1]:5080");
+            assert_eq!(request_authority(&headers, &origin_form), "[::1]:5080");
+        }
+
+        #[tokio::test]
+        async fn an_unlock_body_that_never_ends_is_given_up_at_its_deadline() {
+            let brief = Duration::from_millis(50);
+            let never = futures::stream::pending::<Result<Vec<u8>, std::io::Error>>();
+            assert!(auth_body(Body::from_stream(never), brief).await.is_err());
+            let form = Body::from(r#"{"password":"open sesame"}"#);
+            assert!(matches!(auth_body(form, brief).await, Ok(Some(_))));
+            let other = Body::from("not the form");
+            assert!(matches!(auth_body(other, brief).await, Ok(None)));
+        }
+
+        #[tokio::test]
+        async fn an_http2_request_naming_the_app_only_in_its_uri_passes_the_boundary() {
+            let router = Router::new()
+                .route("/healthz", get(|| async { "app" }))
+                .layer(middleware::from_fn(serve_boundary));
+            let http2 = |uri: String| {
+                let request = Request::get(uri).version(axum::http::Version::HTTP_2);
+                router.clone().oneshot(request.body(Body::empty()).unwrap())
+            };
+            let web_url = config::get_config().common.web_url.clone();
+
+            let app = http2(format!("{web_url}/healthz")).await.unwrap();
+            assert_eq!(app.status(), StatusCode::OK, "{web_url}");
+            assert_eq!(body_text(app).await, "app");
+            let custom = http2("https://status.brand.com/healthz".to_string())
+                .await
+                .unwrap();
+            assert_eq!(custom.status(), StatusCode::NOT_FOUND);
+        }
+
+        #[tokio::test]
+        async fn the_boundary_with_no_pages_stops_a_customer_authority_on_every_app_route() {
+            let mut router = Router::new();
+            for path in APP_ROUTES {
+                router = router.route(path, get(|| async { "app" }));
+            }
+            let router = router.layer(middleware::from_fn(serve_boundary));
+            let on = |host: &'static str, path: &'static str| {
+                let request = Request::get(path).header(header::HOST, host);
+                router.clone().oneshot(request.body(Body::empty()).unwrap())
+            };
+
+            for path in APP_ROUTES {
+                let custom = on("status.brand.com", path).await.unwrap();
+                assert_eq!(custom.status(), StatusCode::NOT_FOUND, "{path}");
+                assert_ne!(body_text(custom).await, "app", "{path}");
+                for operational in ["localhost:5080", "10.1.2.3:5080", "[::1]:5080"] {
+                    let passed = on(operational, path).await.unwrap();
+                    assert_eq!(body_text(passed).await, "app", "{operational} {path}");
+                }
+            }
+        }
+
+        #[test]
+        fn the_router_installs_the_host_layer_for_synthetics_or_for_the_proxy_boundary() {
+            assert!(host_layer_wanted(true, false));
+            assert!(host_layer_wanted(false, true));
+            assert!(host_layer_wanted(true, true));
+            assert!(!host_layer_wanted(false, false));
+        }
+    }
+
+    #[test]
+    fn a_public_path_can_never_name_a_page_identity() {
+        let slug = Lookup::slug("p1".to_string());
+        let identity = Lookup::identity("org-a".to_string(), "p1".to_string());
+
+        assert_eq!(slug.identity_of(), None, "a slug is not an identity");
+        assert_eq!(identity.identity_of(), Some(("org-a", "p1")));
+        assert_ne!(
+            slug.cache_key(),
+            identity.cache_key(),
+            "the same string is two different entries"
+        );
+        assert_eq!(slug.scope(), "p1");
+        assert_eq!(identity.scope(), "p1", "the cookie scope is cookie-safe");
+        assert!(identity.scope().bytes().all(|b| b.is_ascii_graphic()));
+    }
+
+    #[tokio::test]
+    async fn a_warm_identity_entry_is_not_reachable_from_the_public_slug_route() {
+        let identity = Lookup::identity("org-a".to_string(), "p1".to_string());
+        prime_key(
+            identity.cache_key(),
+            public_entry("page body"),
+            Instant::now(),
+        );
+
+        // The public plane asks the cache with a slug key; the identity entry is a different entry.
+        let from_a_path = cache_get(&Lookup::slug("p1".to_string()).cache_key());
+
+        assert!(
+            from_a_path.is_none(),
+            "a public slug saw the identity entry"
+        );
+        assert!(matches!(
+            cache_get(&identity.cache_key()),
+            Some((Cached::Public(_), _))
+        ));
+    }
+
+    #[tokio::test]
+    async fn an_identity_scoped_unlock_cookie_is_a_valid_header_and_verifies() {
+        let identity = Lookup::identity("org-a".to_string(), "7530553754064519168".to_string());
+        let hash = "$argon2id$v=19$m=19456,t=2,p=1$c2FsdA$aGFzaA";
+        let pwv = openobserve_core::status_pages::pw_version(hash);
+        let Some(cookie) = openobserve_core::status_pages::issue_unlock_cookie(
+            &identity.scope(),
+            &pwv,
+            UNLOCK_COOKIE_TTL_SECS,
+        )
+        .await
+        else {
+            eprintln!("skipped: no chart signing key in this test process");
+            return;
+        };
+
+        // The cookie value is the scope verbatim, so an identity with a control character made the
+        // Set-Cookie header unbuildable and the unlock answered 401.
+        let header = format!("{UNLOCK_COOKIE_NAME}={cookie}; Path=/; HttpOnly; SameSite=Lax");
+        assert!(
+            header.parse::<header::HeaderValue>().is_ok(),
+            "{header} is not a header value"
+        );
+        assert!(
+            openobserve_core::status_pages::verify_unlock_cookie(&cookie, &identity.scope(), &pwv)
+                .await
+        );
+        assert!(
+            identity.scope().bytes().all(|b| b.is_ascii_graphic()),
+            "the scope stays header-safe"
+        );
+        assert_eq!(
+            identity.cache_key(),
+            CacheKey::Identity("7530553754064519168".to_string()),
+            "the entry is typed by its identity, not by a path string"
+        );
+    }
+
+    /// The client-address contract proxy mode relies on: the one header the operator's proxy
+    /// controls is the only source, because the first source with a value wins.
+    mod real_ip_boundary {
+        use std::net::SocketAddr;
+
+        use axum::{Router, extract::ConnectInfo, http::Request, middleware, routing::get};
+        use config::axum::middlewares::{extract_real_ip, resolve_client_ip_sources};
+        use tower::ServiceExt;
+
+        use super::*;
+
+        const DEFAULT_SOURCES: &str = "XEnvoyExternalAddress,XRealIp,RightmostXForwardedFor";
+        const PROXY_HEADER: (&str, &str) = ("x-forwarded-for", "198.51.100.7");
+
+        /// The limiter key the public plane uses, behind the real-IP layer with these sources.
+        async fn bucket(sources: &str, headers: &[(&str, &str)]) -> String {
+            let app = Router::new()
+                .route(
+                    "/",
+                    get(
+                        |ip: Option<Extension<RealIp>>| async move { client_ip(ip.map(|ip| ip.0)) },
+                    ),
+                )
+                .layer(middleware::from_fn(extract_real_ip))
+                .layer(Extension(resolve_client_ip_sources(sources)));
+            let mut request = Request::get("/").body(Body::empty()).unwrap();
+            for (name, value) in headers {
+                let name = header::HeaderName::from_bytes(name.as_bytes()).unwrap();
+                request.headers_mut().insert(name, value.parse().unwrap());
+            }
+            request
+                .extensions_mut()
+                .insert(ConnectInfo(SocketAddr::from(([10, 0, 0, 9], 4000))));
+            body_text(app.oneshot(request).await.unwrap()).await
+        }
+
+        #[tokio::test]
+        async fn with_one_configured_source_a_higher_priority_default_header_cannot_move_the_bucket()
+         {
+            let source = "RightmostXForwardedFor";
+            let first = bucket(source, &[PROXY_HEADER, ("x-real-ip", "1.1.1.1")]).await;
+            let second = bucket(
+                source,
+                &[
+                    PROXY_HEADER,
+                    ("x-real-ip", "2.2.2.2"),
+                    ("x-envoy-external-address", "3.3.3.3"),
+                ],
+            )
+            .await;
+
+            assert_eq!(first, "198.51.100.7");
+            assert_eq!(
+                first, second,
+                "one bucket however the client dresses its headers"
+            );
+        }
+
+        #[tokio::test]
+        async fn with_the_default_list_left_in_place_the_higher_priority_header_wins() {
+            let by_real_ip =
+                bucket(DEFAULT_SOURCES, &[PROXY_HEADER, ("x-real-ip", "1.1.1.1")]).await;
+            let by_envoy = bucket(
+                DEFAULT_SOURCES,
+                &[
+                    PROXY_HEADER,
+                    ("x-real-ip", "1.1.1.1"),
+                    ("x-envoy-external-address", "3.3.3.3"),
+                ],
+            )
+            .await;
+
+            assert_eq!(by_real_ip, "1.1.1.1");
+            assert_eq!(by_envoy, "3.3.3.3", "a client picks its own bucket");
+        }
+
+        #[tokio::test]
+        async fn connect_info_as_the_only_source_gives_every_visitor_the_peers_bucket() {
+            let first = bucket("ConnectInfo", &[PROXY_HEADER, ("x-real-ip", "1.1.1.1")]).await;
+            let second = bucket("ConnectInfo", &[("x-real-ip", "2.2.2.2")]).await;
+
+            assert_eq!(first, "10.0.0.9");
+            assert_eq!(first, second);
+        }
     }
 }

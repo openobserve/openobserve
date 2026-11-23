@@ -571,6 +571,24 @@ mod tests {
     }
 
     #[test]
+    fn the_gate_does_not_start_in_proxy_mode_with_or_without_a_target_and_does_in_built_in_mode() {
+        use o2_enterprise::enterprise::status_pages::cert_store::{
+            CertificateMode, built_in_tls_on,
+        };
+
+        for target in ["", "domains.example.com"] {
+            let enabled = built_in_tls_on(CertificateMode::Proxy, target, false);
+            assert!(!enabled, "proxy mode never runs built-in TLS: {target:?}");
+            assert!(
+                Plan::decide(enabled, true, &settings()).is_none(),
+                "{target:?}"
+            );
+        }
+        let built_in = built_in_tls_on(CertificateMode::BuiltIn, "domains.example.com", false);
+        assert!(Plan::decide(built_in, true, &settings()).is_some());
+    }
+
+    #[test]
     fn the_redirect_and_health_ports_turn_off_with_a_zero_and_proxy_protocol_reads_the_list() {
         let settings = Settings {
             http_port: 0,

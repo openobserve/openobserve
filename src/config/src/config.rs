@@ -1158,8 +1158,11 @@ pub struct Config {
 
 /// The values of `ZO_STATUS_PAGE_DOMAIN_PROBE`; the first is the fallback.
 const STATUS_PAGE_DOMAIN_PROBES: [&str; 2] = ["listener", "load_balancer"];
+/// The values of `ZO_STATUS_PAGE_DOMAIN_TLS`; the first is the fallback.
+const STATUS_PAGE_DOMAIN_TLS_MODES: [&str; 2] = ["built_in", "proxy"];
 
-/// Custom domains of status pages. Built-in TLS is on when `target` is set.
+/// Custom domains of status pages. `tls` picks built-in TLS (needs `target`; a claim is proven by
+/// its CNAME) or proxy mode (proven by a TXT record; the two host lists keep normal routing).
 #[derive(Serialize, EnvConfig, Default)]
 pub struct StatusPageDomain {
     #[env_config(
@@ -1171,9 +1174,27 @@ pub struct StatusPageDomain {
     #[env_config(
         name = "ZO_STATUS_PAGE_DOMAIN_TARGET",
         default = "",
-        help = "The hostname customers point their CNAME at. Empty turns the built-in TLS for custom domains off. A change takes effect at the next restart."
+        help = "The hostname customers point their CNAME at. Needed for built-in TLS: with the default mode an empty value turns custom domains off. Ignored in proxy mode. Changing the name lapses every custom domain whose CNAME does not follow. A change takes effect at the next restart."
     )]
     pub target: String,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_TLS",
+        default = "built_in",
+        help = "How custom domains get HTTPS. `built_in`: OpenObserve orders the certificates and terminates TLS on the domain listener; it needs ZO_STATUS_PAGE_DOMAIN_TARGET, and a custom domain is proven by a CNAME under that target. `proxy`: your own proxy terminates TLS with its own certificates and forwards to the main HTTP port with the Host header; OpenObserve orders no certificate and opens no domain port, needs no target, and a custom domain is proven by a TXT record. Not available on OpenObserve Cloud. A change takes effect at the next restart and asks every existing custom domain for the other record."
+    )]
+    pub tls: String,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_APP_HOSTS",
+        default = "",
+        help = "Comma-separated hostnames, besides the host of ZO_WEB_URL, that serve the OpenObserve app itself (UI, API, webhooks). Read in proxy mode only."
+    )]
+    pub app_hosts: String,
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_OPERATIONAL_HOSTS",
+        default = "",
+        help = "Comma-separated hostnames, besides IP-literal hosts and localhost, that keep answering OpenObserve's own operational routes (for example a Service name used by the kubelet or a scraper). Read in proxy mode only."
+    )]
+    pub operational_hosts: String,
     #[env_config(
         name = "ZO_STATUS_PAGE_DOMAIN_ENCRYPTION_KEY",
         default = "",
@@ -1247,6 +1268,9 @@ impl std::fmt::Debug for StatusPageDomain {
         let Self {
             reserved_suffixes,
             target,
+            tls,
+            app_hosts,
+            operational_hosts,
             https_port,
             http_port,
             health_port,
@@ -1262,6 +1286,9 @@ impl std::fmt::Debug for StatusPageDomain {
         f.debug_struct("StatusPageDomain")
             .field("reserved_suffixes", reserved_suffixes)
             .field("target", target)
+            .field("tls", tls)
+            .field("app_hosts", app_hosts)
+            .field("operational_hosts", operational_hosts)
             .field("https_port", https_port)
             .field("http_port", http_port)
             .field("health_port", health_port)
@@ -5782,6 +5809,13 @@ fn check_status_page_domain_config(cfg: &mut Config) {
         );
         domain.probe = STATUS_PAGE_DOMAIN_PROBES[0].to_string();
     }
+    if !STATUS_PAGE_DOMAIN_TLS_MODES.contains(&domain.tls.as_str()) {
+        log::error!(
+            "ZO_STATUS_PAGE_DOMAIN_TLS ({}) must be `built_in` or `proxy`, using `built_in`",
+            domain.tls
+        );
+        domain.tls = STATUS_PAGE_DOMAIN_TLS_MODES[0].to_string();
+    }
 }
 
 pub fn ensure_not_empty(s: &str, name: &str) -> Result<(), anyhow::Error> {
@@ -5860,6 +5894,11 @@ mod tests {
         );
         assert_eq!((cfg.allow_orgs.as_str(), cfg.deny_orgs.as_str()), ("", ""));
         assert_eq!(cfg.epoch, 1);
+        assert_eq!(cfg.tls, "built_in");
+        assert_eq!(
+            (cfg.app_hosts.as_str(), cfg.operational_hosts.as_str()),
+            ("", "")
+        );
     }
 
     #[test]
@@ -5873,6 +5912,21 @@ mod tests {
         for probe in ["", "Listener", "proxy", "load-balancer"] {
             let cfg = domain_config("", probe);
             assert_eq!(cfg.status_page_domain.probe, "listener", "{probe:?}");
+        }
+    }
+
+    #[test]
+    fn status_page_domain_tls_proxy_is_kept_and_an_unknown_mode_is_built_in() {
+        let with_tls = |tls: &str| {
+            let mut cfg = domain_config("", "listener");
+            cfg.status_page_domain.tls = tls.to_string();
+            check_status_page_domain_config(&mut cfg);
+            cfg.status_page_domain.tls
+        };
+        assert_eq!(with_tls("proxy"), "proxy");
+        assert_eq!(with_tls("built_in"), "built_in");
+        for unknown in ["", "Proxy", "builtin", "off", "listener"] {
+            assert_eq!(with_tls(unknown), "built_in", "{unknown:?}");
         }
     }
 

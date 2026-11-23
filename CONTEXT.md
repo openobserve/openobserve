@@ -19,8 +19,20 @@ An org's request to use a custom domain for one of its status pages. Several org
 _Avoid_: Domain record, binding
 
 **Ownership proof**:
-The DNS TXT record under `_o2-verify.<custom domain>` whose value matches the claim's token. It must stay in DNS: it is checked again every 6 hours.
+The record that shows the org controls the hostname, asked for by the installation's certificate mode and never chosen per claim. With built-in TLS it is the claim's CNAME, `<custom domain> CNAME <label>.<domain target>`. In proxy mode it is the TXT record `_o2-verify.<custom domain>` whose value is the claim's token. It must stay in DNS: it is checked again every 6 hours, and a holder whose proof is gone lapses 72 hours after its first negative answer.
 _Avoid_: Verification record, DCV
+
+**Certificate mode**:
+Who terminates TLS for custom domains and with that which ownership proof is asked, set by `ZO_STATUS_PAGE_DOMAIN_TLS` and read once at startup. `built_in` is the default and the only mode on Cloud; `proxy` is for self-hosted installations. With the default mode and no domain target, custom domains are off.
+_Avoid_: TLS mode, proof mode
+
+**Built-in TLS**:
+The certificate mode in which OpenObserve orders the certificates and terminates TLS on the domain listener. It needs a domain target, and a claim is proven by its CNAME under that target.
+_Avoid_: Managed TLS, auto TLS
+
+**Proxy mode**:
+The certificate mode in which the operator's own proxy terminates TLS and forwards to the main HTTP port with the visitor's `Host`. OpenObserve orders no certificate, opens no domain port and needs no target; a claim is proven by its TXT record, and the main listener's host route serves the holder of the `Host`. Everything except the app authority and operational authority is the custom-domain plane: it never reaches the app.
+_Avoid_: Reverse proxy mode, passthrough
 
 **Holder**:
 The one live claim that holds a hostname, because its ownership proof was found and has not been lost to another claim. A hostname has at most one holder.
@@ -31,7 +43,7 @@ A live claim that is the holder. Verified means the org controls the hostname, n
 _Avoid_: Active, connected, live, serving
 
 **Lapse**:
-A holder losing its hostname because one DNS answer shows another claim's token and not the holder's. The holder fails with reason "proof lost", the other claim becomes the holder, and nothing grants the lapsed claim the hostname again without a new proof. A DNS outage never lapses a holder.
+A holder losing its hostname: one DNS answer shows another claim's proof and not the holder's, or the holder's own proof is gone and a negative answer comes 72 hours or more after its first one. The holder fails with reason "proof lost" and nothing grants it the hostname again without a new proof. A DNS outage never lapses a holder: only a negative answer counts.
 _Avoid_: Revoke, steal, expire
 
 **Serving custom domain**:
@@ -43,7 +55,7 @@ Ending a claim, by the org, by deleting its page or org, or by expiry: a claim t
 _Avoid_: Delete, unclaim
 
 **Pending**:
-The state of a claim that is not the holder. It shows the TXT record and one reason: record missing, value differs, DNS lookup failed, held by another organization, or proof lost.
+The state of a claim that is not the holder. It shows the record of the mode and one reason. Built-in TLS: no record, points elsewhere, points at the app host, DNS lookup failed, held by another organization, or proof lost. Proxy mode: record missing, value differs, DNS lookup failed, held by another organization, or proof lost. While custom domains are off it shows that they are not enabled and no record.
 _Avoid_: Unverified, waiting
 
 **Not serving**:
@@ -53,6 +65,14 @@ _Avoid_: Disabled, inactive
 **Expired**:
 The state of a claim released because it was not the holder for 7 days. It is listed for 30 more days.
 _Avoid_: Deleted, failed
+
+**App authority**:
+In proxy mode, the host of `ZO_WEB_URL` or a host in `ZO_STATUS_PAGE_DOMAIN_APP_HOSTS`: a request for it keeps normal routing, so the UI, the API and webhooks work.
+_Avoid_: App domain, main host
+
+**Operational authority**:
+In proxy mode, an IP-literal host, `localhost` or a host in `ZO_STATUS_PAGE_DOMAIN_OPERATIONAL_HOSTS`: a request for it keeps normal routing, so probes and scrapes of the app's own routes work.
+_Avoid_: Internal host, health host
 
 ### Orgs
 
