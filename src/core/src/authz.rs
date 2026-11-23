@@ -528,10 +528,17 @@ impl StreamReadMemo {
         if unrestricted {
             return true;
         }
-        let cell = shared_cell(&self.streams, (stream_type, name.to_string()));
+        let (cell, first_of_type) = {
+            let mut cells = self.streams.lock().unwrap_or_else(|e| e.into_inner());
+            let first = !cells.keys().any(|(t, _)| *t == stream_type);
+            let cell = cells.entry((stream_type, name.to_string())).or_default();
+            (cell.clone(), first)
+        };
+        // A lone stream's own Check already counts the org-wide grants.
         *cell
             .get_or_init(|| async {
-                (org_wide_grant_covers(name)
+                (!first_of_type
+                    && org_wide_grant_covers(name)
                     && self.org_wide(checker, user_id, org_id, stream_type).await)
                     || checker
                         .can_read_stream(
@@ -1122,17 +1129,20 @@ pub(crate) async fn readable_streams(
     org_id: &str,
     streams: HashSet<(StreamType, String)>,
 ) -> Option<HashSet<(StreamType, String)>> {
-    use futures::stream::StreamExt;
-
     if !checker.enforces_rbac().await
         || checker.is_root(user_id).await
         || checker.is_root_or_admin(org_id, user_id).await
     {
         return None;
     }
+    let mut per_type: std::collections::HashMap<StreamType, usize> = Default::default();
+    for (stream_type, _) in &streams {
+        *per_type.entry(*stream_type).or_default() += 1;
+    }
+    // A lone stream's own Check already counts the org-wide grants, so asking first costs more.
     let (covered, mut to_check): (Vec<_>, Vec<_>) = streams
         .into_iter()
-        .partition(|(_, name)| org_wide_grant_covers(name));
+        .partition(|(stream_type, name)| per_type[stream_type] > 1 && org_wide_grant_covers(name));
     let mut readable = HashSet::new();
     if !covered.is_empty() {
         let mut types: Vec<StreamType> = Vec::new();
@@ -1150,7 +1160,21 @@ pub(crate) async fn readable_streams(
             }
         }
     }
-    let checked: Vec<(StreamType, String)> = futures::stream::iter(to_check)
+    readable.extend(check_each(checker, user_id, org_id, to_check).await);
+    Some(readable)
+}
+
+/// One Check per stream, 16 at a time; the streams that pass.
+#[cfg(any(feature = "enterprise", test))]
+pub(crate) async fn check_each(
+    checker: &dyn StreamAccessChecker,
+    user_id: &str,
+    org_id: &str,
+    streams: Vec<(StreamType, String)>,
+) -> HashSet<(StreamType, String)> {
+    use futures::stream::StreamExt;
+
+    futures::stream::iter(streams)
         .map(|(stream_type, name)| async move {
             let stream = TypedStream {
                 org_id: org_id.to_string(),
@@ -1163,9 +1187,7 @@ pub(crate) async fn readable_streams(
         .buffer_unordered(16)
         .filter_map(std::future::ready)
         .collect()
-        .await;
-    readable.extend(checked);
-    Some(readable)
+        .await
 }
 
 /// In `_meta` the cached membership names the role, whatever role the request carries.
@@ -1949,7 +1971,7 @@ mod tests {
             );
         }
         let calls = checker.calls("u2");
-        assert_eq!(calls.streams, 0);
+        assert_eq!(calls.streams, 1, "only the first stream of the type");
         assert_eq!(calls.org_wide.len(), 1);
 
         checker.grant_admin("o1", "u3");
@@ -1971,6 +1993,18 @@ mod tests {
         assert!(futures::future::join_all(reads).await.iter().all(|ok| !ok));
         let calls = checker.calls("u1");
         assert_eq!(calls.streams, 1);
+        assert!(
+            calls.org_wide.is_empty(),
+            "a lone stream needs no org-wide question"
+        );
+
+        let reads = ["b", "c", "d"]
+            .into_iter()
+            .flat_map(|name| (0..4).map(move |_| name))
+            .map(|name| memo.can_read(&checker, "u1", "o1", StreamType::Logs, name));
+        futures::future::join_all(reads).await;
+        let calls = checker.calls("u1");
+        assert_eq!(calls.streams, 4);
         assert_eq!(calls.org_wide.len(), 1);
     }
 
@@ -2058,8 +2092,11 @@ mod tests {
             (Logs, "app"),
             (Logs, "audit"),
             (Metrics, "cpu"),
+            (Metrics, "mem"),
             (Traces, "default"),
+            (Traces, "other"),
             (Profiles, "heap"),
+            (Profiles, "cpu"),
         ]);
         let checker = [Logs, Metrics, Traces, Profiles]
             .into_iter()
@@ -2113,6 +2150,21 @@ mod tests {
             assert_eq!(checker.stream_checks(), 3, "{case}");
             assert_eq!(checker.org_wide_asked().len(), 1, "{case}");
         }
+    }
+
+    // o2-enterprise#3642: one stream of a type costs its own Check and no org-wide question.
+    #[tokio::test]
+    async fn a_lone_stream_of_a_type_skips_the_org_wide_question() {
+        use StreamType::{Logs, Traces};
+
+        let checker = FakeChecker::default()
+            .reads("u1", "o1/traces/default")
+            .reads("u1", "o1/logs/app");
+        let all = wanted(&[(Logs, "app"), (Logs, "audit"), (Traces, "default")]);
+        let kept = readable_streams(&checker, "u1", "o1", all).await;
+        assert_eq!(kept, Some(wanted(&[(Logs, "app"), (Traces, "default")])));
+        assert_eq!(checker.org_wide_asked(), [vec![Logs]]);
+        assert_eq!(checker.stream_checks(), 3);
     }
 
     #[tokio::test]
@@ -2169,7 +2221,7 @@ mod tests {
     #[tokio::test]
     async fn a_covered_stream_keeps_its_own_name() {
         let checker = FakeChecker::default().reads_all("u1", "o1", StreamType::Metrics);
-        let all = wanted(&[(StreamType::Metrics, "a:b")]);
+        let all = wanted(&[(StreamType::Metrics, "a:b"), (StreamType::Metrics, "c")]);
         let kept = readable_streams(&checker, "u1", "o1", all.clone()).await;
         assert_eq!(kept, Some(all));
         assert_eq!(checker.stream_checks(), 0);

@@ -310,16 +310,17 @@ async fn readable_among(
     use config::meta::stream::StreamType;
 
     // the engine drops a matcher whose value is the placeholder, which would unscope the read
-    let wanted: std::collections::HashSet<(StreamType, String)> = streams
+    let wanted: Vec<(StreamType, String)> = streams
         .into_iter()
         .filter(|stream| stream != placeholder)
         .map(|stream| (StreamType::Traces, stream))
         .collect();
-    let mut readable: Vec<String> =
-        match crate::authz::readable_streams(checker, user_id, org_id, wanted.clone()).await {
-            None => wanted.into_iter().map(|(_, name)| name).collect(),
-            Some(readable) => readable.into_iter().map(|(_, name)| name).collect(),
-        };
+    // the caller's traces:_all_ check came first, so the org-wide question would repeat it
+    let mut readable: Vec<String> = crate::authz::check_each(checker, user_id, org_id, wanted)
+        .await
+        .into_iter()
+        .map(|(_, name)| name)
+        .collect();
     readable.sort();
     readable
 }
@@ -523,13 +524,16 @@ mod tests {
                 .await
                 .is_empty()
         );
-        // o2-enterprise#3642: a per-type traces grant reads all of them without a stream Check
+        // o2-enterprise#3642: the per-stream Check honors a per-type grant; no org-wide repeat
         checker.grant_read_all("u2", "o1", StreamType::Traces);
         assert_eq!(
             readable_among(&checker, "o1", "u2", streams, "_o2_all_").await,
             vec!["a".to_string(), "b".to_string(), "c".to_string()]
         );
-        assert_eq!(checker.calls("u2").streams, 0);
+        assert!(
+            checker.calls("u2").org_wide.is_empty(),
+            "the traces:_all_ pre-check already asked"
+        );
     }
 
     #[cfg(feature = "enterprise")]

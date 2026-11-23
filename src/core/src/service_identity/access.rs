@@ -301,8 +301,11 @@ mod tests {
         let calls = checker.calls(user);
         assert_eq!(calls.streams, 1, "only _rumdata needs its own Check");
         assert_eq!(calls.org_wide.len(), 1);
-        let asked: HashSet<_> = calls.org_wide[0].iter().copied().collect();
-        assert_eq!(asked, HashSet::from([StreamType::Traces, StreamType::Logs]));
+        assert_eq!(
+            calls.org_wide[0],
+            [StreamType::Traces],
+            "_rumdata is a lone logs stream"
+        );
     }
 
     #[tokio::test]
@@ -319,14 +322,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn with_no_trace_rows_only_logs_is_asked_org_wide() {
+    async fn with_no_trace_rows_rum_costs_one_check_and_no_org_wide_question() {
         let org = "issue3592_no_traces";
         let user = "issue3592-no-traces@example.com";
         let checker = fake_checker();
         let summaries = [row(org, "rum", "_rumdata")];
         let readable = ReadableStreams::load(org, user, &summaries).await;
         assert!(!readable.rum && readable.traces.is_empty());
-        assert_eq!(checker.calls(user).org_wide, [vec![StreamType::Logs]]);
+        assert!(checker.calls(user).org_wide.is_empty());
         assert_eq!(checker.calls(user).streams, 1);
     }
 }

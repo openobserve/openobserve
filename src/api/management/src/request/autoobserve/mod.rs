@@ -886,12 +886,13 @@ async fn readable_subjects(org_id: &str, user_id: &str, subjects: Vec<EntityRef>
 async fn readable_streams(org_id: &str, user_id: &str, ids: Vec<(String, String)>) -> Vec<bool> {
     use config::meta::stream::StreamType;
 
-    // An unknown type name is refused, never read as the default type.
+    // An unknown type name is refused, never read as the default type `from` falls back to.
     let typed: Vec<Option<(StreamType, String)>> = ids
         .into_iter()
         .map(|(stream_type, name)| {
             let parsed = StreamType::from(stream_type.as_str());
-            (parsed.as_str() == stream_type).then_some((parsed, name))
+            let known = parsed != StreamType::default() || stream_type.eq_ignore_ascii_case("logs");
+            known.then_some((parsed, name))
         })
         .collect();
     let wanted = typed.iter().flatten().cloned().collect();
@@ -1044,10 +1045,13 @@ mod tests {
         checker.grant_read_all(&wide, &org, StreamType::Logs);
         let ids: Vec<(String, String)> = (0..20)
             .map(|i| ("logs".to_string(), format!("s{i}")))
-            .chain([("nonsense".to_string(), "s0".to_string())])
+            .chain([
+                ("nonsense".to_string(), "s0".to_string()),
+                ("LOGS".to_string(), "s1".to_string()),
+            ])
             .collect();
         let mut expected = vec![true; 20];
-        expected.push(false);
+        expected.extend([false, true]);
         assert_eq!(readable_streams(&org, &wide, ids.clone()).await, expected);
         let calls = checker.calls(&wide);
         assert_eq!(calls.streams, 0);

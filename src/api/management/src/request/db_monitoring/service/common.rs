@@ -114,36 +114,16 @@ pub(super) async fn can_read_stream(
         // dead". It projects only `_timestamp` and the kind column and reduces
         // them to counts, so no field value reaches the wire, and
         // `validate_server_stream` pins `?stream=` to the DBM streams first.
-        if check_permissions(
-            org_id,
-            org_id,
-            user_id,
-            "db_monitoring",
-            "GET",
-            None,
-            true,
-            false,
-            false,
-        )
-        .await
-        {
+        if module_grant(org_id, user_id).await {
             return stream_read_decision(true, false);
         }
 
+        let wanted = vec![stream_name.to_string()];
         return stream_read_decision(
             false,
-            check_permissions(
-                &config::utils::str::into_ofga_supported_format(stream_name),
-                org_id,
-                user_id,
-                stream_type.as_str(),
-                "GET",
-                None,
-                false,
-                true,
-                false,
-            )
-            .await,
+            !stream_grants(org_id, user_id, wanted, stream_type)
+                .await
+                .is_empty(),
         );
     }
     #[cfg(not(feature = "enterprise"))]
@@ -1121,22 +1101,33 @@ async fn readable_among(
         if !get_openfga_config().enabled || module_grant(org_id, user_id).await {
             return streams;
         }
-        let wanted = streams.iter().map(|s| (stream_type, s.clone())).collect();
-        let Some(readable) =
-            openobserve_core::authz::readable_org_streams(user_id, org_id, wanted).await
-        else {
-            return streams;
-        };
-        streams
-            .into_iter()
-            .filter(|s| readable.contains(&(stream_type, s.clone())))
-            .collect()
+        stream_grants(org_id, user_id, streams, stream_type).await
     }
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, user_id, stream_type);
         streams
     }
+}
+
+/// The `streams` a stream grant lets the user read, by the same Check a search of them uses.
+#[cfg(feature = "enterprise")]
+async fn stream_grants(
+    org_id: &str,
+    user_id: &str,
+    streams: Vec<String>,
+    stream_type: StreamType,
+) -> Vec<String> {
+    let wanted = streams.iter().map(|s| (stream_type, s.clone())).collect();
+    let Some(readable) =
+        openobserve_core::authz::readable_org_streams(user_id, org_id, wanted).await
+    else {
+        return streams;
+    };
+    streams
+        .into_iter()
+        .filter(|s| readable.contains(&(stream_type, s.clone())))
+        .collect()
 }
 
 /// `db_monitoring:_all_{org}`, the module toggle of the role editor.
@@ -2590,7 +2581,7 @@ mod tests {
     ///
     /// Six of them — `instances`, `activity`, `server_queries`, `deadlocks`,
     /// `blocking`, `table_health` — route through `involved_streams`, which
-    /// filters every candidate through `can_read_stream`. If `can_read_stream`
+    /// filters every candidate by `can_read_stream`'s rule. If that rule
     /// consults only the `traces`/`logs`/`metrics` stream objects, the module
     /// grant is never consulted, every candidate filters out, and each handler
     /// maps the empty result to `unauthorized_response()`. The other four
@@ -2669,27 +2660,83 @@ mod tests {
             .expect("can_read_stream must keep its non-enterprise arm");
         let body = &src[start..end];
 
-        // The FIRST check_permissions call is the module check — it has to be,
-        // or the per-stream check would run first and the grant would be
-        // consulted only after a denial. The next call opens the fallback.
-        let call = body
-            .find("check_permissions(")
-            .expect("can_read_stream must consult check_permissions");
-        let args = match body[call + 1..].find("check_permissions(") {
-            Some(next) => &body[call..call + 1 + next],
-            None => &body[call..],
-        };
+        // The module check runs first in both gates, or a stream grant would be asked before it.
+        for (gate, fallback) in [
+            ("async fn can_read_stream(", "stream_grants("),
+            ("async fn readable_among(", "stream_grants("),
+        ] {
+            let at = src.find(gate).expect("gate must exist");
+            let gate_body = &src[at..];
+            let module = gate_body
+                .find("module_grant(")
+                .expect("gate asks the module");
+            let stream = gate_body
+                .find(fallback)
+                .expect("gate falls back to streams");
+            assert!(module < stream, "{gate} must ask the module grant first");
+        }
+        assert!(body.contains("module_grant("));
 
+        let at = src
+            .find("async fn module_grant(")
+            .expect("module_grant must exist");
+        let end = src[at..].find("\n}\n").map(|o| at + o).expect("fn end");
+        let args = &src[at..end];
+        assert!(args.contains("check_permissions("));
         assert!(
             args.contains("\"db_monitoring\""),
-            "can_read_stream must ask OFGA about the `db_monitoring` module \
+            "module_grant must ask OFGA about the `db_monitoring` module \
              object; asking only about the stream type is the defect"
         );
         // Object id is the org, not the stream: `db_monitoring` has no
         // per-object entities, so a stream-named object can never match.
         assert!(
-            !args.contains("into_ofga_supported_format(stream_name)"),
+            !args.contains("into_ofga_supported_format("),
             "the module check must not pass the stream name as the object id"
+        );
+    }
+
+    // o2-enterprise#3642: the list and `?stream=` share one rule; a lone stream costs one Check.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn stream_grants_matches_the_list_and_single_stream_paths() {
+        use openobserve_core::authz::{TypedStream, fake_checker};
+
+        let checker = fake_checker();
+        let org = format!("dbm_{}", config::ider::uuid());
+        let single = format!("single_{}", config::ider::uuid());
+        checker.grant_read(
+            &single,
+            &TypedStream {
+                org_id: org.clone(),
+                stream_type: StreamType::Traces,
+                name: "s1".to_string(),
+            },
+        );
+        let all: Vec<String> = ["s0", "s1", "s2"].map(str::to_string).to_vec();
+        let got = stream_grants(&org, &single, all.clone(), StreamType::Traces).await;
+        assert_eq!(got, vec!["s1".to_string()]);
+        let one = stream_grants(&org, &single, vec!["s1".into()], StreamType::Traces).await;
+        assert_eq!(one, vec!["s1".to_string()]);
+        let calls = checker.calls(&single);
+        assert_eq!(calls.streams, 4);
+        assert_eq!(
+            calls.org_wide.len(),
+            1,
+            "only the list asks the org-wide question"
+        );
+
+        let wide = format!("wide_{}", config::ider::uuid());
+        checker.grant_read_all(&wide, &org, StreamType::Traces);
+        assert_eq!(
+            stream_grants(&org, &wide, all.clone(), StreamType::Traces).await,
+            all
+        );
+        let one = stream_grants(&org, &wide, vec!["s2".into()], StreamType::Traces).await;
+        assert_eq!(
+            one,
+            vec!["s2".to_string()],
+            "a type-wide grant opens a lone stream"
         );
     }
 
