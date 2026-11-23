@@ -399,38 +399,51 @@ const MULTIPART_UPLOADS: &[(&str, &str, &str)] = &[
     ("ent", "/api/{org_id}/settings/logo", "file"),
 ];
 
-/// Query parameters (edition, method, path, name) the handler rejects a request without.
-const REQUIRED_QUERY_PARAMS: &[(&str, &str, &str, &str)] = &[
+/// Query parameters (edition, method, path, name, required) the handler reads; an MCP tool
+/// passes only declared ones, and a required one is rejected when missing.
+const QUERY_PARAMS: &[(&str, &str, &str, &str, bool)] = &[
     (
         "all",
         "POST",
         "/api/{org_id}/prometheus/api/v1/format_query",
         "query",
+        true,
     ),
-    ("ent", "GET", "/api/{org_id}/search/profile", "trace_id"),
+    ("all", "GET", "/api/{org_id}/streams", "fetchSchema", false),
+    (
+        "ent",
+        "GET",
+        "/api/{org_id}/search/profile",
+        "trace_id",
+        true,
+    ),
     (
         "cloud",
         "GET",
         "/api/{org_id}/billings/checkout_session_detail",
         "session_id",
+        true,
     ),
     (
         "cloud",
         "GET",
         "/api/{org_id}/billings/checkout_session_detail",
         "status",
+        true,
     ),
     (
         "cloud",
         "GET",
         "/api/{org_id}/billings/checkout_session_detail",
         "plan",
+        true,
     ),
     (
         "cloud",
         "GET",
         "/api/{org_id}/billings/hosted_subscription_url",
         "plan",
+        true,
     ),
 ];
 
@@ -1682,24 +1695,29 @@ fn multipart_uploads_name_their_parts() {
 }
 
 #[test]
-fn required_query_params_are_declared_required() {
+fn query_params_the_handlers_read_are_declared() {
     let spec = published_spec();
     let ops = published_ops(&spec);
     let mut checked = 0;
-    for (edition, method, path, name) in REQUIRED_QUERY_PARAMS {
+    for (edition, method, path, name, required) in QUERY_PARAMS {
         let Some(op) = row_op(&ops, edition, method, path) else {
             continue;
         };
         checked += 1;
         let declared = op["parameters"].as_array().is_some_and(|params| {
             params.iter().any(|param| {
-                param["name"] == *name && param["in"] == "query" && param["required"] == true
+                param["name"] == *name
+                    && param["in"] == "query"
+                    && param["required"].as_bool().unwrap_or(false) == *required
             })
         });
-        assert!(declared, "{method} {path}: {name} must be a required param");
+        assert!(
+            declared,
+            "{method} {path}: {name} must be a query param with required={required}"
+        );
     }
     assert!(
-        checked >= build_floor(1, 2, 6),
+        checked >= build_floor(2, 3, 7),
         "only {checked} params checked"
     );
 }

@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "cloud")]
+use std::collections::HashMap;
+
 use config::{
     ider,
     meta::user::{DBUser, UserRole, UserType},
@@ -23,8 +26,12 @@ use sea_orm::{
     entity::prelude::*,
     sea_query::{Func, Query, SimpleExpr},
 };
+#[cfg(feature = "cloud")]
+use sea_orm::{Condition, FromQueryResult, Select, sea_query::LikeExpr};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "cloud")]
+use super::entity::organizations;
 use super::entity::{
     org_users,
     users::{ActiveModel, Column, Entity, Model},
@@ -33,6 +40,14 @@ use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
+
+#[cfg(feature = "cloud")]
+const DEFAULT_LIST_PAGE_SIZE: i64 = 20;
+#[cfg(feature = "cloud")]
+const MAX_LIST_PAGE_SIZE: i64 = 100;
+// Keeps the page offset far inside the signed 64-bit OFFSET every backend binds.
+#[cfg(feature = "cloud")]
+const MAX_LIST_PAGE: i64 = u32::MAX as i64;
 
 impl From<Model> for UserRecord {
     fn from(model: Model) -> Self {
@@ -139,6 +154,93 @@ impl From<&UserRecord> for DBUser {
             password_ext: user.password_ext.clone(),
         }
     }
+}
+
+/// Which users one page of the cross-organization listing holds. Root users are never listed.
+#[cfg(feature = "cloud")]
+#[derive(Clone, Debug, PartialEq)]
+pub struct UserListFilter {
+    search: Option<String>,
+    org_id: Option<String>,
+    page_idx: u64,
+    page_size: u64,
+}
+
+#[cfg(feature = "cloud")]
+impl UserListFilter {
+    /// `page` is 1-based. Missing or out-of-range paging values are clamped, never rejected.
+    pub fn new(
+        search: Option<&str>,
+        org_id: Option<&str>,
+        page: Option<i64>,
+        page_size: Option<i64>,
+    ) -> Self {
+        let non_empty = |value: Option<&str>| {
+            value
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+        };
+        let page = page.unwrap_or(1).clamp(1, MAX_LIST_PAGE);
+        let page_size = page_size
+            .unwrap_or(DEFAULT_LIST_PAGE_SIZE)
+            .clamp(1, MAX_LIST_PAGE_SIZE);
+        Self {
+            search: non_empty(search),
+            org_id: non_empty(org_id),
+            page_idx: (page - 1).unsigned_abs(),
+            page_size: page_size.unsigned_abs(),
+        }
+    }
+}
+
+/// One page of listed users, and how many users match the filter in total.
+#[cfg(feature = "cloud")]
+#[derive(Clone, Debug, PartialEq, Serialize, utoipa::ToSchema)]
+pub struct UserListPage {
+    pub data: Vec<ListedUser>,
+    pub total: u64,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Clone, Debug, PartialEq, Serialize, utoipa::ToSchema)]
+pub struct ListedUser {
+    /// The `users.id` primary key.
+    pub id: String,
+    pub email: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub is_external: bool,
+    pub created_at: i64,
+    pub orgs: Vec<ListedMembership>,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Clone, Debug, PartialEq, Serialize, utoipa::ToSchema)]
+pub struct ListedMembership {
+    pub org_id: String,
+    pub org_name: String,
+    pub role: UserRole,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Debug, FromQueryResult)]
+struct ListedUserRow {
+    id: String,
+    email: String,
+    first_name: String,
+    last_name: String,
+    user_type: i16,
+    created_at: i64,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Debug, FromQueryResult)]
+struct MembershipRow {
+    email: String,
+    org_id: String,
+    org_name: String,
+    role: i16,
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
@@ -365,6 +467,14 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<UserRecord>, errors::Error> 
     Ok(records)
 }
 
+/// One page of non-root users, newest first, each with every organization they belong to.
+#[cfg(feature = "cloud")]
+pub async fn list_page(filter: &UserListFilter) -> Result<UserListPage, errors::Error> {
+    list_page_with(get_orm_client_ro().await, filter)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 pub async fn len() -> usize {
     let client = get_orm_client_ro().await;
     let len = Entity::find().count(client).await;
@@ -438,6 +548,115 @@ fn not_a_service_account() -> SimpleExpr {
             .and_where(org_users::Column::Role.is_in(service_account_roles))
             .to_owned(),
     )
+}
+
+#[cfg(feature = "cloud")]
+async fn list_page_with<C: ConnectionTrait>(
+    conn: &C,
+    filter: &UserListFilter,
+) -> Result<UserListPage, sea_orm::DbErr> {
+    let paginator = listed_users_query(filter)
+        .into_model::<ListedUserRow>()
+        .paginate(conn, filter.page_size);
+    let total = paginator.num_items().await?;
+    let rows = paginator.fetch_page(filter.page_idx).await?;
+    let memberships = if rows.is_empty() {
+        vec![]
+    } else {
+        let emails = rows.iter().map(|row| row.email.clone()).collect();
+        memberships_query(emails)
+            .into_model::<MembershipRow>()
+            .all(conn)
+            .await?
+    };
+    Ok(UserListPage {
+        data: attach_memberships(rows, memberships),
+        total,
+    })
+}
+
+#[cfg(feature = "cloud")]
+fn listed_users_query(filter: &UserListFilter) -> Select<Entity> {
+    let lowered_email = || Expr::expr(Func::lower(Expr::col((Entity, Column::Email))));
+    let mut query = Entity::find()
+        .select_only()
+        .columns([
+            Column::Id,
+            Column::Email,
+            Column::FirstName,
+            Column::LastName,
+            Column::UserType,
+            Column::CreatedAt,
+        ])
+        .filter(Column::IsRoot.eq(false));
+    if let Some(term) = &filter.search {
+        let pattern = format!("%{}%", crate::db::escape_like_prefix(&term.to_lowercase()));
+        query = query.filter(
+            Condition::any()
+                .add(Column::Id.eq(term.as_str()))
+                .add(lowered_email().like(LikeExpr::new(pattern).escape('\\'))),
+        );
+    }
+    // The org_users.email foreign key keeps the users.email spelling, so exact matches use the
+    // index.
+    if let Some(org_id) = &filter.org_id {
+        query = query.filter(
+            Column::Email.in_subquery(
+                Query::select()
+                    .column((org_users::Entity, org_users::Column::Email))
+                    .from(org_users::Entity)
+                    .and_where(org_users::Column::OrgId.eq(org_id.as_str()))
+                    .to_owned(),
+            ),
+        );
+    }
+    query
+        .order_by_desc(Column::CreatedAt)
+        .order_by_desc(Column::Id)
+}
+
+/// Every membership of the given `users.email` values, with the organization's name.
+#[cfg(feature = "cloud")]
+fn memberships_query(emails: Vec<String>) -> Select<org_users::Entity> {
+    org_users::Entity::find()
+        .select_only()
+        .column(org_users::Column::Email)
+        .column(org_users::Column::OrgId)
+        .column(organizations::Column::OrgName)
+        .column(org_users::Column::Role)
+        .inner_join(organizations::Entity)
+        .filter(org_users::Column::Email.is_in(emails))
+        .order_by_asc(organizations::Column::OrgName)
+        .order_by_asc(org_users::Column::OrgId)
+}
+
+#[cfg(feature = "cloud")]
+fn attach_memberships(
+    rows: Vec<ListedUserRow>,
+    memberships: Vec<MembershipRow>,
+) -> Vec<ListedUser> {
+    let mut by_email: HashMap<String, Vec<ListedMembership>> = HashMap::new();
+    for membership in memberships {
+        by_email
+            .entry(membership.email)
+            .or_default()
+            .push(ListedMembership {
+                org_id: membership.org_id,
+                org_name: membership.org_name,
+                role: membership.role.into(),
+            });
+    }
+    rows.into_iter()
+        .map(|row| ListedUser {
+            orgs: by_email.remove(&row.email).unwrap_or_default(),
+            id: row.id,
+            email: row.email,
+            first_name: row.first_name,
+            last_name: row.last_name,
+            is_external: UserType::from(row.user_type).is_external(),
+            created_at: row.created_at,
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -762,5 +981,245 @@ mod tests {
         assert_eq!(rec.password_ext, Some("ext".to_string()));
         assert_eq!(rec.created_at, 1_000_000);
         assert_eq!(rec.updated_at, 2_000_000);
+    }
+
+    #[cfg(feature = "cloud")]
+    mod listing {
+        use sea_orm::{DbBackend, QueryTrait};
+
+        use super::*;
+        use crate::table::entity::organizations;
+
+        const USERS: [(&str, &str, i64, bool, UserType); 6] = [
+            ("u-root", "root@acme.com", 60, true, UserType::Internal),
+            ("u-alice", "Alice@Acme.com", 40, false, UserType::External),
+            ("u-bob", "bob@acme.com", 30, false, UserType::Internal),
+            ("u-carol", "carol@other.io", 30, false, UserType::Internal),
+            ("u-dave", "dave_x@other.io", 10, false, UserType::Internal),
+            ("u-jane", "jane.x@other.io", 5, false, UserType::Internal),
+        ];
+        const MEMBERSHIPS: [(&str, &str, UserRole); 5] = [
+            ("root@acme.com", "acme", UserRole::Root),
+            ("Alice@Acme.com", "other", UserRole::Viewer),
+            ("Alice@Acme.com", "acme", UserRole::Admin),
+            ("bob@acme.com", "acme", UserRole::Editor),
+            ("carol@other.io", "other", UserRole::Admin),
+        ];
+
+        async fn listing_db() -> sea_orm::DatabaseConnection {
+            let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+            let backend = db.get_database_backend();
+            let schema = Schema::new(backend);
+            for stmt in [
+                schema.create_table_from_entity(Entity),
+                schema.create_table_from_entity(org_users::Entity),
+                schema.create_table_from_entity(organizations::Entity),
+            ] {
+                db.execute(backend.build(&stmt)).await.unwrap();
+            }
+            for (identifier, name) in [("acme", "Acme Corp"), ("other", "Other Inc")] {
+                organizations::ActiveModel {
+                    identifier: Set(identifier.to_string()),
+                    org_name: Set(name.to_string()),
+                    org_type: Set(0),
+                    status: Set("active".to_string()),
+                    created_at: Set(0),
+                    updated_at: Set(0),
+                    deleted_at: Set(None),
+                    trial_ends_at: Set(0),
+                }
+                .insert(&db)
+                .await
+                .unwrap();
+            }
+            for (id, email, created_at, is_root, user_type) in USERS {
+                ActiveModel {
+                    id: Set(id.to_string()),
+                    email: Set(email.to_string()),
+                    first_name: Set(String::new()),
+                    last_name: Set(String::new()),
+                    password: Set(String::new()),
+                    salt: Set(String::new()),
+                    is_root: Set(is_root),
+                    password_ext: Set(None),
+                    user_type: Set(user_type.into()),
+                    created_at: Set(created_at),
+                    updated_at: Set(created_at),
+                    must_reset_password: Set(false),
+                    password_reset_reason: Set(None),
+                    flagged_at: Set(None),
+                    password_updated_at: Set(None),
+                }
+                .insert(&db)
+                .await
+                .unwrap();
+            }
+            for (i, (email, org_id, role)) in MEMBERSHIPS.into_iter().enumerate() {
+                org_users::ActiveModel {
+                    id: Set(format!("m{i}")),
+                    email: Set(email.to_string()),
+                    org_id: Set(org_id.to_string()),
+                    role: Set(role.into()),
+                    token: Set(String::new()),
+                    rum_token: Set(None),
+                    created_at: Set(0),
+                    updated_at: Set(0),
+                    allow_static_token: Set(false),
+                }
+                .insert(&db)
+                .await
+                .unwrap();
+            }
+            db
+        }
+
+        async fn listed(
+            db: &sea_orm::DatabaseConnection,
+            search: Option<&str>,
+            org_id: Option<&str>,
+            page: Option<i64>,
+            page_size: Option<i64>,
+        ) -> (Vec<String>, u64) {
+            let filter = UserListFilter::new(search, org_id, page, page_size);
+            let page = list_page_with(db, &filter).await.unwrap();
+            (
+                page.data.into_iter().map(|user| user.id).collect(),
+                page.total,
+            )
+        }
+
+        #[test]
+        fn paging_values_are_clamped_not_rejected() {
+            for (page, page_size, expected_idx, expected_size) in [
+                (None, None, 0, 20),
+                (Some(3), Some(50), 2, 50),
+                (Some(0), Some(0), 0, 1),
+                (Some(-4), Some(1_000), 0, 100),
+                (Some(i64::MAX), Some(-1), u64::from(u32::MAX) - 1, 1),
+            ] {
+                let filter = UserListFilter::new(None, None, page, page_size);
+                assert_eq!(
+                    (filter.page_idx, filter.page_size),
+                    (expected_idx, expected_size),
+                    "page={page:?} page_size={page_size:?}"
+                );
+            }
+        }
+
+        #[test]
+        fn blank_search_and_org_filter_nothing() {
+            let filter = UserListFilter::new(Some("  "), Some(""), None, None);
+            assert_eq!((filter.search, filter.org_id), (None, None));
+        }
+
+        #[tokio::test]
+        async fn listing_is_newest_first_paged_and_never_returns_root() {
+            let db = listing_db().await;
+            for (page, page_size, expected) in [
+                (
+                    None,
+                    None,
+                    vec!["u-alice", "u-carol", "u-bob", "u-dave", "u-jane"],
+                ),
+                (Some(1), Some(2), vec!["u-alice", "u-carol"]),
+                (Some(2), Some(2), vec!["u-bob", "u-dave"]),
+                (Some(3), Some(2), vec!["u-jane"]),
+                (Some(9), Some(2), vec![]),
+            ] {
+                let (ids, total) = listed(&db, None, None, page, page_size).await;
+                assert_eq!(ids, expected, "page={page:?} page_size={page_size:?}");
+                assert_eq!(total, 5, "page={page:?} page_size={page_size:?}");
+            }
+        }
+
+        #[tokio::test]
+        async fn search_matches_an_exact_id_or_an_email_substring_in_any_case() {
+            let db = listing_db().await;
+            for (search, expected) in [
+                ("ACME", vec!["u-alice", "u-bob"]),
+                ("u-bob", vec!["u-bob"]),
+                ("U-BOB", vec![]),
+                ("u-bo", vec![]),
+                ("e_x", vec!["u-dave"]),
+                ("%", vec![]),
+                ("root", vec![]),
+                ("", vec!["u-alice", "u-carol", "u-bob", "u-dave", "u-jane"]),
+            ] {
+                let (ids, total) = listed(&db, Some(search), None, None, None).await;
+                assert_eq!(ids, expected, "{search}");
+                assert_eq!(total, expected.len() as u64, "{search}");
+            }
+        }
+
+        #[tokio::test]
+        async fn org_filter_keeps_members_only_and_combines_with_search() {
+            let db = listing_db().await;
+            for (org_id, search, expected) in [
+                ("acme", None, vec!["u-alice", "u-bob"]),
+                ("other", None, vec!["u-alice", "u-carol"]),
+                ("acme", Some("bob"), vec!["u-bob"]),
+                ("other", Some("bob"), vec![]),
+                ("missing", None, vec![]),
+            ] {
+                let (ids, total) = listed(&db, search, Some(org_id), None, None).await;
+                assert_eq!(ids, expected, "{org_id} {search:?}");
+                assert_eq!(total, expected.len() as u64, "{org_id} {search:?}");
+            }
+        }
+
+        #[tokio::test]
+        async fn each_user_carries_every_membership_with_org_name_and_role() {
+            let db = listing_db().await;
+            let filter = UserListFilter::new(None, None, None, None);
+            let page = list_page_with(&db, &filter).await.unwrap();
+            let alice = &page.data[0];
+            assert_eq!(alice.email, "Alice@Acme.com");
+            assert!(alice.is_external);
+            assert_eq!(alice.created_at, 40);
+            assert_eq!(
+                alice.orgs,
+                vec![
+                    ListedMembership {
+                        org_id: "acme".to_string(),
+                        org_name: "Acme Corp".to_string(),
+                        role: UserRole::Admin,
+                    },
+                    ListedMembership {
+                        org_id: "other".to_string(),
+                        org_name: "Other Inc".to_string(),
+                        role: UserRole::Viewer,
+                    },
+                ]
+            );
+            let dave = page.data.iter().find(|user| user.id == "u-dave").unwrap();
+            assert!(!dave.is_external);
+            assert!(dave.orgs.is_empty());
+        }
+
+        #[test]
+        fn memberships_are_read_for_the_given_emails_only() {
+            let sql = memberships_query(vec!["Alice@Acme.com".to_string()])
+                .build(DbBackend::Sqlite)
+                .to_string();
+            // The org_users.email foreign key keeps the users.email spelling, so the index applies.
+            assert!(
+                sql.contains(r#"WHERE "org_users"."email" IN ('Alice@Acme.com')"#),
+                "{sql}"
+            );
+        }
+
+        #[test]
+        fn the_org_filter_matches_stored_emails_exactly() {
+            let filter = UserListFilter::new(None, Some("acme"), None, None);
+            let sql = listed_users_query(&filter)
+                .build(DbBackend::Sqlite)
+                .to_string();
+            assert!(
+                sql.contains(
+                    r#""users"."email" IN (SELECT "org_users"."email" FROM "org_users" WHERE "org_users"."org_id" = 'acme')"#
+                ),
+                "{sql}"
+            );
+        }
     }
 }

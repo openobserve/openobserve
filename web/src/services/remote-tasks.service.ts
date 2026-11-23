@@ -202,7 +202,6 @@ export type RemoteTaskCandidateTestPayload = CreateRemoteTaskPayload &
 
 export interface RemoteTaskVerificationReport {
   rawRequest: string;
-  rawResponse: string;
   statusCode?: number;
   parsedOutput?: any;
   latencyMs: number;
@@ -252,7 +251,6 @@ export interface RemoteTaskTestRunRow {
   status: "ok" | "skipped" | "error";
   parsedOutput?: any;
   rawRequest: string;
-  rawResponse: string;
   httpStatus?: number;
   latencyMs: number;
   /** Calls the registered retry policy actually made, so a retried sample reads as one. */

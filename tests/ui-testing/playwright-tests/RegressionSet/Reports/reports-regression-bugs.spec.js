@@ -157,6 +157,41 @@ test.describe("Reports Regression Bug Fixes", () => {
     }
   });
 
+  test("Report name typed before the folders load survives the form seeding", {
+    tag: ['@bug-15547', '@P3', '@regression', '@reportsRegression']
+  }, async ({ page }) => {
+    const org = process.env.ORGNAME || 'default';
+    const name = `e2e_early_name_${Date.now()}`;
+    const folderReq = new RegExp(`/api/v2/${org}/folders/(reports|dashboards)(\\?|$)`);
+    let delayed = 0;
+    let released = 0;
+    await page.route(folderReq, async (route) => {
+      delayed += 1;
+      await new Promise((r) => setTimeout(r, 3000));
+      await route.continue().catch(() => {});
+      released += 1;
+    });
+    const foldersLoaded = page.waitForResponse((r) => folderReq.test(r.url()), { timeout: 30000 });
+
+    await page.goto(`${process.env.ZO_BASE_URL}/web/reports/create?org_identifier=${org}`);
+    const nameInput = pm.reportsFormValidation.getReportNameInputLocator();
+    await pm.reportsFormValidation.fillReportName(name, 15000);
+    const typedAt = Date.now();
+
+    await foldersLoaded;
+    expect(Date.now(), 'the name must be typed before the folders arrive').toBeGreaterThan(typedAt + 500);
+    expect(delayed, 'the folders request should have been held back').toBeGreaterThan(0);
+    await expect.poll(() => released, { timeout: 15000, message: 'every held folders request must be answered' }).toBe(delayed);
+    // the old seedForm reset ran after the folders answered, so give the form a beat to apply it
+    await page.waitForTimeout(1000);
+    await expect(nameInput).toHaveValue(name);
+
+    await pm.reportsFormValidation.clickContinueStep1();
+    await expect(pm.reportsFormValidation.getReportNameErrorLocator()).toBeHidden();
+    await expect(nameInput).toHaveValue(name);
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+  });
+
   test.afterEach(async () => {
     testLogger.info('Reports regression test completed');
   });

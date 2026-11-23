@@ -1142,6 +1142,88 @@ export default class DashboardactionPage {
     return slice;
   }
 
+  // A funnel is canvas-painted too: each stage is an ECharts polygon, so its drawn centre (page coordinates)
+  // and its rendered label text are read off the live instance. Stages come back in data (query) order.
+  async getFunnelState(scopeSelector = this.chartRendererSelector) {
+    return this._withLiveCharts(scopeSelector, (findCharts, { scopeSel }) => {
+      const found = findCharts(scopeSel)
+        .map(({ chart }) => chart)
+        .find((chart) => {
+          try {
+            return chart.getOption()?.series?.[0]?.type === "funnel";
+          } catch {
+            return false; // A disposed instance throws.
+          }
+        });
+      if (!found) return null;
+
+      const series = found.getOption().series[0];
+      const data = found.getModel().getSeriesByIndex(0).getData();
+      const rect = found.getDom().getBoundingClientRect();
+      const stages = [];
+      for (let i = 0; i < data.count(); i++) {
+        const el = data.getItemGraphicEl(i);
+        const points = el?.shape?.points;
+        if (!Array.isArray(points) || !points.length || el.invisible || el.ignore) continue;
+        const cx = points.reduce((sum, p) => sum + p[0], 0) / points.length;
+        const cy = points.reduce((sum, p) => sum + p[1], 0) / points.length;
+        const label = el.getTextContent?.();
+        stages.push({
+          name: String(data.getName(i) ?? ""),
+          value: Number(data.get("value", i) ?? 0),
+          labelText: label && !label.ignore && !label.invisible ? String(label.style?.text ?? "") : "",
+          x: rect.left + cx,
+          y: rect.top + cy,
+        });
+      }
+      return {
+        sort: series.sort ?? null,
+        orient: series.orient ?? null,
+        stages,
+      };
+    });
+  }
+
+  /** Poll until a funnel is drawn, and return its state. */
+  async waitForFunnel(timeout = 20000) {
+    let state = null;
+    await expect
+      .poll(async () => {
+        state = await this.getFunnelState();
+        return state?.stages?.length ?? 0;
+      }, { timeout, message: "funnel never drew any stage" })
+      .toBeGreaterThan(0);
+    return state;
+  }
+
+  /** Stage names as drawn: top to bottom when vertical, left to right when horizontal. */
+  funnelDrawOrder(state) {
+    const axis = state.orient === "horizontal" ? "x" : "y";
+    return [...state.stages].sort((a, b) => a[axis] - b[axis]).map((stage) => stage.name);
+  }
+
+  /** Stage names ordered by value, largest first (smallest first with `ascending`). */
+  funnelNamesByValue(state, ascending = false) {
+    return [...state.stages]
+      .sort((a, b) => (ascending ? a.value - b.value : b.value - a.value))
+      .map((stage) => stage.name);
+  }
+
+  /** Rendered label text of the named funnel stage, or "" while it is not drawn. */
+  async getFunnelStageLabel(name) {
+    const state = await this.getFunnelState();
+    return state?.stages.find((stage) => stage.name === name)?.labelText ?? "";
+  }
+
+  // The largest stage is the widest, so it is the easiest real click target.
+  async clickLargestFunnelStage() {
+    const state = await this.waitForFunnel();
+    const stage = state.stages.reduce((a, b) => (b.value > a.value ? b : a));
+    await this.page.mouse.move(stage.x, stage.y);
+    await this.page.mouse.click(stage.x, stage.y);
+    return stage;
+  }
+
   async getGaugeLayoutProblems(expected = {}, scopeSelector = this.chartRendererSelector) {
     const charts = await this.getChartOptionSnapshots(scopeSelector);
     if (charts.length !== 1) return [`expected one rendered chart, found ${charts.length}`];
