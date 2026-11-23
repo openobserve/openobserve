@@ -484,6 +484,39 @@ describe("useStarterPackFlow", () => {
     expect(flow.interrupted.value).toBe(true);
   });
 
+  it("names who started an unfinished setup when it was not this user", async () => {
+    fake.installs = [record({ status: "incomplete", installedBy: "other@x" })];
+    const other = setup();
+    await other.load();
+    expect(other.interrupted.value).toBe(true);
+    expect(other.interruptedBy.value).toBe("other@x");
+
+    fake.installs = [record({ status: "incomplete", installedBy: undefined })];
+    const unknown = setup();
+    await unknown.load();
+    expect(unknown.interruptedBy.value).toBe("");
+
+    fake.installs = [record({ status: "incomplete" })];
+    const own = setup();
+    await own.load();
+    expect(own.interruptedBy.value).toBeNull();
+    fake.installs = [record()];
+    const done = setup();
+    await done.load();
+    expect(done.interruptedBy.value).toBeNull();
+  });
+
+  it("shows this user's own unfinished setup over someone else's", async () => {
+    fake.installs = [
+      record({ installId: "theirs", status: "incomplete", installedBy: "other@x" }),
+      record({ installId: "mine", status: "incomplete" }),
+    ];
+    const flow = setup();
+    await flow.load();
+    expect(flow.record.value?.installId).toBe("mine");
+    expect(flow.interruptedBy.value).toBeNull();
+  });
+
   it("offers Undo to the installer or an admin for 24 hours only", async () => {
     fake.installs = [record({ installedBy: "other@x" })];
     const other = setup();

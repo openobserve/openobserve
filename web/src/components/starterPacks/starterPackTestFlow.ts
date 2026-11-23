@@ -56,6 +56,7 @@ export const fakeFlow = (over: Record<string, unknown> = {}) =>
     installFailed: ref(false),
     installed: ref(false),
     interrupted: ref(false),
+    interruptedBy: computed(() => null),
     items: ref([]),
     skipped: ref([]),
     land: vi.fn(async () => undefined),
