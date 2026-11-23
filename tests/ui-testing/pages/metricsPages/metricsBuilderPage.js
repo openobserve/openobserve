@@ -564,15 +564,12 @@ export class MetricsBuilderPage {
     }
 
     /**
-     * Add `<first label> <operator> <first value>`; returns the label and value picked, throws when none are listed
+     * Add `<label> <operator> <first value>`; returns the label and value picked
+     * @param {string} label
      * @param {string} operator
      */
-    async addFirstLabelFilter(operator = '=') {
+    async addLabelFilterWithFirstValue(label, operator = '=') {
         await this.clickAddLabelFilter();
-        const label = await this.firstOptionKey();
-        if (!label) {
-            throw new Error(`no labels listed for metric "${await this.getStreamSelectedValue()}"`);
-        }
         await this.getLabelFilterOption(label).click();
         await this.selectOperator(operator);
         const value = await this.selectFirstLabelValue(label);

@@ -176,9 +176,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     // 2. Opening the bar lists the metric's labels; nothing is added until a matcher is complete
     await builder.clickAddLabelFilter();
     expect(await builder.getLabelFilterCount()).toBe(initialCount);
-    const firstLabel = await builder.firstOptionKey();
-    expect(firstLabel, `no labels listed for metric ${SEEDED_METRIC}`).not.toBe('');
-    testLogger.info(`First label: ${firstLabel}`);
+    const firstLabel = SEEDED_LABELS[0];
 
     // 3. Picking a label lists PromQL's matchers, plus IN / NOT IN written as an alternation
     await builder.getLabelFilterOption(firstLabel).click();
@@ -414,7 +412,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const builder = pm.metricsBuilderPage;
 
     // Setup: add filter, operation, step value
-    const added = await builder.addFirstLabelFilter();
+    const added = await builder.addLabelFilterWithFirstValue(SEEDED_LABELS[0]);
     expect(added.label).toBeTruthy();
     expect(await builder.getLabelFilterCount()).toBe(1);
 
@@ -466,7 +464,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await pm.metricsPage.selectLast15Minutes();
 
     // 3. Add label filter
-    const added = await builder.addFirstLabelFilter();
+    const added = await builder.addLabelFilterWithFirstValue(SEEDED_LABELS[0]);
     expect(added.label).not.toBe('');
     expect(await builder.getLabelFilterCount()).toBeGreaterThan(0);
 
@@ -677,7 +675,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await pm.metricsPage.selectLast15Minutes();
 
     // 2. Add label filter
-    const added = await builder.addFirstLabelFilter();
+    const added = await builder.addLabelFilterWithFirstValue(SEEDED_LABELS[0]);
     expect(added.label).not.toBe('');
     expect(await builder.getLabelFilterCount()).toBe(1);
 
@@ -737,7 +735,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Time range: last 15 minutes');
 
     // 3. Add a label filter and fully configure label + operator + value
-    const added = await builder.addFirstLabelFilter();
+    const added = await builder.addLabelFilterWithFirstValue(SEEDED_LABELS[0]);
     const selectedLabel = added.label;
     const selectedValue = added.value;
     expect(await builder.getLabelFilterCount()).toBe(1);
@@ -760,18 +758,16 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     // Find the multi-select param for labels (type="select" in the operation menu)
     // Inside the chip menu the param is OSelect (Reka Listbox)
     const labelParam = builder.getOperationParam(0);
-    if (await labelParam.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await labelParam.click();
-      await builder.getOperationParamPopover(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await expect(labelParam).toBeVisible({ timeout: 10000 });
+    await labelParam.click();
+    await builder.getOperationParamPopover(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
-      // Select the label from the dropdown
-      const paramOption = builder.getOperationParamOptionByValue(0, selectedLabel);
-      if (await paramOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await paramOption.click();
-        await builder.getOperationParamPopover(0).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-        testLogger.info(`Sum operation: selected label "${selectedLabel}" for by clause`);
-      }
-    }
+    // Select the label from the dropdown
+    const paramOption = builder.getOperationParamOptionByValue(0, selectedLabel);
+    await expect(paramOption).toBeVisible({ timeout: 10000 });
+    await paramOption.click();
+    await builder.getOperationParamPopover(0).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    testLogger.info(`Sum operation: selected label "${selectedLabel}" for by clause`);
 
     // Close the operation menu
     await page.keyboard.press('Escape');
@@ -879,7 +875,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await pm.metricsPage.selectLast15Minutes();
 
     // 3. Add label filter and configure label + operator(=) + value
-    const added = await builder.addFirstLabelFilter();
+    const added = await builder.addLabelFilterWithFirstValue(SEEDED_LABELS[0]);
     const selectedLabel = added.label;
     const selectedValue = added.value;
     expect(await builder.getLabelFilterCount()).toBe(1);
@@ -900,18 +896,16 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await builder.getOperationMenu(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
     const labelParam = builder.getOperationParam(0);
-    if (await labelParam.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await labelParam.click();
-      // Inside the chip menu the param is an OSelect (Reka Listbox)
-      await builder.getOperationParamPopover(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await expect(labelParam).toBeVisible({ timeout: 10000 });
+    await labelParam.click();
+    // Inside the chip menu the param is an OSelect (Reka Listbox)
+    await builder.getOperationParamPopover(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
-      const paramOption = builder.getOperationParamOptionByValue(0, selectedLabel);
-      if (await paramOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await paramOption.click();
-        await builder.getOperationParamPopover(0).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-        testLogger.info(`Sum by: ${selectedLabel}`);
-      }
-    }
+    const paramOption = builder.getOperationParamOptionByValue(0, selectedLabel);
+    await expect(paramOption).toBeVisible({ timeout: 10000 });
+    await paramOption.click();
+    await builder.getOperationParamPopover(0).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    testLogger.info(`Sum by: ${selectedLabel}`);
     await page.keyboard.press('Escape');
     await builder.getOperationMenu(0).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
 
@@ -1009,7 +1003,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await pm.metricsPage.selectLast15Minutes();
 
     // 3. Add label filter with label + operator(=) + value
-    const added = await builder.addFirstLabelFilter();
+    const added = await builder.addLabelFilterWithFirstValue(SEEDED_LABELS[0]);
     const selectedLabel = added.label;
     const selectedValue = added.value;
     expect(await builder.getLabelFilterCount()).toBe(1);
@@ -1029,17 +1023,15 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await opBtn.click();
     await builder.getOperationMenu(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     const labelParam = builder.getOperationParam(0);
-    if (await labelParam.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await labelParam.click();
-      // Param OSelect (Reka Listbox)
-      await builder.getOperationParamPopover(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-      const paramOption = builder.getOperationParamOptionByValue(0, selectedLabel);
-      if (await paramOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await paramOption.click();
-        await builder.getOperationParamPopover(0).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-        testLogger.info(`Sum by: ${selectedLabel}`);
-      }
-    }
+    await expect(labelParam).toBeVisible({ timeout: 10000 });
+    await labelParam.click();
+    // Param OSelect (Reka Listbox)
+    await builder.getOperationParamPopover(0).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    const paramOption = builder.getOperationParamOptionByValue(0, selectedLabel);
+    await expect(paramOption).toBeVisible({ timeout: 10000 });
+    await paramOption.click();
+    await builder.getOperationParamPopover(0).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    testLogger.info(`Sum by: ${selectedLabel}`);
     await page.keyboard.press('Escape');
     await builder.getOperationMenu(0).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
 
