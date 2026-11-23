@@ -263,6 +263,14 @@ async fn run() -> Result<(), anyhow::Error> {
 
             // flush WAL cache to disk
             _ = ingester::flush_all().await;
+            #[cfg(feature = "enterprise")]
+            if let Err(e) =
+                openobserve_core::pipeline::batch_execution::flush_all_buffers(true).await
+            {
+                log::error!(
+                    "[Pipeline] failed to flush remote destination buffers on shutdown: {e}"
+                );
+            }
             // flush compact offset cache to disk disk
             _ = db::compact::files::sync_cache_to_db().await;
         });

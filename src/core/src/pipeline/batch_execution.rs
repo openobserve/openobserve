@@ -3124,76 +3124,72 @@ async fn read_body_capped(mut res: reqwest::Response, limit: usize) -> String {
     config::meta::db_normalizer::truncate_at_boundary(&text, limit).to_string()
 }
 
+/// Writes due buffers to the WAL and drops any whose writer is gone. [weak: its rows are lost]
 #[cfg(feature = "enterprise")]
-pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
+pub async fn flush_all_buffers(force: bool) -> Result<(), anyhow::Error> {
     let mut buffers = BATCH_BUFFERS.lock().await;
 
-    for (batch_key, buffer) in buffers.iter_mut() {
-        // let buffer_key = format!("{}:{}:{}:{}:{}", pipeline_id, metadata.org_id,
-        // remote_stream.destination_name, batch_key, "remote");
-        let key = batch_key.clone();
+    for (key, records_to_write) in take_due_records(&mut buffers, force) {
+        // buffer key: pipeline_id:org_id:destination_name:batch_key:remote
         let key_parts = key.split(":").collect::<Vec<&str>>();
-        let pipeline_id = key_parts[0].to_string();
-        let org_id = key_parts[1].to_string();
-        let destination_name = key_parts[2].to_string();
-        let batch_key = key_parts[3].to_string();
-        // let stream_type = key_parts[4].to_string();
+        let pipeline_id = key_parts[0];
+        let org_id = key_parts[1];
+        let destination_name = key_parts[2];
+        let batch_key = key_parts[3];
 
-        let remote_stream = config::meta::stream::RemoteStreamParams {
-            org_id: org_id.clone().into(),
-            destination_name: destination_name.clone().into(),
+        log::debug!(
+            "[Pipeline]: Flushing buffer for batch_key '{}' - writing {} records to WAL",
+            batch_key,
+            records_to_write.len()
+        );
+
+        let remote_stream_for_batch = config::meta::stream::RemoteStreamParams {
+            org_id: org_id.to_string().into(),
+            destination_name: destination_name.to_string().into(),
         };
 
-        let mut remote_stream_for_batch = remote_stream.clone();
-        remote_stream_for_batch.org_id = org_id.clone().into();
+        let records_len = records_to_write.len();
 
-        if buffer.should_flush() {
-            let records_to_write = buffer.take_records();
+        let writer = match get_pipeline_wal_writer(pipeline_id, remote_stream_for_batch).await {
+            Ok(writer) => writer,
+            Err(e) => {
+                log::error!(
+                    "DestinationNode error getting the WAL writer for batch_key '{batch_key}', dropping {records_len} buffered records: {e}"
+                );
+                buffers.remove(&key);
+                continue;
+            }
+        };
+        match writer.write_wal(records_to_write).await {
+            Err(e) => {
+                let err_msg = format!(
+                    "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
+                );
+                log::error!("{err_msg}");
+            }
+            Ok(data_size) => {
+                let data_size_mb = data_size as f64 / config::SIZE_IN_MB;
 
-            log::debug!(
-                "[Pipeline]: Flushing buffer for batch_key '{}' - writing {} records to WAL",
-                batch_key,
-                records_to_write.len()
-            );
+                // Report remote destination usage after successful WAL write
+                if data_size_mb > 0.0 {
+                    let req_stats = config::meta::self_reporting::usage::RequestStats {
+                        size: data_size_mb,
+                        records: records_len as i64,
+                        response_time: 0.0,
+                        ..config::meta::self_reporting::usage::RequestStats::default()
+                    };
 
-            // Create remote stream configuration with batch_key routing
-            let mut remote_stream_for_batch = remote_stream.clone();
-            remote_stream_for_batch.org_id = org_id.clone().into();
-
-            let records_len = records_to_write.len();
-
-            let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream_for_batch).await?;
-            match writer.write_wal(records_to_write).await {
-                Err(e) => {
-                    let err_msg = format!(
-                        "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
-                    );
-                    log::error!("{err_msg}");
-                }
-                Ok(data_size) => {
-                    let data_size_mb = data_size as f64 / config::SIZE_IN_MB;
-
-                    // Report remote destination usage after successful WAL write
-                    if data_size_mb > 0.0 {
-                        let req_stats = config::meta::self_reporting::usage::RequestStats {
-                            size: data_size_mb,
-                            records: records_len as i64,
-                            response_time: 0.0,
-                            ..config::meta::self_reporting::usage::RequestStats::default()
-                        };
-
-                        usage_reporting::report_request_usage_stats(
-                            req_stats,
-                            &org_id,
-                            &destination_name,
-                            config::meta::stream::StreamType::Logs, /* Default to Logs for
-                                                                     * remote destination */
-                            config::meta::self_reporting::usage::UsageType::RemotePipeline,
-                            0, // No additional functions for remote destination
-                            chrono::Utc::now().timestamp_micros(),
-                        )
-                        .await;
-                    }
+                    usage_reporting::report_request_usage_stats(
+                        req_stats,
+                        org_id,
+                        destination_name,
+                        config::meta::stream::StreamType::Logs, /* Default to Logs for
+                                                                 * remote destination */
+                        config::meta::self_reporting::usage::UsageType::RemotePipeline,
+                        0, // No additional functions for remote destination
+                        chrono::Utc::now().timestamp_micros(),
+                    )
+                    .await;
                 }
             }
         }
@@ -3201,6 +3197,21 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
     drop(buffers); // Release the lock before async operations
 
     Ok(())
+}
+
+/// Empties every due buffer (all when forced) and returns the non-empty takes. [no-fail]
+#[cfg(feature = "enterprise")]
+fn take_due_records(
+    buffers: &mut HashMap<String, BatchBuffer>,
+    force: bool,
+) -> Vec<(String, Vec<json::Value>)> {
+    buffers
+        .iter_mut()
+        .filter(|(_, buffer)| force || buffer.should_flush())
+        // Taking from an idle buffer restarts its batching window without a writer lookup.
+        .map(|(key, buffer)| (key.clone(), buffer.take_records()))
+        .filter(|(_, records)| !records.is_empty())
+        .collect()
 }
 
 async fn send_to_children(
@@ -3337,6 +3348,10 @@ mod tests {
     };
 
     use super::*;
+
+    /// Serializes tests on the process-wide `BATCH_BUFFERS`, since a forced flush clears every key.
+    #[cfg(feature = "enterprise")]
+    static BATCH_BUFFERS_TESTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
     #[test]
     fn test_my_regex() {
@@ -5858,6 +5873,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn remote_records_are_buffered_under_the_pipelines_own_org() {
+        let _serial = BATCH_BUFFERS_TESTS.lock().await;
         for (pipeline_id, node_org) in [("pipe-remote-blank", ""), ("pipe-remote-other", "org-2")] {
             let remote = config::meta::stream::RemoteStreamParams {
                 org_id: node_org.into(),
@@ -5887,6 +5903,67 @@ mod tests {
                 .filter(|k| k.starts_with(&format!("{pipeline_id}:")))
                 .collect();
             assert_eq!(keys, [&format!("{pipeline_id}:org-1:dest:default:remote")]);
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn take_due_records_takes_due_buffers_and_skips_empty_ones() {
+        let buffer = |records: usize, age: Duration| {
+            let mut b = BatchBuffer::new();
+            b.add_records(vec![json::json!({"k": "v"}); records]);
+            b.last_write = Instant::now().checked_sub(age).unwrap();
+            b
+        };
+        for (force, expected) in [
+            (false, vec![("full", 50)]),
+            (true, vec![("full", 50), ("young", 1)]),
+        ] {
+            let mut buffers = HashMap::from([
+                ("full".to_string(), buffer(50, Duration::ZERO)),
+                ("young".to_string(), buffer(1, Duration::ZERO)),
+                ("empty".to_string(), buffer(0, Duration::from_secs(10))),
+            ]);
+            let mut taken: Vec<_> = take_due_records(&mut buffers, force)
+                .into_iter()
+                .map(|(key, records)| (key, records.len()))
+                .collect();
+            taken.sort();
+            let expected: Vec<_> = expected
+                .into_iter()
+                .map(|(key, len)| (key.to_string(), len))
+                .collect();
+            assert_eq!(taken, expected, "force={force}");
+            assert!(
+                buffers["empty"].last_write.elapsed() < Duration::from_secs(5),
+                "an idle buffer restarts its window, force={force}"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn flush_all_buffers_drops_buffers_of_unknown_pipelines_and_keeps_going() {
+        if !crate::pipeline::tests::meta_store().await {
+            return;
+        }
+        let _serial = BATCH_BUFFERS_TESTS.lock().await;
+        let now = config::utils::time::now_micros();
+        let keys = ["ghost-a", "ghost-b"].map(|id| format!("{id}-{now}:org-1:dest:default:remote"));
+        {
+            let mut buffers = BATCH_BUFFERS.lock().await;
+            for key in &keys {
+                let mut buffer = BatchBuffer::new();
+                buffer.add_records(vec![json::json!({"k": "v"})]);
+                buffers.insert(key.clone(), buffer);
+            }
+        }
+
+        flush_all_buffers(true).await.unwrap();
+
+        let buffers = BATCH_BUFFERS.lock().await;
+        for key in &keys {
+            assert!(!buffers.contains_key(key), "{key} kept");
         }
     }
 }

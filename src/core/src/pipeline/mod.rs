@@ -798,7 +798,7 @@ mod tests {
     }
 
     /// The meta store CI configures through `ZO_META_STORE`, migrated once per binary.
-    async fn meta_store() -> bool {
+    pub(super) async fn meta_store() -> bool {
         static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
         if std::env::var("ZO_META_STORE").is_err() {
             eprintln!("skipped: needs ZO_META_STORE");
