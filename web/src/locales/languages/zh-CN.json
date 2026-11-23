@@ -12402,9 +12402,6 @@
     "testErrorClientError": "客户端错误 (4xx)。请检查您的凭证和配置。",
     "testErrorServerError": "服务器错误 (5xx)。目标服务遇到问题。",
     "viewDetails": "查看详情",
-    "error": "错误",
-    "httpStatus": "HTTP 状态",
-    "responseBody": "响应正文",
     "retry": "重试",
     "suggestCheckUrl": "请验证 webhook 网址是否正确且可访问。",
     "suggestCheckFirewall": "检查您的防火墙设置并确保目标服务可访问。",
@@ -14202,7 +14199,6 @@
       "loadFailedTitle": "无法加载此告警"
     },
     "timeLabel": "时间",
-    "unknownHttpStatus": "未知",
     "previewEvaluation": {
       "realTimeReason": "当条件匹配时",
       "matchingGroup": "匹配组",
@@ -15623,7 +15619,6 @@
       "hideWebhook": "隐藏 Slack webhook URL",
       "slackAppFallback": "Slack 应用",
       "previewDisclaimer": "安装后，Slack 会提供实际的应用图标和目标频道。",
-      "successResponseBody": "Slack 响应",
       "callbackTitle": "正在连接 Slack",
       "callbackWorking": "正在返回 {product}…",
       "callbackError": "无法完成此 Slack 连接。请关闭此窗口并重试。",
@@ -16258,6 +16253,7 @@
       "userId": "用户 ID",
       "orgId": "组织 ID",
       "orgName": "组织",
+      "orgOption": "{name} ({id})",
       "role": "角色",
       "noOrganizations": "不属于任何组织",
       "ssoOnlyHint": "在此邮箱通过 SSO 登录时生效"
@@ -20202,7 +20198,6 @@
         "latency": "延迟",
         "output": "提取的输出",
         "rawRequest": "已发送的请求",
-        "rawResponse": "已收到的响应",
         "idle": "运行测试后，请求和响应都会显示在此处。",
         "disabledHint": "请先填写名称和端点。",
         "failure": {

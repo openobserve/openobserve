@@ -12402,9 +12402,6 @@
     "testErrorClientError": "İstemci hatası (4xx). Lütfen kimlik bilgilerinizi ve yapılandırmanızı kontrol edin.",
     "testErrorServerError": "Sunucu hatası (5xx). Hedef hizmet sorun yaşıyor.",
     "viewDetails": "Ayrıntıları Görüntüle",
-    "error": "Hata",
-    "httpStatus": "HTTP Durumu",
-    "responseBody": "Yanıt Gövdesi",
     "retry": "Tekrar dene",
     "suggestCheckUrl": "Lütfen webhook URL'sinin doğru ve erişilebilir olduğunu doğrulayın.",
     "suggestCheckFirewall": "Güvenlik duvarı ayarlarınızı kontrol edin ve hedef hizmete erişilebildiğinden emin olun.",
@@ -14202,7 +14199,6 @@
       "loadFailedTitle": "Bu uyarı yüklenemedi"
     },
     "timeLabel": "Zaman",
-    "unknownHttpStatus": "Bilinmiyor",
     "previewEvaluation": {
       "realTimeReason": "Koşullar eşleştiğinde",
       "matchingGroup": "eşleşen grup",
@@ -15623,7 +15619,6 @@
       "hideWebhook": "Slack webhook URL'sini gizle",
       "slackAppFallback": "Slack uygulaması",
       "previewDisclaimer": "Slack, kurulumdan sonra gerçek uygulama simgesini ve hedef kanalı sağlar.",
-      "successResponseBody": "Slack yanıtı",
       "callbackTitle": "Slack'e bağlanılıyor",
       "callbackWorking": "{product} uygulamasına geri dönülüyor…",
       "callbackError": "Bu Slack bağlantısı tamamlanamıyor. Bu pencereyi kapatıp tekrar deneyin.",
@@ -16258,6 +16253,7 @@
       "userId": "Kullanıcı kimliği",
       "orgId": "Kuruluş kimliği",
       "orgName": "Kuruluş",
+      "orgOption": "{name} ({id})",
       "role": "Rol",
       "noOrganizations": "Hiçbir kuruluşun üyesi değil",
       "ssoOnlyHint": "Bu e-posta SSO ile oturum açtığında geçerlidir"
@@ -20202,7 +20198,6 @@
         "latency": "Gecikme",
         "output": "Çıkarılan Çıktı",
         "rawRequest": "Gönderilen İstek",
-        "rawResponse": "Alınan Yanıt",
         "idle": "Bir test çalıştırdığınızda istek ve yanıt burada görünür.",
         "disabledHint": "Önce adı ve uç noktayı doldurun.",
         "failure": {

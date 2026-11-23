@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="open"
     :title="t('settings.userManagementPage.detailsTitle')"
-    size="md"
+    size="lg"
     data-test="user-management-detail-dialog"
     @update:open="emit('update:open', $event)"
   >
@@ -104,7 +104,8 @@ const orgColumns: OTableColumnDef<ListedMembership>[] = [
     id: "org_id",
     header: t("settings.userManagementPage.orgId"),
     accessorKey: "org_id",
-    size: COL.name,
+    // A full 27-character organization id, since most orgs share the name "default".
+    size: 280,
     meta: { align: "left" },
   },
   {

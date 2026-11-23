@@ -25,6 +25,28 @@ import { userKeys } from "@/services/users.querykeys";
 import { domainManagementKeys } from "@/services/domainManagement.querykeys";
 import UserManagement from "./UserManagement.vue";
 
+// JSDOM has no layout, so the real virtualizer renders no option rows; render them all.
+vi.mock("@tanstack/vue-virtual", async () => {
+  const { computed, unref } = await import("vue");
+  return {
+    useVirtualizer: (options: any) =>
+      computed(() => {
+        const count = unref(options).count;
+        return {
+          getVirtualItems: () =>
+            Array.from({ length: count }, (_, index) => ({
+              index,
+              key: index,
+              start: 0,
+              size: 28,
+            })),
+          getTotalSize: () => count * 28,
+          scrollToIndex: () => {},
+          measureElement: () => {},
+        };
+      }),
+  };
+});
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/users", () => ({ default: { listAllUsers: vi.fn() } }));
 vi.mock("@/services/domainManagement", () => ({
@@ -408,5 +430,65 @@ describe("UserManagement", () => {
     expect(usersService.listAllUsers).toHaveBeenCalledTimes(1);
     expect(domainService.getDomainRestrictions).toHaveBeenCalledTimes(1);
     expect(orgService.get_admin_org).toHaveBeenCalledTimes(1);
+  });
+
+  describe("organization filter", () => {
+    const ORG_A = "3MRK72SNBkJ7yd9Yhe5RqXTYf8V";
+    const ORG_B = "3MTC6WDR3qUpIgkX8QE5UxCabcd";
+    const orgOption = (id: string) =>
+      document.querySelector<HTMLElement>(
+        `[data-test="user-management-org-select-option"][data-test-value="${id}"]`,
+      );
+
+    const openAndSearch = async (term: string) => {
+      const wrapper = await mountPage();
+      await wrapper.find('[data-test="user-management-org-select-trigger"]').trigger("click");
+      await flushPromises();
+      const input = document.querySelector<HTMLInputElement>(
+        '[data-test="user-management-org-select-search"]',
+      )!;
+      input.value = term;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await flushPromises();
+      return wrapper;
+    };
+
+    beforeEach(() => {
+      orgService.get_admin_org.mockResolvedValue({
+        data: {
+          data: [
+            { identifier: ORG_A, name: "default" },
+            { identifier: ORG_B, name: "default" },
+          ],
+        },
+      });
+    });
+
+    it("finds an organization by a pasted id", async () => {
+      await openAndSearch(ORG_A);
+
+      expect(orgOption(ORG_A)).not.toBeNull();
+      expect(orgOption(ORG_B)).toBeNull();
+    });
+
+    it("still finds organizations by name", async () => {
+      await openAndSearch("defa");
+
+      expect(orgOption(ORG_A)).not.toBeNull();
+      expect(orgOption(ORG_B)).not.toBeNull();
+    });
+
+    it("shows each option's name with its id, in the list and in the trigger", async () => {
+      const wrapper = await openAndSearch("");
+
+      const text = orgOption(ORG_A)?.textContent ?? "";
+      expect(text).toContain("default");
+      expect(text).toContain(ORG_A);
+
+      (wrapper.vm as any).orgFilter = ORG_A;
+      await flushPromises();
+      const trigger = wrapper.find('[data-test="user-management-org-select-trigger"]');
+      expect(trigger.attributes("data-test-selected-label")).toBe(`default (${ORG_A})`);
+    });
   });
 });

@@ -12400,9 +12400,6 @@
     "testErrorClientError": "Client error (4xx). Please check your credentials and configuration.",
     "testErrorServerError": "Server error (5xx). The destination service is experiencing issues.",
     "viewDetails": "View Details",
-    "error": "ข้อผิดพลาด",
-    "httpStatus": "HTTP Status",
-    "responseBody": "Response Body",
     "retry": "Retry",
     "suggestCheckUrl": "Please verify the webhook URL is correct and reachable.",
     "suggestCheckFirewall": "Check your firewall settings and ensure the destination service is accessible.",
@@ -14200,7 +14197,6 @@
       "loadFailedTitle": "ไม่สามารถโหลดการแจ้งเตือนนี้ได้"
     },
     "timeLabel": "เวลา",
-    "unknownHttpStatus": "Unknown",
     "previewEvaluation": {
       "realTimeReason": "When conditions match",
       "matchingGroup": "matching group",
@@ -15621,7 +15617,6 @@
       "hideWebhook": "Hide Slack webhook URL",
       "slackAppFallback": "Slack app",
       "previewDisclaimer": "Slack supplies the actual app icon and destination channel after installation.",
-      "successResponseBody": "Slack response",
       "callbackTitle": "Connecting Slack",
       "callbackWorking": "Returning to {product}…",
       "callbackError": "This Slack connection cannot be completed. Close this window and try again.",
@@ -16256,6 +16251,7 @@
       "userId": "ID ผู้ใช้",
       "orgId": "ID องค์กร",
       "orgName": "องค์กร",
+      "orgOption": "{name} ({id})",
       "role": "บทบาท",
       "noOrganizations": "ไม่ได้เป็นสมาชิกขององค์กรใด",
       "ssoOnlyHint": "มีผลเมื่ออีเมลนี้ลงชื่อเข้าใช้ผ่าน SSO"
@@ -20200,7 +20196,6 @@
         "latency": "Latency",
         "output": "Extracted Output",
         "rawRequest": "Request Sent",
-        "rawResponse": "Response Received",
         "idle": "The request and the response both appear here once you run a test.",
         "disabledHint": "Fill in the name and endpoint first.",
         "failure": {

@@ -12402,9 +12402,6 @@
     "testErrorClientError": "Client-Fehler (4xx). Bitte überprüfen Sie Ihre Anmeldedaten und Ihre Konfiguration.",
     "testErrorServerError": "Serverfehler (5xx). Der Ziel-Dienst hat Probleme.",
     "viewDetails": "Details ansehen",
-    "error": "Fehler",
-    "httpStatus": "HTTP-Status",
-    "responseBody": "Antworttext",
     "retry": "Erneut versuchen",
     "suggestCheckUrl": "Bitte überprüfen Sie, ob die Webhook-URL korrekt und erreichbar ist.",
     "suggestCheckFirewall": "Überprüfen Sie Ihre Firewall-Einstellungen und stellen Sie sicher, dass der Ziel-Dienst erreichbar ist.",
@@ -14202,7 +14199,6 @@
       "loadFailedTitle": "Dieser Alarm konnte nicht geladen werden"
     },
     "timeLabel": "Zeit",
-    "unknownHttpStatus": "Unbekannt",
     "previewEvaluation": {
       "realTimeReason": "Wenn Bedingungen zutreffen",
       "matchingGroup": "Passende Gruppe",
@@ -15623,7 +15619,6 @@
       "hideWebhook": "Slack-Webhook-URL ausblenden",
       "slackAppFallback": "Slack-App",
       "previewDisclaimer": "Slack stellt das tatsächliche App-Symbol und den Zielkanal nach der Installation bereit.",
-      "successResponseBody": "Slack-Antwort",
       "callbackTitle": "Slack wird verbunden",
       "callbackWorking": "Zurück zu {product}…",
       "callbackError": "Diese Slack-Verbindung kann nicht abgeschlossen werden. Schließen Sie dieses Fenster und versuchen Sie es erneut.",
@@ -16258,6 +16253,7 @@
       "userId": "Benutzer-ID",
       "orgId": "Organisations-ID",
       "orgName": "Organisation",
+      "orgOption": "{name} ({id})",
       "role": "Rolle",
       "noOrganizations": "Kein Mitglied einer Organisation",
       "ssoOnlyHint": "Gilt, wenn sich diese E-Mail über SSO anmeldet"
@@ -20202,7 +20198,6 @@
         "latency": "Latenz",
         "output": "Extrahierte Ausgabe",
         "rawRequest": "Gesendete Anfrage",
-        "rawResponse": "Empfangene Antwort",
         "idle": "Die Anfrage und die Antwort erscheinen beide hier, sobald Sie einen Test ausführen.",
         "disabledHint": "Geben Sie zuerst Name und Endpunkt an.",
         "failure": {
