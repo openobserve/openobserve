@@ -272,6 +272,29 @@ test.describe("Query Values variables - metrics and PromQL", { tag: ["@dashboard
     await expect(page.locator('[data-test="variable-query-error-pods"]')).toHaveCount(0);
   });
 
+  test("All on a custom variable keeps values with regex characters in a PromQL panel", async ({ page }) => {
+    await fx.ingestRouteMetric();
+    const qv = new PageManager(page).dashboardQueryVariable;
+    const path = customPromql("path", `label_values(${fx.METRIC_ROUTES}, path)`, {});
+    const panelQuery = `sum by (path) (${fx.METRIC_ROUTES}{path=~"$path"})`;
+    const id = await fx.createDashboard(fx.dashboardBody(uniqueTitle("e2e_qv_promql_all"), {
+      variables: [{ ...path, multiSelect: true, selectAllValueForMultiSelect: "all" }],
+      panels: [fx.promqlPanel("routes", panelQuery)],
+    }));
+    const queries = fx.trackQueries(page);
+    await qv.openDashboard(fx.dashboardUrl(id));
+
+    const sent = await fx.waitForSearch(
+      queries,
+      (url) => url.includes("/query_range") && url.includes(fx.METRIC_ROUTES),
+      { kind: "promql", timeout: 45000 },
+    );
+    const query = sent.split("&query=")[1].split("&")[0];
+    expect(query).toBe(`sum by (path) (${fx.METRIC_ROUTES}{path=~"/b|GET /a\\\\(1\\\\)"})`);
+    const series = await fx.promqlInstant(query);
+    expect(series.map((s) => s.metric.path).sort()).toEqual(["/b", "GET /a(1)"]);
+  });
+
   test("E3: a custom PromQL variable saves query_type and query only", async ({ page }) => {
     const qv = new PageManager(page).dashboardQueryVariable;
     const id = await startCustomPromql(qv, { name: "pods" });

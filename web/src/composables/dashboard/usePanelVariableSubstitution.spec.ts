@@ -774,6 +774,43 @@ describe("query variable 'All'", () => {
     );
   });
 
+  it("matches values with regex characters literally in a PromQL regex matcher", () => {
+    const paths = [
+      { label: "GET /a(1)", value: "GET /a(1)" },
+      { label: "/b", value: "/b" },
+    ];
+    const { inst } = makeWithVariable({ ...customQuery, value: ["_o2_all_"], options: paths });
+    expect(inst.replaceQueryValue('up{path=~"$svc"}', 0, 1, "promql").query).toBe(
+      String.raw`up{path=~"GET /a\\(1\\)|/b"}`,
+    );
+    expect(inst.replaceQueryValue("SELECT * FROM t WHERE p IN ($svc)", 0, 1, "sql").query).toBe(
+      "SELECT * FROM t WHERE p IN ('GET /a(1)','/b')",
+    );
+  });
+
+  it("escapes a picked query value only as far as its PromQL position needs", () => {
+    const { inst } = makeWithVariable({
+      ...customQuery,
+      multiSelect: false,
+      value: 'a.b"c',
+      options: [{ label: 'a.b"c', value: 'a.b"c' }],
+    });
+    const run = (q: string) => inst.replaceQueryValue(q, 0, 1, "promql").query;
+    expect(run('up{p=~"$svc"}')).toBe(String.raw`up{p=~"a\\.b\"c"}`);
+    expect(run('up{p="$svc"}')).toBe(String.raw`up{p="a.b\"c"}`);
+  });
+
+  it("leaves other variables' PromQL values as written, so a regex value still works", () => {
+    const { inst } = makeWithVariable({
+      type: "custom",
+      value: ["api-.*", "web"],
+      options: [],
+    });
+    expect(inst.replaceQueryValue('up{svc=~"$svc"}', 0, 1, "promql").query).toBe(
+      'up{svc=~"api-.*|web"}',
+    );
+  });
+
   it("filters to nothing, never to everything, when the loaded list is empty", () => {
     const { inst } = makeWithVariable({ ...customQuery, value: ["_o2_all_"], options: [] });
     expect(inst.replaceQueryValue("SELECT * FROM t WHERE svc IN ($svc)", 0, 1, "sql").query).toBe(

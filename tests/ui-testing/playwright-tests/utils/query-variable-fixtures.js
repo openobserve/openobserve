@@ -25,6 +25,9 @@ const ORG = () => getOrgIdentifier() || process.env.ORGNAME || 'default';
 const LOGS_STREAM = 'e2e_query_vars';
 const METRIC_UP = 'e2e_qv_up';
 const METRIC_INFO = 'e2e_qv_pod_info';
+// Outside the e2e_qv_ names, which a metrics() test counts; its path values hold regex characters.
+const METRIC_ROUTES = 'e2e_route_hits';
+const ROUTE_PATHS = ['GET /a(1)', '/b'];
 
 // service_id is a string column; "007" checks a numeric-looking value keeps its leading zero.
 const LOG_ROWS = [
@@ -125,6 +128,34 @@ async function ingestQueryVariableData() {
   testLogger.info('Query variable fixtures ingested', { logs: logs.length, metrics: metrics.length });
 }
 
+/** Ingests METRIC_ROUTES, one series per ROUTE_PATHS value, and waits until both are queryable. */
+async function ingestRouteMetric(timeoutMs = 90000) {
+  const now = Date.now() * 1000;
+  const rows = [];
+  for (let minute = 0; minute < 10; minute++) {
+    for (const path of ROUTE_PATHS) {
+      rows.push({ __name__: METRIC_ROUTES, __type__: 'gauge', path, _timestamp: now - minute * 60_000_000, value: 1 });
+    }
+  }
+  await ingestPost('/ingest/metrics/_json', rows);
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const end = Math.floor(Date.now() / 1000);
+    const match = encodeURIComponent(METRIC_ROUTES);
+    const res = await api('GET', `/prometheus/api/v1/label/path/values?match[]=${match}&start=${end - 3600}&end=${end + 60}`);
+    if ((res.data?.data ?? []).length >= ROUTE_PATHS.length) return;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  throw new Error(`metric ${METRIC_ROUTES} never became queryable`);
+}
+
+/** The series an instant PromQL query returns now. */
+async function promqlInstant(query) {
+  const time = Math.floor(Date.now() / 1000);
+  const res = await api('GET', `/prometheus/api/v1/query?query=${encodeURIComponent(query)}&time=${time}`);
+  return res.data?.data?.result ?? [];
+}
+
 function customAxis(alias) {
   return { label: '', alias, column: alias, type: 'custom', color: null, functionName: null, args: [] };
 }
@@ -147,6 +178,33 @@ function logsTablePanel(id, sql, { stream = LOGS_STREAM, x = 'service_name', y =
         stream_type: 'logs',
         x: [customAxis(x)],
         y: [customAxis(y)],
+        z: [],
+        filter: { filterType: 'group', logicalOperator: 'AND', conditions: [] },
+      },
+      config: { promql_legend: '' },
+    }],
+    layout: { x: 0, y: layoutSeq * 10, w: 96, h: 10, i: ++layoutSeq },
+  };
+}
+
+/** A line panel running the PromQL `query` as written. */
+function promqlPanel(id, query) {
+  return {
+    id,
+    type: 'line',
+    title: id,
+    description: '',
+    queryType: 'promql',
+    config: { show_legends: true, legends_position: null },
+    queries: [{
+      query,
+      vrlFunctionQuery: '',
+      customQuery: true,
+      fields: {
+        stream: '',
+        stream_type: 'metrics',
+        x: [],
+        y: [],
         z: [],
         filter: { filterType: 'group', logicalOperator: 'AND', conditions: [] },
       },
@@ -314,11 +372,15 @@ module.exports = {
   LOGS_STREAM,
   METRIC_UP,
   METRIC_INFO,
+  METRIC_ROUTES,
   LOG_ROWS,
   ALL_SERVICES,
   METRIC_SERIES,
   ingestQueryVariableData,
+  ingestRouteMetric,
+  promqlInstant,
   logsTablePanel,
+  promqlPanel,
   queryValuesVariable,
   customVariable,
   dashboardBody,

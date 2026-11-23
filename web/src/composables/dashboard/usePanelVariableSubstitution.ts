@@ -30,25 +30,30 @@ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { MIN_PERCENTILE_SAMPLES } from "@/utils/metrics/metricDefaults";
 import {
   isQueryVariableAllPending,
+  promValueEscaperAt,
   resolveQueryVariableValue,
+  usesQueryVariableLoader,
 } from "@/utils/dashboard/variables/queryVariableUtils";
 
 const formatPanelVariableValue = (
   variable: any,
   format: VariableFormat | undefined,
   queryType: any,
+  promEscape?: (value: string) => string,
 ): string => {
   const escape = (value: any) => escapeSingleQuotes(String(value));
+  const literal = (value: any) => (promEscape ? promEscape(String(value)) : value);
   const resolved = resolveQueryVariableValue(variable);
 
   if (!Array.isArray(resolved)) {
     // a date variable prints in its effective format; a null value is the All sentinel
     const dateText = formatDateVariable(variable, format);
-    return `${escape(dateText ?? (resolved === null ? SELECT_ALL_VALUE : resolved))}`;
+    const value = dateText ?? (resolved === null ? SELECT_ALL_VALUE : resolved);
+    return promEscape ? String(literal(value)) : escape(value);
   }
 
   // If no data found (empty array), use SELECT_ALL_VALUE
-  const values = resolved.length === 0 ? [SELECT_ALL_VALUE] : resolved;
+  const values = (resolved.length === 0 ? [SELECT_ALL_VALUE] : resolved).map(literal);
   const singleQuoted = values.map((value: any) => `'${escape(value)}'`).join(",") || "''";
   switch (format) {
     case "csv":
@@ -505,7 +510,7 @@ export const usePanelVariableSubstitution = ({
     query = replaceVariablePlaceholders(
       query,
       [...fixedValues.keys(), ...dependentVariables.keys()],
-      ({ name, format }) => {
+      ({ name, format, offset }) => {
         // fixed variables shadow a dashboard variable of the same name
         if (fixedValues.has(name)) {
           if (format) return undefined;
@@ -514,7 +519,12 @@ export const usePanelVariableSubstitution = ({
         }
 
         const variable = dependentVariables.get(name);
-        const value = formatPanelVariableValue(variable, format, queryType);
+        // Values a query variable loaded are data, never patterns; other types may hold a regex on purpose.
+        const promEscape =
+          queryType === "promql" && usesQueryVariableLoader(variable)
+            ? promValueEscaperAt(query, offset)
+            : undefined;
+        const value = formatPanelVariableValue(variable, format, queryType, promEscape);
         const isScalar = !Array.isArray(variable.value);
         report("variable", name, isScalar ? (variable.value ?? SELECT_ALL_VALUE) : value);
         return value;

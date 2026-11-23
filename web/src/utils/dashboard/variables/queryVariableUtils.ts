@@ -521,17 +521,26 @@ const promContextAt = (text: string, offset: number): PromValueContext => {
   return /[=!]~\s*$/.test(text.slice(0, open)) ? "regex" : "string";
 };
 
+const escapePromValue = (value: string, context: PromValueContext): string => {
+  const literal = context === "regex" ? escapeRegExp(value) : value;
+  return context === "bare" ? literal : escapePromString(literal);
+};
+
+/** Escapes a value read from data for the PromQL position of the placeholder at `offset`. */
+export const promValueEscaperAt = (text: string, offset: number) => {
+  const context = promContextAt(text, offset);
+  return (value: string): string => escapePromValue(value, context);
+};
+
 const formatPromValues = (
   values: string[],
   format: VariableFormat | undefined,
   context: PromValueContext,
 ): string => {
   // A regex matcher is the only place an "all" selection can be honoured in PromQL.
-  const resolved = values.map((value) => {
-    if (value === SELECT_ALL_VALUE) return ".*";
-    const literal = context === "regex" ? escapeRegExp(value) : value;
-    return context === "bare" ? literal : escapePromString(literal);
-  });
+  const resolved = values.map((value) =>
+    value === SELECT_ALL_VALUE ? ".*" : escapePromValue(value, context),
+  );
   switch (format) {
     case "csv":
       return resolved.join(",");
