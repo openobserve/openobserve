@@ -556,6 +556,13 @@ const footerNote = computed<{ icon?: IconName; error?: boolean; text: I18nText }
     const count = keptCount.value;
     return { icon: "info", text: t("starterPacks.undo.kept", { count }, count) };
   }
+  const busyBy = flow.busyBy.value;
+  if (busyBy !== null) {
+    const text = busyBy
+      ? t("starterPacks.busyBy", { who: raw(busyBy) })
+      : t("starterPacks.busySomeone");
+    return { icon: "schedule", text };
+  }
   if (flow.forbidden.value) return { icon: "lock", text: t("starterPacks.noPermission") };
   if (flow.installFailed.value) {
     return { icon: "error", error: true, text: t("starterPacks.progress.installError") };

@@ -44,6 +44,7 @@ export const fakeFlow = (over: Record<string, unknown> = {}) =>
     }),
     alertsTotal: ref(2),
     busy: ref(false),
+    busyBy: ref(null),
     dashboardCount: ref(1),
     dashboardItem: shallowRef(undefined),
     enabledAlertIds: shallowRef(new Set<string>()),

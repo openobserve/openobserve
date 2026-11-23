@@ -15270,6 +15270,8 @@
     "scopeSeen": "All clusters · {count} seen so far: {clusters}",
     "noPermission": "You can't set up packs in this org. Ask an admin to set it up.",
     "askAdmin": "Ask an admin to set this up",
+    "busyBy": "{who} is setting this pack up right now. Check back in a minute.",
+    "busySomeone": "Someone else is setting this pack up right now. Check back in a minute.",
     "card": {
       "dashboards": "{count} dashboard | {count} dashboards"
     },
