@@ -9,6 +9,7 @@ import { UNDO_WINDOW_US, useStarterPackFlow } from "./useStarterPackFlow";
 
 const fake = vi.hoisted(() => ({
   installs: [] as PackInstallRecord[],
+  listError: null as unknown,
   installPack: vi.fn(),
   previewPack: vi.fn(),
   undoPack: vi.fn(),
@@ -25,7 +26,10 @@ vi.mock("./useStarterPacks", () => ({
     previewPack: fake.previewPack,
     undoPack: fake.undoPack,
     removePack: fake.removePack,
-    listInstalls: async () => fake.installs,
+    listInstalls: async () => {
+      if (fake.listError) throw fake.listError;
+      return fake.installs;
+    },
   }),
 }));
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: fake.push }) }));
@@ -127,6 +131,7 @@ describe("useStarterPackFlow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     fake.installs = [];
+    fake.listError = null;
     fake.alerts = [];
     fake.previewPack.mockResolvedValue({ items: [], names: {}, notIncluded: [] });
   });
@@ -346,6 +351,30 @@ describe("useStarterPackFlow", () => {
       name: "viewDashboard",
       query: { org_identifier: "org", dashboard: "d1", folder: "fd" },
     });
+  });
+
+  const refused = Object.assign(new Error("http"), { response: { status: 403 } });
+
+  it("calls a refused preview forbidden, not a load error to retry", async () => {
+    fake.previewPack.mockRejectedValueOnce(refused);
+    const flow = setup();
+    await flow.loadPreview();
+    expect(flow.previewState.value).toBe("forbidden");
+    expect(flow.forbidden.value).toBe(true);
+    fake.previewPack.mockRejectedValueOnce(new Error("down"));
+    await flow.loadPreview();
+    expect(flow.previewState.value).toBe("error");
+  });
+
+  it("calls a refused record read forbidden, not a load failure", async () => {
+    fake.listError = refused;
+    const flow = setup();
+    await flow.load();
+    expect(flow.forbidden.value).toBe(true);
+    expect(flow.loadFailed.value).toBe(false);
+    fake.listError = new Error("down");
+    await flow.load();
+    expect(flow.loadFailed.value).toBe(true);
   });
 
   it("names a refused setup separately from a failed one", async () => {

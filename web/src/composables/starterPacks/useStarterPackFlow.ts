@@ -42,7 +42,7 @@ export const UNDO_WINDOW_US = 24 * 60 * 60 * 1_000_000;
 
 const CLOCK_TICK_MS = 60_000;
 
-export type PackPreviewState = "idle" | "loading" | "ready" | "error";
+export type PackPreviewState = "idle" | "loading" | "ready" | "error" | "forbidden";
 
 /** What the user changed in the plan before setup. */
 export interface PackInstallChoice {
@@ -52,6 +52,8 @@ export interface PackInstallChoice {
   /** Alert destination the created alerts route to, whether they start on or off. */
   destination?: string;
 }
+
+const isForbidden = (error: any): boolean => error?.response?.status === 403;
 
 const countsAsItem = (item: PackRecordItem) => item.kind !== "folder";
 const notSkipped = (item: PackRecordItem) => item.status !== "skipped";
@@ -154,8 +156,10 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     try {
       record.value = newestRecord(await listInstalls(pack.id));
       if (record.value) await readAlertsOn();
-    } catch {
-      loadFailed.value = true;
+    } catch (error) {
+      // A retry cannot get past a refusal, so it reads as ask an admin, not as a failed load.
+      if (isForbidden(error)) forbidden.value = true;
+      else loadFailed.value = true;
     }
     loaded.value = true;
   };
@@ -169,8 +173,10 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       if (run !== previewRun) return;
       preview.value = next;
       previewState.value = "ready";
-    } catch {
-      if (run === previewRun) previewState.value = "error";
+    } catch (error) {
+      if (run !== previewRun) return;
+      if (isForbidden(error)) forbidden.value = true;
+      previewState.value = isForbidden(error) ? "forbidden" : "error";
     }
   };
 
