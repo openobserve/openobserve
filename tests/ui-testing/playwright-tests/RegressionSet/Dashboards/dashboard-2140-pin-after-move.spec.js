@@ -23,14 +23,14 @@ test.describe('Dashboard pinned to Home survives a folder move (ENT#2140)', { ta
     test.setTimeout(180000);
     const stamp = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
     const title = `ovn_c_2140_${stamp}`;
-    const before = await readHomePin();
+    const before = await readHomePin(page);
     const created = { folders: [], dashboardId: null };
     try {
-      const folderA = await createDashboardFolder(`ovn_c_2140_a_${stamp}`, 'ent2140');
+      const folderA = await createDashboardFolder(page, `ovn_c_2140_a_${stamp}`, 'ent2140');
       created.folders.push(folderA);
-      const folderB = await createDashboardFolder(`ovn_c_2140_b_${stamp}`, 'ent2140');
+      const folderB = await createDashboardFolder(page, `ovn_c_2140_b_${stamp}`, 'ent2140');
       created.folders.push(folderB);
-      created.dashboardId = await createDashboard(pinnedCountDashboard(title), folderB);
+      created.dashboardId = await createDashboard(page, pinnedCountDashboard(title), folderB);
 
       await navigateToBase(page);
       const pm = new PageManager(page);
@@ -56,14 +56,14 @@ test.describe('Dashboard pinned to Home survives a folder move (ENT#2140)', { ta
       expect(reads, 'Home must not ask for the dashboard in its old folder').not.toContain(folderB);
       await expect(new DashboardPanelTablePage(page).panelContainer).toBeVisible({ timeout: 30000 });
 
-      await expect.poll(() => pinnedHomeDashboardId(), { timeout: 15000, message: 'the pin must not be dropped' }).toBe(created.dashboardId);
+      await expect.poll(() => pinnedHomeDashboardId(page), { timeout: 15000, message: 'the pin must not be dropped' }).toBe(created.dashboardId);
       expect(pageErrors).toEqual([]);
     } finally {
-      await restoreHomePin(before);
+      await restoreHomePin(page, before);
       if (created.dashboardId) {
-        for (const f of created.folders) await deleteDashboard(created.dashboardId, f);
+        for (const f of created.folders) await deleteDashboard(page, created.dashboardId, f);
       }
-      for (const f of created.folders) await deleteDashboardFolder(f);
+      for (const f of created.folders) await deleteDashboardFolder(page, f);
     }
   });
 });

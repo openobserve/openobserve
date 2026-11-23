@@ -33,6 +33,7 @@ const PageManager = require("../../pages/page-manager");
 const testLogger = require("../utils/test-logger.js");
 const { JoinHelper, getTableRowCount, verifyJoinChipVisible } = require("../../pages/dashboardPages/dashboard-joins.js");
 const { getAuthHeaders, getOrgIdentifier } = require("../utils/cloud-auth.js");
+const { deleteDashboardsTitled, deleteLogStream } = require("../utils/dashboard-seed-api.js");
 
 // Test data files (from CI-accessible location)
 const testAppUsers = require("../../../test-data/joins/test_app_users.json");
@@ -76,21 +77,6 @@ const ingestJoinTestData = async (streamName, data) => {
   return fetchResponse.json();
 };
 
-const deleteStream = async (streamName) => {
-  const orgId = getOrgIdentifier();
-  const baseUrl = process.env["INGESTION_URL"] || "http://localhost:5080";
-  try {
-    const headers = getAuthHeaders();
-    await fetch(`${baseUrl}/api/${orgId}/streams/${streamName}`, {
-      method: "DELETE",
-      headers,
-    });
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 const verifyStreamExists = async (streamName, maxWaitMs = 60000) => {
   const orgId = getOrgIdentifier();
   const baseUrl = process.env["INGESTION_URL"] || "http://localhost:5080";
@@ -132,35 +118,11 @@ const ingestTestData = async (streams) => {
   testLogger.info("All streams verified");
 };
 
-const cleanupStreams = async (streams) => {
+const cleanupStreams = async (page, streams) => {
   testLogger.info(`Cleaning up streams`);
-  await deleteStream(streams.WEB_REQUESTS);
-  await deleteStream(streams.APP_USERS);
-  await deleteStream(streams.SESSIONS);
-};
-
-const deleteDashboardByName = async (dashboardName) => {
-  const orgId = getOrgIdentifier();
-  const baseUrl = process.env["INGESTION_URL"] || "http://localhost:5080";
-  try {
-    const headers = getAuthHeaders();
-    const listResponse = await fetch(`${baseUrl}/api/${orgId}/dashboards`, {
-      method: "GET",
-      headers,
-    });
-    if (!listResponse.ok) return false;
-    const dashboards = await listResponse.json();
-    const dashboard = dashboards.dashboards?.find(d => d.title === dashboardName);
-    if (!dashboard) return true;
-    await fetch(`${baseUrl}/api/${orgId}/dashboards/${dashboard.dashboardId}`, {
-      method: "DELETE",
-      headers,
-    });
-    testLogger.info(`Deleted dashboard: ${dashboardName}`);
-    return true;
-  } catch {
-    return false;
-  }
+  await deleteLogStream(page, streams.WEB_REQUESTS);
+  await deleteLogStream(page, streams.APP_USERS);
+  await deleteLogStream(page, streams.SESSIONS);
 };
 
 async function createDashboardAndAddFirstPanel(page, pm, dashboardName) {
@@ -300,8 +262,8 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await pm.dashboardPanelActions.savePanel();
 
     } finally {
-      await cleanupStreams(STREAMS);
-      await deleteDashboardByName(dashboardName);
+      await cleanupStreams(page, STREAMS);
+      await deleteDashboardsTitled(page, "default", dashboardName);
     }
   });
 
@@ -422,8 +384,8 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await pm.dashboardPanelActions.savePanel();
 
     } finally {
-      await cleanupStreams(STREAMS);
-      await deleteDashboardByName(dashboardName);
+      await cleanupStreams(page, STREAMS);
+      await deleteDashboardsTitled(page, "default", dashboardName);
     }
   });
 
@@ -559,8 +521,8 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await pm.dashboardPanelActions.savePanel();
 
     } finally {
-      await cleanupStreams(STREAMS);
-      await deleteDashboardByName(dashboardName);
+      await cleanupStreams(page, STREAMS);
+      await deleteDashboardsTitled(page, "default", dashboardName);
     }
   });
 
@@ -685,8 +647,8 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await pm.dashboardPanelActions.savePanel();
 
     } finally {
-      await cleanupStreams(STREAMS);
-      await deleteDashboardByName(dashboardName);
+      await cleanupStreams(page, STREAMS);
+      await deleteDashboardsTitled(page, "default", dashboardName);
     }
   });
 
@@ -881,8 +843,8 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await pm.dashboardPanelActions.savePanel();
 
     } finally {
-      await cleanupStreams(STREAMS);
-      await deleteDashboardByName(dashboardName);
+      await cleanupStreams(page, STREAMS);
+      await deleteDashboardsTitled(page, "default", dashboardName);
     }
   });
 
@@ -977,8 +939,8 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await pm.dashboardPanelActions.savePanel();
 
     } finally {
-      await cleanupStreams(STREAMS);
-      await deleteDashboardByName(dashboardName);
+      await cleanupStreams(page, STREAMS);
+      await deleteDashboardsTitled(page, "default", dashboardName);
     }
   });
 
@@ -1050,8 +1012,8 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       testLogger.info("Join configuration preserved after reload");
 
     } finally {
-      await cleanupStreams(STREAMS);
-      await deleteDashboardByName(dashboardName);
+      await cleanupStreams(page, STREAMS);
+      await deleteDashboardsTitled(page, "default", dashboardName);
     }
   });
 
@@ -1168,8 +1130,8 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await pm.dashboardPanelActions.savePanel();
 
     } finally {
-      await cleanupStreams(STREAMS);
-      await deleteDashboardByName(dashboardName);
+      await cleanupStreams(page, STREAMS);
+      await deleteDashboardsTitled(page, "default", dashboardName);
     }
   });
 

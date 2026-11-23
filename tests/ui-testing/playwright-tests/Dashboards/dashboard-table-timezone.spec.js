@@ -10,7 +10,7 @@ test.describe('Table timestamps follow the browser timezone (ENT#1491)', { tag: 
 
   test('cell and copied value read in Asia/Kolkata', async ({ page, context }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
-    const seeded = await seedTimezoneTablePanel(`${Date.now()}${Math.floor(Math.random() * 1000)}`);
+    const seeded = await seedTimezoneTablePanel(page, `${Date.now()}${Math.floor(Math.random() * 1000)}`);
     try {
       await context.grantPermissions(['clipboard-read', 'clipboard-write']);
       await navigateToBase(page);
@@ -24,7 +24,7 @@ test.describe('Table timestamps follow the browser timezone (ENT#1491)', { tag: 
       await panelTable.copyCell(expected, 'x_axis_1');
       await expect.poll(() => page.evaluate(() => navigator.clipboard.readText()), { timeout: 5000 }).toBe(expected);
     } finally {
-      await deleteSeededTablePanel(seeded);
+      await deleteSeededTablePanel(page, seeded);
     }
   });
 });
@@ -34,7 +34,7 @@ test.describe('Table timestamps follow the dashboard timezone (OSS#9855)', { tag
 
   test('picking Asia/Bangkok on the dashboard shifts the cell to UTC+7', async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
-    const seeded = await seedTimezoneTablePanel(`${Date.now()}${Math.floor(Math.random() * 1000)}`);
+    const seeded = await seedTimezoneTablePanel(page, `${Date.now()}${Math.floor(Math.random() * 1000)}`);
     try {
       await navigateToBase(page);
       const pm = new PageManager(page);
@@ -48,7 +48,7 @@ test.describe('Table timestamps follow the dashboard timezone (OSS#9855)', { tag
       await expect(panelTable.cell(expected)).toBeVisible({ timeout: 60000 });
       await expect(panelTable.cell(formatInZone(seeded.rowMs, 'UTC'))).toHaveCount(0);
     } finally {
-      await deleteSeededTablePanel(seeded);
+      await deleteSeededTablePanel(page, seeded);
     }
   });
 });
