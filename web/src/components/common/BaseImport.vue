@@ -127,24 +127,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
                           v-model="jsonFiles"
-                          bottom-slots
-                          :label="t('dashboard.dropFileMsg')"
                           accept=".json"
                           multiple
-                          :helpText="t('common.jsonFilesOnlyHint')"
-                        >
-                          <template v-slot:prepend>
-                            <OIcon name="cloud-upload" size="sm" @click.stop.prevent />
-                          </template>
-                          <template v-slot:append>
-                            <OIcon
-                              name="close"
-                              size="sm"
-                              @click.stop.prevent="jsonFiles = null"
-                              class="cursor-pointer"
-                            />
-                          </template>
-                        </OFile>
+                          :validate="validateJsonFile"
+                        />
                       </div>
                     </div>
                   </slot>
@@ -214,8 +200,8 @@ import AppTabs from "./AppTabs.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
+import { createJsonFileValidator } from "@/lib/forms/File/validateJsonFile";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
@@ -231,7 +217,6 @@ export default defineComponent({
     OPageHeader,
     OButton,
     OInput,
-    OIcon,
     OFile,
   },
   props: {
@@ -327,6 +312,7 @@ export default defineComponent({
   emits: ["back", "cancel", "import", "update:jsonStr", "update:jsonArray", "update:activeTab"],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
+    const validateJsonFile = createJsonFileValidator(t);
     const { lgUp } = useBreakpoint();
     const stackPanes = computed(() => !lgUp.value);
 
@@ -539,6 +525,7 @@ export default defineComponent({
     });
 
     return {
+      validateJsonFile,
       raw,
       t,
       stackPanes,

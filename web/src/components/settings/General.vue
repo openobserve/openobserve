@@ -186,12 +186,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFile
                 data-test="setting_ent_custom_logo_img_file_upload_locked"
                 accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
-                class="o2-file-input mx-0 min-w-0 flex-1"
-              >
-                <template v-slot:prepend>
-                  <OIcon name="lock" size="sm" class="lock-chip" />
-                </template>
-              </OFile>
+                variant="compact"
+                class="min-w-0 flex-1"
+              />
             </div>
             <div
               v-else-if="
@@ -223,12 +220,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('settings.general.logoLightLabel')"
                 accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
                 @rejected="onRejected"
-                class="o2-file-input mx-0 min-w-0 flex-1"
-              >
-                <template v-slot:prepend>
-                  <OIcon name="attach-file" size="sm" />
-                </template>
-              </OFile>
+                variant="compact"
+                class="min-w-0 flex-1"
+              />
             </div>
           </OSettingRow>
 
@@ -245,12 +239,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFile
                 data-test="setting_ent_custom_logo_dark_img_file_upload_locked"
                 accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
-                class="o2-file-input mx-0 min-w-0 flex-1"
-              >
-                <template v-slot:prepend>
-                  <OIcon name="lock" size="sm" class="lock-chip" />
-                </template>
-              </OFile>
+                variant="compact"
+                class="min-w-0 flex-1"
+              />
             </div>
             <div
               v-else-if="
@@ -282,12 +273,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('settings.general.logoDarkLabel')"
                 accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
                 @rejected="onRejected"
-                class="o2-file-input mx-0 min-w-0 flex-1"
-              >
-                <template v-slot:prepend>
-                  <OIcon name="attach-file" size="sm" />
-                </template>
-              </OFile>
+                variant="compact"
+                class="min-w-0 flex-1"
+              />
             </div>
           </OSettingRow>
         </OFormSection>

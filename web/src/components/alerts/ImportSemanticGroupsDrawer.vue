@@ -37,21 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('correlation.selectJsonFile')"
           accept=".json"
           @update:model-value="loadFile"
+          @clear="clearFile"
           data-test="semantic-groups-import-file-drawer"
-        >
-          <template v-slot:prepend>
-            <OIcon name="cloud-upload" size="sm" />
-          </template>
-          <template v-slot:append>
-            <OIcon
-              v-if="jsonFile"
-              name="close"
-              size="sm"
-              @click.stop="clearFile"
-              class="cursor-pointer"
-            />
-          </template>
-        </OFile>
+        />
       </div>
 
       <!-- Loading State -->

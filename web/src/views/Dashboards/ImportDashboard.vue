@@ -130,10 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="dashboard-import-file-control"
                           name="jsonFiles"
                           :label="t('dashboard.selectFile')"
-                          :placeholder="t('dashboard.dropFileMsg')"
                           accept=".json"
                           multiple
-                          dropZone
+                          :validate="validateJsonFile"
                           :disabled="!!isLoading"
                         />
                       </div>
@@ -297,6 +296,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormFile from "@/lib/forms/File/OFormFile.vue";
+import { createJsonFileValidator } from "@/lib/forms/File/validateJsonFile";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeImportDashboardSchema, importDashboardDefaults } from "./ImportDashboard.schema";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -309,6 +309,7 @@ export default defineComponent({
   props: ["dashboardId"],
   setup() {
     const { t } = useI18nTyped();
+    const validateJsonFile = createJsonFileValidator(t);
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
@@ -887,6 +888,7 @@ export default defineComponent({
     };
 
     return {
+      validateJsonFile,
       t,
       goBack,
       onSubmit,
