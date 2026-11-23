@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex w-5 shrink-0 items-center justify-center">
               <div
                 v-if="fleet.id !== DEFAULT_FLEET"
-                class="invisible flex group-hover/row:visible has-[[data-state=open]]:visible"
+                class="pointer-events-none flex opacity-0 group-hover/row:pointer-events-auto group-hover/row:opacity-100 in-focus-visible:pointer-events-auto in-focus-visible:opacity-100 has-focus-visible:pointer-events-auto has-focus-visible:opacity-100 has-[[data-state=open]]:pointer-events-auto has-[[data-state=open]]:opacity-100"
               >
                 <ODropdown side="bottom" align="start">
                   <template #trigger>
