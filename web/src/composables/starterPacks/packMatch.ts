@@ -123,4 +123,8 @@ export const dashboardItems = (doc: Record<string, any>): MatchItem[] =>
   dashboardPanelNeeds(doc)
     // A panel that reads no stream is text, and the installer's fit check drops it too.
     .filter(({ streams }) => streams.size > 0)
-    .map(({ streams, fields }) => ({ streams: [...streams], fields: [...fields] }));
+    .map(({ streamType, streams, fields }) => ({
+      streamType,
+      streams: [...streams],
+      fields: [...fields],
+    }));

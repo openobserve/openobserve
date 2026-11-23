@@ -142,4 +142,29 @@ describe("matchItem", () => {
     expect(item).toEqual({ streams: ["kube_pod"], fields: ["phase"] });
     expect(matchItem(item, facts())).toBe(true);
   });
+
+  it("keeps a SQL panel's stream type, so a same-named stream of another type does not fit", () => {
+    const sql = (stream_type?: string) => ({
+      queries: [{ query: "SELECT '0' AS n FROM default", fields: { stream_type } }],
+    });
+    const [logs, untyped] = dashboardItems({ tabs: [{ panels: [sql("logs"), sql()] }] });
+    expect([logs.streamType, untyped.streamType]).toEqual(["logs", undefined]);
+    const traces = facts({
+      streams: toStreamsByType([
+        { name: "default", stream_type: "traces", stats: { doc_time_max: fresh } },
+      ]),
+      fields: new Map([[schemaKey("traces", "default"), new Set(["trace_id"])]]),
+    });
+    expect(matchItem(logs, traces)).toBe(false);
+    expect(matchItem(untyped, traces)).toBe(true);
+  });
+
+  it("ignores a PromQL panel's stream type, which saved dashboards often leave as logs", () => {
+    const panel = {
+      queryType: "promql",
+      queries: [{ query: "sum(kube_pod)", fields: { stream_type: "logs" } }],
+    };
+    const [item] = dashboardItems({ tabs: [{ panels: [panel] }] });
+    expect(matchItem(item, facts())).toBe(true);
+  });
 });

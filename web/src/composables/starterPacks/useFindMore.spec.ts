@@ -69,7 +69,7 @@ vi.mock("./usePackCatalog", () => ({
 fake.loadAlertFile = vi.fn(async () => ({}));
 fake.matchAlerts = vi.fn(async () => new Map([["nginx/5xx", true]]));
 vi.mock("./packMatchData", () => ({
-  readOrgStreams: async () => [],
+  readOrgStreams: async () => ({ metrics: new Map([["kube_pod_status_phase", 1]]) }),
   matchPack: async () => ({
     dashboards: new Map(),
     alerts: new Map([["k8s/one", true]]),

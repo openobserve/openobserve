@@ -70,7 +70,7 @@ const packSource = (
 ) => {
   const owned = installedIds(records);
   // Home's matcher offers a pack only on this rule, so the header never lists one Home does not.
-  const offered = match.ready && (pack.detector === "kubernetes" || fits.length > 0);
+  const offered = match.ready && fits.length > 0;
   const fresh = (id: string, ready: boolean) => offered && ready && !owned.has(id);
   const items: FindMoreItem[] = [
     ...pack.dashboards
