@@ -51,7 +51,7 @@ test.describe("Traces Groups view testcases", () => {
 
     await expect(pm.tracesPage.getGroupsTable()).toBeVisible({ timeout: 20000 });
     await expect(pm.tracesPage.getGroupsValues().first()).toBeVisible({ timeout: 20000 });
-    await expect(page.locator('[data-test="traces-search-result-pagination"]')).toHaveCount(0);
+    await expect(pm.tracesPage.getResultPagination()).toHaveCount(0);
     await expect(page).toHaveURL(/[?&]view=groups(&|$)/, { timeout: 10000 });
     await expect(page).toHaveURL(/[?&]group_by=service_name(&|$)/);
 
@@ -63,7 +63,7 @@ test.describe("Traces Groups view testcases", () => {
 
   test("P1: Clicking a group adds its filter and shows the span list at once", {
     tag: ['@tracesGroups', '@traces', '@query', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async () => {
     await pm.tracesPage.pickGroupBy('service_name');
     const first = pm.tracesPage.getGroupsValues().first();
     await expect(first).toBeVisible({ timeout: 20000 });
@@ -74,7 +74,7 @@ test.describe("Traces Groups view testcases", () => {
     await expect(pm.tracesPage.getGroupByValue()).toHaveText('Group by');
     await pm.tracesPage.expectQueryEditorValue(`service_name = '${service}'`);
     await expect(pm.tracesPage.getGroupsTable()).toHaveCount(0, { timeout: 20000 });
-    await expect(page.locator(pm.tracesPage.searchResultList)).toBeVisible({ timeout: 20000 });
+    await expect(pm.tracesPage.getSearchResultList()).toBeVisible({ timeout: 20000 });
   });
 
   test("P2: Exclude term from the row menu stays in the Groups view", {

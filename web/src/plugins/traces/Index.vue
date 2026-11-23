@@ -1288,6 +1288,9 @@ async function getQueryData(
         endTime: queryReq.query.end_time,
         runId: ++groupsRunId,
       };
+      // Loading flips back in this tick, so the results' watcher never dates this run or clears its notice.
+      searchObj.meta.lastRunAt = Date.now();
+      if (!searchObj.meta.chartRefreshFailed) searchObj.meta.refreshFailedAt = null;
       searchObj.loading = false;
       // The Groups table loads its own rows; the count chips above it still come from the count.
       refreshResultCount();

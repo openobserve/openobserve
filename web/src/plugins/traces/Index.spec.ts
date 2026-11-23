@@ -6500,6 +6500,9 @@ describe("Index.vue (Main Traces Page)", () => {
         mockSearchObj.meta.scope = "all";
         mockSearchObj.data.stream.hasParentColumn = false;
         mockSearchObj.data.groupsRequest = null;
+        mockSearchObj.meta.chartRefreshFailed = false;
+        mockSearchObj.meta.refreshFailedAt = null;
+        mockSearchObj.meta.lastRunAt = undefined;
       });
 
       it("hands the Groups table the filter, scope and window, runs no span list, and still counts", async () => {
@@ -6537,6 +6540,26 @@ describe("Index.vue (Main Traces Page)", () => {
         await runGrouped();
         expect(mockSearchObj.data.groupsRequest?.textKey).toBe(false);
         mockSearchObj.data.stream.selectedStreamFields = fields;
+      });
+
+      it("dates a grouped run and clears an earlier failed-refresh notice", async () => {
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        mockSearchObj.meta.lastRunAt = 1;
+        mockSearchObj.meta.refreshFailedAt = 5;
+        mockSearchObj.meta.chartRefreshFailed = false;
+        await runGrouped();
+        expect(mockSearchObj.meta.lastRunAt).toBeGreaterThan(1);
+        expect(mockSearchObj.meta.refreshFailedAt).toBeNull();
+      });
+
+      it("keeps the notice of a grouped run whose charts failed to refresh", async () => {
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        mockSearchObj.meta.refreshFailedAt = 5;
+        mockSearchObj.meta.chartRefreshFailed = true;
+        await runGrouped();
+        expect(mockSearchObj.meta.refreshFailedAt).toBe(5);
       });
 
       it("gives every grouped run a new request, so the table reloads", async () => {

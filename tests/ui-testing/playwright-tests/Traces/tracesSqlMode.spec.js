@@ -234,7 +234,7 @@ test.describe("Traces SQL mode testcases", () => {
 
   test("P1: A per-trace SQL query shows one row per trace, opens it, and Back re-runs nothing", {
     tag: ['@tracesSqlMode', '@traces', '@query', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async () => {
     await pm.tracesPage.toggleSqlModeFromToolbar();
     await pm.tracesPage.expectSqlMode(true);
     await pm.tracesPage.setQueryEditorValue(PER_TRACE);
@@ -250,12 +250,10 @@ test.describe("Traces SQL mode testcases", () => {
     await pm.tracesPage.openFirstSqlResultRow();
     await pm.tracesPage.expectTraceDetailsVisible();
 
-    let searches = 0;
-    page.on('request', (request) => {
-      if (request.url().includes('_search_stream')) searches++;
-    });
-    await pm.tracesPage.navigateBackFromTraceDetails();
-    await expect(table).toBeVisible({ timeout: 10000 });
+    const searches = await pm.tracesPage.countSearchStreams(
+      () => pm.tracesPage.navigateBackFromTraceDetails(),
+      () => expect(table).toBeVisible({ timeout: 10000 }),
+    );
     expect(searches).toBe(0);
   });
 });

@@ -4205,6 +4205,14 @@ export class TracesPage {
     return this.page.locator('[data-test="traces-groups"]');
   }
 
+  getSearchResultList() {
+    return this.page.locator(this.searchResultList);
+  }
+
+  getResultPagination() {
+    return this.page.locator('[data-test="traces-search-result-pagination"]');
+  }
+
   getGroupsValues() {
     return this.page.locator('[data-test="traces-groups"] [data-test="traces-groups-value"]');
   }
