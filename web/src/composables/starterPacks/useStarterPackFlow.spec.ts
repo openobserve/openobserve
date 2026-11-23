@@ -397,6 +397,13 @@ describe("useStarterPackFlow", () => {
     ]);
   });
 
+  it("names a Library alert from the cached Library before the preview has loaded", () => {
+    const pack = { ...PACK, alerts: ["lib/cpu"] } as unknown as StarterPack;
+    const manifest = { alerts: [{ id: "lib/cpu", title: "Host high CPU usage" }] };
+    const flow = setup({ alertLibrary: { manifest } }, pack);
+    expect(flow.nameOf("lib/cpu")).toBe("Host high CPU usage");
+  });
+
   const refused = Object.assign(new Error("http"), { response: { status: 403 } });
 
   it("calls a refused preview forbidden, not a load error to retry", async () => {
