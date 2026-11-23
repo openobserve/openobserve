@@ -80,7 +80,7 @@ function chainDrafts(list: Part[], env: Env): Outcome {
   return { t: "drafts", drafts: [draft], form: "shorthand" };
 }
 
-function mathOutcome(text: string, env: Env): Outcome {
+export function mathOutcome(text: string, env: Env, rollingOnly = false): Outcome {
   const math = scanDateMath(text, 0, env.nowUs, env.zone);
   if (math === undefined) return { t: "none" };
   if (math === null || math.end !== text.length) return { t: "invalid", reason: "unreadable" };
@@ -88,6 +88,7 @@ function mathOutcome(text: string, env: Env): Outcome {
   if (only && only.sign < 0 && !math.snapped) {
     return { t: "drafts", drafts: rollingDrafts(only.n, only.unit, env), form: "date-math" };
   }
+  if (rollingOnly) return { t: "none" };
   const drafts =
     math.offsets.length === 0 && !math.snapped
       ? singleDrafts(math.alts, env)

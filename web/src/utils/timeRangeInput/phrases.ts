@@ -44,6 +44,7 @@ import {
   type Scanned,
 } from "./machine";
 import type { Elem, Slot, Words } from "./packs/schema";
+import { mathOutcome } from "./shorthand";
 import type { Alt, ClockMod, ClockValue, Draft, Outcome, Point, UnitKey } from "./types";
 
 export interface DateVal {
@@ -67,6 +68,7 @@ interface Caps {
   n?: number;
   unit?: { unit: UnitKey; count?: number };
   start?: Alt<Point>[];
+  startText?: string;
   end?: Alt<Point>[];
   day?: Alt<DateVal>[];
   date?: Alt<DateVal>[];
@@ -270,7 +272,10 @@ function slotHits(sc: Scan, s: Slot, pos: number): Hit<Partial<Caps>>[] {
     case "clock":
       return coreClockHits(sc, pos).map(([e, clock]) => [e, { clock }]);
     case "start":
-      return pointHits(sc, pos).map(([e, start]) => [e, { start }]);
+      return pointHits(sc, pos).map(([e, start]) => [
+        e,
+        { start, startText: sc.text.slice(pos, e) },
+      ]);
     case "end":
       return pointHits(sc, pos).map(([e, end]) => [e, { end }]);
     default:
@@ -765,11 +770,7 @@ function offsetLike(sc: Scan, k: number): boolean {
   );
 }
 
-function joinSplits(
-  sc: Scan,
-  out: Draft[][],
-  zero: { hit: boolean; incomplete: boolean; reversed: boolean },
-): void {
+function joinSplits(sc: Scan, out: Caps[], zero: { incomplete: boolean }): void {
   const joins = [...sc.env.pack.joins, ...UNIVERSAL_JOINS];
   for (const join of joins) {
     const at: number[] = [];
@@ -797,10 +798,8 @@ function joinSplits(
         continue;
       }
       const right = wholePoint(sc, rightStart, sc.len);
-      const r = rangeDrafts(left, right, sc.env);
-      zero.hit = zero.hit || r.zero;
-      zero.reversed = zero.reversed || r.reversed;
-      if (r.drafts.length > 0) out.push(r.drafts);
+      if (right.length > 0)
+        out.push({ start: left, startText: sc.text.slice(0, leftEnd), end: right });
     }
   }
 }
@@ -808,24 +807,30 @@ function joinSplits(
 /** Step 3: a range template or a join whose two sides each read wholly as a point or period. */
 export function rangeOutcome(sc: Scan): Outcome {
   const saved = sc.partial;
-  const found: Draft[][] = [];
+  const matches: Caps[] = [];
   const zero = { hit: false, incomplete: false, reversed: false };
   for (const elems of sc.env.pack.rangeTemplates) {
     for (const prefixed of [elems, [DAY_PREFIX, ...elems]]) {
-      for (const c of whole(sc, prefixed)) {
-        if (!c.start || !c.end) continue;
-        // A day before a range lands on its clocks; with no clock to land on it would be dropped text.
-        if (c.day && ![...c.start, ...c.end].some((a) => a.v.p === "clock")) continue;
-        const r = rangeDrafts(onDay(sc, c.start, c.day), onDay(sc, c.end, c.day), sc.env);
-        zero.hit = zero.hit || r.zero;
-        zero.reversed = zero.reversed || r.reversed;
-        if (r.drafts.length > 0) found.push(r.drafts);
-      }
+      matches.push(...whole(sc, prefixed));
     }
   }
   sc.partial = false;
-  joinSplits(sc, found, zero);
-  const drafts = distinct(found.flat());
+  joinSplits(sc, matches, zero);
+  const found: Draft[] = [];
+  for (const c of matches) {
+    if (!c.start?.length || !c.end?.length) continue;
+    // A day before a range lands on its clocks; with no clock to land on it would be dropped text.
+    if (c.day && ![...c.start, ...c.end].some((a) => a.v.p === "clock")) continue;
+    if (c.startText && c.end.every((a) => a.v.p === "now")) {
+      const math = mathOutcome(c.startText, sc.env, true);
+      if (math.t === "drafts") return math;
+    }
+    const r = rangeDrafts(onDay(sc, c.start, c.day), onDay(sc, c.end, c.day), sc.env);
+    zero.hit = zero.hit || r.zero;
+    zero.reversed = zero.reversed || r.reversed;
+    found.push(...r.drafts);
+  }
+  const drafts = distinct(found);
   if (drafts.length > 0) return { t: "drafts", drafts, form: "range" };
   if (zero.hit) return { t: "invalid", reason: "zero-length" };
   // Both sides read wholly but run backwards: never swapped, and no later step may claim the text.
