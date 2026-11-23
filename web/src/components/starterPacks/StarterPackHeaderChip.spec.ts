@@ -86,14 +86,21 @@ vi.mock("@/composables/starterPacks/useStarterPackFlow", async () => {
     useStarterPackFlow: (_org: string, pack: { id: string }) => {
       const record = shallowRef<Record<string, any> | null>(null);
       const running = ref(false);
+      const runningBy = ref<string | null>(null);
       const flow = {
         pack,
         running,
+        runningBy,
+        forbidden: ref(false),
         record,
         loaded: ref(false),
         installed: computed(() => record.value?.status === "complete"),
         interrupted: computed(
-          () => !running.value && !!record.value && record.value.status !== "complete",
+          () =>
+            !running.value &&
+            runningBy.value === null &&
+            !!record.value &&
+            record.value.status !== "complete",
         ),
         interruptedBy: computed(() =>
           flow.interrupted.value && record.value?.installedBy ? record.value.installedBy : null,
@@ -408,7 +415,7 @@ describe("StarterPackHeaderChip", () => {
     expect(find(wrapper, "pane-kubernetes").exists()).toBe(true);
   });
 
-  it("offers Finish on a stopped setup only to the person who started it", async () => {
+  it("offers Finish on a stopped setup wherever the list offers Set up, and View Pack while it runs", async () => {
     save([HOSTS]);
     fake.records.hosts = { status: "incomplete", items: [] };
     const wrapper = render();
@@ -417,7 +424,29 @@ describe("StarterPackHeaderChip", () => {
     expect(find(wrapper, "starter-pack-list-primary-btn").text()).toBe("Finish");
     fake.flows.hosts.record.value = { status: "incomplete", items: [], installedBy: "o@x" };
     await nextTick();
+    expect(find(wrapper, "starter-pack-list-primary-btn").text()).toBe("Finish");
+    // The list never gates Set up on permission; the drawer says when the user may not.
+    fake.flows.hosts.forbidden.value = true;
+    await nextTick();
+    expect(find(wrapper, "starter-pack-list-primary-btn").text()).toBe("Finish");
+    fake.flows.hosts.runningBy.value = "o@x";
+    await nextTick();
     expect(find(wrapper, "starter-pack-list-primary-btn").text()).toBe("View Pack");
+  });
+
+  it("keeps a pack whose setup runs elsewhere on the list, counted as not set up", async () => {
+    save([K8S]);
+    const wrapper = render();
+    await open(wrapper);
+    fake.flows.hosts.record.value = { status: "installing", items: [], installedBy: "o@x" };
+    fake.flows.hosts.runningBy.value = "o@x";
+    fake.flows.hosts.loaded.value = true;
+    await nextTick();
+    expect(railIds(wrapper)).toEqual(["kubernetes", "hosts"]);
+    expect(find(wrapper, "starter-pack-list-row-hosts").text()).toContain("Setting up…");
+    expect(find(wrapper, "starter-pack-list-subtitle").text()).toBe(
+      "2 packs fit data you already send",
+    );
   });
 
   it("opens on a pack's review when another surface asks for it", async () => {

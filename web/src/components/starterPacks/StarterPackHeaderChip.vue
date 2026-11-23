@@ -78,7 +78,8 @@ const rail = computed<RailPack[]>(() => {
     const setUp = flow.loaded.value ? flow.installed.value : known;
     const stopped =
       flow.interrupted.value || (!flow.loaded.value && copy?.interrupted?.packId === pack.id);
-    if (!source && !setUp && !stopped && !known) return [];
+    const elsewhere = flow.runningBy.value !== null;
+    if (!source && !setUp && !stopped && !elsewhere && !known) return [];
     return [{ entry, source, setUp, stopped }];
   });
 });
@@ -103,10 +104,8 @@ const listSubtitle = computed(() => {
 const primaryLabel = computed(() => {
   const row = selected.value;
   if (row?.setUp) return t("starterPacks.popup.viewPack");
-  if (row?.stopped && row.entry.flow.interruptedBy.value === null) {
-    return t("starterPacks.progress.finish");
-  }
-  if (row?.stopped) return t("starterPacks.popup.viewPack");
+  if (row?.stopped) return t("starterPacks.progress.finish");
+  if (row && row.entry.flow.runningBy.value !== null) return t("starterPacks.popup.viewPack");
   return t("starterPacks.popup.reviewSetUp");
 });
 

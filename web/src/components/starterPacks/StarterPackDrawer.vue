@@ -36,6 +36,7 @@ import { getImageURL } from "@/utils/zincutils";
 import { readQuery } from "@/composables/query/readQuery";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { detectPrebuiltType, PREBUILT_DESTINATION_TYPES } from "@/utils/prebuilt-templates";
+import { packBusyText } from "@/composables/starterPacks/packCardText";
 import { ageText, packScopeValue } from "@/composables/starterPacks/packCopy";
 import type { PackNotIncludedReason, PackRecordItem } from "@/composables/starterPacks/types";
 import { useAdaptedData } from "@/composables/starterPacks/useAdaptedData";
@@ -424,7 +425,9 @@ const toggleOpen = (group: PackGroup) => {
 
 const step = computed<Step>(() => {
   if (readyShown.value) return "ready";
-  if (flow.running.value || flow.interrupted.value) return "setup";
+  if (flow.running.value || flow.interrupted.value || flow.runningBy.value !== null) {
+    return "setup";
+  }
   return installed.value ? "installed" : "content";
 });
 const sendMode = computed<"loading" | "select" | "email" | "none">(() => {
@@ -539,10 +542,15 @@ const note = computed<{ icon?: IconName; spin?: boolean; text: I18nText }>(() =>
   return { text: defaultNote.value };
 });
 
+const busyText = (who: string): I18nText => packBusyText(t, who, flow.isMe(who));
+
 /** The status line beside the footer buttons; failures live here, never in a banner. */
 const footerNote = computed<{ icon?: IconName; error?: boolean; text: I18nText } | null>(() => {
   if (step.value === "setup") {
     if (flow.running.value) return { text: t("starterPacks.popup.keepsGoing") };
+    const runningBy = flow.runningBy.value;
+    if (runningBy !== null) return { icon: "schedule", text: busyText(runningBy) };
+    if (flow.forbidden.value) return { icon: "lock", text: t("starterPacks.noPermission") };
     const by = flow.interruptedBy.value;
     if (by !== null) {
       const text = by
@@ -564,12 +572,7 @@ const footerNote = computed<{ icon?: IconName; error?: boolean; text: I18nText }
     return { icon: "info", text: t("starterPacks.undo.kept", { count }, count) };
   }
   const busyBy = flow.busyBy.value;
-  if (busyBy !== null) {
-    const text = busyBy
-      ? t("starterPacks.busyBy", { who: raw(busyBy) })
-      : t("starterPacks.busySomeone");
-    return { icon: "schedule", text };
-  }
+  if (busyBy !== null) return { icon: "schedule", text: busyText(busyBy) };
   if (flow.forbidden.value) return { icon: "lock", text: t("starterPacks.noPermission") };
   if (flow.installFailed.value) {
     return { icon: "error", error: true, text: t("starterPacks.progress.installError") };
@@ -671,6 +674,16 @@ watch(
       readyShown.value = true;
       installedHere.value = true;
     }
+  },
+);
+// A confirm opened on one install must not act on the record that replaced it.
+watch(
+  () => {
+    const r = flow.record.value;
+    return r ? `${r.installId}|${r.status}|${r.runId}` : null;
+  },
+  () => {
+    inlineConfirm.value = null;
   },
 );
 // Answering the last open question must not collapse the card the user is working in.
@@ -1090,6 +1103,15 @@ const confirmDone = () => {
           </OButton>
           <OText variant="meta" data-test="starter-pack-ready-undo-left">{{ undoLabel }}</OText>
         </template>
+        <OButton
+          v-else-if="step === 'setup' && flow.interrupted.value && flow.canManage.value"
+          variant="ghost-destructive"
+          size="sm-action"
+          data-test="starter-pack-setup-undo-btn"
+          @click="inlineConfirm = 'undo'"
+        >
+          {{ t("starterPacks.landing.undo") }}
+        </OButton>
         <template v-else-if="step === 'installed'">
           <OButton
             v-if="flow.canUndo.value"
@@ -1151,7 +1173,7 @@ const confirmDone = () => {
             (step === 'setup' || step === 'ready') &&
             failedCount &&
             !flow.forbidden.value &&
-            flow.interruptedBy.value === null
+            flow.runningBy.value === null
           "
           variant="primary"
           size="sm-action"
@@ -1163,7 +1185,12 @@ const confirmDone = () => {
           {{ t("starterPacks.progress.retry", { count: failedCount }, failedCount) }}
         </OButton>
         <OButton
-          v-else-if="step === 'setup' && !failedCount && flow.interruptedBy.value === null"
+          v-else-if="
+            step === 'setup' &&
+            !failedCount &&
+            !flow.forbidden.value &&
+            flow.runningBy.value === null
+          "
           variant="primary"
           size="sm-action"
           class="min-w-35"

@@ -35,6 +35,7 @@ const input = (over: Partial<PackRowInput> = {}): PackRowInput => ({
   running: false,
   installed: false,
   interrupted: false,
+  runningElsewhere: false,
   forbidden: false,
   installFailed: false,
   failedCount: 0,
@@ -62,6 +63,11 @@ describe("packRowState", () => {
 
   it("shows progress while setting up, even over a stopped record", () => {
     expect(packRowState(input({ running: true, interrupted: true })).kind).toBe("settingUp");
+  });
+
+  it("offers nothing while another tab or user runs the setup, even to a refused user", () => {
+    expect(packRowState(input({ runningElsewhere: true })).kind).toBe("elsewhere");
+    expect(packRowState(input({ runningElsewhere: true, forbidden: true })).kind).toBe("elsewhere");
   });
 
   it("is ready once set up, with Undo only while the window lasts", () => {

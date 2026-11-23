@@ -31,6 +31,7 @@ import {
   setUpWithDefaults,
   type PackRowState,
 } from "@/composables/starterPacks/packChatRow";
+import { packBusyText } from "@/composables/starterPacks/packCardText";
 import { DIGEST_MAX_PACKS } from "@/composables/starterPacks/packDigest";
 import { packById } from "@/composables/starterPacks/usePackCatalog";
 import { useHomePacks, type HomePack } from "@/composables/starterPacks/useHomePacks";
@@ -101,10 +102,15 @@ const progressLine = ({ flow }: HomePack): I18nText => {
     : t("starterPacks.stepper.settingUp");
 };
 
-const busyLine = ({ flow }: HomePack): I18nText =>
-  flow.busyBy.value
-    ? t("starterPacks.busyBy", { who: raw(flow.busyBy.value) })
-    : t("starterPacks.busySomeone");
+const busyLine = ({ flow }: HomePack): I18nText => {
+  const who = flow.busyBy.value ?? "";
+  return packBusyText(t, who, flow.isMe(who));
+};
+
+const runningLine = ({ flow }: HomePack): I18nText => {
+  const who = flow.runningBy.value ?? "";
+  return packBusyText(t, who, flow.isMe(who));
+};
 
 const startedByLine = (by: string): I18nText =>
   by ? t("starterPacks.startedBy", { who: raw(by) }) : t("starterPacks.startedBySomeone");
@@ -161,6 +167,10 @@ const setUpLabel = (count: number | null): I18nText =>
             <template v-if="state.kind === 'settingUp'">
               <OSpinner size="xs" class="shrink-0" />
               <span class="truncate">{{ progressLine(item) }}</span>
+            </template>
+            <template v-else-if="state.kind === 'elsewhere'">
+              <OIcon name="schedule" size="sm" class="shrink-0" />
+              <span class="truncate">{{ runningLine(item) }}</span>
             </template>
             <span v-else-if="state.kind === 'ready'" class="truncate">{{
               t("starterPacks.ready.title", { title: item.title })
@@ -231,7 +241,7 @@ const setUpLabel = (count: number | null): I18nText =>
             </OButton>
           </template>
           <OButton
-            v-else-if="state.kind === 'failed' && item.flow.interruptedBy.value === null"
+            v-else-if="state.kind === 'failed'"
             variant="primary"
             size="sm-action"
             icon-left="refresh"

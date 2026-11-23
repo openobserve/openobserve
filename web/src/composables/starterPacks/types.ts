@@ -195,6 +195,11 @@ export interface PackInstallRecord {
   items: PackRecordItem[];
   /** Microseconds; starts the Undo window. */
   installedAt?: number;
+  /** Microseconds of the last write; a quiet `installing` record has stopped. */
+  updatedAt?: number;
+  /** The run that last claimed the record, so two continuers of one stopped setup cannot both run. */
+  runId?: string;
+  /** Whoever started it, even after someone else finishes it. */
   installedBy?: string;
   version?: string;
   /** The catalog the pack definition came from. */
@@ -297,6 +302,8 @@ export interface PackPreview {
 export interface PackInstallOptions {
   /** Item ids to skip, matched on an item's own id or the id it copies; created items stay. */
   exclude?: string[];
+  /** The stopped setup a Finish continues; when it is gone, no fresh setup starts in its place. */
+  resumeOf?: string;
   /** Created alerts start enabled instead of silent. */
   enableAlerts?: boolean;
   /** Alert destination every created alert routes to, on or off. */
@@ -329,5 +336,13 @@ export class StarterPackBusyError extends Error {
   constructor(public readonly installedBy: string) {
     super("starter_pack_busy");
     this.name = "StarterPackBusyError";
+  }
+}
+
+/** The setup a Finish meant to continue is no longer unfinished, so nothing ran. */
+export class StarterPackStaleError extends Error {
+  constructor() {
+    super("starter_pack_stale");
+    this.name = "StarterPackStaleError";
   }
 }

@@ -107,6 +107,7 @@ const bestStart = computed(
 
 const railLine = (row: RailPack): I18nText => {
   if (row.stopped) return t("starterPacks.popup.stopped");
+  if (row.entry.flow.runningBy.value !== null) return t("starterPacks.stepper.settingUp");
   const at = row.entry.flow.record.value?.installedAt;
   if (row.setUp && at) {
     return t("starterPacks.popup.setUpAgo", { when: ageText(t, Date.now() - at / 1000) });

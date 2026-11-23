@@ -31,6 +31,7 @@ import {
 } from "@/composables/starterPacks/useHomePacks";
 import { usePackGate } from "@/composables/starterPacks/usePackGate";
 import { useStarterPackPopup, type RailPack } from "@/composables/starterPacks/useStarterPackPopup";
+import { packBusyText } from "@/composables/starterPacks/packCardText";
 import { packTitle } from "@/composables/starterPacks/usePackCatalog";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
@@ -135,6 +136,8 @@ const busy = computed(
     (selected.value.flow.running.value || opening.value === selected.value.pack.id),
 );
 const interruptedLine = ({ flow, title }: HomePack) => {
+  const running = flow.runningBy.value;
+  if (running !== null) return packBusyText(t, running, flow.isMe(running), title);
   const by = flow.interruptedBy.value;
   if (by === null) {
     const counts = { made: flow.made.value.length, total: flow.toCreate.value.length };
@@ -291,8 +294,13 @@ const interruptedLine = ({ flow, title }: HomePack) => {
         inline-actions
         :data-test="item.testId('home-pack-interrupted')"
       >
-        {{ interruptedLine(item) }}
-        <template v-if="item.flow.interruptedBy.value === null" #actions>
+        <span :data-test="item.testId('home-pack-interrupted-line')">{{
+          interruptedLine(item)
+        }}</span>
+        <template
+          v-if="item.flow.interrupted.value && !item.flow.forbidden.value && !home.askAdmin.value"
+          #actions
+        >
           <OButton
             variant="primary"
             size="sm-action"

@@ -143,6 +143,9 @@ describe("StarterPackChatRows", () => {
     flow.busyBy.value = "";
     await nextTick();
     expect(note()).toBe("Someone else is setting this pack up right now. Check back in a minute.");
+    flow.busyBy.value = "user@example.com";
+    await nextTick();
+    expect(note()).toBe("You are setting this pack up in another tab. Check back in a minute.");
     expect(fake.browser.markInstalled).not.toHaveBeenCalled();
   });
 
@@ -205,18 +208,29 @@ describe("StarterPackChatRows", () => {
     expect(wrapper.get('[data-test="starter-pack-chat-retry-hosts"]').text()).toBe("Retry 2 items");
   });
 
-  it("offers no Retry on a partial set up someone else started, and names them", async () => {
+  it("offers Retry on a partial set up someone else started, and names them", async () => {
     fake.flows.hosts.record.value = { status: "incomplete", items: [] };
     fake.flows.hosts.interrupted.value = true;
     fake.flows.hosts.interruptedBy = ref("other@example.com");
     fake.flows.hosts.failed.value = [{}, {}];
     const wrapper = await render();
-    expect(has(wrapper, "starter-pack-chat-retry-hosts")).toBe(false);
+    expect(wrapper.get('[data-test="starter-pack-chat-retry-hosts"]').text()).toBe("Retry 2 items");
     const note = () => wrapper.get('[data-test="starter-pack-chat-note-hosts"]').text();
     expect(note()).toBe("other@example.com started setting up this pack.");
     fake.flows.hosts.interruptedBy.value = "";
     await nextTick();
     expect(note()).toBe("Someone else started setting up this pack.");
+  });
+
+  it("says who is running a setup elsewhere, with no Set up or Finish", async () => {
+    fake.flows.hosts.record.value = { status: "installing", items: [] };
+    fake.flows.hosts.runningBy.value = "other@example.com";
+    const wrapper = await render();
+    expect(has(wrapper, "starter-pack-chat-retry-hosts")).toBe(false);
+    expect(has(wrapper, "starter-pack-chat-set-up-hosts")).toBe(false);
+    expect(wrapper.get('[data-test="starter-pack-chat-note-hosts"]').text()).toBe(
+      "other@example.com is setting this pack up right now. Check back in a minute.",
+    );
   });
 
   it("asks for an admin instead of offering the button", async () => {

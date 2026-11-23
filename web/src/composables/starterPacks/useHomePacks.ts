@@ -65,7 +65,8 @@ function useHomePack(org: string, pack: StarterPack, active: () => boolean) {
 
   const view = computed<HomePackView>(() => {
     if (!flow.loaded.value) return "loading";
-    if (flow.interrupted.value) return "interrupted";
+    // A setup running in another tab is unfinished too, so it is never read as set up.
+    if (flow.interrupted.value || flow.runningBy.value !== null) return "interrupted";
     if (flow.record.value && !flow.running.value) return "installed";
     // A role refused the pack's reads is often refused the match's too, and Retry cannot fix that.
     if (flow.forbidden.value || matcher.forbidden.value) return "forbidden";
@@ -179,7 +180,7 @@ export function useHomePacks(
   const showSection = computed(() => answered.value && canCreate.value);
   const askAdmin = computed(() => answered.value && !canCreate.value);
   const offerShown = computed(() => loading.value || showSection.value);
-  // A stopped setup is said in any org; the rest only belongs next to an offer.
+  // An unfinished setup is said in any org; the rest only belongs next to an offer.
   const notices = computed(() =>
     items.filter(
       (item) =>

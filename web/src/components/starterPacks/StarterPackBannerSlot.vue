@@ -19,6 +19,7 @@ import { computed, onMounted, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { packBusyText } from "@/composables/starterPacks/packCardText";
 import { packById, packTitle } from "@/composables/starterPacks/usePackCatalog";
 import type { HomePackRowItem, HomePackView } from "@/composables/starterPacks/useHomePacks";
 import { usePackGate } from "@/composables/starterPacks/usePackGate";
@@ -79,6 +80,7 @@ const showRow = computed(
     gate.visible.value &&
     matcher.state.value !== "error" &&
     !flow.interrupted.value &&
+    flow.runningBy.value === null &&
     (flow.forbidden.value || pending.value || offering.value),
 );
 const view = computed<HomePackView>(() => {
@@ -86,9 +88,12 @@ const view = computed<HomePackView>(() => {
   if (pending.value) return "loading";
   return "offer";
 });
+const unfinished = computed(() => flow.interrupted.value || flow.runningBy.value !== null);
 const interruptedLine = computed(() => {
-  const by = flow.interruptedBy.value;
   const title = packTitle(pack);
+  const running = flow.runningBy.value;
+  if (running !== null) return packBusyText(t, running, flow.isMe(running), title);
+  const by = flow.interruptedBy.value;
   if (by === null) {
     const counts = { made: flow.made.value.length, total: flow.toCreate.value.length };
     return t("starterPacks.home.interrupted", { title, ...counts });
@@ -121,14 +126,14 @@ const row: HomePackRowItem = {
     </OButton>
   </Teleport>
   <OBanner
-    v-if="gate.visible.value && flow.interrupted.value"
+    v-if="gate.visible.value && unfinished"
     variant="warning"
     dense
     inline-actions
     data-test="first-event-status-pack-interrupted"
   >
-    {{ interruptedLine }}
-    <template v-if="flow.interruptedBy.value === null" #actions>
+    <span data-test="first-event-status-pack-interrupted-line">{{ interruptedLine }}</span>
+    <template v-if="flow.interrupted.value && !flow.forbidden.value" #actions>
       <OButton
         variant="primary"
         size="sm-action"

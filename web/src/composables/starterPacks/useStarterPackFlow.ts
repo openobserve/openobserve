@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, onScopeDispose, ref, shallowRef } from "vue";
+import { computed, onScopeDispose, ref, shallowRef, watch } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
 
@@ -26,6 +26,7 @@ import { featureState } from "@/utils/featureGate";
 import {
   StarterPackBusyError,
   StarterPackPermissionError,
+  StarterPackStaleError,
   copyName,
   copyParts,
   leftOutIds,
@@ -40,6 +41,7 @@ import {
 import { adaptSavedView } from "./packAdapt";
 import { RESERVED_FIELD } from "./packBinding";
 import { useBrowserMatches } from "./useBrowserMatches";
+import { isRunning } from "./useInstallRecords";
 import { useStarterPacks } from "./useStarterPacks";
 
 export const UNDO_WINDOW_US = 24 * 60 * 60 * 1_000_000;
@@ -56,6 +58,8 @@ export interface PackInstallChoice {
   /** Alert destination the created alerts route to, whether they start on or off. */
   destination?: string;
   emailFailure?: PackEmailFailure;
+  /** The stopped setup a Finish continues. */
+  resumeOf?: string;
 }
 
 const isForbidden = (error: any): boolean => error?.response?.status === 403;
@@ -72,7 +76,7 @@ export const isOrgAdmin = (state: Record<string, any>): boolean => {
 export const canManageInstall = (state: Record<string, any>, record: PackInstallRecord | null) =>
   isOrgAdmin(state) || (!!record?.installedBy && record.installedBy === state.userInfo?.email);
 
-// Only its starter can finish a setup, so their own unfinished one is the one to show.
+// Anyone who can set up may finish a stopped setup; the user's own unfinished one shows first.
 const newestRecord = (rows: PackInstallRecord[], me: string): PackInstallRecord | null => {
   const live = rows.filter((row) => row.status !== "removed");
   const unfinished = live.filter((row) => row.status !== "complete");
@@ -90,6 +94,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const { manifest: libraryManifest } = useAlertLibrary();
 
   const myEmail = (): string => store.state.userInfo?.email ?? "";
+  const isMe = (email: string): boolean => !!email && email === myEmail();
   const record = shallowRef<PackInstallRecord | null>(null);
   const loaded = ref(false);
   const loadFailed = ref(false);
@@ -144,8 +149,22 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const toCreate = computed(() =>
     items.value.filter((item) => item.status !== "existing" && notSkipped(item)),
   );
+  const liveByClock = computed(
+    () => !running.value && !!record.value && isRunning(record.value, nowUs.value),
+  );
+  const recheck = ref(false);
+  // Until the re-read lands, a quiet run still reads as running, so Finish never shows on a stale copy.
+  const runningElsewhere = computed(() => liveByClock.value || recheck.value);
   const interrupted = computed(
-    () => !running.value && !!record.value && record.value.status !== "complete",
+    () =>
+      !running.value &&
+      !!record.value &&
+      record.value.status !== "complete" &&
+      !runningElsewhere.value,
+  );
+  /** Who started the setup another tab or user is running now, or "" when its record names no one. */
+  const runningBy = computed(() =>
+    runningElsewhere.value ? (record.value?.installedBy ?? "") : null,
   );
   /** Who started the unfinished setup when it was not this user, or "" when its record names no one. */
   const interruptedBy = computed(() => {
@@ -186,6 +205,17 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     }
     loaded.value = true;
   };
+
+  // A run that went quiet may have finished, so the record is read again before Finish shows.
+  watch(
+    liveByClock,
+    (live, was) => {
+      if (!was || live) return;
+      recheck.value = true;
+      void load().finally(() => (recheck.value = false));
+    },
+    { flush: "sync" },
+  );
 
   const loadPreview = async () => {
     previewRun += 1;
@@ -314,7 +344,13 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
 
   const install = async (folderName?: string, choice: PackInstallChoice = {}): Promise<boolean> => {
     if (running.value) return false;
-    const { exclude: unticked = [], enableAlerts = false, destination, emailFailure } = choice;
+    const {
+      exclude: unticked = [],
+      enableAlerts = false,
+      destination,
+      emailFailure,
+      resumeOf,
+    } = choice;
     running.value = true;
     installFailed.value = false;
     forbidden.value = false;
@@ -335,6 +371,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
         enableAlerts,
         destination,
         emailFailure,
+        resumeOf,
         onProgress: (next) => {
           record.value = { ...next, items: [...next.items] };
           if (enableAlerts) trackEnabled(next);
@@ -350,9 +387,22 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       alertsOn.value = enabledAlertIds.value.size;
       return done.status === "complete";
     } catch (error) {
+      if (error instanceof StarterPackStaleError) {
+        await load();
+        return false;
+      }
+      if (error instanceof StarterPackBusyError) {
+        // The record shown may be older than the run that refused this one.
+        await load();
+        busyBy.value = error.installedBy;
+        return false;
+      }
       if (error instanceof StarterPackPermissionError) forbidden.value = true;
-      else if (error instanceof StarterPackBusyError) busyBy.value = error.installedBy;
       else installFailed.value = true;
+      // This tab's run has ended, so its last progress must not read as a live run.
+      if (record.value?.status === "installing") {
+        record.value = { ...record.value, status: "incomplete" };
+      }
       return false;
     } finally {
       running.value = false;
@@ -360,10 +410,23 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     }
   };
 
-  /** Finishes an interrupted install the way it was asked for, even after a reload. */
-  const retry = () => {
-    const { enableAlerts, destination, emailFailure } = record.value ?? {};
-    return install(undefined, { enableAlerts, destination, emailFailure });
+  const shownAs = (row: PackInstallRecord | null) =>
+    row ? [row.installId, row.status, row.runId].join(":") : "";
+
+  // Another tab or user may have moved the setup on since this view read it; then only refresh.
+  const stillAsShown = async (): Promise<boolean> => {
+    const before = shownAs(record.value);
+    await load();
+    return !loadFailed.value && shownAs(record.value) === before;
+  };
+
+  /** Finishes the interrupted install shown, the way it was asked for, even after a reload. */
+  const retry = async () => {
+    if (running.value || !(await stillAsShown())) return false;
+    const shown = record.value;
+    if (!shown || shown.status === "complete") return false;
+    const { enableAlerts, destination, emailFailure, installId } = shown;
+    return install(undefined, { enableAlerts, destination, emailFailure, resumeOf: installId });
   };
 
   const applyRemoval = async (work: () => Promise<PackRemovalResult>) => {
@@ -378,8 +441,10 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       // A plan read before the removal still counts the removed items as existing.
       if (previewState.value !== "idle") await loadPreview();
       return !removalFailed.value;
-    } catch {
-      removalFailed.value = true;
+    } catch (error) {
+      // A setup that started running again is not this removal's to touch.
+      if (error instanceof StarterPackBusyError) await load();
+      else removalFailed.value = true;
       return false;
     } finally {
       busy.value = false;
@@ -387,7 +452,8 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     }
   };
 
-  const undo = () => {
+  const undo = async () => {
+    if (!(await stillAsShown())) return false;
     const installId = record.value?.installId;
     return applyRemoval(() =>
       installId ? undoPack(pack, installId) : Promise.resolve({ removed: [], kept: [] }),
@@ -418,6 +484,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     installed,
     interrupted,
     interruptedBy,
+    isMe,
     itemRoute,
     items,
     land,
@@ -438,6 +505,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     removalFailed,
     retry,
     running,
+    runningBy,
     skipped,
     toCreate,
     undo,

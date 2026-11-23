@@ -17,13 +17,15 @@ import { useBrowserMatches } from "./useBrowserMatches";
 import type { HomePackRowItem, HomePackView } from "./useHomePacks";
 import type { StarterPackFlow } from "./useStarterPackFlow";
 
-export type PackRowKind = "idle" | "settingUp" | "ready" | "failed" | "forbidden";
+export type PackRowKind = "idle" | "settingUp" | "elsewhere" | "ready" | "failed" | "forbidden";
 
 export interface PackRowInput {
   view: HomePackView;
   running: boolean;
   installed: boolean;
   interrupted: boolean;
+  /** Another tab or user is running the setup, so this one offers nothing. */
+  runningElsewhere: boolean;
   forbidden: boolean;
   installFailed: boolean;
   failedCount: number;
@@ -56,6 +58,7 @@ export function packRowState(input: PackRowInput): PackRowState {
   });
   if (input.running) return state("settingUp");
   if (input.installed) return state("ready");
+  if (input.runningElsewhere) return state("elsewhere");
   if (input.forbidden || input.askAdmin || input.view === "forbidden") return state("forbidden");
   if (input.interrupted) return state("failed");
   return state("idle");
@@ -68,6 +71,7 @@ export const packRowInput = (item: HomePackRowItem, askAdmin: boolean): PackRowI
     running: flow.running.value,
     installed: flow.installed.value,
     interrupted: flow.interrupted.value,
+    runningElsewhere: flow.runningBy.value !== null,
     forbidden: flow.forbidden.value,
     installFailed: flow.installFailed.value,
     failedCount: flow.failed.value.length,
