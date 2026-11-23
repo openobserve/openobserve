@@ -225,10 +225,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ formatCost((spans as any[])[virtualRow.index].genAiCost.total) }}
                       </span>
                       <span
-                        v-if="(spans as any[])[virtualRow.index].cacheUse"
+                        v-if="cacheUses[(spans as any[])[virtualRow.index].spanId]"
                         class="ms-2"
                         :class="
-                          (spans as any[])[virtualRow.index].cacheUse.state === 'miss'
+                          cacheUses[(spans as any[])[virtualRow.index].spanId].state === 'miss'
                             ? 'text-status-warning-text! font-medium'
                             : 'text-text-secondary!'
                         "
@@ -236,28 +236,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :title="
                           t('traces.threadView.cacheDetail', {
                             read: formatTokens(
-                              (spans as any[])[virtualRow.index].cacheUse.readTokens,
+                              cacheUses[(spans as any[])[virtualRow.index].spanId].readTokens,
                             ),
                             written: formatTokens(
-                              (spans as any[])[virtualRow.index].cacheUse.writeTokens,
+                              cacheUses[(spans as any[])[virtualRow.index].spanId].writeTokens,
                             ),
                           })
                         "
                       >
                         <template
-                          v-if="(spans as any[])[virtualRow.index].cacheUse.state === 'miss'"
+                          v-if="
+                            cacheUses[(spans as any[])[virtualRow.index].spanId].state === 'miss'
+                          "
                         >
                           <OIcon name="warning-amber" size="xs" />
                           {{ t("traces.threadView.cacheMiss") }}
                         </template>
                         <template
-                          v-else-if="(spans as any[])[virtualRow.index].cacheUse.state === 'hit'"
+                          v-else-if="
+                            cacheUses[(spans as any[])[virtualRow.index].spanId].state === 'hit'
+                          "
                         >
                           <OIcon name="cached" size="xs" />
                           {{
                             t("traces.threadView.cacheHit", {
                               tokens: formatTokens(
-                                (spans as any[])[virtualRow.index].cacheUse.readTokens,
+                                cacheUses[(spans as any[])[virtualRow.index].spanId].readTokens,
                               ),
                             })
                           }}
@@ -267,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{
                             t("traces.threadView.cacheWrite", {
                               tokens: formatTokens(
-                                (spans as any[])[virtualRow.index].cacheUse.writeTokens,
+                                cacheUses[(spans as any[])[virtualRow.index].spanId].writeTokens,
                               ),
                             })
                           }}
@@ -439,6 +443,7 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
+import type { CacheUse } from "./threadView.utils";
 import { getServiceIconDataUrl, getSpanTechIconDataUrl } from "@/utils/traces/convertTraceData";
 import { getKindIcon } from "@/composables/traces/useTraceProcessing";
 import { useVirtualizer, type VirtualItem } from "@tanstack/vue-virtual";
@@ -522,6 +527,11 @@ export default defineComponent({
     /** Span id → rule label, for spans that carry an issue chip. */
     issueSpans: {
       type: Object as PropType<Record<string, I18nText>>,
+      default: () => ({}),
+    },
+    /** Span id → prompt-cache outcome, for LLM calls that report cache tokens. */
+    cacheUses: {
+      type: Object as PropType<Record<string, CacheUse>>,
       default: () => ({}),
     },
   },

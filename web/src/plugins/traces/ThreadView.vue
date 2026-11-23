@@ -367,6 +367,8 @@ export interface Props {
    * view passes true so it reads like the Collapsed summary.
    */
   condenseTurns?: boolean;
+  /** Models that used the prompt cache earlier in the session, before `spans`. */
+  warmCacheModels?: string[];
 }
 const props = withDefaults(defineProps<Props>(), {
   showSummary: true,
@@ -480,7 +482,10 @@ interface TurnCache {
 
 // Keyed by the rendered turn's span id; a condensed turn sums the calls it merged.
 const cacheByTurn = computed<Map<string, TurnCache>>(() => {
-  const byCall = classifyCacheUse(traceGroups.value.flatMap((g) => g.turns.map((t) => t.span)));
+  const byCall = classifyCacheUse(
+    traceGroups.value.flatMap((g) => g.turns.map((t) => t.span)),
+    props.warmCacheModels,
+  );
   const out = new Map<string, TurnCache>();
   for (const g of traceGroups.value) {
     const merged = props.condenseTurns && g.turns.length > 1;

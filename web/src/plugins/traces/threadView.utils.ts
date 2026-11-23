@@ -84,11 +84,14 @@ export interface CacheUse {
 
 /**
  * Prompt-cache outcome per LLM call, keyed by span id. A miss is a call that read
- * nothing after an earlier call of the same model had already used the cache.
+ * nothing after the same model had already used the cache (`warmBefore`: before these spans).
  */
-export function classifyCacheUse(llmSpans: any[]): Map<string, CacheUse> {
+export function classifyCacheUse(
+  llmSpans: any[],
+  warmBefore: string[] = [],
+): Map<string, CacheUse> {
   const out = new Map<string, CacheUse>();
-  const warmModels = new Set<string>();
+  const warmModels = new Set<string>(warmBefore);
   const ordered = [...llmSpans].sort((a, b) => Number(a.start_time) - Number(b.start_time));
   for (const span of ordered) {
     const readTokens = Number(span?.gen_ai_usage_cache_read_input_tokens) || 0;

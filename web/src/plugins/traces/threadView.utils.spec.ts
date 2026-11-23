@@ -156,6 +156,12 @@ describe("classifyCacheUse", () => {
     const failed = { gen_ai_usage_total_tokens: 0 };
     expect(states([call("a", 1, 0, 400), call("b", 2, 0, 0, failed)])).toEqual({ a: "cold" });
   });
+
+  it("calls a first write a miss when the model was warm before these spans", () => {
+    expect(Object.fromEntries(classifyCacheUse([call("a", 1, 0, 400)], ["m1"]))).toMatchObject({
+      a: { state: "miss" },
+    });
+  });
 });
 
 // ===========================================================================

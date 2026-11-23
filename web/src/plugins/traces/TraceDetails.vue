@@ -742,6 +742,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :search-query="searchQuery"
                         :spanList="spanList"
                         :selectedSpanId="selectedSpanId"
+                        :cacheUses="cacheUses"
                         :hoveredSpanId="hoveredSpanId"
                         :isSidebarOpen="!!(isSidebarOpen && (selectedSpanId || showTraceDetails))"
                         :showCriticalPath="showCriticalPath"
@@ -922,6 +923,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ThreadView
                   :spans="effectiveSpanList"
                   :selected-span-id="selectedSpanId"
+                  :warm-cache-models="warmCacheModels"
                   @span-selected="updateSelectedSpan"
                 />
               </div>
@@ -1196,13 +1198,8 @@ import { escapeSingleQuotes } from "@/utils/queryUtils";
 import useNotifications from "@/composables/useNotifications";
 import { parseUsageDetails, parseCostDetails, hasTracePreview, isLLMTrace } from "@/utils/llmUtils";
 import { formatTimestamp, useTraceProcessing } from "@/composables/traces/useTraceProcessing";
-import {
-  classify,
-  classifyCacheUse,
-  hasLLMPayload,
-  spanTimeBounds,
-  type CacheUse,
-} from "./threadView.utils";
+import { classify, classifyCacheUse, hasLLMPayload, spanTimeBounds } from "./threadView.utils";
+import { useWarmCacheModels } from "./composables/useWarmCacheModels";
 import {
   attributeSteps,
   headlineSteps,
@@ -1861,6 +1858,16 @@ export default defineComponent({
         ""
       );
     });
+
+    const warmCacheModels = useWarmCacheModels(currentTraceStreamName, spanList);
+    const cacheUses = computed(() =>
+      Object.fromEntries(
+        classifyCacheUse(
+          (spanList.value || []).filter((s: any) => classify(s) === "llm_turn"),
+          warmCacheModels.value,
+        ),
+      ),
+    );
 
     // Check if service streams feature is enabled
     const serviceStreamsEnabled = computed(() => {
@@ -2977,9 +2984,6 @@ export default defineComponent({
       });
 
       const formattedSpanMap: any = {};
-      const cacheBySpan = classifyCacheUse(
-        spanList.value.filter((s: any) => classify(s) === "llm_turn"),
-      );
 
       spanList.value.forEach((spanData: any, idx: number) => {
         // Validate span data before processing
@@ -2991,7 +2995,7 @@ export default defineComponent({
           );
         }
 
-        const formattedSpan = getFormattedSpan(spanData, cacheBySpan.get(String(spanData.span_id)));
+        const formattedSpan = getFormattedSpan(spanData);
         const spanId = spanData.span_id || formattedSpan.spanId || `span_${idx}_${Date.now()}`;
         formattedSpanMap[spanId] = formattedSpan;
       });
@@ -3237,7 +3241,7 @@ export default defineComponent({
 
     // Convert span object to required format
     // Converting ns to ms
-    const getFormattedSpan = (span: any, cacheUse?: CacheUse) => {
+    const getFormattedSpan = (span: any) => {
       const usage = parseUsageDetails(span);
       const cost = parseCostDetails(span);
 
@@ -3263,7 +3267,6 @@ export default defineComponent({
         links: JSON.parse(span.links || "[]"),
         genAiUsage: usage,
         genAiCost: cost,
-        cacheUse,
         resolvedIdentity: resolveSpanIdentity(span),
       };
     };
@@ -3820,6 +3823,8 @@ export default defineComponent({
       copyToClipboard,
       copyTraceId,
       sessionId,
+      warmCacheModels,
+      cacheUses,
       copySessionId,
       traceDetailsShareURL,
       info: "info",
