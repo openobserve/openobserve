@@ -725,6 +725,7 @@ export function useStarterPacks(org: string) {
     record: PackInstallRecord,
     enableAlerts = false,
     destination?: string,
+    fresh = false,
   ): Promise<PackRecordItem> => {
     const adaptation = { repairs: record.repairs ?? [], bindings: record.bindings ?? [] };
     const adapter = adapterFor(
@@ -739,8 +740,10 @@ export function useStarterPacks(org: string) {
     );
     try {
       let found = await adapter.lookup();
-      // Another surface made it first, so the pack links it and never deletes it.
-      if (found && isShared(pack, item)) return { ...item, ...found, status: "existing" };
+      // Another surface or install made it first, so the pack links it and never deletes it.
+      // A resume cannot tell its own crashed create apart, so only a fresh pass links.
+      if (found && (fresh || isShared(pack, item)))
+        return { ...item, ...found, status: "existing" };
       let made: boolean | void = true;
       if (!found) {
         // A create that errored may still have committed, so only the lookup after it decides.
@@ -847,7 +850,7 @@ export function useStarterPacks(org: string) {
     // A resumed record was already the pack's active one, so only a fresh one can lose the race.
     if (!interrupted) await stopIfNotFirst(record);
     onProgress?.(record);
-    return settleRecord(pack, record, entries, onProgress, enableAlerts, destination);
+    return settleRecord(pack, record, entries, onProgress, enableAlerts, destination, !interrupted);
   };
 
   const settleRecord = async (
@@ -857,6 +860,7 @@ export function useStarterPacks(org: string) {
     onProgress?: PackInstallOptions["onProgress"],
     enableAlerts = false,
     destination?: string,
+    fresh = false,
   ): Promise<PackInstallRecord> => {
     for (let index = 0; index < record.items.length; index += 1) {
       const item = record.items[index];
@@ -869,6 +873,7 @@ export function useStarterPacks(org: string) {
         record,
         enableAlerts,
         destination,
+        fresh,
       );
       await records.write(record);
       onProgress?.(record);
