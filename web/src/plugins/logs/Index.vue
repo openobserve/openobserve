@@ -116,9 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="bg-card-glass-bg relative-position h-full w-full">
                     <div
                       v-if="
-                        !searchObj.loadingStream &&
-                        searchObj.data.stream.streamLists.length == 0 &&
-                        searchObj.loading == false
+                        !searchObj.loadingStream && noUserStreamsInOrg && searchObj.loading == false
                       "
                       class="h-full max-lg:overflow-y-auto"
                     >
@@ -167,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     -->
                     <div
                       v-else-if="
-                        searchObj.data.stream.streamLists.length > 0 &&
+                        !noUserStreamsInOrg &&
                         searchObj.data.stream.selectedStream.length == 0 &&
                         searchObj.data.filterErrMsg === ''
                       "
@@ -520,9 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <LogsNoDataState
                 v-else-if="
-                  !searchObj.loadingStream &&
-                  searchObj.data.stream.streamLists.length == 0 &&
-                  searchObj.loading == false
+                  !searchObj.loadingStream && noUserStreamsInOrg && searchObj.loading == false
                 "
                 data-test="logs-drill-down-no-streams-in-org-text"
               >
@@ -532,7 +528,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </LogsNoDataState>
               <LogsNoStreamState
                 v-else-if="
-                  searchObj.data.stream.streamLists.length > 0 &&
+                  !noUserStreamsInOrg &&
                   searchObj.data.stream.selectedStream.length == 0 &&
                   searchObj.data.filterErrMsg === ''
                 "
@@ -728,6 +724,7 @@ import { resolveUrlViewToggle } from "@/composables/useLogs/logsViewToggle";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { featureState, streamTypeFeature } from "@/utils/featureGate";
 import { inheritedRetentionDays } from "@/utils/dataRetention";
+import { isUserDataStream } from "@/utils/internalStreams";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { verifyOrganizationStatus, deepCopy, addSpacesToOperators } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
@@ -2102,6 +2099,16 @@ export default defineComponent({
       return !!searchObj.data.stream.streamLists.length;
     });
 
+    // A picked internal stream still shows its results; "logs" keeps enrichment-table lists counted as user data.
+    const noUserStreamsInOrg = computed(() => {
+      const stream = searchObj.data.stream;
+      return !stream.streamLists.some(
+        (row: { value: string; internal?: boolean }) =>
+          stream.selectedStream.includes(row.value) ||
+          isUserDataStream({ name: row.value, is_internal: row.internal === true }, "logs"),
+      );
+    });
+
     const toggleExpandLog = (index: number) => {
       if (expandedLogs.value.includes(index))
         expandedLogs.value = expandedLogs.value.filter((item) => item != index);
@@ -2185,8 +2192,8 @@ export default defineComponent({
     // Mirrors the drill-down template's state chain, so the stream select sits in the dashboard header only while it is mounted.
     const drillDownShowsDashboard = computed(() => {
       const stream = searchObj.data.stream;
-      const noStreamsInOrg = !searchObj.loadingStream && stream.streamLists.length == 0;
-      const noStreamSelected = stream.streamLists.length > 0 && stream.selectedStream.length == 0;
+      const noStreamsInOrg = !searchObj.loadingStream && noUserStreamsInOrg.value;
+      const noStreamSelected = !noUserStreamsInOrg.value && stream.selectedStream.length == 0;
       return (
         !searchObj.meta.sqlMode &&
         !searchObj.loading &&
@@ -4380,6 +4387,7 @@ export default defineComponent({
       verifyOrganizationStatus,
       collapseFieldList,
       areStreamsPresent,
+      noUserStreamsInOrg,
       toggleExpandLog,
       expandedLogs,
       fieldValues,

@@ -506,6 +506,11 @@ export class IngestionConfigPage {
                     results.push({ index: i, url: href, status, ok: false, rateLimited: true });
                     continue;
                 }
+                if ([502, 503, 504].includes(status) && await this.githubBlobExistsOnRaw(href)) {
+                    testLogger.warn(`[doc-links] GitHub blob page answered ${status}, file confirmed on raw.githubusercontent.com: ${href}`);
+                    results.push({ index: i, url: href, status, ok: true, verifiedVia: 'raw' });
+                    continue;
+                }
                 results.push({
                     index: i,
                     url: href,
@@ -543,6 +548,23 @@ export class IngestionConfigPage {
             this.rateLimitRetryBudgetMs -= Date.now() - started;
         }
         return response;
+    }
+
+    // GitHub's blob renderer can 5xx while the file is served fine, so raw.githubusercontent.com is asked once
+    async githubBlobExistsOnRaw(href) {
+        const match = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+?)(?:[?#].*)?$/.exec(href);
+        if (!match || this.networkErrorRetryBudgetMs < 5000) return false;
+        const rawUrl = `https://raw.githubusercontent.com/${match[1]}/${match[2]}/${match[3]}`;
+        const started = Date.now();
+        try {
+            const response = await this.page.request.head(rawUrl, { timeout: Math.min(10000, this.networkErrorRetryBudgetMs) });
+            return response.ok();
+        } catch (error) {
+            testLogger.warn(`[doc-links] raw check failed (${error.message}), keeping the blob status: ${rawUrl}`);
+            return false;
+        } finally {
+            this.networkErrorRetryBudgetMs -= Date.now() - started;
+        }
     }
 
     async headWithNetworkErrorRetry(href, maxRetries = 2) {

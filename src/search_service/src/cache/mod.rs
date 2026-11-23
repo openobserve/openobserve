@@ -116,6 +116,15 @@ pub async fn search(
         &mut req.query.timezone,
         req.query.end_time,
     )?;
+    // The cache key needs it, and every search below runs with the same set.
+    crate::raw_streams::resolve_request(
+        trace_id,
+        org_id,
+        stream_type,
+        user_id.as_deref(),
+        &mut req,
+    )
+    .await;
 
     // check the original query function first
     let mut query_fn = req
@@ -581,11 +590,14 @@ pub async fn prepare_cache_response(
     if !req.clusters.is_empty() {
         hash_body.extend(req.clusters.clone());
     }
+    // An unresolved request is pinned to redaction, so its search matches this key.
+    req.raw_streams.get_or_insert_with(Default::default);
     #[cfg(feature = "vectorscan")]
     if let Some(digest) = crate::datafusion::physical_optimizer::sdr_redact::redaction_digest(
         org_id,
         stream_type,
         &sql.stream_names,
+        req.raw_streams.as_ref(),
     ) {
         hash_body.push(digest);
     }

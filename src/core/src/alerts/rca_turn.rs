@@ -68,7 +68,7 @@ use o2_enterprise::enterprise::{
             HealthResponse, POLICY_CONTEXT_KEY, QueryRequest, RCA_AGENT_TYPE, SESSION_ID_HEADER,
             get_agent_client,
         },
-        toolsets::{CliEntry, McpEntry, SkillEntry, push::load_agent_tools},
+        toolsets::{McpEntry, SkillEntry, push::load_agent_tools},
     },
     alerts::rca_service,
     common::config::get_config as get_o2_config,
@@ -386,13 +386,13 @@ async fn start_turn(
         }
     }
     let prompt = prompt.render();
-    let (mcps, clis, skills) = load_agent_tools(&run.org_id).await;
+    let (mcps, skills) = load_agent_tools(&run.org_id).await;
 
     let session_id = match run.session_id.clone() {
         Some(session_id) => session_id,
         None => {
             let mut patch = RunUpdate {
-                context_used: Some(context_used(&run.context, &mcps, &clis, &skills)),
+                context_used: Some(context_used(&run.context, &mcps, &skills)),
                 ..Default::default()
             };
             let session_id = match fork {
@@ -476,7 +476,6 @@ async fn start_turn(
         .ok();
     let mut request = rca_request(prompt, &run.context, settings.as_ref());
     request.mcps = (!mcps.is_empty()).then_some(mcps);
-    request.clis = (!clis.is_empty()).then_some(clis);
     request.skills = (!skills.is_empty()).then_some(skills);
     admission::apply_admission(&mut request, &admitted);
     let AdmittedTurn {
@@ -575,12 +574,7 @@ fn rca_policy(settings: Option<&OrgAiSettings>) -> Value {
 }
 
 /// Expose only the context actually provided to this run.
-fn context_used(
-    context: &Value,
-    mcps: &[McpEntry],
-    clis: &[CliEntry],
-    skills: &[SkillEntry],
-) -> Value {
+fn context_used(context: &Value, mcps: &[McpEntry], skills: &[SkillEntry]) -> Value {
     let past_causes: Vec<Value> = context
         .get("past_causes")
         .and_then(Value::as_array)
@@ -590,11 +584,7 @@ fn context_used(
         .filter_map(past_cause)
         .collect();
     let skills: Vec<&str> = skills.iter().map(|s| s.name.as_str()).collect();
-    let toolsets: Vec<&str> = mcps
-        .iter()
-        .map(|m| m.name.as_str())
-        .chain(clis.iter().map(|c| c.name.as_str()))
-        .collect();
+    let toolsets: Vec<&str> = mcps.iter().map(|m| m.name.as_str()).collect();
     json!({ "past_causes": past_causes, "skills": skills, "toolsets": toolsets })
 }
 

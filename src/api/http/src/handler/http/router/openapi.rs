@@ -555,11 +555,13 @@ const MCP_OPT_OUT_CATEGORIES: [&str; 2] = ["authorization", "users"];
         openobserve_api_management::request::organization::ingestion_tokens::create_ingestion_token,
         openobserve_api_management::request::organization::ingestion_tokens::enable_disable_ingestion_token,
         openobserve_api_management::request::organization::ingestion_tokens::list_ingestion_tokens,
+        openobserve_api_management::request::organization::org::block_org,
         openobserve_api_management::request::organization::org::cluster_info,
         openobserve_api_management::request::organization::org::list_org_cleanup_tasks,
         openobserve_api_management::request::organization::org::node_list,
         openobserve_api_management::request::organization::org::resurrect_org_deletion,
         openobserve_api_management::request::organization::org::retry_org_cleanup,
+        openobserve_api_management::request::organization::org::unblock_org,
         openobserve_api_management::request::organization::settings::delete_logo,
         openobserve_api_management::request::organization::settings::delete_logo_text,
         openobserve_api_management::request::organization::settings::set_logo_text,
@@ -1644,6 +1646,7 @@ struct WorkflowHttpTriggerApiDoc;
     openobserve_api_management::request::organization::org::initiate_org_deletion,
     openobserve_api_management::request::organization::org::revoke_external_contract,
     openobserve_api_management::request::organization::org::set_quota_usage_limit,
+    openobserve_api_management::request::users::all_users,
 ))]
 struct CloudQuotaApiDoc;
 

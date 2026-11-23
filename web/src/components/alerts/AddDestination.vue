@@ -253,7 +253,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="lastTestResult"
                 :result="lastTestResult"
                 :is-loading="isTestInProgress"
-                :show-success-response-body="dtVal === 'slack'"
                 data-test="prebuilt-test-result"
                 @retry="handleTestDestination"
               />

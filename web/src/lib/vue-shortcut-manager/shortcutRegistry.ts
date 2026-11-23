@@ -203,6 +203,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
       "shortcuts.pages.llmProviders",
       "shortcuts.pages.aiToolsets",
       "shortcuts.pages.orgManagement",
+      "shortcuts.pages.userManagement",
     ],
   },
   {
@@ -1329,6 +1330,20 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         id: "orgManagementRefresh",
         key: "r",
         descriptionKey: "shortcuts.actions.orgManagementRefresh",
+      },
+    ],
+  },
+
+  // ── User Management ─────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.userManagement",
+    scope: "user-management",
+    visible: cloudMetaAdmin,
+    shortcuts: [
+      {
+        id: "userManagementRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.userManagementRefresh",
       },
     ],
   },

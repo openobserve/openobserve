@@ -351,6 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="h-full w-full"
               @updated:dataZoom="onChartUpdate"
               @finished="onHistogramFinished"
+              @painted="onHistogramPainted"
             />
           </div>
 
@@ -1842,8 +1843,6 @@ export default defineComponent({
     const columnSizes = ref({});
 
     const reDrawChart = () => {
-      // Partitions stream in while loading; the chart paints once when the histogram settles.
-      if (searchObj.loadingHistogram) return;
       if (
         Object.prototype.hasOwnProperty.call(searchObj.data.histogram, "xData") &&
         searchObj.data.histogram.xData.length > 0
@@ -2086,6 +2085,8 @@ export default defineComponent({
     // The histogram response lands frames before ECharts paints it, so the run settles on the paint.
     const CHART_PAINT_WAIT_MS = 1500;
     const chartPaintPending = ref(false);
+    const streamPainted = ref(false);
+    const hasPlotChart = () => Object.keys(plotChart.value ?? {}).length > 0;
     let chartPaintTimer: ReturnType<typeof setTimeout> | undefined;
     const settleChartPaint = () => {
       clearTimeout(chartPaintTimer);
@@ -2096,10 +2097,19 @@ export default defineComponent({
       () => !!searchObj.loadingHistogram,
       (loadingNow, loadingBefore) => {
         settleChartPaint();
+        if (loadingNow && !loadingBefore) streamPainted.value = !hasPlotChart();
         if (!loadingBefore || loadingNow || !searchObj.meta.showHistogram || autoRefreshOn())
           return;
         chartPaintPending.value = true;
         chartPaintTimer = setTimeout(settleChartPaint, CHART_PAINT_WAIT_MS);
+      },
+      { flush: "sync" },
+    );
+    // A replacing run can keep loadingHistogram true, so a run's cleared points also start a new stream.
+    watch(
+      () => (searchObj.data.histogram?.xData?.length ?? 0) === 0,
+      (cleared) => {
+        if (cleared) streamPainted.value = !hasPlotChart();
       },
       { flush: "sync" },
     );
@@ -2137,21 +2147,27 @@ export default defineComponent({
     const histogramView = computed(() =>
       resolveHistogramView({
         showHistogram: !!searchObj.meta.showHistogram,
-        hasChart: Object.keys(plotChart.value ?? {}).length > 0,
+        hasChart: hasPlotChart(),
         loading: !!searchObj.loading,
         loadingHistogram: !!searchObj.loadingHistogram,
         histogramPoints: searchObj.data.histogram?.xData?.length ?? 0,
         liveMode: autoRefreshOn(),
+        streamPainted: streamPainted.value,
       }),
     );
     const histogramDimmed = useDelayedFlag(
-      () => histogramView.value.stale || chartPaintPending.value,
+      () => histogramView.value.stale || (chartPaintPending.value && !streamPainted.value),
       STALE_DIM_DELAY_MS,
     );
     const histogramPainted = ref(false);
     const onHistogramFinished = () => {
       histogramPainted.value = true;
-      settleChartPaint();
+    };
+    // A paint with no points of the new run is the previous chart redrawn, so it must not undim it.
+    const onHistogramPainted = () => {
+      if (!searchObj.data.histogram?.xData?.length) return;
+      streamPainted.value = true;
+      if (chartPaintPending.value) settleChartPaint();
     };
     let histogramPaintFrame = 0;
     // Reveal on "finished" so the bars never grow from empty axes; the frame cap only guards a lost event.
@@ -3218,6 +3234,7 @@ export default defineComponent({
       histogramSettling,
       chartPaintPending,
       onHistogramFinished,
+      onHistogramPainted,
       histogramPainted,
       canChangePage,
       hasPrevPage,

@@ -113,6 +113,7 @@ export default defineComponent({
       aiToolsets: "ai_toolsets",
       license: "license",
       orgnizationManagement: "organization_management",
+      userManagement: "user_management",
       regexPatterns: "regex_patterns",
       syntheticsLocations: "synthetics_locations",
       correlationSettings: "correlation_settings",
@@ -518,6 +519,16 @@ export default defineComponent({
           licenseLocked: aiAssistantLicense === "locked",
           dataTest: "settings-assistant-tab",
           group: "Assistant",
+        },
+        {
+          key: "user_management",
+          label: t("settings.userManagement"),
+          description: t("settings.userManagementDesc"),
+          icon: "manage-accounts",
+          to: { name: "userManagement", query: { org_identifier: org } },
+          visible: isCloud && meta,
+          dataTest: "user-management-tab",
+          group: "Account",
         },
       ];
       return items;

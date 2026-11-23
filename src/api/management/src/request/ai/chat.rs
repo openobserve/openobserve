@@ -1097,13 +1097,13 @@ fn rca_mode_refused(mode: Option<ChatMode>) -> Option<&'static str> {
     (mode == Some(ChatMode::Rca)).then_some(RCA_MODE_REFUSED)
 }
 
-/// The org's tools a turn may carry: the query helper gets no CLI or third-party MCP tools.
+/// The org's tools a turn may carry: the query helper gets no third-party MCP tools.
 #[cfg(feature = "enterprise")]
-fn turn_tools<M, C>(mode: Option<ChatMode>, mcps: Vec<M>, clis: Vec<C>) -> (Vec<M>, Vec<C>) {
+fn turn_tools<M>(mode: Option<ChatMode>, mcps: Vec<M>) -> Vec<M> {
     if mode == Some(ChatMode::GenerateQuery) {
-        return (Vec::new(), Vec::new());
+        return Vec::new();
     }
-    (mcps, clis)
+    mcps
 }
 
 /// A named agent settles the mode a request left unsaid.
@@ -3282,9 +3282,9 @@ async fn chat_turn(
                 .collect()
         });
 
-        let (tool_mcps, tool_clis, tool_skills) =
+        let (tool_mcps, tool_skills) =
             o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(org_id_str).await;
-        let (tool_mcps, tool_clis) = turn_tools(prompt_body.mode, tool_mcps, tool_clis);
+        let tool_mcps = turn_tools(prompt_body.mode, tool_mcps);
         let session = parts
             .headers
             .get(X_O2_ASSISTANT_SESSION_ID.as_str())
@@ -3305,11 +3305,6 @@ async fn chat_turn(
                     None
                 } else {
                     Some(tool_mcps)
-                },
-                clis: if tool_clis.is_empty() {
-                    None
-                } else {
-                    Some(tool_clis)
                 },
                 skills: if tool_skills.is_empty() {
                     None
@@ -3694,9 +3689,9 @@ async fn stream_turn(
                 .collect()
         });
 
-        let (tool_mcps, tool_clis, tool_skills) =
+        let (tool_mcps, tool_skills) =
             o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(&org_id_str).await;
-        let (tool_mcps, tool_clis) = turn_tools(prompt_body.mode, tool_mcps, tool_clis);
+        let tool_mcps = turn_tools(prompt_body.mode, tool_mcps);
         let session = forward_headers
             .get(X_O2_ASSISTANT_SESSION_ID.as_str())
             .map(String::as_str);
@@ -3714,11 +3709,6 @@ async fn stream_turn(
                     None
                 } else {
                     Some(tool_mcps)
-                },
-                clis: if tool_clis.is_empty() {
-                    None
-                } else {
-                    Some(tool_clis)
                 },
                 skills: if tool_skills.is_empty() {
                     None
@@ -6587,15 +6577,9 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[test]
-    fn a_query_turn_carries_no_cli_or_third_party_mcp_tools() {
-        let (mcps, clis) = turn_tools(
-            Some(ChatMode::GenerateQuery),
-            vec!["github"],
-            vec!["kubectl"],
-        );
-        assert!(mcps.is_empty() && clis.is_empty());
-        let (mcps, clis) = turn_tools(None, vec!["github"], vec!["kubectl"]);
-        assert_eq!((mcps, clis), (vec!["github"], vec!["kubectl"]));
+    fn a_query_turn_carries_no_third_party_mcp_tools() {
+        assert!(turn_tools(Some(ChatMode::GenerateQuery), vec!["github"]).is_empty());
+        assert_eq!(turn_tools(None, vec!["github"]), vec!["github"]);
     }
 
     #[cfg(feature = "enterprise")]

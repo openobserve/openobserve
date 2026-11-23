@@ -1338,9 +1338,8 @@ describe("usePrebuiltDestinations", () => {
           skipTlsVerify: true,
         },
       });
-      expect(result).toEqual(
-        expect.objectContaining({ success: true, statusCode: 200, responseBody: "ok" }),
-      );
+      expect(result).toEqual(expect.objectContaining({ success: true, statusCode: 200 }));
+      expect(result).not.toHaveProperty("responseBody");
       expect(lastTestResult.value).toEqual(result);
       expect(isTestInProgress.value).toBe(false);
     });

@@ -239,9 +239,6 @@ impl From<DashboardError> for Response {
             DashboardError::CreateDefaultFolder => {
                 MetaHttpResponse::internal_error("Error saving default folder")
             }
-            DashboardError::DistinctValueError => {
-                MetaHttpResponse::internal_error("Error in updating distinct values")
-            }
             DashboardError::MoveDashboardDeleteOld(dashb_id, folder_id, e) => {
                 MetaHttpResponse::internal_error(format!(
                     "error deleting the dashboard {dashb_id} from old folder {folder_id} : {e}"

@@ -167,7 +167,6 @@ const copySuccessMessage = computed(() =>
 const onCopy = () => {
   copyToClipboard(props.code, t, {
     successMessage: copySuccessMessage.value,
-    errorMessage: t("common.copyContentError"),
   }).then((copied) => {
     if (copied) emit("copy", { partial: false });
   });

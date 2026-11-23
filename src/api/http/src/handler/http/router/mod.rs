@@ -1471,6 +1471,14 @@ fn service_route_table() -> Router {
             "/{org_id}/organizations/{target_org_id}/resurrect",
             post(organization::org::resurrect_org_deletion),
         )
+        .route(
+            "/{org_id}/organizations/{target_org_id}/block",
+            post(organization::org::block_org),
+        )
+        .route(
+            "/{org_id}/organizations/{target_org_id}/unblock",
+            post(organization::org::unblock_org),
+        )
         .route("/{org_id}/settings", get(organization::settings::get).post(organization::settings::create))
         .route("/{org_id}/settings/logo", post(organization::settings::upload_logo).delete(organization::settings::delete_logo))
         .route("/{org_id}/settings/logo/text", post(organization::settings::set_logo_text).delete(organization::settings::delete_logo_text))
@@ -2440,6 +2448,7 @@ fn service_route_table() -> Router {
                 get(organization::org::all_organizations)
                     .delete(organization::org::initiate_org_deletion),
             )
+            .route("/{org_id}/all_users", get(users::all_users))
             .route(
                 "/{org_id}/extend_trial_period",
                 put(organization::org::extend_trial_period),

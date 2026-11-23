@@ -179,10 +179,8 @@ impl ToolsetUse {
         self.names
             .iter()
             .find(|(_, name)| {
-                tool.strip_prefix("cli_") == Some(name.as_str())
-                    || tool
-                        .strip_prefix(name.as_str())
-                        .is_some_and(|rest| rest.starts_with(['_', '-']))
+                tool.strip_prefix(name.as_str())
+                    .is_some_and(|rest| rest.starts_with(['_', '-']))
             })
             .map(|(id, _)| id.clone())
     }
@@ -202,7 +200,7 @@ impl ToolsetUse {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     summary = "Create an AI toolset",
-    description = "Creates a new AI toolset (MCP server, CLI tool, skill, or generic config). \
+    description = "Creates a new AI toolset (MCP server, skill, or generic config). \
                    The `data` field is encrypted at rest using per-org envelope encryption. \
                    Only available in enterprise deployments.",
     request_body(
@@ -324,7 +322,7 @@ pub async fn get(
 pub struct ListQuery {
     /// Substring filter on the toolset name (case-insensitive `LIKE '%val%'`).
     pub name: Option<String>,
-    /// Exact filter on the toolset kind (`mcp`, `cli`, `skill`, `generic`).
+    /// Exact filter on the toolset kind (`mcp`, `skill`, `generic`).
     pub kind: Option<String>,
     /// Maximum number of results to return; a negative value is rejected with 400.
     pub limit: Option<u64>,
@@ -341,7 +339,7 @@ pub struct ListQuery {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("name"   = Option<String>, Query, description = "Substring filter on name (case-insensitive)"),
-        ("kind"   = Option<String>, Query, description = "Exact filter on kind: mcp | cli | skill | generic"),
+        ("kind"   = Option<String>, Query, description = "Exact filter on kind: mcp | skill | generic"),
         ("limit"  = Option<u64>,   Query, description = "Maximum number of results"),
     ),
     security(("Authorization" = [])),
@@ -389,12 +387,9 @@ pub async fn list(
     summary = "Update an AI toolset",
     description = "Updates the description and/or data of an existing AI toolset. \
                    When `data` is provided it replaces the existing config, except that a \
-                   secret (MCP `headers`, CLI `env` and `credential_files` values) sent as \
-                   `***` keeps its stored value; a secret key left out is removed. Keeping \
-                   any `***` requires every destination field (MCP `url`; CLI `command`, \
-                   `allowed_subcommands`, `blocked_subcommands`, `requires_confirmation`) and \
-                   every entry of `headers`, `env` and `credential_files` to stay unchanged, \
-                   except removals; otherwise the save is refused with 400 \
+                   secret (MCP `headers` values) sent as `***` keeps its stored value; a \
+                   secret key left out is removed. Keeping any `***` requires the MCP `url` \
+                   and every entry of `headers` to stay unchanged, except removals; otherwise the save is refused with 400 \
                    `invalid_request` naming the changed `fields`, and nothing is saved. \
                    Rotating one secret therefore means re-entering all of them. \
                    Only available in enterprise deployments.",
@@ -566,7 +561,7 @@ pub async fn patch(Path((org_id, id)): Path<(String, String)>, body: Bytes) -> R
     operation_id = "TestAiToolset",
     summary = "Check that an AI toolset works",
     description = "Org admins and root only. An MCP toolset is asked to list its tools with \
-                   its stored credentials; a CLI or skill toolset has its configuration \
+                   its stored credentials; a skill toolset has its configuration \
                    checked, since only O2 Assistant runs it. Creates no chat, spends no \
                    credit and never returns a secret or the server's own text: \
                    `error.message` is a fixed sentence and every network failure is the \
@@ -740,7 +735,7 @@ async fn check_toolset(toolset: &OrgToolset) -> Option<ToolsetTestError> {
             Some(mcp) => list_mcp_tools(&mcp).await.err(),
             None => invalid(),
         },
-        ToolsetKind::Cli | ToolsetKind::Skill | ToolsetKind::Generic => None,
+        ToolsetKind::Skill | ToolsetKind::Generic => None,
     }
 }
 
@@ -939,39 +934,7 @@ mod tests {
         assert_eq!(merged["headers"]["Authorization"], "Bearer typed-again");
     }
 
-    #[test]
-    fn kept_cli_credentials_never_run_under_a_changed_command() {
-        let stored =
-            r#"{"command":"kubectl","blocked_subcommands":["delete"],"env":{"TOKEN":"real"}}"#;
-        let incoming =
-            json!({"command": "sh", "blocked_subcommands": ["delete"], "env": {"TOKEN": "***"}});
-        let changed =
-            merge_secrets("o", "t1", Some(ToolsetKind::Cli), Some(stored), incoming).unwrap_err();
-        assert_eq!(changed.fields, ["command"]);
-    }
 
-    #[tokio::test]
-    async fn a_kept_cli_token_next_to_a_changed_env_endpoint_is_a_400_and_nothing_merges() {
-        let stored = r#"{"command":"vault","env":{"VAULT_ADDR":"https://vault.corp","VAULT_TOKEN":"s.real"}}"#;
-        let incoming = json!({
-            "command": "vault",
-            "env": {"VAULT_ADDR": "https://attacker.example", "VAULT_TOKEN": "***"}
-        });
-        let changed =
-            merge_secrets("o", "t1", Some(ToolsetKind::Cli), Some(stored), incoming).unwrap_err();
-        assert_eq!(changed.fields, ["env"]);
-        let response = destination_changed(&changed);
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let text = String::from_utf8(body.to_vec()).unwrap();
-        assert!(text.contains(r#""fields":["env"]"#), "{text}");
-        assert!(
-            !text.contains("s.real") && !text.contains("attacker"),
-            "{text}"
-        );
-    }
 
     #[tokio::test]
     async fn a_refused_save_is_a_typed_400_that_names_fields_never_values() {
@@ -1171,7 +1134,7 @@ mod tests {
         let frames = concat!(
             "data: {\"type\":\"tool_result\",\"tool\":\"github-enterprise_create_issue\",\"success\":true}\n",
             "data: {\"type\":\"tool_result\",\"tool\":\"github_search\",\"success\":false}\n",
-            "data: {\"type\":\"tool_result\",\"tool\":\"cli_kubectl\",\"success\":true}\n",
+            "data: {\"type\":\"tool_result\",\"tool\":\"kubectl_get\",\"success\":true}\n",
             "data: {\"type\":\"tool_result\",\"tool\":\"old_x\",\"success\":true}\n",
             "data: {\"type\":\"tool_result\",\"tool\":\"SearchSQL\",\"success\":true}\n",
         );

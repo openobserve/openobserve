@@ -158,15 +158,16 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 157: add alert_incident_alerts.labels and severity, create alert_pair_verdicts, and delete
 //      service_streams rows named by the metric-name label that list no trace stream.
 // 158: create alert_leases.
-// 159: add first_event_at to ai_chat_turns.
-// 160: org_ai_toolsets health; create ai_grants, ai_actions, ai_access_requests, ai_turn_marks.
-// 161: chat pins, seeds, turn versions, decisions, hide_attachments, ai_chat_feedback/imports.
-// 162: create paid_overage_attribution.
-// 163: create ai_approvals.
-// 164: add agent to ai_chat_turns.
-// 165: add branched_from to ai_chat_sessions.
-// 166: add approval_scope to ai_actions.
-pub const DB_SCHEMA_VERSION: u64 = 166;
+// 159: delete org_ai_toolsets rows of the removed cli kind.
+// 160: add first_event_at to ai_chat_turns.
+// 161: org_ai_toolsets health; create ai_grants, ai_actions, ai_access_requests, ai_turn_marks.
+// 162: chat pins, seeds, turn versions, decisions, hide_attachments, ai_chat_feedback/imports.
+// 163: create paid_overage_attribution.
+// 164: create ai_approvals.
+// 165: add agent to ai_chat_turns.
+// 166: add branched_from to ai_chat_sessions.
+// 167: add approval_scope to ai_actions.
+pub const DB_SCHEMA_VERSION: u64 = 167;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

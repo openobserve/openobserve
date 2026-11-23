@@ -84,6 +84,9 @@ pub struct Request {
     pub local_mode: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub agent_options: Option<AgentOptions>,
+    /// Resolved once where the user request arrives; never read from a request body.
+    #[serde(skip)]
+    pub raw_streams: Option<RawStreams>,
 }
 
 impl Default for Request {
@@ -101,7 +104,45 @@ impl Default for Request {
             clear_cache: false,
             local_mode: None,
             agent_options: None,
+            raw_streams: None,
         }
+    }
+}
+
+/// The streams a request may read unredacted, as `{stream_type}/{stream}`. An empty set
+/// redacts every protected stream, so a hop that loses it can only redact more.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RawStreams(std::collections::BTreeSet<String>);
+
+impl RawStreams {
+    pub fn insert(&mut self, stream_type: StreamType, stream: &str) {
+        self.0.insert(Self::key(stream_type, stream));
+    }
+
+    pub fn contains(&self, stream_type: StreamType, stream: &str) -> bool {
+        self.0.contains(&Self::key(stream_type, stream))
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &String> {
+        self.0.iter()
+    }
+
+    pub fn to_vec(&self) -> Vec<String> {
+        self.0.iter().cloned().collect()
+    }
+
+    fn key(stream_type: StreamType, stream: &str) -> String {
+        format!("{stream_type}/{stream}")
+    }
+}
+
+impl From<Vec<String>> for RawStreams {
+    fn from(streams: Vec<String>) -> Self {
+        Self(streams.into_iter().collect())
     }
 }
 
@@ -674,6 +715,9 @@ pub struct SearchPartitionRequest {
     pub search_type: Option<SearchEventType>,
     #[serde(default)]
     pub timezone: Option<String>,
+    /// Keys the streaming aggregation cache; resolved like [`Request::raw_streams`].
+    #[serde(skip)]
+    pub raw_streams: Option<RawStreams>,
 }
 
 impl SearchPartitionRequest {
@@ -710,6 +754,7 @@ impl From<&Request> for SearchPartitionRequest {
             sampling_ratio: req.query.sampling_ratio,
             search_type: req.search_type,
             timezone: req.query.timezone.clone(),
+            raw_streams: req.raw_streams.clone(),
         }
     }
 }
@@ -801,6 +846,7 @@ impl SearchHistoryRequest {
             clear_cache: false,
             local_mode: None,
             agent_options: None,
+            raw_streams: None,
         };
         Ok(search_req)
     }
@@ -1457,6 +1503,7 @@ impl MultiStreamRequest {
                 clear_cache: false,
                 local_mode: None,
                 agent_options: None,
+                raw_streams: None,
             });
         }
         res
@@ -2138,6 +2185,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_request_body_cannot_ask_for_raw_values() {
+        let body = r#"{"query":{"sql":"SELECT * FROM t","start_time":0,"end_time":1},"raw_streams":["logs/t"]}"#;
+        let req: Request = json::from_str(body).unwrap();
+        assert!(req.raw_streams.is_none());
+        let body =
+            r#"{"sql":"SELECT * FROM t","start_time":0,"end_time":1,"raw_streams":["logs/t"]}"#;
+        let req: SearchPartitionRequest = json::from_str(body).unwrap();
+        assert!(req.raw_streams.is_none());
+
+        let resolved = Request {
+            raw_streams: Some(RawStreams::from(vec!["logs/t".to_string()])),
+            ..Default::default()
+        };
+        assert!(!json::to_string(&resolved).unwrap().contains("raw_streams"));
+    }
+
+    #[test]
     fn test_response() {
         let mut res = Response::default();
         res.set_total(10);
@@ -2365,6 +2429,7 @@ mod tests {
             sampling_ratio: None,
             search_type: None,
             timezone: None,
+            raw_streams: None,
         };
 
         req.decode().unwrap();

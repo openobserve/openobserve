@@ -473,22 +473,25 @@ describe("useRoleEntityLoaders - stream loaders", () => {
     ]);
   });
 
-  it("logs_pattern, logs_insights and logs_cache all list logs streams", async () => {
+  it("logs_pattern, logs_insights, logs_unredacted and logs_cache all list logs streams", async () => {
     const {
       getLogsPatternStreams,
       getLogsInsightsStreams,
+      getLogsUnredactedStreams,
       getLogsCacheStreams,
       updateResourceEntities,
     } = setup();
 
     await getLogsPatternStreams();
     await getLogsInsightsStreams();
+    await getLogsUnredactedStreams();
     await getLogsCacheStreams();
 
     expect(getStreamsMock).toHaveBeenCalledWith("logs", false);
     expect(updateResourceEntities.mock.calls).toEqual([
       ["logs_pattern", ["name"], [{ name: "app" }, { name: "sys" }]],
       ["logs_insights", ["name"], [{ name: "app" }, { name: "sys" }]],
+      ["logs_unredacted", ["name"], [{ name: "app" }, { name: "sys" }]],
       ["logs_cache", ["name"], [{ name: "app" }, { name: "sys" }]],
     ]);
   });

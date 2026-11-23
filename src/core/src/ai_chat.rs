@@ -807,6 +807,7 @@ async fn search_rows(
         clear_cache: false,
         local_mode: None,
         agent_options: None,
+        raw_streams: None,
     };
     let trace_id = config::ider::generate_trace_id();
     let resp = as_chat_history_reader(crate::search::search(
