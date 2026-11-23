@@ -57,12 +57,25 @@ describe("useHomePacks", () => {
   beforeEach(() => {
     resetStarterPackPopups();
     fake.flow = fakeFlow();
-    fake.matcher = { state: ref("matched"), streams: ref([]), checkShared: vi.fn() };
+    fake.matcher = {
+      state: ref("matched"),
+      forbidden: ref(false),
+      streams: ref([]),
+      checkShared: vi.fn(),
+    };
   });
 
   it("asks for an admin when a refused read also fails the match", () => {
     fake.flow.forbidden.value = true;
     fake.matcher.state.value = "error";
+    const packs = home();
+    expect(packs.items[0].view.value).toBe("forbidden");
+    expect(packs.askAdmin.value).toBe(true);
+  });
+
+  it("asks for an admin when only the match's reads are refused", () => {
+    fake.matcher.state.value = "error";
+    fake.matcher.forbidden.value = true;
     const packs = home();
     expect(packs.items[0].view.value).toBe("forbidden");
     expect(packs.askAdmin.value).toBe(true);

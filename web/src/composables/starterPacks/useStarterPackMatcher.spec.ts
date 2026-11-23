@@ -20,6 +20,7 @@ const fake = vi.hoisted(() => ({
   traces: [] as string[],
   columns: {} as Record<string, string[]>,
   fail: false,
+  failStatus: 0,
   clusters: ["staging-eu-1"],
   sql: [] as string[],
   forced: [] as string[],
@@ -29,7 +30,9 @@ const fake = vi.hoisted(() => ({
 vi.mock("@/constants/starterPacks", () => ({ STARTER_PACKS_ENABLED: false }));
 vi.mock("@/composables/query/readQuery", () => ({
   readQuery: async (options: { queryKey: unknown[] }, force?: boolean) => {
-    if (fake.fail) throw new Error("down");
+    if (fake.fail) {
+      throw Object.assign(new Error("down"), { response: { status: fake.failStatus } });
+    }
     if (force && options.queryKey.length === 3) fake.forced.push(String(options.queryKey[2]));
     const key = JSON.stringify(options.queryKey);
     if ((options.queryKey as string[]).length === 2 && key.includes("metrics")) {
@@ -85,6 +88,7 @@ describe("useStarterPackMatcher", () => {
       traces: [],
       columns: {},
       fail: false,
+      failStatus: 0,
       sql: [],
       forced: [],
     });
@@ -162,6 +166,26 @@ describe("useStarterPackMatcher", () => {
     fake.fail = false;
     await api.retry();
     expect(api.state.value).toBe("none");
+  });
+
+  it("says the reads were refused when the match fails with a 403, until a check succeeds", async () => {
+    fake.fail = true;
+    fake.failStatus = 403;
+    const { api } = setup();
+    await api.check();
+    expect(api.state.value).toBe("error");
+    expect(api.forbidden.value).toBe(true);
+    fake.fail = false;
+    await api.retry();
+    expect(api.forbidden.value).toBe(false);
+  });
+
+  it("does not call a failure for another reason refused", async () => {
+    fake.fail = true;
+    fake.failStatus = 500;
+    const { api } = setup();
+    await api.check();
+    expect(api.forbidden.value).toBe(false);
   });
 
   it("re-runs while polling, offers the partial setup after 3 minutes, and stops on a match", async () => {
