@@ -20,7 +20,7 @@ import { echartsPaletteColor } from "./thresholds";
 import { labelColorOn } from "./chartLabelContrast";
 import { calculateWidthText } from "./chartDimensionUtils";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
-import { pieLegendPercentDecimals, piePercentPrecision } from "./legendConfiguration";
+import { createPieSlicePercent } from "./legendConfiguration";
 
 export const GAUGE_STYLES = ["semi", "arc", "circle"] as const;
 export const DEFAULT_GAUGE_STYLE = "semi";
@@ -149,16 +149,11 @@ export const applyGaugeOptions = (options: any, panelSchema: any): void => {
   if (overlays.length) options.series.push(...overlays);
 };
 
-const pieLabelFormatter = (contents: string[], panelSchema: any) => {
+// Reads the slices from the series when called, after bucketing or sorting has replaced them.
+const pieLabelFormatter = (contents: string[], panelSchema: any, series: any) => {
   const lookup = createSeriesOverrideLookup(panelSchema?.config);
-  const panelDecimals = piePercentPrecision(panelSchema?.config);
-  // ECharts' percent trims trailing zeros, which would disagree with the legend.
-  const percentText = (params: any) => {
-    const overrideDecimals = lookup.get(params?.name)?.decimals;
-    const decimals =
-      overrideDecimals === undefined ? panelDecimals : pieLegendPercentDecimals(overrideDecimals);
-    return `${Number(params?.percent ?? 0).toFixed(decimals)}%`;
-  };
+  const slicePercent = createPieSlicePercent(panelSchema?.config);
+  const percentText = (params: any) => `${slicePercent(series, params)}%`;
   return (params: any) =>
     contents
       .map((content) => {
@@ -277,8 +272,7 @@ const outsideLabelsFit = (
     panel,
   );
   const fontSize = Number(series.label?.fontSize) || PIE_LABEL_FONT_SIZE;
-  const format = pieLabelFormatter([...contents], panelSchema);
-  const precision = Number(series.percentPrecision ?? 2);
+  const format = pieLabelFormatter([...contents], panelSchema, series);
   const roomRight = panel.width - (cx + outer + PIE_LABEL_LINE) - PIE_LABEL_BLEED;
   const roomLeft = cx - outer - PIE_LABEL_LINE - PIE_LABEL_BLEED;
   let start = 0;
@@ -286,11 +280,7 @@ const outsideLabelsFit = (
     const middle = Math.PI / 2 - 2 * Math.PI * (start + share / 2);
     start += share;
     const item = series.data[index];
-    const text = format({
-      name: item?.name,
-      value: item?.value,
-      percent: (share * 100).toFixed(precision),
-    });
+    const text = format({ name: item?.name, value: item?.value });
     return labelWidth(String(text), fontSize) <= (Math.cos(middle) >= 0 ? roomRight : roomLeft);
   });
 };
@@ -302,18 +292,17 @@ const percentLabel = (series: any, item: any, index: number) => ({
 
 /** Percent labels inside each slice, hidden on slices too thin to hold the text. */
 const placePercentInside = (series: any, panel: PanelSize | null, panelSchema: any) => {
-  const formatter = pieLabelFormatter(["percent"], panelSchema);
+  const formatter = pieLabelFormatter(["percent"], panelSchema, series);
   series.label = { ...series.label, position: "inside", formatter };
   const shares = sliceShares(series.data);
   const geometry = panel ? pieGeometry(series, panel) : null;
   const fontSize = Number(series.label?.fontSize) || PIE_LABEL_FONT_SIZE;
-  const precision = Number(series.percentPrecision ?? 2);
   series.data = series.data.map((item: any, index: number) => {
     const label = percentLabel(series, item, index);
     if (!geometry) return { ...item, label };
     const middle = (geometry.inner + geometry.outer) / 2;
     const arc = shares[index] * 2 * Math.PI * middle;
-    const text = `${(shares[index] * 100).toFixed(precision)}%`;
+    const text = String(formatter({ name: item?.name, value: item?.value }));
     const ring = geometry.outer - geometry.inner;
     const fits =
       arc >= labelWidth(text, fontSize) + PIE_LABEL_INSET && ring >= fontSize + PIE_LABEL_INSET;
@@ -374,7 +363,11 @@ export const applyPieOptions = (
       series.label =
         contents.length === 0
           ? { ...series.label, show: false }
-          : { ...series.label, show: true, formatter: pieLabelFormatter(contents, panelSchema) };
+          : {
+              ...series.label,
+              show: true,
+              formatter: pieLabelFormatter(contents, panelSchema, series),
+            };
     }
     if (!Array.isArray(series.data)) return;
     if (threshold !== null && threshold > 0)

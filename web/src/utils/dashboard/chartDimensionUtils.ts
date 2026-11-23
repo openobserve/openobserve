@@ -13,10 +13,15 @@ let measureTextCtx: CanvasRenderingContext2D | null | undefined;
  *
  * @param {string} text - The text to calculate the width of.
  * @param {string} fontSize - The font size of the text.
+ * @param {string} weight - Optional font weight, e.g. "bold".
  * @return {number} The width of the text in pixels.
  */
-// eslint-disable-next-line local/no-hardcoded-px -- measures text ECharts paints, and ECharts fontSize is a plain number = literal CSS px that never scales with the root; the measurement must use that same fixed px or it mis-reserves space
-export const calculateWidthText = (text: string, fontSize: string = "12px"): number => {
+export const calculateWidthText = (
+  text: string,
+  // eslint-disable-next-line local/no-hardcoded-px -- measures text ECharts paints, and ECharts fontSize is a plain number = literal CSS px that never scales with the root; the measurement must use that same fixed px or it mis-reserves space
+  fontSize: string = "12px",
+  weight?: string,
+): number => {
   if (!text) return 0;
 
   if (measureTextCtx === undefined) {
@@ -31,13 +36,13 @@ export const calculateWidthText = (text: string, fontSize: string = "12px"): num
     // Must match the family ECharts renders axis labels with (set globally by
     // registerO2EChartsTheme), otherwise nameGap/width come out wrong.
     // eslint-disable-next-line local/no-hardcoded-px -- mirrors the caller's ECharts fontSize, which is literal CSS px (see the fallback on the signature above)
-    measureTextCtx.font = canvasFont(fontSize || "12px", "sans");
+    measureTextCtx.font = canvasFont(fontSize || "12px", "sans", weight);
     return Math.ceil(measureTextCtx.measureText(String(text)).width);
   }
 
   // no 2D context (e.g. jsdom) — deterministic estimate, avg glyph ≈ 0.6em
   const px = parseFloat(fontSize) || 12;
-  return Math.ceil(String(text).length * px * 0.6);
+  return Math.ceil(String(text).length * px * (weight === "bold" ? 0.65 : 0.6));
 };
 
 /**

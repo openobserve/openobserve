@@ -365,7 +365,9 @@ describe("pie and donut", () => {
     applyPieOptions(options, { type: "donut", config: { pie_label_content: ["percent"] } });
     const [pale, deep] = options.series[0].data as any[];
     expect(options.series[0].label.position).toBe("inside");
-    expect(options.series[0].label.formatter({ percent: 14.4 })).toBe("14.40%");
+    expect(options.series[0].label.formatter({ name: "pale", value: 1, percent: 49 })).toBe(
+      "50.00%",
+    );
     expect(pale.label.color).toBe(chartColor("--color-black"));
     expect(deep.label.color).toBe(chartColor("--color-white"));
   });

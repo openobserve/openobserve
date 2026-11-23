@@ -603,12 +603,22 @@ describe("PieConverter", () => {
     describe.each(["pie", "donut"])("%s percent decimals", (type) => {
       const convertWith = (config: Record<string, any>) =>
         converter.convert(
-          [{ series: [{ name: "series1", values: [[1, "100"]] }], timestamps: [1], queryIndex: 0 }],
+          [
+            {
+              series: [
+                { name: "series1", values: [[1, "100"]] },
+                { name: "series2", values: [[1, "200"]] },
+              ],
+              timestamps: [1],
+              queryIndex: 0,
+            },
+          ],
           { type, config },
           mockStore,
           mockExtras,
         ).series[0];
-      const params = { name: "series1", value: 100, percent: 33.3333 };
+      // ECharts' own percent is ignored: the label takes the share the legend prints too.
+      const params = { name: "series1", value: 100, percent: 99 };
 
       it("rounds the slice percents and prints the labels at the panel decimals", () => {
         const series = convertWith({ decimals: 4 });
@@ -617,17 +627,15 @@ describe("PieConverter", () => {
 
         const whole = convertWith({ decimals: 0, label_format: "{b} {d}%" });
         expect(whole.percentPrecision).toBe(0);
-        expect(whole.label.formatter({ ...params, percent: 33 })).toBe("series1 33%");
+        expect(whole.label.formatter(params)).toBe("series1 33%");
       });
 
       it("defaults to two decimals and caps the rounding precision", () => {
         expect(convertWith({}).percentPrecision).toBe(2);
-        expect(convertWith({}).label.formatter({ ...params, percent: 33.33 })).toBe(
-          "series1: 100.00 (33.33%)",
-        );
+        expect(convertWith({}).label.formatter(params)).toBe("series1: 100.00 (33.33%)");
         const capped = convertWith({ decimals: 20 });
         expect(capped.percentPrecision).toBe(13);
-        expect(capped.label.formatter({ ...params, percent: 33.3333333333333 })).toBe(
+        expect(capped.label.formatter(params)).toBe(
           "series1: 100.00000000000000000000 (33.3333333333333%)",
         );
       });
@@ -642,6 +650,7 @@ describe("PieConverter", () => {
                 name: "series1",
                 values: [[1, "100"]],
               },
+              { name: "series2", values: [[1, "100"]] },
             ],
             timestamps: [1],
             queryIndex: 0,
@@ -674,6 +683,7 @@ describe("PieConverter", () => {
                 name: "series1",
                 values: [[1, "100"]],
               },
+              { name: "series2", values: [[1, "100"]] },
             ],
             timestamps: [1],
             queryIndex: 0,
