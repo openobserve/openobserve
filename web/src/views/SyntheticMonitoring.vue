@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @delete="confirmDeleteStatusPage"
         @post-update="openPostUpdate"
         @view-updates="openNoticeHistory"
-        @manage-domains="openDomains"
+        @manage-domains="openDomainsFromList"
       />
     </div>
 
@@ -490,8 +490,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="domainsPage"
       v-model:open="showDomains"
       :org-identifier="orgIdentifier"
+      :key="domainsPage.id"
       :page-id="domainsPage.id"
       :page-name="domainsPage.name"
+      :initial-domains="domainsSeed"
+      :initial-domains-read-seq="domainsSeedReadSeq"
     />
   </OPageLayout>
 </template>
@@ -505,6 +508,7 @@ import { syntheticsMonitorsQuery } from "@/services/synthetics.queries";
 import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import config from "@/aws-exports";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -524,9 +528,11 @@ import CreateStatusPageDialog from "@/views/synthetics/status-pages/CreateStatus
 import PostUpdateDialog from "@/views/synthetics/status-pages/PostUpdateDialog.vue";
 import NoticeHistoryDialog from "@/views/synthetics/status-pages/NoticeHistoryDialog.vue";
 import DomainsDialog from "@/views/synthetics/status-pages/DomainsDialog.vue";
+import { nextDomainsReadSeq } from "@/views/synthetics/status-pages/domainsReadSeq";
 import statusPagesService, {
   type StatusPageListItem,
   type PreviewResponse,
+  type StatusPageDomain,
 } from "@/services/status_pages";
 import SyntheticsVariablesTab from "@/components/synthetics/variables/SyntheticsVariablesTab.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
@@ -567,6 +573,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useListViewState } from "@/composables/useListViewState";
+import { useQueryWriter } from "@/composables/useQueryWriter";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
@@ -577,6 +584,9 @@ const route = useRoute();
 const store = useStore();
 const { t } = useI18nTyped();
 const { confirm } = useConfirmDialog();
+
+// The folder pick and a consumed ?domains key both write the query; see useQueryWriter.
+const { write: writeQuery, holds: queryHolds } = useQueryWriter(route, router);
 const { isMobile, lgUp } = useBreakpoint();
 
 // ── API types ──────────────────────────────────────────────────────────
@@ -888,7 +898,11 @@ const activeSection = ref<SyntheticsSection>(initialSection);
 // Replace, not push, so a tab click adds no history entry; the key is always written so the URL matches the tab.
 watch(activeSection, (section) => {
   if (route.query.section !== section) {
-    router.replace({ query: { ...route.query, section } }).catch(() => {});
+    // Through the shared writer, and a link's key never follows the user to another tab.
+    writeQuery(
+      { section, ...(section === "status-pages" ? {} : { domains: undefined }) },
+      "replace",
+    );
   }
 });
 watch(
@@ -1012,14 +1026,10 @@ watch(activeFolderId, async (newFolderId, oldFolderId) => {
   if (searchAcrossFolders.value) {
     searchAcrossFolders.value = false;
   }
-  // Only push when the folder is not already in the URL to avoid a
-  // redundant history entry during initial mount.
+  // Only write when the folder is not already in the URL. A mailed ?domains link, committed or
+  // still being removed, is replaced rather than pushed past, so Back cannot return to it.
   if (route.query.folder !== newFolderId) {
-    router
-      .push({
-        query: { ...route.query, folder: newFolderId },
-      })
-      .catch(() => {});
+    writeQuery({ folder: newFolderId }, queryHolds("domains") ? "replace" : "push");
   }
   await loadMonitors(newFolderId);
 });
@@ -1239,6 +1249,7 @@ async function deleteLocation() {
 const statusPages = ref<StatusPageListItem[]>([]);
 const statusPagesLoading = ref(false);
 const statusPagesForbidden = ref<ForbiddenState>(false);
+const statusPagesLoaded = ref(false);
 const showCreateStatusPage = ref(false);
 
 async function loadStatusPages() {
@@ -1253,6 +1264,7 @@ async function loadStatusPages() {
     console.error("[status-pages] failed to load", err);
   } finally {
     statusPagesLoading.value = false;
+    statusPagesLoaded.value = true;
   }
 }
 
@@ -1323,11 +1335,57 @@ const openNoticeHistory = async (page: StatusPageListItem) => {
 
 const showDomains = ref(false);
 const domainsPage = ref<StatusPageListItem | null>(null);
+// The rows a mailed link already fetched, so the dialog does not ask twice.
+const domainsSeed = ref<StatusPageDomain[] | null>(null);
+// The sequence number that read took when it started, so the dialog can tell it from the reload
+// after an add.
+const domainsSeedReadSeq = ref<number | null>(null);
 
-const openDomains = (page: StatusPageListItem) => {
+const openDomains = (
+  page: StatusPageListItem,
+  seed: StatusPageDomain[] | null = null,
+  readSeq: number | null = null,
+) => {
   domainsPage.value = page;
+  domainsSeed.value = seed;
+  domainsSeedReadSeq.value = readSeq;
   showDomains.value = true;
 };
+
+// Bumped by anything that should cancel a mailed link still waiting on its domain read.
+let domainsLinkSeq = 0;
+
+// Opening a dialog from the list, or leaving Status Pages, wins over a link still in flight.
+const openDomainsFromList = (page: StatusPageListItem) => {
+  domainsLinkSeq++;
+  openDomains(page);
+};
+watch(activeSection, (section) => {
+  if (section !== "status-pages") domainsLinkSeq++;
+});
+
+// A mailed link carries ?domains=<page id>: once the list has loaded, drop the key and open the
+// dialog only if the user can read that page's domains. Anything else opens nothing, silently.
+watch(
+  [() => route.query.domains, statusPagesLoaded, activeSection],
+  async ([pageId, loaded, section]) => {
+    if (typeof pageId !== "string" || !loaded || section !== "status-pages") return;
+    const seq = ++domainsLinkSeq;
+    const page = statusPages.value.find((p) => p.id === pageId);
+    writeQuery({ domains: undefined }, "replace");
+    if (!page || !(config.isCloud === "true" || config.isEnterprise === "true")) return;
+    try {
+      // Listing a page does not grant its domains, so ask silently before showing a dialog.
+      const readSeq = nextDomainsReadSeq();
+      const res = await statusPagesService.listDomains(orgIdentifier.value, page.id, {
+        silentForbidden: true,
+      });
+      if (seq === domainsLinkSeq) openDomains(page, res.data, readSeq);
+    } catch (err) {
+      console.error("[status-pages] domains link not opened", err);
+    }
+  },
+);
 
 const confirmDeleteStatusPage = async (page: StatusPageListItem) => {
   const ok = await confirm({

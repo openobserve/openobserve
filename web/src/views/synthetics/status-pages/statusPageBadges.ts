@@ -14,7 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { I18nKey } from "@/types/i18n";
-import type { StatusPageHealth, StatusPageVisibility } from "@/services/status_pages";
+import type {
+  DomainServingState,
+  StatusPageDomain,
+  StatusPageHealth,
+  StatusPageVisibility,
+} from "@/services/status_pages";
 
 // Same health vocabulary as the rest of the app: green = operational,
 // red = outage, amber = degraded, blue = maintenance, neutral = unknown.
@@ -56,6 +61,24 @@ export function visibilityBadge(visibility: StatusPageVisibility): {
 // origin root, NOT under the /web/ SPA (which would 404 in the Vue router).
 export function publicStatusPageUrl(slug: string): string {
   return `${window.location.origin}/status/${slug}`;
+}
+
+// `serving` is shown only with probe evidence: without it the row is still being set up.
+export function shownServingState(d: StatusPageDomain): DomainServingState {
+  if (d.serving_state === "serving" && d.evidence?.probe_checked_at == null) return "setting_up";
+  return d.serving_state;
+}
+
+// A page with a custom domain whose view says `serving` is public at that domain's root; with
+// several, the oldest. Every other case, the domains not loaded included, keeps the slug URL.
+export function publicPageUrl(slug: string, domains: readonly StatusPageDomain[] | null): string {
+  let serving: StatusPageDomain | undefined;
+  for (const d of domains ?? []) {
+    if (shownServingState(d) === "serving" && (!serving || d.created_at < serving.created_at)) {
+      serving = d;
+    }
+  }
+  return serving ? `https://${serving.domain}/` : publicStatusPageUrl(slug);
 }
 
 // impact: 0 none, 1 degraded, 2 partial_outage, 3 major_outage.
@@ -100,6 +123,16 @@ export function domainStateBadge(servingState: string): {
       return { variant: "default-outline", labelKey: "statusPages.domains.state.pending" };
     case "verified":
       return { variant: "success-outline", labelKey: "statusPages.domains.state.verified" };
+    case "waiting_for_dns":
+      return { variant: "warning-outline", labelKey: "statusPages.domains.state.waitingForDns" };
+    case "setting_up":
+      return { variant: "info-outline", labelKey: "statusPages.domains.state.settingUp" };
+    case "ready":
+      return { variant: "primary-outline", labelKey: "statusPages.domains.state.ready" };
+    case "serving":
+      return { variant: "success-soft", labelKey: "statusPages.domains.state.serving" };
+    case "delayed":
+      return { variant: "warning-soft", labelKey: "statusPages.domains.state.delayed" };
     case "not_serving":
       return { variant: "error-outline", labelKey: "statusPages.domains.state.notServing" };
     case "expired":

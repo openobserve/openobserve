@@ -43,12 +43,87 @@ describe("statusPages.domains in the locale files", () => {
     });
   });
 
-  it("keeps a label for each phase 1 state in en-US", () => {
+  it("keeps a label for each of the nine states in en-US", () => {
     expect(Object.keys(domainsOf("en-US").state).sort()).toEqual([
+      "delayed",
       "expired",
       "notServing",
       "pending",
+      "ready",
+      "serving",
+      "settingUp",
       "verified",
+      "waitingForDns",
     ]);
+  });
+});
+
+// Every string value under statusPages.domains of en-US, with its dotted key path.
+function leaves(node: unknown, path: string[] = []): [string, string][] {
+  if (typeof node === "string") return [[path.join("."), node]];
+  return Object.entries(node as Record<string, unknown>).flatMap(([key, value]) =>
+    leaves(value, [...path, key]),
+  );
+}
+
+// The keys that may name the TXT record: its labels and copy strings, and its reasons.
+const TXT_KEYS = [
+  "txtNameLabel",
+  "txtValueLabel",
+  "copyTxtName",
+  "copyTxtValue",
+  "txtNameCopied",
+  "txtValueCopied",
+  "recordInstructions",
+  "txtMissingWarning",
+  "reason.recordMissing",
+  "reason.valueMismatch",
+  "reason.heldByAnotherOrg",
+  "reason.proofLost",
+  "reason.proofLostSince",
+  "installation.proxy",
+];
+
+// The keys that may say the word proxy: row 6a and the root's installation sentences.
+const PROXY_KEYS = ["reason.proxyMode", "installation.proxy", "installation.off"];
+
+describe("the words of statusPages.domains in en-US", () => {
+  const all = leaves(domainsOf("en-US"));
+  const textOf = (key: string) => all.find(([k]) => k === key)?.[1] ?? "";
+
+  it("reads a non-empty set of strings", () => {
+    expect(all.length).toBeGreaterThan(80);
+  });
+
+  it("never says a record is no longer there or must be put back", () => {
+    expect(all.filter(([, text]) => /no longer|it back/i.test(text))).toEqual([]);
+  });
+
+  it("names the TXT record and _o2-verify only in the TXT keys", () => {
+    const outside = all.filter(
+      ([key, text]) => /TXT|_o2-verify/.test(text) && !TXT_KEYS.includes(key),
+    );
+
+    expect(outside).toEqual([]);
+  });
+
+  it.each(["reason.recordMissing", "reason.heldByAnotherOrg", "reason.proofLost"])(
+    "keeps %s a TXT sentence",
+    (key) => {
+      expect(textOf(key)).toMatch(/TXT|_o2-verify/);
+    },
+  );
+
+  it("never names a CNAME in a TXT key", () => {
+    expect(TXT_KEYS.filter((key) => /CNAME/.test(textOf(key)))).toEqual([]);
+  });
+
+  it("says the whole word proxy only in row 6a and the installation sentences", () => {
+    const outside = all.filter(
+      ([key, text]) => /\bproxy\b/i.test(text) && !PROXY_KEYS.includes(key),
+    );
+
+    expect(outside).toEqual([]);
+    expect(textOf("reason.pointsElsewhere")).toContain("CDN proxying");
   });
 });

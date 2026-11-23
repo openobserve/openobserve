@@ -35,6 +35,7 @@ import StatusPageEditor from "./StatusPageEditor.vue";
 vi.mock("@/services/status_pages", () => ({
   default: {
     get: vi.fn(),
+    listDomains: vi.fn().mockResolvedValue({ data: [] }),
     update: vi.fn(() => Promise.resolve({ data: {} })),
     updateComponents: vi.fn(() => Promise.resolve({ data: {} })),
     rotateSlug: vi.fn(),
