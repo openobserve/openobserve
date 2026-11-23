@@ -59,7 +59,7 @@ const MAIN: Record<string, [string, string]> = {
   "--color-tabs-inactive-text": ["#262626", "#e5e5e5"],
   "--color-text-body": ["#404040", "#d4d4d4"],
   "--color-text-inverse": ["#ffffff", "#171717"],
-  "--color-text-secondary": ["#737373", "#a3a3a3"],
+  "--color-text-secondary": ["#5f5f5f", "#a3a3a3"],
 };
 
 const UTILITY =

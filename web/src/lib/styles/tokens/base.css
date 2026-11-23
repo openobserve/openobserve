@@ -103,6 +103,8 @@
   /* The lightest grey that clears 3:1 on white and on grey-100. */
   --color-grey-450: #8a8a8a;
   --color-grey-500: #737373;
+  /* The lightest grey that clears 4.5:1 on every light hover and selected surface. */
+  --color-grey-550: #5f5f5f;
   --color-grey-600: #525252;
   --color-grey-700: #404040;
   --color-grey-800: #262626;

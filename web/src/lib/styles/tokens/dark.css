@@ -79,8 +79,8 @@
   --color-text-label: var(--color-grey-400); /* form labels, metadata */
   --color-text-muted: var(--color-grey-400); /* de-emphasized */
   --color-text-disabled: var(--color-grey-600); /* dimmer than labels so disabled reads disabled */
-  /* Between grey-500 and grey-400: the lowest grey that clears 4.5:1 on the dark canvas without matching secondary text. */
-  --color-text-placeholder: #7c7c7c;
+  /* grey-450, not grey-400: clears 4.5:1 on inputs, dialogs and dropdowns without matching secondary text. */
+  --color-text-placeholder: var(--color-grey-450);
   --color-text-link: var(--color-primary-400); /* clickable links (teal) */
   --color-text-link-hover: var(--color-primary-300); /* link hover state (teal) */
   --color-text-code: var(--color-grey-300); /* inline code, monospace */
