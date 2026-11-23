@@ -20,6 +20,7 @@ import { useStore } from "vuex";
 import { readQuery } from "@/composables/query/readQuery";
 import { refreshOrgResources } from "@/composables/useOrgResources";
 import { alertsByTagsQuery } from "@/services/alerts.queries";
+import type { AlertLibraryManifest } from "@/types/alertLibrary";
 import { featureState } from "@/utils/featureGate";
 
 import {
@@ -208,7 +209,13 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     ...pack.savedViews.map(({ id, name }) => [id, name]),
     ...pack.dashboards.map(({ id, title }) => [id, title]),
   ]);
-  const nameOf = (itemId: string) => preview.value?.names[itemId] ?? packNames[itemId] ?? itemId;
+  // The preview fills the Library cache first, so its titles show before the rest of the plan.
+  const libraryTitle = (itemId: string): string | undefined =>
+    (store.state.alertLibrary?.manifest as AlertLibraryManifest | null | undefined)?.alerts?.find(
+      ({ id }) => id === itemId,
+    )?.title;
+  const nameOf = (itemId: string) =>
+    preview.value?.names[itemId] ?? packNames[itemId] ?? libraryTitle(itemId) ?? itemId;
 
   const planned = (kind: PackRecordItem["kind"]) =>
     (preview.value?.items ?? []).filter((item) => item.kind === kind && item.status !== "existing");
