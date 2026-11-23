@@ -193,19 +193,15 @@ async function enableLogPatternsExtraction(page, streamName) {
 async function waitForStreamData(page, streamName, expectedMinCount = 1, maxWaitMs = 30000, pollIntervalMs = 2000) {
   const orgId = getOrgIdentifier();
   const headers = getHeaders();
-  const baseUrl = process.env.INGESTION_URL.endsWith('/')
-    ? process.env.INGESTION_URL.slice(0, -1)
-    : process.env.INGESTION_URL;
+  const baseUrl = (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, '');
 
   const startTime = Date.now();
-  const endTime = Date.now() * 1000; // microseconds
   const startTimeUs = (Date.now() - 3600000) * 1000; // 1 hour ago in microseconds
 
   const searchPayload = {
     query: {
       sql: `SELECT COUNT(*) as count FROM "${streamName}"`,
       start_time: startTimeUs,
-      end_time: endTime,
       from: 0,
       size: 1
     }
@@ -215,7 +211,8 @@ async function waitForStreamData(page, streamName, expectedMinCount = 1, maxWait
     try {
       const response = await page.request.post(`${baseUrl}/api/${orgId}/_search?type=logs`, {
         headers: headers,
-        data: searchPayload
+        // The window must reach now on each poll, or rows stamped after the first poll never count.
+        data: { query: { ...searchPayload.query, end_time: Date.now() * 1000 } }
       });
 
       if (response.status() === 200) {
