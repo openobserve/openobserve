@@ -463,6 +463,34 @@ describe("useStarterPackFlow", () => {
     expect(flow.busyBy.value).toBeNull();
   });
 
+  it("drops ask an admin once a later read or preview succeeds", async () => {
+    fake.previewPack.mockRejectedValueOnce(refused);
+    const flow = setup();
+    await flow.loadPreview();
+    expect(flow.forbidden.value).toBe(true);
+    await flow.loadPreview();
+    expect(flow.forbidden.value).toBe(false);
+
+    fake.listError = refused;
+    await flow.load();
+    expect(flow.forbidden.value).toBe(true);
+    fake.listError = null;
+    await flow.load();
+    expect(flow.forbidden.value).toBe(false);
+  });
+
+  it("drops the busy notice once a reload finds no setup running", async () => {
+    fake.installPack.mockRejectedValue(new StarterPackBusyError("first@x"));
+    const flow = setup();
+    await flow.install();
+    fake.installs = [record({ installedBy: "first@x", status: "installing" })];
+    await flow.load();
+    expect(flow.busyBy.value).toBe("first@x");
+    fake.installs = [record({ installedBy: "first@x" })];
+    await flow.load();
+    expect(flow.busyBy.value).toBeNull();
+  });
+
   it("shows partial progress, then failed items, then retry to complete", async () => {
     const incomplete = record({
       status: "incomplete",
