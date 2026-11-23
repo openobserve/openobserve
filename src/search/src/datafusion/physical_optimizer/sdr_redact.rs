@@ -401,13 +401,12 @@ mod tests {
     }
 
     fn redacted_ctx() -> SessionContext {
-        ctx_with(protected())
-    }
-
-    fn ctx_with(protected: HashMap<String, Arc<ScalarUDF>>) -> SessionContext {
         let ctx = SessionContext::new();
         let inner = MemTable::try_new(test_schema(), vec![vec![test_batch()]]).unwrap();
-        let table = RedactedTable { inner, protected };
+        let table = RedactedTable {
+            inner,
+            protected: protected(),
+        };
         ctx.register_table("t", Arc::new(table)).unwrap();
         ctx
     }
