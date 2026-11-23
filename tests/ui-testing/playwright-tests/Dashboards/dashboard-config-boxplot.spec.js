@@ -215,9 +215,8 @@ test.describe("ConfigPanel — Box Plot Settings", () => {
 
       await setupBoxplotPanelWithConfig(page, pm, dashboardName);
       await selector.setCustomSQL(RAW_VALUES_SQL);
-      // Custom mode seeds the editor with the builder's summary SQL and maps Value to its first column
-      // (y_axis_1_min). Replacing the query changes the column count, so the well is not remapped:
-      // swap the stale field for the raw column, as a user has to.
+      // Replacing the seeded summary SQL changes the column count, so Value is not remapped from
+      // y_axis_1_min; swap it by hand, as a user has to.
       await selector.waitForFieldListRow("y_axis_1");
       await selector.removeFieldIfPresent(STALE_SUMMARY_ALIAS, "y");
       await selector.searchAndAddField("y_axis_1", "y");
