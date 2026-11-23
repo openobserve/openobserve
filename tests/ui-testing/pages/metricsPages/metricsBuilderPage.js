@@ -411,7 +411,7 @@ export class MetricsBuilderPage {
 
         // Select from dropdown options
         const option = this.page.locator(`[data-test="index-dropdown-stream-option"][data-test-value="${metricName}"]`).first();
-        if (await option.isVisible({ timeout: 5000 }).catch(() => false)) {
+        if (await option.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false)) {
             await option.click();
             await this.streamPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
@@ -544,16 +544,18 @@ export class MetricsBuilderPage {
         return true;
     }
 
-    /** Pick the first loaded value of the open value list; returns it, or '' when the label has none. */
-    async selectFirstLabelValue() {
+    /** Pick the first loaded value of the open value list; throws when the label has none. */
+    async selectFirstLabelValue(label) {
         const value = await this.firstOptionKey();
-        if (!value) return '';
+        if (!value) {
+            throw new Error(`no values for label "${label}" of metric "${await this.getStreamSelectedValue()}"`);
+        }
         await this.getLabelFilterOption(value).click();
         return value;
     }
 
     /**
-     * Add `<first label> <operator> <first value>`; returns the label and value picked ('' when none loaded)
+     * Add `<first label> <operator> <first value>`; returns the label and value picked (both '' when the metric lists no labels)
      * @param {string} operator
      */
     async addFirstLabelFilter(operator = '=') {
@@ -565,7 +567,7 @@ export class MetricsBuilderPage {
         }
         await this.getLabelFilterOption(label).click();
         await this.selectOperator(operator);
-        const value = await this.selectFirstLabelValue();
+        const value = await this.selectFirstLabelValue(label);
         await this.labelBuilder.close();
         return { label, value };
     }

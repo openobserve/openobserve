@@ -21,7 +21,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
   });
 
   /** Create a fresh PageManager per test — avoids data races in parallel workers. */
-  async function setupTest(page, testInfo) {
+  async function setupTest(page, testInfo, { metric } = {}) {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     const pm = new PageManager(page);
@@ -36,6 +36,13 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     // counts / query text, so start them from an empty operations list.
     const seededOps = await pm.metricsBuilderPage.clearOperations();
     expect(seededOps).toBe(0);
+
+    if (metric) {
+      expect(await pm.metricsBuilderPage.selectMetric(metric)).toBe(true);
+      // Picking a metric re-seeds its default operations.
+      expect(await pm.metricsBuilderPage.clearOperations()).toBe(0);
+      expect(await pm.metricsBuilderPage.getStreamSelectedValue()).toBe(metric);
+    }
 
     testLogger.info('Test setup completed - navigated to metrics page');
     return pm;
@@ -163,7 +170,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
   test("P1: Label filters - add, configure, verify operators, multiple, remove", {
     tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
   }, async ({ page }, testInfo) => {
-    const pm = await setupTest(page, testInfo);
+    const pm = await setupTest(page, testInfo, { metric: SEEDED_METRIC });
     const builder = pm.metricsBuilderPage;
 
     // 1. Initial count is 0
@@ -186,7 +193,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
       // 4. "=" then the first loaded value completes the chip
       await builder.selectOperator('=');
-      const firstValue = await builder.selectFirstLabelValue();
+      const firstValue = await builder.selectFirstLabelValue(firstLabel);
       await builder.labelBuilder.close();
       expect(await builder.getLabelFilterCount()).toBe(initialCount + 1);
       const chipText = await builder.getLabelFilterText(0);
@@ -411,7 +418,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
   test("P1: State persistence - filters, operations, step value across Builder/Custom switch", {
     tag: ['@metrics', '@builder', '@functional', '@P1', '@all']
   }, async ({ page }, testInfo) => {
-    const pm = await setupTest(page, testInfo);
+    const pm = await setupTest(page, testInfo, { metric: SEEDED_METRIC });
     const builder = pm.metricsBuilderPage;
 
     // Setup: add filter, operation, step value
@@ -454,7 +461,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
   test("P1: E2E - build query with Rate operation, step value, run and verify chart", {
     tag: ['@metrics', '@builder', '@e2e', '@P1', '@all']
   }, async ({ page }, testInfo) => {
-    const pm = await setupTest(page, testInfo);
+    const pm = await setupTest(page, testInfo, { metric: SEEDED_METRIC });
     const builder = pm.metricsBuilderPage;
 
     // 1. Verify builder mode + metric pre-selected
@@ -670,7 +677,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
   test("P2: E2E - add filter + operation, switch to Instant query type, run and verify", {
     tag: ['@metrics', '@builder', '@e2e', '@P2', '@all']
   }, async ({ page }, testInfo) => {
-    const pm = await setupTest(page, testInfo);
+    const pm = await setupTest(page, testInfo, { metric: SEEDED_METRIC });
     const builder = pm.metricsBuilderPage;
 
     // 1. Set time range
@@ -1035,7 +1042,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
   test("P1: E2E - save metric query to dashboard, edit panel, verify builder config persisted", {
     tag: ['@metrics', '@builder', '@dashboard', '@e2e', '@P1', '@all']
   }, async ({ page }, testInfo) => {
-    const pm = await setupTest(page, testInfo);
+    const pm = await setupTest(page, testInfo, { metric: SEEDED_METRIC });
     const builder = pm.metricsBuilderPage;
     const panelTitle = `test_panel_${Date.now()}`;
 
