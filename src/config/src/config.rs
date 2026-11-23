@@ -158,7 +158,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 157: add alert_incident_alerts.labels and severity, create alert_pair_verdicts, and delete
 //      service_streams rows named by the metric-name label that list no trace stream.
 // 159: delete org_ai_toolsets rows of the removed cli kind.
-pub const DB_SCHEMA_VERSION: u64 = 159;
+// 160: add held_domain, release_seal, release_reason, proof_failed_since and expires_at to
+//      status_page_custom_domains, with a unique index on held_domain.
+pub const DB_SCHEMA_VERSION: u64 = 160;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1148,6 +1150,18 @@ pub struct Config {
     pub service_versions: ServiceVersions,
     pub self_profiles: SelfProfiles,
     pub public_ai_chat: PublicAiChat,
+    pub status_page_domain: StatusPageDomain,
+}
+
+/// Custom domains of status pages.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct StatusPageDomain {
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_RESERVED_SUFFIXES",
+        default = "",
+        help = "Comma-separated hostname suffixes no custom domain may use, for example `.internal.example.com`."
+    )]
+    pub reserved_suffixes: String,
 }
 
 /// Unauthenticated read-only links to shared AI chats.

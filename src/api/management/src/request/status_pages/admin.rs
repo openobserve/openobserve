@@ -804,6 +804,52 @@ pub async fn verify_domain(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/status_pages/domains/release_shadowed",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "ReleaseShadowedStatusPageDomains",
+    summary = "Release every custom domain claim that is not the holder of its hostname",
+    description = "Root only. Run before rolling back to a release that reads claims by hostname alone.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::status_pages::ReleaseShadowedResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn release_shadowed(Path(org_id): Path<String>, headers: HeaderMap) -> Response {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, headers);
+        licensed_only("release_shadowed")
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        let refusal = "only a root user may release shadowed claims";
+        let user_id = match root_caller(&headers, refusal) {
+            Ok(user_id) => user_id,
+            Err(refused) => return refused,
+        };
+        match openobserve_core::status_pages::release_shadowed_domains().await {
+            Ok(released) => {
+                audit(&org_id, user_id, "release_shadowed", None).await;
+                MetaHttpResponse::json(config::meta::status_pages::ReleaseShadowedResponse {
+                    released,
+                })
+            }
+            Err(e) => map_err("release_shadowed", e),
+        }
+    }
+}
+
 /// R-1 composition: resolve the check's folder, then OpenFGA-check read on it.
 /// Enterprise-only — the OSS build has no OpenFGA (and its stub returns false),
 /// so the gate is compiled only where it can be enforced.
@@ -846,6 +892,16 @@ async fn audit(org_id: &str, actor: &str, action: &str, notice_id: Option<&str>)
 /// Read it exactly: the route check ran against that identity, so the list must too.
 fn user_id_of(headers: &HeaderMap) -> Option<&str> {
     std::str::from_utf8(headers.get("user_id")?.as_bytes()).ok()
+}
+
+/// The caller's exact identity when it is a root user. A missing or invalid identity, and any
+/// other user, is refused, so the check and the audit read the same one.
+#[cfg(feature = "enterprise")]
+fn root_caller<'a>(headers: &'a HeaderMap, refusal: &str) -> Result<&'a str, Response> {
+    match user_id_of(headers) {
+        Some(user_id) if db::user::is_root_user(user_id) => Ok(user_id),
+        _ => Err(MetaHttpResponse::forbidden(refusal)),
+    }
 }
 
 #[cfg(test)]

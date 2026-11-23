@@ -278,11 +278,13 @@ mod m20261221_000001_add_last_detection_at_to_alert_incidents;
 mod m20261222_000001_incident_membership_and_catalog_cleanup;
 mod m20261223_000001_create_alert_leases;
 mod m20261224_000001_delete_cli_ai_toolsets;
+mod m20261225_000001_status_page_domain_holders;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
 pub(crate) use m20261021_000001_create_public_dashboards::forget_draft_migrations;
 pub(crate) use m20261218_000001_add_security_case_to_alert_incidents::forget_renamed_migrations;
+pub(crate) use m20261225_000001_status_page_domain_holders::settle_duplicates;
 
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn create_public_dashboards_schema_for_test(
@@ -440,6 +442,21 @@ pub(crate) async fn create_slo_tables_for_test(
         .up(&manager)
         .await?;
     m20261009_000004_add_kind_to_slo_backfill_jobs::Migration
+        .up(&manager)
+        .await
+}
+
+/// The claim table as the migrations leave it, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_status_page_custom_domains_table(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
+    m20260825_000001_create_status_page_custom_domains::Migration
+        .up(&manager)
+        .await?;
+    m20261225_000001_status_page_domain_holders::Migration
         .up(&manager)
         .await
 }
@@ -924,6 +941,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261222_000001_incident_membership_and_catalog_cleanup::Migration),
             Box::new(m20261223_000001_create_alert_leases::Migration),
             Box::new(m20261224_000001_delete_cli_ai_toolsets::Migration),
+            Box::new(m20261225_000001_status_page_domain_holders::Migration),
         ]
     }
 }
@@ -1063,6 +1081,7 @@ mod tests {
         ),
         (158, "m20261223_000001_create_alert_leases"),
         (159, "m20261224_000001_delete_cli_ai_toolsets"),
+        (160, "m20261225_000001_status_page_domain_holders"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

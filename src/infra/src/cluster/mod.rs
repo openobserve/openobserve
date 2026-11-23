@@ -470,6 +470,30 @@ fn all_nodes_run_commit(nodes: Option<&[Node]>, commit: &str) -> bool {
     }
 }
 
+/// True when every online node reads a custom domain's claim by its holder. While one does not,
+/// two unreleased claims for a hostname could make it serve the pending one. Unknown counts as
+/// false.
+pub async fn all_online_nodes_know_holders() -> bool {
+    all_nodes_know_holders(get_cached_online_nodes().await.as_deref())
+}
+
+fn all_nodes_know_holders(nodes: Option<&[Node]>) -> bool {
+    match nodes {
+        Some(nodes) if !nodes.is_empty() => nodes.iter().all(|n| n.status_page_holders),
+        _ => false,
+    }
+}
+
+/// True when an online node is positively known to lack the holder capability. An empty or
+/// unknown node list is not that.
+pub async fn any_online_node_lacks_holders() -> bool {
+    any_node_lacks_holders(get_cached_online_nodes().await.as_deref())
+}
+
+fn any_node_lacks_holders(nodes: Option<&[Node]>) -> bool {
+    nodes.is_some_and(|nodes| nodes.iter().any(|n| !n.status_page_holders))
+}
+
 #[inline]
 pub async fn get_cached_online_router_nodes() -> Option<Vec<Node>> {
     get_cached_nodes(|node| node.status == NodeStatus::Online && node.is_router()).await
@@ -694,6 +718,33 @@ mod tests {
         );
         assert!(!all_nodes_run_commit(Some(&[]), "abc"), "empty list");
         assert!(!all_nodes_run_commit(None, "abc"), "unknown");
+    }
+
+    #[test]
+    fn a_second_claim_needs_every_node_to_know_holders() {
+        let node = |status_page_holders: bool| Node {
+            status_page_holders,
+            ..Node::default()
+        };
+        assert!(all_nodes_know_holders(Some(&[node(true), node(true)])));
+        assert!(
+            !all_nodes_know_holders(Some(&[node(true), node(false)])),
+            "an older node"
+        );
+        assert!(!all_nodes_know_holders(Some(&[])), "empty list");
+        assert!(!all_nodes_know_holders(None), "unknown");
+    }
+
+    #[test]
+    fn an_older_node_is_only_reported_when_it_is_seen() {
+        let node = |status_page_holders: bool| Node {
+            status_page_holders,
+            ..Node::default()
+        };
+        assert!(any_node_lacks_holders(Some(&[node(true), node(false)])));
+        assert!(!any_node_lacks_holders(Some(&[node(true), node(true)])));
+        assert!(!any_node_lacks_holders(Some(&[])), "empty list");
+        assert!(!any_node_lacks_holders(None), "unknown");
     }
 
     use super::*;

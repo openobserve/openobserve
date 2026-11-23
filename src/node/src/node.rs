@@ -145,6 +145,7 @@ pub fn proto_node_to_config(node: NodeDetails) -> ConfigNode {
         broadcasted: node.broadcasted,
         version: node.version,
         commit: String::new(),
+        status_page_holders: false,
         metrics,
     }
 }
@@ -251,6 +252,7 @@ mod tests {
             broadcasted: true,
             version: "1.0.0".to_string(),
             commit: "".to_string(),
+            status_page_holders: false,
             metrics: NodeMetrics::default(),
         };
 
@@ -312,6 +314,7 @@ mod tests {
             broadcasted: false,
             version: "".to_string(),
             commit: "".to_string(),
+            status_page_holders: false,
             metrics: NodeMetrics::default(),
         };
         let proto = config_node_to_proto(node);
@@ -336,6 +339,7 @@ mod tests {
             broadcasted: false,
             version: "".to_string(),
             commit: "".to_string(),
+            status_page_holders: false,
             metrics: NodeMetrics::default(),
         };
         let proto = config_node_to_proto(node);

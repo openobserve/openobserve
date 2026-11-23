@@ -477,22 +477,82 @@ pub struct CreateDomainResponse {
     pub txt_value: String,
 }
 
+/// What a custom domain is shown as. This release produces `Pending`, `Verified`, `NotServing`
+/// and `Expired`; the others belong to certificate serving.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainServingState {
+    Pending,
+    Verified,
+    WaitingForDns,
+    SettingUp,
+    Ready,
+    Serving,
+    Delayed,
+    NotServing,
+    Expired,
+}
+
+/// Who must act to move a claim on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainActs {
+    Customer,
+    Operator,
+}
+
+/// When each fact behind a domain's state was last seen. Only the proof times are filled until
+/// certificate serving exists.
+#[derive(Debug, Clone, Default, Serialize, utoipa::ToSchema)]
+pub struct DomainEvidence {
+    pub proof_checked_at: Option<i64>,
+    pub proof_failed_since: Option<i64>,
+    pub dns_checked_at: Option<i64>,
+    pub probe_checked_at: Option<i64>,
+    pub ca_validated_at: Option<i64>,
+    pub probe_mode: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct DomainAdminView {
     pub id: String,
     pub domain: String,
     /// 0 pending, 1 verified, 2 failed.
     pub verification_state: i32,
-    /// 0 record-missing, 1 value-mismatch, 2 dns-resolution-failed.
+    /// 0 record-missing, 1 value-mismatch, 2 dns-resolution-failed, 3 held by another
+    /// organization, 4 proof lost.
     pub verification_failure_reason: Option<i32>,
     pub verified_at: Option<i64>,
     pub last_checked_at: Option<i64>,
     pub created_at: i64,
-    /// The ownership TXT record, served only while the domain is unverified —
-    /// it is not a secret (proving ownership means publishing it in public DNS),
-    /// and hiding it would strand a user who lost it before their DNS was right.
-    pub txt_name: Option<String>,
-    pub verification_token: Option<String>,
+    /// The ownership TXT record. It is not a secret (proving ownership means publishing it in
+    /// public DNS) and it must stay in DNS, so it is shown in every state.
+    pub txt_name: String,
+    pub verification_token: String,
+    /// The claim holds the hostname; only a holder is routed.
+    pub is_holder: bool,
+    pub serving_state: DomainServingState,
+    /// Why the claim is in `serving_state`; null before the first check.
+    pub reason: Option<String>,
+    pub warning: Option<String>,
+    /// When the claim lapses or serving stops, if a warning says it will.
+    pub warning_at: Option<i64>,
+    /// When a claim that holds nothing is released.
+    pub expires_at: Option<i64>,
+    pub released_at: Option<i64>,
+    pub cname_target: Option<String>,
+    pub app_host: Option<String>,
+    pub certificate_expires_at: Option<i64>,
+    pub next_action_at: Option<i64>,
+    pub state_computed_at: Option<i64>,
+    pub evidence: DomainEvidence,
+    pub can_check_again: bool,
+    pub acts: Option<DomainActs>,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct ReleaseShadowedResponse {
+    pub released: u64,
 }
 
 fn default_snooze_hours() -> i64 {

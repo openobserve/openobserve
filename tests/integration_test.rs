@@ -1816,9 +1816,17 @@ mod tests {
             last_checked_at: None,
             created_at: now,
             updated_at: now,
+            ..Default::default()
         };
+        let conn = infra::db::get_orm_client_rw().await;
+        let inserted =
+            infra::table::status_pages::insert_domain_claim(conn, &claim, true, 20).await;
+        assert_eq!(
+            inserted.unwrap(),
+            infra::table::status_pages::ClaimInsert::Created
+        );
         assert!(
-            infra::table::status_pages::insert_domain_if_unclaimed(&claim)
+            infra::table::status_pages::grant_domain(conn, &claim.id, now)
                 .await
                 .unwrap()
         );
@@ -3806,9 +3814,17 @@ mod tests {
                 last_checked_at: None,
                 created_at: now,
                 updated_at: now,
+                ..Default::default()
             };
+            let conn = infra::db::get_orm_client_rw().await;
+            let inserted =
+                infra::table::status_pages::insert_domain_claim(conn, &claim, true, 20).await;
+            assert_eq!(
+                inserted.unwrap(),
+                infra::table::status_pages::ClaimInsert::Created
+            );
             assert!(
-                infra::table::status_pages::insert_domain_if_unclaimed(&claim)
+                infra::table::status_pages::grant_domain(conn, &claim.id, now)
                     .await
                     .unwrap()
             );
