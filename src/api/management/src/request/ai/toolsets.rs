@@ -45,7 +45,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
         ("org_id" = String, Path, description = "Organization name"),
     ),
     summary = "Create an AI toolset",
-    description = "Creates a new AI toolset (MCP server, CLI tool, skill, or generic config). \
+    description = "Creates a new AI toolset (MCP server, skill, or generic config). \
                    The `data` field is encrypted at rest using per-org envelope encryption. \
                    Only available in enterprise deployments.",
     request_body(
@@ -159,7 +159,7 @@ pub async fn get(
 pub struct ListQuery {
     /// Substring filter on the toolset name (case-insensitive `LIKE '%val%'`).
     pub name: Option<String>,
-    /// Exact filter on the toolset kind (`mcp`, `cli`, `skill`, `generic`).
+    /// Exact filter on the toolset kind (`mcp`, `skill`, `generic`).
     pub kind: Option<String>,
     /// Maximum number of results to return; a negative value is rejected with 400.
     pub limit: Option<u64>,
@@ -176,7 +176,7 @@ pub struct ListQuery {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("name"   = Option<String>, Query, description = "Substring filter on name (case-insensitive)"),
-        ("kind"   = Option<String>, Query, description = "Exact filter on kind: mcp | cli | skill | generic"),
+        ("kind"   = Option<String>, Query, description = "Exact filter on kind: mcp | skill | generic"),
         ("limit"  = Option<u64>,   Query, description = "Maximum number of results"),
     ),
     security(("Authorization" = [])),
