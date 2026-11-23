@@ -48,6 +48,13 @@ enum UpdateServiceAccountVariants {
 
 config::any_of_schema!(UpdateServiceAccountAnswer, UpdateServiceAccountVariants);
 
+#[derive(Debug, PartialEq)]
+enum SaTarget {
+    Updatable,
+    System,
+    NotServiceAccount,
+}
+
 /// ListServiceAccounts
 
 #[utoipa::path(
@@ -228,15 +235,21 @@ pub async fn update(
 
     let email_id = email_id.trim().to_string();
 
-    // Check if this is a system service account - prefer role-based check over email pattern
-    // matching
-    if let Ok(user_record) = db::org_users::get(&org_id, &email_id).await {
-        if user_record.role == UserRole::SreAgent {
+    let user_record = match db::org_users::get_optional(&org_id, &email_id).await {
+        Ok(record) => record,
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+    match service_account_target(
+        user_record.as_ref().map(|record| &record.role),
+        openobserve_core::organization::is_system_service_account(&email_id),
+    ) {
+        SaTarget::Updatable => {}
+        SaTarget::System => {
             return MetaHttpResponse::forbidden("System service accounts cannot be modified");
         }
-    } else if openobserve_core::organization::is_system_service_account(&email_id) {
-        // Fall back to email pattern matching if user record is not found
-        return MetaHttpResponse::forbidden("System service accounts cannot be modified");
+        SaTarget::NotServiceAccount => {
+            return MetaHttpResponse::not_found("Service account not found");
+        }
     }
 
     let rotate_token = match query.get("rotateToken") {
@@ -492,4 +505,44 @@ pub async fn delete_bulk(
         unsuccessful,
         err,
     })
+}
+
+/// Decides whether the update target is an editable service account. [pure]
+fn service_account_target(role: Option<&UserRole>, is_system_email: bool) -> SaTarget {
+    match role {
+        Some(UserRole::ServiceAccount) => SaTarget::Updatable,
+        Some(UserRole::SreAgent) => SaTarget::System,
+        Some(
+            UserRole::Root | UserRole::Admin | UserRole::Editor | UserRole::Viewer | UserRole::User,
+        ) => SaTarget::NotServiceAccount,
+        None if is_system_email => SaTarget::System,
+        None => SaTarget::NotServiceAccount,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_service_account_target() {
+        let cases = [
+            (Some(UserRole::Root), false, SaTarget::NotServiceAccount),
+            (Some(UserRole::Admin), false, SaTarget::NotServiceAccount),
+            (Some(UserRole::Editor), false, SaTarget::NotServiceAccount),
+            (Some(UserRole::Viewer), false, SaTarget::NotServiceAccount),
+            (Some(UserRole::User), false, SaTarget::NotServiceAccount),
+            (Some(UserRole::ServiceAccount), false, SaTarget::Updatable),
+            (Some(UserRole::SreAgent), false, SaTarget::System),
+            (None, true, SaTarget::System),
+            (None, false, SaTarget::NotServiceAccount),
+        ];
+        for (role, is_system_email, expected) in cases {
+            assert_eq!(
+                service_account_target(role.as_ref(), is_system_email),
+                expected,
+                "role {role:?}, system email {is_system_email}"
+            );
+        }
+    }
 }
