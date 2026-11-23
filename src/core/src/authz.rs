@@ -1792,6 +1792,24 @@ mod tests {
         }
     }
 
+    // o2-enterprise#3642: a `{type}:_all_` grant reaches a lone stream only through selfParent,
+    // and DB monitoring's `?stream=` relies on it.
+    #[test]
+    fn the_live_stream_check_counts_per_type_all_grants() {
+        let source = include_str!("authz.rs");
+        let start = source
+            .find(concat!(
+                "impl StreamAccessChecker for ",
+                "OpenFgaStreamChecker"
+            ))
+            .unwrap();
+        let body = &source[start..];
+        let check = &body[body.find("async fn can_read_stream(").unwrap()..];
+        let check = &check[..check.find("async fn org_wide_readable(").unwrap()];
+        assert!(check.contains("use_self_parent: true"));
+        assert!(check.contains("use_self_context: false"));
+    }
+
     fn related(logs: &[&str], traces: &[&str], metrics: &[&str]) -> RelatedStreams {
         let infos = |names: &[&str]| -> Vec<StreamInfo> {
             names
