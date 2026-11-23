@@ -414,6 +414,7 @@ describe("StarterPackDrawer", () => {
         exclude: [],
         enableAlerts: false,
         destination: undefined,
+        emailFailure: "email",
       });
     });
 
@@ -984,6 +985,32 @@ describe("StarterPackDrawer", () => {
     expect(has(wrapper, "starter-pack-ready")).toBe(true);
     expect(wrapper.get('[data-test="starter-pack-drawer-note"]').text()).toBe(
       "1 of 1 created · 1 alert on",
+    );
+  });
+
+  it("keeps why Email me failed on Ready after a resumed install", async () => {
+    const items = [{ kind: "alert", itemId: "a1", status: "created", id: "al1" }];
+    const flow = fakeFlow({
+      interrupted: ref(true),
+      items: ref(items),
+      toCreate: ref([{ kind: "alert", itemId: "a1", status: "pending" }]),
+      record: shallowRef({ status: "incomplete", enableAlerts: false, emailFailure: "forbidden" }),
+    });
+    flow.retry = vi.fn(async () => {
+      flow.interrupted.value = false;
+      flow.running.value = true;
+      await nextTick();
+      flow.made.value = items as never;
+      flow.installed.value = true;
+      flow.running.value = false;
+      return true;
+    }) as never;
+    const wrapper = render(flow);
+    await flushPromises();
+    await wrapper.get('[data-test="starter-pack-progress-finish-btn"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.get('[data-test="starter-pack-ready-email-failed"]').text()).toBe(
+      "You can't add alert destinations in this org, so your email destination was not created and the alerts were added turned off.",
     );
   });
 
