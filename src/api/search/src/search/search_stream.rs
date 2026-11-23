@@ -511,6 +511,33 @@ pub async fn search_http2_stream(
         return res;
     }
 
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = crate::search::check_query_fn_permissions(
+        &org_id,
+        &user_id,
+        req.query.query_fn.as_deref().as_slice(),
+    )
+    .await
+    {
+        report_to_audit(
+            user_id,
+            org_id.clone(),
+            trace_id,
+            res.status().into(),
+            Some("Unauthorized Access".to_string()),
+            "POST".to_string(),
+            format!("/api/{}/_search_stream", org_id),
+            query
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&"),
+            body_bytes,
+        )
+        .await;
+        return res;
+    }
+
     // 0 means size 0 with no positive SQL LIMIT, so use the default; negative stays unlimited.
     match sql.limit {
         0 => req.query.size = cfg.limit.query_default_limit,
@@ -906,6 +933,32 @@ pub async fn values_http2_stream(
             trace_id,
             res.status().into(),
             Some("Unauthorized Access to key".to_string()),
+            "POST".to_string(),
+            format!("/api/{}/_values_stream", org_id),
+            query
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&"),
+            body_bytes.clone(),
+        )
+        .await;
+        return res;
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = crate::search::check_query_fn_permissions(
+        &org_id,
+        &user_id,
+        values_req.vrl_fn.as_deref().as_slice(),
+    )
+    .await
+    {
+        report_to_audit(
+            user_id,
+            org_id.clone(),
+            trace_id,
+            res.status().into(),
+            Some("Unauthorized Access".to_string()),
             "POST".to_string(),
             format!("/api/{}/_values_stream", org_id),
             query

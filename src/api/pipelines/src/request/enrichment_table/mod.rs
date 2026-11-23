@@ -88,6 +88,19 @@ pub async fn save_enrichment_table(
     {
         return MetaHttpResponse::forbidden(openobserve_core::security::INTEL_LIST_REFUSED);
     }
+    #[cfg(feature = "enterprise")]
+    {
+        let has_url_jobs =
+            match db::enrichment_table::get_url_jobs_for_table(&org_id, &table_name).await {
+                Ok(jobs) => !jobs.is_empty(),
+                Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
+            };
+        if let Some(refused) =
+            upload_refusal(&org_id, &user_email.user_id, &table_name, has_url_jobs).await
+        {
+            return refused;
+        }
+    }
 
     // Reject if a URL enrichment already exists with this name
     // to prevent cross-type silent overwrite
@@ -331,6 +344,17 @@ pub async fn save_enrichment_table_from_url(
             return MetaHttpResponse::internal_error("Failed to check job status");
         }
     };
+    #[cfg(feature = "enterprise")]
+    if let Some(refused) = upload_refusal(
+        &org_id,
+        &user_email.user_id,
+        &table_name,
+        !existing_jobs.is_empty(),
+    )
+    .await
+    {
+        return refused;
+    }
 
     // Reject if a file upload enrichment already exists with this name
     // to prevent cross-type silent overwrite. A file upload enrichment has
@@ -751,6 +775,40 @@ pub async fn get_all_enrichment_table_statuses(
     }
 }
 
+/// Refuses an upload unless the caller may edit the stored table, or create one when none exists.
+#[cfg(feature = "enterprise")]
+async fn upload_refusal(
+    org_id: &str,
+    user_id: &str,
+    table_name: &str,
+    has_url_jobs: bool,
+) -> Option<Response> {
+    use crate::request::{Target, allowed};
+
+    // A table with URL jobs exists before its first download lands any data.
+    let exists = has_url_jobs
+        || match infra::schema::get(
+            org_id,
+            table_name,
+            config::meta::stream::StreamType::EnrichmentTables,
+        )
+        .await
+        {
+            Ok(schema) => !schema.fields().is_empty(),
+            Err(e) => return Some(MetaHttpResponse::internal_error(e.to_string())),
+        };
+    let (target, method) = if exists {
+        (Target::One(table_name), "PUT")
+    } else {
+        (Target::All, "POST")
+    };
+    if allowed(org_id, user_id, "enrichment_tables", target, method).await {
+        None
+    } else {
+        Some(MetaHttpResponse::forbidden("Unauthorized Access"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -793,6 +851,93 @@ mod tests {
             "http://[2002:a9fe:a9fe::1]/data.csv",
         ] {
             assert!(SsrfGuard::validate_url_with_config(url).is_err(), "{url}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    mod upload_rights {
+        use arrow_schema::{DataType, Field, Schema};
+        use axum::http::StatusCode;
+        use config::meta::stream::StreamType;
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache, insert_latest};
+
+        use super::super::upload_refusal;
+        use crate::request::{Target, tests::grant};
+
+        /// The meta store CI configures through `ZO_META_STORE`, migrated once per binary.
+        async fn meta_store() -> bool {
+            static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+            if std::env::var("ZO_META_STORE").is_err() {
+                eprintln!("skipped: needs ZO_META_STORE");
+                return false;
+            }
+            ONCE.get_or_init(|| async {
+                infra::db_init().await.unwrap();
+                infra::table::migrate().await.unwrap();
+            })
+            .await;
+            true
+        }
+
+        /// One caller who may only create tables and one who may only edit `table`.
+        fn creator_and_editor(table: &str) -> (String, String) {
+            let creator = format!("{}@example.com", config::ider::uuid());
+            grant(&creator, &[("enrichment_tables", Target::All, "POST")]);
+            let editor = format!("{}@example.com", config::ider::uuid());
+            grant(&editor, &[("enrichment_tables", Target::One(table), "PUT")]);
+            (creator, editor)
+        }
+
+        fn status(refusal: Option<axum::response::Response>) -> Option<StatusCode> {
+            refusal.map(|resp| resp.status())
+        }
+
+        #[tokio::test]
+        async fn uploading_to_a_stored_table_needs_its_edit_right() {
+            let schema = Schema::new(vec![Field::new("k", DataType::Utf8, true)]);
+            insert_latest(
+                &mut *STREAM_SCHEMAS_LATEST.write().await,
+                format!("ur_org1/{}/ur_stored", StreamType::EnrichmentTables),
+                SchemaCache::new(schema),
+            );
+            let (creator, editor) = creator_and_editor("ur_stored");
+            assert_eq!(
+                status(upload_refusal("ur_org1", &creator, "ur_stored", false).await),
+                Some(StatusCode::FORBIDDEN)
+            );
+            assert_eq!(
+                status(upload_refusal("ur_org1", &editor, "ur_stored", false).await),
+                None
+            );
+        }
+
+        #[tokio::test]
+        async fn a_url_table_without_data_yet_is_a_stored_table() {
+            let (creator, editor) = creator_and_editor("ur_url_only");
+            assert_eq!(
+                status(upload_refusal("ur_org2", &creator, "ur_url_only", true).await),
+                Some(StatusCode::FORBIDDEN)
+            );
+            assert_eq!(
+                status(upload_refusal("ur_org2", &editor, "ur_url_only", true).await),
+                None
+            );
+        }
+
+        #[tokio::test]
+        async fn creating_a_new_table_needs_the_org_create_right() {
+            if !meta_store().await {
+                return;
+            }
+            let (creator, editor) = creator_and_editor("ur_new");
+            assert_eq!(
+                status(upload_refusal("ur_org3", &creator, "ur_new", false).await),
+                None
+            );
+            assert_eq!(
+                status(upload_refusal("ur_org3", &editor, "ur_new", false).await),
+                Some(StatusCode::FORBIDDEN)
+            );
         }
     }
 }

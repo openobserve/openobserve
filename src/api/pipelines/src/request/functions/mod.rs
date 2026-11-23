@@ -430,6 +430,7 @@ pub async fn list_pipeline_dependencies(
 )]
 pub async fn test_function(
     Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(req_body): Json<TestVRLRequest>,
 ) -> Response {
     let TestVRLRequest {
@@ -437,6 +438,16 @@ pub async fn test_function(
         events,
         trans_type,
     } = req_body;
+    #[cfg(feature = "enterprise")]
+    if let Err(refused) = openobserve_core::background_access::guard_vrl_function(
+        &org_id,
+        &user_email.user_id,
+        &function,
+    )
+    .await
+    {
+        return refused;
+    }
 
     // test_run_function will auto-detect VRL vs JS if trans_type is None
     match openobserve_core::functions::test_run_function(&org_id, function, events, trans_type)
@@ -598,6 +609,69 @@ mod tests {
             );
             ENRICHMENT_TABLES.remove(&shared);
             ENRICHMENT_TABLES.remove(&own);
+        }
+
+        #[tokio::test]
+        async fn test_run_of_a_denied_enrichment_table_is_refused() {
+            fake_checker();
+            let key = add_table("sf_org4", "sf_test_table");
+            let caller = user();
+            let run = |user_id: String| {
+                test_function(
+                    Path("sf_org4".to_string()),
+                    Headers(UserEmail { user_id }),
+                    Json(TestVRLRequest {
+                        function: vrl("sf_test_table").function,
+                        events: vec![serde_json::json!({"k": "v"})],
+                        trans_type: Some(0),
+                    }),
+                )
+            };
+            let resp = run(caller.clone()).await;
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+            assert_eq!(
+                message(resp).await,
+                "Unauthorized Access: no read permission on enrichment_tables/sf_test_table"
+            );
+
+            fake_checker().grant_read(&caller, &table("sf_org4", "sf_test_table"));
+            assert_eq!(run(caller).await.status(), StatusCode::OK);
+            ENRICHMENT_TABLES.remove(&key);
+        }
+
+        #[tokio::test]
+        async fn a_test_run_that_compiles_only_once_suffixed_is_refused() {
+            fake_checker();
+            let key = add_table("sf_org5", "sf_rt_table");
+            let function = format!("{}\n.r = row ==", vrl("sf_rt_table").function);
+            let resp = test_function(
+                Path("sf_org5".to_string()),
+                Headers(UserEmail { user_id: user() }),
+                Json(TestVRLRequest {
+                    function,
+                    events: vec![serde_json::json!({"k": "v"})],
+                    trans_type: Some(0),
+                }),
+            )
+            .await;
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+            ENRICHMENT_TABLES.remove(&key);
+        }
+
+        #[tokio::test]
+        async fn saving_a_skip_vrl_marked_function_checks_it_without_its_marker() {
+            fake_checker();
+            let key = add_table("sf_org6", "sf_skip_table");
+            let mut skip_vrl = vrl("sf_skip_table");
+            skip_vrl.function = format!("#ResultArray#SkipVRL#{}", skip_vrl.function);
+            let resp = save_function(
+                Path("sf_org6".to_string()),
+                Headers(UserEmail { user_id: user() }),
+                Json(skip_vrl),
+            )
+            .await;
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+            ENRICHMENT_TABLES.remove(&key);
         }
 
         #[tokio::test]

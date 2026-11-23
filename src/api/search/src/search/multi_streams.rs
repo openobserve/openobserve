@@ -264,6 +264,23 @@ pub async fn search_multi(
 
     let per_query_resp = multi_req.per_query_response;
 
+    #[cfg(feature = "enterprise")]
+    {
+        let query_fns = multi_req
+            .query_fn
+            .as_deref()
+            .into_iter()
+            .chain(
+                queries
+                    .iter()
+                    .filter_map(|req| req.query.query_fn.as_deref()),
+            )
+            .collect::<Vec<_>>();
+        if let Some(res) = super::check_query_fn_permissions(&org_id, user_id, &query_fns).await {
+            return res;
+        }
+    }
+
     // Before making any rpc requests, first check the sql expressions can be decoded correctly
     for req in queries.iter_mut() {
         if let Err(e) = req.decode() {
@@ -818,6 +835,13 @@ pub async fn _search_partition_multi(
             return res;
         }
     }
+    #[cfg(feature = "enterprise")]
+    if let Some(res) =
+        super::check_query_fn_permissions(&org_id, user_id, req.query_fn.as_deref().as_slice())
+            .await
+    {
+        return res;
+    }
 
     let search_fut =
         SearchService::search_partition_multi(&trace_id, &org_id, user_id, stream_type, &req);
@@ -990,6 +1014,16 @@ pub async fn around_multi(
             return res;
         }
         resolved_streams.push(stream_name);
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = super::check_query_fn_permissions(
+        &org_id,
+        &user_email.user_id,
+        query.get("query_fn").map(String::as_str).as_slice(),
+    )
+    .await
+    {
+        return res;
     }
 
     let mut multi_resp = search::Response {
@@ -1356,6 +1390,39 @@ pub async fn search_multi_stream(
     let needs_post_vrl = per_query_resp && is_result_array_vrl;
 
     let mut queries = multi_req.to_query_req();
+
+    #[cfg(feature = "enterprise")]
+    {
+        let query_fns = multi_req
+            .query_fn
+            .as_deref()
+            .into_iter()
+            .chain(
+                queries
+                    .iter()
+                    .filter_map(|req| req.query.query_fn.as_deref()),
+            )
+            .collect::<Vec<_>>();
+        if let Some(res) = super::check_query_fn_permissions(&org_id, &user_id, &query_fns).await {
+            report_to_audit(
+                user_id.clone(),
+                org_id.clone(),
+                trace_id.clone(),
+                res.status().into(),
+                Some("Unauthorized Access".to_string()),
+                "POST".to_string(),
+                format!("/api/{}/_search_multi_stream", org_id),
+                query
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>()
+                    .join("&"),
+                body_bytes.clone(),
+            )
+            .await;
+            return res;
+        }
+    }
 
     // Set each of the sql queries with use_cache from query params
     let clear_cache = get_clear_cache_from_request(&query);

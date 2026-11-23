@@ -315,6 +315,13 @@ pub async fn search(
     }
 
     #[cfg(feature = "enterprise")]
+    if let Some(res) =
+        check_query_fn_permissions(&org_id, user_id, req.query.query_fn.as_deref().as_slice()).await
+    {
+        return res;
+    }
+
+    #[cfg(feature = "enterprise")]
     if req.clear_cache && !can_clear_cache(&org_id, user_id, stream_type, &stream_names).await {
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
@@ -540,6 +547,16 @@ pub async fn around_v1(
     {
         return res;
     }
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_query_fn_permissions(
+        &org_id,
+        &user_email.user_id,
+        url_query.get("query_fn").map(String::as_str).as_slice(),
+    )
+    .await
+    {
+        return res;
+    }
 
     let ret = around::around(
         &trace_id,
@@ -671,6 +688,16 @@ pub async fn around_v2(
         &user_email.user_id,
         &stream_type,
         StreamPermissionResourceType::Search,
+    )
+    .await
+    {
+        return res;
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_query_fn_permissions(
+        &org_id,
+        &user_email.user_id,
+        url_query.get("query_fn").map(String::as_str).as_slice(),
     )
     .await
     {
@@ -1028,6 +1055,16 @@ async fn values_inner(
     if let Some(res) = check_cipher_key_permissions(org_id, user_id, &query_sql).await {
         return res;
     }
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_query_fn_permissions(
+        org_id,
+        user_id,
+        query.get("query_fn").map(String::as_str).as_slice(),
+    )
+    .await
+    {
+        return res;
+    }
 
     // pick up where clause from sql
     let where_str = match pickup_where(&query_sql) {
@@ -1358,6 +1395,45 @@ pub(crate) async fn check_sql_stream_permissions(
     None
 }
 
+/// Every text a `query_fn` may run as: the value and each base64 layer under it, each once.
+#[cfg(feature = "enterprise")]
+pub(crate) fn query_fn_layers(query_fn: &str) -> Vec<String> {
+    // Handlers and the search service decode at most three times in a row; one more is margin.
+    const MAX_DECODES: usize = 4;
+    let mut layers = vec![query_fn.to_string()];
+    for _ in 0..MAX_DECODES {
+        let Some(last) = layers.last() else { break };
+        match base64::decode_url(last) {
+            Ok(decoded) if !layers.contains(&decoded) => layers.push(decoded),
+            _ => break,
+        }
+    }
+    layers
+}
+
+/// Refuses `query_fns` when any of their layers reads an enrichment table the caller may not read.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn check_query_fn_permissions(
+    org_id: &str,
+    user_id: &str,
+    query_fns: &[&str],
+) -> Option<Response> {
+    let mut sources = query_fns
+        .iter()
+        .flat_map(|f| query_fn_layers(f))
+        .collect::<Vec<_>>();
+    sources.sort_unstable();
+    sources.dedup();
+    for source in &sources {
+        if let Err(refused) =
+            openobserve_core::background_access::guard_vrl_function(org_id, user_id, source).await
+        {
+            return Some(refused);
+        }
+    }
+    None
+}
+
 /// `clear_cache` rewrites a result-cache entry every user shares, so it needs edit rights.
 #[cfg(feature = "enterprise")]
 pub(crate) async fn can_clear_cache(
@@ -1569,6 +1645,11 @@ pub async fn search_partition(
             &trace_id,
         )
         .await
+        {
+            return res;
+        }
+        if let Some(res) =
+            check_query_fn_permissions(&org_id, user_id, req.query_fn.as_deref().as_slice()).await
         {
             return res;
         }
@@ -1938,6 +2019,12 @@ pub async fn result_schema(
     {
         return res;
     }
+    #[cfg(feature = "enterprise")]
+    if let Some(res) =
+        check_query_fn_permissions(&org_id, user_id, req.query.query_fn.as_deref().as_slice()).await
+    {
+        return res;
+    }
 
     // get stream settings
     for stream_name in stream_names {
@@ -2282,6 +2369,420 @@ mod tests {
                 body.contains("check_sql_stream_permissions("),
                 "{file}: {signature} must authorize each stream under the type its SQL names"
             );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn query_fn_search_handlers_check_the_enrichment_tables_their_vrl_reads() {
+        let handlers = [
+            ("mod.rs", include_str!("mod.rs"), "pub async fn search("),
+            ("mod.rs", include_str!("mod.rs"), "pub async fn around_v1("),
+            ("mod.rs", include_str!("mod.rs"), "pub async fn around_v2("),
+            ("mod.rs", include_str!("mod.rs"), "async fn values_inner("),
+            (
+                "mod.rs",
+                include_str!("mod.rs"),
+                "pub async fn search_partition(",
+            ),
+            (
+                "mod.rs",
+                include_str!("mod.rs"),
+                "pub async fn result_schema(",
+            ),
+            (
+                "search_stream.rs",
+                include_str!("search_stream.rs"),
+                "pub async fn search_http2_stream(",
+            ),
+            (
+                "search_stream.rs",
+                include_str!("search_stream.rs"),
+                "pub async fn values_http2_stream(",
+            ),
+            (
+                "search_job.rs",
+                include_str!("search_job.rs"),
+                "pub async fn submit_job(",
+            ),
+            (
+                "search_job.rs",
+                include_str!("search_job.rs"),
+                "async fn check_permissions(",
+            ),
+            (
+                "patterns.rs",
+                include_str!("patterns.rs"),
+                "pub async fn extract_patterns(",
+            ),
+            (
+                "multi_streams.rs",
+                include_str!("multi_streams.rs"),
+                "pub async fn search_multi(",
+            ),
+            (
+                "multi_streams.rs",
+                include_str!("multi_streams.rs"),
+                "pub async fn _search_partition_multi(",
+            ),
+            (
+                "multi_streams.rs",
+                include_str!("multi_streams.rs"),
+                "pub async fn around_multi(",
+            ),
+            (
+                "multi_streams.rs",
+                include_str!("multi_streams.rs"),
+                "pub async fn search_multi_stream(",
+            ),
+        ];
+        for (file, text, signature) in handlers {
+            let start = text
+                .find(signature)
+                .unwrap_or_else(|| panic!("{file}: {signature} not found"));
+            let body = &text[start..];
+            let body = &body[..body.find("\n}\n").expect("handler end")];
+            assert!(
+                body.contains("check_query_fn_permissions("),
+                "{file}: {signature} must check the enrichment tables its query_fn reads"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_query_fn_reading_a_denied_enrichment_table_is_refused() {
+        use openobserve_core::authz::{TypedStream, fake_checker};
+        use transform::enrichment::{ENRICHMENT_TABLES, StreamTable};
+
+        fake_checker();
+        let key = "qf_org1/enrichment_tables/qf_table".to_string();
+        ENRICHMENT_TABLES.insert(
+            key.clone(),
+            StreamTable {
+                org_id: "qf_org1".to_string(),
+                stream_name: "qf_table".to_string(),
+                data: std::sync::Arc::new(vec![]),
+            },
+        );
+        let caller = format!("{}@example.com", config::ider::uuid());
+        let vrl = r#"row = get_enrichment_table_record!("qf_table", {"k": .k})"#;
+        let encoded = base64::encode_url(vrl);
+        for query_fn in [encoded.as_str(), vrl] {
+            let refused = check_query_fn_permissions("qf_org1", &caller, &[query_fn]).await;
+            assert_eq!(
+                refused.map(|resp| resp.status()),
+                Some(StatusCode::FORBIDDEN),
+                "{query_fn}"
+            );
+        }
+        let plain = base64::encode_url(".k = 1");
+        assert!(
+            check_query_fn_permissions("qf_org1", &caller, &[plain.as_str()])
+                .await
+                .is_none()
+        );
+
+        fake_checker().grant_read(
+            &caller,
+            &TypedStream {
+                org_id: "qf_org1".to_string(),
+                stream_type: StreamType::EnrichmentTables,
+                name: "qf_table".to_string(),
+            },
+        );
+        assert!(
+            check_query_fn_permissions("qf_org1", &caller, &[encoded.as_str()])
+                .await
+                .is_none()
+        );
+        ENRICHMENT_TABLES.remove(&key);
+    }
+
+    #[cfg(feature = "enterprise")]
+    mod query_fn_access {
+        use axum::{Json, body::to_bytes, extract::Path};
+        use config::meta::search::{MultiStreamRequest, Request};
+        use openobserve_core::authz::fake_checker;
+        use transform::enrichment::{ENRICHMENT_TABLES, StreamTable};
+
+        use super::*;
+        use crate::search::{multi_streams, search_stream, search_stream::values_http2_stream};
+
+        const ORG: &str = "qf2_org";
+        // 58 bytes, so its base64 ends in padding and the handler adds no trailing ` .`
+        const VRL: &str = r#"row = get_enrichment_table_record!("qf2_table", {"k": .k})"#;
+        const REFUSED: &str =
+            "Unauthorized Access: no read permission on enrichment_tables/qf2_table";
+
+        /// A caller the stream checks pass as root while the enrichment guard sees a plain user.
+        async fn caller() -> String {
+            fake_checker();
+            ENRICHMENT_TABLES.insert(
+                format!("{ORG}/enrichment_tables/qf2_table"),
+                StreamTable {
+                    org_id: ORG.to_string(),
+                    stream_name: "qf2_table".to_string(),
+                    data: std::sync::Arc::new(vec![]),
+                },
+            );
+            {
+                use arrow_schema::Schema;
+                use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+                let schema = Schema::new(vec![Field::new("k", DataType::Utf8, true)]);
+                STREAM_SCHEMAS_LATEST
+                    .write()
+                    .await
+                    .insert(format!("{ORG}/logs/qf2_logs"), SchemaCache::new(schema));
+            }
+            let email = format!("{}@example.com", config::ider::uuid());
+            common::infra::config::ORG_USERS.insert(
+                format!("{}/{email}", config::DEFAULT_ORG),
+                infra::table::org_users::OrgUserRecord {
+                    role: config::meta::user::UserRole::Root,
+                    token: String::new(),
+                    rum_token: None,
+                    org_id: config::DEFAULT_ORG.into(),
+                    email: email.clone(),
+                    created_at: 0,
+                    allow_static_token: true,
+                },
+            );
+            email
+        }
+
+        fn twice(vrl: &str) -> String {
+            base64::encode_url(&base64::encode_url(vrl))
+        }
+
+        fn user(email: &str) -> Headers<UserEmail> {
+            Headers(UserEmail {
+                user_id: email.to_string(),
+            })
+        }
+
+        fn multi_body(query_fn: &str, per_query_response: bool) -> serde_json::Value {
+            serde_json::json!({
+                "sql": ["SELECT * FROM \"qf2_logs\""],
+                "start_time": 1,
+                "end_time": 2,
+                "query_fn": query_fn,
+                "per_query_response": per_query_response
+            })
+        }
+
+        async fn assert_refused(resp: Response, shape: &str) {
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN, "{shape}");
+            let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+            let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(body["message"], REFUSED, "{shape}");
+        }
+
+        #[test]
+        fn the_vrl_encodes_with_padding() {
+            assert!(base64::encode_url(VRL).ends_with('.'));
+        }
+
+        #[tokio::test]
+        async fn a_body_query_fn_is_checked() {
+            let email = caller().await;
+            let req: Request = serde_json::from_value(serde_json::json!({
+                "query": {"sql": "SELECT * FROM \"qf2_logs\"", "start_time": 1, "end_time": 2,
+                          "query_fn": base64::encode_url(VRL)}
+            }))
+            .unwrap();
+            let resp = search(
+                Path(ORG.to_string()),
+                user(&email),
+                HeaderMap::new(),
+                Query(HashMap::new()),
+                Json(req),
+            )
+            .await;
+            assert_refused(resp, "_search body").await;
+        }
+
+        #[tokio::test]
+        async fn a_twice_encoded_url_query_fn_is_checked_as_run() {
+            let email = caller().await;
+            let url = |extra: &[(&str, &str)]| {
+                let mut query: HashMap<String, String> = extra
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect();
+                query.insert("query_fn".to_string(), twice(VRL));
+                Query(query)
+            };
+            let path = || Path((ORG.to_string(), "qf2_logs".to_string()));
+            let resp = values(
+                path(),
+                HeaderMap::new(),
+                user(&email),
+                url(&[("fields", "k")]),
+            )
+            .await;
+            assert_refused(resp, "_values").await;
+            let resp =
+                around_v1(path(), HeaderMap::new(), user(&email), url(&[("key", "1")])).await;
+            assert_refused(resp, "_around").await;
+        }
+
+        #[tokio::test]
+        async fn a_twice_encoded_values_stream_vrl_is_checked_as_run() {
+            let email = caller().await;
+            let body = serde_json::json!({
+                "fields": ["k"], "no_count": false, "vrl_fn": twice(VRL), "start_time": 1,
+                "end_time": 2, "stream_name": "qf2_logs", "stream_type": "logs", "sql": ""
+            });
+            let resp = values_http2_stream(
+                Path(ORG.to_string()),
+                Query(HashMap::new()),
+                user(&email),
+                HeaderMap::new(),
+                body.to_string().into(),
+            )
+            .await;
+            assert_refused(resp, "_values_stream").await;
+        }
+
+        async fn search_body(email: &str, vrl: &str) -> Response {
+            let req: Request = serde_json::from_value(serde_json::json!({
+                "query": {"sql": "SELECT * FROM \"qf2_logs\"", "start_time": 1, "end_time": 2,
+                          "query_fn": base64::encode_url(vrl)}
+            }))
+            .unwrap();
+            search(
+                Path(ORG.to_string()),
+                user(email),
+                HeaderMap::new(),
+                Query(HashMap::new()),
+                Json(req),
+            )
+            .await
+        }
+
+        #[tokio::test]
+        async fn a_query_fn_that_compiles_only_once_suffixed_is_checked() {
+            let email = caller().await;
+            let vrl = "x = get_enrichment_table_record!(\"qf2_table\", {\"k\": .k})\n.r = x ==";
+            assert_refused(search_body(&email, vrl).await, "_search suffix only").await;
+        }
+
+        #[tokio::test]
+        async fn a_skip_vrl_marked_query_fn_is_checked_without_its_marker() {
+            let email = caller().await;
+            let vrl =
+                r#"#ResultArray#SkipVRL#.r = get_enrichment_table_record!("qf2_table", {"k": 1})"#;
+            assert_refused(search_body(&email, vrl).await, "_search SkipVRL").await;
+        }
+
+        fn thrice(vrl: &str) -> String {
+            base64::encode_url(&twice(vrl))
+        }
+
+        #[tokio::test]
+        async fn a_twice_encoded_streaming_body_query_fn_is_checked() {
+            let email = caller().await;
+            let body = |agent_options: serde_json::Value| {
+                serde_json::json!({
+                    "query": {"sql": "SELECT * FROM \"qf2_logs\"", "start_time": 1, "end_time": 2,
+                              "query_fn": twice(VRL)},
+                    "agent_options": agent_options
+                })
+            };
+            let resp = search_stream::search_http2_stream(
+                Path(ORG.to_string()),
+                Query(HashMap::new()),
+                user(&email),
+                HeaderMap::new(),
+                body(serde_json::Value::Null).to_string().into(),
+            )
+            .await;
+            assert_refused(resp, "_search_stream").await;
+            let req: Request =
+                serde_json::from_value(body(serde_json::json!({"mode": "partition"}))).unwrap();
+            let resp = search(
+                Path(ORG.to_string()),
+                user(&email),
+                HeaderMap::new(),
+                Query(HashMap::new()),
+                Json(req),
+            )
+            .await;
+            assert_refused(resp, "_search agent_options.mode=partition").await;
+        }
+
+        #[tokio::test]
+        async fn a_triple_encoded_values_stream_vrl_is_checked() {
+            let email = caller().await;
+            let body = serde_json::json!({
+                "fields": ["k"], "no_count": false, "vrl_fn": thrice(VRL), "start_time": 1,
+                "end_time": 2, "stream_name": "qf2_logs", "stream_type": "logs", "sql": ""
+            });
+            let resp = values_http2_stream(
+                Path(ORG.to_string()),
+                Query(HashMap::new()),
+                user(&email),
+                HeaderMap::new(),
+                body.to_string().into(),
+            )
+            .await;
+            assert_refused(resp, "_values_stream thrice").await;
+        }
+
+        #[tokio::test]
+        async fn a_triple_encoded_multi_stream_query_fn_is_checked() {
+            let email = caller().await;
+            let top_level = multi_body(&thrice(VRL), false);
+            let per_query = serde_json::json!({
+                "sql": [{"sql": "SELECT * FROM \"qf2_logs\"", "query_fn": thrice(VRL)}],
+                "start_time": 1,
+                "end_time": 2
+            });
+            for (shape, body) in [("top-level", top_level), ("per-query", per_query)] {
+                let resp = multi_streams::search_multi_stream(
+                    Path(ORG.to_string()),
+                    Query(HashMap::new()),
+                    user(&email),
+                    HeaderMap::new(),
+                    body.to_string().into(),
+                )
+                .await;
+                assert_refused(resp, &format!("_search_multi_stream {shape} thrice")).await;
+            }
+        }
+
+        #[tokio::test]
+        async fn a_multi_search_top_level_query_fn_is_checked_as_run() {
+            let email = caller().await;
+            for (query_fn, per_query_response) in [
+                (twice(VRL), false),
+                (base64::encode_url(VRL), false),
+                (base64::encode_url(VRL), true),
+            ] {
+                let shape = format!("{query_fn} per_query_response={per_query_response}");
+                let body = multi_body(&query_fn, per_query_response);
+                let req: MultiStreamRequest = serde_json::from_value(body.clone()).unwrap();
+                let resp = multi_streams::search_multi(
+                    Path(ORG.to_string()),
+                    Query(HashMap::new()),
+                    user(&email),
+                    HeaderMap::new(),
+                    Json(req),
+                )
+                .await;
+                assert_refused(resp, &format!("_search_multi {shape}")).await;
+                let resp = multi_streams::search_multi_stream(
+                    Path(ORG.to_string()),
+                    Query(HashMap::new()),
+                    user(&email),
+                    HeaderMap::new(),
+                    body.to_string().into(),
+                )
+                .await;
+                assert_refused(resp, &format!("_search_multi_stream {shape}")).await;
+            }
         }
     }
 

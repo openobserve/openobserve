@@ -781,25 +781,53 @@ pub async fn denial_message(
         .map(|denied| crate::authz::stream_access_message(org_id, &denied))
 }
 
-/// A body whose tables cannot be read is left to the function save, which answers it.
+/// A body no runtime form of which compiles is left to the caller's compile, which answers it.
 #[cfg(feature = "enterprise")]
 pub async fn guard_vrl_function(org_id: &str, user_id: &str, source: &str) -> Result<(), Response> {
     // VRL reads tables only via enrichment functions, so naming none skips a compile.
     if !reads_enrichment_tables(source) || !rbac_enforced().await {
         return Ok(());
     }
-    let Ok(tables) = transform::enrichment_tables_read(source, org_id) else {
-        return Ok(());
-    };
-    let sources: Vec<QuerySource> = tables
-        .into_iter()
-        .map(|(table_org, name)| QuerySource::Stream {
-            org_id: table_org,
-            stream_type: StreamType::EnrichmentTables,
-            name,
-        })
-        .collect();
+    // A text no candidate compiles reads nothing, so its tables are left to the caller's compile.
+    let mut sources: Vec<QuerySource> = Vec::new();
+    for candidate in vrl_compile_candidates(source) {
+        let Ok(tables) = transform::enrichment_tables_read(&candidate, org_id) else {
+            continue;
+        };
+        for (table_org, name) in tables {
+            let table = QuerySource::Stream {
+                org_id: table_org,
+                stream_type: StreamType::EnrichmentTables,
+                name,
+            };
+            if !sources.contains(&table) {
+                sources.push(table);
+            }
+        }
+    }
     guard_write(org_id, user_id, &sources).await
+}
+
+/// Every text a runtime may compile from VRL `source`: as written, suffixed, and without SkipVRL.
+#[cfg(feature = "enterprise")]
+fn vrl_compile_candidates(source: &str) -> Vec<String> {
+    use config::meta::function::RESULT_ARRAY_SKIP_VRL;
+
+    let mut bases = vec![source.to_string()];
+    // `apply_vrl_to_response` strips the marker from the trimmed text before it compiles.
+    let trimmed = source.trim();
+    if RESULT_ARRAY_SKIP_VRL.is_match(trimmed) {
+        bases.push(RESULT_ARRAY_SKIP_VRL.replace(trimmed, "").to_string());
+    }
+    let mut candidates = Vec::with_capacity(bases.len() * 2);
+    for base in bases {
+        // Runtimes append ` \n .` when the text, or its trimmed form, lacks a trailing `.`.
+        if !base.ends_with('.') {
+            candidates.push(format!("{base} \n ."));
+        }
+        candidates.push(base);
+    }
+    candidates
 }
 
 /// Whether VRL `source` names an enrichment-table function, the only way it reads a table.
