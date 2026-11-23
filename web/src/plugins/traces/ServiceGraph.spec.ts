@@ -336,6 +336,45 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.find('[data-test="service-graph-loading"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="service-graph-no-data-state"]').exists()).toBe(true);
     });
+
+    it("shows the error, not the loading state, when the first load fails", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(new Error("API Error"));
+      try {
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(wrapper.vm.lastRunAt).toBeNull();
+        expect(wrapper.find('[data-test="service-graph-loading"]').exists()).toBe(false);
+        expect(wrapper.text()).toContain("API Error");
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+
+    it("keeps the last successful run time when a reload fails", async () => {
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: { nodes: [], edges: [] },
+      } as any);
+      wrapper = createWrapper();
+      await flushPromises();
+      const lastGood = wrapper.vm.lastRunAt;
+      expect(lastGood).toEqual(expect.any(Number));
+
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(new Error("API Error"));
+      const now = vi.spyOn(Date, "now").mockReturnValue(lastGood + 60_000);
+      try {
+        await wrapper.vm.loadServiceGraph();
+        await flushPromises();
+
+        expect(wrapper.vm.error).toBeTruthy();
+        expect(wrapper.vm.lastRunAt).toBe(lastGood);
+      } finally {
+        now.mockRestore();
+        consoleError.mockRestore();
+      }
+    });
   });
 
   describe("Toolbar Layout", () => {
@@ -2205,18 +2244,170 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
   });
 
   describe("node side panel time range", () => {
-    it("resolves the range when the panel opens instead of passing stored start/end", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      const resolvedNow = { startTime: 3000000, endTime: 4000000 };
-      mockGetEffectiveTimeRange.mockReturnValueOnce(resolvedNow);
-
+    const MINUTE = 60 * 1000;
+    const windowEndingAt = (iso: string, minutes = 15) => ({
+      startTime: Date.parse(iso) - minutes * MINUTE,
+      endTime: Date.parse(iso),
+    });
+    const panelRange = () =>
+      wrapper.findComponent({ name: "ServiceGraphSidePanel" }).props("timeRange");
+    const openFirstNode = async () => {
       wrapper.vm.handleNodeClick({ dataType: "node", data: wrapper.vm.graphData.nodes[0] });
       await flushPromises();
+    };
+    const holdNextTopologyCall = () => {
+      let settle!: (v: unknown) => void;
+      vi.mocked(serviceGraphService.getCurrentTopology).mockImplementationOnce(
+        () => new Promise((resolve) => (settle = resolve)) as any,
+      );
+      return () => settle(mockApiResponse);
+    };
 
-      const panel = wrapper.findComponent({ name: "ServiceGraphSidePanel" });
-      expect(panel.props("timeRange")).toEqual(resolvedNow);
-      expect(mockGetEffectiveTimeRange).toHaveBeenLastCalledWith(mockSearchObj.data.datetime);
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-19T10:00:00Z"));
+      mockGetEffectiveTimeRange.mockImplementation((dt: any) =>
+        dt?.type === "relative"
+          ? {
+              startTime: Date.now() - (dt.relativeTimePeriod === "1h" ? 60 : 15) * MINUTE,
+              endTime: Date.now(),
+            }
+          : { startTime: dt.startTime, endTime: dt.endTime },
+      );
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("gives the panel the graph's load window even after time has passed", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      vi.setSystemTime(new Date("2026-11-19T10:10:00Z"));
+      await openFirstNode();
+
+      expect(panelRange()).toEqual(windowEndingAt("2026-11-19T10:00:00Z"));
+    });
+
+    it("moves graph and panel together on a refresh and on a range change", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      await openFirstNode();
+
+      vi.setSystemTime(new Date("2026-11-19T10:05:00Z"));
+      vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
+      await wrapper.vm.loadServiceGraph();
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining(windowEndingAt("2026-11-19T10:05:00Z")),
+      );
+      expect(panelRange()).toEqual(windowEndingAt("2026-11-19T10:05:00Z"));
+
+      vi.setSystemTime(new Date("2026-11-19T10:07:00Z"));
+      mockSearchObj.data.datetime.relativeTimePeriod = "1h";
+      await flushPromises();
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining(windowEndingAt("2026-11-19T10:07:00Z", 60)),
+      );
+      expect(panelRange()).toEqual(windowEndingAt("2026-11-19T10:07:00Z", 60));
+    });
+
+    it("moves graph and panel together when the embedding page changes its range", async () => {
+      wrapper = createWrapper({}, { timeRange: { startTime: 5000000, endTime: 9000000 } });
+      await flushPromises();
+      await openFirstNode();
+
+      const nextRange = { startTime: 6000000, endTime: 9500000 };
+      await wrapper.setProps({ timeRange: nextRange });
+      await flushPromises();
+
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenLastCalledWith(
+        "test-org",
+        expect.objectContaining(nextRange),
+      );
+      expect(panelRange()).toEqual(nextRange);
+    });
+
+    it("reloads once a load settles when its inputs changed during it", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      await openFirstNode();
+
+      vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
+      const settleFirst = holdNextTopologyCall();
+      vi.setSystemTime(new Date("2026-11-19T10:05:00Z"));
+      const firstLoad = wrapper.vm.loadServiceGraph();
+      await flushPromises();
+
+      vi.setSystemTime(new Date("2026-11-19T10:06:00Z"));
+      await wrapper.setProps({ streamFilter: "stream2" });
+      await flushPromises();
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledTimes(1);
+
+      settleFirst();
+      await firstLoad;
+      await flushPromises();
+
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledTimes(2);
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenLastCalledWith(
+        "test-org",
+        expect.objectContaining({
+          streamName: "stream2",
+          ...windowEndingAt("2026-11-19T10:06:00Z"),
+        }),
+      );
+      expect(panelRange()).toEqual(windowEndingAt("2026-11-19T10:06:00Z"));
+    });
+
+    it("folds a refresh made during a load into that load when nothing changed", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
+      const settleFirst = holdNextTopologyCall();
+      const firstLoad = wrapper.vm.loadServiceGraph();
+      await flushPromises();
+      await wrapper.vm.loadServiceGraph();
+
+      settleFirst();
+      await firstLoad;
+      await flushPromises();
+
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not start another load after it unmounts", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
+      const settleFirst = holdNextTopologyCall();
+      const firstLoad = wrapper.vm.loadServiceGraph();
+      await flushPromises();
+      await wrapper.setProps({ streamFilter: "stream2" });
+      wrapper.unmount();
+
+      settleFirst();
+      await firstLoad;
+      await flushPromises();
+
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledTimes(1);
+      wrapper = undefined as any;
+    });
+
+    it("keeps the last loaded window for the panel when a reload fails", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValueOnce(new Error("boom"));
+      vi.setSystemTime(new Date("2026-11-19T10:05:00Z"));
+      await wrapper.vm.loadServiceGraph();
+
+      // The panel is not rendered while the error state shows, so read the window it will reopen with.
+      expect(wrapper.vm.error).toBeTruthy();
+      expect(wrapper.vm.sidePanelTimeRange).toEqual(windowEndingAt("2026-11-19T10:00:00Z"));
     });
 
     it("passes an absolute range through unchanged", async () => {
