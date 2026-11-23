@@ -2,6 +2,7 @@
 
 <template>
   <div class="rounded-default">
+    <h1 class="sr-only">{{ t("routeTitles.streamExplorer") }}</h1>
     <SearchBar
       ref="searchBarRef"
       :query-data="queryData"
