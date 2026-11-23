@@ -94,8 +94,8 @@ pub fn protected_columns(
     }
 }
 
-/// Part of a cache key: results hold redacted or raw values, so a pattern change or a different
-/// `raw_streams` must miss them. `None` when no stream read is protected.
+/// Part of a cache key: results are stored redacted, so a pattern change must miss them. `None`
+/// when no stream read is redacted; a raw stream reads like an unprotected one and shares its key.
 #[cfg(feature = "vectorscan")]
 pub fn redaction_digest(
     org_id: &str,
@@ -113,17 +113,13 @@ pub fn redaction_digest(
         .filter_map(|stream| {
             let stype = stream.get_stream_type(stream_type);
             let name = stream.stream_name();
-            let class = if raw_streams.is_some_and(|raw| raw.contains(stype, &name)) {
-                "raw"
-            } else {
-                "redact"
-            };
+            if raw_streams.is_some_and(|raw| raw.contains(stype, &name)) {
+                return None;
+            }
             match manager.search_protection(org_id, stype, &name) {
-                Ok(Some(protection)) => {
-                    Some(format!("{stype}/{name}={}:{class}", protection.digest))
-                }
+                Ok(Some(protection)) => Some(format!("{stype}/{name}={}", protection.digest)),
                 Ok(None) => None,
-                Err(_) => Some(format!("{stype}/{name}=unbuilt:{class}")),
+                Err(_) => Some(format!("{stype}/{name}=unbuilt")),
             }
         })
         .collect();
@@ -408,11 +404,6 @@ mod tests {
         ctx_with(protected())
     }
 
-    /// What the scanning node builds for a stream in `raw_streams`: no redact function.
-    fn raw_reader_ctx() -> SessionContext {
-        ctx_with(HashMap::new())
-    }
-
     fn ctx_with(protected: HashMap<String, Arc<ScalarUDF>>) -> SessionContext {
         let ctx = SessionContext::new();
         let inner = MemTable::try_new(test_schema(), vec![vec![test_batch()]]).unwrap();
@@ -504,36 +495,6 @@ mod tests {
         )
         .await;
         assert!(none.contains("| 0 "), "{none}");
-    }
-
-    #[tokio::test]
-    async fn test_a_raw_reader_reads_raw_values_but_never_the_raw_copy() {
-        let ctx = raw_reader_ctx();
-        let found = run(&ctx, "SELECT msg FROM t WHERE msg LIKE '%SECRETVAL10000%'").await;
-        assert!(found.contains("SECRETVAL10000"), "{found}");
-        let original = run(&ctx, "SELECT count(_original) AS c FROM t").await;
-        assert!(original.contains("| 0 "), "{original}");
-        let plan = ctx
-            .sql("SELECT msg FROM t")
-            .await
-            .unwrap()
-            .create_physical_plan()
-            .await
-            .unwrap();
-        let plan = displayable(plan.as_ref()).indent(true).to_string();
-        assert!(!plan.contains(SDR_REDACT_UDF_NAME), "{plan}");
-    }
-
-    #[test]
-    fn test_a_raw_reader_keeps_its_filters_in_the_scan() {
-        use datafusion::logical_expr::{col, lit};
-
-        let filters = vec![
-            col("msg").like(lit("%a%")),
-            col(ORIGINAL_DATA_COL_NAME).like(lit("%a%")),
-        ];
-        let redacted = redacted_columns(&HashMap::new());
-        assert_eq!(scan_filters(&filters, &redacted), vec![filters[0].clone()]);
     }
 
     #[test]
@@ -678,16 +639,17 @@ mod tests {
 
         let streams = [datafusion::common::TableReference::from("app")];
         let digest = |raw: Option<&RawStreams>| {
-            redaction_digest("sdr_digest", StreamType::Logs, &streams, raw).unwrap()
+            redaction_digest("sdr_digest", StreamType::Logs, &streams, raw)
         };
         let mut raw = RawStreams::default();
         raw.insert(StreamType::Logs, "app");
-        assert_ne!(digest(Some(&raw)), digest(Some(&RawStreams::default())));
-        assert_eq!(digest(None), digest(Some(&RawStreams::default())));
-        assert!(digest(Some(&raw)).ends_with(":raw"));
+        let redacted = digest(Some(&RawStreams::default()));
+        assert!(redacted.is_some());
+        assert_eq!(digest(None), redacted);
 
         let unprotected = [datafusion::common::TableReference::from("plain")];
-        let none = redaction_digest("sdr_digest", StreamType::Logs, &unprotected, Some(&raw));
-        assert_eq!(none, None);
+        let plain = redaction_digest("sdr_digest", StreamType::Logs, &unprotected, None);
+        assert_eq!(plain, None);
+        assert_eq!(digest(Some(&raw)), plain);
     }
 }

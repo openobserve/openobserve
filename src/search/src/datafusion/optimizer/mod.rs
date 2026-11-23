@@ -331,10 +331,7 @@ fn stream_index_fields(sql: &Sql) -> HashMap<TableReference, HashSet<String>> {
             let stream_type = stream_name.get_stream_type(sql.stream_type);
             let name = stream_name.stream_name();
             let protected = if sql.raw_streams.contains(stream_type, &name) {
-                crate::datafusion::physical_optimizer::sdr_redact::RAW_COPY_COLUMNS
-                    .iter()
-                    .map(|c| c.to_string())
-                    .collect()
+                Default::default()
             } else {
                 crate::datafusion::physical_optimizer::sdr_redact::protected_columns(
                     &sql.org_id,

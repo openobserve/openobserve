@@ -312,7 +312,7 @@ mod tests {
         registry::set_redaction_digest("sdr-class-check", current);
         assert!(check(Some("sdr-class-check")).is_ok());
 
-        registry::set_redaction_digest("sdr-class-check", Some("sdr=logs/app=d:raw".to_string()));
+        registry::set_redaction_digest("sdr-class-check", Some("sdr=logs/app=stale".to_string()));
         assert!(check(Some("sdr-class-check")).is_err());
         registry::remove_cache("sdr-class-check");
     }
