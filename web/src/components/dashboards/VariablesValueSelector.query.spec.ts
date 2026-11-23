@@ -320,6 +320,45 @@ describe("VariablesValueSelector — custom and PromQL query_values variables", 
       wrapper.unmount();
     });
 
+    it("lists the latest range when the range changes again before the earlier reload answers", async () => {
+      const svc = {
+        name: "svc",
+        type: "query_values",
+        scope: "global",
+        multiSelect: false,
+        query_data: { stream_type: "logs", query: "SELECT DISTINCT svc FROM logs" },
+      };
+      streamReturns([{ svc: "new_svc" }]);
+      const { manager, wrapper } = await mountWith([svc]);
+      const opened = wrapper.vm.variablesData.values.find((v: any) => v.name === "svc");
+      await (wrapper.vm as any).loadVariableOptions(opened);
+      await flushPromises();
+
+      let answerEarlier!: () => void;
+      streamMock.mockImplementationOnce((payload: any, handlers: any) => {
+        answerEarlier = () => {
+          handlers.data(payload, {
+            type: "search_response_hits",
+            content: { results: { hits: [{ svc: "old_svc" }, { svc: "new_svc" }] } },
+          });
+          handlers.data(payload, { type: "end" });
+        };
+      });
+      await moveRange(wrapper, 1_699_980_000_000);
+      await flushPromises();
+      await moveRange(wrapper, 1_700_003_300_000);
+      await flushPromises();
+      answerEarlier();
+      await flushPromises();
+
+      const lastQuery = streamMock.mock.calls.at(-1)[0].queryReq.query;
+      expect(lastQuery.start_time).toBe(1_700_003_300_000);
+      const variable = manager.getVariable("svc", "global") as any;
+      expect(variable.options).toEqual([{ label: "new_svc", value: "new_svc" }]);
+      expect(variable.isLoading).toBe(false);
+      wrapper.unmount();
+    });
+
     it("restores an explicit pick once a later range lists its values again", async () => {
       labelValues.mockResolvedValue(promValues(["default", "monitoring", "kube"]));
       const { manager, wrapper } = await mountWith(

@@ -163,6 +163,43 @@ test.describe("Query Values variables - dashboard runtime", { tag: ["@dashboards
       .toBe(true);
   });
 
+  test("F4: a second time change before the first reload answers reloads for the latest range", async ({ page }) => {
+    const pm = new PageManager(page);
+    const qv = pm.dashboardQueryVariable;
+    const svc = customSql("svc", `SELECT DISTINCT service_name FROM "${S}"`, "service_name");
+    const id = await fx.createDashboard(fx.dashboardBody(uniqueTitle("e2e_qv_f4_quick"), { variables: [svc] }));
+    const queries = fx.trackQueries(page);
+    await qv.openDashboard(fx.dashboardUrl(id));
+    await qv.expectOptionValues("svc", fx.ALL_SERVICES);
+
+    // Holds the 6-hour reload until the range has moved on, as a slow query would.
+    const sixHours = 6 * 3600 * 1_000_000;
+    const window = (r) => r.endTime - r.startTime;
+    const isValuesQuery = (r) => r.sql === `SELECT DISTINCT service_name FROM "${S}"`;
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
+    await page.route("**/_search_stream**", async (route) => {
+      const body = JSON.parse(route.request().postData() || "{}");
+      const query = typeof body.query === "object" ? body.query : body;
+      if (query.end_time - query.start_time >= sixHours - 60_000_000) await held;
+      await route.continue();
+    });
+
+    queries.clear();
+    await pm.dashboardTimeRefresh.setRelative("6", "h");
+    await qv.refreshDashboard();
+    await expect
+      .poll(() => queries.searchRequests().some((r) => isValuesQuery(r) && window(r) >= sixHours - 60_000_000), { timeout: 30000 })
+      .toBe(true);
+    await pm.dashboardTimeRefresh.setRelative("15", "m");
+    await qv.refreshDashboard();
+    await expect
+      .poll(() => queries.searchRequests().some((r) => isValuesQuery(r) && window(r) <= 16 * 60 * 1_000_000), { timeout: 30000 })
+      .toBe(true);
+    release();
+    await qv.expectOptionValues("svc", fx.ALL_SERVICES);
+  });
+
   test("F5: var-x in the URL selects custom variable values on load", async ({ page }) => {
     const qv = new PageManager(page).dashboardQueryVariable;
     const id = await fx.createDashboard(runtimeDashboard(uniqueTitle("e2e_qv_f5")));

@@ -832,6 +832,8 @@ export default defineComponent({
 
     // Latest load per query variable; a response that lands after a newer request is dropped.
     const queryVariableRequestIds: Record<string, number> = {};
+    // Variables whose latest load is a time-range reload, which a newer range must restart.
+    const timeRangeReloads = new Set<string>();
 
     const getVariablesForSubstitution = () =>
       useManager && manager
@@ -967,6 +969,8 @@ export default defineComponent({
       const requestId = (queryVariableRequestIds[name] ?? 0) + 1;
       queryVariableRequestIds[name] = requestId;
       const isStale = () => isUnmounted || queryVariableRequestIds[name] !== requestId;
+      if (pruneStale) timeRangeReloads.add(name);
+      else timeRangeReloads.delete(name);
       variableObject.isLoading = true;
       variableObject.isVariableLoadingPending = true;
 
@@ -989,12 +993,14 @@ export default defineComponent({
           runSql: runSqlForVariable(variableObject),
         });
         if (isStale()) return;
+        timeRangeReloads.delete(name);
         variableObject.queryError = undefined;
         variableObject.queryCapped = result.capped;
         applyQueryVariableOptions(variableObject, result.options, pruneStale);
         onSettled?.();
       } catch (error) {
         if (isStale()) return;
+        timeRangeReloads.delete(name);
         if (!(error instanceof QueryVariableCancelledError)) {
           variableObject.queryError = getQueryVariableErrorMessage(error);
           variableLog(name, `Query variable failed: ${variableObject.queryError}`);
@@ -1007,14 +1013,17 @@ export default defineComponent({
     // A new time range reloads custom query variables like a fresh load, parents before the children that read them.
     const reloadQueryVariablesForTimeRange = () => {
       if (!useManager || !manager || isUnmounted) return;
+      const isReloading = (v: any) => timeRangeReloads.has(v.name);
       const inFlight = variablesData.values.filter(
-        (v: any) => isCustomQueryVariable(v) && v.isLoading,
+        (v: any) => isCustomQueryVariable(v) && v.isLoading && !isReloading(v),
       );
       inFlight.forEach((v: any) => void fetchQueryVariableOptions(v));
 
       const targets = variablesData.values.filter(
         (v: any) =>
-          isCustomQueryVariable(v) && v.isVariablePartialLoaded && !v.isVariableLoadingPending,
+          isCustomQueryVariable(v) &&
+          v.isVariablePartialLoaded &&
+          (!v.isVariableLoadingPending || isReloading(v)),
       );
       const pending = new Set<string>(targets.map((v: any) => v.name));
       const parentsOf = (v: any): string[] =>
@@ -1024,7 +1033,7 @@ export default defineComponent({
           if (!pending.has(v.name) || parentsOf(v).some((parent) => pending.has(parent))) return;
           pending.delete(v.name);
           // The manager already reloads a child whose parent value changed.
-          if (v.isVariableLoadingPending || !v.isVariablePartialLoaded) {
+          if ((v.isVariableLoadingPending && !isReloading(v)) || !v.isVariablePartialLoaded) {
             startReady();
             return;
           }
