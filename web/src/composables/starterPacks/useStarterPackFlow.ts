@@ -23,6 +23,7 @@ import { alertsByTagsQuery } from "@/services/alerts.queries";
 import { featureState } from "@/utils/featureGate";
 
 import {
+  StarterPackBusyError,
   StarterPackPermissionError,
   leftOutIds,
   type PackChoices,
@@ -84,6 +85,8 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const busy = ref(false);
   const installFailed = ref(false);
   const forbidden = ref(false);
+  /** Who started the setup that is already running, or "" when its record names no one. */
+  const busyBy = ref<string | null>(null);
   const preview = shallowRef<PackPreview | null>(null);
   const previewState = ref<PackPreviewState>("idle");
   const removal = shallowRef<PackRemovalResult | null>(null);
@@ -271,6 +274,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     running.value = true;
     installFailed.value = false;
     forbidden.value = false;
+    busyBy.value = null;
     try {
       const plan = preview.value ?? (await previewPack(pack, choices.value));
       const exclude = [...new Set([...leftOutIds(plan), ...unticked])];
@@ -299,6 +303,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       return done.status === "complete";
     } catch (error) {
       if (error instanceof StarterPackPermissionError) forbidden.value = true;
+      else if (error instanceof StarterPackBusyError) busyBy.value = error.installedBy;
       else installFailed.value = true;
       return false;
     } finally {
@@ -349,6 +354,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     alertsRoute,
     alertsTotal,
     busy,
+    busyBy,
     canManage,
     canUndo,
     chooseField,
