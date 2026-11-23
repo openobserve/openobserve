@@ -284,6 +284,7 @@ describe("usePackCatalog", () => {
       ]);
       expect(pack.dashboards[0].title).toBe(HOST_METRICS_DASHBOARD_TITLE);
       expect(pack.dashboards[0].shared).toEqual({
+        folderId: "default",
         find: expect.any(Function),
         create: expect.any(Function),
       });

@@ -1519,6 +1519,7 @@ describe("useStarterPacks", () => {
     it("does not own a dashboard the importer reports as already there", async () => {
       let seen = false;
       const shared = {
+        folderId: "default",
         find: vi.fn(async () => (seen ? { id: "setup-card", folderId: "default" } : null)),
         create: vi.fn(async () => {
           seen = true;
@@ -1552,6 +1553,54 @@ describe("useStarterPacks", () => {
       expect((dashboardItem(record) as { id?: string }).id).not.toBe("other-host");
       await api.undoPack(HOSTS, record.installId);
       expect(hostDashboards().map(({ dashboard_id }) => dashboard_id)).toEqual(["other-host"]);
+    });
+
+    it("keeps a Host Metrics dashboard the record names outside the importer's folder", async () => {
+      const api = packs();
+      const record = await api.installPack(HOSTS);
+      const body = { title: HOST_METRICS_DASHBOARD_TITLE, tabs: [] };
+      fake.state.dashboards.push({
+        dashboard_id: "theirs",
+        title: HOST_METRICS_DASHBOARD_TITLE,
+        folder_id: "team",
+        body,
+      });
+      const key = [...fake.state.kv.keys()][0];
+      const stored = JSON.parse(fake.state.kv.get(key)!);
+      Object.assign(dashboardItem(stored)!, {
+        id: "theirs",
+        folderId: "team",
+        sourceHash: contentHash(body),
+      });
+      fake.state.kv.set(key, JSON.stringify(stored));
+
+      const result = await api.undoPack(HOSTS, record.installId);
+
+      expect(fake.state.dashboards.map(({ dashboard_id }) => dashboard_id)).toContain("theirs");
+      expect(result.kept.map(({ reason }) => reason)).toEqual(["changed"]);
+    });
+
+    it("fails, not owns, an import that returns no dashboard id", async () => {
+      const shared = {
+        folderId: "default",
+        find: vi.fn(async () =>
+          fake.state.dashboards.length ? { id: "other-host", folderId: "default" } : null,
+        ),
+        create: vi.fn(async () => {
+          fake.state.dashboards.push({
+            dashboard_id: "other-host",
+            title: HOST_METRICS_DASHBOARD_TITLE,
+            folder_id: "default",
+            body: { title: HOST_METRICS_DASHBOARD_TITLE },
+          });
+          return { id: "", folderId: "default" };
+        }),
+      };
+      const [dashboard] = HOSTS.dashboards;
+      const pack = { ...HOSTS, dashboards: [{ ...dashboard, shared }] };
+      const record = await packs().installPack(pack);
+      expect(dashboardItem(record)).toMatchObject({ status: "failed" });
+      expect((dashboardItem(record) as { id?: string }).id).toBeUndefined();
     });
 
     it("links a dashboard the setup card imported after the plan, and never owns it", async () => {

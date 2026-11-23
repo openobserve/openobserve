@@ -282,8 +282,8 @@ export function useStarterPacks(org: string) {
     if (shared) {
       let made: FoundItem | null = null;
       return {
-        // Another install's import carries the same title, so the one this call made wins.
-        lookup: async () => (made?.id ? made : shared.find(org)),
+        // Another install's import carries the same title, so only the one this call made is ours.
+        lookup: async () => (made ? (made.id ? made : null) : shared.find(org)),
         create: async () => {
           made = await shared.create(org);
           return made !== null;
@@ -933,11 +933,10 @@ export function useStarterPacks(org: string) {
       return own.every((tag) => tags.includes(tag));
     }
     if (item.kind !== "dashboard") return true;
+    const { title, shared } = pack.dashboards.find(({ id }) => id === item.itemId) ?? {};
     // Two installs can each import it, so the shared title, not the first match, marks ours.
-    if (isShared(pack, item)) {
-      return body.title === pack.dashboards.find(({ id }) => id === item.itemId)?.title;
-    }
-    const folderId = folderIdOf(items, "dashboards");
+    if (shared && body.title !== title) return false;
+    const folderId = shared ? shared.folderId : folderIdOf(items, "dashboards");
     if (!folderId || found.folderId !== folderId) return false;
     const rows = await readQuery(dashboardsByFolderQuery(org, folderId), true);
     return rows.some((row) => row.dashboard_id === found.id);

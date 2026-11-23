@@ -42,6 +42,8 @@ export interface PackDashboard {
 
 /** Another surface's dashboard import; one it finds already there is linked, never owned. */
 export interface PackSharedDashboard {
+  /** The one folder the importer creates in. */
+  folderId: string;
   find: (org: string) => Promise<{ id: string; folderId: string } | null>;
   /** The dashboard this call made, or null when it was already there. */
   create: (org: string) => Promise<{ id: string; folderId: string } | null>;
