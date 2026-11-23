@@ -681,6 +681,27 @@ describe("StarterPackDrawer", () => {
     );
   });
 
+  it("says who is setting the pack up when another install started first", async () => {
+    const flow = ready();
+    const wrapper = await shown(flow);
+    flow.install = vi.fn(async () => {
+      flow.busyBy.value = "first@example.com";
+      return false;
+    }) as never;
+    await submit(wrapper).trigger("click");
+    await flushPromises();
+    expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
+      "first@example.com is setting this pack up right now. Check back in a minute.",
+    );
+  });
+
+  it("says someone else is setting the pack up when the other installer is unknown", () => {
+    const wrapper = render(ready({ busyBy: ref("") }));
+    expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
+      "Someone else is setting this pack up right now. Check back in a minute.",
+    );
+  });
+
   describe("View Pack", () => {
     const ITEMS = [
       { kind: "dashboard", itemId: "overview", status: "created", id: "d1", folderId: "fd" },
