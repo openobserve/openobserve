@@ -530,6 +530,37 @@ describe("post-loop review fixes", () => {
     ]);
   });
 
+  it.each([
+    ["en-US", "now-15m to now", 15, "m"],
+    ["en-US", "now-2h to now", 2, "h"],
+    ["de-DE", "now-2h bis now", 2, "h"],
+    ["fr-FR", "de now-7d à now", 7, "d"],
+  ] as const)("%s %s rolls like the start alone", async (locale, text, value, unit) => {
+    const range = await run(locale, text, NOW);
+    expect(range).toMatchObject({
+      state: "valid",
+      reading: { kind: "rolling", rolling: { value, unit } },
+    });
+    expect(range).toEqual(await run(locale, `now-${value}${unit}`, NOW));
+  });
+
+  it("applies the same span limit and fix with an explicit now end", async () => {
+    const limits = { allowFuture: false, maxSpanUs: 3_600_000_000 };
+    const bare = await run("en-US", "now-2h", NOW, "UTC", limits);
+    expect(bare).toMatchObject({ state: "blocked", reason: "max-span", fix: { kind: "rolling" } });
+    expect(await run("en-US", "now-2h to now", NOW, "UTC", limits)).toEqual(bare);
+  });
+
+  it.each(["now-1d/d", "now-1d/d to now", "now-15m+5m to now"])(
+    "keeps %s absolute and fixed to now",
+    async (text) => {
+      expect(await run("en-US", text, NOW)).toMatchObject({
+        state: "valid",
+        reading: { kind: "absolute", fixedToNow: true },
+      });
+    },
+  );
+
   it("E: now-1d to now asks across a repeated hour, like bare now-1d", async () => {
     const at = "2026-11-02T06:30:00Z";
     const range = await run("en-US", "now-1d to now", at, "America/New_York");
