@@ -833,7 +833,7 @@ fn dashboard_queries(inner: &Value) -> Vec<Query<'_>> {
         );
     }
     for variable in inner["variables"]["list"].as_array().into_iter().flatten() {
-        queries.push(stream_query(&variable["query_data"]));
+        queries.extend(variable_query(&variable["query_data"]));
     }
     queries
 }
@@ -843,6 +843,64 @@ fn stream_query(fields: &Value) -> Query<'_> {
         stream_type: fields["stream_type"].as_str().unwrap_or_default(),
         stream: fields["stream"].as_str().unwrap_or_default(),
     }
+}
+
+/// A variable with its own query reads only that query; its saved stream is an unused builder
+/// setting.
+fn variable_query(fields: &Value) -> Option<Query<'_>> {
+    let text = fields["query"].as_str().unwrap_or_default().trim();
+    if text.is_empty() {
+        Some(stream_query(fields))
+    } else if fields["query_type"].as_str() == Some("promql") {
+        promql_variable_expr(text).map(Query::PromQl)
+    } else {
+        Some(Query::Sql {
+            sql: text,
+            default_type: fields["stream_type"].as_str().unwrap_or_default(),
+        })
+    }
+}
+
+/// The PromQL a Grafana-style variable query evaluates, or `None` when it reads no one metric,
+/// as `metrics(regex)` and `label_values(label)` do. Other text is scanned as written.
+fn promql_variable_expr(query: &str) -> Option<&str> {
+    let Some((name, args)) = query
+        .split_once('(')
+        .and_then(|(name, rest)| Some((name.trim(), rest.trim_end().strip_suffix(')')?.trim())))
+    else {
+        return Some(query);
+    };
+    match name {
+        "label_values" => last_top_level_comma(args).map(|at| args[..at].trim()),
+        "label_names" | "query_result" => Some(args).filter(|args| !args.is_empty()),
+        "metrics" => None,
+        _ => Some(query),
+    }
+}
+
+/// Byte offset of the last comma outside brackets and quotes.
+fn last_top_level_comma(text: &str) -> Option<usize> {
+    let (mut depth, mut quote, mut escaped, mut last) = (0i32, None, false, None);
+    for (at, ch) in text.char_indices() {
+        if let Some(open) = quote {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == open {
+                quote = None;
+            }
+            continue;
+        }
+        match ch {
+            '"' | '\'' | '`' => quote = Some(ch),
+            '(' | '[' | '{' => depth += 1,
+            ')' | ']' | '}' => depth -= 1,
+            ',' if depth == 0 => last = Some(at),
+            _ => {}
+        }
+    }
+    last
 }
 
 fn dashboard_query(query: &Value, promql: bool) -> Option<Query<'_>> {
@@ -1279,6 +1337,60 @@ mod tests {
         let d = dashboard_with("d", "promql", vec![custom("up")], variable);
         assert_eq!(hits_of(&d), (Some(None), 0));
         assert_eq!(hits_of(&dashboard("promql", vec![custom("up")])), (None, 0));
+    }
+
+    fn with_query_variable(stream: &str, query_type: &str, query: &str) -> Dashboard {
+        let variable = json!([{
+            "type": "query_values", "name": "v", "label": "V",
+            "query_data": {
+                "stream_type": "metrics", "stream": stream, "field": "job",
+                "query_type": query_type, "query": query
+            }
+        }]);
+        dashboard_with("d", "promql", vec![custom("up")], variable)
+    }
+
+    #[test]
+    fn a_query_variable_reading_the_metric_is_a_use() {
+        let used = [
+            (
+                "promql",
+                r#"label_values(http_requests_total{a="1,2", b="$b"}, path)"#,
+            ),
+            ("promql", "label_names(http_requests_total)"),
+            ("promql", "query_result(sum(rate(http_requests_total[5m])))"),
+            ("sql", r#"SELECT DISTINCT path FROM "http_requests_total""#),
+        ];
+        for (query_type, query) in used {
+            let d = with_query_variable("up", query_type, query);
+            assert_eq!(hits_of(&d), (Some(None), 0), "{query}");
+        }
+        let d = with_query_variable(METRIC, "promql", "label_values(up, job)");
+        let names = dashboard_queries(&dashboard_json(&d)).iter().fold(
+            HashSet::new(),
+            |mut names, query| {
+                query.add_names(&mut names);
+                names
+            },
+        );
+        assert!(names.contains("up") && !names.contains(METRIC));
+    }
+
+    #[test]
+    fn a_query_variable_reads_only_its_query_not_its_saved_stream() {
+        let not_used = [
+            ("promql", "label_values(path)"),
+            ("promql", "metrics(http_requests_.*)"),
+            (
+                "promql",
+                r#"label_values(up{path="http_requests_total"}, job)"#,
+            ),
+            ("sql", r#"SELECT DISTINCT job FROM "up""#),
+        ];
+        for (query_type, query) in not_used {
+            let d = with_query_variable(METRIC, query_type, query);
+            assert_eq!(hits_of(&d), (None, 0), "{query}");
+        }
     }
 
     #[test]
