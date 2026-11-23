@@ -17,9 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex h-full flex-col p-0">
     <OPageLayout
+      overflow-first
       bleed
       v-if="!showImportTemplate && !showTemplateEditor"
       :title="t('alerts.header')"
+      icon="shield-alert-outline"
+      :subtitle="t('alerts.subtitle')"
+      tabs-below
     >
       <template #header-tabs>
         <AlertSectionTabs />
@@ -49,24 +53,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</OButton>
       </template>
 
-      <template v-if="allKindsNoticeCount > 0" #banner>
-        <OBanner
-          tone="info"
-          :message="t('alert_templates.allKindsNotice', { count: allKindsNoticeCount })"
-          dismissible
-          data-test="template-list-all-kinds-notice"
-          @dismiss="dismissAllKindsNotice"
-        >
-          <template #actions>
-            <OButton
-              variant="secondary"
-              data-test="template-list-all-kinds-review"
-              @click="reviewAllKinds"
-              >{{ t("alert_templates.allKindsNoticeReview") }}</OButton
-            >
-          </template>
-        </OBanner>
-      </template>
+      <OBanner
+        v-if="allKindsNoticeCount > 0"
+        tone="info"
+        class="mx-3 mt-2 shrink-0"
+        :message="t('alert_templates.allKindsNotice', { count: allKindsNoticeCount })"
+        dismissible
+        data-test="template-list-all-kinds-notice"
+        @dismiss="dismissAllKindsNotice"
+      >
+        <template #actions>
+          <OButton
+            variant="secondary"
+            data-test="template-list-all-kinds-review"
+            @click="reviewAllKinds"
+            >{{ t("alert_templates.allKindsNoticeReview") }}</OButton
+          >
+        </template>
+      </OBanner>
 
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable

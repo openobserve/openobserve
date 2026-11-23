@@ -17,12 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="notFound ? t('reports.history.notFoundTitle') : raw(report?.name || '')"
+    icon="description"
+    :subtitle="subtitle"
     :back="backTarget"
     title-data-test="reports-reportdetail-title"
     bleed
+    tabs-below
   >
-    <template #status>
-      <template v-if="report">
+    <template #title-trail>
+      <div v-if="report" class="flex items-center gap-2">
         <OTag
           :tone="report.enabled ? 'ok' : 'neutral'"
           :label="report.enabled ? t('reports.history.enabled') : t('reports.history.paused')"
@@ -34,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           value="overdue"
           data-test="reports-reportdetail-overdue"
         />
-      </template>
+      </div>
     </template>
 
     <template #actions>
@@ -117,7 +120,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </span>
           </ODescriptionItem>
-          <ODescriptionItem :label="t('reports.history.nextRun')" :value="nextRunText" />
         </ODescriptionList>
       </OContent>
     </template>
@@ -214,10 +216,26 @@ const frequencyText = computed<I18nText>(() => {
   }
 });
 
-const nextRunText = computed<string>(() => {
+const subtitle = computed<I18nText>(() => {
   const r = report.value;
-  if (!r?.next_run_at || !r.enabled) return "";
-  return formatTimestampInTimezone(r.next_run_at, RUN_TIME_FORMAT, r.timezone || "UTC");
+  if (!r) return raw("");
+  const tz = r.timezone || "UTC";
+  const parts: string[] = [`${frequencyText.value} (${tz})`];
+  if (r.next_run_at && r.enabled) {
+    parts.push(
+      t("reports.history.nextRunAt", {
+        time: raw(formatTimestampInTimezone(r.next_run_at, RUN_TIME_FORMAT, tz)),
+      }),
+    );
+  }
+  const dashboards = r.dashboards?.length ?? 0;
+  parts.push(t("reports.history.dashboardCount", { count: dashboards }, dashboards));
+  if (!isCached.value) {
+    const count = recipients.value.length;
+    parts.push(t("reports.history.recipientCount", { count }, count));
+  }
+  if (attachmentType.value) parts.push(attachmentType.value.toUpperCase());
+  return raw(parts.join(" · "));
 });
 
 const backTarget = computed(() => ({

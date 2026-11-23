@@ -29,7 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div data-test="alert-library-page" class="flex h-full flex-col">
-    <OPageLayout bleed :title="t('alerts.header')" title-data-test="alert-library-title">
+    <OPageLayout
+      bleed
+      :title="t('alerts.header')"
+      icon="shield-alert-outline"
+      title-data-test="alert-library-title"
+      :subtitle="t('alerts.subtitle')"
+      tabs-below
+    >
       <template #header-tabs>
         <AlertSectionTabs />
       </template>

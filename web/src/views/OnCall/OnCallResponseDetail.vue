@@ -3,18 +3,128 @@
     bleed
     data-test="oncall-response-detail-page"
     :title="title"
+    title-min-width
+    icon="notifications-active"
+    tabs-below
     :back="{
-      label: t('oncall.responsesTitle'),
+      label: t('oncall.backToResponses'),
       to: { name: 'onCallResponses', query: { org_identifier: orgId } },
     }"
   >
-    <template #status>
-      <template v-if="response && lgUp">
-        <span class="inline-flex" data-test="oncall-response-state-tag">
-          <OTag type="oncallResponseState" :value="response.state" size="sm" />
-          <OTooltip v-if="closedAfter" :content="closedAfter" />
+    <!-- Team and open time read as one short line; the team is a real link because
+         "whose rotation is this" is the next click a responder makes. -->
+    <template v-if="response" #subtitle>
+      <span class="flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap">
+        <i18n-t
+          keypath="oncall.responseSubtitle"
+          tag="span"
+          scope="global"
+          class="flex min-w-0 items-center gap-1 truncate"
+          data-test="oncall-response-subtitle"
+        >
+          <template #team>
+            <span
+              v-if="!response.team_id"
+              class="text-status-error-text shrink-0"
+              data-test="oncall-response-team-none"
+              >{{ t("oncall.statUnrouted") }}</span
+            >
+            <OTag
+              v-else-if="teamDeleted"
+              tone="neutral"
+              size="sm"
+              data-test="oncall-response-team-deleted"
+            >
+              {{ t("oncall.deletedTeam") }}
+            </OTag>
+            <OSkeleton
+              v-else-if="!teamName"
+              shape="block"
+              class="h-3.5 w-20"
+              data-test="oncall-response-team-pending"
+            />
+            <router-link
+              v-else
+              class="text-accent min-w-0 hover:underline"
+              :to="teamRoute"
+              data-test="oncall-response-team-link"
+            >
+              <OTruncatedText class="block">{{ raw(teamName) }}</OTruncatedText>
+            </router-link>
+          </template>
+          <template #opened>
+            <span class="shrink-0" data-test="oncall-response-opened">{{ openedAtClock }}</span>
+          </template>
+        </i18n-t>
+        <OTruncatedText
+          v-if="response.state === 'acknowledged' && response.acked_by"
+          class="shrink-[100]"
+          :tooltip="t('oncall.escalationAckedBy', { who: tooltipOf(response.acked_by) })"
+          data-test="oncall-response-acked-by"
+        >
+          {{ raw("·") }}
+          <i18n-t keypath="oncall.escalationAckedBy" tag="span" scope="global">
+            <template #who>
+              <OnCallPersonName
+                :email="response.acked_by"
+                data-test="oncall-response-acked-by-name"
+              />
+            </template>
+          </i18n-t>
+        </OTruncatedText>
+        <!-- A closed page's state tag already says it, and an acknowledged one names its holder just before. -->
+        <span
+          v-if="lgUp && isOpenState && response.state !== 'acknowledged'"
+          class="flex min-w-0 shrink-[100] items-center gap-1"
+          data-test="oncall-response-phrase"
+        >
+          <span v-if="headerPhraseKind !== 'unknown'" class="shrink-0">{{ raw("·") }}</span>
+          <!-- Words, not the list's chip: the title row keeps only state and priority. -->
+          <OTruncatedText
+            v-if="headerPhraseKind === 'nobodyAnswered'"
+            class="text-status-error-text min-w-0"
+            :tooltip="t('oncall.ladderExhausted')"
+            data-test="oncall-response-phrase-exhausted"
+          >
+            {{ t("oncall.state_exhausted") }}
+          </OTruncatedText>
+          <OnCallEscalationCell
+            v-else
+            class="min-w-0"
+            :response-id="response.id"
+            :record="response"
+            :progress="escalation"
+            :total-rungs="totalRungs"
+            :progress-loaded="escalationLoaded"
+            :reached-step="headerReachedStep"
+            :team-deleted="teamDeleted"
+          />
         </span>
-        <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
+        <!-- Why this team is looking at somebody else's outage, said with the page's other facts. -->
+        <span
+          v-if="lgUp && isImpacted"
+          class="text-status-info-text inline-flex shrink-[100] items-center gap-1 truncate"
+          data-test="oncall-response-liaison-tag"
+        >
+          {{ raw("·") }} {{ t("oncall.liaisonTag") }}
+          <OTooltip side="bottom" :content="t('oncall.ladderLiaisonNote')" />
+        </span>
+      </span>
+    </template>
+
+    <template #title-trail>
+      <template v-if="response && lgUp">
+        <!-- The title ellipsises first; clipping here means the chips can never paint under the actions. -->
+        <span
+          class="flex min-w-0 shrink-[0.01] items-center gap-3.25 overflow-hidden"
+          data-test="oncall-response-title-trail"
+        >
+          <span class="inline-flex shrink-0" data-test="oncall-response-state-tag">
+            <OTag type="oncallResponseState" :value="response.state" size="sm" />
+            <OTooltip v-if="closedAfter" :content="closedAfter" />
+          </span>
+          <OTag class="shrink-0" type="alertPriority" :value="`p${response.priority}`" size="sm" />
+        </span>
       </template>
     </template>
 
@@ -254,19 +364,16 @@
     <template v-if="response">
       <!-- This page is a document, so the body is the scroller; the note box sticks to its foot. -->
       <OContent y class="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        <!-- Wide screens carry state and priority beside the title; the ladder phrase reads here on every width. -->
         <div
-          v-if="!lgUp || isOpenState || isImpacted"
+          v-if="!lgUp"
           class="mb-3 flex flex-wrap items-center gap-2"
           data-test="oncall-response-meta"
         >
-          <template v-if="!lgUp">
-            <span class="inline-flex" data-test="oncall-response-state-tag">
-              <OTag type="oncallResponseState" :value="response.state" size="sm" />
-              <OTooltip v-if="closedAfter" :content="closedAfter" />
-            </span>
-            <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-          </template>
+          <span class="inline-flex" data-test="oncall-response-state-tag">
+            <OTag type="oncallResponseState" :value="response.state" size="sm" />
+            <OTooltip v-if="closedAfter" :content="closedAfter" />
+          </span>
+          <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
           <span
             v-if="isOpenState"
             class="flex min-w-32 shrink-[1000] truncate"
@@ -282,10 +389,9 @@
               :team-deleted="teamDeleted"
             />
           </span>
-          <span v-if="isImpacted" class="inline-flex" data-test="oncall-response-liaison-tag">
-            <OTag tone="outline" size="sm">{{ t("oncall.liaisonTag") }}</OTag>
-            <OTooltip side="bottom" :content="t('oncall.ladderLiaisonNote')" />
-          </span>
+          <OTag v-if="isImpacted" tone="outline" size="sm" data-test="oncall-response-liaison-tag">
+            {{ t("oncall.liaisonTag") }}
+          </OTag>
         </div>
 
         <!-- The one sentence this screen exists to say when it is true:
@@ -743,6 +849,7 @@ import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import OnCallAboutPage from "@/components/oncall/OnCallAboutPage.vue";
 import OnCallDeliveryLedger from "@/components/oncall/OnCallDeliveryLedger.vue";
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OnCallReachAlarm from "@/components/oncall/OnCallReachAlarm.vue";
 import OnCallWhatFired from "@/components/oncall/OnCallWhatFired.vue";
 import OnCallWhoIsOn from "@/components/oncall/OnCallWhoIsOn.vue";
@@ -772,6 +879,7 @@ import OnCallVerdictCard from "@/components/oncall/OnCallVerdictCard.vue";
 import OnCallResponseDetailSkeleton from "./OnCallResponseDetailSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
@@ -841,6 +949,7 @@ import {
   isEscalating,
   isSnoozed,
   isUnresolved,
+  pagePhrase,
   pageState,
   promoteSeverityFloor,
   promoteSeverityOptions,
@@ -848,6 +957,7 @@ import {
   routingReasonOf,
 } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
+import { formatTimestampInTimezone } from "@/utils/date";
 
 const HOLD_RECHECK_MS = 10_000;
 /// Re-reads of a lapsed rung before giving up: a minute at HOLD_RECHECK_MS.
@@ -1103,6 +1213,20 @@ const hasMoreActions = computed(() => isOpenState.value || !response.value?.inci
 const canEscalate = computed(() => !!response.value?.team_id && !teamDeleted.value);
 const canSnooze = computed(() => canAcknowledge.value && !!response.value?.team_id);
 
+/// Where the subtitle's team link goes: the same target OnCallAboutPage's team row links to.
+const teamRoute = computed(() => ({
+  name: "onCallTeamDetail",
+  params: { teamId: response.value?.team_id ?? "", tab: "overview" },
+  query: { org_identifier: orgId.value },
+}));
+
+/// Clock time, not "N ago": the elapsed duration is already said beside the title tags.
+const openedAtClock = computed(() => {
+  const r = response.value;
+  if (!r) return "";
+  return formatTimestampInTimezone(r.opened_at, "HH:mm", store.state.timezone);
+});
+
 /// Rungs the team's policy defines for this priority, `null` when the policy could not be read.
 const totalRungs = computed(
   () =>
@@ -1110,12 +1234,26 @@ const totalRungs = computed(
     null,
 );
 
-/// The record's own step, so the phrase says something true before the ladder's progress has answered.
+/// The record's own step, so the header says something true before the ladder's progress has answered.
 const headerReachedStep = computed(() =>
   reachedStepOf(
     policy.value?.rungs.find((rung) => rung.priority === response.value?.priority)?.steps,
     response.value?.reached_rung_micros,
   ),
+);
+
+/// The subtitle's separator waits for a phrase, so an unanswered ladder leaves no dangling dot.
+const headerPhraseKind = computed(() =>
+  response.value
+    ? pagePhrase({
+        record: response.value,
+        progress: escalation.value,
+        progressLoaded: escalationLoaded.value,
+        totalRungs: totalRungs.value,
+        reachedStep: headerReachedStep.value,
+        nowMicros: nowMicros.value,
+      }).kind
+    : "unknown",
 );
 
 // The same progress decides the header tag; the time is the last step's, which the record's flag lags.

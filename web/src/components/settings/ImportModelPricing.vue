@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     container-class="flex-1 min-h-0"
     container-style=""
     :tabs="allTabs"
-    :back="{ label: t('settings.llmModelPricing'), onClick: arrowBackFn }"
+    @back="arrowBackFn"
     @cancel="arrowBackFn"
     @import="importJson"
     @update:active-tab="handleTabChange"

@@ -13,7 +13,7 @@ the Free Software Foundation, either version 3 of the License, or
     :is-importing="isImporting"
     container-style="height: calc(100vh - var(--navbar-height));"
     :editor-heights="editorHeights"
-    :back="{ label: t('onlineEvals.tabs.scoreConfigs'), onClick: goBack }"
+    @back="goBack"
     @cancel="goBack"
     @import="importJson"
   >

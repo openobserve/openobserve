@@ -22,9 +22,8 @@ import analytics from "@/services/product_analytics";
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 const mockBack = vi.fn();
-const mockPush = vi.fn();
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ back: mockBack, push: mockPush }),
+  useRouter: () => ({ back: mockBack, push: vi.fn() }),
   useRoute: () => ({ params: {}, query: {} }),
 }));
 
@@ -361,13 +360,13 @@ describe("ImportSemanticGroups - applyChanges", () => {
     expect(groups.some((g: any) => g.id === "unch-1")).toBe(true);
   });
 
-  it("returns to Correlation settings after a successful apply from a deep link", async () => {
+  it("calls handleBack after successful apply", async () => {
     const w = await mountComp();
     (w.vm as any).diffData = mockDiffData;
     (w.vm as any).selectedAdditions = ["add-1"];
     await (w.vm as any).applyChanges();
     await flushPromises();
-    expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ name: "correlationSettings" }));
+    expect(mockBack).toHaveBeenCalled();
   });
 
   // The groups are cached, and dimension analytics is computed from them, so an import expires the whole scope.
@@ -400,13 +399,11 @@ describe("ImportSemanticGroups - applyChanges", () => {
   });
 });
 
-describe("ImportSemanticGroups - back", () => {
-  it("pops in-app history instead of pushing the parent (N3)", async () => {
-    window.history.replaceState({ back: "/settings/correlation" }, "");
+describe("ImportSemanticGroups - handleBack", () => {
+  it("calls router.back()", async () => {
     const w = await mountComp();
-    (w.vm as any).goBack();
+    (w.vm as any).handleBack();
     expect(mockBack).toHaveBeenCalled();
-    window.history.replaceState(null, "");
   });
 });
 

@@ -804,12 +804,11 @@ describe("CreateReport", () => {
   // ── Back navigation ──────────────────────────────────────────────────────
 
   describe("back button", () => {
-    it("should open the reports list when back is clicked with no history", async () => {
+    it("should call router.back() when back button is clicked", async () => {
       ({ wrapper, mockRouter } = mountComponent());
       await flushPromises();
       await wrapper.find('[data-test="add-report-back-btn"]').trigger("click");
-      expect(mockRouter.back).not.toHaveBeenCalled();
-      expect(mockRouter.push).toHaveBeenCalledWith(expect.objectContaining({ name: "reports" }));
+      expect(mockRouter.back).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -21,7 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :style="containerStyle"
   >
     <!-- Hidden when the host page renders its own header, e.g. the pipeline shell's. -->
-    <OPageHeader v-if="!hideHeader" :title="title" :back="headerBack">
+    <OPageHeader
+      v-if="!hideHeader"
+      :title="title"
+      :back="{ label: raw(''), onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
+      class="border-border-default shrink-0 border-b"
+      :class="headerContainerClass"
+    >
       <template #actions>
         <!-- Slot for additional header content (e.g., folder dropdown) -->
         <slot name="header-additional" />
@@ -182,13 +188,11 @@ import {
   onBeforeUnmount,
   type PropType,
 } from "vue";
-import { type I18nText, useI18nTyped } from "@/types/i18n";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import axios from "axios";
 import { debounce } from "lodash-es";
 import AppTabs from "./AppTabs.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
-import type { PageHeaderBack } from "@/lib/core/PageHeader/OPageHeader.types";
-import { usePageContextLabel } from "@/lib/core/PageHeader/pageContext";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
@@ -245,12 +249,6 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
-    // The parent list: its name labels the header's back link and `to` is where Back lands (N3).
-    // Without it the link reads as the page's area and emits "back".
-    back: {
-      type: Object as PropType<PageHeaderBack>,
-      default: undefined,
-    },
     // Hide the built-in header (title + back + cancel/import buttons) when the
     // host page already renders its own page header and teleports the actions.
     hideHeader: {
@@ -277,6 +275,10 @@ export default defineComponent({
       default: "mb-2.5",
     },
     containerStyle: {
+      type: String,
+      default: "",
+    },
+    headerContainerClass: {
       type: String,
       default: "",
     },
@@ -356,12 +358,6 @@ export default defineComponent({
     const handleBack = () => {
       emit("back");
     };
-
-    const pageContext = usePageContextLabel();
-    const headerBack = computed<PageHeaderBack>(() => ({
-      dataTest: `${props.testPrefix}-import-back-btn`,
-      ...(props.back ?? { label: pageContext.value, onClick: handleBack }),
-    }));
 
     const handleCancel = () => {
       emit("cancel");
@@ -524,6 +520,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       validateJsonFile,
       stackPanes,
@@ -537,7 +534,6 @@ export default defineComponent({
       editorKey,
       isImportingLocal,
       handleBack,
-      headerBack,
       handleCancel,
       handleImport,
       handleTabChange,

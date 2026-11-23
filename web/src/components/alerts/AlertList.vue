@@ -19,9 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="alert-list-page" class="flex h-full flex-col">
     <OPageLayout
+      overflow-first
       bleed
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       :title="t('alerts.header')"
+      icon="shield-alert-outline"
+      :subtitle="t('alerts.subtitle')"
+      tabs-below
     >
       <!-- The title names the group the peer tabs form, so it stays put on every tab (H8). -->
       <template #header-tabs>

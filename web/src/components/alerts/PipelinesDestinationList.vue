@@ -20,7 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bleed
       v-if="!showDestinationEditor"
       :title="t('pipeline_destinations.header')"
-      :about="t('settings.pipelineDestinationsDesc')"
+      icon="person-pin-circle"
+      :subtitle="t('settings.pipelineDestinationsDesc')"
     >
       <template #actions>
         <OButton

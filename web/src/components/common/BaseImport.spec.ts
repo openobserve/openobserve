@@ -180,16 +180,6 @@ describe("BaseImport.vue", () => {
       expect(wrapper.emitted("back")).toBeTruthy();
     });
 
-    it("labels the back link with the given parent and runs its handler instead of emitting", async () => {
-      const onClick = vi.fn();
-      wrapper = createWrapper({ back: { label: "Alerts", onClick } });
-      const link = wrapper.find('[data-test="dashboard-import-back-btn"]');
-      expect(link.text()).toContain("Alerts");
-      await link.trigger("click");
-      expect(onClick).toHaveBeenCalled();
-      expect(wrapper.emitted("back")).toBeFalsy();
-    });
-
     it("emits 'cancel' when cancel button is clicked", async () => {
       wrapper = createWrapper();
       await wrapper.find('[data-test="dashboard-import-cancel-btn"]').trigger("click");

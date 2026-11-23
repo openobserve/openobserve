@@ -29,23 +29,13 @@
 <template>
   <OPageLayout
     :title="unavailableTitle ?? raw(alert?.name || '')"
+    icon="notifications"
+    :subtitle="unavailable ? raw('') : subtitle"
     :back="backTarget"
     title-data-test="alerts-alertdetail-title"
     bleed
   >
-    <!-- M-6 forbids silent truncation: a capped evaluation says so instead of showing a partial table. -->
-    <template v-if="!unavailable && !isCompositeAlert && groupData?.capped" #banner>
-      <OBanner tone="warn" data-test="alerts-alertdetail-cap-banner">
-        {{
-          t("alerts.groups.capBanner", {
-            observed: groupData?.groups_observed,
-            cap: groupData?.group_cap,
-          })
-        }}
-      </OBanner>
-    </template>
-
-    <template #status>
+    <template #title-trail>
       <div v-if="!unavailable" class="flex items-center gap-2">
         <OTag
           v-if="isMultiAlert"
@@ -215,6 +205,21 @@
       </template>
 
       <template v-else>
+        <!-- M-6 forbids silent truncation: a capped evaluation says so instead of showing a partial table. -->
+        <OBanner
+          v-if="groupData?.capped"
+          tone="warn"
+          class="shrink-0"
+          data-test="alerts-alertdetail-cap-banner"
+        >
+          {{
+            t("alerts.groups.capBanner", {
+              observed: groupData.groups_observed,
+              cap: groupData.group_cap,
+            })
+          }}
+        </OBanner>
+
         <OContent v-if="isMultiAlert" class="shrink-0 pt-3">
           <OStatStrip :items="groupStats" data-test="alerts-alertdetail-group-stats" />
         </OContent>
@@ -660,6 +665,21 @@ const fetchSloName = async () => {
     sloName.value = "";
   }
 };
+
+const subtitle = computed(() => {
+  if (!alert.value) return raw("");
+  // An SLO alert's stream_name is empty and its group_by does not exist, so the
+  // generic subtitle renders as nothing at all. Say what it actually watches.
+  if (isSloAlertView.value) {
+    return raw(sloName.value || sloId.value || "");
+  }
+  const groupBy = aggregation.value?.group_by || [];
+  const parts = [alert.value.stream_name].filter(Boolean);
+  if (groupBy.length) {
+    parts.push(t("alerts.groups.groupedBy", { columns: groupBy.join(", ") }));
+  }
+  return raw(parts.join(" · "));
+});
 
 /** Render a count that may be a lower bound with the `≥` the marker demands. */
 const withBound = (value?: number, isLowerBound?: boolean) => {

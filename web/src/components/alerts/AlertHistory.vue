@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-history-page"
     :title="t('alerts.history')"
     title-data-test="alerts-history-title"
-    :back="{ label: t('alerts.header'), to: alertListRoute, dataTest: 'alert-history-back-btn' }"
+    :back="{ label: t('alerts.header'), onClick: goBack, dataTest: 'alert-history-back-btn' }"
     bleed
   >
     <template #actions>
@@ -549,8 +549,8 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { alertHistoryQuery, alertsListQuery } from "@/services/alerts.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
-import { useRoute } from "vue-router";
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
@@ -587,6 +587,7 @@ type HistoryView = { page: number; size: number; sortBy: string; sortOrder: "asc
 
 const { t } = useI18nTyped();
 const store = useStore();
+const router = useRouter();
 const route = useRoute();
 
 // Data
@@ -1076,13 +1077,13 @@ const closeErrorDialog = () => {
   errorMessage.value = null;
 };
 
-const alertListRoute = computed(() => {
+const goBack = () => {
   const { folder, tab } = route.query;
-  return {
+  router.push({
     name: "alertList",
     query: { org_identifier: store.state.selectedOrganization.identifier, folder, tab },
-  };
-});
+  });
+};
 
 onBeforeUnmount(() => {
   unmounted = true;

@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- The reader's own on-call: their shifts, how pages reach them, and what has been sent to them. -->
 <template>
-  <OPageLayout bleed data-test="oncall-mine-page" :title="t('oncall.mineTitle')">
-    <template #status>
+  <OPageLayout bleed data-test="oncall-mine-page" :title="t('oncall.mineTitle')" icon="person">
+    <template #title-trail>
       <BetaBadge class="shrink-0" />
     </template>
     <template #actions>

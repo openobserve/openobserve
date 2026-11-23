@@ -221,6 +221,21 @@ describe("AlertDetail — SLO alerts", () => {
     expect(wrapper.findComponent({ name: "AlertGroupChart" }).exists()).toBe(false);
   });
 
+  // This family has no stream_name, so the subtitle names the SLO; asserted on the header prop
+  // because the page prints the SLO name in more than one place.
+  it("subtitles the page with the SLO rather than an absent stream", async () => {
+    wrapper = await mountView(sloAlert());
+    const layout = wrapper.findComponent({ name: "OPageLayout" });
+    expect(layout.props("subtitle")).toContain("checkout-availability");
+  });
+
+  it("subtitles with the raw slo_id when the name did not resolve", async () => {
+    vi.mocked(sloService.get).mockRejectedValue(new Error("boom"));
+    wrapper = await mountView(sloAlert());
+    const layout = wrapper.findComponent({ name: "OPageLayout" });
+    expect(layout.props("subtitle")).toContain("slo-123");
+  });
+
   // ── Edit diversion ───────────────────────────────────────────────────────
   //
   // `sloAlertEditRoute` returns null for TWO different situations, and this
@@ -335,6 +350,20 @@ describe("AlertDetail — SLO alerts", () => {
         }),
       );
     });
+  });
+
+  // The subtitle is shared: an SLO branch that returns early must not drop the stream and group-by.
+  it("leaves an ordinary alert's subtitle alone", async () => {
+    wrapper = await mountView({
+      id: "alert-1",
+      name: "cpu-per-host",
+      stream_name: "default",
+      query_condition: { type: "sql", aggregation: { group_by: ["host"] } },
+    });
+
+    const subtitle = wrapper.findComponent({ name: "OPageLayout" }).props("subtitle") as string;
+    expect(subtitle).toContain("default");
+    expect(subtitle).toContain("host");
   });
 });
 

@@ -120,9 +120,10 @@ const alerts = vi.mocked(alertsService);
 const stubs = {
   OPageLayout: {
     name: "OPageLayout",
-    // `status` carries the state tags beside the title, an assertion of its own.
+    // `title-trail` carries the state tags and `subtitle` the team/firing/
+    // opened line, both of which are assertions of their own.
     template:
-      "<div><div data-test='stub-status'><slot name='status' /></div><slot name='actions' /><div data-test='stub-header-tabs'><slot name='header-tabs' /></div><slot /></div>",
+      "<div><div data-test='stub-subtitle'><slot name='subtitle' /></div><div data-test='stub-title-trail'><slot name='title-trail' /></div><slot name='actions' /><div data-test='stub-header-tabs'><slot name='header-tabs' /></div><slot /></div>",
   },
   OTooltip: {
     name: "OTooltip",
@@ -647,32 +648,33 @@ describe("OnCallResponseDetail", () => {
     });
     const layout = wrapper.findComponent({ name: "OPageLayout" });
     expect(layout.attributes("title")).toBe("composite_clone_child_a_muv1p0nee7qa");
-    expect(
-      wrapper.find('[data-test="stub-status"] [data-test="oncall-response-state-tag"]').exists(),
-    ).toBe(true);
+    // "visible" lets the h1 overflow instead of ellipsising, which is what ran the title under the chips.
+    expect(layout.attributes("title-overflow")).toBeUndefined();
+    expect(wrapper.find('[data-test="oncall-response-state-tag"]').classes()).toContain("shrink-0");
   });
 
-  /// Who holds the page reads in the who-is-on card, so the title row keeps its width for the title.
-  it("names the holder of an acknowledged page in the body, not beside the title", async () => {
+  /// Who holds the page reads with team and time, so the title row keeps its width for the title.
+  it("names the holder of an acknowledged page in the subtitle, not beside the title", async () => {
     const wrapper = await renderWith({ state: "acknowledged", acked_by: "ana@acme.io" });
-    expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("ackedBy")).toBe("ana@acme.io");
-    expect(wrapper.find('[data-test="stub-status"]').text()).not.toContain("Acknowledged by");
+    expect(wrapper.find('[data-test="oncall-response-phrase"]').exists()).toBe(false);
+    const acked = wrapper.find('[data-test="oncall-response-acked-by"]');
+    expect(acked.text()).toContain("Acknowledged by");
+    expect(acked.findComponent({ name: "OnCallPersonName" }).props("email")).toBe("ana@acme.io");
   });
 
-  /// A long ladder line beside the title ran under the header actions, so it reads in the body.
-  it("says how far the page has climbed in the body, not beside the title", async () => {
+  /// A long ladder line beside the title ran under the header actions, so it reads on the subtitle line.
+  it("says how far the page has climbed on the subtitle line, not beside the title", async () => {
     const wrapper = await renderWith();
-    const phrase = wrapper.find(
-      '[data-test="oncall-response-meta"] [data-test="oncall-response-phrase"]',
-    );
+    const phrase = wrapper.find('[data-test="stub-subtitle"] [data-test="oncall-response-phrase"]');
     expect(phrase.exists()).toBe(true);
+    expect(phrase.classes()).toContain("min-w-0");
     expect(
-      wrapper.find('[data-test="stub-status"] [data-test="oncall-response-phrase"]').exists(),
+      wrapper.find('[data-test="stub-title-trail"] [data-test="oncall-response-phrase"]').exists(),
     ).toBe(false);
   });
 
-  /// The title row holds only state and priority; an exhausted ladder is said in the body.
-  it("says nobody answered in the body, not beside the title", async () => {
+  /// The title row holds only state and priority; an exhausted ladder is said in words on the subtitle line.
+  it("says nobody answered on the subtitle line, not as a chip beside the title", async () => {
     service.escalationProgress.mockResolvedValue(
       axiosReply({
         fired: [{ after_micros: 0, at: 1, targets: ["ana@acme.io"], reached: ["ana@acme.io"] }],
@@ -682,13 +684,15 @@ describe("OnCallResponseDetail", () => {
       }),
     );
     const wrapper = await renderWith();
-    expect(
-      wrapper
-        .find('[data-test="oncall-response-meta"] [data-test="oncall-escalation-cell-exhausted"]')
-        .exists(),
-    ).toBe(true);
-    const status = wrapper.find('[data-test="stub-status"]');
-    expect(status.findAllComponents({ name: "OTag" })).toHaveLength(2);
+    const words = wrapper.find(
+      '[data-test="stub-subtitle"] [data-test="oncall-response-phrase-exhausted"]',
+    );
+    expect(words.text()).toContain("Nobody answered");
+    const trail = wrapper.find('[data-test="stub-title-trail"]');
+    expect(trail.findAllComponents({ name: "OTag" })).toHaveLength(2);
+    expect(trail.find('[data-test="oncall-response-title-trail"]').classes()).toContain(
+      "overflow-hidden",
+    );
   });
 
   describe("an Unacknowledge the server cannot apply", () => {
@@ -1313,6 +1317,39 @@ describe("OnCallResponseDetail", () => {
     });
   });
 
+  /// The tagline: team, which firing this is, and when it opened — read once,
+  /// under the title, instead of being spread across a metadata grid.
+  describe("the tagline", () => {
+    it("links the team name to its detail page", async () => {
+      const wrapper = await renderWith();
+      const link = wrapper
+        .findAllComponents({ name: "RouterLink" })
+        .find((c) => c.attributes("data-test") === "oncall-response-team-link");
+
+      expect(link?.text()).toBe("Platform");
+      expect(link?.props("to")).toEqual({
+        name: "onCallTeamDetail",
+        params: { teamId: "team_1", tab: "overview" },
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    });
+
+    /// How often the alert fired before is a stat-strip fact, not tagline copy.
+    it("keeps the firing number out of the tagline", async () => {
+      const wrapper = await renderWith();
+      expect(wrapper.find('[data-test="oncall-response-firing"]').exists()).toBe(false);
+    });
+
+    /// The elapsed duration already rides the title tags — "opened" repeats it
+    /// as a clock time rather than a second "N ago".
+    it("shows the clock time the page opened, not how long ago", async () => {
+      const wrapper = await renderWith();
+      const opened = wrapper.find('[data-test="oncall-response-opened"]');
+
+      expect(opened.text()).toMatch(/^\d{2}:\d{2}$/);
+    });
+  });
+
   describe("top stats and what fired", () => {
     it("says how often it fired before, and only when it did", async () => {
       const first = await renderWith();
@@ -1677,13 +1714,18 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
     });
   });
 
-  /// In the body the phrase keeps a readable floor on every width.
-  it("keeps the escalation phrase readable", async () => {
+  /// On the subtitle line the phrase gives way after team and time; in the body it keeps a readable floor; the title keeps its floor.
+  it("keeps the escalation phrase readable and the title floored", async () => {
     for (const lgUp of [true, false]) {
       mockViewport.lgUp = lgUp;
       const wrapper = await renderWith();
       const classes = wrapper.find('[data-test="oncall-response-phrase"]').classes();
-      expect(classes, `lg ${lgUp}`).toEqual(expect.arrayContaining(["min-w-32", "truncate"]));
+      expect(classes, `lg ${lgUp}`).toEqual(
+        expect.arrayContaining(lgUp ? ["min-w-0", "shrink-[100]"] : ["min-w-32", "truncate"]),
+      );
+      expect(wrapper.findComponent({ name: "OPageLayout" }).attributes()).toHaveProperty(
+        "title-min-width",
+      );
       wrapper.unmount();
     }
     mockViewport.lgUp = true;
@@ -1825,10 +1867,10 @@ describe("OnCallResponseDetail — responding", () => {
       expect(
         wrapper
           .find(
-            '[data-test="oncall-response-phrase"] [data-test="oncall-escalation-cell-exhausted"]',
+            '[data-test="oncall-response-phrase"] [data-test="oncall-response-phrase-exhausted"]',
           )
-          .exists(),
-      ).toBe(true);
+          .text(),
+      ).toContain("Nobody answered");
       const banner = wrapper.find('[data-test="oncall-response-exhausted-banner"]');
       expect(banner.text()).toMatch(
         /^Nobody answered\. Every step ran by [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{2}:\d{2}\. Acknowledge to take it, or hand it off\.$/,
@@ -1854,8 +1896,8 @@ describe("OnCallResponseDetail — responding", () => {
         exhausted_at: 1_700_000_000_000_000,
       });
 
-      expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("ackedBy")).toBe(
-        "engineer@example.com",
+      expect(wrapper.find('[data-test="oncall-response-acked-by"]').text()).toContain(
+        "Acknowledged by",
       );
       expect(wrapper.find('[data-test="oncall-response-exhausted-banner"]').exists()).toBe(false);
     });
@@ -2510,6 +2552,10 @@ describe("OnCallResponseDetail — responding", () => {
       service.listTeams.mockResolvedValue(axiosReply([{ id: "team_2", name: "Payments" }]));
       const wrapper = await renderWith();
 
+      expect(wrapper.find('[data-test="oncall-response-team-link"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-response-team-deleted"]').text()).toBe(
+        "Deleted team",
+      );
       expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("teamDeleted")).toBe(true);
       expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("teamDeleted")).toBe(true);
       expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("noTeam")).toBe(true);
@@ -2545,6 +2591,7 @@ describe("OnCallResponseDetail — responding", () => {
         else service.listTeams.mockRejectedValue(new Error("down"));
         const wrapper = await renderWith({ team_id: teamId });
 
+        expect(wrapper.find('[data-test="oncall-response-team-deleted"]').exists()).toBe(expected);
         for (const name of ["OnCallAboutPage", "OnCallWhoIsOn"]) {
           expect(wrapper.findComponent({ name }).props("teamDeleted"), name).toBe(expected);
         }
@@ -2667,6 +2714,9 @@ describe("OnCallResponseDetail — responding", () => {
       }
       // Hand-off to a team still needs the team list.
       expect(service.listTeams).toHaveBeenCalled();
+      expect(wrapper.find('[data-test="oncall-response-team-none"]').text()).toBe("Unrouted");
+      expect(wrapper.find('[data-test="oncall-response-team-link"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-response-team-deleted"]').exists()).toBe(false);
       expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).exists()).toBe(false);
       expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("teamId")).toBeNull();
       expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("noTeam")).toBe(true);

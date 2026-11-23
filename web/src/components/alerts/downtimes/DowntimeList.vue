@@ -16,9 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="downtime-list-page" class="flex h-full flex-col">
-    <OPageLayout bleed :title="t('alerts.downtimes.title')" :about="t('alerts.downtimes.subtitle')">
-      <template #status>
-        <BetaBadge />
+    <OPageLayout
+      bleed
+      :title="t('alerts.downtimes.title')"
+      icon="notifications-paused"
+      :subtitle="t('alerts.downtimes.subtitle')"
+    >
+      <template #title>
+        <span class="inline-flex max-w-full min-w-0 items-center gap-2">
+          <span class="truncate">{{ t("alerts.downtimes.title") }}</span>
+          <BetaBadge class="shrink-0" />
+        </span>
       </template>
       <template v-if="!forbidden" #actions>
         <OButton

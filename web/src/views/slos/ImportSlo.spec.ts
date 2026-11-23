@@ -45,8 +45,8 @@ import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDo
 const store = createStore({ state: { selectedOrganization: { identifier: "acme" } } });
 
 const BaseImportStub = {
-  props: ["title", "testPrefix", "isImporting", "back"],
-  emits: ["cancel", "import"],
+  props: ["title", "testPrefix", "isImporting"],
+  emits: ["back", "cancel", "import"],
   template:
     '<div><slot name="file-input-section" :json-files="null" :update-files="() => {}" /><slot name="output-content" /></div>',
   setup(_props: unknown, { expose }: any) {
@@ -314,12 +314,11 @@ describe("ImportSlo", () => {
     const wrapper = mountImport();
     wrapper.findComponent(SelectFolderDropDown).vm.$emit("folder-selected", { value: "ops" });
 
-    const back = wrapper.findComponent(BaseImportStub).props("back") as any;
+    wrapper.findComponent(BaseImportStub).vm.$emit("back");
     wrapper.findComponent(BaseImportStub).vm.$emit("cancel");
 
-    expect(back.to.query.folder).toBe("team-a");
-    expect(back.to.name).toBe("sloList");
-    expect(push.mock.calls.map(([target]) => target.query.folder)).toEqual(["team-a"]);
+    expect(push.mock.calls.map(([target]) => target.query.folder)).toEqual(["team-a", "team-a"]);
+    expect(push.mock.calls[0][0].name).toBe("sloList");
   });
 });
 

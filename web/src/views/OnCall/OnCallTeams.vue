@@ -15,8 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout bleed data-test="oncall-teams-page" :title="t('oncall.teamsTitle')">
-    <template #status>
+  <OPageLayout
+    bleed
+    data-test="oncall-teams-page"
+    :title="t('oncall.teamsTitle')"
+    icon="group-work"
+  >
+    <template #title-trail>
       <BetaBadge class="shrink-0" />
     </template>
     <template #actions>

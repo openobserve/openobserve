@@ -21,7 +21,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ? t('alertCalibration.detail.title', { time: formatTime(run.window_end) })
         : t('alertCalibration.detail.titleLoading')
     "
-    :back="{ label: t('alertCalibration.title'), to: digestsRoute }"
+    :subtitle="
+      run
+        ? t('alertCalibration.detail.subtitle', {
+            start: formatDay(run.window_start),
+            end: formatDay(run.window_end),
+            time: formatAgo(run.emitted_at),
+          })
+        : raw('')
+    "
+    icon="tune"
+    :back="{ label: t('alertCalibration.detail.back'), to: digestsRoute }"
     scroll
     pad-y
     data-test="alert-calibration-digest-page"

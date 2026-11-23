@@ -27,7 +27,8 @@
 <template>
   <OPageLayout
     :title="t('slos.title')"
-    :about="t('slos.subtitle')"
+    icon="target"
+    :subtitle="t('slos.subtitle')"
     title-data-test="slos-slolist-title"
     bleed
   >

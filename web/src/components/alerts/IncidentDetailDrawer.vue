@@ -19,9 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       :back="{
         onClick: close,
-        label: t('alerts.incidents.title'),
+        label: t('alerts.incidents.goBack'),
         dataTest: 'incident-detail-back-btn',
       }"
+      :subtitle="t('alerts.incidents.incident')"
+      title-overflow="visible"
+      tabs-below
       bleed
     >
       <!-- Incident name — click the title to rename, Enter or blur saves,
@@ -41,7 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
 
-      <template #status>
+      <!-- Status, Severity, Alerts badges — trail immediately after the title
+           (soft dot-badge variant used in the Incident list). -->
+      <template #title-trail>
         <template v-if="incidentDetails && !isEditingTitle">
           <!-- The header chips are the only status and severity controls, so they work on every tab. -->
           <ODropdown v-model:open="statusMenuOpen" align="start">
@@ -1231,7 +1236,6 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
-import useSmartBack from "@/composables/useSmartBack";
 import incidentsService, {
   Incident,
   IncidentWithAlerts,
@@ -2330,14 +2334,6 @@ export default defineComponent({
       contextRegistry.unregister("incidents");
     });
 
-    // A deep link has no list to pop back to, so it lands on the list with this route's query.
-    const { goBack: goBackToList } = useSmartBack(() => ({
-      name: "incidentList",
-      query: {
-        ...route.query,
-        org_identifier: store.state.selectedOrganization.identifier,
-      },
-    }));
     const close = () => {
       // Clear correlation data when closing
       correlationData.value = null;
@@ -2347,7 +2343,15 @@ export default defineComponent({
       contextRegistry.setActive("");
       contextRegistry.unregister("incidents");
 
-      goBackToList();
+      // Navigate back to incident list, carrying over this route's own query (e.g. page)
+      // instead of dropping it. `tab` never reaches here: the load consumes it.
+      router.push({
+        name: "incidentList",
+        query: {
+          ...route.query,
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
     };
 
     // Esc leaves the page only when nothing else on it owns the key: no

@@ -18,21 +18,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     bleed
     :title="title"
+    :subtitle="subtitle"
+    icon="notifications-paused"
     :back="{
       label: t('alerts.downtimes.title'),
-      to: listRoute,
+      onClick: goBack,
       dataTest: 'downtime-detail-back',
     }"
+    tabs-below
     title-data-test="downtime-detail-title"
   >
-    <template #status>
-      <BetaBadge />
-      <OTag
-        v-if="downtime"
-        type="downtimeStatus"
-        :value="downtime.status"
-        data-test="downtime-detail-status"
-      />
+    <template #title>
+      <span class="inline-flex max-w-full min-w-0 items-center gap-2">
+        <span class="truncate">{{ title }}</span>
+        <BetaBadge class="shrink-0" />
+      </span>
+    </template>
+
+    <template v-if="downtime" #title-trail>
+      <OTag type="downtimeStatus" :value="downtime.status" data-test="downtime-detail-status" />
     </template>
 
     <template v-if="downtime" #actions-overflow>
@@ -535,14 +539,28 @@ const title = computed<I18nText>(() =>
   downtime.value ? raw(downtime.value.name) : t("alerts.downtimes.detailTitle"),
 );
 // After an End now or a cancel, the planned schedule is not what happened, so the real stop is shown too.
-const stoppedAt = computed<{ label: I18nText; time: string } | null>(() => {
+const stoppedAt = computed<{ label: I18nText; time: string; line: I18nText } | null>(() => {
   const d = downtime.value;
   if (!d?.cancelled_at || (d.status !== "ended_early" && d.status !== "cancelled")) return null;
   const time = formatWindowTime(d.cancelled_at, viewerZone.value);
   const zoned = t("alerts.downtimes.detail.stoppedTime", { time, zone: viewerZone.value });
   return d.status === "ended_early"
-    ? { label: t("alerts.downtimes.detail.endedEarlyAt"), time: zoned }
-    : { label: t("alerts.downtimes.detail.cancelledAt"), time: zoned };
+    ? {
+        label: t("alerts.downtimes.detail.endedEarlyAt"),
+        time: zoned,
+        line: t("alerts.downtimes.detail.endedEarlyAtTime", { time: zoned }),
+      }
+    : {
+        label: t("alerts.downtimes.detail.cancelledAt"),
+        time: zoned,
+        line: t("alerts.downtimes.detail.cancelledAtTime", { time: zoned }),
+      };
+});
+
+const subtitle = computed<I18nText | undefined>(() => {
+  if (!downtime.value) return undefined;
+  const planned = scheduleSentence(downtime.value.schedule, t);
+  return stoppedAt.value ? raw(`${planned} · ${stoppedAt.value.line}`) : planned;
 });
 
 const repeats = computed(() => !!downtime.value && downtime.value.schedule.repeat !== "none");
@@ -804,11 +822,11 @@ const sendTest = async () => {
 // ── Actions ─────────────────────────────────────────────────────────────────
 const orgQuery = () => ({ org_identifier: orgId.value });
 
-const listRoute = computed(() => ({
-  name: "downtimes",
-  query: { ...orgQuery(), folder: downtime.value?.folder_id ?? "default" },
-}));
-const goBack = () => router.push(listRoute.value);
+const goBack = () =>
+  router.push({
+    name: "downtimes",
+    query: { ...orgQuery(), folder: downtime.value?.folder_id ?? "default" },
+  });
 
 const editDowntime = () =>
   router.push({

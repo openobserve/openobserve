@@ -215,13 +215,19 @@ describe("AlertInsights - fetchAlerts on mount", () => {
   });
 });
 
-describe("AlertInsights - back", () => {
+describe("AlertInsights - goBack", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("clicking back with no history lands on alertList", async () => {
+  it("calls router.push with alertList", async () => {
+    const w = await mountComp();
+    (w.vm as any).goBack();
+    expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ name: "alertList" }));
+  });
+
+  it("clicking back button calls goBack", async () => {
     const w = await mountComp();
     await w.find('[data-test="alert-insights-back-btn"]').trigger("click");
-    expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ name: "alertList" }));
+    expect(mockPush).toHaveBeenCalled();
   });
 });
 

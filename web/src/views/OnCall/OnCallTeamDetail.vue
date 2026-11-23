@@ -2,16 +2,26 @@
   <OPageLayout
     bleed
     data-test="oncall-team-detail-page"
-    :title="team ? raw(team.name) : t('oncall.teamDetail')"
-    title-data-test="oncall-team-detail-title"
+    :subtitle="subtitle"
+    icon="group-work"
+    title-overflow="visible"
+    tabs-below
     :back="{
-      label: t('oncall.teamsTitle'),
+      label: t('oncall.backToTeams'),
       to: { name: 'onCallTeams', query: { org_identifier: orgId } },
     }"
   >
+    <!-- Team names are free text and can run long; truncate so it never
+         crowds the actions on the right. -->
+    <template #title>
+      <OTruncatedText class="block" data-test="oncall-team-detail-title">{{
+        team ? raw(team.name) : t("oncall.teamDetail")
+      }}</OTruncatedText>
+    </template>
+
     <!-- Whether a page would reach anybody is the team's headline fact, so it
          rides the title instead of sitting in a card below it. -->
-    <template #status>
+    <template #title-trail>
       <span v-if="loaded" class="inline-flex">
         <OTag
           type="oncallCoverage"
@@ -526,6 +536,7 @@ import {
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -780,12 +791,24 @@ const routeTab = computed(() => {
 });
 
 /// The overview's server count once it answers, else the roster already loaded,
-/// so the tab's count never waits on a second request.
+/// so the header never waits on a second request.
 const memberCount = computed(() => overview.value?.members ?? members.value.length);
 
 /// `null` until the roster has been read: an empty array on a page still
 /// loading would announce "this team has nobody in it" about every team.
 const hasMembers = computed<boolean | null>(() => (loaded.value ? members.value.length > 0 : null));
+
+const subtitle = computed(() => {
+  if (!team.value) return undefined;
+  const rules = ruleCount.value;
+  const base = t(
+    "oncall.teamSubtitle",
+    { tz: team.value.timezone, count: memberCount.value },
+    memberCount.value,
+  );
+  if (rules === null) return base;
+  return raw(`${base} · ${t("oncall.teamOwnsRules", { count: rules }, rules)}`);
+});
 
 /// Pages this team was woken by, inside the activity window.
 const recentPages = computed(() => {

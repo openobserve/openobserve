@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('alerts.insights.title')"
-    :back="{ label: t('alerts.header'), to: alertListRoute, dataTest: 'alert-insights-back-btn' }"
+    :back="{ label: t('menu.alerts'), onClick: goBack, dataTest: 'alert-insights-back-btn' }"
+    tabs-below
     bleed
   >
     <template #actions>
@@ -434,13 +435,13 @@ const fetchAlerts = async () => {
   }
 };
 
-const alertListRoute = computed(() => {
+const goBack = () => {
   const { folder, tab } = route.query;
-  return {
+  router.push({
     name: "alertList",
     query: { org_identifier: store.state.selectedOrganization.identifier, folder, tab },
-  };
-});
+  });
+};
 
 const updateDateTime = (value: any) => {
   if (value.userChangedValue) {

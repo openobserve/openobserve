@@ -23,129 +23,172 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <OPageLayout
-      bleed
-      :back="{ label: t('alerts.header'), to: alertListRoute, dataTest: 'add-alert-back-btn' }"
-    >
-      <!-- The name is the title in both modes; edit mode renders it read-only. Anomaly and alert
-           names bind the same `name` field, which useAlertForm mirrors into anomalyConfig.name. -->
-      <template #title>
-        <OFormInlineEdit
-          ref="step1Ref"
-          name="name"
-          :readonly="beingUpdated || anomalyEditMode"
-          :data-test="isAnomalyMode ? 'add-anomaly-name-input' : 'add-alert-name-input'"
-          :placeholder="
-            isAnomalyMode ? t('alerts.anomalyNamePlaceholder') : t('alerts.alertNamePlaceholder')
-          "
-          :aria-label="isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName')"
-          :edit-hint="
-            alertAutoName.isAuto.value ? t('common.inlineEdit.autoHint') : t('alerts.renameHint')
-          "
-          @update:model-value="alertAutoName.markManual"
-          @commit="alertAutoName.onCommit"
-          @cancel="alertAutoName.onCommit"
-        />
-      </template>
+    <OPageLayout bleed>
+      <template #header>
+        <OPageHeader
+          class="alert-v3-topbar border-border-default [container-type:inline-size] shrink-0 border-b [container-name:topbar]"
+          :back="{
+            label: activeFolderName || t('alerts.header'),
+            onClick: goBackToAlertsList,
+            dataTest: 'add-alert-back-btn',
+          }"
+          title-overflow="visible"
+        >
+          <!-- The name is the title in both modes; edit mode renders it read-only. Anomaly and alert
+               names bind the same `name` field, which useAlertForm mirrors into anomalyConfig.name. -->
+          <template #title>
+            <OFormInlineEdit
+              ref="step1Ref"
+              name="name"
+              :readonly="beingUpdated || anomalyEditMode"
+              :data-test="isAnomalyMode ? 'add-anomaly-name-input' : 'add-alert-name-input'"
+              :placeholder="
+                isAnomalyMode
+                  ? t('alerts.anomalyNamePlaceholder')
+                  : t('alerts.alertNamePlaceholder')
+              "
+              :aria-label="
+                isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName')
+              "
+              :edit-hint="
+                alertAutoName.isAuto.value
+                  ? t('common.inlineEdit.autoHint')
+                  : t('alerts.renameHint')
+              "
+              @update:model-value="alertAutoName.markManual"
+              @commit="alertAutoName.onCommit"
+              @cancel="alertAutoName.onCommit"
+            />
+          </template>
 
-      <template #status>
-        <template v-if="(beingUpdated || anomalyEditMode) && isAnomalyMode">
-          <OTooltip
-            :content="raw(anomalyConfig.last_error)"
-            :disabled="
-              (anomalyConfig.status !== 'failed' &&
-                !isAnomalyDataReadinessStatus(anomalyConfig.status)) ||
-              !anomalyConfig.last_error
-            "
-          >
-            <OTag v-if="anomalyConfig.status" type="anomalyStatus" :value="anomalyConfig.status" />
-          </OTooltip>
-          <!-- §4.8 health badge: its own element keyed off notice_class, never folded into the status tag. -->
-          <OTooltip v-if="anomalyNoticeBadge" :content="anomalyNoticeTooltip">
-            <OTag tone="warn" :label="anomalyNoticeBadge.label" data-test="anomaly-notice-badge" />
-          </OTooltip>
-          <span
-            v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
-            class="text-2xs text-text-secondary whitespace-nowrap"
-          >
-            {{ t("alerts.lastRun", { time: anomalyFormatTs(anomalyConfig.last_detection_run) }) }}
-          </span>
-        </template>
-      </template>
-
-      <template #actions>
-        <template v-if="(beingUpdated || anomalyEditMode) && isAnomalyMode">
-          <OTooltip v-if="anomalyConfig.status === 'failed'" :content="t('alerts.retryTraining')">
-            <OButton
-              variant="danger-ghost"
-              :loading="anomalyRetraining"
-              @click="anomalyTriggerRetrain"
-              icon="replay"
+          <!-- EDIT MODE (anomaly): status + last-run + retry trail the name -->
+          <template #title-trail>
+            <div
+              v-if="(beingUpdated || anomalyEditMode) && isAnomalyMode"
+              class="flex items-center gap-1.5"
             >
-              {{ t("alerts.retry") }}
-            </OButton>
-          </OTooltip>
-          <OTooltip
-            v-else-if="anomalyCanCheckDataNow(anomalyConfig)"
-            :content="t('alerts.anomaly.checkDataNowTooltip')"
-          >
-            <OButton
-              variant="ghost"
-              :loading="anomalyRetraining"
-              data-test="anomaly-check-data-now"
-              @click="anomalyTriggerRetrain"
-              icon="replay"
-            >
-              {{ t("alerts.anomaly.checkDataNow") }}
-            </OButton>
-          </OTooltip>
-        </template>
+              <OTooltip
+                :content="raw(anomalyConfig.last_error)"
+                :disabled="
+                  (anomalyConfig.status !== 'failed' &&
+                    !isAnomalyDataReadinessStatus(anomalyConfig.status)) ||
+                  !anomalyConfig.last_error
+                "
+              >
+                <OTag
+                  v-if="anomalyConfig.status"
+                  type="anomalyStatus"
+                  :value="anomalyConfig.status"
+                />
+              </OTooltip>
+              <!-- §4.8 health badge: its own element keyed off notice_class, never folded into the status tag. -->
+              <OTooltip v-if="anomalyNoticeBadge" :content="anomalyNoticeTooltip">
+                <OTag
+                  tone="warn"
+                  :label="anomalyNoticeBadge.label"
+                  data-test="anomaly-notice-badge"
+                />
+              </OTooltip>
+              <span
+                v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
+                class="text-2xs text-text-secondary whitespace-nowrap"
+              >
+                {{
+                  t("alerts.lastRun", { time: anomalyFormatTs(anomalyConfig.last_detection_run) })
+                }}
+              </span>
+              <OTooltip
+                v-if="anomalyConfig.status === 'failed'"
+                :content="t('alerts.retryTraining')"
+              >
+                <OButton
+                  variant="danger-ghost"
+                  size="sm"
+                  :loading="anomalyRetraining"
+                  @click="anomalyTriggerRetrain"
+                  icon="replay"
+                >
+                  {{ t("alerts.retry") }}
+                </OButton>
+              </OTooltip>
+              <OTooltip
+                v-else-if="anomalyCanCheckDataNow(anomalyConfig)"
+                :content="t('alerts.anomaly.checkDataNowTooltip')"
+              >
+                <OButton
+                  variant="ghost"
+                  size="sm"
+                  :loading="anomalyRetraining"
+                  data-test="anomaly-check-data-now"
+                  @click="anomalyTriggerRetrain"
+                  icon="replay"
+                >
+                  {{ t("alerts.anomaly.checkDataNow") }}
+                </OButton>
+              </OTooltip>
+            </div>
+          </template>
+
+          <!-- Where the alert is saved; an existing alert does not move folders from here. -->
+          <template #subtitle>
+            <span class="flex min-w-0 items-center gap-1 leading-normal">
+              <span class="whitespace-nowrap">
+                {{ t("alerts.modeInFolder", { mode: headerModeLabel }) }}
+              </span>
+              <InlineSelectFolderDropdown
+                v-if="!(beingUpdated || anomalyEditMode)"
+                variant="inline"
+                :model-value="activeFolderId as string"
+                type="alerts"
+                @update:model-value="updateActiveFolderId({ value: $event })"
+              />
+              <OTruncatedText v-else class="text-text-body font-medium">
+                {{ activeFolderName }}
+              </OTruncatedText>
+            </span>
+          </template>
+        </OPageHeader>
       </template>
 
+      <div v-if="siemDetectionId" class="flex shrink-0 flex-col gap-2 px-3 pt-2">
+        <OBanner tone="info" icon="shield-alert-outline" data-test="add-alert-siem-detection">
+          {{ t("alerts.siemDetection.notice") }}
+          <template #actions>
+            <OButton
+              variant="secondary"
+              icon-end="open-in-new"
+              data-test="add-alert-siem-detection-open"
+              @click="openInSecurity"
+              >{{ t("alerts.siemDetection.open") }}</OButton
+            >
+          </template>
+        </OBanner>
+      </div>
       <!-- Prefill warnings say what the source adapter changed (a stripped LIMIT, a rolling window);
            most surfaces skip the confirm dialog, so without them the transforms would be silent. -->
-      <template
-        v-if="siemDetectionId || prefillWarnings.length || calibrationHandoff.reserved.value"
-        #banner
+      <div
+        v-if="prefillWarnings.length || calibrationHandoff.reserved.value"
+        class="flex shrink-0 flex-col gap-2 px-3 pt-2"
       >
-        <div class="flex flex-col">
-          <OBanner
-            v-if="siemDetectionId"
-            tone="info"
-            icon="shield-alert-outline"
-            data-test="add-alert-siem-detection"
-          >
-            {{ t("alerts.siemDetection.notice") }}
-            <template #actions>
-              <OButton
-                variant="secondary"
-                icon-end="open-in-new"
-                data-test="add-alert-siem-detection-open"
-                @click="openInSecurity"
-                >{{ t("alerts.siemDetection.open") }}</OButton
-              >
-            </template>
+        <!-- Invisible until the handoff is read, so the slot keeps its height from first paint. -->
+        <div
+          v-if="calibrationHandoff.reserved.value"
+          :class="calibrationBanner ? '' : 'invisible'"
+          :data-severity="calibrationBanner?.tone ?? ''"
+          data-test="add-alert-calibration-banner"
+        >
+          <OBanner :tone="calibrationBanner?.tone ?? 'info'">
+            <OTruncatedText>{{ calibrationBanner?.text ?? "" }}</OTruncatedText>
           </OBanner>
-          <!-- Invisible until the handoff is read, so the slot keeps its height from first paint. -->
-          <div
-            v-if="calibrationHandoff.reserved.value"
-            :class="calibrationBanner ? '' : 'invisible'"
-            :data-severity="calibrationBanner?.tone ?? ''"
-            data-test="add-alert-calibration-banner"
-          >
-            <OBanner :tone="calibrationBanner?.tone ?? 'info'">
-              <OTruncatedText>{{ calibrationBanner?.text ?? "" }}</OTruncatedText>
-            </OBanner>
-          </div>
-          <OBanner
-            v-for="(warning, index) in prefillWarnings"
-            :key="`${warning.key}-${index}`"
-            :tone="warning.level === 'info' ? 'info' : 'warn'"
-            :message="t(`alerts.prefill.warnings.${warning.key}`, warning.params ?? {})"
-            :data-test="`add-alert-prefill-warning-${warning.key}`"
-          />
         </div>
-      </template>
+        <OBanner
+          v-for="(warning, index) in prefillWarnings"
+          :key="`${warning.key}-${index}`"
+          :tone="warning.level === 'info' ? 'info' : 'warn'"
+          :message="t(`alerts.prefill.warnings.${warning.key}`, warning.params ?? {})"
+          :data-test="`add-alert-prefill-warning-${warning.key}`"
+        />
+      </div>
 
       <div :key="draftFormKey" class="flex min-h-0 flex-1 max-lg:flex-col max-lg:overflow-y-auto">
         <!-- LEFT column wrapper (flex: 6.5) -->
@@ -192,25 +235,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ option.label }}
                 </OToggleGroupItem>
               </OToggleGroup>
-              <!-- Where the alert is saved; an existing alert does not move folders from here. -->
-              <div
-                class="ms-auto flex min-w-0 items-center gap-1.5 ps-3"
-                data-test="add-alert-folder"
-              >
-                <span class="text-text-heading text-xs font-semibold whitespace-nowrap">
-                  {{ t("alerts.folder") }}
-                </span>
-                <InlineSelectFolderDropdown
-                  v-if="!(beingUpdated || anomalyEditMode)"
-                  variant="inline"
-                  :model-value="activeFolderId as string"
-                  type="alerts"
-                  @update:model-value="updateActiveFolderId({ value: $event })"
-                />
-                <OTruncatedText v-else class="text-text-body text-xs font-medium">
-                  {{ activeFolderName }}
-                </OTruncatedText>
-              </div>
             </div>
             <div
               v-if="!isCompositeMode"
@@ -704,6 +728,7 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { useAutoName } from "@/composables/useAutoName";
 import { buildAlertAutoName } from "@/utils/autoName";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -766,6 +791,7 @@ export default defineComponent({
     OForm,
     OFormInlineEdit,
     OFormSelect,
+    OPageHeader,
     OTruncatedText,
     CompositeAlertForm,
     EditorDraftDialogs,
@@ -960,6 +986,17 @@ export default defineComponent({
       return tabs.filter((tab: any) => (tab as any).show !== false);
     });
 
+    // Mode as the subtitle, as AddPanel does it: the header reads the name first, then what you're doing.
+    const headerModeLabel = computed(() => {
+      const editing = alertForm.beingUpdated.value || alertForm.anomalyEditMode.value;
+      if (alertForm.isAnomalyMode.value) {
+        return editing
+          ? alertForm.t("alerts.editAnomalyMode")
+          : alertForm.t("alerts.addAnomalyMode");
+      }
+      return editing ? alertForm.t("alerts.editAlertMode") : alertForm.t("alerts.addAlertMode");
+    });
+
     const activeFolderName = computed(() => {
       const folders = alertForm.store.state.organizationData.foldersByType?.alerts ?? [];
       const found = folders.find((f: any) => f.folderId === alertForm.activeFolderId.value);
@@ -974,14 +1011,16 @@ export default defineComponent({
       }
     });
 
-    const alertListRoute = computed(() => ({
-      name: "alertList",
-      query: {
-        folder: alertForm.activeFolderId.value ?? "default",
-        tab: alertForm.router.currentRoute.value.query.tab,
-        org_identifier: store.state.selectedOrganization.identifier,
-      },
-    }));
+    const goBackToAlertsList = () => {
+      return alertForm.router.push({
+        path: "/alerts",
+        query: {
+          folder: alertForm.activeFolderId.value ?? "default",
+          tab: alertForm.router.currentRoute.value.query.tab,
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
 
     const {
       openSetup: openOncallSetup,
@@ -1114,6 +1153,7 @@ export default defineComponent({
       draftFormKey: alertEditorDraft.formKey,
       cancelEditor,
       alertAutoName,
+      headerModeLabel,
       isAnomalyDetectionEnabled,
       anomalyNoticeBadge,
       anomalyNoticeTooltip,
@@ -1123,7 +1163,7 @@ export default defineComponent({
       anomalyLockedReason,
       alertTabs,
       activeFolderName,
-      alertListRoute,
+      goBackToAlertsList,
       onStreamTypeChange,
       onAlertTypeChange,
       queryModeName,

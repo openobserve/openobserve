@@ -28,11 +28,13 @@
 <template>
   <OPageLayout
     :title="notFound ? t('slos.notFound') : raw(slo?.name || sloId)"
+    icon="target"
+    :subtitle="notFound ? raw('') : subtitle"
     :back="{ to: backTarget, label: t('slos.title') }"
     title-data-test="slos-slodetail-title"
     bleed
   >
-    <template #status>
+    <template #title-trail>
       <div class="flex items-center gap-2">
         <OTag
           v-if="slo"
@@ -336,10 +338,12 @@ import {
   formatBurn,
   formatCoverage,
   formatSli,
+  formatSlice,
   formatTarget,
   formatTimeToExhaust,
   formatWindow,
   healthIcon,
+  sliTypeLabel,
   sloHealth,
 } from "@/composables/useSloFormat";
 
@@ -497,6 +501,16 @@ const backTarget = computed(() => {
     name: "sloList",
     query: { ...restQuery, org_identifier: org.value },
   };
+});
+
+const subtitle = computed(() => {
+  if (!slo.value) return raw("");
+  const parts = [
+    sliTypeLabel(slo.value.sli_type, t),
+    t("slos.overRolling", { window: formatWindow(slo.value.window_secs) }),
+    formatSlice(slo.value.slice_interval_secs),
+  ];
+  return raw(parts.join(" · "));
 });
 
 const healthVariant = computed(() => {

@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="alert"
     class="min-h-0 flex-1"
     :is-importing="isAlertImporting"
-    :back="{ label: t('alerts.header'), to: listRoute }"
-    @cancel="goBack"
+    @back="router.back()"
+    @cancel="router.back()"
     @import="importJson"
   >
     <!-- Custom URL Input Section with Folder Dropdown -->
@@ -275,7 +275,6 @@ import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import useSmartBack from "@/composables/useSmartBack";
 import alertsService from "../../services/alerts";
 import { saveAnomalyConfigMutation } from "@/services/anomaly_detection.queries";
 import { useMutation } from "@tanstack/vue-query";
@@ -344,11 +343,6 @@ export default defineComponent({
     const validateJsonFile = createJsonFileValidator(t);
     const store = useStore();
     const router = useRouter();
-    const listRoute = computed(() => ({
-      name: "alertList",
-      query: { org_identifier: store.state.selectedOrganization.identifier },
-    }));
-    const { goBack } = useSmartBack(() => listRoute.value);
 
     const { getStreams } = useStreams(t);
 
@@ -1141,8 +1135,7 @@ export default defineComponent({
       raw,
       validateJsonFile,
       importJson,
-      listRoute,
-      goBack,
+      router,
       baseImportRef,
       alertErrorsToDisplay,
       alertErrorItems,

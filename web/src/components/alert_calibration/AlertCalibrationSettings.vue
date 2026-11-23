@@ -17,8 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('alertCalibration.settings.title')"
-    :about="t('alertCalibration.subtitle')"
-    :back="{ label: t('alertCalibration.title'), to: dashboardRoute }"
+    :subtitle="t('alertCalibration.subtitle')"
+    icon="tune"
+    :back="{ label: t('alertCalibration.title'), onClick: openPage }"
     data-test="alert-calibration-settings"
   >
     <div class="flex flex-col gap-4">
@@ -94,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useRouter } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
@@ -116,6 +118,7 @@ import AlertCalibrationSettingsForm from "./AlertCalibrationSettingsForm.vue";
 
 const { t } = useI18nTyped();
 useLeaveIfAlertCalibrationOff("alertList");
+const router = useRouter();
 const orgId = useOrgId();
 
 const configQuery = useQuery(() => alertCalibrationConfigQuery(orgId.value));
@@ -125,8 +128,6 @@ const { canRun, canEdit } = useAlertCalibrationRights();
 
 const reload = () => void configQuery.refetch();
 
-const dashboardRoute = computed(() => ({
-  name: "alertCalibration",
-  query: { org_identifier: orgId.value },
-}));
+const openPage = () =>
+  router.push({ name: "alertCalibration", query: { org_identifier: orgId.value } });
 </script>

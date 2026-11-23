@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :is-importing="isImporting"
     :show-splitter="false"
     container-class="h-[calc(100vh-var(--navbar-height))]!"
-    :back="{ label: t('settings.correlationSettings'), to: parentRoute }"
-    @cancel="goBack"
+    @back="handleBack"
+    @cancel="handleBack"
     @import="handleImport"
     @update:jsonArray="handleJsonUpdate"
   >
@@ -344,7 +344,7 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import type { FileValue } from "@/lib/forms/File/OFile.types";
-import useSmartBack from "@/composables/useSmartBack";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import BaseImport from "@/components/common/BaseImport.vue";
 import alertsService from "@/services/alerts";
@@ -374,12 +374,8 @@ interface SemanticGroupDiff {
 }
 
 const { t } = useI18nTyped();
+const router = useRouter();
 const store = useStore();
-const parentRoute = computed(() => ({
-  name: "correlationSettings",
-  query: { org_identifier: store.state.selectedOrganization.identifier },
-}));
-const { goBack } = useSmartBack(() => parentRoute.value);
 
 const jsonFile = ref<File | null>(null);
 const importedGroups = ref<SemanticGroup[]>([]);
@@ -552,7 +548,7 @@ const applyChanges = async () => {
       variant: "success",
     });
 
-    goBack();
+    handleBack();
   } catch (error: any) {
     toast({
       message: t("toastMessages.alerts.failedToSaveChanges", {
@@ -563,6 +559,10 @@ const applyChanges = async () => {
   } finally {
     isApplying.value = false;
   }
+};
+
+const handleBack = () => {
+  router.back();
 };
 
 const handleImport = () => {

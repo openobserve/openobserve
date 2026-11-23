@@ -16,7 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="report-list-page" class="h-full">
-    <OPageLayout bleed :title="t('reports.header')" title-data-test="report-list-title">
+    <OPageLayout
+      bleed
+      :title="t('reports.header')"
+      title-data-test="report-list-title"
+      icon="description"
+      :subtitle="t('reports.subtitle')"
+      tabs-below
+    >
       <template #header-tabs>
         <OTabs :model-value="activeTab" data-test="report-list-tabs" @change="onTabChange">
           <OTab

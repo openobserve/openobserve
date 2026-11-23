@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     title-data-test="add-report-title"
     :back="{
       label: t('reports.header'),
-      to: reportsListRoute(),
+      onClick: () => router.back(),
       dataTest: 'add-report-back-btn',
     }"
     bleed

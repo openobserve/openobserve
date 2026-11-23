@@ -316,7 +316,7 @@ describe("OnCallRouting", () => {
     expect(rulesPanel(wrapper).props("defaultTeamId")).toBe("team_2");
   });
 
-  it("puts the precedence sentence behind the header's About popover", () => {
+  it("puts the precedence sentence behind an info icon, not a subtitle", () => {
     const wrapper = mount(OnCallRouting, {
       global: {
         plugins: [i18n, store],
@@ -324,14 +324,23 @@ describe("OnCallRouting", () => {
           ...stubs,
           OPageLayout: {
             name: "OPageLayout",
-            props: ["about"],
-            template: "<div><slot name='status' /><slot /></div>",
+            props: ["subtitle"],
+            template:
+              "<div><span class='sub'>{{ subtitle }}</span><slot name='title-trail' /><slot /></div>",
           },
         },
       },
     });
+    expect(wrapper.find(".sub").text()).toBe("");
+    const info = wrapper.find('[data-test="oncall-routing-precedence-info"]');
     const precedence = String(i18n.global.t("oncall.routingPrecedence"));
-    expect(String(wrapper.findComponent({ name: "OPageLayout" }).props("about"))).toBe(precedence);
+    expect(info.attributes("tabindex")).toBe("0");
+    expect(info.attributes("aria-label")).toBe(precedence);
+    expect(
+      wrapper
+        .findAllComponents({ name: "OTooltip" })
+        .some((c) => c.props("content") === precedence),
+    ).toBe(true);
   });
 
   it("opens on the queue when linked there from a team's tab", async () => {

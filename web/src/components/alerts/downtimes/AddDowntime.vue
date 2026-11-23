@@ -22,90 +22,120 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="add-downtime"
     @keydown.capture="blockEnterSubmit"
   >
-    <OPageLayout
-      bleed
-      :back="{ label: t('alerts.downtimes.title'), to: listRoute, dataTest: 'add-downtime-back' }"
-    >
-      <template #title>
-        <OFormInlineEdit
-          name="name"
-          :placeholder="t('alerts.downtimes.form.namePlaceholder')"
-          :aria-label="t('alerts.downtimes.form.nameLabel')"
-          :edit-hint="
-            autoName.isAuto.value
-              ? t('common.inlineEdit.autoHint')
-              : t('alerts.downtimes.form.renameHint')
-          "
-          :submit-on-enter="false"
-          data-test="add-downtime-name"
-          @update:model-value="autoName.markManual"
-          @commit="autoName.onCommit"
-          @cancel="autoName.onCommit"
-        />
-      </template>
-      <template #status>
-        <BetaBadge />
-        <OTag
-          v-if="editStatus"
-          type="downtimeStatus"
-          :value="editStatus"
-          data-test="add-downtime-status"
-        />
-      </template>
-      <template #actions>
-        <OButton
-          variant="secondary"
-          :disabled="isSubmitting"
-          data-test="add-downtime-cancel"
-          @click="goBack"
+    <OPageLayout bleed>
+      <template #header>
+        <OPageHeader
+          class="border-border-default shrink-0 border-b"
+          :back="{ label: folderLabel, onClick: goBack, dataTest: 'add-downtime-back' }"
+          title-overflow="visible"
         >
-          {{ t("alerts.downtimes.form.cancel") }}
-        </OButton>
-        <OButton
-          variant="primary"
-          type="submit"
-          :loading="isSubmitting"
-          :disabled="noFolder"
-          data-test="add-downtime-save"
-          @click="onSaveClick"
-        >
-          {{ t("alerts.downtimes.form.save") }}
-        </OButton>
-      </template>
-
-      <template v-if="noFolder || staleMessage || editStatus === 'active'" #banner>
-        <div class="flex flex-col">
-          <OBanner
-            v-if="noFolder"
-            tone="warn"
-            :message="t('alerts.downtimes.noFolder')"
-            data-test="add-downtime-no-folder"
-          />
-          <OBanner
-            v-if="staleMessage"
-            tone="warn"
-            :message="staleMessage"
-            data-test="add-downtime-stale-banner"
-          >
-            <template #actions>
+          <template #title>
+            <OFormInlineEdit
+              name="name"
+              :placeholder="t('alerts.downtimes.form.namePlaceholder')"
+              :aria-label="t('alerts.downtimes.form.nameLabel')"
+              :edit-hint="
+                autoName.isAuto.value
+                  ? t('common.inlineEdit.autoHint')
+                  : t('alerts.downtimes.form.renameHint')
+              "
+              :submit-on-enter="false"
+              data-test="add-downtime-name"
+              @update:model-value="autoName.markManual"
+              @commit="autoName.onCommit"
+              @cancel="autoName.onCommit"
+            />
+          </template>
+          <template #title-trail>
+            <span class="inline-flex shrink-0 items-center gap-2">
+              <BetaBadge />
+              <OTag
+                v-if="editStatus"
+                type="downtimeStatus"
+                :value="editStatus"
+                data-test="add-downtime-status"
+              />
+            </span>
+          </template>
+          <template #subtitle>
+            <span class="flex min-w-0 items-center gap-1 leading-normal">
+              <span class="whitespace-nowrap">
+                {{
+                  t("alerts.downtimes.form.modeInFolder", {
+                    mode: isEdit
+                      ? t("alerts.downtimes.form.editMode")
+                      : t("alerts.downtimes.form.newMode"),
+                  })
+                }}
+              </span>
+              <InlineSelectFolderDropdown
+                v-if="!isEdit"
+                variant="inline"
+                type="downtimes"
+                :model-value="folderId"
+                data-test="add-downtime-folder"
+                @update:model-value="setFolder"
+              />
+              <span v-else class="text-text-body min-w-0 truncate font-medium">
+                {{ folderLabel }}
+              </span>
+            </span>
+          </template>
+          <template #actions>
+            <div class="flex gap-2">
               <OButton
                 variant="secondary"
-                :loading="detailQuery.isFetching.value"
-                data-test="add-downtime-reload"
-                @click="reloadRow"
+                :disabled="isSubmitting"
+                data-test="add-downtime-cancel"
+                @click="goBack"
               >
-                {{ t("alerts.downtimes.form.reload") }}
+                {{ t("alerts.downtimes.form.cancel") }}
               </OButton>
-            </template>
-          </OBanner>
-          <OBanner
-            v-if="editStatus === 'active'"
-            tone="info"
-            :message="t('alerts.downtimes.form.activeBanner')"
-            data-test="add-downtime-active-banner"
-          />
-        </div>
+              <OButton
+                variant="primary"
+                type="submit"
+                :loading="isSubmitting"
+                :disabled="noFolder"
+                data-test="add-downtime-save"
+                @click="onSaveClick"
+              >
+                {{ t("alerts.downtimes.form.save") }}
+              </OButton>
+            </div>
+          </template>
+        </OPageHeader>
       </template>
+
+      <div v-if="noFolder" class="shrink-0 px-3 pt-2">
+        <OBanner
+          tone="warn"
+          :message="t('alerts.downtimes.noFolder')"
+          data-test="add-downtime-no-folder"
+        />
+      </div>
+
+      <div v-if="staleMessage" class="shrink-0 px-3 pt-2">
+        <OBanner tone="warn" :message="staleMessage" data-test="add-downtime-stale-banner">
+          <template #actions>
+            <OButton
+              variant="secondary"
+              :loading="detailQuery.isFetching.value"
+              data-test="add-downtime-reload"
+              @click="reloadRow"
+            >
+              {{ t("alerts.downtimes.form.reload") }}
+            </OButton>
+          </template>
+        </OBanner>
+      </div>
+
+      <div v-if="editStatus === 'active'" class="shrink-0 px-3 pt-2">
+        <OBanner
+          tone="info"
+          :message="t('alerts.downtimes.form.activeBanner')"
+          data-test="add-downtime-active-banner"
+        />
+      </div>
 
       <div class="flex min-h-0 flex-1 max-lg:flex-col max-lg:overflow-y-auto">
         <div class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 py-2 max-lg:flex-none">
@@ -131,23 +161,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t(MODULE_LABEL_KEYS[m]) }}
                 </OToggleGroupItem>
               </OFormToggleGroup>
-              <!-- Where the downtime is saved; an existing one does not move folders from here. -->
-              <div class="ms-auto flex min-w-0 items-center gap-1.5 max-md:ms-0">
-                <span class="text-compact font-semibold">
-                  {{ t("alerts.downtimes.columns.folder") }}
-                </span>
-                <InlineSelectFolderDropdown
-                  v-if="!isEdit"
-                  variant="inline"
-                  type="downtimes"
-                  :model-value="folderId"
-                  data-test="add-downtime-folder"
-                  @update:model-value="setFolder"
-                />
-                <span v-else class="text-text-body min-w-0 truncate font-medium">
-                  {{ folderLabel }}
-                </span>
-              </div>
             </div>
             <div
               v-if="groupScopeLines.length || groupLimitIsLost"
@@ -371,7 +384,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import useSmartBack from "@/composables/useSmartBack";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
@@ -430,6 +442,7 @@ import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
@@ -1007,9 +1020,9 @@ onMounted(startDraft);
 watch(draftReady, startDraft);
 
 // ── Navigation ──────────────────────────────────────────────────────────────
-const listRoute = computed(() => ({
-  name: "downtimes",
-  query: { org_identifier: orgId.value, folder: folderId.value },
-}));
-const { goBack } = useSmartBack(() => listRoute.value);
+const goBack = () =>
+  router.push({
+    name: "downtimes",
+    query: { org_identifier: orgId.value, folder: folderId.value },
+  });
 </script>

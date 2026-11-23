@@ -53,11 +53,11 @@ export class OnCallResponseDetailPage {
     return {
       root: '[data-test="oncall-response-detail-page"]',
       empty: '[data-test="oncall-response-detail-empty"]',
-      // The header has no subtitle any more; the team line lives in the routing card.
-      teamLine: '[data-test="oncall-about-page"]',
-      teamLink: '[data-test="oncall-about-team-link"]',
-      teamNone: '[data-test="oncall-about-team-none"]',
+      subtitle: '[data-test="oncall-response-subtitle"]',
+      teamLink: '[data-test="oncall-response-team-link"]',
+      teamNone: '[data-test="oncall-response-team-none"]',
       originLink: '[data-test="oncall-response-origin-link"]',
+      opened: '[data-test="oncall-response-opened"]',
       stats: '[data-test="oncall-response-stats"]',
       liaisonTag: '[data-test="oncall-response-liaison-tag"]',
       liaisonBanner: '[data-test="oncall-response-liaison-banner"]',
@@ -87,7 +87,7 @@ export class OnCallResponseDetailPage {
       deliveriesPanel: '[data-test="oncall-response-deliveries"]',
       causesPanel: '[data-test="oncall-response-causes"]',
       reportPanel: '[data-test="oncall-response-report"]',
-      teamPending: '[data-test="oncall-about-team-pending"]',
+      teamPending: '[data-test="oncall-response-team-pending"]',
       incidentPending: '[data-test="oncall-about-incident-pending"]',
       activityToggleAll: '[data-test="oncall-response-activity-toggle-all"]',
 
@@ -178,9 +178,9 @@ export class OnCallResponseDetailPage {
     if (inMenu) await this.page.keyboard.press('Escape');
   }
 
-  /** The routing card names the record's team; the header carries only the title. */
+  /** The record's own title line — what the responder reads first. */
   async expectSubtitleContains(text) {
-    await expect(this.page.locator(this.locators.teamLine)).toContainText(text, { timeout: 30000 });
+    await expect(this.page.locator(this.locators.subtitle)).toContainText(text, { timeout: 30000 });
   }
 
 

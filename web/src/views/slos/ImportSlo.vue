@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="slo"
     class="min-h-0 flex-1"
     :is-importing="importing || foldersLoading"
-    :back="{ label: t('slos.title'), to: listRoute(initialFolder) }"
+    @back="goToList(initialFolder)"
     @cancel="goToList(initialFolder)"
     @import="importJson"
   >
@@ -181,12 +181,11 @@ function onFolderSelected(folder: { value?: string }) {
   selectedFolder.value = folder?.value || selectedFolder.value;
 }
 
-function listRoute(folder: string) {
-  return { name: "sloList", query: { ...route.query, org_identifier: org.value, folder } };
-}
-
 function goToList(folder: string) {
-  router.push(listRoute(folder));
+  router.push({
+    name: "sloList",
+    query: { ...route.query, org_identifier: org.value, folder },
+  });
 }
 
 function toCreatePayload(
