@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="rounded-surface relative grid place-items-center border transition-colors"
       :class="[
-        data.compact ? 'h-12 w-12' : 'h-16 w-16',
+        'h-16 w-16',
         data.add
           ? 'border-border-strong text-text-secondary bg-surface-base border-dashed'
           : data.selected
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ]"
       :data-test="`fleet-flow-node-${id}-box`"
     >
-      <OIcon :name="data.icon" :size="data.compact ? 'sm' : 'md'" />
+      <OIcon :name="data.icon" size="md" />
       <span
         v-if="data.issueSeverity && data.issueSeverity !== 'healthy'"
         class="ring-surface-base text-2xs text-text-inverse absolute -end-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full px-1 font-semibold ring-2"

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :d="path[0]"
     class="fill-none transition-[stroke-width,opacity]"
     :class="[
-      data?.branch ? 'stroke-status-error-text' : SIGNAL_STROKE[data?.signal ?? 'logs'],
+      data?.branch ? 'stroke-status-error-text' : 'stroke-accent',
       data?.dimmed ? 'opacity-15' : data?.noData ? 'opacity-40' : '',
     ]"
     :stroke-width="strokeWidth"
@@ -57,7 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { EdgeLabelRenderer, getBezierPath, type Position } from "@vue-flow/core";
 import type { FleetFlowEdgeData } from "./flowTypes";
-import { SIGNAL_STROKE } from "./flowIssues";
 
 const props = defineProps<{
   id: string;

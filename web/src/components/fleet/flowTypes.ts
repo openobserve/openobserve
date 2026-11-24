@@ -33,7 +33,6 @@ export interface FleetFlowNodeData {
   badge?: I18nText;
   count?: number;
   selected?: boolean;
-  compact?: boolean;
   add?: boolean;
   inbound?: boolean;
   outbound?: boolean;
@@ -45,7 +44,6 @@ export interface FleetFlowNodeData {
 }
 
 export interface FleetFlowEdgeData {
-  signal: Telemetry;
   /** Stroke width in canvas units, scaled from the rate. */
   width: number;
   /** A failure branch: dashed, danger-coloured, labelled at its end. */
