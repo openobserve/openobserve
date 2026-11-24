@@ -14762,11 +14762,15 @@
     "noFields": "426d29983ef60f6c",
     "noOperators": "d621271ea67b9c11",
     "noValues": "d9c51cf7cbba7c3c",
+    "numberOnly": "8bc1221bdfa46edb",
+    "numberOrVariable": "7d7b3a5b26554668",
     "operatorNames": {
       "containsIgnoreCase": "e69c6b3c27e5a6f9",
       "isEmpty": "906dd5bad339282b",
       "isNotEmpty": "788812fb9eb5ef29",
+      "matchesRegex": "2c8549068c479891",
       "notEndsWith": "1035e37a14f3bc0f",
+      "notMatchesRegex": "7c99416b15119ec0",
       "notStartsWith": "544330f40460cbf3"
     },
     "operators": {
@@ -19381,6 +19385,7 @@
       "descWithFilters": "c62f9fc05c54c953",
       "jumpToData": "e49f00aafe7c84fc",
       "openHistory": "145dd6f1992eb214",
+      "queryWarning": "484fbba480fd218d",
       "selectedRange": "d0e349b3f5dbfdd3",
       "title": "55d5a441fcc4e6f9"
     },

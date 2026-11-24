@@ -1310,6 +1310,8 @@
     "clearAll": "清除所有过滤器",
     "toggleConnector": "在 AND 和 OR 之间切换",
     "selectedCount": "未选择任何值 | 已选择 {count} 个值 | 已选择 {count} 个值",
+    "numberOrVariable": "输入数字或 $variable",
+    "numberOnly": "输入数字",
     "query": "查询",
     "builderTooltip": "通过选择字段、条件和值来构建过滤器",
     "queryTooltip": "自行编写查询",
@@ -1349,7 +1351,9 @@
       "notStartsWith": "不以…开头",
       "notEndsWith": "不以…结尾",
       "isEmpty": "为空",
-      "isNotEmpty": "不为空"
+      "isNotEmpty": "不为空",
+      "matchesRegex": "匹配正则表达式",
+      "notMatchesRegex": "不匹配正则表达式"
     },
     "types": {
       "string": "文本",
@@ -21640,6 +21644,7 @@
     },
     "noEvents": {
       "title": "未找到事件",
+      "queryWarning": "查询执行警告",
       "descNoFilters": "在 {range} 中未找到任何事件。尝试扩大加载结果的时间范围。",
       "descWithFilters": "在所选窗口中，没有与<strong>该查询</strong>相匹配的内容。尝试扩大时间范围、放松筛选条件或重置查询。",
       "descOutOfRange": "您的时间窗口不包含来自此流的任何数据。跳转到最后出现数据的时间。",

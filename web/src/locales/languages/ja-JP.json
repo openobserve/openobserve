@@ -1310,6 +1310,8 @@
     "clearAll": "すべてのフィルターをクリア",
     "toggleConnector": "AND と OR を切り替え",
     "selectedCount": "値が選択されていません | {count} 個の値を選択済み | {count} 個の値を選択済み",
+    "numberOrVariable": "数値または $variable を入力",
+    "numberOnly": "数値を入力",
     "query": "クエリ",
     "builderTooltip": "フィールド、条件、値を選択してフィルターを作成",
     "queryTooltip": "クエリを自分で入力",
@@ -1349,7 +1351,9 @@
       "notStartsWith": "～で始まらない",
       "notEndsWith": "～で終わらない",
       "isEmpty": "空である",
-      "isNotEmpty": "空でない"
+      "isNotEmpty": "空でない",
+      "matchesRegex": "正規表現に一致",
+      "notMatchesRegex": "正規表現に一致しない"
     },
     "types": {
       "string": "テキスト",
@@ -21640,6 +21644,7 @@
     },
     "noEvents": {
       "title": "イベントが見つかりません",
+      "queryWarning": "クエリ実行警告",
       "descNoFilters": "{range} にはイベントが見つかりませんでした。結果を読み込むには、時間範囲を広げてみてください。",
       "descWithFilters": "選択したウィンドウには、<strong>このクエリと一致するものはありません</strong>。時間範囲を広げるか、フィルターを緩めるか、クエリをリセットしてみてください。",
       "descOutOfRange": "選択した時間ウィンドウには、このストリームのデータが含まれていません。データが最後に確認された時点へジャンプしてください。",

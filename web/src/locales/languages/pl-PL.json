@@ -1310,6 +1310,8 @@
     "clearAll": "Wyczyść wszystkie filtry",
     "toggleConnector": "Przełączaj między AND i OR",
     "selectedCount": "Nie wybrano wartości | Wybrano {count} wartość | Wybrano {count} wartości",
+    "numberOrVariable": "Wprowadź liczbę lub $variable",
+    "numberOnly": "Wprowadź liczbę",
     "query": "Zapytanie",
     "builderTooltip": "Buduj filtry, wybierając pola, warunki i wartości",
     "queryTooltip": "Napisz zapytanie samodzielnie",
@@ -1349,7 +1351,9 @@
       "notStartsWith": "Nie zaczyna się od",
       "notEndsWith": "Nie kończy się na",
       "isEmpty": "Jest puste",
-      "isNotEmpty": "Nie jest puste"
+      "isNotEmpty": "Nie jest puste",
+      "matchesRegex": "Pasuje do wyrażenia regularnego",
+      "notMatchesRegex": "Nie pasuje do wyrażenia regularnego"
     },
     "types": {
       "string": "Tekst",
@@ -21640,6 +21644,7 @@
     },
     "noEvents": {
       "title": "Nie znaleziono zdarzeń",
+      "queryWarning": "Ostrzeżenie wykonania zapytania",
       "descNoFilters": "Nie znaleziono zdarzeń w {range}.",
       "descWithFilters": "Nic nie pasuje do <strong>tego zapytania</strong> w wybranym oknie. Strumień ma tutaj dane — spróbuj poluzować filtr w pasku zapytań.",
       "descOutOfRange": "Twoje okno czasowe nie zawiera żadnych danych z tego strumienia. Przejdź do momentu, kiedy dane były ostatnio widziane.",

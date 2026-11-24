@@ -34,62 +34,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   The "Ask AI" ghost button is only shown when aiEnabled is true.
 -->
 <template>
-  <OEmptyState illustration="logs" size="hero" :hide-action="true">
-    <template #title>{{ t("logs.noEvents.title") }}</template>
+  <div class="flex h-full flex-col">
+    <OBanner
+      v-if="functionMessages"
+      variant="warning"
+      icon="warning"
+      dense
+      preserve-whitespace
+      class="mx-page-edge mt-3 shrink-0"
+      data-test="logs-no-events-query-error"
+    >
+      <div class="font-semibold">{{ t("logs.noEvents.queryWarning") }}</div>
+      <div class="font-mono text-xs">{{ functionMessages }}</div>
+    </OBanner>
+    <OEmptyState illustration="logs" size="hero" :hide-action="true" class="min-h-0 flex-1">
+      <template #title>{{ t("logs.noEvents.title") }}</template>
 
-    <template #description>
-      <!-- Filter applied within an overlapping window: relax the query. -->
-      <span
-        v-if="windowHasStreamData && hasFilters"
-        v-html="DOMPurify.sanitize(t('logs.noEvents.descWithFilters'))"
-      />
-      <!-- We know where the stream's last data is: offer to jump to it. -->
-      <span v-else-if="jumpTarget">{{ t("logs.noEvents.descOutOfRange") }}</span>
-      <!-- No stream stats: generic fallback. -->
-      <span v-else>{{ t("logs.noEvents.descNoFilters", { range: currentPeriodLabel }) }}</span>
-    </template>
+      <template #description>
+        <!-- Filter applied within an overlapping window: relax the query. -->
+        <span
+          v-if="windowHasStreamData && hasFilters"
+          v-html="DOMPurify.sanitize(t('logs.noEvents.descWithFilters'))"
+        />
+        <!-- We know where the stream's last data is: offer to jump to it. -->
+        <span v-else-if="jumpTarget">{{ t("logs.noEvents.descOutOfRange") }}</span>
+        <!-- No stream stats: generic fallback. -->
+        <span v-else>{{ t("logs.noEvents.descNoFilters", { range: currentPeriodLabel }) }}</span>
+      </template>
 
-    <template #actions>
-      <!-- The selected range has no data but the stream does (out of range, or a
+      <template #actions>
+        <!-- The selected range has no data but the stream does (out of range, or a
            no-filter window in a gap): offer a precise jump to the latest data. -->
-      <EmptyStateActionCard
-        v-if="jumpTarget"
-        icon="schedule"
-        :label="t('logs.noEvents.jumpToData')"
-        :sublabel="raw(jumpTargetSublabel)"
-        data-test="logs-no-events-jump-to-data-card"
-        @click="emit('jump-to-stream-data', jumpTarget!.from, jumpTarget!.to)"
-      />
-      <!-- Filter excluded everything within an overlapping window: no action
+        <EmptyStateActionCard
+          v-if="jumpTarget"
+          icon="schedule"
+          :label="t('logs.noEvents.jumpToData')"
+          :sublabel="raw(jumpTargetSublabel)"
+          data-test="logs-no-events-jump-to-data-card"
+          @click="emit('jump-to-stream-data', jumpTarget!.from, jumpTarget!.to)"
+        />
+        <!-- Filter excluded everything within an overlapping window: no action
            card — the user relaxes the query themselves (Ask AI / history below). -->
-    </template>
+      </template>
 
-    <template #extra>
-      <div class="flex flex-wrap items-center justify-center gap-2">
-        <OButton
-          variant="ghost"
-          size="sm"
-          icon-left="history"
-          data-test="logs-no-events-open-history-btn"
-          @click="emit('open-history')"
-        >
-          {{ t("logs.noEvents.openHistory") }}
-        </OButton>
-        <OButton
-          v-if="aiEnabled && windowHasStreamData && !jumpTarget"
-          variant="ghost"
-          size="sm"
-          data-test="logs-no-events-ask-ai-btn"
-          @click="emit('ask-ai')"
-        >
-          <template #icon-left>
-            <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
-          </template>
-          {{ t("logs.noEvents.askAi") }}
-        </OButton>
-      </div>
-    </template>
-  </OEmptyState>
+      <template #extra>
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          <OButton
+            variant="ghost"
+            size="sm"
+            icon-left="history"
+            data-test="logs-no-events-open-history-btn"
+            @click="emit('open-history')"
+          >
+            {{ t("logs.noEvents.openHistory") }}
+          </OButton>
+          <OButton
+            v-if="aiEnabled && windowHasStreamData && !jumpTarget"
+            variant="ghost"
+            size="sm"
+            data-test="logs-no-events-ask-ai-btn"
+            @click="emit('ask-ai')"
+          >
+            <template #icon-left>
+              <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
+            </template>
+            {{ t("logs.noEvents.askAi") }}
+          </OButton>
+        </div>
+      </template>
+    </OEmptyState>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -98,6 +112,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useAiIcon } from "@/composables/useAiIcon";
 import { DateTime } from "luxon";
 import { periodToLabel } from "@/composables/useWidenRange";
@@ -120,6 +135,8 @@ const props = defineProps<{
   queryWindowUs?: { start: number; end: number };
   /** User-selected timezone string, e.g. "America/New_York" or "UTC". */
   timezone?: string;
+  /** The server's function error or notice for this run; zero hits may be caused by it. */
+  functionError?: string | string[];
 }>();
 
 const emit = defineEmits<{
@@ -130,6 +147,20 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const { aiIconSrc } = useAiIcon();
+
+// The server sends a list of messages, which can arrive as an array or as its JSON text.
+const functionMessages = computed<string>(() => {
+  const value = props.functionError;
+  if (Array.isArray(value)) return value.join("\n");
+  if (!value?.trimStart().startsWith("[")) return value ?? "";
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed.map(String).join("\n");
+  } catch {
+    // Not JSON after all: a message that merely starts with a bracket.
+  }
+  return value;
+});
 
 // --- filter detection -------------------------------------------------------
 
