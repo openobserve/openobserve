@@ -70,6 +70,7 @@ async fn ensure_dashboard_in_org(org_id: &str, dashboard_id: &str) -> bool {
     ),
     responses(
         (status = StatusCode::CREATED, description = "Dashboard created", body = inline(DashboardResponseBody)),
+        (status = StatusCode::BAD_REQUEST, description = "Dashboard has no title", body = ()),
         (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
         (status = StatusCode::UNPROCESSABLE_ENTITY, description = "Invalid dashboard body", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
@@ -123,6 +124,7 @@ pub async fn create_dashboard(
     request_body(content = inline(DashboardRequestBody), description = "Dashboard details"),
     responses(
         (status = StatusCode::OK, description = "Dashboard updated", body = inline(DashboardResponseBody)),
+        (status = StatusCode::BAD_REQUEST, description = "Missing or invalid hash, or dashboard has no title", body = ()),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
         (status = StatusCode::UNPROCESSABLE_ENTITY, description = "Invalid dashboard body", body = ()),
         (status = StatusCode::CONFLICT, description = "Conflict: Failed to save due to concurrent changes", body = ()),
