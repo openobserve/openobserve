@@ -3,8 +3,8 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { deleteStream } = require('../utils/traces-api.js');
 
-// The prefix "e2e_streamfv_" is used for targeted cleanup.
 const VALID_STREAM_NAME = 'e2e_streamfv_001';
 const INHERITED_RETENTION_VALUES = ['', '0'];
 
@@ -29,17 +29,8 @@ test.describe('Streams Add Stream form validation', { tag: ['@streams-form-valid
     });
 
     test.afterAll(async ({ request }) => {
-        const org   = process.env.ORGNAME || 'default';
-        // API calls go to INGESTION_URL (backend) not ZO_BASE_URL (Vite dev server)
-        const base  = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/+$/, '');
-        const email = process.env.ZO_ROOT_USER_EMAIL;
-        const pass  = process.env.ZO_ROOT_USER_PASSWORD;
-        const creds = Buffer.from(`${email}:${pass}`).toString('base64');
         for (const streamName of createdStreams) {
-            await request.delete(
-                `${base}/api/${org}/streams/${streamName}?type=logs&delete_all=false`,
-                { headers: { Authorization: `Basic ${creds}` } }
-            );
+            await deleteStream(request, streamName, { type: 'logs' });
         }
     });
 
