@@ -1101,6 +1101,7 @@ pub fn dbm_search_request(
         clear_cache: false,
         local_mode: Some(false),
         agent_options: None,
+        raw_streams: None,
     }
 }
 

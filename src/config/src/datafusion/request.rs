@@ -16,7 +16,7 @@
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier, SearchInfo, SuperClusterInfo};
 
 use crate::meta::{
-    search::default_use_cache,
+    search::{RawStreams, default_use_cache},
     self_reporting::protected_streams::{ProtectedReader, current_reader},
     stream::StreamType,
 };
@@ -42,6 +42,7 @@ pub struct Request {
     pub protected_reader: Option<ProtectedReader>,
     /// Adds the structured `profile` column to EXPLAIN ANALYZE output.
     pub analyze_profile: bool,
+    pub raw_streams: RawStreams,
 }
 
 impl Default for Request {
@@ -64,6 +65,7 @@ impl Default for Request {
             histogram_interval: 0,
             protected_reader: None,
             analyze_profile: false,
+            raw_streams: RawStreams::default(),
         }
     }
 }
@@ -99,6 +101,7 @@ impl Request {
             histogram_interval,
             protected_reader: None,
             analyze_profile: false,
+            raw_streams: RawStreams::default(),
         }
     }
 
@@ -125,6 +128,10 @@ impl Request {
 
     pub fn set_analyze_profile(&mut self, analyze_profile: bool) {
         self.analyze_profile = analyze_profile;
+    }
+
+    pub fn set_raw_streams(&mut self, raw_streams: RawStreams) {
+        self.raw_streams = raw_streams;
     }
 
     /// Mark the request with the protected-stream reader whose scope issues it, if any.
@@ -154,6 +161,7 @@ impl From<FlightSearchRequest> for Request {
             // Never carried across nodes.
             protected_reader: None,
             analyze_profile: false,
+            raw_streams: RawStreams::from(req.raw_streams),
         }
     }
 }
@@ -164,6 +172,7 @@ pub struct FlightSearchRequest {
     pub search_info: SearchInfo,
     pub index_info: IndexInfo,
     pub super_cluster_info: SuperClusterInfo,
+    pub raw_streams: Vec<String>,
 }
 
 impl FlightSearchRequest {
@@ -185,6 +194,7 @@ impl From<cluster_rpc::FlightSearchRequest> for FlightSearchRequest {
             search_info: request.search_info.unwrap(),
             index_info: request.index_info.unwrap(),
             super_cluster_info: request.super_cluster_info.unwrap(),
+            raw_streams: request.raw_streams,
         }
     }
 }
@@ -196,6 +206,7 @@ impl From<FlightSearchRequest> for cluster_rpc::FlightSearchRequest {
             search_info: Some(request.search_info),
             index_info: Some(request.index_info),
             super_cluster_info: Some(request.super_cluster_info),
+            raw_streams: request.raw_streams,
         }
     }
 }
@@ -234,6 +245,7 @@ mod tests {
                 local_mode: Some(true),
                 ..Default::default()
             },
+            raw_streams: vec!["logs/secure".to_string()],
         }
     }
 
@@ -253,6 +265,28 @@ mod tests {
         assert_eq!(req.local_mode, Some(true));
         assert!(!req.streaming_output);
         assert!(req.streaming_id.is_none());
+        assert!(req.raw_streams.contains(StreamType::Logs, "secure"));
+        assert!(!req.raw_streams.contains(StreamType::Logs, "other"));
+    }
+
+    #[test]
+    fn raw_streams_survive_the_proto_round_trip() {
+        let wire = cluster_rpc::FlightSearchRequest::from(make_flight_request());
+        assert_eq!(wire.raw_streams, ["logs/secure"]);
+        let back = FlightSearchRequest::from(wire);
+        assert_eq!(back.raw_streams, ["logs/secure"]);
+    }
+
+    #[test]
+    fn a_request_from_an_older_node_reads_nothing_raw() {
+        use prost::Message;
+
+        let mut wire = cluster_rpc::FlightSearchRequest::from(make_flight_request());
+        wire.raw_streams.clear();
+        let old_bytes = wire.encode_to_vec();
+        let decoded = cluster_rpc::FlightSearchRequest::decode(old_bytes.as_slice()).unwrap();
+        let req = Request::from(FlightSearchRequest::from(decoded));
+        assert!(req.raw_streams.is_empty());
     }
 
     #[tokio::test]
