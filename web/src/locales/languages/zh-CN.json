@@ -12413,7 +12413,7 @@
     "suggestCheckPermissions": "检查您的凭证是否具有必要的权限。",
     "suggestCheckEndpoint": "请验证端点 URL 是否正确。",
     "suggestRateLimit": "你已经超过了速率限制。请稍候，然后再重试。",
-    "suggestServerIssue": "目标服务遇到问题。请稍后再试。",
+    "suggestServerIssue": "请几分钟后重试。如果持续失败，请检查目标服务。",
     "description": "描述",
     "stream_name": "数据流名称",
     "cloneTitle": "克隆告警",
@@ -20184,7 +20184,7 @@
         "latency": "延迟",
         "output": "提取的输出",
         "rawRequest": "已发送的请求",
-        "idle": "运行测试后，请求和响应都会显示在此处。",
+        "idle": "运行测试后，发送的请求和提取的输出将显示在此处。",
         "disabledHint": "请先填写名称和端点。",
         "failure": {
           "transport": "无法访问端点。",

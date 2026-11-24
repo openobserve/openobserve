@@ -12413,7 +12413,7 @@
     "suggestCheckPermissions": "Vérifiez que vos informations d'identification disposent des autorisations nécessaires.",
     "suggestCheckEndpoint": "Vérifiez que l'URL du point de terminaison est correcte.",
     "suggestRateLimit": "Vous avez dépassé la limite de débit. Veuillez patienter avant de réessayer.",
-    "suggestServerIssue": "Le service de destination rencontre des problèmes. Veuillez réessayer plus tard.",
+    "suggestServerIssue": "Réessayez dans quelques minutes. Si l'échec persiste, vérifiez le service de destination.",
     "description": "Descriptif",
     "stream_name": "Nom du stream",
     "cloneTitle": "Cloner l'alerte",
@@ -20184,7 +20184,7 @@
         "latency": "Latence",
         "output": "Sortie extraite",
         "rawRequest": "Requête envoyée",
-        "idle": "La requête et la réponse apparaissent ici une fois que vous exécutez un test.",
+        "idle": "La requête envoyée et la sortie extraite apparaissent ici une fois que vous lancez un test.",
         "disabledHint": "Saisissez d'abord le nom et le point de terminaison.",
         "failure": {
           "transport": "Impossible d'atteindre le point de terminaison.",

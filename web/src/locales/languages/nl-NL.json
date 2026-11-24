@@ -12413,7 +12413,7 @@
     "suggestCheckPermissions": "Controleer of uw inloggegevens over de vereiste machtigingen beschikken.",
     "suggestCheckEndpoint": "Controleer of de URL van het eindpunt juist is.",
     "suggestRateLimit": "Je hebt de tarieflimiet overschreden. Een ogenblik geduld a.u.b. voordat u het opnieuw probeert.",
-    "suggestServerIssue": "De bestemmingsservice ondervindt problemen. Probeer het later opnieuw.",
+    "suggestServerIssue": "Probeer het over een paar minuten opnieuw. Als het blijft mislukken, controleer dan de bestemmingsservice.",
     "description": "Omschrijving",
     "stream_name": "Naam van de stream",
     "cloneTitle": "Alarm klonen",
@@ -20184,7 +20184,7 @@
         "latency": "Latentie",
         "output": "Geëxtraheerde uitvoer",
         "rawRequest": "Verzonden verzoek",
-        "idle": "Het verzoek en het antwoord verschijnen hier beide wanneer je een test uitvoert.",
+        "idle": "Het verzonden verzoek en de geëxtraheerde uitvoer verschijnen hier zodra je een test uitvoert.",
         "disabledHint": "Vul eerst de naam en het eindpunt in.",
         "failure": {
           "transport": "Kon het eindpunt niet bereiken.",

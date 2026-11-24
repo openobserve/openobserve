@@ -12413,7 +12413,7 @@
     "suggestCheckPermissions": "Vergewissern Sie sich, dass Ihre Anmeldeinformationen über die erforderlichen Berechtigungen verfügen.",
     "suggestCheckEndpoint": "Bitte überprüfen Sie, ob die Endpunkt-URL korrekt ist.",
     "suggestRateLimit": "Sie haben das Ratenlimit überschritten. Bitte warten Sie, bevor Sie es erneut versuchen.",
-    "suggestServerIssue": "Der Ziel-Dienst hat Probleme. Bitte versuchen Sie es später erneut.",
+    "suggestServerIssue": "Versuchen Sie es in ein paar Minuten erneut. Wenn es weiterhin fehlschlägt, prüfen Sie den Zieldienst.",
     "description": "Beschreibung",
     "stream_name": "Name des Streams",
     "cloneTitle": "Alarm klonen",
@@ -20184,7 +20184,7 @@
         "latency": "Latenz",
         "output": "Extrahierte Ausgabe",
         "rawRequest": "Gesendete Anfrage",
-        "idle": "Die Anfrage und die Antwort erscheinen beide hier, sobald Sie einen Test ausführen.",
+        "idle": "Die gesendete Anfrage und die extrahierte Ausgabe erscheinen hier, sobald Sie einen Test ausführen.",
         "disabledHint": "Geben Sie zuerst Name und Endpunkt an.",
         "failure": {
           "transport": "Der Endpunkt konnte nicht erreicht werden.",

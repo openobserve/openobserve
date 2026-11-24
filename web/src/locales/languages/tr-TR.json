@@ -12413,7 +12413,7 @@
     "suggestCheckPermissions": "Kimlik bilgilerinizin gerekli izinlere sahip olup olmadığını kontrol edin.",
     "suggestCheckEndpoint": "Lütfen uç nokta URL'sinin doğru olduğunu doğrulayın.",
     "suggestRateLimit": "Oran sınırını aştınız. Lütfen tekrar denemeden önce bekleyin.",
-    "suggestServerIssue": "Hedef hizmet sorun yaşıyor. Lütfen daha sonra tekrar deneyin.",
+    "suggestServerIssue": "Birkaç dakika içinde tekrar deneyin. Başarısız olmaya devam ederse hedef hizmeti kontrol edin.",
     "description": "Açıklama",
     "stream_name": "Akış Adı",
     "cloneTitle": "Uyarıyı Klonla",
@@ -20184,7 +20184,7 @@
         "latency": "Gecikme",
         "output": "Çıkarılan Çıktı",
         "rawRequest": "Gönderilen İstek",
-        "idle": "Bir test çalıştırdığınızda istek ve yanıt burada görünür.",
+        "idle": "Bir test çalıştırdığınızda gönderilen istek ve çıkarılan çıktı burada görünür.",
         "disabledHint": "Önce adı ve uç noktayı doldurun.",
         "failure": {
           "transport": "Uç noktaya ulaşılamadı.",
