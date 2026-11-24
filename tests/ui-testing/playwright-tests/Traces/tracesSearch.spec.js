@@ -7,6 +7,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ingestTraces } = require('../utils/trace-ingestion.js');
+const { waitForSearch } = require('../utils/traces-api.js');
 
 test.describe("Traces Search testcases", () => {
   test.describe.configure({ mode: 'serial' });
@@ -22,7 +23,14 @@ test.describe("Traces Search testcases", () => {
 
     // Global-setup traces age out of the 15m window on long shards, so each test seeds its own.
     const seeded = await ingestTraces(page, 5);
-    expect(seeded.successful, 'traces ingested').toBeGreaterThan(0);
+    expect(seeded.successful, 'traces ingested').toBe(5);
+    for (const traceId of seeded.traceIds) {
+      await waitForSearch(page.request, `SELECT trace_id FROM "default" WHERE trace_id = '${traceId}'`, {
+        expected: true,
+        pick: (result) => result.hits.length > 0,
+        message: 'seeded traces must be searchable',
+      });
+    }
 
     // Post-authentication stabilization wait
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
