@@ -42,7 +42,9 @@ import {
   ref,
   shallowReadonly,
   shallowRef,
+  type DeepReadonly,
   type InjectionKey,
+  type Ref,
   type ShallowRef,
 } from "vue";
 

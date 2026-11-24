@@ -1423,13 +1423,15 @@ const rowStyle = (row: TableRow) => {
 };
 
 // Query-shaped actions need traffic to point at; the row click already opens Metrics.
-const rowActions: OTableRowAction[] = [
+const rowActions: OTableRowAction<TableRow>[] = [
   {
     id: "queries",
     icon: "search",
     label: t("dbm.databases.openTopQueries"),
     visible: (row) => !isBreakdownRow(row) && !row.trafficless,
-    onSelect: (row) => onRowAction("queries", row),
+    onSelect: (row) => {
+      if (!isBreakdownRow(row)) onRowAction("queries", row);
+    },
     dataTest: () => "dbm-databases-row-actions-queries",
   },
   {
@@ -1437,7 +1439,9 @@ const rowActions: OTableRowAction[] = [
     icon: "notifications-active",
     label: t("dbm.common.createAlert"),
     visible: (row) => !isBreakdownRow(row) && !row.trafficless,
-    onSelect: (row) => onRowAction("alert", row),
+    onSelect: (row) => {
+      if (!isBreakdownRow(row)) onRowAction("alert", row);
+    },
     dataTest: () => "dbm-databases-row-actions-alert",
   },
 ];
