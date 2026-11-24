@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-tabs>
       <!-- The sibling badges come from the shell's one shared fan-out; the
            page's own count is substituted into what it passes here. -->
-      <DbmSectionTabs v-bind="tabCounts" />
+      <DbmSectionTabs v-bind="tabCounts" :counts-loading="countsLoading" />
     </template>
 
     <template #actions>
@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import DbmHeaderActions from "@/components/dbm/DbmHeaderActions.vue";
 import DbmSectionTabs from "@/components/dbm/DbmSectionTabs.vue";
+import { useDbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
 import type { DbmDateChange, DbmRange } from "@/composables/dbm/useDbmScope";
 import type { DbmTabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -84,4 +85,5 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const { loading: countsLoading } = useDbmTabCountsContext();
 </script>

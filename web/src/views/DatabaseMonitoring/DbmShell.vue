@@ -117,7 +117,7 @@ const store = useStore();
 
 const rendersTabStrip = computed(() => DBM_TAB_STRIP_ROUTES.has(String(route.name ?? "")));
 
-const { counts, load, publishOwnCount } = useDbmTabCounts();
+const { counts, loading, load, publishOwnCount } = useDbmTabCounts();
 
 const org = computed(() => (store.state.selectedOrganization?.identifier as string) ?? "");
 
@@ -219,5 +219,5 @@ watch(
 // better than the fan-out can into the shared snapshot — the thing that makes
 // a refined count visible from every tab and not only from the page that
 // produced it. See useDbmListPage's `ownCounts`.
-provideDbmTabCounts({ counts, refresh, publishOwnCount });
+provideDbmTabCounts({ counts, loading, refresh, publishOwnCount });
 </script>

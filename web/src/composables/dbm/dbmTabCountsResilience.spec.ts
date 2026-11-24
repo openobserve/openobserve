@@ -618,7 +618,7 @@ describe("the shell provides the whole tab-counts context", () => {
     // Whatever the shell destructures from the composable must reach the
     // provide call — the two lists are the wiring, and a member in one and not
     // the other is exactly the defect above.
-    expect(source).toContain("provideDbmTabCounts({ counts, refresh, publishOwnCount })");
+    expect(source).toContain("provideDbmTabCounts({ counts, loading, refresh, publishOwnCount })");
   });
 
   it("returns a callable publishOwnCount from the composable itself", () => {

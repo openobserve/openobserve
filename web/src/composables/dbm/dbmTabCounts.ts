@@ -38,6 +38,8 @@
 import {
   inject,
   provide,
+  readonly,
+  ref,
   shallowReadonly,
   shallowRef,
   type InjectionKey,
@@ -59,6 +61,8 @@ import {
 export interface DbmTabCountsContext {
   /** The shared snapshot. Always fully shaped — see `DbmTabCounts`. */
   counts: Readonly<ShallowRef<DbmTabCounts>>;
+  /** The fan-out is in flight, so a `null` count means "not answered yet", not "unavailable". */
+  loading: DeepReadonly<Ref<boolean>>;
   /**
    * Refetch the badges under the CURRENT scope.
    *
@@ -101,6 +105,7 @@ export const provideDbmTabCounts = (context: DbmTabCountsContext): void => {
 export const useDbmTabCountsContext = (): DbmTabCountsContext =>
   inject(DBM_TAB_COUNTS, {
     counts: shallowReadonly(shallowRef(emptyDbmTabCounts())),
+    loading: readonly(ref(false)),
     refresh: () => {},
     publishOwnCount: () => {},
   });

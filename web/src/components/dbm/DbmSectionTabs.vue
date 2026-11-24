@@ -74,9 +74,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            absent for the counts that exist in one vantage only: qualifying a
            deadlock count would imply a choice between feeds that was never
            available. -->
+        <!-- Same box as the badge, so the count arriving swaps in place and
+           pushes no following tab. Only a tab that WILL have a count gets one. -->
+        <OSkeleton
+          v-if="section.count == null && section.countPending"
+          class="h-4.5 w-11 rounded-full"
+          :data-test="`dbm-section-tab-count-loading-${section.key}`"
+        />
         <span
-          v-if="section.count != null"
-          class="text-2xs inline-flex items-baseline gap-1 rounded-full px-1.5 py-1 leading-none font-bold"
+          v-else-if="section.count != null"
+          class="text-2xs inline-flex min-w-11 items-baseline justify-center gap-1 rounded-full px-1.5 py-1 leading-none font-bold"
           :class="
             section.key === activeTab
               ? 'bg-badge-primary-soft-bg text-badge-primary-soft-text'
@@ -103,6 +110,7 @@ import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
 
 import config from "@/aws-exports";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -154,6 +162,8 @@ const props = defineProps<{
    * tables for an engine the recipe never queries.
    */
   tableHealthCount?: BadgeCount;
+  /** The shared count fan-out is in flight: a missing count on a countable tab is still coming. */
+  countsLoading?: boolean;
 }>();
 
 const { t } = useI18nTyped();
@@ -240,6 +250,8 @@ interface Section {
    * reach the template as a bare total.
    */
   count?: string | null;
+  /** The count is still on its way, so a placeholder holds the badge's place. */
+  countPending?: boolean;
   /**
    * The vantage suffix printed beside an OVERLAP count, or `undefined` for a
    * count with only one possible source. Resolved from the count itself, so a
@@ -322,6 +334,7 @@ const sections = computed<Section[]>(() => [
     label: t("dbm.page.tabs.overview"),
     to: { name: "dbmDatabases", query: carriedQuery.value },
     count: badgeCount(props.databaseCount),
+    countPending: props.countsLoading,
   },
   {
     // Beside Overview: the fleet's vital signs, before any per-query view.
@@ -336,6 +349,7 @@ const sections = computed<Section[]>(() => [
     label: t("dbm.page.tabs.queries"),
     to: { name: "dbmQueries", query: carriedQuery.value },
     count: badgeCount(props.queryCount),
+    countPending: props.countsLoading,
     // Not an overlap MEASURE (a distinct-statement count is not calls or
     // database time), but its provenance swaps between the trace rollup and
     // the database-reported list exactly as the samples badge's does — so the
@@ -349,6 +363,7 @@ const sections = computed<Section[]>(() => [
     label: t("dbm.page.tabs.samples"),
     to: { name: "dbmSamples", query: carriedQuery.value },
     count: badgeCount(props.sampleCallsCount),
+    countPending: props.countsLoading,
     // A CALL COUNT — one of the exactly two overlap measures — so it carries
     // its vantage rather than the generic population claim it used to make.
     ...overlapBadge(props.sampleCallsCount),
@@ -360,6 +375,7 @@ const sections = computed<Section[]>(() => [
     label: t("dbm.page.tabs.activity"),
     to: { name: "dbmActivity", query: carriedQuery.value },
     count: badgeCount(props.activityCount),
+    countPending: props.countsLoading,
     hint: t("dbm.page.tabs.activityHint"),
   },
   {
@@ -370,6 +386,7 @@ const sections = computed<Section[]>(() => [
     // one the OSS backend refuses — and its hint explains the lock rather
     // than the (absent) number.
     count: isEnterprise.value ? badgeCount(props.deadlockCount) : null,
+    countPending: isEnterprise.value && props.countsLoading,
     hint: isEnterprise.value
       ? t("dbm.page.tabs.deadlocksHint")
       : t("dbm.page.tabs.deadlocksLocked"),
@@ -380,6 +397,7 @@ const sections = computed<Section[]>(() => [
     label: t("dbm.page.tabs.blocked"),
     to: { name: "dbmBlocking", query: carriedQuery.value },
     count: isEnterprise.value ? badgeCount(props.blockedCount) : null,
+    countPending: isEnterprise.value && props.countsLoading,
     hint: isEnterprise.value ? t("dbm.page.tabs.blockedHint") : t("dbm.page.tabs.blockedLocked"),
     disabled: !isEnterprise.value,
   },
@@ -390,6 +408,7 @@ const sections = computed<Section[]>(() => [
     label: t("dbm.page.tabs.tableHealth"),
     to: { name: "dbmTableHealth", query: carriedQuery.value },
     count: isEnterprise.value ? badgeCount(props.tableHealthCount) : null,
+    countPending: isEnterprise.value && props.countsLoading,
     hint: isEnterprise.value
       ? t("dbm.page.tabs.tableHealthHint")
       : t("dbm.page.tabs.tableHealthLocked"),
