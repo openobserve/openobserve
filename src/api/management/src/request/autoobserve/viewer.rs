@@ -26,7 +26,7 @@ use o2_enterprise::enterprise::autoobserve::{
 };
 use openobserve_core::{
     auth::check_permissions,
-    authz::{active_checker, readable_service_records},
+    authz::{StreamReadMemo, active_checker, readable_service_records},
     autoobserve::causes::deploy::{EVIDENCE, EVIDENCE_OVERFLOW},
     background_access::rbac_enforced,
     service_identity::access,
@@ -63,6 +63,7 @@ impl ViewerResolver for WebViewer {
         let rights = LiveRights {
             org_id: org,
             user_id: &self.user_id,
+            evidence: Default::default(),
         };
         resolve_with(&rights, subjects).await
     }
@@ -72,6 +73,7 @@ impl ViewerResolver for WebViewer {
 struct LiveRights<'a> {
     org_id: &'a str,
     user_id: &'a str,
+    evidence: StreamReadMemo,
 }
 
 #[async_trait]
@@ -154,7 +156,15 @@ impl ReadRights for LiveRights<'_> {
     async fn evidence(&self, streams: &[String], overflow: bool) -> bool {
         let admin = access::org_wide_read(self.org_id, self.user_id).await;
         !streams.is_empty()
-            && access::evidence(self.org_id, self.user_id, streams, overflow, admin).await
+            && access::evidence(
+                self.org_id,
+                self.user_id,
+                streams,
+                overflow,
+                admin,
+                &self.evidence,
+            )
+            .await
     }
 
     async fn security(&self) -> bool {
