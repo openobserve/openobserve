@@ -46,18 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :content="filter.disabledReason"
         />
       </div>
-      <!-- Filters first, then the search takes the rest of the row; the wrapper sets the width because OSearchInput's own w-full beats a class on it. -->
-      <div v-if="searchDataTest" class="min-w-48 flex-1 max-md:w-full max-md:basis-full">
-        <OSearchInput
-          :model-value="search"
-          :placeholder="placeholder"
-          clearable
-          :debounce="debounce"
-          :data-test="searchDataTest"
-          @update:model-value="onSearch"
-        />
-      </div>
-      <slot />
+      <!-- More Filters sits with the filters it extends, before the search. -->
       <OPopover v-if="hasMore" align="end">
         <template #trigger>
           <OButton variant="outline" size="sm" class="shrink-0" data-test="dbm-more-filters">
@@ -85,6 +74,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <slot name="more" />
         </div>
       </OPopover>
+      <!-- Filters first, then the search takes the rest of the row; the wrapper sets the width because OSearchInput's own w-full beats a class on it. -->
+      <div v-if="searchDataTest" class="min-w-48 flex-1 max-md:w-full max-md:basis-full">
+        <OSearchInput
+          :model-value="search"
+          :placeholder="placeholder"
+          clearable
+          :debounce="debounce"
+          :data-test="searchDataTest"
+          @update:model-value="onSearch"
+        />
+      </div>
+      <slot />
       <slot name="trailing" />
     </div>
     <slot name="coverage" />
