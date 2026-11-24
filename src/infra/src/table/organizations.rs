@@ -27,13 +27,18 @@ use sea_orm::{
     QueryOrder, QuerySelect, Schema, Set, TransactionTrait, entity::prelude::*,
 };
 
-use super::entity::organizations::{ActiveModel, Column, Entity, Model};
+use super::{
+    entity::organizations::{ActiveModel, Column, Entity, Model},
+    secret_store_job_markers::{self, ALL_ORGS, FILL_ORG_INCARNATION},
+};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
 const STATUS_DELETED: &str = "deleted";
+const FILL_PAGE_ROWS: u64 = 200;
+const FILL_LOCK_KEY: &str = "/secret_store/maint/fill_org_incarnation";
 
 static CACHE: Lazy<Arc<RwAHashMap<String, OrganizationRecord>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
@@ -149,6 +154,7 @@ pub async fn add(
     let now = chrono::Utc::now().timestamp_micros();
     let record = ActiveModel {
         identifier: Set(org_id.to_string()),
+        org_incarnation: Set(config::ider::ksuid()),
         org_name: Set(org_name.to_string()),
         org_type: Set(org_type.into()),
         status: Set("active".to_string()),
@@ -284,6 +290,33 @@ pub async fn get_on_writer(org_id: &str) -> Result<OrganizationRecord, errors::E
     find_in_db(get_orm_client_rw().await, org_id)
         .await?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Organization not found".to_string())))
+}
+
+/// Reads the org on `conn`, so a job sees a status change made earlier in its own transaction.
+pub async fn get_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<Option<OrganizationRecord>, errors::Error> {
+    find_in_db(conn, org_id).await
+}
+
+pub async fn get_incarnation_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<Option<String>, Error> {
+    Ok(Entity::find_by_id(org_id)
+        .select_only()
+        .column(Column::OrgIncarnation)
+        .into_tuple()
+        .one(conn)
+        .await?)
+}
+
+pub async fn org_tag_for<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result<String, Error> {
+    let incarnation = get_incarnation_in(conn, org_id)
+        .await?
+        .ok_or_else(|| DbError::KeyNotExists(org_id.to_owned()))?;
+    config::meta::secret_store::external::org_tag(org_id, &incarnation).map_err(Error::SecretStore)
 }
 
 pub async fn list(filter: ListFilter) -> Result<Vec<OrganizationRecord>, errors::Error> {
@@ -594,6 +627,73 @@ pub async fn invalidate_cache(org_id: Option<&str>) {
     }
 }
 
+pub async fn fill_org_incarnation<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+) -> Result<u64, Error> {
+    let mut after = None;
+    let mut filled = 0;
+    loop {
+        let mut page = Entity::find()
+            .select_only()
+            .column(Column::Identifier)
+            .filter(Column::OrgIncarnation.eq(""))
+            .order_by_asc(Column::Identifier)
+            .limit(FILL_PAGE_ROWS);
+        if let Some(cursor) = after {
+            page = page.filter(Column::Identifier.gt(cursor));
+        }
+        let mut ids = page.into_tuple::<String>().all(conn).await?;
+        if ids.is_empty() {
+            break;
+        }
+        // Start the SQLite write transaction after reading the page to avoid upgrading a stale
+        // snapshot.
+        let txn = conn.begin().await?;
+        for id in &ids {
+            filled += Entity::update_many()
+                .col_expr(Column::OrgIncarnation, Expr::value(config::ider::ksuid()))
+                .filter(Column::Identifier.eq(id.as_str()))
+                .filter(Column::OrgIncarnation.eq(""))
+                .exec(&txn)
+                .await?
+                .rows_affected;
+        }
+        txn.commit().await?;
+        after = ids.pop();
+    }
+    secret_store_job_markers::insert_if_absent_in(
+        conn,
+        ALL_ORGS,
+        FILL_ORG_INCARNATION,
+        config::utils::time::now_micros(),
+    )
+    .await?;
+    Ok(filled)
+}
+
+pub async fn run_org_incarnation_fill() -> Result<u64, Error> {
+    let conn = get_orm_client_rw().await;
+    if fill_marker_done(conn).await? {
+        return Ok(0);
+    }
+    let locker = crate::dist_lock::lock(FILL_LOCK_KEY, 0).await?;
+    let result = match fill_marker_done(conn).await {
+        Ok(true) => Ok(0),
+        Ok(false) => fill_org_incarnation(conn).await,
+        Err(e) => Err(e),
+    };
+    crate::dist_lock::unlock(&locker).await?;
+    result
+}
+
+async fn fill_marker_done<C: ConnectionTrait>(conn: &C) -> Result<bool, Error> {
+    Ok(
+        secret_store_job_markers::get_marker_in(conn, ALL_ORGS, FILL_ORG_INCARNATION)
+            .await?
+            .is_some(),
+    )
+}
+
 async fn find_in_db<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -639,6 +739,88 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    async fn recreated_organization_gets_a_new_incarnation_and_tag() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org = crate::table::testing::unique("org_recreated");
+        let conn = get_orm_client_rw().await;
+        add(&org, &org, OrganizationType::Default).await.unwrap();
+        let first = get_incarnation_in(conn, &org).await.unwrap().unwrap();
+        assert_eq!(first.len(), 27);
+        assert!(first.parse::<svix_ksuid::Ksuid>().is_ok());
+        let tag = org_tag_for(conn, &org).await.unwrap();
+        remove(&org).await.unwrap();
+        assert!(get_incarnation_in(conn, &org).await.unwrap().is_none());
+        add(&org, &org, OrganizationType::Default).await.unwrap();
+        let second = get_incarnation_in(conn, &org).await.unwrap().unwrap();
+        assert_ne!(second, first);
+        assert_ne!(org_tag_for(conn, &org).await.unwrap(), tag);
+        remove(&org).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn concurrent_org_incarnation_fills_write_each_pending_row_once() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let conn = get_orm_client_rw().await;
+        let prefix = crate::table::testing::unique("org_pending");
+        let ids: Vec<_> = (0..=FILL_PAGE_ROWS)
+            .map(|i| format!("{prefix}_{i}"))
+            .collect();
+        let models = ids.iter().map(|id| ActiveModel {
+            identifier: Set(id.clone()),
+            org_name: Set(id.clone()),
+            org_type: Set(0),
+            status: Set("active".into()),
+            created_at: Set(1),
+            updated_at: Set(1),
+            #[cfg(feature = "cloud")]
+            trial_ends_at: Set(1),
+            ..Default::default()
+        });
+        Entity::insert_many(models).exec(conn).await.unwrap();
+        assert!(matches!(
+            org_tag_for(conn, &ids[0]).await,
+            Err(Error::SecretStore(
+                config::meta::secret_store::SecretErrorCode::OrgTagPending
+            ))
+        ));
+        let blank = Entity::find()
+            .filter(Column::OrgIncarnation.eq(""))
+            .count(conn)
+            .await
+            .unwrap();
+        let (a, b) = tokio::join!(fill_org_incarnation(conn), fill_org_incarnation(conn));
+        assert_eq!(a.unwrap() + b.unwrap(), blank);
+        assert!(fill_marker_done(conn).await.unwrap());
+        let read = || {
+            Entity::find()
+                .select_only()
+                .column(Column::OrgIncarnation)
+                .filter(Column::Identifier.is_in(ids.iter().cloned()))
+                .order_by_asc(Column::Identifier)
+                .into_tuple::<String>()
+                .all(conn)
+        };
+        let filled = read().await.unwrap();
+        assert_eq!(filled.len(), ids.len());
+        assert!(
+            filled
+                .iter()
+                .all(|v| v.parse::<svix_ksuid::Ksuid>().is_ok())
+        );
+        assert_eq!(fill_org_incarnation(conn).await.unwrap(), 0);
+        assert_eq!(read().await.unwrap(), filled);
+        Entity::delete_many()
+            .filter(Column::Identifier.is_in(ids))
+            .exec(conn)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
     async fn test_a_fill_read_before_an_invalidation_is_dropped() {
         let org_id = "t-stale-fill";
         let epoch = cache_epoch();
@@ -647,6 +829,35 @@ mod tests {
         fill_cache(org_id, stale, epoch).await;
         let cached = CACHE.write().await.remove(org_id).is_some();
         assert!(!cached, "a row read before the invalidation was cached");
+    }
+
+    #[tokio::test]
+    async fn test_get_in_sees_a_status_change_of_its_own_transaction() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let org_id = crate::table::testing::unique("t_org_get_in");
+        add(&org_id, &org_id, OrganizationType::Default)
+            .await
+            .unwrap();
+        let txn = get_orm_client_rw().await.begin().await.unwrap();
+        assert!(
+            set_status_if_in(&txn, &org_id, "active", "deleting")
+                .await
+                .unwrap()
+        );
+        let seen = get_in(&txn, &org_id).await.unwrap().unwrap();
+        txn.rollback().await.unwrap();
+        let after = get_in(get_orm_client_rw().await, &org_id).await.unwrap();
+        assert!(
+            get_in(get_orm_client_rw().await, "t_org_get_in_none")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        remove(&org_id).await.unwrap();
+        assert_eq!(seen.status, "deleting");
+        assert_eq!(after.unwrap().status, "active");
     }
 
     #[test]
@@ -696,6 +907,7 @@ mod tests {
         use super::super::entity::organizations::Model;
         let model = Model {
             identifier: "test-org".to_string(),
+            org_incarnation: String::new(),
             org_name: "Test Org".to_string(),
             org_type: 0,
             status: "active".to_string(),

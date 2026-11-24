@@ -319,6 +319,9 @@ pub struct Destination {
     /// Every consumer referencing this destination; present only when `include_usage=true`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uses: Option<Vec<DestinationUseResponse>>,
+    /// Bind options for the secrets this save references; never stored or read back.
+    #[serde(default, skip_serializing)]
+    pub secret_binds: Vec<meta_dest::SecretBindInput>,
 }
 
 impl Destination {

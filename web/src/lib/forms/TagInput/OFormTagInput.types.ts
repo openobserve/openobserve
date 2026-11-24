@@ -12,6 +12,10 @@ export interface FormTagInputProps {
   name: string;
   /** Placeholder shown when there are no tags (forwarded to OTagInput) */
   placeholder?: I18nText;
-  /** Floating label (forwarded to OTagInput) */
+  /** Label shown above the field, like the other OForm* fields */
   label?: I18nText;
+  /** Hint shown under the field while it has no error */
+  helpText?: I18nText;
+  /** Marks the label with an asterisk; the schema still owns the rule */
+  required?: boolean;
 }

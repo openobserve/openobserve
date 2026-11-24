@@ -20,6 +20,7 @@ arrow-json.workspace = true
 arrow-schema.workspace = true
 async-recursion.workspace = true
 async-fs.workspace = true
+async-trait.workspace = true
 aws-config.workspace = true
 aws-sdk-sns.workspace = true
 axum.workspace = true
@@ -66,6 +67,7 @@ rand.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+serde_json_canonicalizer.workspace = true
 serde_with = { version = "3", features = ["macros", "json"] }
 sha2.workspace = true
 sha256.workspace = true
@@ -91,6 +93,7 @@ utoipa.workspace = true
 uuid.workspace = true
 vrl.workspace = true
 vortex = { workspace = true }
+zeroize.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true

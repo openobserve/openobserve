@@ -256,6 +256,16 @@ describe("OTagInput", () => {
   // ── Removing tags ─────────────────────────────────────────────────────────
 
   describe("removing tags", () => {
+    it("gives each chip remove button a stable index-keyed data-test", async () => {
+      wrapper = buildWrapper({ modelValue: ["tag1", "tag2"] });
+
+      expect(wrapper.find('[data-test="tag-remove-1"]').attributes("aria-label")).toBe(
+        "Remove tag2",
+      );
+      await wrapper.find('[data-test="tag-remove-0"]').trigger("click");
+      expect(wrapper.emitted("update:modelValue")![0][0]).toEqual(["tag2"]);
+    });
+
     it("emits update:modelValue without the removed tag when remove button is clicked", async () => {
       wrapper = buildWrapper({ modelValue: ["tag1", "tag2", "tag3"] });
 

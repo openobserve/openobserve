@@ -443,7 +443,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_ranges_counts_clipped_bytes() {
         let directory = tempfile::tempdir().unwrap();
-        let org = config::ider::uuid();
+        let org = config::ider::ksuid();
         let location = Path::from(format!("files/{org}/logs/ranges"));
         let store = Local::new(directory.path().to_str().unwrap(), false);
         store

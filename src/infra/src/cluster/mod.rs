@@ -55,6 +55,65 @@ pub static FLATTEN_COMPACTOR_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> =
     Lazy::new(Default::default);
 pub static NODES_HEALTH_CHECK: Lazy<RwAHashMap<String, usize>> = Lazy::new(Default::default);
 
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct BuildVersion<'a> {
+    core: [u64; 3],
+    stage: TagStage<'a>,
+    commits_after: u64,
+}
+
+impl<'a> BuildVersion<'a> {
+    fn parse(version: &'a str) -> Option<Self> {
+        let version = version.strip_prefix('v').unwrap_or(version);
+        let (tag, commits_after) = split_git_distance(version)?;
+        let (core, stage) = match tag.split_once('-') {
+            None => (tag, TagStage::Release),
+            Some((core, suffix)) => {
+                let identifiers = suffix
+                    .split(['.', '-'])
+                    .map(VersionIdentifier::parse)
+                    .collect::<Option<Vec<_>>>()?;
+                (core, TagStage::Prerelease(identifiers))
+            }
+        };
+        let mut parts = core.split('.');
+        let core = [
+            version_number(parts.next()?)?,
+            version_number(parts.next()?)?,
+            version_number(parts.next()?)?,
+        ];
+        parts.next().is_none().then_some(Self {
+            core,
+            stage,
+            commits_after,
+        })
+    }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+enum TagStage<'a> {
+    Prerelease(Vec<VersionIdentifier<'a>>),
+    Release,
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+enum VersionIdentifier<'a> {
+    Number(u64),
+    Text(&'a str),
+}
+
+impl<'a> VersionIdentifier<'a> {
+    fn parse(part: &'a str) -> Option<Self> {
+        if part.is_empty() || !part.bytes().all(|b| b.is_ascii_alphanumeric()) {
+            return None;
+        }
+        if part.bytes().all(|b| b.is_ascii_digit()) {
+            return part.parse().ok().map(Self::Number);
+        }
+        Some(Self::Text(part))
+    }
+}
+
 pub async fn add_node_to_cache(node: Node) {
     NODES.write().await.insert(node.uuid.clone(), node);
 }
@@ -463,6 +522,51 @@ pub async fn all_online_nodes_run_this_build() -> bool {
     )
 }
 
+pub fn version_at_least(version: &str, min: &str) -> bool {
+    matches!((BuildVersion::parse(version), BuildVersion::parse(min)),
+        (Some(version), Some(min)) if version >= min)
+}
+
+pub async fn live_nodes_below(min: &str) -> Option<Vec<String>> {
+    get_cached_nodes(|_| true)
+        .await
+        .map(|nodes| nodes_below(&nodes, min))
+}
+
+pub async fn all_live_nodes_at_least(min: &str) -> bool {
+    matches!(live_nodes_below(min).await, Some(v) if v.is_empty())
+}
+
+fn version_number(part: &str) -> Option<u64> {
+    if !part.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    part.parse().ok()
+}
+
+fn split_git_distance(version: &str) -> Option<(&str, u64)> {
+    let mut parts = version.rsplitn(3, '-');
+    if let (Some(hash), Some(count), Some(tag)) = (parts.next(), parts.next(), parts.next())
+        && let Some(hash) = hash.strip_prefix('g')
+        && !hash.is_empty()
+        && hash.bytes().all(|b| b.is_ascii_hexdigit())
+        && count.bytes().all(|b| b.is_ascii_digit())
+    {
+        return Some((tag, version_number(count)?));
+    }
+    Some((version, 0))
+}
+
+fn nodes_below(nodes: &[Node], min: &str) -> Vec<String> {
+    let mut below: Vec<_> = nodes
+        .iter()
+        .filter(|n| n.status != NodeStatus::Offline && !version_at_least(&n.version, min))
+        .map(|n| n.name.clone())
+        .collect();
+    below.sort_unstable();
+    below
+}
+
 fn all_nodes_run_commit(nodes: Option<&[Node]>, commit: &str) -> bool {
     match nodes {
         Some(nodes) if !nodes.is_empty() => nodes.iter().all(|n| n.commit == commit),
@@ -673,6 +777,56 @@ async fn remove_previous_incarnations(node: &Node) {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn d225_version_order_includes_prerelease_and_git_distance() {
+        for (version, min, expected) in [
+            ("v1.2.0", "1.2.0", true),
+            ("v1.10.0", "v1.9.90", true),
+            ("v1.2.0", "v1.2.0-rc1-452-g9c73ed48b2", true),
+            ("v1.2.0-rc1", "v1.2.0", false),
+            ("v1.2.0-rc1-452-g9c73ed48b2", "v1.2.0-rc1", true),
+            ("v1.2.0-rc1-452-g9c73ed48b2", "v1.2.0-rc1-453-gabc", false),
+            ("v1.2.0-12-gabc", "v1.2.0-2-gdef", true),
+            ("v1.2.0", "v1.2.0-12-gabc", false),
+            ("v1.2.0-rc.12", "v1.2.0-rc-2", true),
+            ("v1.2.0-beta", "v1.2.0-rc", false),
+            ("v1.2.0-rc", "v1.2.0-rc.1", false),
+            ("v1.2.1-alpha", "v1.2.0-12-gabc", true),
+            ("", "", false),
+            ("unknown", "v1.2.0", false),
+            ("1.2.0", "", false),
+            ("1.2", "0.0.0", false),
+            ("1.2.0.0", "0.0.0", false),
+            ("1.2.0-", "0.0.0", false),
+            ("1.2.0-rc..1", "0.0.0", false),
+            ("1.2.0-rc!", "0.0.0", false),
+        ] {
+            assert_eq!(
+                version_at_least(version, min),
+                expected,
+                "{version} >= {min}"
+            );
+        }
+    }
+
+    #[test]
+    fn d225_nodes_below_counts_preparing_nodes_and_ignores_offline_nodes() {
+        let node = |name: &str, version: &str, status| Node {
+            name: name.to_owned(),
+            version: version.to_owned(),
+            status,
+            ..Node::default()
+        };
+        let nodes = [
+            node("offline", "v1.1.0", NodeStatus::Offline),
+            node("preparing", "v1.1.0", NodeStatus::Prepare),
+            node("current", "v1.2.0", NodeStatus::Online),
+            node("unknown", "", NodeStatus::Online),
+        ];
+        assert_eq!(nodes_below(&nodes, "v1.2.0"), ["preparing", "unknown"]);
+    }
 
     #[test]
     fn holds_need_every_node_on_this_commit() {
@@ -695,8 +849,6 @@ mod tests {
         assert!(!all_nodes_run_commit(Some(&[]), "abc"), "empty list");
         assert!(!all_nodes_run_commit(None, "abc"), "unknown");
     }
-
-    use super::*;
 
     #[tokio::test]
     #[ignore]

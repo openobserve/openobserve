@@ -132,6 +132,7 @@ vi.mock("@/utils/prebuilt-templates", async (importOriginal) => {
 
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { usePrebuiltDestinations, type SlackSetupMetadata } from "./usePrebuiltDestinations";
+import type { SecretBind } from "@/services/secrets";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -486,6 +487,35 @@ describe("usePrebuiltDestinations", () => {
   // createDestination
   // -------------------------------------------------------------------------
   describe("createDestination", () => {
+    it.each(["slack", "email"])(
+      "includes secret binds in a prebuilt %s create payload",
+      async (type) => {
+        mockDestCreate.mockResolvedValue({ data: {} });
+        const binds: SecretBind[] = [
+          {
+            secret_id: "s1",
+            allow_this_consumer: true,
+            pin: ["notify.example.com"],
+            expected_policy_rev: "rev-9",
+          },
+        ];
+        const { createDestination } = usePrebuiltDestinations();
+
+        await createDestination(
+          type,
+          "ops-notice",
+          type === "email" ? { recipients: "ops@example.com" } : makeSlackCredentials(),
+          {},
+          false,
+          undefined,
+          undefined,
+          binds,
+        );
+
+        expect(mockDestCreate.mock.calls[0][0].data.secret_binds).toEqual(binds);
+      },
+    );
+
     it("calls alertDestinationService.create with correct org_identifier", async () => {
       mockDestCreate.mockResolvedValue({ data: {} });
 
@@ -783,6 +813,36 @@ describe("usePrebuiltDestinations", () => {
   // updateDestination
   // -------------------------------------------------------------------------
   describe("updateDestination", () => {
+    it.each(["slack", "email"])(
+      "includes secret binds in a prebuilt %s update payload",
+      async (type) => {
+        mockDestUpdate.mockResolvedValue({ data: {} });
+        const binds: SecretBind[] = [
+          {
+            secret_id: "s1",
+            allow_this_consumer: true,
+            pin: ["notify.example.com"],
+            expected_policy_rev: "rev-9",
+          },
+        ];
+        const { updateDestination } = usePrebuiltDestinations();
+
+        await updateDestination(
+          type,
+          "old-notice",
+          "ops-notice",
+          type === "email" ? { recipients: "ops@example.com" } : makeSlackCredentials(),
+          {},
+          false,
+          undefined,
+          undefined,
+          binds,
+        );
+
+        expect(mockDestUpdate.mock.calls[0][0].data.secret_binds).toEqual(binds);
+      },
+    );
+
     it("calls alertDestinationService.update with original name", async () => {
       mockDestUpdate.mockResolvedValue({ data: {} });
 

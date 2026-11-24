@@ -26,7 +26,10 @@ use std::sync::{Arc, LazyLock};
 use axum::response::Response;
 #[cfg(feature = "enterprise")]
 use common::meta::http::HttpResponse as MetaHttpResponse;
-use config::meta::user::UserRole;
+use config::meta::{
+    secret_store::{Decision, SecretErrorCode},
+    user::UserRole,
+};
 #[cfg(any(feature = "enterprise", test))]
 use config::meta::{
     service_streams::{RelatedStreams, StreamInfo},
@@ -761,6 +764,41 @@ pub async fn check_permissions(
     true
 }
 
+/// Secret store authorization; `role` is the caller's role in the path org.
+#[cfg(feature = "enterprise")]
+pub async fn check_strict(
+    org_id: &str,
+    user_id: &str,
+    role: UserRole,
+    object: &str,
+    verb: &str,
+) -> Result<Decision, SecretErrorCode> {
+    let role = strict_role(user_id, role);
+    o2_openfga::authorizer::authz::check_strict(org_id, user_id, &role, object, verb)
+        .await
+        .map_err(|_| SecretErrorCode::PermissionsUnavailable)
+}
+
+/// OSS org admins can manage agent tokens; secret objects still require root.
+#[cfg(not(feature = "enterprise"))]
+pub async fn check_strict(
+    org_id: &str,
+    user_id: &str,
+    role: UserRole,
+    object: &str,
+    verb: &str,
+) -> Result<Decision, SecretErrorCode> {
+    let role = strict_role(user_id, role);
+    Ok(
+        if role == "root" || (role == "admin" && object == format!("org:{org_id}") && verb == "PUT")
+        {
+            Decision::Allow
+        } else {
+            Decision::Deny
+        },
+    )
+}
+
 pub async fn list_objects_for_user(
     org_id: &str,
     user_id: &str,
@@ -1228,6 +1266,15 @@ fn shared_cell<K: Eq + std::hash::Hash>(
 ) -> Arc<tokio::sync::OnceCell<bool>> {
     let mut cells = cells.lock().unwrap_or_else(|e| e.into_inner());
     cells.entry(key).or_default().clone()
+}
+
+/// The authorizer's step 0 knows root only by this role name, never by a membership lookup.
+fn strict_role(user_id: &str, role: UserRole) -> String {
+    if role == UserRole::Root || db::user::is_root_user(user_id) {
+        "root".to_string()
+    } else {
+        role.to_string()
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -2404,6 +2451,63 @@ mod tests {
             .org_wide_readable("issue3592-nobody@example.com", "issue3592_org", &wanted)
             .await;
         assert!(types.is_empty());
+    }
+
+    #[tokio::test]
+    async fn check_strict_passes_root_as_the_root_role() {
+        assert_eq!(
+            strict_role("u3-not-root@example.com", UserRole::Root),
+            "root"
+        );
+        assert_eq!(
+            strict_role("u3-not-root@example.com", UserRole::Admin),
+            "admin"
+        );
+        let decision = check_strict(
+            "o1",
+            "u3-root@example.com",
+            UserRole::Root,
+            "secrets:S1",
+            "PUT",
+        )
+        .await;
+        assert_eq!(decision, Ok(Decision::Allow));
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn without_enterprise_check_strict_allows_only_root() {
+        for role in [UserRole::Admin, UserRole::Editor, UserRole::Viewer] {
+            let decision = check_strict(
+                "o1",
+                "u3-admin@example.com",
+                role.clone(),
+                "secrets:S1",
+                "GET",
+            )
+            .await;
+            assert_eq!(decision, Ok(Decision::Deny), "{role}");
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn oss_strict_org_admin_access_does_not_grant_secret_access() {
+        for (role, object, verb, expected) in [
+            (UserRole::Admin, "org:o1", "PUT", Decision::Allow),
+            (UserRole::Editor, "org:o1", "PUT", Decision::Deny),
+            (UserRole::Viewer, "org:o1", "PUT", Decision::Deny),
+            (UserRole::Admin, "org:o2", "PUT", Decision::Deny),
+            (UserRole::Admin, "org:o1", "GET", Decision::Deny),
+            (UserRole::Admin, "secrets:S1", "PUT", Decision::Deny),
+            (UserRole::Root, "secrets:S1", "PUT", Decision::Allow),
+        ] {
+            assert_eq!(
+                check_strict("o1", "token-admin@example.com", role, object, verb).await,
+                Ok(expected),
+                "{object} {verb}"
+            );
+        }
     }
 
     #[cfg(feature = "enterprise")]

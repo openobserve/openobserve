@@ -701,7 +701,7 @@ mod tests {
 
     #[tokio::test]
     async fn forget_removes_one_entry_and_its_accounting() {
-        let key = format!("public_dashboards/o/{}/r3600#1", config::ider::uuid());
+        let key = format!("public_dashboards/o/{}/r3600#1", config::ider::ksuid());
         set_for_test(&key, Bytes::from_static(b"body")).await;
         assert!(holds(&key));
         forget(&key).await.unwrap();

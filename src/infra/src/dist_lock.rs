@@ -17,6 +17,12 @@ use crate::{db::nats, errors::Result};
 
 pub struct Locker(LockerStore);
 
+/// Outcome of [`try_lock`]; `Acquired(None)` is local mode, where no lock is needed.
+pub enum TryLock {
+    Acquired(Option<Locker>),
+    Held,
+}
+
 enum LockerStore {
     Nats(nats::Locker),
 }
@@ -87,6 +93,20 @@ pub async fn lock(key: &str, wait_ttl: u64) -> Result<Option<Locker>> {
     let mut lock = nats::Locker::new(key);
     lock.lock(wait_ttl).await?;
     Ok(Some(Locker(LockerStore::Nats(lock))))
+}
+
+/// Takes the lock without waiting, for periodic jobs that skip a pass another node is running.
+pub async fn try_lock(key: &str) -> Result<TryLock> {
+    if config::get_config().common.local_mode {
+        return Ok(TryLock::Acquired(None));
+    }
+
+    let mut lock = nats::Locker::new(key);
+    Ok(if lock.try_lock().await? {
+        TryLock::Acquired(Some(Locker(LockerStore::Nats(lock))))
+    } else {
+        TryLock::Held
+    })
 }
 
 pub async fn unlock(locker: &Option<Locker>) -> Result<()> {

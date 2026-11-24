@@ -261,7 +261,7 @@ mod tests {
         conn.execute(backend.build(stmt.if_not_exists()))
             .await
             .unwrap();
-        format!("kvguard{}", config::ider::uuid())
+        format!("kvguard{}", config::ider::ksuid())
     }
 
     fn app() -> Router {

@@ -666,7 +666,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     fn denied_user() -> openobserve_api_common::extractors::Headers<UserEmail> {
         openobserve_api_common::extractors::Headers(UserEmail {
-            user_id: format!("{}@example.com", config::ider::uuid()),
+            user_id: format!("{}@example.com", config::ider::ksuid()),
         })
     }
 

@@ -63,7 +63,7 @@ pub async fn create(
 ) -> Result<Unavailability, errors::Error> {
     let client = get_orm_client_rw().await;
     let record = Unavailability {
-        id: ider::uuid(),
+        id: ider::ksuid(),
         org_id: org_id.to_string(),
         user_email: user_email.to_string(),
         start_at,

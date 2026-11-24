@@ -287,7 +287,7 @@ pub async fn set_read(
     let mut marked = 0;
     for event_id in owned {
         let model = oncall_delivery_reads::ActiveModel {
-            id: Set(ider::uuid()),
+            id: Set(ider::ksuid()),
             org_id: Set(org_id.to_string()),
             user_email: Set(user_email.to_string()),
             event_id: Set(event_id),

@@ -41,16 +41,20 @@ use config::{
             level::AlertLevel,
             notification_kind::{NotificationKind, PlatformAction},
         },
-        destinations::DestinationType,
+        destinations::{Destination, DestinationType, Module},
     },
 };
+use infra::secret_store::redact::HumanOutcome;
 
 use super::{
-    context::NotificationContext, format::derive_channel_format, platform::platform_of,
+    context::NotificationContext, format::derive_channel_format, human, platform::platform_of,
     preview::synthetic_context, render::render, resolve::resolve_content, send::SendError,
 };
-use crate::alerts::alert::dispatch_test_message;
 pub use crate::alerts::notifications::render::RenderedMessage;
+use crate::alerts::{
+    alert::{dispatch_test_message, send_saved_http_notification},
+    destinations::{SavePrincipal, SecretRefusal, authorize_human_send},
+};
 
 /// Marker prepended to every test-send title/subject. Never remove or make
 /// conditional — it is the entire reason a test-send is safe to build.
@@ -60,7 +64,10 @@ pub const TEST_MARKER: &str = "[TEST] ";
 static RATE_LIMITER: LazyLock<RwLock<HashMap<String, (i64, u32)>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Longest receiver body a test-send error shows.
+const MAX_ERROR_BODY_CHARS: usize = 200;
+
+#[derive(Debug)]
 pub enum TestSendError {
     /// Per-user rate cap exceeded — mapped to HTTP 429 by the handler.
     RateLimited {
@@ -68,10 +75,24 @@ pub enum TestSendError {
     },
     RenderFailed(String),
     DispatchFailed(String),
+    SavedDispatchFailed {
+        message: String,
+        outcome: HumanOutcome,
+    },
+    Secret(SecretRefusal),
     /// Draft fails the same content validation `templates::save` applies.
     InvalidContent(String),
     /// A live send of this kind skips the destination's platform, so the test does not send.
     PlatformSkipped(NotificationKind),
+}
+
+impl TestSendError {
+    pub fn outcome(self) -> HumanOutcome {
+        match self {
+            Self::SavedDispatchFailed { outcome, .. } => outcome,
+            error => human::outcome_of(&Err(error.into())),
+        }
+    }
 }
 
 impl std::fmt::Display for TestSendError {
@@ -83,7 +104,10 @@ impl std::fmt::Display for TestSendError {
                 get_config().limit.alert_test_send_per_minute
             ),
             Self::RenderFailed(e) => write!(f, "test-send render failed: {e}"),
-            Self::DispatchFailed(e) => write!(f, "test-send dispatch failed: {e}"),
+            Self::DispatchFailed(e) | Self::SavedDispatchFailed { message: e, .. } => {
+                write!(f, "test-send dispatch failed: {e}")
+            }
+            Self::Secret(refusal) => write!(f, "{refusal}"),
             Self::InvalidContent(e) => write!(f, "{e}"),
             Self::PlatformSkipped(kind) => write!(
                 f,
@@ -235,6 +259,45 @@ pub async fn test_send(
         .map_err(|e| TestSendError::DispatchFailed(dispatch_error_text(&e)))
 }
 
+pub async fn test_send_saved(
+    org_id: &str,
+    principal: &SavePrincipal,
+    destination: &Destination,
+    spec: &ContentSpec,
+    kind: NotificationKind,
+) -> Result<String, TestSendError> {
+    let Module::Alert {
+        destination_type, ..
+    } = &destination.module
+    else {
+        return Err(TestSendError::InvalidContent(
+            "Test-send is only supported for alert destinations".into(),
+        ));
+    };
+    let endpoint = match destination_type {
+        DestinationType::Http(endpoint) if endpoint.uses_store_refs() => endpoint,
+        _ => return test_send(org_id, &principal.user_id, destination_type, spec, kind).await,
+    };
+    authorize_human_send(principal, destination)
+        .await
+        .map_err(TestSendError::Secret)?;
+    let (_, rendered) = build_test_message_with_title(destination_type, spec, kind)?;
+    let RenderedMessage::Http { body } = rendered else {
+        return Err(TestSendError::RenderFailed(
+            "Expected an HTTP notification".into(),
+        ));
+    };
+    check_rate_limit(&principal.user_id)?;
+    let send = send_saved_http_notification(destination, endpoint, None, body);
+    match super::send::as_human_sender(principal.user_id.clone(), send).await {
+        Ok(message) => Ok(message),
+        Err(error) => Err(TestSendError::SavedDispatchFailed {
+            message: error.to_string(),
+            outcome: human::outcome_of(&Err(error)),
+        }),
+    }
+}
+
 /// Fails when an email destination has no org-member recipient left, so a test that would
 /// send nothing is refused before it is charged.
 pub(crate) async fn email_reaches_a_member(
@@ -246,9 +309,6 @@ pub(crate) async fn email_reaches_a_member(
     }
     Ok(())
 }
-
-/// Longest receiver body a test-send error shows.
-const MAX_ERROR_BODY_CHARS: usize = 200;
 
 /// The dispatch error with the receiver's body cut short, and an HTML page left out.
 fn dispatch_error_text(e: &anyhow::Error) -> String {
@@ -461,10 +521,10 @@ mod tests {
                 NotificationKind::Downtime,
             )
             .expect_err("a live downtime send skips this platform");
-            assert_eq!(
+            assert!(matches!(
                 err,
                 TestSendError::PlatformSkipped(NotificationKind::Downtime)
-            );
+            ));
         }
     }
 

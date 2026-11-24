@@ -27,6 +27,12 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
+import WriteOnlyField from "@/components/synthetics/configure/WriteOnlyField.vue";
+import SecretPicker from "@/views/Secrets/SecretPicker.vue";
+import { useSecretPickerShown } from "@/views/Secrets/useSecretConsumer";
+import { hasStoreRef, refText } from "@/views/Secrets/secretRefs";
+import type { SecretPickerItem } from "@/services/secrets";
+import { headerIsSecure, isKept, setReplaced, slotKey } from "@/utils/synthetics/writeOnly";
 import type { FilterField } from "@/utils/query/filterBar";
 
 const props = defineProps<{ check: ProtocolCheck; validationErrors?: Record<string, string> }>();
@@ -77,9 +83,41 @@ const body = computed({
 });
 const showBody = computed(() => !["GET", "HEAD"].includes(cfg.value.method));
 
-function patchHeader(index: number, patch: Partial<{ name: string; value: string }>) {
-  const headers = cfg.value.headers.map((h, i) => (i === index ? { ...h, ...patch } : h));
-  update({ headers });
+const pickerShown = useSecretPickerShown();
+const checkId = computed(() => String((props.check as { id?: string }).id ?? ""));
+
+function patchHeader(
+  index: number,
+  patch: Partial<{ name: string; value: string; secure: boolean }>,
+  base: ProtocolCheck = props.check,
+) {
+  const headers = base.http!.headers.map((h, i) => (i === index ? { ...h, ...patch } : h));
+  emit("update:check", { ...base, http: { ...base.http!, headers } });
+}
+
+/** A secure header is write-only unless it holds a store ref, which is a name, not a value. */
+const writeOnlyRow = (h: { name: string; value: string; secure?: boolean }) =>
+  isKept(props.check, slotKey.header(h.name)) || (headerIsSecure(h) && !hasStoreRef([h.value]));
+
+function setHeaderKept(index: number, kept: boolean) {
+  const key = slotKey.header(cfg.value.headers[index].name);
+  patchHeader(index, { value: "" }, setReplaced(props.check, key, !kept));
+}
+
+/** Turning Secure off needs a typed value (`slot_value_required`), so a kept value is dropped. */
+function setHeaderSecure(index: number, secure: boolean) {
+  const h = cfg.value.headers[index];
+  const key = slotKey.header(h.name);
+  if (!secure && isKept(props.check, key)) {
+    patchHeader(index, { secure, value: "" }, setReplaced(props.check, key, true));
+    return;
+  }
+  patchHeader(index, { secure });
+}
+
+function pickInto(index: number, item: SecretPickerItem) {
+  const current = cfg.value.headers[index].value;
+  patchHeader(index, { value: `${current}${refText(item.kind, item.name)}` });
 }
 function addHeader() {
   update({ headers: [...cfg.value.headers, { name: "", value: "" }] });
@@ -139,18 +177,56 @@ function removeHeader(index: number) {
             />
           </div>
           <div class="min-w-0 flex-1">
-            <OInput
+            <WriteOnlyField
+              v-if="writeOnlyRow(h)"
               :model-value="h.value"
+              :meta="check.writeOnly?.[slotKey.header(h.name)]"
+              :kept="isKept(check, slotKey.header(h.name))"
               :placeholder="t('synthetics.protocolConfig.http.headerValue')"
-              :error="!!validationErrors?.[`http.headers.${i}.value`]"
-              :error-message="raw(validationErrors?.[`http.headers.${i}.value`])"
+              :error="raw(validationErrors?.[`http.headers.${i}.value`])"
               :data-test="`synthetics-check-http-header-value-${i}`"
-              @update:model-value="
-                (v: string | number) =>
-                  patchHeader(i, { value: typeof v === 'string' ? v : String(v) })
-              "
-            />
+              @update:model-value="(v: string) => patchHeader(i, { value: v })"
+              @update:kept="(kept: boolean) => setHeaderKept(i, kept)"
+            >
+              <template v-if="pickerShown" #append>
+                <SecretPicker
+                  consumer-type="synthetics_check"
+                  :consumer-id="checkId"
+                  :locations="check.locations"
+                  :data-test="`synthetics-check-http-header-${i}-secret-picker`"
+                  @pick="(item: SecretPickerItem) => pickInto(i, item)"
+                />
+              </template>
+            </WriteOnlyField>
+            <div v-else class="flex min-w-0 items-start gap-2">
+              <OInput
+                class="min-w-0 flex-1"
+                :model-value="h.value"
+                :placeholder="t('synthetics.protocolConfig.http.headerValue')"
+                :error="!!validationErrors?.[`http.headers.${i}.value`]"
+                :error-message="raw(validationErrors?.[`http.headers.${i}.value`])"
+                :data-test="`synthetics-check-http-header-value-${i}`"
+                @update:model-value="
+                  (v: string | number) =>
+                    patchHeader(i, { value: typeof v === 'string' ? v : String(v) })
+                "
+              />
+              <SecretPicker
+                v-if="pickerShown"
+                consumer-type="synthetics_check"
+                :consumer-id="checkId"
+                :locations="check.locations"
+                :data-test="`synthetics-check-http-header-${i}-secret-picker`"
+                @pick="(item: SecretPickerItem) => pickInto(i, item)"
+              />
+            </div>
           </div>
+          <OSwitch
+            :model-value="headerIsSecure(h)"
+            :label="t('synthetics.secretFields.secure')"
+            :data-test="`synthetics-check-http-header-secure-${i}`"
+            @update:model-value="(v: boolean | string | number) => setHeaderSecure(i, v === true)"
+          />
           <OButton
             variant="ghost"
             size="icon-sm"
@@ -161,6 +237,13 @@ function removeHeader(index: number) {
             <template #icon-left><OIcon name="close" size="xs" /></template>
           </OButton>
         </div>
+        <p
+          v-if="cfg.headers.some((h) => headerIsSecure(h))"
+          class="text-text-secondary mb-2 text-xs"
+          data-test="synthetics-check-http-secure-hint"
+        >
+          {{ t("synthetics.secretFields.secureOffHint") }}
+        </p>
         <OButton
           variant="outline"
           size="sm"

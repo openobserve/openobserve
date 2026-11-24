@@ -20,10 +20,15 @@ export const aiToolsetNameRegex = /^[a-zA-Z0-9_-]+$/;
 // free-form and optional (a blank starter row is valid — only non-empty rows are
 // persisted on save). `visible` is the per-row password-visibility UI flag; it is
 // form-owned bookkeeping excluded from the saved payload.
+// `set` and `replaced` track a write-only value the server kept (V37); never sent as is.
+const setMetaSchema = z.object({ updated_at: z.number(), updated_by: z.string() });
+
 export const secretRowSchema = z.object({
   key: z.string().optional(),
   value: z.string().optional(),
   visible: z.boolean().optional(),
+  set: setMetaSchema.optional(),
+  replaced: z.boolean().optional(),
 });
 
 export const makeAddAiToolsetSchema = (t: (_key: string) => string) =>
@@ -37,6 +42,7 @@ export const makeAddAiToolsetSchema = (t: (_key: string) => string) =>
         .max(256, t("aiToolset.nameTooLong")),
       kind: z.string().min(1, t("aiToolset.kindRequired")),
       description: z.string().optional(),
+      automation_allowed: z.boolean().optional(),
 
       // ── MCP fields (validated only when kind === "mcp" — see superRefine) ─
       // Number inputs emit strings → z.coerce.number(); consumers coerce at use.

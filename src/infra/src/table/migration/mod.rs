@@ -300,6 +300,13 @@ mod m20261226_000001_add_oncall_team_to_incident_integrations;
 mod m20261226_000001_create_autoresolve_corrections;
 mod m20261227_000001_add_autoresolve_plan_history;
 mod m20261228_000001_add_autoresolve_run_incident;
+mod m20261229_000001_create_org_secret_store;
+mod m20261229_000002_create_secret_store_jobs;
+mod m20261229_000003_add_secret_store_columns;
+mod m20261229_000004_rename_llm_secrets;
+mod m20261229_000005_create_secret_backends;
+mod m20261229_000006_probe_token_partial_unique;
+mod m20261229_000007_add_requested_by_to_oncall_responses;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -691,6 +698,9 @@ pub(crate) async fn create_workflow_http_trigger_tables(
     m20260820_000003_create_llm_secrets::Migration
         .up(&manager)
         .await?;
+    m20261229_000004_rename_llm_secrets::Migration
+        .up(&manager)
+        .await?;
     m20261026_000001_create_workflow_http_triggers::Migration
         .up(&manager)
         .await?;
@@ -993,6 +1003,13 @@ impl MigratorTrait for Migrator {
             Box::new(m20261226_000001_create_autoresolve_corrections::Migration),
             Box::new(m20261227_000001_add_autoresolve_plan_history::Migration),
             Box::new(m20261228_000001_add_autoresolve_run_incident::Migration),
+            Box::new(m20261229_000001_create_org_secret_store::Migration),
+            Box::new(m20261229_000002_create_secret_store_jobs::Migration),
+            Box::new(m20261229_000003_add_secret_store_columns::Migration),
+            Box::new(m20261229_000004_rename_llm_secrets::Migration),
+            Box::new(m20261229_000005_create_secret_backends::Migration),
+            Box::new(m20261229_000006_probe_token_partial_unique::Migration),
+            Box::new(m20261229_000007_add_requested_by_to_oncall_responses::Migration),
         ]
     }
 }
@@ -1149,6 +1166,7 @@ mod tests {
         (171, "m20261226_000001_create_autoresolve_corrections"),
         (172, "m20261227_000001_add_autoresolve_plan_history"),
         (173, "m20261228_000001_add_autoresolve_run_incident"),
+        (174, "m20261229_000007_add_requested_by_to_oncall_responses"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1227,6 +1245,82 @@ mod tests {
         position("m20260923_000001_create_ai_chat_sessions");
 
         for (earlier, later) in [
+            (
+                "m20261224_000001_delete_cli_ai_toolsets",
+                "m20261229_000001_create_org_secret_store",
+            ),
+            (
+                "m20261229_000001_create_org_secret_store",
+                "m20261229_000002_create_secret_store_jobs",
+            ),
+            (
+                "m20261229_000002_create_secret_store_jobs",
+                "m20261229_000003_add_secret_store_columns",
+            ),
+            (
+                "m20261229_000003_add_secret_store_columns",
+                "m20261229_000004_rename_llm_secrets",
+            ),
+            (
+                "m20261229_000004_rename_llm_secrets",
+                "m20261229_000005_create_secret_backends",
+            ),
+            (
+                "m20261229_000005_create_secret_backends",
+                "m20261229_000006_probe_token_partial_unique",
+            ),
+            (
+                "m20261229_000006_probe_token_partial_unique",
+                "m20261229_000007_add_requested_by_to_oncall_responses",
+            ),
+            (
+                "m20260806_000001_create_oncall_tables",
+                "m20261229_000007_add_requested_by_to_oncall_responses",
+            ),
+            (
+                "m20260707_000004_create_synthetics_probe_tokens",
+                "m20261229_000006_probe_token_partial_unique",
+            ),
+            (
+                "m20260724_000001_add_name_is_default_to_synthetics_probe_tokens",
+                "m20261229_000006_probe_token_partial_unique",
+            ),
+            (
+                "m20261229_000003_add_secret_store_columns",
+                "m20261229_000006_probe_token_partial_unique",
+            ),
+            (
+                "m20241227_000001_create_organizations_table",
+                "m20261229_000005_create_secret_backends",
+            ),
+            (
+                "m20261229_000001_create_org_secret_store",
+                "m20261229_000005_create_secret_backends",
+            ),
+            (
+                "m20260820_000003_create_llm_secrets",
+                "m20261229_000004_rename_llm_secrets",
+            ),
+            (
+                "m20260917_000001_create_synthetics_shared_variables",
+                "m20261229_000003_add_secret_store_columns",
+            ),
+            (
+                "m20260707_000003_create_synthetics_jobs",
+                "m20261229_000003_add_secret_store_columns",
+            ),
+            (
+                "m20260707_000004_create_synthetics_probe_tokens",
+                "m20261229_000003_add_secret_store_columns",
+            ),
+            (
+                "m20260714_000002_create_synthetics_agents",
+                "m20261229_000003_add_secret_store_columns",
+            ),
+            (
+                "m20260820_000003_create_llm_secrets",
+                "m20261229_000001_create_org_secret_store",
+            ),
             (
                 "m20260707_000003_create_synthetics_jobs",
                 "m20260917_000001_add_env_to_synthetics_jobs",

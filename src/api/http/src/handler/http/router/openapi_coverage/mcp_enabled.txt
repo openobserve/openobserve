@@ -182,6 +182,7 @@ all GetRumSavedFunnel
 all GetSavedView
 all GetSearchJobResult
 all GetSearchJobStatus
+all GetSecret
 all GetSemanticGroups
 all GetServiceIdentityConfig
 all GetServiceStreamAnalytics
@@ -241,6 +242,7 @@ all ListRumNamedEvents
 all ListRumSavedFunnels
 all ListSavedViews
 all ListSearchJobs
+all ListSecrets
 all ListServiceDeploys
 all ListServiceStreams
 all ListServiceVerdicts
@@ -340,7 +342,6 @@ all StreamSchema
 all SubmitSearchJob
 all SyntheticsJobAck
 all SyntheticsJobLease
-all SyntheticsJobResolve
 all SystemSettingGetResolved
 all SystemSettingListResolved
 ent TestRemoteTask

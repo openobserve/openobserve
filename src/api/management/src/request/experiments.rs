@@ -2051,7 +2051,7 @@ mod tests {
     }
 
     fn unknown_user() -> String {
-        format!("{}@example.com", config::ider::uuid())
+        format!("{}@example.com", config::ider::ksuid())
     }
 
     fn inline_task() -> ExperimentTaskConfig {

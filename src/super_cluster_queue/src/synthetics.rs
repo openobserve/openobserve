@@ -42,9 +42,12 @@
 //! fails `synthetics_folder_fk` here, forever. Messages carry the folder's
 //! public slug instead and it is resolved against this region's table below.
 
-use config::meta::{
-    folder::{DEFAULT_FOLDER, Folder, FolderType},
-    synthetics::Synthetic,
+use config::{
+    meta::{
+        folder::{DEFAULT_FOLDER, Folder, FolderType},
+        synthetics::Synthetic,
+    },
+    utils::encryption::{Algorithm, SECRET_PREFIX},
 };
 use infra::{
     db::get_orm_client_rw,
@@ -255,8 +258,11 @@ fn encrypt_with(dek: &[u8], check: &mut Synthetic) -> Result<()> {
         if value.is_empty() {
             return Ok(());
         }
-        *value = config::utils::encryption::encrypt_secret_value(dek, value)
+        // The wire carries plaintext only, so a value typed as `AESenc:...` is a literal.
+        let ciphertext = Algorithm::Aes256Siv
+            .encrypt(dek, value)
             .map_err(|e| Error::Message(format!("encrypt on apply failed: {e}")))?;
+        *value = format!("{SECRET_PREFIX}{ciphertext}");
         Ok::<(), Error>(())
     })
 }
@@ -395,6 +401,7 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
 #[cfg(test)]
 mod encrypt_on_apply_tests {
     use config::meta::synthetics::SyntheticAuth;
+    use o2_enterprise::enterprise::super_cluster::queue::SyntheticsCheckPayload;
 
     use super::*;
 
@@ -434,26 +441,111 @@ mod encrypt_on_apply_tests {
         );
     }
 
-    /// A redelivered message re-encrypts an already-encrypted value; wrapping
-    /// it twice would make it undecryptable.
+    /// The wire is plaintext only, so a typed value that looks like ciphertext is stored as
+    /// ciphertext of itself; passing it through would leave an undecryptable credential.
     #[test]
-    fn re_applying_does_not_double_wrap() {
+    fn a_typed_prefix_value_is_encrypted_as_a_literal() {
         let dek = vec![5u8; 64];
         let mut check = Synthetic {
             auth: Some(SyntheticAuth::Bearer {
-                token: "hunter2".into(),
+                token: "AESenc:abc".into(),
             }),
             ..Default::default()
         };
+        check
+            .config_secrets
+            .insert("/body".into(), "AESenc:body".into());
         encrypt_with(&dek, &mut check).unwrap();
-        let once = match check.auth.as_ref().unwrap() {
+        let token = match check.auth.as_ref().unwrap() {
             SyntheticAuth::Bearer { token } => token.clone(),
             _ => unreachable!(),
         };
-        encrypt_with(&dek, &mut check).unwrap();
-        match check.auth.as_ref().unwrap() {
-            SyntheticAuth::Bearer { token } => assert_eq!(token, &once),
-            _ => unreachable!(),
+        assert_ne!(token, "AESenc:abc");
+        assert_eq!(
+            config::utils::encryption::decrypt_secret_value(&dek, &token).unwrap(),
+            "AESenc:abc"
+        );
+        assert_eq!(
+            config::utils::encryption::decrypt_secret_value(&dek, &check.config_secrets["/body"])
+                .unwrap(),
+            "AESenc:body"
+        );
+    }
+
+    fn sender_ciphertext(dek: &[u8], value: &str) -> String {
+        let ciphertext = Algorithm::Aes256Siv.encrypt(dek, value).unwrap();
+        format!("{SECRET_PREFIX}{ciphertext}")
+    }
+
+    /// Mirrors `SyntheticsCheckPayload::for_wire`, which decrypts every prefixed secret once.
+    fn to_wire(dek: &[u8], mut check: Synthetic) -> String {
+        config::meta::synthetics::for_each_secret(&mut check, &mut |value: &mut String| {
+            if value.starts_with(SECRET_PREFIX) {
+                *value = config::utils::encryption::decrypt_secret_value(dek, value)?;
+            }
+            Ok::<(), config::utils::encryption::EncryptError>(())
+        })
+        .unwrap();
+        serde_json::to_string(&SyntheticsCheckPayload {
+            config_secrets: check.config_secrets.clone(),
+            check,
+            folder_slug: String::new(),
+        })
+        .unwrap()
+    }
+
+    /// Message 85 carries the S03 split entries (an HTTP body, a browser step value) and their
+    /// `#m/` metadata in clear, and the receiver stores them under its own key only.
+    #[test]
+    fn split_write_only_entries_cross_in_clear_and_land_under_the_receivers_key() {
+        use config::meta::synthetics::SyntheticType;
+        let (sender, receiver) = (vec![7u8; 64], vec![9u8; 64]);
+        let meta =
+            r#"{"updated_at":1,"updated_by":"a@x","origins":{"_org":["https://a.example:443"]}}"#;
+        let checks = [
+            (SyntheticType::Http, "/body", "#m/body", "body-secret"),
+            (
+                SyntheticType::Browser,
+                "/steps/0/value",
+                "#m/step/s1",
+                "AESenc:step-secret",
+            ),
+        ];
+        for (kind, pointer, meta_key, plain) in checks {
+            let mut check = Synthetic {
+                check_type: kind,
+                config: serde_json::json!({"steps":[{"id":"s1","action":"fill"}]}),
+                ..Default::default()
+            };
+            let stored = [
+                (pointer, sender_ciphertext(&sender, plain)),
+                (meta_key, sender_ciphertext(&sender, meta)),
+            ];
+            for (key, value) in &stored {
+                check.config_secrets.insert((*key).into(), value.clone());
+            }
+
+            let wire = to_wire(&sender, check);
+            let value: serde_json::Value = serde_json::from_str(&wire).unwrap();
+            assert_eq!(value["config_secrets"][pointer], plain);
+            assert_eq!(value["config_secrets"][meta_key], meta);
+            for (_, ciphertext) in &stored {
+                let body = ciphertext.strip_prefix(SECRET_PREFIX).unwrap();
+                assert!(!wire.contains(body), "sender ciphertext on the wire");
+            }
+
+            let payload: SyntheticsCheckPayload = serde_json::from_str(&wire).unwrap();
+            let mut applied = payload.into_check();
+            encrypt_with(&receiver, &mut applied).unwrap();
+            for (key, expected) in [(pointer, plain), (meta_key, meta)] {
+                let at_rest = &applied.config_secrets[key];
+                assert!(at_rest.starts_with(SECRET_PREFIX));
+                assert_eq!(
+                    config::utils::encryption::decrypt_secret_value(&receiver, at_rest).unwrap(),
+                    expected
+                );
+                assert!(config::utils::encryption::decrypt_secret_value(&sender, at_rest).is_err());
+            }
         }
     }
 

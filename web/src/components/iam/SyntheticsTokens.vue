@@ -55,6 +55,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
 
+    <div v-if="preCutoverCount" class="px-page-edge shrink-0 pt-3">
+      <OBanner
+        variant="warning"
+        icon="sync"
+        :content="
+          t('synthetics.secretRunner.rotateBanner', { count: preCutoverCount }, preCutoverCount)
+        "
+        data-test="synthetics-tokens-pre-cutover-banner"
+      />
+    </div>
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
@@ -114,6 +124,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTruncatedText class="font-medium">{{ row.name }}</OTruncatedText>
               <OTag v-if="row.is_default" variant="primary-soft" size="xs" shape="rounded">
                 {{ t("synthetics.tokens.default") }}
+              </OTag>
+              <OTag
+                v-if="row.pre_cutover"
+                variant="warning-soft"
+                size="xs"
+                shape="rounded"
+                :data-test="`synthetics-token-${row.name}-rotate-required`"
+              >
+                {{ t("synthetics.secretRunner.rotateRequired") }}
               </OTag>
             </div>
           </template>
@@ -270,6 +289,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import {
@@ -294,6 +314,8 @@ interface AgentToken {
   agents: number;
   created_by: string;
   created_at: number;
+  /** Created before agent tokens became admin-only; holders may no longer be allowed to see it. */
+  pre_cutover?: boolean;
 }
 
 export default defineComponent({
@@ -313,6 +335,7 @@ export default defineComponent({
     OTable,
     OTag,
     OUserCell,
+    OBanner,
   },
   setup() {
     const store = useStore();
@@ -331,6 +354,9 @@ export default defineComponent({
       const data = tokensList.data.value;
       return (data as any)?.tokens ?? [];
     });
+    const preCutoverCount = computed(
+      () => (tokens.value as AgentToken[]).filter((tok) => tok.pre_cutover).length,
+    );
     const loading = tokensList.isPending;
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
@@ -584,6 +610,7 @@ export default defineComponent({
     ]);
 
     return {
+      preCutoverCount,
       t,
       tokens,
       loading,

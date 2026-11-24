@@ -1770,7 +1770,7 @@ mod tests {
     async fn assert_batched_ranges() {
         let key = format!(
             "files/default/logs/ranges/2026/09/20/10/{}.parquet",
-            config::ider::uuid()
+            config::ider::ksuid()
         );
         assert!(get_config().disk_cache.enabled);
         set(&key, Bytes::from_static(b"0123456789abcdef"))
@@ -1818,7 +1818,7 @@ mod tests {
     async fn get_opts_rejects_a_range_past_a_short_cached_file() {
         let key = format!(
             "files/default/logs/short/2026/10/15/10/{}.parquet",
-            config::ider::uuid()
+            config::ider::ksuid()
         );
         set(&key, Bytes::from_static(b"0123456789abcdef"))
             .await
@@ -2161,7 +2161,7 @@ mod tests {
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(FileType::Result, 1024 * 1024, "lru");
         file_data.multi_dir = vec!["scan1".to_string(), "scan2".to_string()];
-        let prefix = format!("results/scan_org/logs/{}", config::ider::uuid());
+        let prefix = format!("results/scan_org/logs/{}", config::ider::ksuid());
         let keys: Vec<String> = (0..4)
             .map(|i| format!("{prefix}/hash/{i}000_{i}999_0_0.json"))
             .collect();
@@ -2801,7 +2801,7 @@ mod tests {
     static PUBLIC_DASHBOARD_TESTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
     fn public_key(range: &str) -> (String, String) {
-        let link = config::ider::uuid();
+        let link = config::ider::ksuid();
         (
             link.clone(),
             format!("{PUBLIC_DASHBOARDS_PREFIX}org/{link}/{range}"),
@@ -2867,7 +2867,7 @@ mod tests {
     #[tokio::test]
     async fn public_dashboard_files_have_no_per_key_entry_limit_and_no_result_metas() {
         let _serial = PUBLIC_DASHBOARD_TESTS.lock().await;
-        let link = config::ider::uuid();
+        let link = config::ider::ksuid();
         let keys: Vec<String> = (0..RESULT_CACHE_MAX_ENTRIES_PER_KEY + 2)
             .map(|i| format!("{PUBLIC_DASHBOARDS_PREFIX}org/{link}/r{}", (i + 1) * 60))
             .collect();
@@ -2977,7 +2977,7 @@ mod tests {
     fn small_result_bucket(tmp: &tempfile::TempDir) -> (FileData, Vec<String>) {
         let mut files = temp_root_file_data(tmp);
         files.max_size = 100;
-        let org = config::ider::uuid();
+        let org = config::ider::ksuid();
         let keys: Vec<String> = (0..4)
             .map(|i| format!("results/{org}/logs/default/h{i}/1000_2000_0_0.json"))
             .collect();
@@ -3003,7 +3003,7 @@ mod tests {
         let (mut files, keys) = small_result_bucket(&tmp);
         let key = format!(
             "{PUBLIC_DASHBOARDS_PREFIX}org/{}/r3600",
-            config::ider::uuid()
+            config::ider::ksuid()
         );
         files.data.insert(key.clone(), 10);
         files.cur_size += 10;
@@ -3029,7 +3029,7 @@ mod tests {
         let (mut files, keys) = small_result_bucket(&tmp);
         let key = format!(
             "{PUBLIC_DASHBOARDS_PREFIX}org/{}/r3600",
-            config::ider::uuid()
+            config::ider::ksuid()
         );
         let (tmp_file, path) = staged_public_file(&files, &key, 30);
         let old = files

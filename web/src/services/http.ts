@@ -263,7 +263,11 @@ const http = ({ headers } = {} as any) => {
             if (
               (config.isEnterprise == "true" || config.isCloud == "true") &&
               !error.config?.skipAccessToast &&
-              !error.config?.silentForbidden
+              !error.config?.silentForbidden &&
+              !(
+                typeof error.response.data?.code === "string" &&
+                error.response.data.code.startsWith("secret_")
+              )
             ) {
               recordRefusal(error);
             }

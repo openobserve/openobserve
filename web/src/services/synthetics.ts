@@ -215,8 +215,8 @@ const syntheticsService = {
   getLocations: (orgIdentifier: string) => http().get(`/api/${orgIdentifier}/synthetics/locations`),
 
   // ── Private locations ──────────────────────────────────────────────────
-  getAgentSetup: (orgIdentifier: string) =>
-    http().get(`/api/${orgIdentifier}/synthetics/agent-setup`),
+  getAgentSetup: (orgIdentifier: string, silentForbidden = false) =>
+    http().get(`/api/${orgIdentifier}/synthetics/agent-setup`, { silentForbidden }),
 
   // ── Agent tokens (org-level o2syn_ probe credentials) ──────────────────
   listAgentTokens: (orgIdentifier: string) =>
@@ -227,6 +227,13 @@ const syntheticsService = {
 
   rotateAgentToken: (orgIdentifier: string, name?: string) =>
     http().post(`/api/${orgIdentifier}/synthetics/agent-tokens/rotate`, name ? { name } : {}),
+
+  /** The only route that returns an existing agent token: org admin, audited (§6 S04). */
+  viewAgentToken: (orgIdentifier: string, name: string) =>
+    http().post<{ token: string }>(
+      `/api/${orgIdentifier}/synthetics/agent-tokens/${encodeURIComponent(name)}/view`,
+      {},
+    ),
 
   setAgentTokenEnabled: (orgIdentifier: string, name: string, enabled: boolean) =>
     http().patch(`/api/${orgIdentifier}/synthetics/agent-tokens/${encodeURIComponent(name)}`, {

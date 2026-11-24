@@ -33,6 +33,7 @@ pub mod queue;
 pub mod runtime;
 pub mod scheduler;
 pub mod schema;
+pub mod secret_store;
 pub mod secrets;
 pub mod storage;
 pub mod table;

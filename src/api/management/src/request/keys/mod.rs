@@ -73,6 +73,9 @@ pub async fn save(
     if req.name.contains(":") {
         return MetaHttpResponse::bad_request("Key name cannot have ':' in it");
     }
+    if is_reserved_key_name(&req.name) {
+        return reserved_key_name_response();
+    }
 
     let cd: CipherData = match req.key.try_into() {
         Ok(v) => v,
@@ -564,4 +567,33 @@ pub async fn update(
 )]
 pub async fn update(Path(_path): Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("not supported")
+}
+
+// Names starting with `__` belong to system rows such as the org DEK; updates still accept them.
+#[cfg(any(feature = "enterprise", test))]
+fn is_reserved_key_name(name: &str) -> bool {
+    name.starts_with("__")
+}
+
+#[cfg(feature = "enterprise")]
+fn reserved_key_name_response() -> Response {
+    use config::meta::secret_store::{SecretErrorCode, api::SecretErrorBody};
+    let body = SecretErrorBody {
+        code: SecretErrorCode::ReservedKeyName,
+        message: "Key names starting with '__' are reserved".to_string(),
+    };
+    (StatusCode::BAD_REQUEST, Json(body)).into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_double_underscore_names_are_reserved() {
+        assert!(is_reserved_key_name("__default__"));
+        assert!(is_reserved_key_name("__payments"));
+        assert!(!is_reserved_key_name("_single"));
+        assert!(!is_reserved_key_name("payments__"));
+    }
 }

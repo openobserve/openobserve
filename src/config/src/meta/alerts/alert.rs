@@ -687,7 +687,7 @@ mod tests {
 
     #[test]
     fn test_get_unique_key_with_id() {
-        let ksuid_str = ider::uuid();
+        let ksuid_str = ider::ksuid();
         let ksuid = Ksuid::from_str(&ksuid_str).unwrap();
         let alert = Alert {
             id: Some(ksuid),

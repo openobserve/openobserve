@@ -489,6 +489,87 @@ const BODYLESS_ROUTES: &[(&str, &str, &str)] = &[
 const ALWAYS_FORBIDDEN: &[(&str, &str, &str)] = &[
     ("noncloud", "GET", "/api/invites"),
     ("noncloud", "DELETE", "/api/invites/{token}"),
+    ("oss", "GET", "/api/{org_id}/secrets"),
+    ("oss", "POST", "/api/{org_id}/secrets"),
+    ("oss", "GET", "/api/{org_id}/secrets/status"),
+    ("oss", "GET", "/api/{org_id}/secrets/prescan"),
+    ("oss", "GET", "/api/{org_id}/secrets/_all/grants"),
+    ("oss", "PUT", "/api/{org_id}/secrets/_all/grants"),
+    ("oss", "GET", "/api/{org_id}/secrets/{secret_id}"),
+    ("oss", "PUT", "/api/{org_id}/secrets/{secret_id}"),
+    ("oss", "DELETE", "/api/{org_id}/secrets/{secret_id}"),
+    (
+        "oss",
+        "PUT",
+        "/api/{org_id}/secrets/{secret_id}/values/{env}",
+    ),
+    (
+        "oss",
+        "DELETE",
+        "/api/{org_id}/secrets/{secret_id}/values/{env}",
+    ),
+    ("oss", "PUT", "/api/{org_id}/secrets/{secret_id}/policy"),
+    ("oss", "GET", "/api/{org_id}/secrets/{secret_id}/grants"),
+    ("oss", "PUT", "/api/{org_id}/secrets/{secret_id}/grants"),
+    ("oss", "GET", "/api/{org_id}/secrets/{secret_id}/usage"),
+    ("oss", "POST", "/api/{org_id}/secrets/{secret_id}/restore"),
+    ("oss", "POST", "/api/{org_id}/secrets/{secret_id}/purge"),
+    ("oss", "PUT", "/api/{org_id}/secrets/{secret_id}/rename"),
+    ("oss", "POST", "/api/{org_id}/secrets/{secret_id}/refresh"),
+    ("oss", "GET", "/api/{org_id}/secrets/backends"),
+    ("oss", "POST", "/api/{org_id}/secrets/backends"),
+    ("oss", "PUT", "/api/{org_id}/secrets/backends/{backend_id}"),
+    (
+        "oss",
+        "DELETE",
+        "/api/{org_id}/secrets/backends/{backend_id}",
+    ),
+    (
+        "oss",
+        "PUT",
+        "/api/{org_id}/secrets/backends/{backend_id}/credential",
+    ),
+    (
+        "oss",
+        "POST",
+        "/api/{org_id}/secrets/backends/{backend_id}/test",
+    ),
+    (
+        "oss",
+        "GET",
+        "/api/{org_id}/secrets/backends/{backend_id}/grants",
+    ),
+    (
+        "oss",
+        "PUT",
+        "/api/{org_id}/secrets/backends/{backend_id}/grants",
+    ),
+    (
+        "oss",
+        "GET",
+        "/api/{org_id}/secrets/backends/{backend_id}/identity",
+    ),
+    (
+        "oss",
+        "POST",
+        "/api/{org_id}/secrets/backends/{backend_id}/identity/rotate",
+    ),
+    (
+        "oss",
+        "GET",
+        "/api/{org_id}/secrets/backends/{backend_id}/trust_template",
+    ),
+    (
+        "oss",
+        "PUT",
+        "/api/{org_id}/secrets/backend_identities/{target_org}/{provider}",
+    ),
+    ("oss", "GET", "/api/{org_id}/secrets/identity_jobs"),
+    (
+        "oss",
+        "POST",
+        "/api/{org_id}/secrets/identities/{target_org}/{provider}/retry",
+    ),
     ("oss", "POST", "/api/{org_id}/settings/logo"),
     ("oss", "DELETE", "/api/{org_id}/settings/logo"),
     ("oss", "POST", "/api/{org_id}/settings/logo/text"),
@@ -496,8 +577,15 @@ const ALWAYS_FORBIDDEN: &[(&str, &str, &str)] = &[
 ];
 
 /// `Option<Json<T>>` bodies and their schema: leaving the body out works, a JSON `null` is a 422.
-const OPTIONAL_BODIES: &[(&str, &str, &str, &str)] =
-    &[("all", "POST", "/auth/login", "SignInUser")];
+const OPTIONAL_BODIES: &[(&str, &str, &str, &str)] = &[
+    ("all", "POST", "/auth/login", "SignInUser"),
+    (
+        "all",
+        "POST",
+        "/api/{org_id}/secrets/identities/{target_org}/{provider}/retry",
+        "RetryIdentityRequest",
+    ),
+];
 
 /// Body fields clients rely on: edition, method, path, request or status, fields, required fields.
 const BODY_FIELDS: &[BodyFieldsRow] = &[
@@ -630,10 +718,10 @@ type BodyFieldsRow = (
 );
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-struct ParsedRoute {
-    method: String,
-    path: String,
-    active: bool,
+pub(super) struct ParsedRoute {
+    pub(super) method: String,
+    pub(super) path: String,
+    pub(super) active: bool,
 }
 
 struct RouterFn {
@@ -991,7 +1079,7 @@ fn parse_router(source: &str) -> Vec<ParsedRoute> {
     routes
 }
 
-fn parsed_routes() -> Vec<ParsedRoute> {
+pub(super) fn parsed_routes() -> Vec<ParsedRoute> {
     parse_router(ROUTER_SOURCE)
 }
 

@@ -15,7 +15,7 @@
 //  • `field.state.value` may be undefined (optional field) — coerce to `[]`
 //    because OTagInput requires a non-null `string[]`.
 
-import { inject } from "vue";
+import { inject, useId } from "vue";
 import OTagInput from "./OTagInput.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { leaveOnFocusOut, useVisibleFieldError } from "@/lib/forms/Form/fieldError";
@@ -24,6 +24,8 @@ import type { FormTagInputProps } from "./OFormTagInput.types";
 defineOptions({ inheritAttrs: false });
 
 const props = defineProps<FormTagInputProps>();
+const labelId = useId();
+const helpId = useId();
 
 const form = inject(FORM_CONTEXT_KEY, null);
 const shown = useVisibleFieldError(form);
@@ -36,18 +38,50 @@ if (import.meta.env.DEV && !form) {
 <template>
   <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
-      <OTagInput
-        v-bind="$attrs"
-        :placeholder="props.placeholder"
-        :label="props.label"
-        :aria-invalid="shown(field).invalid ? 'true' : undefined"
-        :model-value="field.state.value ?? []"
-        @update:model-value="field.handleChange"
-        @focusout="leaveOnFocusOut(field, $event)"
-      />
-      <div v-if="shown(field).message !== undefined" class="text-input-error-text mt-1 text-xs">
-        {{ shown(field).message }}
+      <div v-if="props.label || props.helpText" class="flex flex-col gap-1">
+        <label
+          v-if="props.label"
+          :id="labelId"
+          data-test="form-tag-input-label"
+          class="text-compact text-input-label-text flex items-center gap-1 leading-tight font-medium"
+          >{{ props.label
+          }}<span v-if="props.required" aria-hidden="true" class="select-none">*</span></label
+        >
+        <OTagInput
+          v-bind="$attrs"
+          :placeholder="props.placeholder"
+          :aria-labelledby="props.label ? labelId : undefined"
+          :aria-describedby="props.helpText ? helpId : undefined"
+          :aria-required="props.required || undefined"
+          :aria-invalid="shown(field).invalid ? 'true' : undefined"
+          :model-value="field.state.value ?? []"
+          @update:model-value="field.handleChange"
+          @focusout="leaveOnFocusOut(field, $event)"
+        />
+        <div v-if="shown(field).message !== undefined" class="text-input-error-text text-xs">
+          {{ shown(field).message }}
+        </div>
+        <span
+          v-else-if="props.helpText"
+          :id="helpId"
+          data-test="form-tag-input-help"
+          class="text-input-hint text-xs leading-snug"
+          >{{ props.helpText }}</span
+        >
       </div>
+      <template v-else>
+        <OTagInput
+          v-bind="$attrs"
+          :placeholder="props.placeholder"
+          :aria-invalid="shown(field).invalid ? 'true' : undefined"
+          :model-value="field.state.value ?? []"
+          @update:model-value="field.handleChange"
+          @focusout="leaveOnFocusOut(field, $event)"
+        />
+        <div v-if="shown(field).message !== undefined" class="text-input-error-text mt-1 text-xs">
+          {{ shown(field).message }}
+        </div>
+      </template>
     </template>
   </component>
 </template>

@@ -50,7 +50,7 @@ pub async fn insert_if_absent_with<C: ConnectionTrait>(
     now: i64,
 ) -> Result<bool, errors::Error> {
     let record = ActiveModel {
-        id: Set(config::ider::uuid()),
+        id: Set(config::ider::ksuid()),
         org_id: Set(fit(org_id, 256)),
         user_email: Set(fit(user_email, 256)),
         message: Set(message.map(str::to_string)),

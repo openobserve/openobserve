@@ -121,7 +121,7 @@ impl MigrationTrait for Migration {
                 );
 
                 new_tokens.push(synthetics_probe_tokens::ActiveModel {
-                    id: Set(config::ider::uuid()),
+                    id: Set(config::ider::ksuid()),
                     org_id: Set(org.identifier),
                     token: Set(token),
                     enabled: Set(true),

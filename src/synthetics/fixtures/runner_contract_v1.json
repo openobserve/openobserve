@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "allowed_hosts": [
+    {"case": "D142 two pins intersect", "pins": [["api.example.com"], ["api.example.com", "b.example.com"]], "target": "https://api.example.com/", "allowed_hosts": ["https://api.example.com:443"], "refused": [{"request": "https://b.example.com/", "why": "allowed by only one pin"}]},
+    {"case": "D142 disjoint pins", "pins": [["api.example.com"], ["b.example.com"]], "target": "https://api.example.com/", "error": "pin_mismatch"},
+    {"case": "D176 only any or legacy secrets", "pins": [], "target": "https://api.example.com/login", "allowed_hosts": ["https://api.example.com:443"], "refused": [{"request": "https://cdn.other.example/a.js", "why": "third-party subresource"}, {"request": "https://api.example.com:8443/", "why": "same host, other port"}, {"request": "http://api.example.com/", "why": "same host over http"}]},
+    {"case": "D228 pinned origin", "pins": [["api.example.com"]], "target": "https://api.example.com/", "allowed_hosts": ["https://api.example.com:443"], "refused": [{"request": "http://api.example.com/", "why": "navigation to http"}, {"request": "https://api.example.com:8443/", "why": "subrequest to another port"}]},
+    {"case": "wildcard narrowed by an exact pin", "pins": [["*.example.com"], ["api.example.com:8443", "api.example.com"]], "target": "https://api.example.com/", "allowed_hosts": ["https://api.example.com:443"]},
+    {"case": "explicit port kept", "pins": [["api.example.com:8443"]], "target": "https://api.example.com:8443/", "allowed_hosts": ["https://api.example.com:8443"]},
+    {"case": "http target without a host list", "pins": [], "target": "http://api.example.com/", "error": "insecure_transport"}
+  ],
+  "transport": [
+    {"case": "302 to another host", "expect": "refused", "why": "follow_redirects is false"},
+    {"case": "same-host redirect to another port", "expect": "refused"},
+    {"case": "same-host redirect to http", "expect": "refused"},
+    {"case": "cross-host browser navigation", "expect": "aborted"},
+    {"case": "ref cookie", "expect": "sent only with Secure"},
+    {"case": "canaries in header, cookie, Basic auth, browser secret slot and step value", "expect": "no result or step row (StartLoad.url, error text) holds a canary"}
+  ]
+}

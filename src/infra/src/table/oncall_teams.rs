@@ -182,7 +182,7 @@ pub async fn create(
     let client = get_orm_client_rw().await;
     let now = now_micros();
     let model = oncall_teams::ActiveModel {
-        id: Set(ider::uuid()),
+        id: Set(ider::ksuid()),
         org_id: Set(org_id.to_string()),
         name: Set(name.to_string()),
         timezone: Set(timezone.to_string()),
@@ -402,7 +402,7 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
 pub async fn add_member(team_id: &str, user_email: &str) -> Result<TeamMember, errors::Error> {
     let client = get_orm_client_rw().await;
     let model = oncall_team_members::ActiveModel {
-        id: Set(ider::uuid()),
+        id: Set(ider::ksuid()),
         team_id: Set(team_id.to_string()),
         user_email: Set(user_email.to_string()),
         created_at: Set(now_micros()),
@@ -419,7 +419,7 @@ pub async fn add_member(team_id: &str, user_email: &str) -> Result<TeamMember, e
 /// form's preview of the handover and the handover the team actually got
 /// disagreed, with nothing on either screen explaining why.
 ///
-/// Ordered on `created_at` rather than `id`: `ider::uuid()` is a KSUID whose
+/// Ordered on `created_at` rather than `id`: `ider::ksuid()` is a KSUID whose
 /// timestamp prefix has one-second resolution, so a bulk add lands several rows
 /// in one second and their relative id order is random. `id` breaks the tie so
 /// the answer is stable across nodes.
@@ -766,7 +766,7 @@ mod tests {
     /// ordering sorts on an explicit timestamp with the id as a tiebreak.
     #[test]
     fn test_generated_ids_are_unique_and_fixed_width() {
-        let ids: std::collections::HashSet<String> = (0..64).map(|_| ider::uuid()).collect();
+        let ids: std::collections::HashSet<String> = (0..64).map(|_| ider::ksuid()).collect();
         assert_eq!(ids.len(), 64, "ksuids must be unique");
         assert!(
             ids.iter().all(|i| i.len() == 27),

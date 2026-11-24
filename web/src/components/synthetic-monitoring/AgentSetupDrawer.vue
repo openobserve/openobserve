@@ -25,6 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="emit('update:open', $event)"
   >
     <div class="flex flex-col gap-6 p-4">
+      <AgentRunnerNotice
+        :agents="agents ?? []"
+        :min-runner-version="minRunnerVersion ?? undefined"
+        :lease-deadline-us="leaseDeadlineUs ?? undefined"
+      />
       <!-- Step 1: deploy -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
@@ -144,6 +149,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p v-else class="text-text-muted text-sm">
           {{ t("synthetics.privateLocations.setup.noToken") }}
         </p>
+
+        <template v-if="isAdmin">
+          <div
+            class="flex flex-wrap items-end gap-2"
+            data-test="synthetics-agent-setup-token-insert"
+          >
+            <OSelect
+              v-model="tokenToInsert"
+              class="w-60"
+              size="sm"
+              :label="t('synthetics.secretRunner.tokenLabel')"
+              :options="tokenOptions"
+              data-test="synthetics-agent-setup-token-select"
+            />
+            <OButton
+              variant="primary"
+              size="sm"
+              icon-left="key"
+              :disabled="!tokenToInsert"
+              :loading="viewToken.isPending.value"
+              data-test="synthetics-agent-setup-insert-token"
+              @click="insertToken"
+            >
+              {{ t("synthetics.secretRunner.insertToken") }}
+            </OButton>
+            <OButton
+              variant="outline"
+              size="sm"
+              icon-left="add"
+              :loading="createToken.isPending.value"
+              data-test="synthetics-agent-setup-new-token"
+              @click="newToken"
+            >
+              {{ t("synthetics.secretRunner.newToken") }}
+            </OButton>
+          </div>
+          <span class="text-text-secondary text-xs">{{
+            t("synthetics.secretRunner.shownFor")
+          }}</span>
+        </template>
+        <OBanner
+          v-else
+          variant="info"
+          icon="info"
+          :content="t('synthetics.secretRunner.askAdmin')"
+          data-test="synthetics-agent-setup-ask-admin"
+        />
+
+        <div
+          v-if="rotateAgents.length"
+          class="border-border-default rounded-default flex flex-col gap-2 border p-3"
+          data-test="synthetics-agent-setup-rotate-required"
+        >
+          <div class="flex flex-wrap items-center gap-2">
+            <span v-for="a in rotateAgents" :key="a.id" class="flex items-center gap-1 text-sm">
+              <span class="text-text-body">{{ agentLabel(a) }}</span>
+              <OTag
+                size="xs"
+                variant="warning-soft"
+                icon=""
+                :label="t('synthetics.secretRunner.rotateRequired')"
+              />
+            </span>
+          </div>
+          <span class="text-text-secondary text-xs">{{
+            t("synthetics.secretRunner.rotateHint")
+          }}</span>
+        </div>
       </div>
 
       <!-- Step 2: wait for the agent to register -->
@@ -176,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -185,6 +258,18 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { useOrgRole } from "@/composables/useOrgRole";
+import { useOrgId } from "@/composables/query/useOrgId";
+import {
+  agentTokensQuery,
+  createAgentTokenMutation,
+  viewAgentTokenMutation,
+} from "@/services/synthetics.queries";
+import type { SyntheticLocationAgent } from "@/types/synthetics";
+import AgentRunnerNotice from "./AgentRunnerNotice.vue";
 
 const props = defineProps<{
   open: boolean;
@@ -204,10 +289,89 @@ const props = defineProps<{
    *  selects the Playwright browser-probe image; default `protocol` installs the
    *  Go agent. The operator can switch tabs either way once open. */
   agentType?: "protocol" | "browser";
+  /** Agents on this location: drive the old-runner notice and Rotate required. */
+  agents?: SyntheticLocationAgent[] | null;
+  minRunnerVersion?: string | null;
+  leaseDeadlineUs?: number | null;
 }>();
 const emit = defineEmits<{ (e: "update:open", open: boolean): void }>();
 
 const { t } = useI18nTyped();
+const orgId = useOrgId();
+
+// Agent tokens are org-admin only since P1-7 (V31); the server refuses everyone else.
+const { isAdmin } = useOrgRole();
+const tokensQuery = useQuery(() =>
+  Object.assign(agentTokensQuery(orgId.value), {
+    enabled: props.open && isAdmin.value && !!orgId.value,
+  }),
+);
+type TokenRow = { name: string; enabled?: boolean };
+// The list route answers `{tokens}`; a bare array is tolerated for older servers.
+const tokenOptions = computed(() => {
+  const data = tokensQuery.data.value as { tokens?: TokenRow[] } | TokenRow[] | undefined;
+  const rows = Array.isArray(data) ? data : (data?.tokens ?? []);
+  return rows
+    .filter((tok) => tok.enabled !== false)
+    .map((tok) => ({ label: raw(tok.name), value: tok.name }));
+});
+const tokenToInsert = ref<string | null>(null);
+const insertedToken = ref<string | null>(null);
+// The viewed token stays in the command for 30 s; each view is audited server-side.
+const TOKEN_SHOWN_MS = 30_000;
+let tokenTimer: ReturnType<typeof setTimeout> | null = null;
+// gcTime 0 + reset: the mutation cache would otherwise keep the token after it is hidden.
+const viewToken = useMutation(() => ({ ...viewAgentTokenMutation(orgId.value), gcTime: 0 }));
+const createToken = useMutation(() => ({ ...createAgentTokenMutation(orgId.value), gcTime: 0 }));
+const hideToken = () => {
+  if (tokenTimer) clearTimeout(tokenTimer);
+  tokenTimer = null;
+  insertedToken.value = null;
+  viewToken.reset();
+  createToken.reset();
+};
+const showForAWhile = (token: string) => {
+  insertedToken.value = token;
+  if (tokenTimer) clearTimeout(tokenTimer);
+  tokenTimer = setTimeout(hideToken, TOKEN_SHOWN_MS);
+};
+const insertToken = async () => {
+  if (!tokenToInsert.value) return;
+  try {
+    const res = await viewToken.mutateAsync(tokenToInsert.value);
+    showForAWhile(res.data.token);
+  } catch (e: any) {
+    toast({
+      variant: "error",
+      message: raw(e?.response?.data?.message) || t("synthetics.secretRunner.viewFailed"),
+    });
+  }
+};
+/** One click: the name says where the token went, so the tokens page can tell it apart. */
+const newToken = async () => {
+  const where = props.locationName || props.locationId || "agent";
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
+  try {
+    const res = await createToken.mutateAsync(`${where}-${stamp}`);
+    tokenToInsert.value = res.data.name;
+    showForAWhile(res.data.token);
+  } catch (e: any) {
+    toast({
+      variant: "error",
+      message: raw(e?.response?.data?.message) || t("synthetics.tokens.createError"),
+    });
+  }
+};
+onBeforeUnmount(hideToken);
+watch(
+  () => props.open,
+  (open) => !open && hideToken(),
+);
+const effectiveToken = computed(() => insertedToken.value || props.token);
+
+const rotateAgents = computed(() => (props.agents ?? []).filter((a) => a.token_pre_cutover));
+const agentLabel = (a: SyntheticLocationAgent) =>
+  a.token_name ? raw(`${a.name} · ${a.token_name}`) : raw(a.name);
 
 const platform = ref<string | number>("docker");
 const selectedAgentType = ref<string | number>("protocol");
@@ -262,7 +426,7 @@ const composedCommand = computed(() => {
       `& ([scriptblock]::Create((irm ${psScriptUrl}))) \``,
       `  -O2Url "${props.o2Url}" \``,
       `  -Org "${props.org || "<org>"}" \``,
-      `  -Token "${props.token || "<o2syn-token>"}" \``,
+      `  -Token "${effectiveToken.value || "<o2syn-token>"}" \``,
     ];
     if (props.locationId) {
       lines.push(`  -LocationId "${props.locationId}" \``);
@@ -279,7 +443,7 @@ const composedCommand = computed(() => {
     `  --platform=${platform.value} \\`,
     `  --o2-url=${props.o2Url} \\`,
     `  --org=${props.org || "<org>"} \\`,
-    `  --token=${props.token || "<o2syn-token>"} \\`,
+    `  --token=${effectiveToken.value || "<o2syn-token>"} \\`,
   ];
   if (props.locationId) {
     lines.push(`  --location-id=${props.locationId} \\`);

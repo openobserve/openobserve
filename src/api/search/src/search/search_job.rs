@@ -956,7 +956,7 @@ mod tests {
 
     /// A fresh org whose members can all read every stream, since OpenFGA is off in tests.
     fn org_with_members() -> String {
-        let org = format!("sj_owner_{}", config::ider::uuid());
+        let org = format!("sj_owner_{}", config::ider::ksuid());
         cache_member(&org, OWNER, UserRole::User);
         cache_member(&org, OTHER, UserRole::User);
         cache_member(&org, ADMIN, UserRole::Admin);

@@ -61,14 +61,19 @@ pub fn generate() -> String {
     IDER.lock().real_time_generate().to_string()
 }
 
-/// Generate a unique id like uuid.
-pub fn uuid() -> String {
+/// Generate a 27-character KSUID; sortable by creation time, so not for secrets.
+pub fn ksuid() -> String {
     Ksuid::new(None, None).to_string()
+}
+
+#[deprecated(note = "returns a KSUID, not a UUID; use `ksuid()`")]
+pub fn uuid() -> String {
+    ksuid()
 }
 
 /// Generate a random hyphenated GUID, for credentials that must be unguessable.
 ///
-/// `uuid()` above returns a KSUID and `Uuid::now_v7()` leaks its creation time,
+/// `ksuid()` above is time-sortable and `Uuid::now_v7()` leaks its creation time,
 /// so neither is usable for a secret.
 pub fn random_uuid() -> String {
     uuid::Builder::from_random_bytes(rand::random::<[u8; 16]>())
@@ -571,11 +576,17 @@ mod tests {
     }
 
     #[test]
-    fn test_uuid() {
-        let uuid1 = uuid();
-        let uuid2 = uuid();
-        assert_ne!(uuid1, uuid2, "Generated UUIDs should be unique");
-        assert_eq!(uuid1.len(), 27, "KSUID should be 27 characters long");
+    fn test_ksuid() {
+        let id1 = ksuid();
+        let id2 = ksuid();
+        assert_ne!(id1, id2, "Generated KSUIDs should be unique");
+        assert_eq!(id1.len(), 27, "KSUID should be 27 characters long");
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn test_uuid_alias_returns_ksuid() {
+        assert_eq!(uuid().len(), 27);
     }
 
     #[test]

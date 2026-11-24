@@ -11,6 +11,7 @@ cloud = []
 test-utils = []
 
 [dependencies]
+aes-siv.workspace = true
 anyhow.workspace = true
 arc-swap.workspace = true
 arrow.workspace = true
@@ -54,6 +55,7 @@ utoipa.workspace = true
 tonic.workspace = true
 tonic-tracing-opentelemetry.workspace = true
 tower.workspace = true
+zeroize.workspace = true
 opentelemetry.workspace = true
 proto.workspace = true
 

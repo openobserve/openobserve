@@ -393,7 +393,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_non_intel_tables_pass_without_a_security_grant() {
-        let stranger = format!("{}@example.com", config::ider::uuid());
+        let stranger = format!("{}@example.com", config::ider::ksuid());
         assert!(
             guard_intel_list("org", &stranger, "geoip", "POST")
                 .await
@@ -408,7 +408,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_intel_lists_are_checked_against_the_security_grant() {
-        let stranger = format!("{}@example.com", config::ider::uuid());
+        let stranger = format!("{}@example.com", config::ider::ksuid());
         for (table, method) in [("ioc_feed", "POST"), ("threat_intel_x", "DELETE")] {
             let allowed = security_allowed("org", &stranger, method).await;
             let res = guard_intel_list("org", &stranger, table, method).await;

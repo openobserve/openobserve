@@ -497,7 +497,7 @@ mod tests {
         use config::meta::{alerts::alert::Alert, folder::Folder};
         use svix_ksuid::{Ksuid, KsuidLike};
 
-        let org = format!("acks_{}", config::ider::uuid());
+        let org = format!("acks_{}", config::ider::ksuid());
         let id = Ksuid::new(None, None);
         let mut alert = Alert::default();
         alert.id = Some(id);
@@ -512,7 +512,7 @@ mod tests {
             (Folder::default(), alert),
         );
         let stranger = Headers(UserEmail {
-            user_id: format!("{}@example.com", config::ider::uuid()),
+            user_id: format!("{}@example.com", config::ider::ksuid()),
         });
         let resp = list_alert_acks(Path((org, id.to_string())), stranger).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);

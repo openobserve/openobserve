@@ -274,7 +274,7 @@ pub async fn add(user: UserRecord) -> Result<(), errors::Error> {
         user_type: Set(user.user_type.into()),
         created_at: Set(now),
         updated_at: Set(now),
-        id: Set(ider::uuid()),
+        id: Set(ider::ksuid()),
         must_reset_password: Set(false),
         password_reset_reason: Set(None),
         flagged_at: Set(None),

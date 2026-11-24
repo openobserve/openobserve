@@ -54,4 +54,17 @@ describe("saveMonitorMutation", () => {
     expect(isInvalidated(syntheticsKeys.monitors(ORG))).toBe(true);
     expect(isInvalidated(syntheticsKeys.agentTokens(ORG))).toBe(false);
   });
+
+  it("drops the saved payload from the mutation cache once nothing observes it", async () => {
+    await run(saveMonitorMutation(ORG), { payload: { password: "inline-pw" } });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const cached = JSON.stringify(
+      queryClient
+        .getMutationCache()
+        .getAll()
+        .map((m) => m.state.variables),
+    );
+    expect(cached).not.toContain("inline-pw");
+  });
 });

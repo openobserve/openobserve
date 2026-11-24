@@ -236,6 +236,15 @@ describe("response interceptor — license 403 handling", () => {
     expect(recordForbidden).toHaveBeenCalledTimes(1);
     expect(addLicenseDeniedError).not.toHaveBeenCalled();
   });
+
+  it("leaves secret refusals to the consumer card without an RBAC toast", async () => {
+    const error = forbidden({ code: "secret_use_denied", message: "Use denied" });
+
+    await expect(errorHandler()(error)).rejects.toBe(error);
+
+    expect(recordForbidden).not.toHaveBeenCalled();
+    expect(addLicenseDeniedError).not.toHaveBeenCalled();
+  });
 });
 
 describe("http 403 interceptor", () => {

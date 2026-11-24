@@ -13,14 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::synthetics_variables::GLOBAL_ENVIRONMENT_NAME;
+use config::meta::{secret_store::env_incarnation, synthetics_variables::GLOBAL_ENVIRONMENT_NAME};
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set, SqlErr,
-    TransactionTrait,
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Select, Set,
+    SqlErr, TransactionTrait, sea_query::Expr,
 };
 
-use super::entity::synthetics_environments::{ActiveModel, Column, Entity, Model};
+use super::{
+    entity::synthetics_environments::{ActiveModel, Column, Entity, Model},
+    org_secret_values,
+    secret_store_job_markers::{self, ALL_ORGS, FILL_ENV_INCARNATION},
+    synthetics_env_retired, synthetics_variables,
+};
 use crate::errors::{self, DbError, Error};
+
+/// Rows per commit of the incarnation fill.
+pub const FILL_PAGE_ROWS: u64 = 200;
+const FILL_LOCK_KEY: &str = "/secret_store/maint/fill_env_incarnation";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyntheticsEnvironmentRecord {
@@ -35,6 +44,11 @@ pub struct SyntheticsEnvironmentRecord {
 }
 
 impl SyntheticsEnvironmentRecord {
+    /// Derived from immutable fields, so it equals the stored column whether or not the fill ran.
+    pub fn incarnation(&self) -> String {
+        env_incarnation(&self.org_id, &self.id, self.created_at)
+    }
+
     fn to_active_model(&self) -> ActiveModel {
         ActiveModel {
             id: Set(self.id.clone()),
@@ -45,6 +59,7 @@ impl SyntheticsEnvironmentRecord {
             is_global: Set(self.is_global),
             created_at: Set(self.created_at),
             updated_at: Set(self.updated_at),
+            incarnation: Set(self.incarnation()),
         }
     }
 }
@@ -74,17 +89,39 @@ pub fn environment_id(org_id: &str, name: &str) -> String {
     format!("{org_id}/{name}")
 }
 
-pub async fn add<C: ConnectionTrait>(
+pub async fn add<C: TransactionTrait>(
     conn: &C,
-    record: &SyntheticsEnvironmentRecord,
+    record: &mut SyntheticsEnvironmentRecord,
 ) -> Result<(), errors::Error> {
-    match Entity::insert(record.to_active_model()).exec(conn).await {
-        Ok(_) => Ok(()),
-        Err(e) => match e.sql_err() {
-            Some(SqlErr::UniqueConstraintViolation(_)) => Err(duplicate_name(&record.name)),
-            _ => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
-        },
+    let txn = conn.begin().await?;
+    // A concurrent delete may still own the id. Acquire it before reading that delete's watermark.
+    Entity::insert(record.to_active_model())
+        .exec(&txn)
+        .await
+        .map_err(|e| match e.sql_err() {
+            Some(SqlErr::UniqueConstraintViolation(_)) => duplicate_name(&record.name),
+            _ => e.into(),
+        })?;
+    let mut created_at = record.created_at;
+    if let Some(retired) = synthetics_env_retired::get_in(&txn, &record.org_id, &record.id).await?
+        && created_at <= retired.retired_created_at
+    {
+        created_at = retired
+            .retired_created_at
+            .checked_add(1)
+            .ok_or_else(|| Error::Message("environment creation timestamp exhausted".into()))?;
+        let incarnation = env_incarnation(&record.org_id, &record.id, created_at);
+        Entity::update_many()
+            .col_expr(Column::CreatedAt, Expr::value(created_at))
+            .col_expr(Column::Incarnation, Expr::value(incarnation))
+            .filter(Column::OrgId.eq(&record.org_id))
+            .filter(Column::Id.eq(&record.id))
+            .exec(&txn)
+            .await?;
     }
+    txn.commit().await?;
+    record.created_at = created_at;
+    Ok(())
 }
 
 pub async fn get_by_id<C: ConnectionTrait>(
@@ -92,9 +129,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
     org_id: &str,
     id: &str,
 ) -> Result<Option<SyntheticsEnvironmentRecord>, errors::Error> {
-    Ok(Entity::find()
-        .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Id.eq(id))
+    Ok(environment_by_id(org_id, id)
         .one(conn)
         .await?
         .map(SyntheticsEnvironmentRecord::from))
@@ -191,11 +226,17 @@ pub async fn update<C: ConnectionTrait>(
     }
 }
 
-/// Writes a row as another region has it, unless the stored copy is newer.
+/// Writes a row as another region has it, unless the stored copy is newer or that life was deleted.
 pub async fn apply_upsert<C: ConnectionTrait>(
     conn: &C,
     record: &SyntheticsEnvironmentRecord,
 ) -> Result<bool, errors::Error> {
+    if synthetics_env_retired::get_in(conn, &record.org_id, &record.id)
+        .await?
+        .is_some_and(|retired| record.created_at <= retired.retired_created_at)
+    {
+        return Ok(false);
+    }
     let updated = Entity::update_many()
         .set(record.to_active_model())
         .filter(Column::OrgId.eq(&record.org_id))
@@ -217,21 +258,40 @@ pub async fn apply_upsert<C: ConnectionTrait>(
     Ok(inserted > 0)
 }
 
-/// Deletes an environment and the variables scoped to it, in one transaction.
 pub async fn delete<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
     id: &str,
 ) -> Result<bool, errors::Error> {
     let txn = conn.begin().await?;
-    super::synthetics_variables::delete_by_env(&txn, org_id, id).await?;
-    let res = Entity::delete_many()
-        .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Id.eq(id))
-        .exec(&txn)
-        .await?;
+    let retired = retire_environment(&txn, org_id, id).await?;
     txn.commit().await?;
-    Ok(res.rows_affected > 0)
+    Ok(retired)
+}
+
+/// The caller's transaction keeps the watermark, credentials and value heads tied to the same life.
+pub async fn retire_environment<C: ConnectionTrait>(
+    txn: &C,
+    org_id: &str,
+    env_id: &str,
+) -> Result<bool, errors::Error> {
+    let Some(model) = environment_by_id(org_id, env_id)
+        .lock_exclusive()
+        .one(txn)
+        .await?
+    else {
+        return Ok(false);
+    };
+    let record = SyntheticsEnvironmentRecord::from(model);
+    synthetics_variables::delete_by_env(txn, org_id, env_id).await?;
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Id.eq(env_id))
+        .exec(txn)
+        .await?;
+    org_secret_values::retire_environment_in(txn, org_id, env_id, &record.incarnation()).await?;
+    synthetics_env_retired::retire_in(txn, org_id, env_id, record.created_at).await?;
+    Ok(true)
 }
 
 /// Deletes an org's environments; its variables go first (`synthetics_variables_env_fk`).
@@ -246,9 +306,102 @@ pub async fn delete_by_org<C: ConnectionTrait>(
     Ok(())
 }
 
+/// Fills `''` incarnations page by page, then writes the done marker; returns rows written.
+/// Conditional writes make a rerun, a resume or a second worker a no-op on filled rows.
+pub async fn fill_incarnation<C: TransactionTrait>(conn: &C) -> Result<u64, errors::Error> {
+    let mut after = String::new();
+    let mut written = 0;
+    loop {
+        let txn = conn.begin().await?;
+        let (page_written, last) = fill_incarnation_page(&txn, &after).await?;
+        txn.commit().await?;
+        written += page_written;
+        match last {
+            Some(id) => after = id,
+            None => break,
+        }
+    }
+    let txn = conn.begin().await?;
+    let now = config::utils::time::now_micros();
+    secret_store_job_markers::insert_if_absent_in(&txn, ALL_ORGS, FILL_ENV_INCARNATION, now)
+        .await?;
+    txn.commit().await?;
+    Ok(written)
+}
+
+/// The post-boot fill under the cluster lock; skips the pass once the marker exists.
+pub async fn run_incarnation_fill() -> Result<u64, errors::Error> {
+    let conn = crate::db::get_orm_client_rw().await;
+    if fill_marker_done(conn).await? {
+        return Ok(0);
+    }
+    let locker = crate::dist_lock::lock(FILL_LOCK_KEY, 0).await?;
+    let result = match fill_marker_done(conn).await {
+        Ok(true) => Ok(0),
+        Ok(false) => fill_incarnation(conn).await,
+        Err(e) => Err(e),
+    };
+    crate::dist_lock::unlock(&locker).await?;
+    result
+}
+
+fn environment_by_id(org_id: &str, id: &str) -> Select<Entity> {
+    Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Id.eq(id))
+}
+
 /// Written to be shown: `DbError` would prefix it with its own type names.
 fn duplicate_name(name: &str) -> Error {
     Error::DuplicateName(format!("environment '{name}' already exists in this org"))
+}
+
+async fn fill_marker_done<C: ConnectionTrait>(conn: &C) -> Result<bool, errors::Error> {
+    Ok(
+        secret_store_job_markers::get_marker_in(conn, ALL_ORGS, FILL_ENV_INCARNATION)
+            .await?
+            .is_some(),
+    )
+}
+
+/// One keyset page after `after`; the last id is `None` once a page comes back short.
+async fn fill_incarnation_page<C: ConnectionTrait>(
+    conn: &C,
+    after: &str,
+) -> Result<(u64, Option<String>), errors::Error> {
+    let rows: Vec<(String, String, i64)> = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .column(Column::OrgId)
+        .column(Column::CreatedAt)
+        .filter(Column::Incarnation.eq(""))
+        .filter(Column::Id.gt(after))
+        .order_by_asc(Column::Id)
+        .limit(FILL_PAGE_ROWS)
+        .into_tuple()
+        .all(conn)
+        .await?;
+    let mut written = 0;
+    for (id, org_id, created_at) in &rows {
+        let res = Entity::update_many()
+            .col_expr(
+                Column::Incarnation,
+                Expr::value(env_incarnation(org_id, id, *created_at)),
+            )
+            .filter(Column::OrgId.eq(org_id))
+            .filter(Column::Id.eq(id))
+            .filter(Column::CreatedAt.eq(*created_at))
+            .filter(Column::Incarnation.eq(""))
+            .exec(conn)
+            .await?;
+        written += res.rows_affected;
+    }
+    let last = if (rows.len() as u64) < FILL_PAGE_ROWS {
+        None
+    } else {
+        rows.last().map(|(id, ..)| id.clone())
+    };
+    Ok((written, last))
 }
 
 #[cfg(test)]
@@ -256,6 +409,11 @@ mod tests {
     use sea_orm::{ConnectOptions, Database, DatabaseConnection, Schema};
 
     use super::*;
+    use crate::table::{
+        credential_values,
+        entity::credential_values as credentials,
+        testing::{meta_store, unique},
+    };
 
     /// One connection: separate connections to `sqlite::memory:` are separate databases.
     async fn db() -> DatabaseConnection {
@@ -267,7 +425,49 @@ mod tests {
         db.execute(backend.build(&schema.create_table_from_entity(Entity)))
             .await
             .unwrap();
+        db.execute(
+            backend.build(&schema.create_table_from_entity(secret_store_job_markers::Entity)),
+        )
+        .await
+        .unwrap();
+        db.execute(backend.build(&schema.create_table_from_entity(synthetics_env_retired::Entity)))
+            .await
+            .unwrap();
         db
+    }
+
+    async fn stored_incarnation(
+        db: &DatabaseConnection,
+        record: &SyntheticsEnvironmentRecord,
+    ) -> String {
+        environment_by_id(&record.org_id, &record.id)
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap()
+            .incarnation
+    }
+
+    /// Rows as an older node writes them: no incarnation.
+    async fn seed_blank(db: &DatabaseConnection, count: usize) -> Vec<SyntheticsEnvironmentRecord> {
+        let mut seeded = vec![];
+        for i in 0..count {
+            let mut record = env(&format!("acme/e{i:04}"), "", 1);
+            record.name = format!("e{i:04}");
+            record.created_at = 1_000 + i as i64;
+            add(db, &mut record).await.unwrap();
+            seeded.push(record);
+        }
+        Entity::update_many()
+            .col_expr(Column::Incarnation, Expr::value(""))
+            .exec(db)
+            .await
+            .unwrap();
+        seeded
+    }
+
+    async fn marker_done(db: &DatabaseConnection) -> bool {
+        fill_marker_done(db).await.unwrap()
     }
 
     #[tokio::test]
@@ -348,6 +548,289 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(stored.description, "same");
+    }
+
+    #[tokio::test]
+    async fn every_writer_stores_the_derived_incarnation() {
+        let db = db().await;
+        let (global, _) = get_or_create_global(&db, "acme").await.unwrap();
+        assert_eq!(
+            stored_incarnation(&db, &global).await,
+            env_incarnation("acme", &global.id, 0)
+        );
+        let mut local = env("acme/staging", "", 1);
+        add(&db, &mut local).await.unwrap();
+        assert_eq!(stored_incarnation(&db, &local).await, local.incarnation());
+        let mut replicated = env("acme/qa", "", 9);
+        replicated.name = "qa".to_string();
+        replicated.created_at = 7;
+        assert!(apply_upsert(&db, &replicated).await.unwrap());
+        assert_eq!(
+            stored_incarnation(&db, &replicated).await,
+            env_incarnation("acme", "acme/qa", 7)
+        );
+        assert_eq!(local.incarnation().len(), 27);
+    }
+
+    #[tokio::test]
+    async fn the_fill_writes_what_readers_already_compute_and_a_rerun_changes_nothing() {
+        let db = db().await;
+        let seeded = seed_blank(&db, 450).await;
+        let before: Vec<String> = seeded.iter().map(|r| r.incarnation()).collect();
+        assert!(!marker_done(&db).await);
+
+        assert_eq!(fill_incarnation(&db).await.unwrap(), 450);
+        assert!(marker_done(&db).await);
+        for (record, expected) in seeded.iter().zip(&before) {
+            assert_eq!(&stored_incarnation(&db, record).await, expected);
+            let read = get_by_id(&db, "acme", &record.id).await.unwrap().unwrap();
+            assert_eq!(&read.incarnation(), expected);
+        }
+        assert_eq!(fill_incarnation(&db).await.unwrap(), 0);
+        assert_eq!(stored_incarnation(&db, &seeded[0]).await, before[0]);
+    }
+
+    #[tokio::test]
+    async fn an_interrupted_fill_resumes_and_two_workers_write_each_row_once() {
+        let db = db().await;
+        let seeded = seed_blank(&db, 230).await;
+        let (first, last) = fill_incarnation_page(&db, "").await.unwrap();
+        assert_eq!(first, FILL_PAGE_ROWS);
+        assert!(last.is_some());
+        assert!(!marker_done(&db).await, "no marker until the last page");
+
+        let (a, b) = tokio::join!(fill_incarnation(&db), fill_incarnation(&db));
+        assert_eq!(first + a.unwrap() + b.unwrap(), 230);
+        for record in &seeded {
+            assert_eq!(stored_incarnation(&db, record).await, record.incarnation());
+        }
+        assert!(marker_done(&db).await);
+    }
+
+    async fn seed_value(
+        db: &DatabaseConnection,
+        org_id: &str,
+        env_id: &str,
+        incarnation: &str,
+    ) -> org_secret_values::Model {
+        let value = org_secret_values::Model {
+            id: config::ider::ksuid(),
+            org_id: org_id.into(),
+            secret_id: "secret".into(),
+            env_id: env_id.into(),
+            env_incarnation: incarnation.into(),
+            state: "active".into(),
+            value_ref: Some(config::ider::ksuid()),
+            backend_id: None,
+            value_rev: config::ider::ksuid(),
+            value_version: 1,
+            updated_by: "tester".into(),
+        };
+        org_secret_values::insert_in(db, value.into())
+            .await
+            .unwrap()
+    }
+
+    async fn read_value(
+        db: &DatabaseConnection,
+        value: &org_secret_values::Model,
+    ) -> org_secret_values::Model {
+        org_secret_values::get_value_in(
+            db,
+            &value.org_id,
+            &value.secret_id,
+            &value.env_id,
+            &value.env_incarnation,
+        )
+        .await
+        .unwrap()
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn retirement_commits_or_rolls_back_the_whole_environment_incarnation() {
+        if !meta_store().await {
+            return;
+        }
+        let db = crate::db::get_orm_client_rw().await;
+        let org = unique("retire_env");
+        let mut record = env(&environment_id(&org, "staging"), "", 10);
+        record.org_id = org.clone();
+        record.created_at = 10;
+        add(db, &mut record).await.unwrap();
+        let current = seed_value(db, &org, &record.id, &record.incarnation()).await;
+        let older = seed_value(db, &org, &record.id, &env_incarnation(&org, &record.id, 9)).await;
+        let other = seed_value(
+            db,
+            &org,
+            &environment_id(&org, "other"),
+            &record.incarnation(),
+        )
+        .await;
+        let credential = credentials::Model {
+            id: config::ider::ksuid(),
+            secret_ref: current.value_ref.clone().unwrap(),
+            org_id: org.clone(),
+            owner_kind: credential_values::OWNER_KIND_ORG_SECRET.into(),
+            owner_id: current.id.clone(),
+            purpose: "value".into(),
+            key_id: None,
+            state: "current".into(),
+            ciphertext: "ciphertext".into(),
+            last_verified_at: None,
+            grace_expires_at: None,
+            created_at: 10,
+            updated_at: 10,
+        };
+        credential_values::insert(db, credential.clone().into())
+            .await
+            .unwrap();
+        let pointer = org_secret_values::insert_in(
+            db,
+            org_secret_values::Model {
+                id: config::ider::ksuid(),
+                secret_id: "pointer".into(),
+                value_ref: Some(config::ider::ksuid()),
+                backend_id: Some(config::ider::ksuid()),
+                ..current.clone()
+            }
+            .into(),
+        )
+        .await
+        .unwrap();
+        let pointer_credential = credentials::Model {
+            id: config::ider::ksuid(),
+            secret_ref: pointer.value_ref.clone().unwrap(),
+            owner_kind: credential_values::OWNER_KIND_ORG_SECRET_POINTER.into(),
+            owner_id: pointer.id.clone(),
+            ..credential.clone()
+        };
+        credential_values::insert(db, pointer_credential.clone().into())
+            .await
+            .unwrap();
+        let variable = synthetics_variables::SyntheticsVariableRecord {
+            id: config::ider::ksuid(),
+            org_id: org.clone(),
+            env: record.id.clone(),
+            name: "url".into(),
+            value: "test".into(),
+            kind: "plain".into(),
+            description: String::new(),
+            example: String::new(),
+            tags: vec![],
+            owner: None,
+            created_at: 10,
+            updated_at: 10,
+        };
+        synthetics_variables::insert_row(db, &variable)
+            .await
+            .unwrap();
+
+        let txn = db.begin().await.unwrap();
+        assert!(retire_environment(&txn, &org, &record.id).await.unwrap());
+        txn.rollback().await.unwrap();
+        assert_eq!(
+            get_by_id(db, &org, &record.id).await.unwrap().unwrap(),
+            record
+        );
+        assert_eq!(
+            synthetics_variables::get(db, &org, &variable.id)
+                .await
+                .unwrap()
+                .unwrap(),
+            variable
+        );
+        for value in [&current, &pointer, &older, &other] {
+            assert_eq!(&read_value(db, value).await, value);
+        }
+        for owned in [&credential, &pointer_credential] {
+            assert_eq!(
+                &credential_values::find_state(db, &org, &owned.secret_ref, "current")
+                    .await
+                    .unwrap()
+                    .unwrap(),
+                owned
+            );
+        }
+        assert!(
+            synthetics_env_retired::get_in(db, &org, &record.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+
+        let before = chrono::Utc::now().timestamp_millis();
+        assert!(delete(db, &org, &record.id).await.unwrap());
+        assert!(!delete(db, &org, &record.id).await.unwrap());
+        assert!(get_by_id(db, &org, &record.id).await.unwrap().is_none());
+        assert!(
+            synthetics_variables::get(db, &org, &variable.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        for value in [&current, &pointer] {
+            let deleted = read_value(db, value).await;
+            assert_eq!(deleted.state, "deleted");
+            assert!(deleted.value_ref.is_none() && deleted.backend_id.is_none());
+        }
+        for value in [&older, &other] {
+            assert_eq!(&read_value(db, value).await, value);
+        }
+        for owned in [&credential, &pointer_credential] {
+            let retired = credential_values::find_state(db, &org, &owned.secret_ref, "retired")
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(retired.id, owned.id);
+            assert!(
+                (before..=chrono::Utc::now().timestamp_millis())
+                    .contains(&retired.grace_expires_at.unwrap())
+            );
+        }
+        assert_eq!(
+            synthetics_env_retired::get_in(db, &org, &record.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .retired_created_at,
+            record.created_at
+        );
+        org_secret_values::delete_by_org(&org).await.unwrap();
+        credential_values::delete_by_org(&org).await.unwrap();
+        synthetics_env_retired::delete_by_org(&org).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn recreating_an_environment_stamps_its_new_life_after_the_watermark() {
+        if !meta_store().await {
+            return;
+        }
+        let db = crate::db::get_orm_client_rw().await;
+        let org = unique("recreate_env");
+        let mut record = env(&environment_id(&org, "staging"), "", 10);
+        record.org_id = org.clone();
+        record.created_at = 10;
+        add(db, &mut record).await.unwrap();
+        for (requested, expected) in [(9, 11), (11, 12), (25, 25)] {
+            let old = record.incarnation();
+            let mut stale = record.clone();
+            assert!(delete(db, &org, &record.id).await.unwrap());
+            stale.updated_at += 1;
+            assert!(!apply_upsert(db, &stale).await.unwrap());
+            assert!(get_by_id(db, &org, &record.id).await.unwrap().is_none());
+            record.created_at = requested;
+            add(db, &mut record).await.unwrap();
+            assert_eq!(record.created_at, expected);
+            assert_ne!(record.incarnation(), old);
+            assert_eq!(
+                get_by_id(db, &org, &record.id).await.unwrap().unwrap(),
+                record
+            );
+            assert_eq!(stored_incarnation(db, &record).await, record.incarnation());
+        }
+        delete_by_org(db, &org).await.unwrap();
+        synthetics_env_retired::delete_by_org(&org).await.unwrap();
     }
 
     #[test]

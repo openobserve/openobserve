@@ -495,7 +495,7 @@ pub async fn update(
 
         for panel_id in panels_to_add {
             let panel_record = timed_annotation_panels::ActiveModel {
-                id: Set(ider::uuid()),
+                id: Set(ider::ksuid()),
                 timed_annotation_id: Set(timed_annotation_id.clone()),
                 panel_id: Set(panel_id),
             };
@@ -565,7 +565,7 @@ async fn insert_timed_annotation(
             errors::Error::Message(err_msg.to_string())
         })?
     } else {
-        ider::uuid()
+        ider::ksuid()
     };
     let record = timed_annotations::ActiveModel {
         id: Set(annotation_id.clone()),
@@ -582,7 +582,7 @@ async fn insert_timed_annotation(
 
     for panel_id in &timed_annotation.panels {
         let panel_record = timed_annotation_panels::ActiveModel {
-            id: Set(ider::uuid()),
+            id: Set(ider::ksuid()),
             timed_annotation_id: Set(annotation_id.clone()),
             panel_id: Set(panel_id.clone()),
         };

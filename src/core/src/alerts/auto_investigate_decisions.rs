@@ -144,7 +144,7 @@ impl DecisionSource for MetaStream {
             ..Default::default()
         };
         let resp = crate::search::grpc_search::grpc_search(
-            &ider::uuid(),
+            &ider::ksuid(),
             META_ORG_ID,
             StreamType::Logs,
             None,

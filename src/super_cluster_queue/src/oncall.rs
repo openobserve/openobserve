@@ -303,7 +303,7 @@ mod tests {
     #[tokio::test]
     async fn contact_put_and_delete_messages_apply() {
         meta_store().await;
-        let org = format!("org_{}", config::ider::uuid());
+        let org = format!("org_{}", config::ider::ksuid());
         let key = format!("/oncall/{org}/contacts/ana@o2.ai");
         let put = format!(
             r#"{{"ContactPut":{{"id":"c_1","org_id":"{org}","user_email":"ana@o2.ai","phone":"+15550100","phone_verified_at":700}}}}"#
@@ -353,7 +353,7 @@ mod tests {
     async fn test_p13_a_replicated_telephony_account_resolves_and_its_delete_removes_it() {
         meta_store().await;
         encrypting();
-        let org = format!("org_{}", config::ider::uuid());
+        let org = format!("org_{}", config::ider::ksuid());
         let key = format!("/oncall/{org}/telephony");
         let put = format!(
             r#"{{"TelephonyAccountPut":{{"org_id":"{org}","provider":"twilio","account_sid":"AC123","auth_token":"tok-secret","from_number":"+15550100"}}}}"#

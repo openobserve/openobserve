@@ -573,6 +573,11 @@ pub struct Response {
     /// For an impacted record, the owner record it was opened alongside.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin_response_id: Option<String>,
+    /// Who triggered the page by hand; every send re-checks their secret use. `None` is a system
+    /// firing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(ignore)]
+    pub requested_by: Option<String>,
     pub state: ResponseState,
     pub opened_at: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -594,6 +599,13 @@ pub struct Response {
 }
 
 impl Response {
+    /// Manual sends need provenance internally; page readers must not receive the sender's email.
+    pub fn for_reader(&self) -> Self {
+        let mut response = self.clone();
+        response.requested_by = None;
+        response
+    }
+
     /// The owning team on a path that only ever runs for a routed record.
     ///
     /// A teamless record never reaches the ladder (R6.2), so the paging path's
@@ -649,6 +661,12 @@ impl Response {
             exhausted_at: None,
             ladder_anchor: Some(now),
             ladder_run: Some(next_ladder_run(self.ladder_run)),
+            // The requester's `use` covered the old team's destinations; the new team's are system
+            // sends.
+            requested_by: match to_team_id {
+                Some(team) if self.team_id.as_deref() != Some(team) => None,
+                _ => self.requested_by.clone(),
+            },
             ..self.clone()
         }
     }
@@ -1453,6 +1471,26 @@ mod tests {
         assert_eq!(back.delivered, Some(true));
     }
 
+    #[test]
+    fn reader_json_omits_manual_sender_and_internal_json_preserves_it() {
+        let mut record = sample(None, None);
+        record.requested_by = Some("manual-sender@oncall.test".to_string());
+
+        let reader = serde_json::to_value(record.for_reader()).unwrap();
+        assert!(reader.get("requested_by").is_none());
+        assert_eq!(
+            record.requested_by.as_deref(),
+            Some("manual-sender@oncall.test")
+        );
+
+        let internal = serde_json::to_value(&record).unwrap();
+        assert_eq!(internal["requested_by"], "manual-sender@oncall.test");
+        assert_eq!(
+            serde_json::from_value::<Response>(internal).unwrap(),
+            record
+        );
+    }
+
     fn sample(acked_at: Option<i64>, closed_at: Option<i64>) -> Response {
         Response {
             id: "resp_1".into(),
@@ -1475,6 +1513,7 @@ mod tests {
             closed_at,
             incident_id: None,
             exhausted_at: None,
+            requested_by: None,
             updated_at: 1_000,
         }
     }

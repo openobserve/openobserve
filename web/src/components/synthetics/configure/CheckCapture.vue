@@ -19,8 +19,12 @@ import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck } from "@/types/synthetics";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { carriesWriteOnly } from "@/utils/synthetics/writeOnly";
 
 const props = defineProps<{ check: BrowserCheck }>();
+// Traces and screenshots record typed values, so the server turns capture off for these checks (R13-03).
+const captureOff = computed(() => carriesWriteOnly(props.check));
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
 const { t } = useI18nTyped();
@@ -61,6 +65,13 @@ const screenshotDescription = computed(() => {
       <h3 class="text-text-heading text-base font-semibold">{{ t("synthetics.capture.title") }}</h3>
     </div>
     <div class="flex flex-col gap-4 px-3 py-2">
+      <OBanner
+        v-if="captureOff"
+        variant="info"
+        icon="info"
+        :content="t('synthetics.secretFields.captureOff')"
+        data-test="synthetics-check-capture-off-note"
+      />
       <div class="flex items-center gap-4">
         <label class="text-text-body w-24 shrink-0 text-sm font-medium">{{
           t("synthetics.capture.screenshot")

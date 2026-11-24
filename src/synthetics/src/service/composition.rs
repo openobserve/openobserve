@@ -18,18 +18,25 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use config::meta::{
+    secret_store::{ConsumerType, SecretErrorCode, grammar::has_secret_ref},
     synthetics::{BrowserConfig, Synthetic, SyntheticType, validate_expanded_steps},
     synthetics_composition::{
         ChildJourney, ExpansionError, expand_steps, placeholders_in, subtest_refs,
     },
 };
 use infra::table::{
-    synthetics_checks,
+    secret_refs, synthetics_checks,
     synthetics_environments::{self, SyntheticsEnvironmentRecord},
+    synthetics_locations,
     synthetics_refs::{self, ParentRef},
     synthetics_variables::{self, SyntheticsVariableRecord},
 };
 use sea_orm::ConnectionTrait;
+
+use super::{
+    checks::store_var_url_for_validation,
+    crypto::{SlotRefusal, carries_write_only, decrypt_synthetic_secrets},
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum CompositionError {
@@ -39,6 +46,8 @@ pub enum CompositionError {
     ReferencedBy(Vec<ParentRef>),
     #[error("a check referenced by other checks cannot contain a subtest")]
     ReferencedCannotHoldSubtest(Vec<ParentRef>),
+    #[error("this check runs inside other checks whose secrets you cannot use")]
+    ParentSecretUseRequired(Vec<ParentRef>),
     #[error("composition lock unavailable: {0}")]
     Lock(String),
 }
@@ -99,9 +108,11 @@ pub(crate) async fn validate_for_save<C: ConnectionTrait>(
 ) -> Result<(), CompositionError> {
     let refs = synthetics_refs::refs_of(body);
     let parents = match own_id {
-        Some(id) if !refs.is_empty() => synthetics_refs::list_parents(conn, org_id, id)
-            .await
-            .map_err(|e| CompositionError::Invalid(e.to_string()))?,
+        Some(id) if body.check_type == SyntheticType::Browser => {
+            synthetics_refs::list_parents(conn, org_id, id)
+                .await
+                .map_err(|e| CompositionError::Invalid(e.to_string()))?
+        }
         _ => Vec::new(),
     };
     let mut children = HashMap::new();
@@ -143,6 +154,69 @@ pub(crate) async fn validate_for_save<C: ConnectionTrait>(
         ),
         other => other,
     }
+}
+
+/// A private-location parent sends embedded children's write-only values to a customer agent, so a
+/// new embedding or private location needs them retyped; so does a journey to an untyped host.
+pub(crate) async fn refuse_private_embedding<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    own_id: Option<&str>,
+    body: &Synthetic,
+) -> anyhow::Result<()> {
+    let refs: HashSet<String> = synthetics_refs::refs_of(body).into_iter().collect();
+    if refs.is_empty() {
+        return Ok(());
+    }
+    crate::job_api::refuse_child_host_change(conn, body).await?;
+    let mut private = HashSet::new();
+    for id in &body.locations {
+        if synthetics_locations::get(id)
+            .await?
+            .is_some_and(|row| row.kind == synthetics_locations::KIND_PRIVATE)
+        {
+            private.insert(id.clone());
+        }
+    }
+    if private.is_empty() {
+        return Ok(());
+    }
+    let stored = match own_id {
+        Some(id) => synthetics_checks::get(conn, org_id, id).await?,
+        None => None,
+    };
+    let mut write_only = HashSet::new();
+    for child_id in &refs {
+        if let Some(child) = synthetics_checks::get(conn, org_id, child_id).await?
+            && carries_inline_credentials(conn, org_id, child).await?
+        {
+            write_only.insert(child_id.clone());
+        }
+    }
+    private_embedding_refusal(body, stored.as_ref(), &private, &write_only)
+}
+
+/// S02: every check that embeds `child_id`, with its definition. Nesting is one level deep, so
+/// the direct parents are the whole transitive set.
+pub async fn parents_of_child(
+    org_id: &str,
+    child_id: &str,
+) -> anyhow::Result<Vec<(ParentRef, Synthetic)>> {
+    let conn = infra::db::get_orm_client_rw().await;
+    parents_of_child_in(conn, org_id, child_id).await
+}
+
+pub(crate) async fn parents_of_child_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    child_id: &str,
+) -> anyhow::Result<Vec<(ParentRef, Synthetic)>> {
+    let (parents, mut definitions) =
+        synthetics_refs::list_parents_with_definitions(conn, org_id, child_id).await?;
+    Ok(parents
+        .into_iter()
+        .filter_map(|p| definitions.remove(&p.id).map(|d| (p, d)))
+        .collect())
 }
 
 /// Refuses when any check outside `deleting` still references one inside it (§5.3 bulk pre-pass).
@@ -265,7 +339,7 @@ fn check_rules(
             "config.steps: subtest '{missing}' is not a browser check in this organization"
         )));
     }
-    let expanded = expand_steps(&cfg.steps, children).map_err(|e| match e {
+    let mut expanded = expand_steps(&cfg.steps, children).map_err(|e| match e {
         ExpansionError::ChildHoldsReference { child, .. } => CompositionError::Invalid(format!(
             "config.steps: '{child}' contains a subtest of its own; nesting is limited to one level"
         )),
@@ -286,6 +360,11 @@ fn check_rules(
             refs.len(),
             if refs.len() == 1 { "" } else { "s" }
         )));
+    }
+    for step in &mut expanded {
+        if let Some(url) = step["url"].as_str().and_then(store_var_url_for_validation) {
+            step["url"] = serde_json::Value::String(url);
+        }
     }
     validate_expanded_steps(&expanded).map_err(|e| {
         CompositionError::Invalid(format!(
@@ -323,6 +402,62 @@ fn check_rules(
             "variables: '{}' uses {{{{{}}}}}, which this test does not define{scope}",
             v.child_id, v.name
         )));
+    }
+    Ok(())
+}
+
+async fn carries_inline_credentials<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    mut child: Synthetic,
+) -> anyhow::Result<bool> {
+    if !carries_write_only(&child) {
+        return Ok(false);
+    }
+    let refs = secret_refs::list_for_consumer_in(
+        conn,
+        org_id,
+        ConsumerType::SyntheticsCheck.as_str(),
+        &child.id,
+    )
+    .await?;
+    if refs.is_empty() {
+        return Ok(true);
+    }
+    decrypt_synthetic_secrets(org_id, &mut child).await?;
+    let mut stored = serde_json::to_value(child)?;
+    for binding in refs {
+        if let Some(value) = stored.pointer_mut(&binding.field)
+            && value.as_str().is_some_and(has_secret_ref)
+        {
+            *value = serde_json::Value::String(String::new());
+        }
+    }
+    Ok(carries_write_only(&serde_json::from_value(stored)?))
+}
+
+fn private_embedding_refusal(
+    body: &Synthetic,
+    stored: Option<&Synthetic>,
+    private: &HashSet<String>,
+    write_only_children: &HashSet<String>,
+) -> anyhow::Result<()> {
+    let (old_refs, old_locations): (HashSet<String>, HashSet<&String>) = stored
+        .map(|s| {
+            (
+                synthetics_refs::refs_of(s).into_iter().collect(),
+                s.locations.iter().collect(),
+            )
+        })
+        .unwrap_or_default();
+    let adds_private = private.iter().any(|id| !old_locations.contains(id));
+    let exposed = synthetics_refs::refs_of(body).into_iter().any(|child| {
+        write_only_children.contains(&child) && (adds_private || !old_refs.contains(&child))
+    });
+    if exposed {
+        return Err(
+            SlotRefusal::new(SecretErrorCode::SlotValueRequiredOnHostChange, "subtests").into(),
+        );
     }
     Ok(())
 }
@@ -460,6 +595,39 @@ pub(crate) mod tests {
             );
         }
         browser("p", json!(steps))
+    }
+
+    #[test]
+    fn a_private_parent_may_not_newly_expose_a_write_only_child() {
+        let refusal = |body: &Synthetic, stored: Option<&Synthetic>, write_only: &[&str]| {
+            let private = HashSet::from(["agent".to_owned()]);
+            let write_only = write_only.iter().map(|s| (*s).to_owned()).collect();
+            private_embedding_refusal(body, stored, &private, &write_only)
+                .err()
+                .map(|e| e.downcast_ref::<SlotRefusal>().unwrap().code.as_str())
+        };
+        let mut parent = parent_with(&["login"], 0);
+        parent.locations = vec!["agent".into()];
+        assert_eq!(
+            refusal(&parent, None, &["login"]),
+            Some("slot_value_required_on_host_change")
+        );
+        assert_eq!(refusal(&parent, None, &[]), None);
+        // Unchanged embedding and locations: the values already reach this agent.
+        assert_eq!(refusal(&parent, Some(&parent), &["login"]), None);
+        let mut public = parent.clone();
+        public.locations = vec!["public".into()];
+        assert_eq!(
+            refusal(&parent, Some(&public), &["login"]),
+            Some("slot_value_required_on_host_change")
+        );
+        let without = parent_with(&[], 0);
+        let mut stored = without.clone();
+        stored.locations = parent.locations.clone();
+        assert_eq!(
+            refusal(&parent, Some(&stored), &["login"]),
+            Some("slot_value_required_on_host_change")
+        );
     }
 
     #[test]
@@ -911,6 +1079,8 @@ pub(crate) mod tests {
         let schema = Schema::new(backend);
         // `validate_for_save` reads the shared tier, so those tables must exist even when empty.
         for statement in [
+            schema.create_table_from_entity(infra::table::entity::secret_refs::Entity),
+            schema.create_table_from_entity(infra::table::entity::secret_dependencies::Entity),
             schema.create_table_from_entity(infra::table::entity::synthetics_refs::Entity),
             schema.create_table_from_entity(infra::table::entity::synthetics_variables::Entity),
             schema.create_table_from_entity(infra::table::entity::synthetics_environments::Entity),

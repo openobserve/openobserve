@@ -149,6 +149,26 @@ pub async fn list<C: ConnectionTrait>(
         .collect())
 }
 
+/// The org's rows whose name is in `names`, in every environment, ordered like [`list`].
+pub async fn list_named<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    names: &[String],
+) -> Result<Vec<SyntheticsVariableRecord>, errors::Error> {
+    if names.is_empty() {
+        return Ok(Vec::new());
+    }
+    Ok(Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Name.is_in(names.iter().cloned()))
+        .order_by_asc(Column::Name)
+        .all(conn)
+        .await?
+        .into_iter()
+        .map(SyntheticsVariableRecord::from)
+        .collect())
+}
+
 pub async fn get<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,

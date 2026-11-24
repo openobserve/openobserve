@@ -47,7 +47,7 @@ pub async fn insert_many_panels(
 
     for panel_id in panel_ids {
         let record = timed_annotation_panels::ActiveModel {
-            id: Set(ider::uuid()),
+            id: Set(ider::ksuid()),
             timed_annotation_id: Set(timed_annotation_id.to_string()),
             panel_id: Set(panel_id),
         };

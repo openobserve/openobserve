@@ -17,10 +17,13 @@
 
 use anyhow::Result;
 use common::utils::ssrf_guard::SsrfGuard;
-use config::meta::destinations::{DestinationType, Endpoint};
+use config::meta::destinations::{Destination, DestinationType, Endpoint};
 use serde_json::{Value, json};
 
-use super::format::{ChannelFormat, derive_channel_format};
+use super::{
+    format::{ChannelFormat, derive_channel_format},
+    send::{self, SecretRequest, SendError},
+};
 
 /// ServiceNow refuses a resolve without a resolution code, and valid values are per-instance.
 const DEFAULT_CLOSE_CODE: &str = "Solved (Permanently)";
@@ -35,23 +38,15 @@ const STATE_CLOSED: &str = "7";
 /// Bounded: unlimited would fall back to the instance row cap and PATCH thousands.
 const LOOKUP_LIMIT: usize = 100;
 
+/// The prefix of a resolve answer that found no open record for the key.
+pub const NOTHING_TO_CLOSE: &str = "nothing to close";
+
 /// A destination whose resolve protocol we know well enough to speak ourselves.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Platform {
     PagerDuty,
     Opsgenie,
     ServiceNow,
-}
-
-/// Read off the destination, never the template — the author may have attached
-/// any message body to a PagerDuty destination and it is still PagerDuty.
-pub fn platform_of(dest_type: &DestinationType) -> Option<Platform> {
-    match derive_channel_format(dest_type) {
-        ChannelFormat::PagerDuty => Some(Platform::PagerDuty),
-        ChannelFormat::Opsgenie => Some(Platform::Opsgenie),
-        ChannelFormat::ServiceNow => Some(Platform::ServiceNow),
-        _ => None,
-    }
 }
 
 impl Platform {
@@ -65,29 +60,6 @@ impl Platform {
     }
 }
 
-/// Overwrites, routing key included: a template's own key would page and then never resolve.
-pub fn stamp_key(
-    platform: Platform,
-    body: &str,
-    episode_id: &str,
-    metadata: &hashbrown::HashMap<String, String>,
-) -> Result<String> {
-    let mut value: Value = serde_json::from_str(body)?;
-    let object = value
-        .as_object_mut()
-        .ok_or_else(|| anyhow::anyhow!("payload is not a JSON object"))?;
-    object.insert(platform.key_field().to_string(), json!(episode_id));
-    if platform == Platform::PagerDuty
-        && let Some(routing_key) = metadata.get("routing_key").filter(|key| !key.is_empty())
-    {
-        object.insert("routing_key".to_string(), json!(routing_key));
-    }
-    Ok(value.to_string())
-}
-
-/// The prefix of a resolve answer that found no open record for the key.
-pub const NOTHING_TO_CLOSE: &str = "nothing to close";
-
 /// A non 2xx platform answer; the text is what the alert recovery logged before.
 #[derive(Debug, thiserror::Error)]
 #[error("status {status}{}", body.as_deref().map(|b| format!(": {b}")).unwrap_or_default())]
@@ -96,64 +68,179 @@ pub struct PlatformRejected {
     pub body: Option<String>,
 }
 
+struct PlatformResponse {
+    text: String,
+    sys_ids: Vec<String>,
+}
+
+/// Read off the destination, never the template — the author may have attached
+/// any message body to a PagerDuty destination and it is still PagerDuty.
+pub fn platform_of(dest_type: &DestinationType) -> Option<Platform> {
+    match derive_channel_format(dest_type) {
+        ChannelFormat::PagerDuty => Some(Platform::PagerDuty),
+        ChannelFormat::Opsgenie => Some(Platform::Opsgenie),
+        ChannelFormat::ServiceNow => Some(Platform::ServiceNow),
+        _ => None,
+    }
+}
+
+/// Overwrites, routing key included: a template's own key would page and then never resolve.
+pub fn stamp_key(
+    platform: Platform,
+    body: &str,
+    episode_id: &str,
+    metadata: &hashbrown::HashMap<String, String>,
+) -> Result<String> {
+    let routing_key = metadata.get("routing_key").filter(|key| !key.is_empty());
+    stamp_key_fields(
+        platform,
+        body,
+        Some(episode_id),
+        routing_key.map(String::as_str),
+    )
+}
+
+pub(crate) fn stamp_secret_key(
+    platform: Option<Platform>,
+    body: &str,
+    episode_id: Option<&str>,
+    endpoint: &Endpoint,
+    attempt: &SecretRequest,
+) -> Result<String> {
+    let Some(platform) = platform else {
+        return Ok(body.to_owned());
+    };
+    let routing_key = if platform == Platform::PagerDuty {
+        Some(attempt.routing_key(endpoint)?)
+    } else {
+        None
+    };
+    let routing_key = routing_key
+        .as_ref()
+        .map(|key| key.as_str())
+        .filter(|key| !key.is_empty());
+    if episode_id.is_none() && routing_key.is_none() {
+        return Ok(body.to_owned());
+    }
+    stamp_key_fields(platform, body, episode_id, routing_key)
+        .map_err(|_| SendError::Render("platform payload is not a JSON object".into()).into())
+}
+
 /// Close whatever the firing opened; ServiceNow needs two, updating only by `sys_id`.
 pub async fn send_resolve(
     platform: Platform,
     endpoint: &Endpoint,
     episode_id: &str,
 ) -> Result<String> {
+    send_resolve_for(None, platform, endpoint, episode_id).await
+}
+
+pub(crate) async fn send_saved_resolve(
+    destination: &Destination,
+    platform: Platform,
+    endpoint: &Endpoint,
+    episode_id: &str,
+) -> Result<String> {
+    send_resolve_for(Some(destination), platform, endpoint, episode_id).await
+}
+
+fn stamp_key_fields(
+    platform: Platform,
+    body: &str,
+    episode_id: Option<&str>,
+    routing_key: Option<&str>,
+) -> Result<String> {
+    let mut value: Value = serde_json::from_str(body)?;
+    let object = value
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("payload is not a JSON object"))?;
+    if let Some(episode_id) = episode_id {
+        object.insert(platform.key_field().to_string(), json!(episode_id));
+    }
+    if platform == Platform::PagerDuty
+        && let Some(routing_key) = routing_key
+    {
+        object.insert("routing_key".to_string(), json!(routing_key));
+    }
+    Ok(value.to_string())
+}
+
+async fn send_resolve_for(
+    destination: Option<&Destination>,
+    platform: Platform,
+    endpoint: &Endpoint,
+    episode_id: &str,
+) -> Result<String> {
     match platform {
-        Platform::PagerDuty => {
-            let body = json!({
-                // Events v2 drops a resolve sent via a different routing key
-                // than the trigger, answering 202 either way.
-                "routing_key": endpoint.metadata.get("routing_key").cloned().unwrap_or_default(),
-                "event_action": "resolve",
-                "dedup_key": episode_id,
-            });
-            request(
-                endpoint,
-                reqwest::Method::POST,
-                &endpoint.url,
-                Some(body.to_string()),
-            )
-            .await
-        }
+        Platform::PagerDuty => request_for(
+            destination,
+            endpoint,
+            reqwest::Method::POST,
+            "",
+            |attempt| {
+                let secret = attempt
+                    .map(|attempt| attempt.routing_key(endpoint))
+                    .transpose()?;
+                let routing_key = secret.as_ref().map_or_else(
+                    || {
+                        endpoint
+                            .metadata
+                            .get("routing_key")
+                            .map_or("", String::as_str)
+                    },
+                    |key| key.as_str(),
+                );
+                Ok(Some(
+                    json!({
+                        // Events v2 drops a resolve sent via a different routing key
+                        // than the trigger, answering 202 either way.
+                        "routing_key": routing_key,
+                        "event_action": "resolve",
+                        "dedup_key": episode_id,
+                    })
+                    .to_string(),
+                ))
+            },
+        )
+        .await
+        .map(|response| response.text),
         Platform::Opsgenie => {
-            let url = format!(
-                "{}/{episode_id}/close?identifierType=alias",
-                endpoint.url.trim_end_matches('/')
-            );
+            let suffix = format!("/{episode_id}/close?identifierType=alias");
             let body = json!({ "source": "OpenObserve" });
-            request(
+            request_for(
+                destination,
                 endpoint,
                 reqwest::Method::POST,
-                &url,
-                Some(body.to_string()),
+                &suffix,
+                |_| Ok(Some(body.to_string())),
             )
             .await
+            .map(|response| response.text)
         }
-        Platform::ServiceNow => resolve_servicenow(endpoint, episode_id).await,
+        Platform::ServiceNow => resolve_servicenow(destination, endpoint, episode_id).await,
     }
 }
 
-async fn resolve_servicenow(endpoint: &Endpoint, episode_id: &str) -> Result<String> {
-    let base = endpoint.url.trim_end_matches('/');
+async fn resolve_servicenow(
+    destination: Option<&Destination>,
+    endpoint: &Endpoint,
+    episode_id: &str,
+) -> Result<String> {
     // No dedup, so one episode leaves several records; closed ones reject a PATCH.
     let lookup = format!(
-        "{base}?sysparm_query=correlation_id={episode_id}^state!={STATE_RESOLVED}^state!={STATE_CLOSED}\
+        "?sysparm_query=correlation_id={episode_id}^state!={STATE_RESOLVED}^state!={STATE_CLOSED}\
          &sysparm_fields=sys_id&sysparm_limit={LOOKUP_LIMIT}"
     );
-    let found = request(endpoint, reqwest::Method::GET, &lookup, None).await?;
-    let sys_ids: Vec<String> = serde_json::from_str::<Value>(&found)
-        .ok()
-        .and_then(|v| v["result"].as_array().cloned())
-        .unwrap_or_default()
-        .iter()
-        .filter_map(|row| row["sys_id"].as_str().map(str::to_string))
-        .collect();
+    let found = request_for(destination, endpoint, reqwest::Method::GET, &lookup, |_| {
+        Ok(None)
+    })
+    .await?;
+    let sys_ids = found.sys_ids;
     // A resolve of a key that opened nothing, or closed already, is done (D8).
     if sys_ids.is_empty() {
+        if endpoint.uses_store_refs() {
+            return Ok(found.text);
+        }
         return Ok(format!(
             "{NOTHING_TO_CLOSE}: no open incident carries correlation_id {episode_id}"
         ));
@@ -172,14 +259,37 @@ async fn resolve_servicenow(endpoint: &Endpoint, episode_id: &str) -> Result<Str
     })
     .to_string();
 
+    if endpoint.uses_store_refs() {
+        let mut outcome = found.text;
+        let mut failure = None;
+        for sys_id in &sys_ids {
+            match request_for(
+                destination,
+                endpoint,
+                reqwest::Method::PATCH,
+                &format!("/{sys_id}"),
+                |_| Ok(Some(body.clone())),
+            )
+            .await
+            {
+                Ok(response) => outcome = response.text,
+                Err(error) if error.downcast_ref::<PlatformRejected>().is_some() => {
+                    failure.get_or_insert(error);
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        return failure.map_or(Ok(outcome), Err);
+    }
     // Runs to the end: one failure must not strand the records after it.
     let (mut closed, mut failures) = (0usize, String::new());
     for sys_id in &sys_ids {
-        match request(
+        match request_for(
+            destination,
             endpoint,
             reqwest::Method::PATCH,
-            &format!("{base}/{sys_id}"),
-            Some(body.clone()),
+            &format!("/{sys_id}"),
+            |_| Ok(Some(body.clone())),
         )
         .await
         {
@@ -195,6 +305,72 @@ async fn resolve_servicenow(endpoint: &Endpoint, episode_id: &str) -> Result<Str
             sys_ids.len()
         ))
     }
+}
+
+async fn request_for(
+    destination: Option<&Destination>,
+    endpoint: &Endpoint,
+    method: reqwest::Method,
+    suffix: &str,
+    body: impl FnOnce(Option<&SecretRequest>) -> Result<Option<String>>,
+) -> Result<PlatformResponse> {
+    let Some(attempt) = SecretRequest::new(
+        destination,
+        endpoint,
+        send::destination_client_builder(endpoint.skip_tls_verify),
+    )
+    .await?
+    else {
+        let url = if suffix.is_empty() {
+            endpoint.url.clone()
+        } else {
+            format!("{}{suffix}", endpoint.url.trim_end_matches('/'))
+        };
+        let lookup = method == reqwest::Method::GET;
+        let text = request(endpoint, method, &url, body(None)?).await?;
+        let sys_ids = if lookup {
+            incident_ids(&text, None)
+        } else {
+            vec![]
+        };
+        return Ok(PlatformResponse { text, sys_ids });
+    };
+    let lookup = method == reqwest::Method::GET;
+    let req = if let Some(body) = body(Some(&attempt))? {
+        attempt.json_request(method, suffix).body(body)
+    } else {
+        attempt.request(method, suffix)
+    };
+    let resp = attempt.send(req).await?;
+    let status = resp.status();
+    if status.is_redirection() {
+        return Err(SendError::RedirectRefused(status).into());
+    }
+    if !status.is_success() {
+        return Err(PlatformRejected { status, body: None }.into());
+    }
+    let sys_ids = if lookup {
+        let text = resp.text().await.map_err(|e| attempt.transport_error(e))?;
+        incident_ids(&text, Some(&attempt))
+    } else {
+        vec![]
+    };
+    Ok(PlatformResponse {
+        text: format!("sent status: {status}"),
+        sys_ids,
+    })
+}
+
+fn incident_ids(text: &str, attempt: Option<&SecretRequest>) -> Vec<String> {
+    let value: Value = serde_json::from_str(text).unwrap_or_default();
+    value["result"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|row| row["sys_id"].as_str())
+        .filter(|id| attempt.is_none_or(|attempt| attempt.accepts_protocol_id(id)))
+        .map(str::to_owned)
+        .collect()
 }
 
 /// Guards the URL this module built rather than the one the operator typed.

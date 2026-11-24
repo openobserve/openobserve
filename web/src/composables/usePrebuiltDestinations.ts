@@ -51,6 +51,7 @@ import type {
   PrebuiltTypeId,
 } from "@/utils/prebuilt-templates/types";
 import type { Destination, Template } from "@/ts/interfaces/alert";
+import type { SecretBind } from "@/services/secrets";
 
 // Store
 import { useStore } from "vuex";
@@ -630,6 +631,7 @@ export function usePrebuiltDestinations() {
     skipTlsVerify: boolean = false,
     templateOverride?: string,
     setup?: SlackSetupMetadata,
+    secretBinds: SecretBind[] = [],
   ): Promise<void> {
     try {
       isLoading.value = true;
@@ -698,6 +700,8 @@ export function usePrebuiltDestinations() {
         }
       }
 
+      if (secretBinds.length) destinationData.secret_binds = secretBinds;
+
       // Create the destination
       await createDestinationWrite.mutateAsync({ destination_name: name, data: destinationData });
 
@@ -734,6 +738,7 @@ export function usePrebuiltDestinations() {
     skipTlsVerify: boolean = false,
     templateOverride?: string,
     setup?: SlackSetupMetadata,
+    secretBinds: SecretBind[] = [],
   ): Promise<void> {
     try {
       isLoading.value = true;
@@ -801,6 +806,8 @@ export function usePrebuiltDestinations() {
           delete destinationData.headers["Authorization"];
         }
       }
+
+      if (secretBinds.length) destinationData.secret_binds = secretBinds;
 
       // Update the destination
       // Original name for lookup: a rename must still address the old row.

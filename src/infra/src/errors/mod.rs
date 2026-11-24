@@ -87,6 +87,8 @@ pub enum Error {
     ErrorCode(ErrorCodes),
     #[error("Not implemented")]
     NotImplemented,
+    #[error("SecretStore# {0}")]
+    SecretStore(config::meta::secret_store::SecretErrorCode),
     #[error("Unknown error")]
     Unknown,
     #[error("Error# {0}")]

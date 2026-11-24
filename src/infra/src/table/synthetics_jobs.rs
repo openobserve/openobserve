@@ -15,20 +15,32 @@
 
 //! DB functions for `synthetics_jobs`.
 //!
-//! `lease_batch` uses the sea-orm query builder (SELECT → UPDATE → SELECT)
+//! `lease_batch_for_org` uses the sea-orm query builder (SELECT → UPDATE → SELECT)
 //! so it works on both SQLite and Postgres without raw SQL dialect branches.
 //! Other functions use `Statement::from_sql_and_values` which handles
 //! placeholder translation ($N → ?) automatically per backend.
 
+use std::collections::HashMap;
+
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseBackend, DbErr, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, Statement, Value, sea_query::Expr,
+    QuerySelect, Statement, Value,
+    sea_query::{Expr, SimpleExpr},
 };
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use svix_ksuid::KsuidLike as _;
+use zeroize::Zeroizing;
 
-use super::entity::synthetics_jobs::{Column, Entity};
+use super::{
+    entity::synthetics_jobs::{Column, Entity},
+    synthetics_environments,
+    synthetics_probe_tokens::token_sha256,
+};
 use crate::errors;
+
+pub const LEASE_TOKEN_PREFIX: &str = "o2lease_";
+/// 32 bytes need 43 base62 digits (62^43 > 2^256), so every secret has one length.
+const LEASE_SECRET_LEN: usize = 43;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -90,6 +102,65 @@ pub struct LeasedRow {
     /// comes from THIS, never the current check — see `EnqueueParams`.
     pub steps_configured: i32,
     pub metadata: String,
+}
+
+/// One claimed job; `lease_token` is set only for a claimer with `runner_contract=1`.
+#[derive(Debug, Serialize)]
+pub struct Lease {
+    #[serde(flatten)]
+    pub row: LeasedRow,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lease_token: Option<LeaseToken>,
+}
+
+/// Stored in `lease_issuer`; a standalone lease principal is accepted only from the dispatcher.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LeaseIssuer {
+    Dispatcher,
+    Agent,
+}
+
+impl LeaseIssuer {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Dispatcher => "dispatcher",
+            Self::Agent => "agent",
+        }
+    }
+}
+
+/// `o2lease_{job_id}.{secret}`, returned once at claim; only its SHA-256 is stored.
+#[derive(Clone, PartialEq, Eq)]
+pub struct LeaseToken(Zeroizing<String>);
+
+impl LeaseToken {
+    fn mint(job_id: &str) -> Self {
+        let secret = base62(&Zeroizing::new(config::utils::rand::random_bytes(32)));
+        Self(Zeroizing::new(format!(
+            "{LEASE_TOKEN_PREFIX}{job_id}.{}",
+            *secret
+        )))
+    }
+
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+
+    pub fn sha256(&self) -> String {
+        token_sha256(&self.0)
+    }
+}
+
+impl std::fmt::Debug for LeaseToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("LeaseToken(..)")
+    }
+}
+
+impl Serialize for LeaseToken {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.0)
+    }
 }
 
 /// Returned by `dead_letter_expired` for each job it terminated. The caller owns
@@ -180,12 +251,19 @@ pub async fn enqueue<C: ConnectionTrait>(
     p: EnqueueParams<'_>,
 ) -> Result<String, errors::Error> {
     let id = svix_ksuid::Ksuid::new(None, None).to_string();
+    // Pins the job to the environment life it was scheduled for; a recreated env is a new life.
+    let env_incarnation = match p.env {
+        Some(env) => synthetics_environments::get_by_id(conn, p.org_id, env)
+            .await?
+            .map(|record| record.incarnation()),
+        None => None,
+    };
     let sql = r#"
         INSERT INTO synthetics_jobs
             (id, synthetics_id, synthetics_name, org_id, location, env, pool,
              scheduled_ts, valid_until, status, dispatch_attempts, run_id, browser_devices,
-             steps_configured, metadata)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 0, $10, $11, $12, $13)
+             steps_configured, metadata, env_incarnation)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 0, $10, $11, $12, $13, $14)
         ON CONFLICT (synthetics_id, location, scheduled_ts, COALESCE(env, '')) DO NOTHING
     "#;
 
@@ -210,6 +288,7 @@ pub async fn enqueue<C: ConnectionTrait>(
                 .unwrap_or(Value::from(None::<String>)),
             Value::from(p.steps_configured),
             Value::from(p.metadata),
+            Value::from(env_incarnation),
         ],
     ))
     .await?;
@@ -300,18 +379,24 @@ const MAX_LEASE_BATCH: i64 = 100;
 /// completes the run as an error, and the probe's real result is then rejected as
 /// a stale ack. A client cannot be trusted to know how long its job may take, so
 /// the server raises any request up to the budget the config validation already
-/// guarantees every check fits inside.
-pub async fn lease_batch<C: ConnectionTrait>(
+/// guarantees every check fits inside, and caps it at `job_lease_max_secs`.
+///
+/// Limited to one org's jobs when `org_id` is set; `None` only for the dispatcher's
+/// public pools, which serve every org.
+#[allow(clippy::too_many_arguments)]
+pub async fn lease_batch_for_org<C: ConnectionTrait>(
     conn: &C,
+    org_id: Option<&str>,
     pool: &str,
     claimed_by: &str,
     limit: i64,
     now_us: i64,
     lease_secs: i64,
     browser: Option<bool>,
-) -> Result<Vec<LeasedRow>, errors::Error> {
-    let lease_secs = lease_secs.max(config::get_config().synthetics.job_lease_secs);
-    let lease_expires_at = now_us + lease_secs * 1_000_000;
+    issuer: Option<LeaseIssuer>,
+) -> Result<Vec<Lease>, errors::Error> {
+    let lease_expires_at =
+        now_us.saturating_add(clamp_lease_secs(lease_secs).saturating_mul(1_000_000));
 
     // `limit` arrives from a client and is cast to u64 below, where a negative
     // wraps to ~1.8e19 and the query becomes unbounded — one agent would lease the
@@ -340,6 +425,9 @@ pub async fn lease_batch<C: ConnectionTrait>(
         .filter(Column::Pool.eq(pool))
         .filter(Column::Status.eq(0i32))
         .filter(Column::ValidUntil.gt(now_us));
+    if let Some(org_id) = org_id {
+        query = query.filter(Column::OrgId.eq(org_id));
+    }
     query = match browser {
         Some(true) => query.filter(Column::BrowserDevices.is_not_null()),
         Some(false) => query.filter(Column::BrowserDevices.is_null()),
@@ -363,7 +451,15 @@ pub async fn lease_batch<C: ConnectionTrait>(
     // blocks on the row lock, then re-evaluates `status = 0` (now false) and
     // claims nothing for that row. Without this guard both would "win" the row
     // and run the check twice (duplicate results).
-    Entity::update_many()
+    // T05: the hash is written by the claim itself, so no committed claim lacks it.
+    let tokens: HashMap<String, LeaseToken> = match issuer {
+        Some(_) => ids
+            .iter()
+            .map(|id| (id.clone(), LeaseToken::mint(id)))
+            .collect(),
+        None => HashMap::new(),
+    };
+    let mut claim = Entity::update_many()
         .col_expr(Column::Status, Expr::value(1i32))
         .col_expr(Column::ClaimedBy, Expr::value(claimed_by))
         .col_expr(Column::ClaimedAt, Expr::value(now_us))
@@ -372,10 +468,18 @@ pub async fn lease_batch<C: ConnectionTrait>(
             Column::DispatchAttempts,
             Expr::col(Column::DispatchAttempts).add(1i32),
         )
+        // Only a claim writes these: a capable claimer's per-row hash, else NULL.
+        .col_expr(Column::LeaseTokenSha256, lease_hash_expr(&tokens))
+        .col_expr(
+            Column::LeaseIssuer,
+            Expr::value(issuer.map(|issuer| issuer.as_str().to_owned())),
+        )
         .filter(Column::Id.is_in(ids.clone()))
-        .filter(Column::Status.eq(0i32))
-        .exec(conn)
-        .await?;
+        .filter(Column::Status.eq(0i32));
+    if let Some(org_id) = org_id {
+        claim = claim.filter(Column::OrgId.eq(org_id));
+    }
+    claim.exec(conn).await?;
 
     // Step 3: return ONLY the rows THIS call actually won — pinned by our
     // (claimed_by, claimed_at) stamp. A racing agent that lost the guard above
@@ -388,25 +492,36 @@ pub async fn lease_batch<C: ConnectionTrait>(
         .all(conn)
         .await?;
 
+    let mut tokens = tokens;
     Ok(models
         .into_iter()
-        .map(|m| LeasedRow {
-            id: m.id,
-            synthetics_id: m.synthetics_id,
-            synthetics_name: m.synthetics_name,
-            org_id: m.org_id,
-            location: m.location,
-            env: m.env,
-            pool: m.pool,
-            scheduled_ts: m.scheduled_ts,
-            valid_until: m.valid_until,
-            dispatch_attempts: m.dispatch_attempts,
-            run_id: m.run_id,
-            browser_devices: m.browser_devices,
-            steps_configured: m.steps_configured,
-            metadata: m.metadata,
+        .map(|model| Lease {
+            lease_token: tokens.remove(&model.id),
+            row: leased_row(model),
         })
         .collect())
+}
+
+/// `CASE id WHEN .. THEN <hash> .. END`, or NULL when the claimer gets no token.
+fn lease_hash_expr(tokens: &HashMap<String, LeaseToken>) -> SimpleExpr {
+    let mut arms = tokens.iter();
+    let Some((id, token)) = arms.next() else {
+        return Expr::value(None::<String>);
+    };
+    let mut case = Expr::case(Expr::col(Column::Id).eq(id.as_str()), token.sha256());
+    for (id, token) in arms {
+        case = case.case(Expr::col(Column::Id).eq(id.as_str()), token.sha256());
+    }
+    case.finally(Expr::value(None::<String>)).into()
+}
+
+/// Client `lease_secs` bounded by the configured floor and ceiling (R8-42).
+pub fn clamp_lease_secs(requested: i64) -> i64 {
+    let cfg = &config::get_config().synthetics;
+    requested.clamp(
+        cfg.job_lease_secs,
+        cfg.job_lease_max_secs.max(cfg.job_lease_secs),
+    )
 }
 
 // ── Job API: ack ──────────────────────────────────────────────────────────────
@@ -664,6 +779,13 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
     Ok(dead)
 }
 
+/// A hash binds completion to one lease. Tokenless matches only attempts claimed without a lease.
+#[derive(Clone, Copy, Debug)]
+pub enum CompletionProof<'a> {
+    Lease(&'a str),
+    Tokenless,
+}
+
 /// Outcome of `fail_dispatch` — whether the job gets another dispatch attempt
 /// or has exhausted its budget.
 #[derive(Debug, PartialEq, Eq)]
@@ -704,26 +826,33 @@ pub async fn fail_dispatch<C: ConnectionTrait>(
     job_id: &str,
     current_attempts: i32,
     max_attempts: i32,
+    lease_sha256: Option<&str>,
 ) -> Result<DispatchFailureOutcome, errors::Error> {
+    // A late failure must not touch a newer attempt the reaper requeued and another holder leased.
+    let same_attempt = |query: sea_orm::UpdateMany<Entity>| {
+        let query = query
+            .filter(Column::Id.eq(job_id))
+            .filter(Column::Status.eq(1i32))
+            .filter(Column::DispatchAttempts.eq(current_attempts));
+        match lease_sha256 {
+            Some(hash) => query.filter(Column::LeaseTokenSha256.eq(hash)),
+            None => query.filter(Column::LeaseTokenSha256.is_null()),
+        }
+    };
     if current_attempts < max_attempts {
         // `AND status = 1` is what keeps this from resurrecting finished work. A
         // dispatch can be judged failed after the probe has already acked — a
         // Lambda that reports and then panics is exactly that — and without the
         // guard the requeue reset a COMPLETED job to Pending, so it was leased and
         // run again: duplicate result, and `finalize_run` twice for one job.
-        let sql = r#"
-            UPDATE synthetics_jobs
-            SET status = 0, claimed_by = NULL, claimed_at = NULL, lease_expires_at = NULL
-            WHERE id = $1 AND status = 1
-        "#;
-        let applied = conn
-            .execute(Statement::from_sql_and_values(
-                conn.get_database_backend(),
-                sql,
-                [Value::from(job_id.to_owned())],
-            ))
+        let applied = same_attempt(Entity::update_many())
+            .col_expr(Column::Status, Expr::value(0i32))
+            .col_expr(Column::ClaimedBy, Expr::value(None::<String>))
+            .col_expr(Column::ClaimedAt, Expr::value(None::<i64>))
+            .col_expr(Column::LeaseExpiresAt, Expr::value(None::<i64>))
+            .exec(conn)
             .await?;
-        if applied.rows_affected() == 0 {
+        if applied.rows_affected == 0 {
             return Ok(DispatchFailureOutcome::AlreadySettled);
         }
         Ok(DispatchFailureOutcome::Requeued)
@@ -737,6 +866,11 @@ pub async fn fail_dispatch<C: ConnectionTrait>(
             .column(Column::Id)
             .filter(Column::Id.eq(job_id))
             .filter(Column::Status.eq(1i32))
+            .filter(Column::DispatchAttempts.eq(current_attempts))
+            .filter(match lease_sha256 {
+                Some(hash) => Column::LeaseTokenSha256.eq(hash),
+                None => Column::LeaseTokenSha256.is_null(),
+            })
             .into_tuple::<String>()
             .one(conn)
             .await?;
@@ -745,6 +879,42 @@ pub async fn fail_dispatch<C: ConnectionTrait>(
         }
         Ok(DispatchFailureOutcome::DeadLettered)
     }
+}
+
+/// Completes one claimed attempt; `None` when the row is no longer that attempt.
+pub async fn complete_attempt<C: ConnectionTrait>(
+    conn: &C,
+    job_id: &str,
+    status: i32,
+    result_json: Option<&str>,
+    now_us: i64,
+    claimed_by: Option<&str>,
+    proof: CompletionProof<'_>,
+) -> Result<Option<String>, errors::Error> {
+    let mut update = Entity::update_many()
+        .col_expr(Column::Status, Expr::value(status))
+        .col_expr(Column::Result, Expr::value(result_json.map(str::to_owned)))
+        .col_expr(Column::CompletedAt, Expr::value(now_us))
+        .filter(Column::Id.eq(job_id))
+        .filter(Column::Status.eq(1));
+    if let Some(owner) = claimed_by {
+        update = update.filter(Column::ClaimedBy.eq(owner));
+    }
+    update = match proof {
+        CompletionProof::Lease(hash) => update
+            .filter(Column::LeaseTokenSha256.eq(hash))
+            .filter(Column::LeaseExpiresAt.gt(now_us)),
+        CompletionProof::Tokenless => update.filter(Column::LeaseTokenSha256.is_null()),
+    };
+    if update.exec(conn).await?.rows_affected == 0 {
+        return Ok(None);
+    }
+    Ok(Entity::find_by_id(job_id)
+        .select_only()
+        .column(Column::RunId)
+        .into_tuple::<String>()
+        .one(conn)
+        .await?)
 }
 
 /// Deletes stale Pending rows whose valid_until has passed (missed entirely).
@@ -935,6 +1105,43 @@ fn split_by_outcome(mut rows: Vec<(String, i32)>) -> RunLocationOutcomes {
     out
 }
 
+fn leased_row(m: super::entity::synthetics_jobs::Model) -> LeasedRow {
+    LeasedRow {
+        id: m.id,
+        synthetics_id: m.synthetics_id,
+        synthetics_name: m.synthetics_name,
+        org_id: m.org_id,
+        location: m.location,
+        env: m.env,
+        pool: m.pool,
+        scheduled_ts: m.scheduled_ts,
+        valid_until: m.valid_until,
+        dispatch_attempts: m.dispatch_attempts,
+        run_id: m.run_id,
+        browser_devices: m.browser_devices,
+        steps_configured: m.steps_configured,
+        metadata: m.metadata,
+    }
+}
+
+fn base62(bytes: &[u8]) -> Zeroizing<String> {
+    const ALPHABET: &[u8; 62] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    let mut num = Zeroizing::new(bytes.to_vec());
+    let mut digits = Zeroizing::new(Vec::with_capacity(LEASE_SECRET_LEN));
+    while num.iter().any(|b| *b != 0) {
+        let mut rem = 0u32;
+        for byte in num.iter_mut() {
+            let acc = (rem << 8) | u32::from(*byte);
+            *byte = (acc / 62) as u8;
+            rem = acc % 62;
+        }
+        digits.push(ALPHABET[rem as usize]);
+    }
+    digits.resize(LEASE_SECRET_LEN, b'0');
+    digits.reverse();
+    Zeroizing::new(String::from_utf8(std::mem::take(&mut *digits)).expect("base62 is ASCII"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1019,11 +1226,294 @@ mod tests {
         db.execute(backend.build(&schema.create_table_from_entity(Entity)))
             .await
             .unwrap();
+        for table in [
+            schema.create_table_from_entity(super::super::entity::synthetics_environments::Entity),
+            schema.create_table_from_entity(super::super::synthetics_env_retired::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
         // The FK to `synthetics_runs` is absent on purpose: sqlite ignores FKs without the pragma.
         db.execute_unprepared(&dedup_index_sql(backend))
             .await
             .unwrap();
         db
+    }
+
+    async fn stored(
+        db: &sea_orm::DatabaseConnection,
+        id: &str,
+    ) -> (Option<String>, Option<String>) {
+        let m = Entity::find_by_id(id.to_string())
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap();
+        (m.lease_token_sha256, m.lease_issuer)
+    }
+
+    async fn lease_one(
+        db: &sea_orm::DatabaseConnection,
+        claimed_by: &str,
+        now_us: i64,
+        issuer: Option<LeaseIssuer>,
+    ) -> Lease {
+        let mut leased = lease_batch_for_org(
+            db,
+            None,
+            "aws-browser",
+            claimed_by,
+            10,
+            now_us,
+            300,
+            None,
+            issuer,
+        )
+        .await
+        .unwrap();
+        assert_eq!(leased.len(), 1);
+        leased.pop().unwrap()
+    }
+
+    /// D222: a claimer without `runner_contract=1` gets no token and keeps today's ack.
+    #[tokio::test]
+    async fn a_legacy_claim_mints_nothing_and_acks_with_the_old_predicate() {
+        let db = jobs_db().await;
+        enqueue(&db, browser_params(1)).await.unwrap();
+        let lease = lease_one(&db, "agent-1", SCHEDULED_TS, None).await;
+        assert!(lease.lease_token.is_none());
+        assert_eq!(stored(&db, &lease.row.id).await, (None, None));
+        let body = serde_json::to_value(&lease).unwrap();
+        assert!(body.get("lease_token").is_none());
+        assert_eq!(body["id"], lease.row.id.as_str());
+        assert!(
+            ack_complete(&db, &lease.row.id, 3, None, SCHEDULED_TS, Some("agent-1"))
+                .await
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_capable_claim_returns_its_token_once_and_stores_only_the_hash() {
+        let db = jobs_db().await;
+        enqueue(&db, browser_params(1)).await.unwrap();
+        let lease = lease_one(&db, "agent-1", SCHEDULED_TS, Some(LeaseIssuer::Agent)).await;
+        let token = lease.lease_token.clone().unwrap();
+        let prefix = format!("{LEASE_TOKEN_PREFIX}{}.", lease.row.id);
+        let secret = token.expose().strip_prefix(&prefix).unwrap();
+        assert_eq!(secret.len(), LEASE_SECRET_LEN);
+        assert!(secret.bytes().all(|b| b.is_ascii_alphanumeric()));
+        assert_eq!(
+            stored(&db, &lease.row.id).await,
+            (Some(token.sha256()), Some("agent".to_string()))
+        );
+        assert_eq!(
+            serde_json::to_value(&lease).unwrap()["lease_token"],
+            token.expose()
+        );
+        assert!(!format!("{lease:?}").contains(secret));
+    }
+
+    #[tokio::test]
+    async fn a_late_dispatch_failure_leaves_the_next_attempt_alone() {
+        let db = jobs_db().await;
+        enqueue(&db, browser_params(1)).await.unwrap();
+        let first = lease_one(&db, "node", SCHEDULED_TS, Some(LeaseIssuer::Dispatcher)).await;
+        let first_hash = first.lease_token.clone().unwrap().sha256();
+        let id = first.row.id.clone();
+        assert_eq!(
+            fail_dispatch(&db, &id, 1, 3, Some(&first_hash))
+                .await
+                .unwrap(),
+            DispatchFailureOutcome::Requeued
+        );
+        let second = lease_one(&db, "node", SCHEDULED_TS + 1, Some(LeaseIssuer::Dispatcher)).await;
+        let second_hash = second.lease_token.clone().unwrap().sha256();
+        assert_eq!(second.row.dispatch_attempts, 2);
+        for (attempts, max, hash) in [
+            (1, 3, Some(first_hash.as_str())),
+            (2, 3, Some(first_hash.as_str())),
+            (2, 3, None),
+            (2, 2, Some(first_hash.as_str())),
+        ] {
+            assert_eq!(
+                fail_dispatch(&db, &id, attempts, max, hash).await.unwrap(),
+                DispatchFailureOutcome::AlreadySettled,
+                "{attempts} {max} {hash:?}"
+            );
+        }
+        let row = Entity::find_by_id(id.clone())
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.status, 1);
+        assert_eq!(
+            row.lease_token_sha256.as_deref(),
+            Some(second_hash.as_str())
+        );
+        assert_eq!(
+            fail_dispatch(&db, &id, 2, 2, Some(&second_hash))
+                .await
+                .unwrap(),
+            DispatchFailureOutcome::DeadLettered
+        );
+        let done = complete_attempt(
+            &db,
+            &id,
+            6,
+            None,
+            SCHEDULED_TS + 2,
+            Some("node"),
+            CompletionProof::Lease(&second_hash),
+        )
+        .await
+        .unwrap();
+        assert!(done.is_some());
+    }
+
+    /// T05: a capable claim never commits a leased row without its hash, so a tokenless ack has
+    /// no window in which it can complete a just-claimed attempt.
+    #[tokio::test]
+    async fn a_capable_claim_writes_the_hash_in_the_claim_itself() {
+        let db = jobs_db().await;
+        db.execute_unprepared(
+            "CREATE TRIGGER claim_carries_hash BEFORE UPDATE ON synthetics_jobs \
+             WHEN OLD.status = 0 AND NEW.status = 1 AND NEW.lease_token_sha256 IS NULL \
+             AND NEW.claimed_by != 'agent-old' \
+             BEGIN SELECT RAISE(ABORT, 'claimed without its lease hash'); END;",
+        )
+        .await
+        .unwrap();
+        for ts in 0..3 {
+            let mut p = browser_params(1);
+            p.scheduled_ts = SCHEDULED_TS + ts;
+            enqueue(&db, p).await.unwrap();
+        }
+        let leased = lease_batch_for_org(
+            &db,
+            None,
+            "aws-browser",
+            "agent-1",
+            10,
+            SCHEDULED_TS,
+            300,
+            None,
+            Some(LeaseIssuer::Agent),
+        )
+        .await
+        .unwrap();
+        assert_eq!(leased.len(), 3);
+        for lease in &leased {
+            let hash = lease.lease_token.as_ref().unwrap().sha256();
+            assert_eq!(
+                stored(&db, &lease.row.id).await,
+                (Some(hash), Some("agent".to_string()))
+            );
+        }
+        let distinct: std::collections::HashSet<_> = leased
+            .iter()
+            .map(|l| l.lease_token.as_ref().unwrap().sha256())
+            .collect();
+        assert_eq!(distinct.len(), 3);
+    }
+
+    /// R15-F11: ack and requeue keep the hash; only the next claim rewrites it.
+    #[tokio::test]
+    async fn only_a_claim_overwrites_the_lease_hash() {
+        let db = jobs_db().await;
+        let mut p = browser_params(1);
+        p.scheduled_ts = SCHEDULED_TS;
+        enqueue(&db, p).await.unwrap();
+        let first = lease_one(&db, "lambda", SCHEDULED_TS, Some(LeaseIssuer::Dispatcher)).await;
+        let hash = first.lease_token.as_ref().unwrap().sha256();
+        let expired = SCHEDULED_TS + 3_600 * 1_000_000;
+        assert_eq!(requeue_expired(&db, expired, 5).await.unwrap(), 1);
+        assert_eq!(
+            stored(&db, &first.row.id).await,
+            (Some(hash.clone()), Some("dispatcher".to_string()))
+        );
+
+        let second = lease_one(&db, "lambda", expired, Some(LeaseIssuer::Dispatcher)).await;
+        let second_hash = second.lease_token.as_ref().unwrap().sha256();
+        assert_ne!(second_hash, hash);
+        ack_complete(&db, &second.row.id, 3, None, expired, Some("lambda"))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored(&db, &second.row.id).await.0, Some(second_hash));
+
+        let mut again = browser_params(1);
+        again.scheduled_ts = SCHEDULED_TS + 1;
+        enqueue(&db, again).await.unwrap();
+        let capable = lease_one(&db, "agent-1", expired, Some(LeaseIssuer::Agent)).await;
+        assert_eq!(requeue_expired(&db, expired * 2, 5).await.unwrap(), 1);
+        let legacy = lease_one(&db, "agent-old", expired * 2, None).await;
+        assert_eq!(legacy.row.id, capable.row.id);
+        assert_eq!(stored(&db, &legacy.row.id).await, (None, None));
+    }
+
+    /// R8-42: any client `lease_secs` lands inside [job_lease_secs, job_lease_max_secs].
+    #[tokio::test]
+    async fn requested_lease_lifetimes_are_clamped_without_overflow() {
+        let cfg = &config::get_config().synthetics;
+        let (floor, ceiling) = (cfg.job_lease_secs, cfg.job_lease_max_secs);
+        for requested in [i64::MIN, -1, 0, 1, floor, ceiling, ceiling + 1, i64::MAX] {
+            let secs = clamp_lease_secs(requested);
+            assert!((floor..=ceiling).contains(&secs), "{requested} -> {secs}");
+        }
+        let db = jobs_db().await;
+        enqueue(&db, browser_params(1)).await.unwrap();
+        let mut leased = lease_batch_for_org(
+            &db,
+            None,
+            "aws-browser",
+            "agent-1",
+            1,
+            SCHEDULED_TS,
+            i64::MAX,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let id = leased.pop().unwrap().row.id;
+        let row = Entity::find_by_id(id).one(&db).await.unwrap().unwrap();
+        assert_eq!(
+            row.lease_expires_at,
+            Some(SCHEDULED_TS + ceiling * 1_000_000)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_job_copies_the_incarnation_of_its_environment() {
+        let db = jobs_db().await;
+        let mut env = super::super::synthetics_environments::SyntheticsEnvironmentRecord {
+            id: "org1/prod".into(),
+            org_id: "org1".into(),
+            name: "prod".into(),
+            description: String::new(),
+            owner: None,
+            is_global: false,
+            created_at: 42,
+            updated_at: 42,
+        };
+        super::super::synthetics_environments::add(&db, &mut env)
+            .await
+            .unwrap();
+        let mut scoped = browser_params(1);
+        scoped.env = Some("org1/prod");
+        let mut gone = browser_params(1);
+        gone.env = Some("org1/deleted");
+        for (p, expected) in [
+            (scoped, Some(env.incarnation())),
+            (gone, None),
+            (browser_params(1), None),
+        ] {
+            let id = enqueue(&db, p).await.unwrap();
+            let row = Entity::find_by_id(id).one(&db).await.unwrap().unwrap();
+            assert_eq!(row.env_incarnation, expected);
+        }
     }
 
     fn browser_params(steps_configured: i32) -> EnqueueParams<'static> {
@@ -1145,23 +1635,32 @@ mod tests {
         p.valid_until = SCHEDULED_TS + 1;
         enqueue(&db, p).await.unwrap();
 
-        let leased = lease_batch(
+        let leased = lease_batch_for_org(
             &db,
+            None,
             "aws-browser",
             "agent-1",
             10,
             SCHEDULED_TS,
             300,
             Some(true),
+            None,
         )
         .await
         .unwrap();
         assert_eq!(leased.len(), 1);
         assert!(
-            ack_complete(&db, &leased[0].id, 3, None, SCHEDULED_TS, Some("agent-1"))
-                .await
-                .unwrap()
-                .is_some(),
+            ack_complete(
+                &db,
+                &leased[0].row.id,
+                3,
+                None,
+                SCHEDULED_TS,
+                Some("agent-1")
+            )
+            .await
+            .unwrap()
+            .is_some(),
             "the probe's ack must apply",
         );
 
@@ -1186,18 +1685,20 @@ mod tests {
         p.valid_until = SCHEDULED_TS + 1;
         enqueue(&db, p).await.unwrap();
 
-        let leased = lease_batch(
+        let leased = lease_batch_for_org(
             &db,
+            None,
             "aws-browser",
             "agent-1",
             10,
             SCHEDULED_TS,
             300,
             Some(true),
+            None,
         )
         .await
         .unwrap();
-        let job_id = leased[0].id.clone();
+        let job_id = leased[0].row.id.clone();
 
         let dead = dead_letter_expired(&db, SCHEDULED_TS + 10_000_000_000, 3)
             .await
@@ -1222,7 +1723,49 @@ mod tests {
         );
     }
 
-    /// `lease_batch` is the OTHER row that becomes a `LeasedRow`. It builds from
+    #[tokio::test]
+    async fn an_org_scoped_lease_takes_only_that_orgs_jobs_from_a_shared_pool() {
+        let db = jobs_db().await;
+        enqueue(&db, browser_params(14)).await.unwrap();
+        let mut other = browser_params(14);
+        other.org_id = "org2";
+        other.synthetics_id = "mon-2";
+        enqueue(&db, other).await.unwrap();
+
+        let leased = lease_batch_for_org(
+            &db,
+            Some("org2"),
+            "aws-browser",
+            "agent-2",
+            10,
+            SCHEDULED_TS,
+            300,
+            Some(true),
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(leased.len(), 1);
+        assert_eq!(leased[0].row.org_id, "org2");
+
+        let rest = lease_batch_for_org(
+            &db,
+            None,
+            "aws-browser",
+            "agent-1",
+            10,
+            SCHEDULED_TS,
+            300,
+            Some(true),
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(rest.len(), 1, "the unscoped wrapper still leases any org");
+        assert_eq!(rest[0].row.org_id, "org1");
+    }
+
+    /// `lease_batch_for_org` is the OTHER row that becomes a `LeasedRow`. It builds from
     /// the sea-orm entity rather than a hand-written SELECT, so it cannot miss a
     /// column — but only while it keeps doing so, which is what this pins.
     #[tokio::test]
@@ -1230,20 +1773,22 @@ mod tests {
         let db = jobs_db().await;
         enqueue(&db, browser_params(14)).await.unwrap();
 
-        let leased = lease_batch(
+        let leased = lease_batch_for_org(
             &db,
+            None,
             "aws-browser",
             "agent-1",
             10,
             SCHEDULED_TS,
             300,
             Some(true),
+            None,
         )
         .await
         .unwrap();
 
         assert_eq!(leased.len(), 1);
-        assert_eq!(leased[0].steps_configured, 14);
+        assert_eq!(leased[0].row.steps_configured, 14);
     }
 
     /// An edit from 14 steps to 8 must not reprice dispatched work: 14 executed

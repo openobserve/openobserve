@@ -517,6 +517,7 @@ mod tests {
             incident_id: None,
             runbook_url: None,
             exhausted_at: None,
+            requested_by: None,
             updated_at: opened_at,
         }
     }

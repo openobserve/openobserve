@@ -682,7 +682,7 @@ mod tests {
     #[tokio::test]
     async fn test_compile_refuses_a_stream_the_caller_cannot_read() {
         openobserve_core::authz::fake_checker();
-        let user_id = format!("{}@example.com", config::ider::uuid());
+        let user_id = format!("{}@example.com", config::ider::ksuid());
         super::super::tests::grant(&user_id, &["GET"]);
         let mut req = request(None, None);
         req.stream = Some("edr".to_string());

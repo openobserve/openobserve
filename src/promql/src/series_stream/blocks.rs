@@ -1103,7 +1103,7 @@ mod tests {
             blocked: bool,
             metadata_blocked: bool,
         ) -> Self {
-            let id = config::ider::uuid();
+            let id = config::ider::ksuid();
             let account = format!("{id}:default");
             let sample_ends = files
                 .iter()
@@ -1301,7 +1301,7 @@ mod tests {
         let max_ts = *timestamps.values().iter().max().unwrap();
         let key = format!(
             "files/o/metrics/m/2026/09/18/06/indexed-v1-{}.parquet",
-            config::ider::uuid()
+            config::ider::ksuid()
         );
         let parent = ParentIdentity {
             object_key: key.clone(),
@@ -1694,7 +1694,7 @@ mod tests {
         let path = directory.path().join(&sidecar);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, bytes).unwrap();
-        let id = config::ider::uuid();
+        let id = config::ider::ksuid();
         infra::storage::add_account(
             &id,
             Box::new(LocalFileSystem::new_with_prefix(directory.path()).unwrap()),
@@ -1745,7 +1745,7 @@ mod tests {
         let fixture = Fixture::new(&[], false).await;
         let sidecar = format!(
             "files/o/mindex/m/2026/09/23/00/ranges-{}.midx",
-            config::ider::uuid()
+            config::ider::ksuid()
         );
         let ranges = (0..64u64)
             .map(|index| {

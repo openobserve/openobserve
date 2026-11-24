@@ -208,7 +208,7 @@ mod tests {
                 schema,
             )
             .unwrap();
-        let id = config::ider::uuid();
+        let id = config::ider::ksuid();
         let account = format!("{id}:default");
         let path = format!("files/test/mindex/m/2026/09/22/00/indexed-v1-{id}.midx");
         let data_path = format!("files/test/metrics/m/2026/09/22/00/indexed-v1-{id}.vortex");

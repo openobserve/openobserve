@@ -469,7 +469,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_file_written_before_enrichment_tables_were_recorded_is_a_miss_and_is_evicted() {
-        let key = key("o", &config::ider::uuid(), "a1-2");
+        let key = key("o", &config::ider::ksuid(), "a1-2");
         let mut old = encode(&Header::default(), &manifest(), &[])
             .unwrap()
             .to_vec();
@@ -483,7 +483,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_file_written_before_headers_named_the_publisher_is_a_miss_and_is_evicted() {
-        let key = key("o", &config::ider::uuid(), "r60");
+        let key = key("o", &config::ider::ksuid(), "r60");
         let header = Header {
             built_at: Some(1),
             ..Default::default()
@@ -503,7 +503,7 @@ mod tests {
 
     #[tokio::test]
     async fn gate16_a_broken_file_on_disk_is_a_miss_and_is_evicted() {
-        let key = key("o", &config::ider::uuid(), "r60");
+        let key = key("o", &config::ider::ksuid(), "r60");
         public_dashboards_replace(&key, 1, Bytes::from_static(b"not a result file"))
             .await
             .unwrap();
@@ -513,7 +513,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_header_length_past_the_cap_is_a_corrupt_file_and_is_evicted() {
-        let key = key("o", &config::ider::uuid(), "r60");
+        let key = key("o", &config::ider::ksuid(), "r60");
         let mut huge = encode(&Header::default(), &manifest(), &[])
             .unwrap()
             .to_vec();
@@ -531,7 +531,7 @@ mod tests {
 
     #[tokio::test]
     async fn gate06_a_write_gets_a_new_incarnation_and_its_own_body() {
-        let key = key("o", &config::ider::uuid(), "r3600");
+        let key = key("o", &config::ider::ksuid(), "r3600");
         let mut header = Header {
             built_at: Some(1),
             ..Default::default()
@@ -556,7 +556,7 @@ mod tests {
             !disk::LOADING_FROM_DISK_DONE.load(Ordering::Relaxed),
             "no scan in tests"
         );
-        let key = key("o", &config::ider::uuid(), "r60");
+        let key = key("o", &config::ider::ksuid(), "r60");
         let path = disk::get_file_path(&key).unwrap();
         std::fs::create_dir_all(std::path::Path::new(&path).parent().unwrap()).unwrap();
         std::fs::write(&path, b"from before the restart").unwrap();
@@ -571,7 +571,7 @@ mod tests {
             !disk::LOADING_FROM_DISK_DONE.load(Ordering::Relaxed),
             "no scan in tests"
         );
-        let key = key("o", &config::ider::uuid(), "r60");
+        let key = key("o", &config::ider::ksuid(), "r60");
         let path = disk::get_file_path(&key).unwrap();
         evict_if_indexed(&key).await;
         assert!(!std::path::Path::new(&path).exists());

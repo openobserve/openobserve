@@ -878,6 +878,20 @@ mod tests {
 
     use super::*;
 
+    // Each region mints its own org_incarnation, so the organization message must never carry it.
+    #[test]
+    fn organization_message_has_no_org_incarnation() {
+        let org = Organization {
+            identifier: "acme".into(),
+            name: "Acme".into(),
+            org_type: "default".into(),
+            service_account: None,
+        };
+        let json = serde_json::to_value(&org).unwrap();
+        assert_eq!(json["identifier"], "acme");
+        assert!(json.get("org_incarnation").is_none());
+    }
+
     #[test]
     fn test_organization_setting_defaults() {
         let setting = OrganizationSetting::default();

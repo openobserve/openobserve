@@ -173,7 +173,7 @@ pub async fn prepare_streaming_aggregate(
 
         let cache_interval_mins = cache_interval.get_duration_minutes();
         if cache_interval_mins > 0 {
-            let streaming_id = ider::uuid();
+            let streaming_id = ider::ksuid();
             #[cfg(feature = "enterprise")]
             let digest = redaction_digest(
                 org_id,

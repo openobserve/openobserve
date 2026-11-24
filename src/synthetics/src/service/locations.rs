@@ -8,6 +8,10 @@ use super::*;
 /// agents — the Lambda-served set. Agent capabilities extend this (e.g. ping).
 const PUBLIC_BASE_TYPES: &[&str] = &["http", "api", "tcp", "tls", "ssh", "dns", "browser"];
 
+/// An agent counts as an old runner while it resolved a credentialed check without a lease within
+/// this window (design S01 banner).
+const OLD_RUNNER_WINDOW_US: i64 = 7 * 24 * 3_600_000_000;
+
 /// An agent is considered live while its `last_seen_at` is within this window
 /// (ZO_SYNTHETICS_AGENT_STALE_SECS, default 120).
 pub(crate) fn agent_liveness_window_us() -> i64 {
@@ -448,7 +452,7 @@ pub async fn create_location(
         }
         #[cfg(feature = "enterprise")]
         synthetics_locations::KIND_PRIVATE => {
-            let id = config::ider::uuid();
+            let id = config::ider::ksuid();
             let pool = req.pool.clone().unwrap_or_else(|| {
                 format!(
                     "private-{org_id}-{}",
@@ -524,6 +528,10 @@ pub struct LocationAgentInfo {
     pub last_seen_at: i64,
     pub created_at: i64,
     pub live: bool,
+    /// `0` once the agent resolved a credentialed check without a lease in the last 7 days;
+    /// absent when nothing shows it lacks `runner_contract=1`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub runner_contract: Option<u8>,
 }
 
 /// One synthetic assigned to the location, for the detail page's checks table.
@@ -572,6 +580,7 @@ pub async fn location_detail(org_id: &str, id: &str) -> anyhow::Result<LocationD
 
     let now = config::utils::time::now_micros();
     let window = agent_liveness_window_us();
+    let tokenless = tokenless_resolves(agents.iter().map(|a| a.id.clone())).await;
     let agent_infos = agents
         .iter()
         .map(|a| LocationAgentInfo {
@@ -582,6 +591,7 @@ pub async fn location_detail(org_id: &str, id: &str) -> anyhow::Result<LocationD
             last_seen_at: a.last_seen_at,
             created_at: a.created_at,
             live: now - a.last_seen_at <= window,
+            runner_contract: observed_runner_contract(tokenless.get(&a.id).copied(), now),
         })
         .collect();
     let check_summaries = checks
@@ -603,6 +613,40 @@ pub async fn location_detail(org_id: &str, id: &str) -> anyhow::Result<LocationD
         checks: check_summaries,
         install,
     })
+}
+
+/// Each agent's last tokenless credential resolve; a failed read shows no agent as old.
+async fn tokenless_resolves(ids: impl Iterator<Item = String>) -> HashMap<String, i64> {
+    use infra::table::entity::synthetics_agents::{Column, Entity};
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
+    let ids: Vec<String> = ids.collect();
+    if ids.is_empty() {
+        return HashMap::new();
+    }
+    let rows: Result<Vec<(String, Option<i64>)>, _> = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .column(Column::LastTokenlessCredentialResolveAt)
+        .filter(Column::Id.is_in(ids))
+        .into_tuple()
+        .all(get_orm_client_ro().await)
+        .await;
+    match rows {
+        Ok(rows) => rows
+            .into_iter()
+            .filter_map(|(id, at)| at.map(|at| (id, at)))
+            .collect(),
+        Err(e) => {
+            log::warn!("[synthetics] tokenless resolve lookup failed: {e}");
+            HashMap::new()
+        }
+    }
+}
+
+fn observed_runner_contract(last_tokenless_resolve_at: Option<i64>, now: i64) -> Option<u8> {
+    last_tokenless_resolve_at
+        .filter(|at| *at > now.saturating_sub(OLD_RUNNER_WINDOW_US))
+        .map(|_| 0)
 }
 
 /// Updates label/enabled on a location.
@@ -847,6 +891,32 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// T06: only a recent tokenless credential resolve marks an agent as an old runner.
+    #[test]
+    fn an_agent_is_old_only_after_a_recent_tokenless_credential_resolve() {
+        let now = 100 * OLD_RUNNER_WINDOW_US;
+        assert_eq!(observed_runner_contract(None, now), None);
+        assert_eq!(observed_runner_contract(Some(now - 1), now), Some(0));
+        assert_eq!(
+            observed_runner_contract(Some(now - OLD_RUNNER_WINDOW_US), now),
+            None
+        );
+        let info = |runner_contract| LocationAgentInfo {
+            id: "a".into(),
+            name: "a".into(),
+            version: None,
+            capabilities: None,
+            last_seen_at: 0,
+            created_at: 0,
+            live: true,
+            runner_contract,
+        };
+        let unknown = serde_json::to_value(info(None)).unwrap();
+        assert!(unknown.get("runner_contract").is_none(), "{unknown}");
+        let old = serde_json::to_value(info(Some(0))).unwrap();
+        assert_eq!(old["runner_contract"], 0);
     }
 
     /// The backward-compatibility claim in [`LocationEntry`], asserted rather

@@ -155,14 +155,14 @@ pub async fn get_or_create(org_id: &str, team_id: &str) -> Result<EscalationPoli
         .unwrap_or_default();
     let defaults = match rotations.first() {
         Some(primary) => EscalationPolicy::default_for_team(
-            ider::uuid(),
+            ider::ksuid(),
             org_id,
             team_id,
             primary.id.clone(),
             rotations.get(1).map(|r| r.id.clone()),
         ),
         // A team with no rotations still needs a policy, and only the whole team resolves.
-        None => EscalationPolicy::whole_team_fallback(ider::uuid(), org_id, team_id),
+        None => EscalationPolicy::whole_team_fallback(ider::ksuid(), org_id, team_id),
     };
     match insert(&defaults).await {
         Ok(created) => Ok(created),

@@ -412,7 +412,7 @@ pub async fn test_http_trigger(
         Ok(found) => found,
         Err(e) => return manage_error(e),
     };
-    workflow.id = format!("test-{}", config::ider::uuid());
+    workflow.id = format!("test-{}", config::ider::ksuid());
     let input = manage::hook_test_input(&trigger_id, body.data);
     match workflows::test_workflow(
         &org_id,

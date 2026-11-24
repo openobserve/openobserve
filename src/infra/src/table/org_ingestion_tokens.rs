@@ -188,7 +188,7 @@ pub fn generate_token() -> String {
 
 /// Generate a Splunk HEC token: a lowercase hyphenated GUID from 16 random bytes.
 ///
-/// `ider::uuid()` returns a KSUID and `Uuid::now_v7()` leaks creation time, so
+/// `ider::ksuid()` returns a KSUID and `Uuid::now_v7()` leaks creation time, so
 /// neither is usable here.
 pub fn generate_splunk_token() -> String {
     config::ider::random_uuid()
@@ -743,7 +743,7 @@ mod tests {
         let org = crate::table::testing::unique("t_ingest_tok");
         let other = format!("{org}_other");
         let record = |org: &str, name: &str, splunk: Option<&str>| OrgIngestionTokenRecord {
-            id: config::ider::uuid(),
+            id: config::ider::ksuid(),
             org_id: org.to_string(),
             name: name.to_string(),
             token: format!("{org}_{name}"),
@@ -785,7 +785,7 @@ mod tests {
         let org = crate::table::testing::unique("t_writer_pick");
         let record =
             |name: &str, is_default: bool, enabled: bool, at: i64| OrgIngestionTokenRecord {
-                id: config::ider::uuid(),
+                id: config::ider::ksuid(),
                 org_id: org.clone(),
                 name: name.to_string(),
                 token: format!("o2oi_{org}_{name}"),
@@ -821,7 +821,7 @@ mod tests {
         }
         let org = crate::table::testing::unique("t_writer_foreign");
         let record = |name: &str, created_by: &str| OrgIngestionTokenRecord {
-            id: config::ider::uuid(),
+            id: config::ider::ksuid(),
             org_id: org.clone(),
             name: name.to_string(),
             token: format!("o2oi_{org}_{name}"),

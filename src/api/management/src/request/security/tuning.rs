@@ -1181,7 +1181,7 @@ mod tests {
         use o2_enterprise::enterprise::security::tuning::ExceptionOperator;
 
         super::super::tests::meta_store().await;
-        let org = format!("tune{}", &config::ider::uuid().replace('-', "")[..10]);
+        let org = format!("tune{}", &config::ider::ksuid().replace('-', "")[..10]);
         let created = stream::create_stream(
             &org,
             "fw",

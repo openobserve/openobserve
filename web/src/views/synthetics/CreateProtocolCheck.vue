@@ -45,6 +45,7 @@ import { getFoldersListByType } from "@/utils/commons";
 import { selectSyntheticsFolder, withCheckFolder } from "@/utils/synthetics/selectFolder";
 import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
+import { loggableError } from "@/services/secrets";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { templateBindingError } from "@/utils/alerts/templateBindingError";
 import { useEditorDraft } from "@/composables/useEditorDraft";
@@ -56,6 +57,9 @@ import {
 } from "@/utils/synthetics/checkDraftSecrets";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import SecretSaveRefusal from "@/views/Secrets/SecretSaveRefusal.vue";
+import { refusalFrom, type SecretRefusal } from "@/views/Secrets/useSecretConsumer";
+import { secureNames, urlRefRefusal } from "@/utils/synthetics/writeOnly";
 import OButton from "@/lib/core/Button/OButton.vue";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
@@ -154,6 +158,20 @@ const pickerFolders = computed(() =>
 /** Only ever carries `folder` today — the folder select is the one field this
  *  view can invalidate on its own. */
 const validationErrors = ref<Record<string, string>>({});
+const secretRefusal = ref<SecretRefusal | null>(null);
+
+/** A URL never carries a secret or a write-only placeholder: run results show the full URL (V34). */
+const secretFieldErrors = computed((): Record<string, string> => {
+  const refusal = urlRefRefusal(check.value.url ?? "", secureNames(check.value));
+  if (!refusal) return {};
+  const params = { name: refusal.name, code: raw(refusal.code) };
+  return {
+    url:
+      refusal.kind === "secret"
+        ? t("synthetics.secretFields.urlSecret", params)
+        : t("synthetics.secretFields.urlSecureVariable", params),
+  };
+});
 
 const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? "",
@@ -435,6 +453,11 @@ async function persistCheck(): Promise<"saved" | "missing" | "failed"> {
     toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
     return "failed";
   }
+  if (secretFieldErrors.value.url) {
+    toast({ variant: "error", message: raw(secretFieldErrors.value.url) });
+    return "failed";
+  }
+  secretRefusal.value = null;
   isSaving.value = true;
   const dismiss = toast({
     variant: "loading",
@@ -469,6 +492,11 @@ async function persistCheck(): Promise<"saved" | "missing" | "failed"> {
   } catch (err: any) {
     dismiss();
     if (err?.response?.status === 404) return "missing";
+    const refusal = refusalFrom(err);
+    if (refusal) {
+      secretRefusal.value = refusal;
+      return "failed";
+    }
     const templateError = templateBindingError(err);
     if (templateError && (check.value.template ?? null) === submittedTemplate)
       validationErrors.value = { ...validationErrors.value, template: templateError };
@@ -479,10 +507,12 @@ async function persistCheck(): Promise<"saved" | "missing" | "failed"> {
         err?.response?.data?.error ||
         t("synthetics.newCheck.saveFailed"),
     });
-    console.error("[synthetics] save failed", err);
+    console.error("[synthetics] save failed", loggableError(err));
     return "failed";
   } finally {
     isSaving.value = false;
+    // The editor stays mounted, so its observer would keep the submitted write-only values.
+    saveMonitor.reset();
   }
 }
 
@@ -520,7 +550,7 @@ async function saveCheck() {
             :destinations="destinations"
             :folders="pickerFolders"
             :folders-loading="foldersLoading"
-            :validation-errors="{ ...validationErrors, ...reentryErrors }"
+            :validation-errors="{ ...validationErrors, ...reentryErrors, ...secretFieldErrors }"
             :allow-private-locations="privateLocationsEnabled"
             class="w-full!"
             @refresh:destinations="loadDestinations(true)"
@@ -535,7 +565,13 @@ async function saveCheck() {
                 :check="check"
                 v-bind="
                   checkType === 'http'
-                    ? { validationErrors: { ...validationErrors, ...reentryErrors } }
+                    ? {
+                        validationErrors: {
+                          ...validationErrors,
+                          ...reentryErrors,
+                          ...secretFieldErrors,
+                        },
+                      }
                     : {}
                 "
                 @update:check="onConfigureUpdate"
@@ -555,6 +591,9 @@ async function saveCheck() {
           </CheckConfigure>
         </div>
       </SyntheticPrefillFrame>
+      <div v-if="secretRefusal" class="px-page-edge shrink-0 pt-3">
+        <SecretSaveRefusal :refusal="secretRefusal" />
+      </div>
 
       <!-- Sticky footer -->
       <div

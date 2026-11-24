@@ -16,11 +16,14 @@
 use std::fmt;
 
 use hashbrown::HashMap;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 
-use crate::stats::MemorySize;
+use crate::{
+    meta::secret_store::grammar::{RefKind, has_secret_ref, parse_refs},
+    stats::MemorySize,
+};
 
 /// `Endpoint::destination_type` of a Jira destination.
 pub const JIRA_DESTINATION_TYPE: &str = "jira";
@@ -112,6 +115,7 @@ pub struct Email {
 #[derive(Serialize, Debug, PartialEq, Eq, Deserialize, Clone, Default)]
 #[serde(default)]
 pub struct Endpoint {
+    #[serde(deserialize_with = "deserialize_endpoint_url")]
     pub url: String,
     #[serde(default)]
     pub method: HTTPType,
@@ -129,8 +133,57 @@ pub struct Endpoint {
 }
 
 impl Endpoint {
+    /// A `{{vars.*}}` counts too: it is substituted from the store at send.
+    pub fn has_store_ref(&self) -> bool {
+        has_store_ref(&self.url)
+            || self
+                .headers
+                .iter()
+                .flat_map(|h| h.values())
+                .any(|v| has_store_ref(v))
+            || self.metadata.values().any(|v| has_store_ref(v))
+    }
+
+    pub fn uses_store_refs(&self) -> bool {
+        crate::get_config().common.secret_store_refs_enabled && self.has_store_ref()
+    }
+
     pub fn is_jira(&self) -> bool {
         self.destination_type.as_deref() == Some(JIRA_DESTINATION_TYPE)
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, ToSchema)]
+pub struct SecretBindInput {
+    pub secret_id: String,
+    #[serde(default)]
+    pub allow_this_consumer: bool,
+    pub pin: SecretBindPin,
+    pub expected_policy_rev: String,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, ToSchema)]
+#[serde(untagged, expecting = "pin_entry_invalid")]
+pub enum SecretBindPin {
+    Keep(SecretBindKeep),
+    Hosts(Vec<String>),
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, ToSchema)]
+#[serde(try_from = "String", rename_all = "snake_case")]
+pub enum SecretBindKeep {
+    Keep,
+}
+
+impl TryFrom<String> for SecretBindKeep {
+    type Error = crate::meta::secret_store::SecretErrorCode;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        if value == "keep" {
+            Ok(Self::Keep)
+        } else {
+            Err(Self::Error::PinEntryInvalid)
+        }
     }
 }
 
@@ -411,11 +464,90 @@ impl Destination {
     }
 }
 
+fn has_store_ref(text: &str) -> bool {
+    has_secret_ref(text)
+        || (text.contains("{{")
+            && parse_refs(text).is_ok_and(|refs| refs.iter().any(|t| t.kind == RefKind::Var)))
+}
+
+fn deserialize_endpoint_url<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<String, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StoredUrl {
+        Plain(String),
+        Fenced { t: String },
+    }
+
+    Ok(match StoredUrl::deserialize(deserializer)? {
+        StoredUrl::Plain(url) | StoredUrl::Fenced { t: url } => url,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use svix_ksuid::KsuidLike;
 
     use super::*;
+
+    #[test]
+    fn t19_a_store_variable_makes_an_endpoint_store_bound() {
+        let header = |v: &str| Endpoint {
+            url: "https://example.test/hook".into(),
+            headers: Some(
+                [("X-Region".to_string(), v.to_string())]
+                    .into_iter()
+                    .collect(),
+            ),
+            ..Default::default()
+        };
+        assert!(header("r-{{vars.REGION}}").has_store_ref());
+        assert!(header("Bearer {{secrets.T}}").has_store_ref());
+        assert!(!header("plain {alert_name}").has_store_ref());
+        let metadata = Endpoint {
+            url: "https://example.test/{{vars.PATH}}".into(),
+            ..Default::default()
+        };
+        assert!(metadata.has_store_ref());
+    }
+
+    #[test]
+    fn endpoint_reads_both_url_shapes_and_emits_a_string() {
+        let url = "https://example.test/{{secrets.PATH}}";
+        for wire_url in [serde_json::json!(url), serde_json::json!({"t": url})] {
+            let endpoint: Endpoint =
+                serde_json::from_value(serde_json::json!({"url": wire_url})).unwrap();
+            assert_eq!(endpoint.url, url);
+            assert_eq!(serde_json::to_value(endpoint).unwrap()["url"], url);
+        }
+    }
+
+    #[test]
+    fn secret_bind_input_accepts_keep_or_a_host_list() {
+        let bind = |pin: &Value| {
+            serde_json::json!({
+                "secret_id": "id", "pin": pin, "expected_policy_rev": "revision"
+            })
+        };
+        for pin in [
+            serde_json::json!("keep"),
+            serde_json::json!(["example.test"]),
+        ] {
+            let input: SecretBindInput = serde_json::from_value(bind(&pin)).unwrap();
+            assert!(!input.allow_this_consumer);
+            assert_eq!(serde_json::to_value(input).unwrap()["pin"], pin);
+        }
+        for invalid in [
+            serde_json::json!("clear"),
+            serde_json::json!("any"),
+            serde_json::json!({"keep": null}),
+            serde_json::Value::Null,
+        ] {
+            let error = serde_json::from_value::<SecretBindInput>(bind(&invalid)).unwrap_err();
+            assert!(error.to_string().contains("pin_entry_invalid"));
+        }
+    }
 
     #[test]
     fn test_template_kind_serde_roundtrip_and_default() {

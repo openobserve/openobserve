@@ -31,6 +31,7 @@ import { getUUID } from "@/utils/uuid";
 import SyntheticsInheritedVariables from "@/components/synthetics/variables/SyntheticsInheritedVariables.vue";
 import PromoteCheckVariableDialog from "@/components/synthetics/variables/PromoteCheckVariableDialog.vue";
 import { useSharedVariables } from "@/components/synthetics/variables/useSharedVariables";
+import { isKept, setReplaced, slotKey } from "@/utils/synthetics/writeOnly";
 import {
   RESOLVED_VARIABLE_CAP,
   buildResolvedGrouped,
@@ -158,11 +159,31 @@ const draftNameError = computed<I18nText | undefined>(() => {
   return undefined;
 });
 
+/** Key of the server-held value behind the row being edited, if it is still kept. */
+const editingKeptKey = computed(() => {
+  if (editingIndex.value === null) return null;
+  const v = variables.value[editingIndex.value];
+  const key = v ? slotKey.variable(v.name) : "";
+  return v && isKept(props.check, key) ? key : null;
+});
+
+/** A kept secure value can't be renamed or made readable without typing it again (V39). */
+const draftValueError = computed<I18nText | undefined>(() => {
+  if (!editingKeptKey.value || draft.value.value) return undefined;
+  const original = variables.value[editingIndex.value!];
+  if (!draft.value.secure) return t("synthetics.secretFields.secureOffNeedsValue");
+  if (original && draft.value.name.trim() !== original.name.trim()) {
+    return t("synthetics.secretFields.renameNeedsValue");
+  }
+  return undefined;
+});
+
 const isDraftValid = computed(() => {
   const name = draft.value.name.trim();
   return (
     !!name &&
     NAME_PATTERN.test(name) &&
+    !draftValueError.value &&
     !variables.value.some((v, i) => i !== editingIndex.value && v.name.trim() === name)
   );
 });
@@ -232,7 +253,12 @@ function commitEdit() {
         }
       : v,
   );
-  emit("update:check", { ...props.check, variables: next });
+  // A typed value replaces the kept one; an empty one keeps it.
+  const base =
+    editingKeptKey.value && draft.value.value
+      ? setReplaced(props.check, editingKeptKey.value, true)
+      : props.check;
+  emit("update:check", { ...base, variables: next });
   closeForm();
 }
 
@@ -461,7 +487,14 @@ function onPromoted(name: string) {
               <OInput
                 v-model="draft.value"
                 :type="draft.secure ? 'password' : 'text'"
-                :placeholder="t('synthetics.authNetwork.variableValuePlaceholder')"
+                autocomplete="new-password"
+                :placeholder="
+                  editingKeptKey
+                    ? t('synthetics.secretFields.keptPlaceholder')
+                    : t('synthetics.authNetwork.variableValuePlaceholder')
+                "
+                :error="!!draftValueError"
+                :error-message="draftValueError"
                 :data-test="`synthetics-check-variables-panel-edit-value-${index}-input`"
               />
               <div class="flex items-center gap-2">

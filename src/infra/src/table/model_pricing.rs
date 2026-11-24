@@ -108,7 +108,7 @@ pub async fn put(item: ModelPricingDefinition) -> Result<ModelPricingDefinition,
         }
         None => {
             let active = ActiveModel {
-                id: Set(item.id.map_or_else(ider::uuid, |id| id.to_string())),
+                id: Set(item.id.map_or_else(ider::ksuid, |id| id.to_string())),
                 org: Set(item.org_id),
                 name: Set(item.name),
                 match_pattern: Set(item.match_pattern),
@@ -153,7 +153,7 @@ async fn insert_missing_built_ins_with_db<C: ConnectionTrait>(
         .into_iter()
         .map(|item| {
             Ok(ActiveModel {
-                id: Set(ider::uuid()),
+                id: Set(ider::ksuid()),
                 org: Set(config::meta::model_pricing::BUILT_IN_ORG.to_string()),
                 name: Set(item.name),
                 match_pattern: Set(item.match_pattern),

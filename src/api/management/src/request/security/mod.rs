@@ -657,7 +657,7 @@ pub(crate) mod tests {
 
         fn stranger() -> Headers<UserEmail> {
             Headers(UserEmail {
-                user_id: format!("{}@example.com", config::ider::uuid()),
+                user_id: format!("{}@example.com", config::ider::ksuid()),
             })
         }
 
@@ -669,7 +669,7 @@ pub(crate) mod tests {
 
         #[tokio::test]
         async fn test_disabling_a_siem_detection_needs_the_security_grant() {
-            let org = format!("gate_{}", config::ider::uuid());
+            let org = format!("gate_{}", config::ider::ksuid());
             let id = plant_siem_detection(&org).await;
             let resp = enable_alert(
                 Path((org.clone(), id)),
@@ -685,7 +685,7 @@ pub(crate) mod tests {
 
         #[tokio::test]
         async fn test_deleting_a_siem_detection_needs_the_security_grant() {
-            let org = format!("gate_{}", config::ider::uuid());
+            let org = format!("gate_{}", config::ider::ksuid());
             let id = plant_siem_detection(&org).await;
             let resp = delete_alert(Path((org.clone(), id)), stranger()).await;
             assert_eq!(resp.status(), StatusCode::FORBIDDEN);
@@ -693,7 +693,7 @@ pub(crate) mod tests {
 
         #[tokio::test]
         async fn test_bulk_writes_are_gated_only_when_they_name_a_siem_detection() {
-            let org = format!("gate_{}", config::ider::uuid());
+            let org = format!("gate_{}", config::ider::ksuid());
             let id = plant_siem_detection(&org).await;
             let other = Ksuid::new(None, None).to_string();
             let Headers(user) = stranger();
@@ -747,7 +747,7 @@ pub(crate) mod tests {
                 IncidentStatus, UpdatePayload, update_incident,
             };
 
-            let org = format!("gate_{}", config::ider::uuid());
+            let org = format!("gate_{}", config::ider::ksuid());
             let id = plant_siem_detection(&org).await;
             let case = unmarked_case(&org, &id).await;
             // The case's insert, or the migration for an older one, sets the marker.
@@ -869,7 +869,7 @@ pub(crate) mod tests {
 
         #[tokio::test]
         async fn test_a_definition_refusal_names_no_detection_to_a_stranger() {
-            let org = format!("gate_{}", config::ider::uuid());
+            let org = format!("gate_{}", config::ider::ksuid());
             let (id, root) = stored_siem_detection(&org).await;
             let ksuid: Ksuid = id.parse().unwrap();
             let conn = infra::db::get_orm_client_ro().await;
@@ -895,7 +895,7 @@ pub(crate) mod tests {
         async fn test_a_detections_groups_and_transitions_need_security_read() {
             use crate::request::alerts::{list_alert_group_transitions, list_alert_groups};
 
-            let org = format!("gate_{}", config::ider::uuid());
+            let org = format!("gate_{}", config::ider::ksuid());
             let (id, root) = stored_siem_detection(&org).await;
             let path = || Path((org.clone(), id.clone()));
             let transitions = || async {
@@ -917,7 +917,7 @@ pub(crate) mod tests {
         async fn test_composites_referencing_a_detection_need_security_read() {
             use crate::request::alerts::get_composite_references;
 
-            let org = format!("gate_{}", config::ider::uuid());
+            let org = format!("gate_{}", config::ider::ksuid());
             let (id, root) = stored_siem_detection(&org).await;
 
             tests::grant(&root, &[]);
@@ -943,7 +943,7 @@ pub(crate) mod tests {
 
             const RULE: &str = "title: t\nlogsource:\n  product: test\ndetection:\n  sel:\n    user: bob\n  condition: sel\n";
             let checker = openobserve_core::authz::fake_checker();
-            let org = format!("gate_{}", config::ider::uuid());
+            let org = format!("gate_{}", config::ider::ksuid());
             let (id, root) = stored_siem_detection_with(&org, &[("sigma_yaml", RULE)]).await;
             let evidence = |user: String| {
                 let path = Path((org.clone(), id.clone()));
@@ -980,7 +980,7 @@ pub(crate) mod tests {
 
             tests::meta_store().await;
             let checker = openobserve_core::authz::fake_checker();
-            let org = format!("gate_{}", config::ider::uuid());
+            let org = format!("gate_{}", config::ider::ksuid());
             let Headers(triager) = stranger();
             tests::grant(&triager.user_id, &["GET", "PUT"]);
             let promote = || async {
@@ -1000,7 +1000,7 @@ pub(crate) mod tests {
             use crate::request::security::investigate::{EntitiesRequest, list_entities};
 
             let checker = openobserve_core::authz::fake_checker();
-            let org = format!("gate_{}", config::ider::uuid());
+            let org = format!("gate_{}", config::ider::ksuid());
             let Headers(analyst) = stranger();
             tests::grant(&analyst.user_id, &["GET"]);
             checker.grant_read(&analyst.user_id, &logs(&org, "okta"));
@@ -1024,7 +1024,7 @@ pub(crate) mod tests {
         #[tokio::test]
         async fn test_stream_reads_follow_the_callers_grants() {
             let checker = openobserve_core::authz::fake_checker();
-            let org = format!("gate_{}", config::ider::uuid());
+            let org = format!("gate_{}", config::ider::ksuid());
             let Headers(user) = stranger();
             checker.grant_read(&user.user_id, &logs(&org, "okta"));
             assert!(
@@ -1047,7 +1047,7 @@ pub(crate) mod tests {
         #[tokio::test]
         async fn test_unreadable_streams_names_only_the_refused_ones() {
             let checker = openobserve_core::authz::fake_checker();
-            let org = format!("gate_{}", config::ider::uuid());
+            let org = format!("gate_{}", config::ider::ksuid());
             let Headers(user) = stranger();
             assert_eq!(
                 unreadable_streams(&org, &user.user_id, ["okta", "edr"]).await,
@@ -1073,7 +1073,7 @@ pub(crate) mod tests {
             use config::meta::stream::StreamType;
 
             let checker = openobserve_core::authz::fake_checker();
-            let org = format!("gate_{}", config::ider::uuid());
+            let org = format!("gate_{}", config::ider::ksuid());
             let Headers(user) = stranger();
             checker.grant_read_all(&user.user_id, &org, StreamType::Logs);
             let names: Vec<String> = (0..50).map(|i| format!("s{i}")).collect();
@@ -1090,7 +1090,7 @@ pub(crate) mod tests {
         // A converted detection's old incident holds only ops firings, so only the marker decides.
         #[tokio::test]
         async fn test_an_unmarked_incident_is_no_case() {
-            let org = format!("gate_{}", config::ider::uuid());
+            let org = format!("gate_{}", config::ider::ksuid());
             let id = plant_siem_detection(&org).await;
             let incident = unmarked_case(&org, &id).await;
             assert!(!incident_touches_siem(&org, &incident).await);

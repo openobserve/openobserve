@@ -53,7 +53,7 @@ fn load_local_node() -> Node {
 }
 
 fn load_local_node_uuid() -> String {
-    ider::uuid()
+    ider::ksuid()
 }
 
 fn load_local_node_role() -> Vec<Role> {

@@ -85,7 +85,7 @@ pub async fn record_with<C: ConnectionTrait>(
     run: NewRun<'_>,
 ) -> Result<Model, errors::Error> {
     let entry = ActiveModel {
-        id: Set(config::ider::uuid()),
+        id: Set(config::ider::ksuid()),
         org_id: Set(run.org_id.to_string()),
         user_email: Set(run.user_email.to_string()),
         query: Set(run.query.to_string()),

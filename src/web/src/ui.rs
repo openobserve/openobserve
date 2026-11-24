@@ -29,9 +29,21 @@ use crate::WebAssets;
 /// Serve static files from embedded web assets
 pub async fn serve(Path(path): Path<String>) -> impl IntoResponse {
     let mut resp = serve_file(&path);
+    let headers = resp.headers_mut();
+    // Public dashboards allow embedding anywhere; other pages allow only same-origin framing
+    // because the TV playlist frames its slides.
+    if !path.starts_with("public/dashboards/") {
+        headers.insert(
+            header::CONTENT_SECURITY_POLICY,
+            HeaderValue::from_static("frame-ancestors 'self'"),
+        );
+        headers.insert(
+            header::X_FRAME_OPTIONS,
+            HeaderValue::from_static("SAMEORIGIN"),
+        );
+    }
     // The viewer page's URL holds the link's slug, a bearer secret, as the data routes' URLs do.
     if path.starts_with("public/dashboards/") {
-        let headers = resp.headers_mut();
         headers.insert(
             "x-robots-tag",
             HeaderValue::from_static("noindex, nofollow"),
@@ -243,6 +255,32 @@ mod tests {
                 assert_eq!(referrer, Some(&b"no-referrer"[..]), "{uri}");
             } else {
                 assert_eq!((robots, referrer), (None, None), "{uri}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn every_page_but_a_public_dashboard_allows_only_same_origin_framing() {
+        let app = ui_routes("/web/");
+        for (uri, framed) in [
+            ("/", false),
+            ("/index.html", false),
+            ("/settings/secrets", false),
+            ("/assets/index-abc.js", false),
+            ("/favicon.ico", false),
+            ("/public/ai_chats/x", false),
+            ("/public/dashboards/k8Zt2mR7aB3cD4eF5gH6Qx", true),
+        ] {
+            let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
+            let resp = app.clone().oneshot(req).await.unwrap();
+            let h = resp.headers();
+            let csp = h.get(header::CONTENT_SECURITY_POLICY).map(|v| v.as_bytes());
+            let xfo = h.get(header::X_FRAME_OPTIONS).map(|v| v.as_bytes());
+            if framed {
+                assert_eq!((csp, xfo), (None, None), "{uri}");
+            } else {
+                assert_eq!(csp, Some(&b"frame-ancestors 'self'"[..]), "{uri}");
+                assert_eq!(xfo, Some(&b"SAMEORIGIN"[..]), "{uri}");
             }
         }
     }

@@ -22,9 +22,14 @@ use axum::{
 use config::{
     DEFAULT_ORG, get_config,
     meta::user::{DBUser, User, UserRole, UserType},
-    utils::base64,
+    utils::{base64, str::constant_time_eq},
 };
 use db::{self, user::is_root_user};
+use infra::table::{
+    entity::synthetics_jobs::{Column, Entity, Model},
+    synthetics_jobs::{LEASE_TOKEN_PREFIX, LeaseIssuer},
+    synthetics_probe_tokens::token_sha256,
+};
 #[cfg(feature = "enterprise")]
 use o2_dex::config::get_config as get_dex_config;
 #[cfg(feature = "enterprise")]
@@ -39,6 +44,7 @@ use openobserve_core::{
     },
     users,
 };
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::common::{
     infra::config::ORG_INGESTION_TOKENS,
@@ -65,6 +71,23 @@ pub struct RequestData {
     pub headers: HeaderMap,
     /// The route template axum matched (`MatchedPath`); ingestion is classified by it.
     pub route: Option<String>,
+}
+
+pub struct AuthenticatedLease {
+    pub org: String,
+    pub job_id: String,
+    pub attempt: i32,
+    pub lease_sha256: String,
+}
+
+impl std::fmt::Debug for AuthenticatedLease {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AuthenticatedLease")
+            .field("org", &self.org)
+            .field("job_id", &self.job_id)
+            .field("attempt", &self.attempt)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Error type for auth validation
@@ -307,6 +330,31 @@ pub async fn validate_token(token: &str, org_id: &str) -> Result<(), AuthError> 
     }
 }
 
+/// Keep lease token parsing in one place so the super-cluster form can use the same entry point.
+pub fn parse_lease_token(token: &str) -> Option<&str> {
+    let (job_id, secret) = token.strip_prefix(LEASE_TOKEN_PREFIX)?.split_once('.')?;
+    (!job_id.is_empty()
+        && job_id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
+        && secret.len() == 43
+        && secret.bytes().all(|b| b.is_ascii_alphanumeric()))
+    .then_some(job_id)
+}
+
+pub async fn authenticate_lease(path_org: &str, token: &str) -> Option<AuthenticatedLease> {
+    let job_id = parse_lease_token(token)?;
+    let conn = infra::db::get_orm_client_rw().await;
+    let row = Entity::find()
+        .filter(Column::Id.eq(job_id))
+        .filter(Column::OrgId.eq(path_org))
+        .one(conn)
+        .await
+        .inspect_err(|e| log::error!("[synthetics] lease auth job_id={job_id}: {e}"))
+        .ok()??;
+    lease_from_row(&row, token, path_org, chrono::Utc::now().timestamp_micros())
+}
+
 /// System-wide domain-management blocklist check.
 ///
 /// Denies **external SSO identities** (users AND SSO/token service accounts) that are on the
@@ -335,6 +383,43 @@ fn is_org_agnostic_path(path: &str) -> bool {
 /// GHSA-29xv-5rx7-5q7v: matching only the last segment let `/{org}/kv/organizations` skip the org.
 fn is_top_level_org_route(path_columns: &[&str]) -> bool {
     matches!(path_columns, ["organizations"])
+}
+
+fn lease_from_row(
+    row: &Model,
+    token: &str,
+    path_org: &str,
+    now_us: i64,
+) -> Option<AuthenticatedLease> {
+    if row.org_id != path_org
+        || row.id != parse_lease_token(token)?
+        || row.status != 1
+        || row.lease_expires_at? <= now_us
+        || row.lease_issuer.as_deref() != Some(LeaseIssuer::Dispatcher.as_str())
+    {
+        return None;
+    }
+    let lease_sha256 = token_sha256(token);
+    let stored_hash = row.lease_token_sha256.as_deref()?;
+    constant_time_eq(lease_sha256.as_bytes(), stored_hash.as_bytes()).then(|| AuthenticatedLease {
+        org: row.org_id.clone(),
+        job_id: row.id.clone(),
+        attempt: row.dispatch_attempts,
+        lease_sha256,
+    })
+}
+
+fn is_lease_route(method: &Method, path_columns: &[&str]) -> bool {
+    method == Method::POST
+        && matches!(
+            path_columns,
+            [
+                _,
+                "synthetics",
+                "jobs",
+                "resolve" | "ack" | "artifact-urls" | "upload"
+            ]
+        )
 }
 
 /// Compare a password under the lockout policy, recording the attempt.
@@ -476,6 +561,28 @@ pub async fn validate_credentials(
         && v.is_empty()
     {
         path_columns.pop();
+    }
+
+    if user_password.starts_with(LEASE_TOKEN_PREFIX) {
+        if is_lease_route(method, &path_columns)
+            && authenticate_lease(path_columns[0], user_password)
+                .await
+                .is_some()
+        {
+            return Ok(TokenValidationResponse {
+                is_valid: true,
+                user_email: "synthetics-lease".to_owned(),
+                is_internal_user: true,
+                user_role: None,
+                user_name: "synthetics-lease".to_owned(),
+                family_name: String::new(),
+                given_name: "synthetics-lease".to_owned(),
+            });
+        }
+        return Ok(TokenValidationResponse {
+            is_valid: false,
+            ..Default::default()
+        });
     }
 
     // Synthetics probe job + agent APIs — `/{org_id}/synthetics/{jobs,agent}/*`.
@@ -1574,6 +1681,211 @@ CN5lTowpVXP2OIiiNTGa75Fj
 -----END PRIVATE KEY-----";
     #[cfg(feature = "enterprise")]
     const TEST_DEX_JWKS: &str = r#"{"keys":[{"kty":"RSA","kid":"test-key","alg":"RS256","use":"sig","n":"xkwTZfEqwHZQFH7F7gwO5gFQDnfXrd88ec8WjwsRmxwlMjHwcT01IgYCVX2cPNjxBmVv5yAYNCYfcqFcXz2SPCIwU1sob_qY3sHtmvLCKrhHnitZHuiDVIUz_fD9sXmm8Pi3k7bgTlVccvOPsCK0jjKcrcolvjz0aX1GeqHUwZ1dZT1XrCP893qHZlQaxgKRCtZkaPswkW6IezemYFiSzXKfeAoRzdBJCpLcgS2hUBXf-p92WRjvQa5WlDUyDGtnMOFuk2YEOOD4NlxLnZK_ZyDyEEpIltQWqZwdm1rnxTu0GuV0L9YtYwOxYzjIhSzNOISbVTSrBKnUw8zUwL4CFQ","e":"AQAB"}]}"#;
+
+    const LEASE_SECRET: &str = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefg";
+
+    #[test]
+    fn lease_token_parser_requires_job_and_base62_secret() {
+        let token = format!("{LEASE_TOKEN_PREFIX}job_1-A.{LEASE_SECRET}");
+        assert_eq!(parse_lease_token(&token), Some("job_1-A"));
+        for invalid in [
+            format!("job.{LEASE_SECRET}"),
+            format!("{LEASE_TOKEN_PREFIX}job{LEASE_SECRET}"),
+            format!("{LEASE_TOKEN_PREFIX}.{LEASE_SECRET}"),
+            format!("{LEASE_TOKEN_PREFIX}job/1.{LEASE_SECRET}"),
+            format!("{LEASE_TOKEN_PREFIX}job.{}", &LEASE_SECRET[1..]),
+            format!("{LEASE_TOKEN_PREFIX}job.{LEASE_SECRET}a"),
+            format!("{LEASE_TOKEN_PREFIX}job.-{}", &LEASE_SECRET[1..]),
+            format!("{LEASE_TOKEN_PREFIX}job..{}", &LEASE_SECRET[1..]),
+        ] {
+            assert!(parse_lease_token(&invalid).is_none());
+        }
+    }
+
+    #[test]
+    fn dispatcher_lease_authenticates_only_for_current_row() {
+        let token = format!("{LEASE_TOKEN_PREFIX}job.{LEASE_SECRET}");
+        let row = Model {
+            id: "job".into(),
+            org_id: "org".into(),
+            synthetics_id: String::new(),
+            synthetics_name: String::new(),
+            location: String::new(),
+            env: None,
+            pool: String::new(),
+            scheduled_ts: 0,
+            valid_until: 0,
+            status: 1,
+            claimed_by: None,
+            claimed_at: None,
+            lease_expires_at: Some(100),
+            dispatch_attempts: 3,
+            run_id: String::new(),
+            browser_devices: None,
+            steps_configured: 1,
+            metadata: String::new(),
+            result: None,
+            started_at: None,
+            completed_at: None,
+            lease_token_sha256: Some(token_sha256(&token)),
+            lease_issuer: Some(LeaseIssuer::Dispatcher.as_str().into()),
+            env_incarnation: None,
+        };
+        let lease = lease_from_row(&row, &token, "org", 99).unwrap();
+        assert_eq!(lease.org, row.org_id);
+        assert_eq!(lease.job_id, row.id);
+        assert_eq!(lease.attempt, row.dispatch_attempts);
+        assert_eq!(Some(&lease.lease_sha256), row.lease_token_sha256.as_ref());
+        assert!(!format!("{lease:?}").contains(&lease.lease_sha256));
+        assert!(lease_from_row(&row, &token, "other", 99).is_none());
+        assert!(lease_from_row(&row, &token, "org", 100).is_none());
+        for invalid in [
+            Model {
+                lease_issuer: Some(LeaseIssuer::Agent.as_str().into()),
+                ..row.clone()
+            },
+            Model {
+                status: 0,
+                ..row.clone()
+            },
+            Model {
+                status: 3,
+                ..row.clone()
+            },
+            Model {
+                lease_token_sha256: Some(token_sha256("other token")),
+                ..row.clone()
+            },
+            Model {
+                id: "other".into(),
+                ..row
+            },
+        ] {
+            assert!(lease_from_row(&invalid, &token, "org", 99).is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn lease_credentials_use_fixed_identity_for_any_username() {
+        use config::meta::{
+            folder::{Folder, FolderType},
+            synthetics::Synthetic,
+        };
+        use infra::table::{
+            entity::{synthetics_jobs::ActiveModel, synthetics_runs},
+            folders, synthetics_checks,
+        };
+        use sea_orm::{ActiveModelTrait, ActiveValue::Set};
+
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let conn = get_orm_client_rw().await;
+        let job_id = config::ider::ksuid();
+        let org = format!("lease-auth-{job_id}");
+        let token = format!("{LEASE_TOKEN_PREFIX}{job_id}.{LEASE_SECRET}");
+        let now = Utc::now().timestamp_micros();
+        let (folder_id, ..) = folders::get_or_create_with(
+            conn,
+            &org,
+            Folder {
+                folder_id: "default".into(),
+                name: "default".into(),
+                ..Default::default()
+            },
+            FolderType::Synthetics,
+        )
+        .await
+        .unwrap();
+        synthetics_checks::insert_row(
+            conn,
+            &org,
+            &job_id,
+            &Synthetic {
+                folder_id: folder_id.to_string(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        synthetics_runs::ActiveModel {
+            id: Set(job_id.clone()),
+            synthetics_id: Set(job_id.clone()),
+            org_id: Set(org.clone()),
+            scheduled_ts: Set(now),
+            created_at: Set(now),
+            ..Default::default()
+        }
+        .insert(conn)
+        .await
+        .unwrap();
+        ActiveModel {
+            id: Set(job_id.clone()),
+            synthetics_id: Set(job_id.clone()),
+            org_id: Set(org.clone()),
+            location: Set("location".into()),
+            pool: Set("pool".into()),
+            scheduled_ts: Set(now),
+            valid_until: Set(now + 60_000_000),
+            status: Set(1),
+            lease_expires_at: Set(Some(now + 60_000_000)),
+            run_id: Set(job_id.clone()),
+            lease_token_sha256: Set(Some(token_sha256(&token))),
+            lease_issuer: Set(Some(LeaseIssuer::Dispatcher.as_str().into())),
+            ..Default::default()
+        }
+        .insert(conn)
+        .await
+        .unwrap();
+
+        for user_id in ["caller@example.com", "other@example.com"] {
+            for route in ["resolve", "ack", "artifact-urls", "upload"] {
+                let checked = validate_credentials(
+                    user_id,
+                    &token,
+                    &format!("{org}/synthetics/jobs/{route}"),
+                    None,
+                    &Method::POST,
+                    false,
+                )
+                .await
+                .unwrap();
+                assert!(checked.is_valid);
+                assert_eq!(checked.user_email, "synthetics-lease");
+                assert_eq!(checked.user_name, "synthetics-lease");
+                assert_eq!(checked.given_name, "synthetics-lease");
+            }
+        }
+        synthetics_checks::delete(conn, &org, &job_id)
+            .await
+            .unwrap();
+        infra::table::entity::folders::Entity::delete_by_id(folder_id.to_string())
+            .exec(conn)
+            .await
+            .unwrap();
+    }
+
+    #[test]
+    fn lease_routes_accept_only_job_attempt_posts() {
+        for route in ["resolve", "ack", "artifact-urls", "upload"] {
+            assert!(is_lease_route(
+                &Method::POST,
+                &["org", "synthetics", "jobs", route]
+            ));
+        }
+        assert!(!is_lease_route(
+            &Method::GET,
+            &["org", "synthetics", "jobs", "resolve"]
+        ));
+        for path in [
+            &["org", "synthetics", "jobs", "lease"][..],
+            &["org", "synthetics", "agent", "register"],
+            &["org", "synthetics", "checks"],
+            &["org", "synthetics", "jobs", "resolve", "more"],
+        ] {
+            assert!(!is_lease_route(&Method::POST, path));
+        }
+    }
 
     #[tokio::test]
     async fn splunk_scheme_is_rejected_on_the_api_tree() {

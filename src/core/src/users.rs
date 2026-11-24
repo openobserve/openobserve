@@ -213,7 +213,7 @@ pub async fn post_user(
                     "Password required to create new user",
                 ));
             }
-            let salt = ider::uuid();
+            let salt = ider::ksuid();
             let password = get_hash(&usr_req.password, &salt);
             let password_ext = get_hash(&usr_req.password, &config::get_ext_auth_salt());
             let token = generate_random_string(16);
@@ -288,7 +288,7 @@ pub async fn post_user(
 
 pub async fn create_new_user(mut db_user: DBUser) -> Result<(), anyhow::Error> {
     if db_user.password.is_empty() {
-        let salt = ider::uuid();
+        let salt = ider::ksuid();
         let generated_pass = generate_random_string(8);
         let password = get_hash(&generated_pass, &salt);
         db_user.password = password;
@@ -1363,7 +1363,7 @@ pub async fn list_user_invites(user_id: &str, only_pending: bool) -> Result<Resp
 }
 
 pub async fn create_root_user(org_id: &str, user_req: UserRequest) -> Result<(), anyhow::Error> {
-    let salt = ider::uuid();
+    let salt = ider::ksuid();
     let password = get_hash(&user_req.password, &salt);
     let password_ext = get_hash(&user_req.password, &config::get_ext_auth_salt());
     let token = user_req
@@ -1663,7 +1663,7 @@ pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), any
 
     // Create the user record in the users table
     let random_password = generate_random_string(32);
-    let salt = ider::uuid();
+    let salt = ider::ksuid();
     let password_hash = get_hash(&random_password, &salt);
     let password_ext = get_hash(&random_password, &config::get_ext_auth_salt());
     let now = chrono::Utc::now().timestamp_micros();
@@ -2125,7 +2125,7 @@ mod tests {
             .await
             .unwrap();
         // The test database outlives the run, so nothing here may collide with an earlier run.
-        let id = config::ider::uuid();
+        let id = config::ider::ksuid();
         let email = format!("publisher-{id}@example.com");
         let email = email.as_str();
         create_user_with_history(email).await;

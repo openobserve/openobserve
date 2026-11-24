@@ -1400,7 +1400,7 @@ mod tests {
 
     async fn seed_ai_rows(org: &str, now: i64) {
         use infra::table::entity::{
-            gen_ai_agents, llm_secrets, org_ai_toolsets, providers, scorers,
+            credential_values, gen_ai_agents, org_ai_toolsets, providers, scorers,
         };
         use sea_orm::Set;
 
@@ -1433,7 +1433,7 @@ mod tests {
             ..Default::default()
         })
         .await;
-        insert_active(llm_secrets::ActiveModel {
+        insert_active(credential_values::ActiveModel {
             id: Set(id()),
             secret_ref: Set(id()),
             org_id: Set(org.to_string()),
@@ -1540,7 +1540,7 @@ mod tests {
         use infra::table::{ai_chat_sessions, ai_chat_shares, ai_chat_turns};
 
         let now = Utc::now().timestamp_micros();
-        let session = config::ider::uuid();
+        let session = config::ider::ksuid();
         ai_chat_sessions::get_or_create(org, &session, "orgdel-user", "a@x", "o2-ai", now)
             .await
             .unwrap();
@@ -1563,7 +1563,7 @@ mod tests {
         // Deleted by their user before: one the sweep still re-purges, one past that window.
         let window = ai_chat_sessions::REPLICA_REPURGE_WINDOW_MICROS;
         for purged_at in [now, now - window - 1] {
-            let session = config::ider::uuid();
+            let session = config::ider::ksuid();
             ai_chat_sessions::get_or_create(org, &session, "orgdel-user", "a@x", "o2-ai", now)
                 .await
                 .unwrap();
@@ -1889,7 +1889,7 @@ mod tests {
         let now = Utc::now().timestamp_micros();
         let has_default = synthetics_probe_tokens::find_default(org).await.unwrap();
         let token = synthetics_probe_tokens::SyntheticsProbeTokenRecord {
-            id: config::ider::uuid(),
+            id: config::ider::ksuid(),
             org_id: org.to_string(),
             name: "orgdel".to_string(),
             token: synthetics_probe_tokens::generate_token(),
@@ -2109,7 +2109,7 @@ mod tests {
             "scorers",
             "online_eval_jobs",
             "providers",
-            "llm_secrets",
+            "credential_values",
             "gen_ai_agents",
             "oncall_teams",
             "oncall_schedules",
@@ -2410,9 +2410,9 @@ mod tests {
 
     async fn drop_llm_and_oncall_rows(org: &str) {
         use infra::table::{
-            ai_chat_sessions, ai_chat_shares, ai_chat_turns, cipher, gen_ai_agents, llm_eval,
-            llm_secrets, oncall_teams, online_eval_jobs, org_ai_toolsets, providers, ratelimit,
-            score_configs, scorers,
+            ai_chat_sessions, ai_chat_shares, ai_chat_turns, cipher, credential_values,
+            gen_ai_agents, llm_eval, oncall_teams, online_eval_jobs, org_ai_toolsets, providers,
+            ratelimit, score_configs, scorers,
         };
 
         #[cfg(feature = "enterprise")]
@@ -2424,7 +2424,7 @@ mod tests {
         scorers::delete_all_by_org(org).await.unwrap();
         online_eval_jobs::delete_all_by_org(org).await.unwrap();
         providers::delete_all_by_org(org).await.unwrap();
-        llm_secrets::delete_by_org(org).await.unwrap();
+        credential_values::delete_by_org(org).await.unwrap();
         org_ai_toolsets::delete_by_org(org).await.unwrap();
         gen_ai_agents::delete_by_org(org).await.unwrap();
         db::model_pricing::delete_by_org(org).await.unwrap();
@@ -2497,7 +2497,7 @@ mod tests {
             (kept, twin.as_str()),
             (config::DEFAULT_ORG, fallback.as_str()),
         ] {
-            let id = config::ider::uuid();
+            let id = config::ider::ksuid();
             templates::ActiveModel {
                 id: Set(id.clone()),
                 org: Set(owner.to_string()),

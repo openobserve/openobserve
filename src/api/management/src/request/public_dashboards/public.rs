@@ -929,7 +929,7 @@ mod tests {
     #[test]
     fn gate12_the_slug_limit_counts_bodies_and_never_a_304() {
         let pd = Model {
-            slug: config::ider::uuid(),
+            slug: config::ider::ksuid(),
             ..link()
         };
         let rpm = config::get_config().public_dashboards.slug_rpm as usize;
@@ -959,7 +959,7 @@ mod tests {
     #[test]
     fn not_ready_responses_carry_retry_after() {
         let pd = Model {
-            slug: config::ider::uuid(),
+            slug: config::ider::ksuid(),
             ..link()
         };
         let building = Served::Building(NotReadyResponse::Building {
@@ -1038,7 +1038,7 @@ mod tests {
     #[tokio::test]
     async fn a_failed_trial_check_keeps_the_cached_file_and_an_expired_trial_evicts_it() {
         let live = Model {
-            id: config::ider::uuid(),
+            id: config::ider::ksuid(),
             slug: "Tr8Zt2mR7aB3cD4eF5gH6Q".into(),
             time_ranges: Some(r#"[{"type":"relative","secs":3600}]"#.into()),
             default_range_key: Some("r3600".into()),
@@ -1081,7 +1081,7 @@ mod tests {
     #[test]
     fn gate12_over_budget_a_current_etag_still_gets_304_and_a_stale_one_gets_429() {
         let pd = Model {
-            slug: config::ider::uuid(),
+            slug: config::ider::ksuid(),
             ..link()
         };
         let rpm = config::get_config().public_dashboards.slug_rpm as usize;
@@ -1115,7 +1115,7 @@ mod tests {
             .await;
         let slug = "Rm8Zt2mR7aB3cD4eF5gH6Q";
         let live = Model {
-            id: config::ider::uuid(),
+            id: config::ider::ksuid(),
             slug: slug.into(),
             time_ranges: Some(r#"[{"type":"relative","secs":3600}]"#.into()),
             default_range_key: Some("r3600".into()),
@@ -1153,7 +1153,7 @@ mod tests {
 
         let slug = "Lc8Zt2mR7aB3cD4eF5gH6Q";
         let live = Model {
-            id: config::ider::uuid(),
+            id: config::ider::ksuid(),
             slug: slug.into(),
             time_ranges: Some(r#"[{"type":"relative","secs":3600}]"#.into()),
             default_range_key: Some("r3600".into()),

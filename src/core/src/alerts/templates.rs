@@ -25,6 +25,7 @@ use config::{
     meta::{
         alerts::{content_spec::ContentSpec, notification_kind::NotificationKind},
         destinations::{Template, TemplateKind, TemplateType},
+        secret_store::{SecretErrorCode, grammar::check_template_text},
     },
 };
 use db::{
@@ -126,6 +127,10 @@ pub async fn save(
     if template.body.is_empty() {
         return Err(TemplateError::EmptyBody);
     }
+    refuse_template_refs(&template.body)?;
+    if let TemplateType::Email { title } = &template.template_type {
+        refuse_template_refs(title)?;
+    }
     if !name.is_empty() {
         template.name = name.to_owned();
     }
@@ -193,6 +198,12 @@ pub async fn save(
     if template.kind == TemplateKind::Content {
         let spec = ContentSpec::parse(&template.body)
             .map_err(|e| TemplateError::InvalidContentSpec(e.to_string()))?;
+        // JSON escapes can hide a template expression until the content spec is decoded.
+        if template.body.contains(r"\u") {
+            let decoded = serde_json::to_string(&spec)
+                .map_err(|e| TemplateError::InvalidContentSpec(e.to_string()))?;
+            refuse_template_refs(&decoded)?;
+        }
         // Reject an unsupported link scheme HERE rather than neutralizing it
         // on every send: the author gets a fixable error instead of a
         // template whose link silently never works (#13742).
@@ -216,6 +227,19 @@ pub async fn save(
         set_ownership(owner, "templates", object).await;
     }
     Ok(saved)
+}
+
+fn refuse_template_refs(text: &str) -> Result<(), TemplateError> {
+    // Near misses are literal text outside ref slots. One must not mask a later valid token.
+    for expression in text.split_inclusive("}}") {
+        if let Some(start) = expression.rfind("{{")
+            && check_template_text(&expression[start..])
+                == Err(SecretErrorCode::RefNotAllowedInField)
+        {
+            return Err(TemplateError::RefNotAllowedInField);
+        }
+    }
+    Ok(())
 }
 
 /// The seeded `prebuilt_default` row and its reserved prefix: read only for every caller, root
@@ -869,6 +893,71 @@ fn pick_used_by(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn template_save_refuses_store_refs_in_bodies_and_titles() {
+        for create in [true, false] {
+            for token in ["{{secrets.PD}}", "{{vars.HOST}}"] {
+                for (body, title) in [(token, "subject"), ("body", token)] {
+                    let template = Template {
+                        org_id: "template_refs".into(),
+                        name: "ref_test".into(),
+                        body: body.into(),
+                        template_type: TemplateType::Email {
+                            title: title.into(),
+                        },
+                        ..Default::default()
+                    };
+                    let error = save("ref_test", template, None, None, create, false)
+                        .await
+                        .unwrap_err();
+                    assert!(matches!(&error, TemplateError::RefNotAllowedInField));
+                    assert_eq!(
+                        crate::http::template_error_response(error).status(),
+                        axum::http::StatusCode::BAD_REQUEST
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn near_misses_in_template_text_are_literal_and_cannot_hide_refs() {
+        assert!(refuse_template_refs("{{secret.X}}").is_ok());
+        for text in ["{{secret.X}} {{vars.X}}", "{{secret.X {{secrets.X}}"] {
+            assert!(refuse_template_refs(text).is_err());
+        }
+    }
+
+    #[tokio::test]
+    async fn content_template_refusal_checks_decoded_text() {
+        if !meta_store().await {
+            return;
+        }
+        let mut template = Template {
+            org_id: config::ider::ksuid(),
+            name: "escaped".into(),
+            body: r#"{"title":"summary","body":"hello"}"#.into(),
+            kind: TemplateKind::Content,
+            ..Default::default()
+        };
+        let stored = infra::table::templates::put(template.clone())
+            .await
+            .unwrap();
+        template.body = r#"{"title":"\u007b\u007bvars.HOST}}","body":"hello"}"#.into();
+        let error = save("escaped", template, None, None, false, false)
+            .await
+            .unwrap_err();
+        assert!(matches!(error, TemplateError::RefNotAllowedInField));
+        let read = infra::table::templates::get(&stored.org_id, "escaped")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(read.body, stored.body);
+        infra::table::templates::delete_by_org(&stored.org_id)
+            .await
+            .unwrap();
+    }
 
     #[test]
     fn fold_used_by_counts_every_reference_kind_per_name() {

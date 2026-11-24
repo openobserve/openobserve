@@ -27,6 +27,7 @@ pub mod custom;
 pub mod default_template;
 pub mod examples;
 pub mod format;
+pub mod human;
 pub mod jira;
 pub(crate) mod modifiers;
 pub mod notify;

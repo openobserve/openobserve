@@ -881,9 +881,9 @@ mod tests {
 
         /// One caller who may only create tables and one who may only edit `table`.
         fn creator_and_editor(table: &str) -> (String, String) {
-            let creator = format!("{}@example.com", config::ider::uuid());
+            let creator = format!("{}@example.com", config::ider::ksuid());
             grant(&creator, &[("enrichment_tables", Target::All, "POST")]);
-            let editor = format!("{}@example.com", config::ider::uuid());
+            let editor = format!("{}@example.com", config::ider::ksuid());
             grant(&editor, &[("enrichment_tables", Target::One(table), "PUT")]);
             (creator, editor)
         }

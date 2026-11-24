@@ -56,6 +56,7 @@ export const makeToolsetFormSchema = (t: Translate, options: ToolsetSchemaOption
         .max(256, t("aiToolset.nameTooLong")),
       kind: z.enum(["mcp", "skill"]),
       description: z.string(),
+      automation_allowed: z.boolean(),
       mcp: z.object({
         url: z.string(),
         timeout_seconds: z.coerce.number().int(whole).positive(whole),
@@ -93,6 +94,7 @@ export const toolsetFormDefaults = (): ToolsetFormValues => ({
   name: "",
   kind: "mcp",
   description: "",
+  automation_allowed: false,
   mcp: { url: "", timeout_seconds: 30, headers: [], writeHeaders: [] },
   skill: { content: "" },
 });
@@ -126,6 +128,7 @@ export function toolsetFormOf(record: unknown, mergeSecrets: boolean): ToolsetFo
   values.name = typeof record.name === "string" ? record.name : "";
   if (record.kind === "mcp" || record.kind === "skill") values.kind = record.kind;
   values.description = typeof record.description === "string" ? record.description : "";
+  values.automation_allowed = record.automation_allowed === true;
   const num = (v: unknown, fallback: number) =>
     typeof v === "number" && Number.isFinite(v) && v > 0 ? v : fallback;
   if (values.kind === "mcp") {

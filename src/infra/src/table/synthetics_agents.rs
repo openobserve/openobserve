@@ -130,6 +130,7 @@ pub async fn register(record: &SyntheticsAgentRecord) -> Result<(), errors::Erro
                 token_id: Set(record.token_id.clone()),
                 last_seen_at: Set(record.last_seen_at),
                 created_at: Set(record.created_at),
+                last_tokenless_credential_resolve_at: Set(None),
             };
             Entity::insert(model)
                 .exec(client)

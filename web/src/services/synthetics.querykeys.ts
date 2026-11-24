@@ -30,4 +30,7 @@ export const syntheticsKeys = {
     orgKey(org, "synthetics", "monitors", folderId ?? "all"),
   agentTokensAll: (org: string) => orgKey(org, "synthetics", "agentTokens"),
   agentTokens: (org: string) => orgKey(org, "synthetics", "agentTokens"),
+  locations: (org: string) => orgKey(org, "synthetics", "locations"),
+  location: (org: string, id: string) => orgKey(org, "synthetics", "locations", id),
+  agentSetup: (org: string) => orgKey(org, "synthetics", "agentSetup"),
 };

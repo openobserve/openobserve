@@ -28,7 +28,8 @@ use config::{
             alert::{Alert, AlertListFilter, ListAlertsParams, RowTemplateType},
         },
         destinations::{
-            AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, Template, TemplateKind,
+            AwsSns, Destination, DestinationType, Email, Endpoint, HTTPType, Module, Template,
+            TemplateKind,
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         search::{SearchEventContext, SearchEventType},
@@ -2757,10 +2758,40 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
+    user_id: &str,
+) -> Result<ManualTrigger, AlertError> {
+    let trigger = super::notifications::send::as_human_sender(
+        user_id.to_owned(),
+        trigger_as(conn, org_id, alert_id, user_id),
+    );
+    // Held rungs page after this returns, so the records keep the requester for the send check.
+    #[cfg(feature = "enterprise")]
+    let trigger = o2_enterprise::enterprise::oncall::escalation::as_requester(user_id, trigger);
+    trigger.await
+}
+
+async fn trigger_as<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+    user_id: &str,
 ) -> Result<ManualTrigger, AlertError> {
     let Some((_folder, alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
         return Err(AlertError::AlertNotFound);
     };
+    destinations::authorize_human_sends(org_id, user_id, &alert.destinations)
+        .await
+        .map_err(|refusal| infra::errors::Error::OtherError(refusal.into()))?;
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::oncall::is_enabled() {
+        let rows = [manual_trigger_row(&alert)];
+        let paged = crate::alerts::scheduler::handlers::page_destinations_for_firing(&alert, &rows)
+            .await
+            .map_err(infra::errors::Error::OtherError)?;
+        destinations::authorize_human_sends(org_id, user_id, &paged)
+            .await
+            .map_err(|refusal| infra::errors::Error::OtherError(refusal.into()))?;
+    }
     let now = Utc::now().timestamp_micros();
     #[cfg(feature = "enterprise")]
     if let Some(downtime) = suppressed_manual_trigger(&alert, &_folder.folder_id, now).await {
@@ -3114,7 +3145,7 @@ impl AlertExt for Alert {
         //   2. A destination fetch failure becomes a per-destination failure instead of a `?` that
         //      aborts the remaining destinations — which, once an earlier destination had already
         //      sent, made the resulting all-fail return trigger a retry that re-sent it (§6.1).
-        let mut snapshot: Vec<(String, Option<(String, DestinationType, Option<Template>)>)> =
+        let mut snapshot: Vec<(String, Option<(Destination, Option<Template>)>)> =
             Vec::with_capacity(self.destinations.len());
         for dest_name in self.destinations.iter() {
             // Ledgered destinations already landed on a prior attempt.
@@ -3123,19 +3154,13 @@ impl AlertExt for Alert {
                 continue;
             }
             match destinations::get_with_template(&self.org_id, dest_name).await {
-                Ok((dest, dest_template)) => match dest.module {
-                    Module::Alert {
-                        destination_type, ..
-                    } => {
+                Ok((dest, dest_template)) => match &dest.module {
+                    Module::Alert { .. } => {
                         // Keyed by the name CONFIGURED on the alert, not
                         // `dest.name`: the ledger is matched against
                         // `self.destinations` on the next attempt, so the two
                         // must be the same string.
-                        let dest_id = dest.id.map(|id| id.to_string()).unwrap_or_default();
-                        snapshot.push((
-                            dest_name.clone(),
-                            Some((dest_id, destination_type, dest_template)),
-                        ))
+                        snapshot.push((dest_name.clone(), Some((dest, dest_template))))
                     }
                     _ => {
                         log::error!(
@@ -3189,8 +3214,14 @@ impl AlertExt for Alert {
         let mut chart_png: Option<Option<std::sync::Arc<Vec<u8>>>> = None;
 
         for (dest_name, resolved) in snapshot.iter() {
-            let Some((dest_id, destination_type, dest_template)) = resolved else {
+            let Some((destination, dest_template)) = resolved else {
                 continue; // already recorded as a resolution failure
+            };
+            let Module::Alert {
+                destination_type, ..
+            } = &destination.module
+            else {
+                continue;
             };
 
             // Use alert-level template if specified, otherwise fall back to
@@ -3268,7 +3299,7 @@ impl AlertExt for Alert {
                 }
             }
 
-            match send_to_destination(self, dest_id, destination_type, template, ctx).await {
+            match send_to_destination(self, destination, destination_type, template, ctx).await {
                 Ok(resp) => {
                     outcome.succeeded.push(dest_name.clone());
                     success_message = format!("{success_message} destination {dest_name} {resp};");
@@ -3558,30 +3589,27 @@ pub async fn send_recovery_notification(
         if !visited.insert(dest_name) {
             continue;
         }
-        let (dest_id, destination_type, dest_template) =
+        let (destination, dest_template) =
             match destinations::get_with_template(&alert.org_id, dest_name).await {
-                Ok((dest, tpl)) => match dest.module {
-                    Module::Alert {
-                        destination_type, ..
-                    } => (
-                        dest.id.map(|id| id.to_string()).unwrap_or_default(),
-                        destination_type,
-                        tpl,
-                    ),
-                    _ => continue,
-                },
+                Ok(pair) => pair,
                 Err(e) => {
                     failures = format!("{failures} destination {dest_name}: {e};");
                     continue;
                 }
             };
+        let Module::Alert {
+            destination_type, ..
+        } = &destination.module
+        else {
+            continue;
+        };
         // Its thread reply goes out from `dispatch_recovery`, whatever `notify_on_recovery` says.
         if matches!(destination_type, DestinationType::SlackApp(_)) {
             continue;
         }
         // A platform resolve is protocol, not a message, so the template is never rendered for it.
         if let (Some(platform), DestinationType::Http(endpoint)) =
-            (platform_of(&destination_type), &destination_type)
+            (platform_of(destination_type), destination_type)
         {
             // Only the firing's own: a resolve quotes the key of the trigger that opened the
             // ticket, so sending one somewhere that never got a trigger closes nothing.
@@ -3594,7 +3622,9 @@ pub async fn send_recovery_notification(
                 );
                 continue;
             }
-            match platform::send_resolve(platform, endpoint, &event.episode_id).await {
+            match platform::send_saved_resolve(&destination, platform, endpoint, &event.episode_id)
+                .await
+            {
                 Ok(resp) => {
                     log::info!(
                         "[RECOVERY] {}/{} episode {} destination {dest_name} closed on {platform:?}",
@@ -3625,8 +3655,8 @@ pub async fn send_recovery_notification(
         // 202 to one it drops. Body at debug only: it can carry recipient data.
         match send_to_destination(
             alert,
-            &dest_id,
-            &destination_type,
+            &destination,
+            destination_type,
             effective.template(),
             &mut ctx,
         )
@@ -3698,19 +3728,21 @@ async fn build_chart_asset(
 /// destination's metadata before rendering (§5.1).
 async fn send_to_destination(
     alert: &Alert,
-    destination_id: &str,
+    destination: &Destination,
     dest_type: &DestinationType,
     template: &Template,
     ctx: &mut NotificationContext,
 ) -> Result<String, anyhow::Error> {
     if matches!(dest_type, DestinationType::SlackApp(_)) {
+        send::refuse_unsupported_refs(dest_type)?;
         ctx.metadata.clear();
         let alert_id = alert.id.map(|id| id.to_string());
+        let destination_id = destination.id.map(|id| id.to_string()).unwrap_or_default();
         let send = crate::alerts::slack_publish::AlertSend {
             org_id: &alert.org_id,
             alert_id: alert_id.as_deref(),
             is_real_time: alert.is_real_time,
-            destination_id,
+            destination_id: &destination_id,
             template,
         };
         return crate::alerts::slack_publish::send_alert(
@@ -3723,6 +3755,7 @@ async fn send_to_destination(
     send::send_to_destination(
         &alert.org_id,
         send::Subject::Alert(&alert.name),
+        destination,
         dest_type,
         template,
         ctx,
@@ -3782,6 +3815,7 @@ pub(crate) async fn send_http_notification(
     endpoint: &Endpoint,
     msg: String,
 ) -> Result<String, anyhow::Error> {
+    send::refuse_endpoint_refs(endpoint)?;
     // A plain body posted at a Jira site root does nothing, so senders without a Jira branch fail.
     if jira::is_jira(endpoint) {
         return Err(send::SendError::Blocked(jira::UNSUPPORTED_SENDER.to_string()).into());
@@ -3912,6 +3946,176 @@ pub(crate) async fn send_http_notification(
     send_outcome(resp_status, &resp_body, hide_body)
 }
 
+pub(crate) async fn send_saved_http_notification(
+    destination: &Destination,
+    endpoint: &Endpoint,
+    ctx: Option<&NotificationContext>,
+    mut msg: String,
+) -> Result<String, anyhow::Error> {
+    let Module::Alert {
+        destination_type, ..
+    } = &destination.module
+    else {
+        anyhow::bail!("expected alert destination");
+    };
+    if !endpoint.uses_store_refs() {
+        send::refuse_endpoint_refs(endpoint)?;
+        if let Some(ctx) = ctx {
+            msg = send::stamp_platform_key(destination_type, ctx, msg);
+        }
+        return send_http_notification(endpoint, msg).await;
+    }
+    if jira::is_jira(endpoint) {
+        send::refuse_endpoint_refs(endpoint)?;
+    }
+
+    let is_slack_hook =
+        url::Url::parse(&endpoint.url).is_ok_and(|url| url.host_str() == Some("hooks.slack.com"));
+    let now_secs = (config::utils::time::now_micros() / 1_000_000) as u64;
+    if is_slack_hook
+        && slack_render::images_undeliverable(now_secs)
+        && let Some(stripped) = slack_render::strip_image_blocks(&msg)
+    {
+        config::metrics::ALERT_CHART_EVENTS_TOTAL
+            .with_label_values(&["slack_image_pre_stripped"])
+            .inc();
+        msg = stripped.msg;
+    }
+
+    let platform = platform_of(destination_type);
+    let episode = ctx.and_then(|ctx| ctx.episode_id.as_deref());
+    let (attempt, response) =
+        send_secret_webhook_attempt(destination, endpoint, platform, episode, &msg).await?;
+    let response = resend_after_auth_refetch(
+        destination,
+        endpoint,
+        platform,
+        episode,
+        &msg,
+        attempt,
+        response,
+    )
+    .await?;
+    let status = response.status();
+    if is_slack_hook
+        && status == reqwest::StatusCode::BAD_REQUEST
+        && let Some(stripped) = slack_render::strip_image_blocks(&msg)
+        && response.text().await.is_ok_and(|text| {
+            text.contains("invalid_attachments") || text.contains("invalid_blocks")
+        })
+    {
+        let (_, retry) =
+            send_secret_webhook_attempt(destination, endpoint, platform, episode, &stripped.msg)
+                .await?;
+        if retry.status().is_success() {
+            config::metrics::ALERT_CHART_EVENTS_TOTAL
+                .with_label_values(&["slack_image_rejected"])
+                .inc();
+            if stripped.had_web_url_image {
+                slack_render::mark_images_undeliverable(now_secs);
+            }
+        }
+        return secret_send_outcome(destination, retry.status());
+    }
+    secret_send_outcome(destination, status)
+}
+
+async fn send_secret_webhook_attempt(
+    destination: &Destination,
+    endpoint: &Endpoint,
+    platform: Option<platform::Platform>,
+    episode: Option<&str>,
+    body: &str,
+) -> Result<(send::SecretRequest, reqwest::Response), anyhow::Error> {
+    let attempt = secret_attempt(destination, endpoint)
+        .await?
+        .ok_or_else(|| {
+            send::secret_error(
+                endpoint,
+                config::meta::secret_store::SecretErrorCode::DeliveryStale,
+            )
+        })?;
+    let response = send_with_attempt(&attempt, endpoint, platform, episode, body).await?;
+    Ok((attempt, response))
+}
+
+async fn secret_attempt(
+    destination: &Destination,
+    endpoint: &Endpoint,
+) -> Result<Option<send::SecretRequest>, anyhow::Error> {
+    send::SecretRequest::new(
+        Some(destination),
+        endpoint,
+        send::destination_client_builder(endpoint.skip_tls_verify),
+    )
+    .await
+}
+
+async fn send_with_attempt(
+    attempt: &send::SecretRequest,
+    endpoint: &Endpoint,
+    platform: Option<platform::Platform>,
+    episode: Option<&str>,
+    body: &str,
+) -> Result<reqwest::Response, anyhow::Error> {
+    let body = platform::stamp_secret_key(platform, body, episode, endpoint, attempt)?;
+    let method = match endpoint.method {
+        HTTPType::POST => reqwest::Method::POST,
+        HTTPType::PUT => reqwest::Method::PUT,
+        HTTPType::GET => reqwest::Method::GET,
+    };
+    attempt
+        .send(attempt.json_request(method, "").body(body))
+        .await
+}
+
+/// A 401/403 refetches provider values once per cooldown, and resends once only if they changed.
+async fn resend_after_auth_refetch(
+    destination: &Destination,
+    endpoint: &Endpoint,
+    platform: Option<platform::Platform>,
+    episode: Option<&str>,
+    body: &str,
+    first: send::SecretRequest,
+    response: reqwest::Response,
+) -> Result<reqwest::Response, anyhow::Error> {
+    let status = response.status();
+    if !matches!(
+        status,
+        reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN
+    ) || !send::refetch_after_auth_failure(destination).await
+    {
+        return Ok(response);
+    }
+    match secret_attempt(destination, endpoint).await? {
+        Some(fresh) if !fresh.same_material(&first, endpoint) => {
+            log::info!(
+                "[ALERT] destination {}/{} answered {status}; resending once after auth_refetch",
+                destination.org_id,
+                destination.name
+            );
+            send_with_attempt(&fresh, endpoint, platform, episode, body).await
+        }
+        _ => Ok(response),
+    }
+}
+
+fn secret_send_outcome(
+    destination: &Destination,
+    status: reqwest::StatusCode,
+) -> Result<String, anyhow::Error> {
+    if !status.is_success() {
+        let id = destination
+            .id
+            .map_or_else(|| destination.name.clone(), |id| id.to_string());
+        log::error!("Alert notification failed for destination {id} with status: {status}");
+    }
+    if status.is_redirection() {
+        return Err(send::SendError::RedirectRefused(status).into());
+    }
+    send_outcome(status, "", true)
+}
+
 /// Send an email; with `text_body: None` it carries only the HTML part.
 ///
 /// Parameter order is `(text_body, html_body)` to MATCH
@@ -4005,10 +4209,27 @@ fn html_with_inline_png(html_body: String, png: &[u8]) -> MultiPart {
 /// no URL fetch is involved anywhere — true zero-storage delivery. Same SSRF
 /// guard discipline as `send_http_notification`.
 pub(crate) async fn send_discord_with_attachment(
+    destination: Option<&Destination>,
     endpoint: &Endpoint,
     msg: String,
     png: std::sync::Arc<Vec<u8>>,
 ) -> Result<String, anyhow::Error> {
+    if endpoint.uses_store_refs() {
+        let attempt = send::SecretRequest::new(
+            destination,
+            endpoint,
+            send::destination_client_builder(endpoint.skip_tls_verify),
+        )
+        .await?;
+        if let (Some(destination), Some(attempt)) = (destination, attempt) {
+            let req = attempt
+                .request(reqwest::Method::POST, "")
+                .multipart(discord_attachment_form(msg, &png)?);
+            let response = attempt.send(req).await?;
+            return secret_send_outcome(destination, response.status());
+        }
+    }
+    send::refuse_endpoint_refs(endpoint)?;
     if let Err(e) = SsrfGuard::validate_destination_url_with_config_async(&endpoint.url).await {
         return Err(send::SendError::Blocked(format!(
             "Destination URL blocked by SSRF guard: {e}"
@@ -4019,14 +4240,7 @@ pub(crate) async fn send_discord_with_attachment(
     let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
 
-    let form = reqwest::multipart::Form::new()
-        .text("payload_json", msg.clone())
-        .part(
-            "files[0]",
-            reqwest::multipart::Part::bytes(png.as_ref().clone())
-                .file_name(crate::alerts::notifications::render::discord::CHART_ATTACHMENT_NAME)
-                .mime_str("image/png")?,
-        );
+    let form = discord_attachment_form(msg.clone(), &png)?;
 
     let resp = client
         .post(url)
@@ -4043,6 +4257,17 @@ pub(crate) async fn send_discord_with_attachment(
         );
     }
     send_outcome(resp_status, &resp_body, hide_body)
+}
+
+fn discord_attachment_form(msg: String, png: &[u8]) -> reqwest::Result<reqwest::multipart::Form> {
+    Ok(reqwest::multipart::Form::new()
+        .text("payload_json", msg)
+        .part(
+            "files[0]",
+            reqwest::multipart::Part::bytes(png.to_vec())
+                .file_name(crate::alerts::notifications::render::discord::CHART_ATTACHMENT_NAME)
+                .mime_str("image/png")?,
+        ))
 }
 
 /// What the caller of a send sees; a peer only the operator allowlist admits shows its status only.
@@ -5756,10 +5981,18 @@ mod send_path_tests {
             shown(send_http_notification(&endpoint(base, "/ok"), "{}".into()).await),
             shown(send_http_notification(&endpoint(base, "/fail"), "{}".into()).await),
             shown(
-                send_discord_with_attachment(&endpoint(base, "/ok"), "{}".into(), png.clone())
+                send_discord_with_attachment(
+                    None,
+                    &endpoint(base, "/ok"),
+                    "{}".into(),
+                    png.clone(),
+                )
+                .await,
+            ),
+            shown(
+                send_discord_with_attachment(None, &endpoint(base, "/fail"), "{}".into(), png)
                     .await,
             ),
-            shown(send_discord_with_attachment(&endpoint(base, "/fail"), "{}".into(), png).await),
             shown(send_resolve(Platform::PagerDuty, &endpoint(base, "/fail"), "ep-1").await),
         ]
     }
@@ -5788,7 +6021,7 @@ mod send_path_tests {
                 let http = tokio::time::timeout(limit, http).await;
                 assert!(http.expect("the HTTP send has no limit").is_err());
                 let png = std::sync::Arc::new(vec![0u8; 8]);
-                let discord = send_discord_with_attachment(&hanging, "{}".into(), png);
+                let discord = send_discord_with_attachment(None, &hanging, "{}".into(), png);
                 let discord = tokio::time::timeout(limit, discord).await;
                 assert!(discord.expect("the multipart send has no limit").is_err());
             },
@@ -5857,7 +6090,7 @@ mod send_path_tests {
                 let png = std::sync::Arc::new(vec![0u8; 8]);
                 let seen = [
                     send_http_notification(&dest, "{}".into()).await,
-                    send_discord_with_attachment(&dest, "{}".into(), png).await,
+                    send_discord_with_attachment(None, &dest, "{}".into(), png).await,
                     send_resolve(Platform::PagerDuty, &dest, "ep-1").await,
                 ];
                 for (path, shown) in ["http", "discord", "resolve"].into_iter().zip(seen) {
@@ -5887,7 +6120,7 @@ mod send_path_tests {
                 let png = std::sync::Arc::new(vec![0u8; 8]);
                 let seen = [
                     send_http_notification(&dest, "{}".into()).await,
-                    send_discord_with_attachment(&dest, "{}".into(), png).await,
+                    send_discord_with_attachment(None, &dest, "{}".into(), png).await,
                 ];
                 for (path, shown) in ["http", "discord"].into_iter().zip(seen) {
                     let shown = shown.expect_err("the body is cut short").to_string();

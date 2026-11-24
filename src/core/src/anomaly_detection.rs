@@ -6330,7 +6330,7 @@ mod tests {
 
         async fn bind_anomaly(org: &str, config: &str, template: &str) {
             let mut model = super::update_interval_validation::stored_config();
-            model.anomaly_id = config::ider::uuid();
+            model.anomaly_id = config::ider::ksuid();
             model.org_id = org.to_string();
             model.name = config.to_string();
             model.template = Some(template.to_string());
@@ -6624,7 +6624,7 @@ mod tests {
                 || async {
                     let folder = store_with_destination("acme").await;
                     let mut model = super::update_interval_validation::stored_config();
-                    model.anomaly_id = config::ider::uuid();
+                    model.anomaly_id = config::ider::ksuid();
                     model.org_id = "acme".to_string();
                     model.folder_id = folder;
                     let id = model.anomaly_id.clone();

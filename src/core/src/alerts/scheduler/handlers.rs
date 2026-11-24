@@ -275,7 +275,7 @@ async fn persist_alert_run_state_deferred(
                 episode
                     .episode_id
                     .clone()
-                    .unwrap_or_else(config::ider::uuid)
+                    .unwrap_or_else(config::ider::ksuid)
             });
         config::meta::alerts::recovery::hold_firing_cycle(prev.as_ref(), state);
         closed
@@ -836,7 +836,7 @@ async fn dispatch_per_group(
             states
                 .get(&item.group_key)
                 .and_then(|state| state.episode_id.clone())
-                .unwrap_or_else(config::ider::uuid)
+                .unwrap_or_else(config::ider::ksuid)
         });
         // The group's OWN row, level and value — never the worst group's
         // (MN-3). One send per group is what makes host-a and host-b page
@@ -2614,6 +2614,21 @@ pub(crate) async fn page_for_alert_firing(
     }
     let group_dimensions = alert_identity(alert, rows).await;
     page_for_alert_identity(trace_id, alert, &group_dimensions).await;
+}
+
+/// The destinations a firing would page through; a manual trigger checks its sender's use on them.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn page_destinations_for_firing(
+    alert: &config::meta::alerts::alert::Alert,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+) -> Result<Vec<String>, anyhow::Error> {
+    let groups = alert_identity(alert, rows).await;
+    o2_enterprise::enterprise::oncall::escalation::page_destinations_for_alert_groups(
+        &alert.org_id,
+        alert.oncall_team.as_deref(),
+        &groups,
+    )
+    .await
 }
 
 /// Why this firing's page was withheld, when it would have reached a team under a valid license.
@@ -4410,7 +4425,7 @@ async fn handle_alert_triggers(
         .ok()
         .flatten()
         .and_then(|state| state.episode_id);
-        Some(open.unwrap_or_else(config::ider::uuid))
+        Some(open.unwrap_or_else(config::ider::ksuid))
     } else {
         None
     };
@@ -7707,7 +7722,7 @@ async fn initiate_stream_deletion(
 
     // Create a job in the compact manual jobs table
     let job = infra::table::compactor_manual_jobs::CompactorManualJob {
-        id: config::ider::uuid(),
+        id: config::ider::ksuid(),
         key: key.clone(),
         status: infra::table::compactor_manual_jobs::Status::Pending,
         created_at: Utc::now().timestamp_micros(),
@@ -8435,6 +8450,7 @@ mod tests {
             priority: 2,
             responder_role: ResponderRole::Owner,
             exhausted_at: None,
+            requested_by: None,
             origin_response_id: None,
             state,
             opened_at: 0,

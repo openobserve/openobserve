@@ -175,7 +175,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 //      added_connections to autoresolve_runs.
 // 172: add autoresolve_runs.plan_history.
 // 173: add incident_id to autoresolve_runs, with one live run per incident.
-pub const DB_SCHEMA_VERSION: u64 = 173;
+// 174: create the org secret store tables and the secret store job tables, and
+// requested_by on oncall_responses.
+pub const DB_SCHEMA_VERSION: u64 = 174;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -513,6 +515,11 @@ pub fn get_config() -> Arc<Config> {
     CONFIG.load().clone()
 }
 
+pub fn secret_store_auth_modes() -> Vec<crate::meta::secret_store::external::AuthMode> {
+    parse_secret_store_auth_modes(&get_config().common.secret_store_auth_modes)
+        .expect("secret store auth modes validated at config load")
+}
+
 pub fn refresh_config() -> Result<(), anyhow::Error> {
     let old = CONFIG.load_full();
     let new = Arc::new(init());
@@ -556,6 +563,10 @@ pub const SYNTHETICS_RELOAD_CLASSES: &[(&str, SyntheticsReloadClass)] = &[
     ),
     ("ZO_SYNTHETICS_LAMBDA_BROWSER", SyntheticsReloadClass::Hot),
     ("ZO_SYNTHETICS_LAMBDA_NET", SyntheticsReloadClass::Hot),
+    (
+        "O2_SYNTHETICS_LEASE_MIN_RUNNER_VERSION",
+        SyntheticsReloadClass::Hot,
+    ),
     ("ZO_SYNTHETICS_API_ENDPOINT", SyntheticsReloadClass::Hot),
     (
         "ZO_SYNTHETICS_INSTALL_SCRIPT_URL",
@@ -623,12 +634,15 @@ pub(crate) fn synthetics_restart_required_changes(
         status_page_public_rpm,
         lambda_browser: _,
         lambda_net: _,
+        lambda_runner_contract: _,
+        lease_min_runner_version: _,
         api_endpoint: _,
         install_script_url: _,
         recorder_extension_url: _,
         agent_stale_secs: _,
         max_check_budget_secs: _,
         job_lease_secs: _,
+        job_lease_max_secs: _,
         max_net_timeout_ms: _,
         browser_max_steps: _,
         browsers: _,
@@ -1451,6 +1465,19 @@ pub struct Synthetics {
         help = "Lambda function name for the network probe. Empty leaves public net-* pools to lease-based agents, which requires enterprise."
     )]
     pub lambda_net: String,
+    /// At 1 or above the dispatcher mints a lease token for each job it claims for Lambda.
+    #[env_config(
+        name = "O2_SYNTHETICS_LAMBDA_RUNNER_CONTRACT",
+        default = 0,
+        help = "Contract level of the managed Lambda runner. 1 makes the dispatcher mint a lease token per claimed job; 0 keeps probe-token resolve and ack."
+    )]
+    pub lambda_runner_contract: u32,
+    #[env_config(
+        name = "O2_SYNTHETICS_LEASE_MIN_RUNNER_VERSION",
+        default = "",
+        help = "Runner version that holds attempt leases. Empty keeps old runners working; set it to refuse credential-bearing checks on older runners 7 days after the store latches."
+    )]
+    pub lease_min_runner_version: String,
     /// Public-facing URL of the OpenObserve API — sent to the probe as
     /// JOBAPI_ENDPOINT and used as the result-stream ingest base URL.
     /// Empty (default) falls back to ZO_WEB_URL.
@@ -1522,6 +1549,13 @@ pub struct Synthetics {
         help = "How long a job is leased to a probe before the reaper requeues it. Must be strictly greater than the check budget."
     )]
     pub job_lease_secs: i64,
+    /// Upper bound on a client-requested lease; `job_lease_secs` stays the floor.
+    #[env_config(
+        name = "ZO_SYNTHETICS_JOB_LEASE_MAX_SECS",
+        default = 900,
+        help = "Longest lease a probe may request, in seconds. Must be at least ZO_SYNTHETICS_JOB_LEASE_SECS."
+    )]
+    pub job_lease_max_secs: i64,
     /// Ceiling for ONE attempt of a non-browser check, in milliseconds.
     #[env_config(
         name = "ZO_SYNTHETICS_MAX_NET_TIMEOUT_MS",
@@ -2170,6 +2204,72 @@ pub struct Common {
         help = "Aggregate accounted memory limit in MB across all topics for the in-memory queue backend (ZO_QUEUE_STORE=memory)."
     )]
     pub memory_queue_max_size: usize,
+    #[env_config(
+        name = "O2_SECRET_STORE_REFS_ENABLED",
+        default = false,
+        help = "Enable secret store references."
+    )]
+    pub secret_store_refs_enabled: bool,
+    #[env_config(
+        name = "O2_SECRET_STORE_IGNORE_RELEASE_FLOOR",
+        default = false,
+        help = "Testing only: treats every node as meeting the store release floor so non-release builds can latch. Never set in production. Must be set on every node."
+    )]
+    pub secret_store_ignore_release_floor: bool,
+    #[env_config(
+        name = "O2_SECRET_STORE_RECOVERY_DAYS",
+        default = 30,
+        help = "Number of days a deleted secret remains recoverable (1 to 90)."
+    )]
+    pub secret_store_recovery_days: i64,
+    #[env_config(
+        name = "O2_SECRET_CACHE_NODE_MB",
+        default = 256,
+        help = "Maximum secret cache size in MB per node."
+    )]
+    pub secret_cache_node_mb: usize,
+    #[env_config(
+        name = "O2_SECRET_CACHE_ORG_MB",
+        default = 32,
+        help = "Maximum secret cache size in MB per organization on each node."
+    )]
+    pub secret_cache_org_mb: usize,
+    #[env_config(
+        name = "O2_SECRET_STORE_REGION",
+        default = "",
+        help = "Region for secret store identities (1 to 24 lowercase letters, digits, or hyphens)."
+    )]
+    pub secret_store_region: String,
+    #[env_config(
+        name = "O2_SECRET_STORE_AUTH_MODES",
+        default = "static",
+        help = "Authentication modes allowed for external secret backends: static only. mapped and region_issuer are not available in this release."
+    )]
+    pub secret_store_auth_modes: String,
+    #[env_config(
+        name = "O2_SECRET_BACKEND_PRIVATE_CIDRS",
+        default = "",
+        help = "Comma-separated IPv4 or IPv6 CIDRs allowed for private secret backend connections."
+    )]
+    pub secret_backend_private_cidrs: String,
+    #[env_config(
+        name = "O2_SECRET_BACKEND_CLUSTER_CIDRS",
+        default = "",
+        help = "Comma-separated IPv4 or IPv6 CIDRs of this cluster's pod and service networks; secret backend connections to them are always refused."
+    )]
+    pub secret_backend_cluster_cidrs: String,
+    #[env_config(
+        name = "O2_CIPHER_MIGRATE_WRAPS",
+        default = false,
+        help = "Migrate legacy cipher key wraps to o2w2 at startup when a master key is configured."
+    )]
+    pub cipher_migrate_wraps: bool,
+    #[env_config(
+        name = "O2_CIPHER_WRAP_FLOOR",
+        default = "",
+        help = "Set to o2w2 to write row-bound wraps and require them for system keys when a master key is configured."
+    )]
+    pub cipher_wrap_floor: String,
     #[env_config(name = "ZO_META_STORE", default = "")]
     pub meta_store: String,
     #[env_config(name = "ZO_META_POSTGRES_DSN", default = "")]
@@ -4532,7 +4632,82 @@ fn check_route_config(cfg: &Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+fn parse_secret_store_auth_modes(
+    value: &str,
+) -> anyhow::Result<Vec<crate::meta::secret_store::external::AuthMode>> {
+    value
+        .split(',')
+        .map(|mode| {
+            mode.trim().parse().map_err(|_| {
+                anyhow::anyhow!("O2_SECRET_STORE_AUTH_MODES requires static, mapped, or region_issuer; got {mode:?}")
+            })
+        })
+        .collect()
+}
+
+fn valid_secret_backend_cidr(cidr: &str) -> bool {
+    let Some((address, prefix)) = cidr.split_once('/') else {
+        return false;
+    };
+    let Ok(address) = address.parse::<std::net::IpAddr>() else {
+        return false;
+    };
+    prefix.bytes().all(|b| b.is_ascii_digit())
+        && prefix
+            .parse::<u8>()
+            .is_ok_and(|n| n <= if address.is_ipv4() { 32 } else { 128 })
+}
+
 fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if !(1..=90).contains(&cfg.common.secret_store_recovery_days) {
+        return Err(anyhow::anyhow!(
+            "O2_SECRET_STORE_RECOVERY_DAYS must be within 1..=90, got {}",
+            cfg.common.secret_store_recovery_days
+        ));
+    }
+    if cfg.common.secret_cache_node_mb == 0 || cfg.common.secret_cache_org_mb == 0 {
+        return Err(anyhow::anyhow!(
+            "O2_SECRET_CACHE_NODE_MB and O2_SECRET_CACHE_ORG_MB must both be greater than zero"
+        ));
+    }
+    if cfg.common.secret_cache_org_mb > cfg.common.secret_cache_node_mb {
+        return Err(anyhow::anyhow!(
+            "O2_SECRET_CACHE_ORG_MB must not exceed O2_SECRET_CACHE_NODE_MB"
+        ));
+    }
+    if !cfg.common.secret_store_region.is_empty()
+        && !crate::meta::secret_store::external::validate_region(&cfg.common.secret_store_region)
+    {
+        anyhow::bail!("O2_SECRET_STORE_REGION must be empty or match [a-z0-9-]{{1,24}}");
+    }
+    if parse_secret_store_auth_modes(&cfg.common.secret_store_auth_modes)?
+        .into_iter()
+        .any(|mode| mode != crate::meta::secret_store::external::AuthMode::Static)
+    {
+        anyhow::bail!(
+            "O2_SECRET_STORE_AUTH_MODES: mapped and region_issuer are not available in this release; use static"
+        );
+    }
+    if !cfg.common.secret_backend_private_cidrs.is_empty() {
+        for cidr in cfg.common.secret_backend_private_cidrs.split(',') {
+            if !valid_secret_backend_cidr(cidr.trim()) {
+                anyhow::bail!("O2_SECRET_BACKEND_PRIVATE_CIDRS contains an invalid CIDR: {cidr}");
+            }
+        }
+    }
+    if !cfg.common.secret_backend_cluster_cidrs.is_empty() {
+        for cidr in cfg.common.secret_backend_cluster_cidrs.split(',') {
+            if !valid_secret_backend_cidr(cidr.trim()) {
+                anyhow::bail!("O2_SECRET_BACKEND_CLUSTER_CIDRS contains an invalid CIDR: {cidr}");
+            }
+        }
+    }
+    if !matches!(cfg.common.cipher_wrap_floor.as_str(), "" | "o2w2") {
+        return Err(anyhow::anyhow!(
+            "O2_CIPHER_WRAP_FLOOR must be empty or o2w2"
+        ));
+    }
+
     if cfg.limit.file_push_interval == 0 {
         cfg.limit.file_push_interval = 60;
     }
@@ -5581,6 +5756,12 @@ fn validate_synthetics_ceilings(cfg: &Synthetics) -> Result<(), String> {
     if cfg.max_check_budget_secs <= 0 || cfg.job_lease_secs <= 0 {
         return Err("synthetics limits must be positive".to_string());
     }
+    if cfg.job_lease_max_secs < cfg.job_lease_secs {
+        return Err(format!(
+            "ZO_SYNTHETICS_JOB_LEASE_MAX_SECS ({}) must be at least ZO_SYNTHETICS_JOB_LEASE_SECS ({})",
+            cfg.job_lease_max_secs, cfg.job_lease_secs
+        ));
+    }
     if cfg.max_net_timeout_ms as i64 > cfg.max_check_budget_secs * 1_000 {
         return Err(format!(
             "ZO_SYNTHETICS_MAX_NET_TIMEOUT_MS ({}) exceeds the check budget ({}s) — a single \
@@ -5640,6 +5821,14 @@ fn check_public_dashboards_config(cfg: &mut Config) {
 }
 
 fn check_synthetics_config(cfg: &mut Config) {
+    if cfg.synthetics.job_lease_max_secs < cfg.synthetics.job_lease_secs {
+        log::info!(
+            "raising ZO_SYNTHETICS_JOB_LEASE_MAX_SECS ({}) to ZO_SYNTHETICS_JOB_LEASE_SECS ({})",
+            cfg.synthetics.job_lease_max_secs,
+            cfg.synthetics.job_lease_secs,
+        );
+        cfg.synthetics.job_lease_max_secs = cfg.synthetics.job_lease_secs;
+    }
     if let Err(e) = validate_synthetics_ceilings(&cfg.synthetics) {
         log::error!(
             "synthetics ceilings rejected, falling back to the built-in ones \
@@ -5651,6 +5840,7 @@ fn check_synthetics_config(cfg: &mut Config) {
         cfg.synthetics.max_check_budget_secs =
             crate::meta::synthetics::DEFAULT_MAX_CHECK_BUDGET_SECS;
         cfg.synthetics.job_lease_secs = crate::meta::synthetics::DEFAULT_JOB_LEASE_SECS;
+        cfg.synthetics.job_lease_max_secs = crate::meta::synthetics::DEFAULT_JOB_LEASE_SECS;
         cfg.synthetics.max_net_timeout_ms = crate::meta::synthetics::DEFAULT_MAX_NET_TIMEOUT_MS;
     }
 
@@ -5799,6 +5989,7 @@ mod tests {
     ) -> Synthetics {
         Synthetics {
             job_lease_secs,
+            job_lease_max_secs: job_lease_secs,
             max_check_budget_secs,
             max_net_timeout_ms,
             ..Default::default()
@@ -5819,6 +6010,24 @@ mod tests {
         // The gap is what dispatch and the ack need. Equal means a run that
         // uses its full budget cannot report before the reaper requeues it.
         assert!(validate_synthetics_ceilings(&ceilings(900, 900, 300_000)).is_err());
+    }
+
+    #[test]
+    fn lease_ceiling_below_the_floor_is_raised_before_validation() {
+        let mut cfg = Config::init().expect("config init");
+        for (lease, max) in [(900, 899), (1200, 900)] {
+            cfg.synthetics = ceilings(lease, 840, 120_000);
+            cfg.synthetics.job_lease_max_secs = max;
+            assert!(validate_synthetics_ceilings(&cfg.synthetics).is_err());
+
+            check_synthetics_config(&mut cfg);
+
+            assert_eq!(cfg.synthetics.job_lease_secs, lease);
+            assert_eq!(cfg.synthetics.job_lease_max_secs, lease);
+            assert_eq!(cfg.synthetics.max_check_budget_secs, 840);
+            assert_eq!(cfg.synthetics.max_net_timeout_ms, 120_000);
+            assert!(validate_synthetics_ceilings(&cfg.synthetics).is_ok());
+        }
     }
 
     #[test]
@@ -5891,6 +6100,7 @@ mod tests {
         "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
         "ZO_SYNTHETICS_LAMBDA_BROWSER",
         "ZO_SYNTHETICS_LAMBDA_NET",
+        "O2_SYNTHETICS_LEASE_MIN_RUNNER_VERSION",
         "ZO_SYNTHETICS_API_ENDPOINT",
         "ZO_SYNTHETICS_INSTALL_SCRIPT_URL",
         "ZO_SYNTHETICS_RECORDER_EXTENSION_URL",
@@ -5924,8 +6134,8 @@ mod tests {
     fn synthetics_reload_classification_is_pinned() {
         assert_eq!(
             SYNTHETICS_RELOAD_CLASSES.len(),
-            18,
-            "Synthetics has 18 keys; every one needs a reload class"
+            19,
+            "Synthetics has 19 keys; every one needs a reload class"
         );
 
         let mut classified: Vec<&str> = SYNTHETICS_RELOAD_CLASSES
@@ -5948,6 +6158,7 @@ mod tests {
         assert_eq!(
             synthetics_names_in_class(SyntheticsReloadClass::Hot),
             vec![
+                "O2_SYNTHETICS_LEASE_MIN_RUNNER_VERSION",
                 "ZO_SYNTHETICS_AGENT_STALE_SECS",
                 "ZO_SYNTHETICS_API_ENDPOINT",
                 "ZO_SYNTHETICS_BROWSERS",
@@ -6016,6 +6227,9 @@ mod tests {
         cfg.agent_stale_secs += 60;
         cfg.max_check_budget_secs += 1;
         cfg.job_lease_secs += 1;
+        cfg.job_lease_max_secs += 1;
+        cfg.lambda_runner_contract += 1;
+        cfg.lease_min_runner_version.push_str("-changed");
         cfg.max_net_timeout_ms += 1;
         cfg.browser_max_steps += 1;
         cfg.browsers = "chromium,firefox".to_string();
@@ -7263,6 +7477,123 @@ mod tests {
         cfg.common.feature_bloom_filter_extra_fields = "trace_id".to_string();
         check_common_config(&mut cfg).unwrap();
         assert_eq!(cfg.common.feature_bloom_filter_extra_fields, "trace_id");
+    }
+
+    #[test]
+    fn secret_store_defaults_pass_validation() {
+        let mut cfg = Config::init().unwrap();
+        check_common_config(&mut cfg).unwrap();
+        assert!(!cfg.common.secret_store_refs_enabled);
+        assert!(!cfg.common.secret_store_ignore_release_floor);
+        assert_eq!(cfg.common.secret_store_recovery_days, 30);
+        assert_eq!(cfg.common.secret_cache_node_mb, 256);
+        assert_eq!(cfg.common.secret_cache_org_mb, 32);
+        assert_eq!(cfg.common.secret_store_region, "");
+        assert_eq!(cfg.common.secret_store_auth_modes, "static");
+        assert_eq!(cfg.common.secret_backend_private_cidrs, "");
+        assert_eq!(cfg.common.secret_backend_cluster_cidrs, "");
+    }
+
+    #[test]
+    fn external_secret_store_settings_validate_at_load() {
+        let unavailable_modes = "O2_SECRET_STORE_AUTH_MODES: mapped and region_issuer are not available in this release; use static";
+        for (region, modes, cidrs, invalid_setting) in [
+            ("west-2", "static", "10.0.0.0/8, fd00::/8", None),
+            ("West", "static", "", Some("O2_SECRET_STORE_REGION")),
+            ("", "other", "", Some("O2_SECRET_STORE_AUTH_MODES")),
+            ("", "", "", Some("O2_SECRET_STORE_AUTH_MODES")),
+            ("", "mapped,", "", Some("O2_SECRET_STORE_AUTH_MODES")),
+            ("", "mapped", "", Some(unavailable_modes)),
+            ("", "region_issuer", "", Some(unavailable_modes)),
+            ("", "static,mapped", "", Some(unavailable_modes)),
+            (
+                "",
+                "static",
+                "10.0.0.0/33",
+                Some("O2_SECRET_BACKEND_PRIVATE_CIDRS"),
+            ),
+            (
+                "",
+                "static",
+                "::1/129",
+                Some("O2_SECRET_BACKEND_PRIVATE_CIDRS"),
+            ),
+            (
+                "",
+                "static",
+                "localhost",
+                Some("O2_SECRET_BACKEND_PRIVATE_CIDRS"),
+            ),
+        ] {
+            let mut cfg = Config::init().unwrap();
+            cfg.common.secret_store_region = region.to_owned();
+            cfg.common.secret_store_auth_modes = modes.to_owned();
+            cfg.common.secret_backend_private_cidrs = cidrs.to_owned();
+            let result = check_common_config(&mut cfg);
+            match invalid_setting {
+                Some(setting) => assert!(result.unwrap_err().to_string().contains(setting)),
+                None => result.unwrap(),
+            }
+        }
+    }
+
+    #[test]
+    fn cluster_cidr_exclusions_validate_at_load() {
+        for (cidrs, valid) in [
+            ("", true),
+            ("10.96.0.0/12, fd10::/108", true),
+            ("10.96.0.0/33", false),
+            ("pods", false),
+        ] {
+            let mut cfg = Config::init().unwrap();
+            cfg.common.secret_backend_cluster_cidrs = cidrs.to_owned();
+            let result = check_common_config(&mut cfg);
+            if valid {
+                result.unwrap();
+            } else {
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("O2_SECRET_BACKEND_CLUSTER_CIDRS")
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn d225_cipher_wrap_defaults_and_floor_validation() {
+        let mut cfg = Config::init().unwrap();
+        assert!(!cfg.common.cipher_migrate_wraps);
+        assert_eq!(cfg.common.cipher_wrap_floor, "");
+        cfg.common.cipher_wrap_floor = "AESenc".to_string();
+        let err = check_common_config(&mut cfg).unwrap_err();
+        assert!(err.to_string().contains("O2_CIPHER_WRAP_FLOOR"));
+        cfg.common.cipher_wrap_floor = "o2w2".to_string();
+        check_common_config(&mut cfg).unwrap();
+    }
+
+    #[test]
+    fn secret_store_recovery_days_bounds() {
+        for (days, valid) in [(0, false), (1, true), (90, true), (91, false)] {
+            let mut cfg = Config::init().unwrap();
+            cfg.common.secret_store_recovery_days = days;
+            assert_eq!(check_common_config(&mut cfg).is_ok(), valid, "days={days}");
+        }
+    }
+
+    #[test]
+    fn secret_cache_size_bounds() {
+        for (node, org, valid) in [(0, 0, false), (1, 0, false), (1, 2, false), (1, 1, true)] {
+            let mut cfg = Config::init().unwrap();
+            cfg.common.secret_cache_node_mb = node;
+            cfg.common.secret_cache_org_mb = org;
+            assert_eq!(
+                check_common_config(&mut cfg).is_ok(),
+                valid,
+                "node={node}, org={org}"
+            );
+        }
     }
 
     #[test]

@@ -22,6 +22,7 @@ vi.mock("vue-i18n", () => ({
 
 import CheckAuthNetwork from "./CheckAuthNetwork.vue";
 import { mockMonitorHttp } from "@/test/unit/mockData/synthetics";
+import type { BrowserCheck } from "@/types/synthetics";
 
 // ── Stubs ───────────────────────────────────────────────────────────────────
 
@@ -270,6 +271,63 @@ describe("CheckAuthNetwork", () => {
       expect(emitted).toBeTruthy();
       const last = emitted![emitted!.length - 1][0] as any;
       expect(last.auth.password).toBe("newpass");
+    });
+  });
+
+  describe("saved cookies", () => {
+    const savedCookie = { name: "session", domain: "example.com", value: "" };
+    const keptCheck: BrowserCheck = {
+      ...mockMonitorHttp,
+      cookies: [savedCookie],
+      writeOnly: {
+        "cookies.session|example.com": {
+          updated_at: 1_700_000_000_000_000,
+          updated_by: "owner@example.com",
+        },
+      },
+    };
+    const nameSelector = '[data-test="synthetics-check-auth-network-cookie-name-0-input"]';
+    const domainSelector = '[data-test="synthetics-check-auth-network-cookie-domain-0-input"]';
+    const hintSelector = '[data-test="synthetics-check-auth-network-cookie-rename-0-hint"]';
+
+    it("keeps a stored cookie's name and domain readonly and explains why", () => {
+      wrapper = mountCheckAuthNetwork({ check: keptCheck });
+
+      expect(wrapper.get<HTMLInputElement>(nameSelector).element.readOnly).toBe(true);
+      expect(wrapper.get<HTMLInputElement>(domainSelector).element.readOnly).toBe(true);
+      expect(wrapper.get(hintSelector).text()).toContain(
+        "synthetics.secretFields.cookieRenameNeedsValue",
+      );
+    });
+
+    it("allows renaming after typing a replacement cookie value", async () => {
+      wrapper = mountCheckAuthNetwork({ check: keptCheck });
+      await wrapper
+        .get('[data-test="synthetics-check-auth-network-cookie-value-0-replace"]')
+        .trigger("click");
+      await wrapper.setProps({ check: wrapper.emitted("update:check")!.at(-1)![0] });
+      await wrapper
+        .get('[data-test="synthetics-check-auth-network-cookie-value-0"]')
+        .setValue("new-cookie-value");
+      await wrapper.setProps({ check: wrapper.emitted("update:check")!.at(-1)![0] });
+
+      expect(wrapper.get<HTMLInputElement>(nameSelector).element.readOnly).toBe(false);
+      expect(wrapper.get<HTMLInputElement>(domainSelector).element.readOnly).toBe(false);
+      expect(wrapper.find(hintSelector).exists()).toBe(false);
+    });
+
+    it("preserves the saved cookie's input element when its name changes", async () => {
+      wrapper = mountCheckAuthNetwork({
+        check: { ...mockMonitorHttp, cookies: [{ ...savedCookie, value: "typed-value" }] },
+      });
+      const nameInput = wrapper.get<HTMLInputElement>(nameSelector);
+      const originalElement = nameInput.element;
+
+      await nameInput.setValue("renamed-session");
+      await wrapper.setProps({ check: wrapper.emitted("update:check")!.at(-1)![0] });
+
+      expect(wrapper.get(nameSelector).element).toBe(originalElement);
+      expect(wrapper.get<HTMLInputElement>(nameSelector).element.value).toBe("renamed-session");
     });
   });
 

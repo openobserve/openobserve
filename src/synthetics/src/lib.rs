@@ -63,11 +63,16 @@ pub mod alerting;
 pub mod callback_endpoint;
 pub mod dispatcher;
 pub mod job_api;
+pub mod origins_backfill;
 pub mod pool;
 pub mod reaper;
 pub mod scheduler;
 pub mod service;
 pub mod status_pages;
+#[cfg(test)]
+mod store_ref_tests;
+#[cfg(test)]
+mod variable_resign_tests;
 
 /// One row per execution — the record the UI's run list and run detail read.
 pub const RESULTS_STREAM: &str = "synthetics_results";
@@ -142,10 +147,14 @@ const JOB_CLUSTER_POLL: std::time::Duration = std::time::Duration::from_secs(10)
 /// answer (an OSS build has no pool) and means the scheduler does not gate — see
 /// [`pool`] for the fail-open reasoning.
 pub async fn init(step_pool: Option<pool::StepPoolHooks>) {
+    // Checks saved while synthetics was on keep their refs, so a rename must still reach them.
+    infra::secret_store::respell::register(std::sync::Arc::new(service::respell::CheckRespell));
     if !config::get_config().synthetics.enabled {
         tracing::info!("[synthetics] disabled via ZO_SYNTHETICS_ENABLED — workers not started");
         return;
     }
+
+    write_boot_markers().await;
 
     // Before any worker is spawned: `scheduler::run` must not see a
     // half-installed pool on its first tick.
@@ -239,6 +248,12 @@ enum SupervisorAction {
     Start,
     Stop,
     Hold,
+}
+
+pub fn init_maintenance(stop: StopToken) {
+    if config::get_config().synthetics.enabled {
+        tokio::spawn(origins_backfill::run(stop));
+    }
 }
 
 /// The supervisor's whole decision: a pure function of whether a worker
@@ -351,13 +366,23 @@ async fn read_job_cluster_claim() -> ClaimRead {
     }
 }
 
-/// Spawns one generation of workers. Every worker takes `stop` and leaves its
-/// loop at the next tick boundary once it is cancelled.
-///
-/// All of them are claim-gated, as they were under the old latch: the status
-/// page task is still one loop (incident engine and snapshot together — the
-/// per-region snapshot split is future work), and the domain verifier writes
-/// shared verification state, so both stay owner-only.
+/// The first boot of this binary starts the old-runner banner period and fixes the agent-token
+/// cutover; insert-if-absent keeps that first time on every later boot and node.
+async fn write_boot_markers() {
+    use infra::table::secret_store_job_markers::{
+        AGENT_TOKEN_CUTOVER, META_ORG, TOKENLESS_RECORDER, insert_if_absent_in,
+    };
+    let conn = infra::db::get_orm_client_rw().await;
+    let now = config::utils::time::now_micros();
+    for job in [TOKENLESS_RECORDER, AGENT_TOKEN_CUTOVER] {
+        if let Err(e) = insert_if_absent_in(conn, META_ORG, job, now).await {
+            tracing::error!("[synthetics] boot marker {job}: {e}");
+        }
+    }
+}
+
+/// Status snapshots and domain verification write shared state, so all workers stay claim-gated.
+/// Cancellation lets a generation stop after losing the advisory job-cluster claim.
 fn spawn_workers(stop: StopToken) -> Vec<tokio::task::JoinHandle<()>> {
     let verifier_stop = stop.clone();
     vec![

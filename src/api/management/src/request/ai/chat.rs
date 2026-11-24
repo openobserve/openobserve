@@ -693,6 +693,7 @@ struct StreamTurn {
     client: Arc<o2_enterprise::enterprise::ai::client::AiAgentClient>,
     span: Option<opentelemetry::Context>,
     audit: TurnAudit,
+    toolset_principal: infra::secret_store::toolset::AgentPrincipal,
 }
 
 /// Meters one turn's SSE stream and gives its `error` and `complete` frames the envelope keys.
@@ -1069,6 +1070,36 @@ fn agent_context(
         }
     }
     context
+}
+
+/// A delegated session never gets an export capability, even when its human holds manage (D41).
+#[cfg(feature = "enterprise")]
+async fn toolset_principal(
+    org_id: &str,
+    user_id: &str,
+    caller: Option<&DelegatedCaller>,
+) -> infra::secret_store::toolset::AgentPrincipal {
+    use infra::secret_store::toolset::AgentPrincipal;
+    if let Some(caller) = caller {
+        return AgentPrincipal::Delegated {
+            user_id: user_id.to_string(),
+            link_id: caller.link_id.clone(),
+        };
+    }
+    // No org role leaves an empty role, which every strict check denies.
+    let role = match openobserve_core::alerts::destinations::SavePrincipal::for_user(
+        org_id, user_id,
+    )
+    .await
+    {
+        Ok(p) if p.role == config::meta::user::UserRole::Root => "root".to_string(),
+        Ok(p) => p.role.to_string(),
+        Err(_) => String::new(),
+    };
+    AgentPrincipal::User {
+        user_id: user_id.to_string(),
+        role,
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -3318,8 +3349,15 @@ async fn chat_turn(
                 .collect()
         });
 
+        let principal = toolset_principal(
+            org_id_str,
+            user_id,
+            parts.extensions.get::<DelegatedCaller>(),
+        )
+        .await;
         let (tool_mcps, tool_skills) =
-            o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(org_id_str).await;
+            o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(org_id_str, &principal)
+                .await;
         let tool_mcps = turn_tools(prompt_body.mode, tool_mcps);
         let session = parts
             .headers
@@ -3726,8 +3764,18 @@ async fn stream_turn(
                 .collect()
         });
 
+        let principal = toolset_principal(
+            &org_id_str,
+            &user_id,
+            parts.extensions.get::<DelegatedCaller>(),
+        )
+        .await;
         let (tool_mcps, tool_skills) =
-            o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(&org_id_str).await;
+            o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(
+                &org_id_str,
+                &principal,
+            )
+            .await;
         let tool_mcps = turn_tools(prompt_body.mode, tool_mcps);
         let session = forward_headers
             .get(X_O2_ASSISTANT_SESSION_ID.as_str())
@@ -3787,6 +3835,7 @@ async fn stream_turn(
             client,
             span: otel_chat_span,
             audit,
+            toolset_principal: principal,
         };
         // With persistence on, a background task owns the turn; a closed tab drops only its feed.
         if persists_turn(
@@ -3832,6 +3881,7 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
         client,
         span,
         mut audit,
+        toolset_principal,
     } = turn;
     let session_id = forward_headers
         .as_ref()
@@ -3957,6 +4007,7 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
     ));
     let rx = spawn_turn(
         TurnSpec {
+            toolset_principal: Some(toolset_principal),
             identity: TurnIdentity {
                 org_id,
                 session_id,
@@ -6760,7 +6811,7 @@ mod tests {
         if caps.per_user == 0 {
             return;
         }
-        let user = format!("eph-{}", config::ider::uuid());
+        let user = format!("eph-{}", config::ider::ksuid());
         let mut held = Vec::new();
         for n in 0..caps.per_user {
             let turn_key = format!("t{n}");
@@ -6787,8 +6838,8 @@ mod tests {
             return;
         }
         let (email, owner) = (
-            format!("mix-{}@x", config::ider::uuid()),
-            config::ider::uuid(),
+            format!("mix-{}@x", config::ider::ksuid()),
+            config::ider::ksuid(),
         );
         let mut held = Vec::new();
         for n in 0..caps.per_user {
@@ -6846,7 +6897,7 @@ mod tests {
     #[tokio::test]
     async fn a_signed_out_login_starts_no_ephemeral_turn() {
         use o2_enterprise::enterprise::ai::chat::registry;
-        let login = format!("login-{}", config::ider::uuid());
+        let login = format!("login-{}", config::ider::ksuid());
         registry::cancel_for_auth_session(&login);
         let session = uuid::Uuid::now_v7().to_string();
         let turn =
@@ -6865,7 +6916,7 @@ mod tests {
         use std::time::Duration;
 
         use o2_enterprise::enterprise::ai::chat::{CancelReason, registry};
-        let login = format!("login-{}", config::ider::uuid());
+        let login = format!("login-{}", config::ider::ksuid());
         let session = uuid::Uuid::now_v7().to_string();
         let turn =
             register_ephemeral_turn("so-org", Some(&session), "t1", "a@x", "a@x", Some(&login))

@@ -169,7 +169,7 @@ async fn insert_in<C: ConnectionTrait>(
 ) -> Result<oncall_user_contacts::Model, errors::Error> {
     let phone = patch.phone.clone().flatten();
     let model = oncall_user_contacts::ActiveModel {
-        id: Set(ider::uuid()),
+        id: Set(ider::ksuid()),
         org_id: Set(org_id.to_string()),
         user_email: Set(user_email.to_string()),
         phone_verified_at: Set(proof_on_file_in(conn, user_email, phone.as_deref()).await?),

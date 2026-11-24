@@ -70,7 +70,7 @@ pub async fn get_usage(
         raw_streams: None,
     };
 
-    let trace_id = ider::uuid();
+    let trace_id = ider::ksuid();
     let resp = SearchService::grpc_search::grpc_search(
         &trace_id,
         META_ORG_ID,

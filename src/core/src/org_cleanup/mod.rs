@@ -1066,7 +1066,7 @@ async fn delete_org_workflow_rows<C: ConnectionTrait>(
 ) -> Result<Vec<String>, anyhow::Error> {
     use infra::{
         secrets::SecretOwnerKind,
-        table::{llm_secrets, workflow_http_trigger_requests, workflow_http_triggers},
+        table::{credential_values, workflow_http_trigger_requests, workflow_http_triggers},
     };
 
     let trigger_ids = workflow_http_triggers::list_by_org(db, org_id)
@@ -1076,8 +1076,12 @@ async fn delete_org_workflow_rows<C: ConnectionTrait>(
         .collect();
     workflow_http_trigger_requests::delete_by_org(db, org_id).await?;
     workflow_http_triggers::delete_by_org(db, org_id).await?;
-    llm_secrets::delete_by_org_owner_kind(db, org_id, SecretOwnerKind::WorkflowTrigger.as_str())
-        .await?;
+    credential_values::delete_by_org_owner_kind(
+        db,
+        org_id,
+        SecretOwnerKind::WorkflowTrigger.as_str(),
+    )
+    .await?;
     Ok(trigger_ids)
 }
 
@@ -1317,18 +1321,75 @@ async fn delete_org_pipelines(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn delete_org_secret_store_rows(org_id: &str) -> Result<(), anyhow::Error> {
+    use infra::table::{
+        org_secret_consumers, org_secret_value_status, org_secret_values, org_secrets,
+        secret_aliases, secret_arrival_pending, secret_backend_identities,
+        secret_backend_readiness, secret_backends, secret_consumer_auth, secret_dependencies,
+        secret_identity_jobs, secret_prescan_hits, secret_refs, secret_store_job_markers,
+    };
+
+    org_secret_consumers::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_secret_consumers: {e}"))?;
+    org_secret_value_status::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_secret_value_status: {e}"))?;
+    org_secret_values::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_secret_values: {e}"))?;
+    org_secrets::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_secrets: {e}"))?;
+    secret_aliases::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/secret_aliases: {e}"))?;
+    secret_arrival_pending::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/secret_arrival_pending: {e}"))?;
+    secret_backend_readiness::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/secret_backend_readiness: {e}"))?;
+    secret_identity_jobs::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/secret_identity_jobs: {e}"))?;
+    secret_backend_identities::delete_manual_by_org_in(get_orm_client_rw().await, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/secret_backend_identities: {e}"))?;
+    secret_backends::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/secret_backends: {e}"))?;
+    secret_consumer_auth::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/secret_consumer_auth: {e}"))?;
+    secret_dependencies::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/secret_dependencies: {e}"))?;
+    secret_prescan_hits::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/secret_prescan_hits: {e}"))?;
+    secret_refs::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/secret_refs: {e}"))?;
+    secret_store_job_markers::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/secret_store_job_markers: {e}"))?;
+    Ok(())
+}
+
 async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     #[cfg(feature = "cloud")]
     use infra::table::trial_quota_usage;
     use infra::table::{
         alert_acks, alert_calibration, alert_incidents, alert_leases, anomaly_detection,
         autoresolve, autoresolve_corrections, autoresolve_run_connections, autoresolve_runs,
-        autoresolve_steps, compactor_manual_jobs, distinct_values, external_alerts, gen_ai_agents,
-        incident_events, incident_integrations, llm_eval, llm_prompts, llm_secrets, oncall_teams,
-        online_eval_jobs, org_ai_toolsets, org_telephony, providers, query_history, ratelimit,
-        rca_runs, rca_steering, re_pattern, re_pattern_stream_map, rum_pa, score_configs, scorers,
-        search_queue, slack_alert_messages, slo, slo_backfill_jobs, slo_budget, slos, status_pages,
-        synthetics_agents, synthetics_checks, synthetics_environments, synthetics_locations,
+        autoresolve_steps, compactor_manual_jobs, credential_values, distinct_values,
+        external_alerts, gen_ai_agents, incident_events, incident_integrations, llm_eval,
+        llm_prompts, oncall_teams, online_eval_jobs, org_ai_toolsets, org_telephony, providers,
+        query_history, ratelimit, rca_runs, rca_steering, re_pattern, re_pattern_stream_map,
+        rum_pa, score_configs, scorers, search_queue, slack_alert_messages, slo, slo_backfill_jobs,
+        slo_budget, slos, status_pages, synthetics_agents, synthetics_checks,
+        synthetics_env_retired, synthetics_environments, synthetics_locations,
         synthetics_probe_tokens, synthetics_variables, timed_annotations, workflows,
     };
 
@@ -1457,12 +1518,17 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     providers::delete_all_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/providers: {e}"))?;
-    llm_secrets::delete_by_org(org_id)
+    // Before credential_values: a repair pass would otherwise re-seal a token row's owned value.
+    synthetics_probe_tokens::delete_by_org(org_id)
         .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/llm_secrets: {e}"))?;
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/synthetics_probe_tokens: {e}"))?;
+    credential_values::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/credential_values: {e}"))?;
     org_ai_toolsets::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_ai_toolsets: {e}"))?;
+    delete_org_secret_store_rows(org_id).await?;
     delete_org_ai_assistant_resources(org_id).await?;
     // A queued write would re-insert the rows; other nodes' flushes refuse an inactive org.
     #[cfg(feature = "enterprise")]
@@ -1494,15 +1560,15 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     synthetics_checks::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/synthetics: {e}"))?;
-    synthetics_probe_tokens::delete_by_org(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/synthetics_probe_tokens: {e}"))?;
     synthetics_variables::delete_by_org(get_orm_client_rw().await, org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/synthetics_variables: {e}"))?;
     synthetics_environments::delete_by_org(get_orm_client_rw().await, org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/synthetics_environments: {e}"))?;
+    synthetics_env_retired::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/synthetics_env_retired: {e}"))?;
     synthetics_agents::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/synthetics_agents: {e}"))?;
@@ -2499,7 +2565,7 @@ mod tests {
     ];
 
     /// Every infra and db-layer source the org-deletion program touches, by path under `src/`.
-    const TEARDOWN_SOURCES: [(&str, &str); 92] = [
+    const TEARDOWN_SOURCES: [(&str, &str); 108] = [
         (
             "db/src/alerts/alert.rs",
             include_str!("../../../db/src/alerts/alert.rs"),
@@ -2685,6 +2751,10 @@ mod tests {
             include_str!("../../../infra/src/table/compactor_manual_jobs.rs"),
         ),
         (
+            "infra/src/table/credential_values.rs",
+            include_str!("../../../infra/src/table/credential_values.rs"),
+        ),
+        (
             "infra/src/table/dashboards.rs",
             include_str!("../../../infra/src/table/dashboards.rs"),
         ),
@@ -2729,10 +2799,6 @@ mod tests {
             include_str!("../../../infra/src/table/llm_eval.rs"),
         ),
         (
-            "infra/src/table/llm_secrets.rs",
-            include_str!("../../../infra/src/table/llm_secrets.rs"),
-        ),
-        (
             "infra/src/table/mod.rs",
             include_str!("../../../infra/src/table/mod.rs"),
         ),
@@ -2769,6 +2835,22 @@ mod tests {
             include_str!("../../../infra/src/table/org_ingestion_tokens.rs"),
         ),
         (
+            "infra/src/table/org_secret_consumers.rs",
+            include_str!("../../../infra/src/table/org_secret_consumers.rs"),
+        ),
+        (
+            "infra/src/table/org_secret_value_status.rs",
+            include_str!("../../../infra/src/table/org_secret_value_status.rs"),
+        ),
+        (
+            "infra/src/table/org_secret_values.rs",
+            include_str!("../../../infra/src/table/org_secret_values.rs"),
+        ),
+        (
+            "infra/src/table/org_secrets.rs",
+            include_str!("../../../infra/src/table/org_secrets.rs"),
+        ),
+        (
             "infra/src/table/org_storage_providers.rs",
             include_str!("../../../infra/src/table/org_storage_providers.rs"),
         ),
@@ -2793,6 +2875,50 @@ mod tests {
             include_str!("../../../infra/src/table/search_job/search_jobs.rs"),
         ),
         (
+            "infra/src/table/secret_aliases.rs",
+            include_str!("../../../infra/src/table/secret_aliases.rs"),
+        ),
+        (
+            "infra/src/table/secret_arrival_pending.rs",
+            include_str!("../../../infra/src/table/secret_arrival_pending.rs"),
+        ),
+        (
+            "infra/src/table/secret_backend_identities.rs",
+            include_str!("../../../infra/src/table/secret_backend_identities.rs"),
+        ),
+        (
+            "infra/src/table/secret_backend_readiness.rs",
+            include_str!("../../../infra/src/table/secret_backend_readiness.rs"),
+        ),
+        (
+            "infra/src/table/secret_backends.rs",
+            include_str!("../../../infra/src/table/secret_backends.rs"),
+        ),
+        (
+            "infra/src/table/secret_consumer_auth.rs",
+            include_str!("../../../infra/src/table/secret_consumer_auth.rs"),
+        ),
+        (
+            "infra/src/table/secret_dependencies.rs",
+            include_str!("../../../infra/src/table/secret_dependencies.rs"),
+        ),
+        (
+            "infra/src/table/secret_identity_jobs.rs",
+            include_str!("../../../infra/src/table/secret_identity_jobs.rs"),
+        ),
+        (
+            "infra/src/table/secret_prescan_hits.rs",
+            include_str!("../../../infra/src/table/secret_prescan_hits.rs"),
+        ),
+        (
+            "infra/src/table/secret_refs.rs",
+            include_str!("../../../infra/src/table/secret_refs.rs"),
+        ),
+        (
+            "infra/src/table/secret_store_job_markers.rs",
+            include_str!("../../../infra/src/table/secret_store_job_markers.rs"),
+        ),
+        (
             "infra/src/table/short_urls.rs",
             include_str!("../../../infra/src/table/short_urls.rs"),
         ),
@@ -2811,6 +2937,10 @@ mod tests {
         (
             "infra/src/table/synthetics_checks.rs",
             include_str!("../../../infra/src/table/synthetics_checks.rs"),
+        ),
+        (
+            "infra/src/table/synthetics_env_retired.rs",
+            include_str!("../../../infra/src/table/synthetics_env_retired.rs"),
         ),
         (
             "infra/src/table/synthetics_environments.rs",
@@ -5390,9 +5520,263 @@ mod tests {
         position_of("delete_org_service_rows(org_id)");
     }
 
+    const SECRET_STORE_TABLES: [&str; 14] = [
+        "org_secret_consumers",
+        "org_secret_value_status",
+        "org_secret_values",
+        "org_secrets",
+        "secret_aliases",
+        "secret_arrival_pending",
+        "secret_backend_readiness",
+        "secret_backends",
+        "secret_consumer_auth",
+        "secret_dependencies",
+        "secret_identity_jobs",
+        "secret_prescan_hits",
+        "secret_refs",
+        "secret_store_job_markers",
+    ];
+
+    #[test]
+    fn test_db_resources_deletes_every_secret_store_table() {
+        let body = fn_body(SOURCE, "delete_org_secret_store_rows");
+        for table in SECRET_STORE_TABLES {
+            let call = format!("{table}::delete_by_org(org_id)");
+            assert!(
+                body.contains(&call),
+                "the store teardown never calls {call}"
+            );
+        }
+        assert!(body.contains("secret_backend_identities::delete_manual_by_org_in("));
+        position_of("delete_org_secret_store_rows(org_id)");
+    }
+
+    #[tokio::test]
+    async fn test_store_teardown_removes_the_orgs_status_and_arrival_rows() {
+        use infra::table::{org_secret_value_status, secret_arrival_pending};
+        use sea_orm::{
+            ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set,
+        };
+
+        if !meta_store().await {
+            return;
+        }
+        let conn = infra::db::get_orm_client_rw().await;
+        let org = format!("t_store_rows_{}", config::utils::time::now_micros());
+        let other = format!("{org}_other");
+        for o in [&org, &other] {
+            org_secret_value_status::ActiveModel {
+                secret_id: Set(config::ider::ksuid()),
+                org_id: Set(o.clone()),
+                env_id: Set("_org".to_string()),
+                env_incarnation: Set(String::new()),
+                region: Set("r2".to_string()),
+                state: Set("set".to_string()),
+                source: Set("local".to_string()),
+                value_version: Set(1),
+                updated_by: Set("u".to_string()),
+                updated_at: Set(1),
+            }
+            .insert(conn)
+            .await
+            .unwrap();
+            secret_arrival_pending::ActiveModel {
+                org_id: Set(o.clone()),
+                consumer_type: Set("alert_destination".to_string()),
+                consumer_id: Set("d1".to_string()),
+                saved_by: Set("u".to_string()),
+                refs: Set("[]".to_string()),
+                op: Set("post".to_string()),
+                removed_envs: Set("[]".to_string()),
+                arrival_mac: Set(String::new()),
+                reason: Set("gate".to_string()),
+                attempts: Set(0),
+                next_at: Set(1),
+                received_at: Set(1),
+            }
+            .insert(conn)
+            .await
+            .unwrap();
+        }
+
+        delete_org_secret_store_rows(&org).await.unwrap();
+
+        let status_left = |o: String| async move {
+            org_secret_value_status::Entity::find()
+                .filter(org_secret_value_status::Column::OrgId.eq(o))
+                .count(infra::db::get_orm_client_rw().await)
+                .await
+                .unwrap()
+        };
+        assert_eq!(status_left(org.clone()).await, 0);
+        assert_eq!(status_left(other.clone()).await, 1);
+        assert!(
+            secret_arrival_pending::get_in(conn, &org, "alert_destination", "d1")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            secret_arrival_pending::get_in(conn, &other, "alert_destination", "d1")
+                .await
+                .unwrap()
+                .is_some()
+        );
+        delete_org_secret_store_rows(&other).await.unwrap();
+    }
+
+    async fn seed_external_secret_backend(org: &str) -> String {
+        use infra::table::entity::{
+            secret_backend_identities, secret_backend_readiness, secret_backends,
+            secret_identity_jobs,
+        };
+        use sea_orm::{ActiveModelTrait, Set};
+
+        let conn = get_orm_client_rw().await;
+        let id = config::ider::ksuid();
+        secret_backends::ActiveModel {
+            id: Set(id.clone()),
+            org_id: Set(org.into()),
+            kind: Set("aws_sm".into()),
+            name: Set("primary".into()),
+            config: Set("{}".into()),
+            path_prefixes: Set("[]".into()),
+            auth_mode: Set("mapped".into()),
+            state: Set("active".into()),
+            backend_rev: Set("b1".into()),
+            ttl_secs: Set(30),
+            stale_max_secs: Set(60),
+            created_by: Set("u".into()),
+            updated_by: Set("u".into()),
+            created_at: Set(1),
+            updated_at: Set(1),
+            ..Default::default()
+        }
+        .insert(conn)
+        .await
+        .unwrap();
+        for (provider, source) in [("aws_sm", "manual"), ("gcp_sm", "provisioned")] {
+            secret_backend_identities::ActiveModel {
+                org_id: Set(org.into()),
+                provider: Set(provider.into()),
+                principal: Set("principal".into()),
+                source: Set(source.into()),
+                state: Set("active".into()),
+                incarnation: Set(config::ider::ksuid()),
+                policy_hash: Set("hash".into()),
+                desired_gen: Set(1),
+                applied_gen: Set(1),
+                rotate_requested: Set(false),
+                created_by: Set("u".into()),
+                created_at: Set(1),
+                updated_at: Set(1),
+                ..Default::default()
+            }
+            .insert(conn)
+            .await
+            .unwrap();
+        }
+        secret_identity_jobs::ActiveModel {
+            id: Set(config::ider::ksuid()),
+            org_id: Set(org.into()),
+            provider: Set("aws_sm".into()),
+            r#gen: Set(1),
+            did: Set("verify".into()),
+            state: Set("done".into()),
+            attempts: Set(1),
+            requested_by: Set("u".into()),
+            created_at: Set(1),
+            updated_at: Set(1),
+            ..Default::default()
+        }
+        .insert(conn)
+        .await
+        .unwrap();
+        secret_backend_readiness::ActiveModel {
+            org_id: Set(org.into()),
+            backend_id: Set(id.clone()),
+            identity_rev: Set("r1".into()),
+            backend_rev: Set("b1".into()),
+            passed_at: Set(1),
+        }
+        .insert(conn)
+        .await
+        .unwrap();
+        id
+    }
+
+    #[tokio::test]
+    async fn test_store_teardown_preserves_provisioned_identities_and_other_org() {
+        use infra::table::{
+            secret_backend_identities, secret_backend_readiness, secret_backends,
+            secret_identity_jobs,
+        };
+
+        if !meta_store().await {
+            return;
+        }
+        let conn = get_orm_client_rw().await;
+        let org = config::ider::ksuid();
+        let other = config::ider::ksuid();
+        let id = seed_external_secret_backend(&org).await;
+        let other_id = seed_external_secret_backend(&other).await;
+        delete_org_secret_store_rows(&org).await.unwrap();
+        for (tenant, backend, retained) in [(&org, &id, false), (&other, &other_id, true)] {
+            assert_eq!(
+                secret_backends::get_in(conn, tenant, backend)
+                    .await
+                    .unwrap()
+                    .is_some(),
+                retained
+            );
+            assert_eq!(
+                secret_backend_readiness::get_in(conn, tenant, backend, "r1")
+                    .await
+                    .unwrap()
+                    .is_some(),
+                retained
+            );
+            assert_eq!(
+                secret_identity_jobs::list_in(conn, tenant, "aws_sm")
+                    .await
+                    .unwrap()
+                    .len(),
+                usize::from(retained)
+            );
+            assert_eq!(
+                secret_backend_identities::get_in(conn, tenant, "aws_sm")
+                    .await
+                    .unwrap()
+                    .is_some(),
+                retained
+            );
+            assert!(
+                secret_backend_identities::get_in(conn, tenant, "gcp_sm")
+                    .await
+                    .unwrap()
+                    .is_some()
+            );
+        }
+        delete_org_secret_store_rows(&other).await.unwrap();
+        for tenant in [&org, &other] {
+            secret_backend_identities::delete_by_org(tenant)
+                .await
+                .unwrap();
+        }
+    }
+
     #[test]
     fn test_db_resources_deletes_query_history() {
         position_of("query_history::delete_by_org(org_id)");
+    }
+
+    #[test]
+    fn test_probe_tokens_are_deleted_before_their_owned_credential_rows() {
+        assert!(
+            position_of("synthetics_probe_tokens::delete_by_org(org_id)")
+                < position_of("credential_values::delete_by_org(org_id)"),
+            "a probe-token repair between the two deletes would strand an owned credential row"
+        );
     }
 
     #[test]
@@ -5416,7 +5800,7 @@ mod tests {
     #[test]
     fn test_the_dek_outlives_every_row_encrypted_under_it() {
         for call in [
-            "llm_secrets::delete_by_org(org_id)",
+            "credential_values::delete_by_org(org_id)",
             "org_ai_toolsets::delete_by_org(org_id)",
             "providers::delete_all_by_org(org_id)",
             "synthetics_checks::delete_by_org(org_id)",
@@ -6042,7 +6426,7 @@ mod tests {
             secrets::{self, SecretOwnerKind},
             table::{
                 entity::{
-                    llm_secrets, workflow_http_trigger_credentials as credentials,
+                    credential_values, workflow_http_trigger_credentials as credentials,
                     workflow_http_trigger_requests as requests, workflow_http_triggers as triggers,
                 },
                 workflow_http_trigger_requests::{self as ledger, NewHookRequest},
@@ -6160,9 +6544,9 @@ mod tests {
                     .count(db)
                     .await
                     .unwrap(),
-                llm_secrets::Entity::find()
-                    .filter(llm_secrets::Column::OrgId.eq(org))
-                    .filter(llm_secrets::Column::OwnerKind.eq("workflow_trigger"))
+                credential_values::Entity::find()
+                    .filter(credential_values::Column::OrgId.eq(org))
+                    .filter(credential_values::Column::OwnerKind.eq("workflow_trigger"))
                     .count(db)
                     .await
                     .unwrap(),

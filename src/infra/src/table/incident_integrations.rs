@@ -192,7 +192,7 @@ pub async fn ensure_default_for_org(
 
     let now = chrono::Utc::now().timestamp_micros();
     let record = IncidentIntegrationRecord {
-        id: config::ider::uuid(),
+        id: config::ider::ksuid(),
         org_id: org_id.to_owned(),
         name: DEFAULT_INTEGRATION_NAME.to_owned(),
         source_type: "auto".to_owned(),
@@ -318,7 +318,7 @@ pub async fn touch_sender(params: TouchSenderParams<'_>) -> Result<(), errors::E
     }
 
     let model = SenderActiveModel {
-        id: Set(config::ider::uuid()),
+        id: Set(config::ider::ksuid()),
         integration_id: Set(integration_id.to_owned()),
         detected_source: Set(detected_source.to_owned()),
         sender_label: Set(sender_label.map(|s| s.to_owned())),

@@ -1461,7 +1461,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_a_stranger_cannot_use_the_routes() {
-        let stranger = format!("{}@example.com", config::ider::uuid());
+        let stranger = format!("{}@example.com", config::ider::ksuid());
         for method in ["GET", "PUT", "POST", "DELETE"] {
             let refused = require("org", &stranger, method).await.unwrap_err();
             assert_eq!(refused.status(), StatusCode::FORBIDDEN);
@@ -1492,7 +1492,7 @@ mod tests {
             use common::infra::config::{ORG_USERS, USERS};
 
             meta_store().await;
-            let org = format!("srcs{}", &config::ider::uuid().replace('-', "")[..10]);
+            let org = format!("srcs{}", &config::ider::ksuid().replace('-', "")[..10]);
             let user = format!("author-{org}@example.com");
             USERS.insert(
                 user.clone(),

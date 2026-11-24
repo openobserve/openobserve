@@ -99,7 +99,7 @@ mod tests {
         conn.execute(backend.build(stmt.if_not_exists()))
             .await
             .unwrap();
-        format!("sample_data_{}", config::ider::uuid())
+        format!("sample_data_{}", config::ider::ksuid())
     }
 
     fn window(start_time: i64, end_time: i64) -> PutSampleDataRequest {

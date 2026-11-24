@@ -50,6 +50,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:state="(state) => setState(i, state)"
         />
       </div>
+      <div v-if="pickerShown" class="mt-5 shrink-0 max-md:mt-0">
+        <SecretPicker
+          consumer-type="ai_toolset"
+          :consumer-id="consumerId"
+          require-manage
+          :data-test="`${testId}-${i}-secret-picker`"
+          @pick="(item: SecretPickerItem) => pickIntoHeader(i, item)"
+        />
+      </div>
       <OButton
         variant="ghost-destructive"
         size="sm"
@@ -78,6 +87,9 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSecretInput from "@/lib/forms/SecretInput/OFormSecretInput.vue";
 import type { SecretInputState } from "@/lib/forms/SecretInput/OSecretInput.types";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
+import type { SecretPickerItem } from "@/services/secrets";
+import SecretPicker from "@/views/Secrets/SecretPicker.vue";
+import { refText } from "@/views/Secrets/secretRefs";
 
 import type { SecretRow } from "./AssistantToolsetForm.schema";
 
@@ -90,8 +102,17 @@ const props = withDefaults(
     legend?: I18nText;
     addLabel?: I18nText;
     testId?: string;
+    pickerShown?: boolean;
+    consumerId?: string;
   }>(),
-  { field: "headers", legend: undefined, addLabel: undefined, testId: "ai-toolset-header" },
+  {
+    field: "headers",
+    legend: undefined,
+    addLabel: undefined,
+    testId: "ai-toolset-header",
+    pickerShown: false,
+    consumerId: "",
+  },
 );
 
 const { t } = useI18nTyped();
@@ -106,5 +127,16 @@ function setState(i: number, state: SecretInputState) {
   const stored = props.rows[i]?.stored;
   if (state === "unchanged" && stored)
     props.form.setFieldValue(`mcp.${props.field}[${i}].key`, stored);
+}
+function pickIntoHeader(i: number, item: SecretPickerItem) {
+  const row = props.rows[i];
+  if (!row) return;
+  const current = row.state === "unchanged" ? "" : (row.value ?? "");
+  if (row.state === "unchanged")
+    props.form.setFieldValue(`mcp.${props.field}[${i}].state`, "replacing");
+  props.form.setFieldValue(
+    `mcp.${props.field}[${i}].value`,
+    `${current}${refText(item.kind, item.name)}`,
+  );
 }
 </script>

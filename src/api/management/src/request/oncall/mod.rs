@@ -795,7 +795,7 @@ fn unchanged() -> serde_json::Value {
 async fn page_with_ack(org_id: &str, response_id: &str, ack: serde_json::Value) -> Response {
     match infra::table::oncall_responses::get(org_id, response_id).await {
         Ok(Some(record)) => {
-            let mut body = serde_json::to_value(record).unwrap_or_default();
+            let mut body = serde_json::to_value(record.for_reader()).unwrap_or_default();
             body["ack"] = ack;
             MetaHttpResponse::json(body)
         }
@@ -2763,7 +2763,7 @@ fn page_row(
     rungs: &std::collections::HashMap<String, i64>,
     titles: &std::collections::HashMap<String, String>,
 ) -> serde_json::Value {
-    let mut value = serde_json::json!(r);
+    let mut value = serde_json::json!(r.for_reader());
     if let Some(obj) = value.as_object_mut() {
         if let Some(url) = runbooks.get(&r.id) {
             obj.insert("runbook_url".to_string(), url.clone().into());
@@ -2924,7 +2924,7 @@ pub async fn resolve_response(
                 return error_response(e);
             }
         }
-        MetaHttpResponse::json(record)
+        MetaHttpResponse::json(record.for_reader())
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -3012,7 +3012,9 @@ pub async fn list_responses_for_incident(
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match infra::table::oncall_responses::list_for_incident(&org_id, &incident_id).await {
-            Ok(rows) => MetaHttpResponse::json(rows),
+            Ok(rows) => {
+                MetaHttpResponse::json(rows.iter().map(|row| row.for_reader()).collect::<Vec<_>>())
+            }
             Err(e) => to_response(e.into()),
         }
     }
@@ -3422,7 +3424,7 @@ pub async fn snooze_response(
         )
         .await
         {
-            Ok(Some(r)) => MetaHttpResponse::json(r),
+            Ok(Some(r)) => MetaHttpResponse::json(r.for_reader()),
             Ok(None) => MetaHttpResponse::not_found("Response record not found"),
             Err(e) => to_response(e),
         }
@@ -3472,7 +3474,7 @@ pub async fn unsnooze_response(
         )
         .await
         {
-            Ok(Some(r)) => MetaHttpResponse::json(r),
+            Ok(Some(r)) => MetaHttpResponse::json(r.for_reader()),
             Ok(None) => MetaHttpResponse::not_found("Response record not found"),
             Err(e) => to_response(e),
         }
@@ -3577,7 +3579,7 @@ pub async fn handoff_response(
             (None, None) => return MetaHttpResponse::bad_request(HANDOFF_NEEDS_A_TARGET),
         };
         match result {
-            Ok(record) => MetaHttpResponse::json(record),
+            Ok(record) => MetaHttpResponse::json(record.for_reader()),
             Err(e) => to_response(e),
         }
     }
@@ -3650,7 +3652,7 @@ pub async fn confirm_recovery(
         )
         .await
         {
-            Ok(record) => MetaHttpResponse::json(record),
+            Ok(record) => MetaHttpResponse::json(record.for_reader()),
             Err(e) => to_response(e),
         }
     }
@@ -3724,7 +3726,7 @@ pub async fn escalate_response(
             Ok((record, EscalatedTo::LadderExhausted)) => {
                 MetaHttpResponse::json(serde_json::json!({
                     "escalated_to": "ladder_exhausted",
-                    "response": record,
+                    "response": record.for_reader(),
                 }))
             }
             Ok((
@@ -3741,7 +3743,7 @@ pub async fn escalate_response(
                 "recipients": recipients,
                 "chased": chased,
                 "deduplicated": deduplicated,
-                "response": record,
+                "response": record.for_reader(),
             })),
             Err(e) => to_response(e),
         }
@@ -3782,6 +3784,24 @@ pub async fn send_test_page(
     {
         if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
+        }
+        if let Ok(policy) = infra::table::oncall_policies::get_by_team(&org_id, &team_id).await
+            && let Ok(team) = infra::table::oncall_teams::get_channel(&org_id, &team_id).await
+        {
+            let policy_destinations = policy
+                .as_ref()
+                .map_or(&[][..], |policy| policy.destinations.as_slice());
+            let names =
+                config::meta::oncall::policy::team_channel(team.as_deref(), policy_destinations);
+            if let Err(refusal) = openobserve_core::alerts::destinations::authorize_human_sends(
+                &org_id,
+                &user_email.user_id,
+                names,
+            )
+            .await
+            {
+                return openobserve_core::http::secret_refusal_response(&refusal);
+            }
         }
         let body = body.unwrap_or_default();
         match o2_enterprise::enterprise::oncall::service::send_test_page(
@@ -3857,6 +3877,7 @@ pub async fn get_response_history(
             Ok(rows) => MetaHttpResponse::json(
                 rows.into_iter()
                     .filter(|r| r.id != response_id)
+                    .map(|row| row.for_reader())
                     .collect::<Vec<_>>(),
             ),
             Err(e) => internal_error("history", &e),
@@ -5902,6 +5923,21 @@ fn promoted_severity(
     }
 }
 
+#[cfg(any(feature = "enterprise", test))]
+fn promoted_page_response(
+    incident_id: &str,
+    severity: &str,
+    record: &config::meta::oncall::Response,
+) -> serde_json::Value {
+    let mut response = record.for_reader();
+    response.incident_id = Some(incident_id.to_string());
+    serde_json::json!({
+        "incident_id": incident_id,
+        "severity": severity,
+        "response": response,
+    })
+}
+
 #[utoipa::path(
     post,
     path = "/{org_id}/oncall/responses/{response_id}/promote",
@@ -6005,9 +6041,6 @@ pub async fn promote_to_incident(
                 return internal_error("promote create incident", &e);
             }
         };
-        let mut updated = record.clone();
-        updated.incident_id = Some(incident.id.clone());
-
         // Best effort: an attached incident beats rolling back over a failed display join.
         if record.subject.subject_type == config::meta::oncall::SubjectType::Alert
             && let Err(e) = infra::table::alert_incidents::add_alert_to_incident(
@@ -6036,11 +6069,11 @@ pub async fn promote_to_incident(
         {
             tracing::warn!("[oncall] promote note: {e}");
         }
-        MetaHttpResponse::json(serde_json::json!({
-            "incident_id": incident.id,
-            "severity": incident.severity,
-            "response": updated,
-        }))
+        MetaHttpResponse::json(promoted_page_response(
+            &incident.id,
+            &incident.severity,
+            &record,
+        ))
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -7144,6 +7177,32 @@ mod tests {
     }
 
     #[test]
+    fn promotion_json_omits_manual_sender_and_preserves_incident_link() {
+        let record = serde_json::from_value::<config::meta::oncall::Response>(serde_json::json!({
+            "id": "manual-page",
+            "org_id": "acme",
+            "subject": {"subject_type": "alert", "source_id": "a1", "firing": 1},
+            "priority": 2,
+            "state": "triggered",
+            "opened_at": 1,
+            "requested_by": "manual-sender@oncall.test",
+        }))
+        .unwrap();
+
+        let body = promoted_page_response("incident-1", "P2", &record);
+        assert!(body["response"].get("requested_by").is_none());
+        assert_eq!(body["response"]["id"], "manual-page");
+        assert_eq!(body["response"]["incident_id"], "incident-1");
+        assert_eq!(body["incident_id"], "incident-1");
+        assert_eq!(body["severity"], "P2");
+        assert_eq!(
+            record.requested_by.as_deref(),
+            Some("manual-sender@oncall.test")
+        );
+        assert!(record.incident_id.is_none());
+    }
+
+    #[test]
     fn test_promote_body_is_entirely_optional() {
         let bare: PromoteRequest = serde_json::from_str("{}").unwrap();
         assert_eq!(bare.title, None);
@@ -7365,6 +7424,7 @@ mod tests {
             ladder_anchor: None,
             ladder_run: Some(1),
             exhausted_at: None,
+            requested_by: None,
             responder_role: ResponderRole::Owner,
             origin_response_id: None,
             priority: 2,
@@ -7554,6 +7614,28 @@ mod tests {
             let got = batch_ids(listed.as_deref(), extra.clone()).ok();
             assert_eq!(got, want, "{listed:?} + {extra:?}");
         }
+    }
+
+    #[test]
+    fn page_rows_omit_manual_sender() {
+        let record = serde_json::from_value::<config::meta::oncall::Response>(serde_json::json!({
+            "id": "manual-page",
+            "org_id": "acme",
+            "subject": {"subject_type": "alert", "source_id": "a1", "firing": 1},
+            "priority": 2,
+            "state": "triggered",
+            "opened_at": 1,
+            "requested_by": "manual-sender@oncall.test",
+        }))
+        .unwrap();
+        let row = page_row(
+            record,
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
+        );
+        assert!(row.get("requested_by").is_none());
+        assert_eq!(row["id"], "manual-page");
     }
 
     #[test]

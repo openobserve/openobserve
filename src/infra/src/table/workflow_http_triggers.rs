@@ -1001,7 +1001,9 @@ mod tests {
 
     use super::*;
     use crate::table::{
-        entity::{llm_secrets, workflow_http_trigger_requests as requests, workflow_run_data},
+        entity::{
+            credential_values, workflow_http_trigger_requests as requests, workflow_run_data,
+        },
         workflow_http_trigger_requests::{self as ledger, NewHookRequest},
     };
 
@@ -1095,9 +1097,9 @@ mod tests {
     }
 
     async fn secret_count(db: &DatabaseConnection, owner_id: &str) -> u64 {
-        llm_secrets::Entity::find()
-            .filter(llm_secrets::Column::OwnerKind.eq("workflow_trigger"))
-            .filter(llm_secrets::Column::OwnerId.eq(owner_id))
+        credential_values::Entity::find()
+            .filter(credential_values::Column::OwnerKind.eq("workflow_trigger"))
+            .filter(credential_values::Column::OwnerId.eq(owner_id))
             .count(db)
             .await
             .unwrap()
@@ -1405,8 +1407,8 @@ mod tests {
         let outcome = apply_snapshot_in(&db, snap, prepared("acme", "c1")).await;
         assert_eq!(outcome.unwrap(), ApplyOutcome::Applied);
         let stored = credential_row(&db, "c1").await;
-        let secret = llm_secrets::Entity::find()
-            .filter(llm_secrets::Column::OwnerId.eq("c1"))
+        let secret = credential_values::Entity::find()
+            .filter(credential_values::Column::OwnerId.eq("c1"))
             .one(&db)
             .await
             .unwrap()

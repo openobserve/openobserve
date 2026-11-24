@@ -384,6 +384,9 @@ mod tests {
         for table in [
             schema.create_table_from_entity(infra::table::entity::synthetics_environments::Entity),
             schema.create_table_from_entity(infra::table::entity::synthetics_variables::Entity),
+            schema.create_table_from_entity(infra::table::synthetics_env_retired::Entity),
+            schema.create_table_from_entity(infra::table::org_secret_values::Entity),
+            schema.create_table_from_entity(infra::table::entity::credential_values::Entity),
         ] {
             db.execute(backend.build(&table)).await.unwrap();
         }
@@ -406,7 +409,7 @@ mod tests {
     #[tokio::test]
     async fn a_late_delete_never_removes_an_environment_created_again_after_it() {
         let db = environment_db().await;
-        synthetics_environments::add(&db, &staging(10))
+        synthetics_environments::add(&db, &mut staging(10))
             .await
             .unwrap();
 
@@ -435,7 +438,7 @@ mod tests {
     #[tokio::test]
     async fn a_delete_from_an_older_sender_still_deletes() {
         let db = environment_db().await;
-        synthetics_environments::add(&db, &staging(10))
+        synthetics_environments::add(&db, &mut staging(10))
             .await
             .unwrap();
         delete_environment(&db, "org1", "org1/staging", 0)

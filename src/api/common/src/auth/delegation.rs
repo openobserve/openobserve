@@ -75,6 +75,7 @@ const RESERVED_STREAM_SLOTS: &[&str] = &[
     "score_configs",
     "scorers",
     "search_jobs",
+    "secrets",
     "short",
     "slos",
     "status_pages",
@@ -1199,6 +1200,21 @@ mod tests {
             (Method::POST, "v2/acme/downtimes/d1/cancel"),
         ] {
             assert!(in_assistant_scope(&method, path), "{method} {path}");
+        }
+    }
+
+    #[test]
+    fn assistant_scope_refuses_secret_store_routes() {
+        for path in [
+            "o1/secrets",
+            "o1/secrets/S1",
+            "o1/secrets/S1/values/_org",
+            "o1/secrets/status",
+            "o1/secrets/_all/grants",
+        ] {
+            for method in [Method::GET, Method::POST, Method::PUT, Method::DELETE] {
+                assert!(!in_scope(ASSISTANT_SCOPE, &method, path), "{method} {path}");
+            }
         }
     }
 

@@ -100,7 +100,7 @@ pub async fn create(
     let client = get_orm_client_rw().await;
     let now = now_micros();
     let rule = OwnershipRule {
-        id: ider::uuid(),
+        id: ider::ksuid(),
         org_id: org_id.to_string(),
         team_id: team_id.to_string(),
         dimensions,
@@ -341,7 +341,7 @@ pub async fn record_unrouted(
     }
 
     let model = oncall_unrouted_signals::ActiveModel {
-        id: Set(ider::uuid()),
+        id: Set(ider::ksuid()),
         org_id: Set(org_id.to_string()),
         path: Set(path.clone()),
         dimensions: Set(serde_json::to_string(dimensions)?),

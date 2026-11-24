@@ -1591,7 +1591,7 @@ pub async fn redirect(
             };
 
             // generate new UUID for access token & store token in DB
-            let session_id = ider::uuid();
+            let session_id = ider::ksuid();
 
             if access_token.is_empty() {
                 audit_login_failure(
@@ -1619,7 +1619,7 @@ pub async fn redirect(
             }
 
             let login_id = crate::request::ai::chats::bound_login_id(
-                &ider::uuid(),
+                &ider::ksuid(),
                 &session_id,
                 &login_data.refresh_token,
             );
@@ -1775,7 +1775,7 @@ pub async fn refresh_token_with_dex(
     match refresh_token(&token).await {
         Ok((access_token, refresh_token_str)) => {
             // generate new UUID for access token & store token in DB
-            let session_id = ider::uuid();
+            let session_id = ider::ksuid();
 
             if access_token.is_empty() {
                 drop_refreshed_session(old_session.as_ref()).await;
@@ -1822,7 +1822,7 @@ pub async fn refresh_token_with_dex(
                 }
             }
 
-            let login = login.unwrap_or_else(ider::uuid);
+            let login = login.unwrap_or_else(ider::ksuid);
             let old = old_session.as_ref().map(|(id, live)| (id.as_str(), *live));
             if !rotate_session(&login, old, &session_id, &access_token).await {
                 log::warn!("Session refresh refused: the login signed out or could not be locked");
@@ -2545,8 +2545,8 @@ mod tests {
     #[tokio::test]
     async fn test_a_slow_login_does_not_hold_up_another_login() {
         let (a, b) = (
-            format!("login-{}", ider::uuid()),
-            format!("login-{}", ider::uuid()),
+            format!("login-{}", ider::ksuid()),
+            format!("login-{}", ider::ksuid()),
         );
         let (started_tx, started_rx) = tokio::sync::oneshot::channel();
         let (release_tx, release_rx) = tokio::sync::oneshot::channel::<()>();
@@ -2606,7 +2606,7 @@ mod tests {
         if !session_store().await {
             return;
         }
-        let (login, old, new) = (ider::uuid(), ider::uuid(), ider::uuid());
+        let (login, old, new) = (ider::ksuid(), ider::ksuid(), ider::ksuid());
         set_session(&old, "token-old").await.unwrap();
         assert!(rotate_session(&login, Some((old.as_str(), true)), &new, "token-new").await);
         assert!(
@@ -2628,7 +2628,7 @@ mod tests {
         if !session_store().await {
             return;
         }
-        let (login, old, new) = (ider::uuid(), ider::uuid(), ider::uuid());
+        let (login, old, new) = (ider::ksuid(), ider::ksuid(), ider::ksuid());
         set_session(&old, "token-old").await.unwrap();
         sign_out_session(&signed_in(&old, &login), &old).await;
         assert!(!rotate_session(&login, Some((old.as_str(), true)), &new, "token-new").await);

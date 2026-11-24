@@ -27,13 +27,21 @@ use std::{
 };
 
 use aws_config::{BehaviorVersion, Region};
-use aws_sdk_lambda::{Client as LambdaClient, primitives::Blob};
+use aws_sdk_lambda::{
+    Client as LambdaClient, error::ProvideErrorMetadata, operation::RequestId, primitives::Blob,
+};
 use dashmap::DashMap;
 use infra::{
     db::get_orm_client_rw,
-    table::{synthetics_jobs, synthetics_runs},
+    table::{
+        synthetics_jobs::{self, CompletionProof, complete_attempt},
+        synthetics_locations,
+        synthetics_locations::SyntheticsLocationRecord,
+        synthetics_runs,
+    },
 };
 
+const BROWSER_POOL: &str = "aws-browser";
 const TICK: Duration = Duration::from_secs(2);
 
 /// Jobs per pool per lease call (`ZO_SYNTHETICS_LEASE_BATCH_SIZE`), read per tick.
@@ -62,7 +70,7 @@ fn next_batch_limit(batch: i64, leased_this_tick: i64, cap: i64) -> i64 {
 /// Read per lease, not held as a constant: `const LEASE_SECS = 900` used to
 /// override `ZO_SYNTHETICS_JOB_LEASE_SECS` outright, so a deployment that
 /// lowered the lease still handed out 900s ones. `limits()` is the same source
-/// `lease_batch` floors against, republished on every config reload.
+/// `lease_batch_for_org` floors against, republished on every config reload.
 fn lease_secs() -> i64 {
     config::get_config().synthetics.job_lease_secs
 }
@@ -80,20 +88,46 @@ async fn dispatcher_pools() -> Vec<String> {
     let cfg = config::get_config();
     let mut pools = Vec::new();
     if !cfg.synthetics.lambda_browser.is_empty() {
-        pools.push("aws-browser".to_string());
+        match synthetics_locations::find_by_pool(BROWSER_POOL).await {
+            Ok(location) if served_publicly(location.as_ref()) => {
+                pools.push(BROWSER_POOL.to_string())
+            }
+            Ok(_) => tracing::error!(
+                "[synthetics dispatcher] pool {BROWSER_POOL} belongs to a private location; not leased"
+            ),
+            Err(e) => tracing::error!("[synthetics dispatcher] find_by_pool {BROWSER_POOL}: {e}"),
+        }
     }
     if !cfg.synthetics.lambda_net.is_empty() {
         // Public rows only — list_visible("") matches no private org.
-        if let Ok(locations) = infra::table::synthetics_locations::list_visible("").await {
+        if let Ok(locations) = synthetics_locations::list_visible("").await {
             pools.extend(
                 locations
                     .into_iter()
-                    .filter(|l| l.enabled && l.org_id.is_none() && l.pool.starts_with("net-"))
+                    .filter(|l| l.enabled && served_publicly(Some(l)) && l.pool.starts_with("net-"))
                     .map(|l| l.pool),
             );
         }
     }
     pools
+}
+
+/// Lease tokens go only to a Lambda runner that declares `runner_contract=1` (R12 N12).
+fn lambda_lease_issuer() -> Option<synthetics_jobs::LeaseIssuer> {
+    (config::get_config().synthetics.lambda_runner_contract >= 1)
+        .then_some(synthetics_jobs::LeaseIssuer::Dispatcher)
+}
+
+/// The dispatcher leases with no org filter, so a pool a private location claims, `aws-browser`
+/// included (a custom pool name may take it), must never reach it.
+fn served_publicly(location: Option<&SyntheticsLocationRecord>) -> bool {
+    location.is_none_or(|l| l.org_id.is_none() || is_managed_pool(&l.pool))
+}
+
+/// F03: a private row created before the `private-` rule may hold one of these names; it must
+/// not stop the venue for every org, and the scheduler routes nothing to it.
+pub(crate) fn is_managed_pool(pool: &str) -> bool {
+    pool == BROWSER_POOL || pool.starts_with("net-")
 }
 
 /// Cache of Lambda clients keyed by AWS region string.
@@ -161,28 +195,31 @@ pub async fn run(stop: crate::StopToken) {
                 if limit == 0 {
                     break;
                 }
-                let rows = match synthetics_jobs::lease_batch(
+                // Only public pools reach here (`dispatcher_pools`); they serve every org.
+                let rows = match synthetics_jobs::lease_batch_for_org(
                     db,
+                    None,
                     &pool,
                     instance_id,
                     limit,
                     now_us,
                     lease_secs(),
                     None, // public pools are already type-segmented (net-* vs aws-browser)
+                    lambda_lease_issuer(),
                 )
                 .await
                 {
                     Ok(r) => r,
                     Err(e) => {
-                        tracing::error!(pool = %pool, "[synthetics dispatcher] lease_batch: {e}");
+                        tracing::error!(pool = %pool, "[synthetics dispatcher] lease_batch_for_org: {e}");
                         continue;
                     }
                 };
 
                 let full = rows.len() as i64 >= limit;
                 leased_this_tick += rows.len() as i64;
-                for row in rows {
-                    tokio::spawn(invoke_probe(row, stop.clone()));
+                for lease in rows {
+                    tokio::spawn(invoke_probe(lease, stop.clone()));
                 }
                 if full {
                     still_active.push(pool);
@@ -311,7 +348,11 @@ async fn mint_default_token(org_id: &str) -> Option<String> {
 
 /// Records a failed dispatch as Error; `false` when the ack did not apply, so the caller must not
 /// report it.
-async fn mark_failure(row: &synthetics_jobs::LeasedRow, reason: Option<&str>) -> bool {
+async fn mark_failure(
+    row: &synthetics_jobs::LeasedRow,
+    reason: Option<&str>,
+    lease_sha256: Option<&str>,
+) -> bool {
     let db = get_orm_client_rw().await;
     let now_us = config::utils::time::now_micros();
     // SyntheticStatus Error = DB int 4; job status Error = 6.
@@ -330,19 +371,21 @@ async fn mark_failure(row: &synthetics_jobs::LeasedRow, reason: Option<&str>) ->
         })
         .to_string(),
     );
-    let acked = match synthetics_jobs::ack_complete(
+    let proof = lease_sha256.map_or(CompletionProof::Tokenless, CompletionProof::Lease);
+    let acked = match complete_attempt(
         db,
         &row.id,
         6,
         result_json.as_deref(),
         now_us,
         Some(INSTANCE_ID.as_str()),
+        proof,
     )
     .await
     {
         Ok(acked) => acked,
         Err(e) => {
-            tracing::error!(synthetics_id = %row.synthetics_id, run_id = %row.run_id, job_id = %row.id, "[synthetics dispatcher] ack_complete: {e}");
+            tracing::error!(synthetics_id = %row.synthetics_id, run_id = %row.run_id, job_id = %row.id, "[synthetics dispatcher] complete_attempt: {e}");
             return false;
         }
     };
@@ -484,7 +527,9 @@ async fn report_to_stream(
 }
 
 /// Invokes the browser probe Lambda for a leased check row.
-async fn invoke_probe(row: synthetics_jobs::LeasedRow, stop: crate::StopToken) {
+async fn invoke_probe(lease: synthetics_jobs::Lease, stop: crate::StopToken) {
+    let synthetics_jobs::Lease { row, lease_token } = lease;
+    let lease_sha256 = lease_token.as_ref().map(|token| token.sha256());
     // Leased just before ownership moved: do not start the probe here. The
     // lease expires and the new owner's reaper re-queues the row.
     if stop.is_cancelled() {
@@ -500,7 +545,7 @@ async fn invoke_probe(row: synthetics_jobs::LeasedRow, stop: crate::StopToken) {
                 location = %row.location,
                 "[synthetics dispatcher] cannot derive AWS region from location — skipping"
             );
-            let _ = mark_failure(&row, Some(REASON_NO_REGION)).await;
+            let _ = mark_failure(&row, Some(REASON_NO_REGION), lease_sha256.as_deref()).await;
             return;
         }
     };
@@ -513,32 +558,37 @@ async fn invoke_probe(row: synthetics_jobs::LeasedRow, stop: crate::StopToken) {
                 pool = %row.pool,
                 "[synthetics dispatcher] no Lambda function configured for pool — skipping"
             );
-            let _ = mark_failure(&row, Some(REASON_NO_LAMBDA)).await;
+            let _ = mark_failure(&row, Some(REASON_NO_LAMBDA), lease_sha256.as_deref()).await;
             return;
         }
     };
 
-    // o2syn_ token from dedicated synthetics_probe_tokens table.
-    //
-    // Minted here when absent rather than skipping. `create_for_org` is the only
-    // thing that sets `is_default`, and it runs at org creation — so an org that
-    // missed it could never dispatch again: `create_agent_token` hardcodes
-    // `is_default: false` and refuses the reserved name, meaning no API call
-    // could produce a token `find_default` would select. Orgs whose locations
-    // are all public never hit the private-location setup path that would
-    // otherwise surface one, so this was reachable in normal use, not just on a
-    // broken bootstrap.
-    //
-    // Safe to do here: reaching this line means the org has an enabled location
-    // and a scheduled job, which is the same entitlement org creation would have
-    // granted. `add` invalidates and publishes the token cache, so peers see it
-    // without waiting for the TTL.
-    let probe_token = match infra::table::synthetics_probe_tokens::find_default(&row.org_id).await {
-        Ok(Some(t)) => t.token,
-        Ok(None) => match mint_default_token(&row.org_id).await {
-            Some(t) => t,
+    // Step 2 (R8-04): a runner with a lease authenticates with it alone, so no probe token travels.
+    let probe_token = match lease_token {
+        Some(_) => None,
+        None => match default_probe_token(&row).await {
+            Ok(token) => Some(token),
+            Err(reason) => {
+                let _ = mark_failure(&row, Some(reason), lease_sha256.as_deref()).await;
+                return;
+            }
+        },
+    };
+
+    // o2oi_ token from org_ingestion_tokens — probe uses for ingest
+    let ingest_token = match infra::table::org_ingestion_tokens::find_default_enabled(&row.org_id)
+        .await
+    {
+        Ok(found) => match found {
+            Some(t) => t.token,
             None => {
-                let _ = mark_failure(&row, Some(REASON_NO_PROBE_TOKEN)).await;
+                tracing::warn!(
+                    job_id = %row.id,
+                    org_id = %row.org_id,
+                    "[synthetics dispatcher] no enabled o2oi_ ingest token for org — skipping"
+                );
+                let _ =
+                    mark_failure(&row, Some(REASON_NO_INGEST_TOKEN), lease_sha256.as_deref()).await;
                 return;
             }
         },
@@ -546,55 +596,26 @@ async fn invoke_probe(row: synthetics_jobs::LeasedRow, stop: crate::StopToken) {
             tracing::error!(
                 job_id = %row.id,
                 org_id = %row.org_id,
-                "[synthetics dispatcher] probe token lookup failed: {e}"
+                "[synthetics dispatcher] ingest token lookup failed: {e}"
             );
-            let _ = mark_failure(&row, Some(REASON_TOKEN_LOOKUP)).await;
+            let _ = mark_failure(&row, Some(REASON_TOKEN_LOOKUP), lease_sha256.as_deref()).await;
             return;
         }
     };
 
-    // o2oi_ token from org_ingestion_tokens — probe uses for ingest
-    let ingest_token =
-        match infra::table::org_ingestion_tokens::find_default_enabled(&row.org_id).await {
-            Ok(found) => match found {
-                Some(t) => t.token,
-                None => {
-                    tracing::warn!(
-                        job_id = %row.id,
-                        org_id = %row.org_id,
-                        "[synthetics dispatcher] no enabled o2oi_ ingest token for org — skipping"
-                    );
-                    let _ = mark_failure(&row, Some(REASON_NO_INGEST_TOKEN)).await;
-                    return;
-                }
-            },
-            Err(e) => {
-                tracing::error!(
-                    job_id = %row.id,
-                    org_id = %row.org_id,
-                    "[synthetics dispatcher] ingest token lookup failed: {e}"
-                );
-                let _ = mark_failure(&row, Some(REASON_TOKEN_LOOKUP)).await;
-                return;
-            }
-        };
-
-    let payload = serde_json::json!({
-        "job_id":            &row.id,
-        "org_id":            &row.org_id,   // scopes the org-pathed Job API calls
-        "synthetics_name":   row.synthetics_name,
-        "dispatch_attempt":  row.dispatch_attempts,
-        "job_api_endpoint":  config::meta::synthetics::api_endpoint(),
-        "job_api_token":     probe_token,   // o2syn_ — for /resolve + /ack
-        "ingest_token":      ingest_token,  // o2oi_  — for /{org}/synthetics_results/_json
-    });
+    let payload = lambda_payload(
+        &row,
+        probe_token.as_deref(),
+        &ingest_token,
+        lease_token.as_ref().map(|token| token.expose()),
+    );
 
     let payload_bytes = match serde_json::to_vec(&payload) {
         Ok(b) => b,
         Err(e) => {
             let error_msg = format!("payload serialize: {e}");
             tracing::error!(job_id = %row.id, "[synthetics dispatcher] {error_msg}");
-            let _ = mark_failure(&row, Some(&error_msg)).await;
+            let _ = mark_failure(&row, Some(&error_msg), lease_sha256.as_deref()).await;
             return;
         }
     };
@@ -623,27 +644,14 @@ async fn invoke_probe(row: synthetics_jobs::LeasedRow, stop: crate::StopToken) {
             // ~15 minutes later under a generic "probe did not respond", with the
             // actual stack trace discarded.
             if let Some(kind) = resp.function_error() {
-                // The payload carries the real error. Truncated because a stack
-                // trace can be large and this goes to a log line, but included
-                // because "Unhandled" on its own says nothing actionable.
-                let detail = resp
-                    .payload()
-                    .map(|b| {
-                        String::from_utf8_lossy(b.as_ref())
-                            .chars()
-                            .take(600)
-                            .collect::<String>()
-                    })
-                    .unwrap_or_default();
-                let error_msg = format!(
-                    "Lambda function error (fn={fn_name} region={region} kind={kind}): {detail}"
-                );
+                let error_msg = function_error_text(&fn_name, &region, kind, resp.request_id());
                 tracing::error!(
                     job_id = %row.id,
                     synthetics_id = %row.synthetics_id,
                     "[synthetics dispatcher] {error_msg}"
                 );
-                handle_dispatch_failure(&row, &ingest_token, &error_msg).await;
+                handle_dispatch_failure(&row, &ingest_token, &error_msg, lease_sha256.as_deref())
+                    .await;
                 return;
             }
             tracing::info!(
@@ -659,11 +667,95 @@ async fn invoke_probe(row: synthetics_jobs::LeasedRow, stop: crate::StopToken) {
             );
         }
         Err(e) => {
-            let error_msg = format!("Lambda invoke failed (fn={fn_name} region={region}): {e:#?}");
+            let error_msg = invoke_error_text(&fn_name, &region, e.code(), e.request_id());
             tracing::error!(job_id = %row.id, "[synthetics dispatcher] {error_msg}");
-            handle_dispatch_failure(&row, &ingest_token, &error_msg).await;
+            handle_dispatch_failure(&row, &ingest_token, &error_msg, lease_sha256.as_deref()).await;
         }
     }
+}
+
+/// The org's default o2syn_ token for a runner without a lease; `Err` is the failure reason.
+async fn default_probe_token(row: &synthetics_jobs::LeasedRow) -> Result<String, &'static str> {
+    // o2syn_ token from dedicated synthetics_probe_tokens table.
+    //
+    // Minted here when absent rather than skipping. `create_for_org` is the only
+    // thing that sets `is_default`, and it runs at org creation — so an org that
+    // missed it could never dispatch again: `create_agent_token` hardcodes
+    // `is_default: false` and refuses the reserved name, meaning no API call
+    // could produce a token `find_default` would select. Orgs whose locations
+    // are all public never hit the private-location setup path that would
+    // otherwise surface one, so this was reachable in normal use, not just on a
+    // broken bootstrap.
+    //
+    // Safe to do here: reaching this line means the org has an enabled location
+    // and a scheduled job, which is the same entitlement org creation would have
+    // granted. `add` invalidates and publishes the token cache, so peers see it
+    // without waiting for the TTL.
+    match infra::table::synthetics_probe_tokens::find_default(&row.org_id).await {
+        Ok(Some(t)) => Ok(t.token),
+        Ok(None) => mint_default_token(&row.org_id)
+            .await
+            .ok_or(REASON_NO_PROBE_TOKEN),
+        Err(e) => {
+            tracing::error!(
+                job_id = %row.id,
+                org_id = %row.org_id,
+                "[synthetics dispatcher] probe token lookup failed: {e}"
+            );
+            Err(REASON_TOKEN_LOOKUP)
+        }
+    }
+}
+
+/// Exactly one runner credential travels: the lease token in step 2, else the org probe token.
+fn lambda_payload(
+    row: &synthetics_jobs::LeasedRow,
+    probe_token: Option<&str>,
+    ingest_token: &str,
+    lease_token: Option<&str>,
+) -> serde_json::Value {
+    let mut payload = serde_json::json!({
+        "job_id":            &row.id,
+        "org_id":            &row.org_id,   // scopes the org-pathed Job API calls
+        "synthetics_name":   row.synthetics_name,
+        "dispatch_attempt":  row.dispatch_attempts,
+        "job_api_endpoint":  config::meta::synthetics::api_endpoint(),
+        "ingest_token":      ingest_token,  // o2oi_  — for /{org}/synthetics_results/_json
+    });
+    match (lease_token, probe_token) {
+        (Some(token), _) => payload["lease_token"] = token.into(),
+        // o2syn_ — for /resolve + /ack
+        (None, Some(token)) => payload["job_api_token"] = token.into(),
+        (None, None) => {}
+    }
+    payload
+}
+
+/// The function's payload can echo a resolved secret (D177): only its metadata is kept.
+fn function_error_text(
+    fn_name: &str,
+    region: &str,
+    kind: &str,
+    request_id: Option<&str>,
+) -> String {
+    format!(
+        "Lambda function error (fn={fn_name} region={region} kind={kind} request_id={})",
+        request_id.unwrap_or("-")
+    )
+}
+
+/// An SDK error can carry request or response text, so only its code and request id are kept.
+fn invoke_error_text(
+    fn_name: &str,
+    region: &str,
+    code: Option<&str>,
+    request_id: Option<&str>,
+) -> String {
+    format!(
+        "Lambda invoke failed (fn={fn_name} region={region} code={} request_id={})",
+        code.unwrap_or("transport"),
+        request_id.unwrap_or("-")
+    )
 }
 
 /// Shared tail for a dispatch that did not produce a usable run, whether the
@@ -676,6 +768,7 @@ async fn handle_dispatch_failure(
     row: &synthetics_jobs::LeasedRow,
     ingest_token: &str,
     error_msg: &str,
+    lease_sha256: Option<&str>,
 ) {
     let db = get_orm_client_rw().await;
     let outcome = synthetics_jobs::fail_dispatch(
@@ -683,6 +776,7 @@ async fn handle_dispatch_failure(
         &row.id,
         row.dispatch_attempts,
         crate::MAX_DISPATCH_ATTEMPTS,
+        lease_sha256,
     )
     .await
     .unwrap_or(synthetics_jobs::DispatchFailureOutcome::DeadLettered);
@@ -717,7 +811,7 @@ async fn handle_dispatch_failure(
             // the ack, and a results-stream record cannot be taken back — so writing
             // one anyway would put a dispatch error next to the probe's real result
             // for the same job.
-            if mark_failure(row, Some(error_msg)).await {
+            if mark_failure(row, Some(error_msg), lease_sha256).await {
                 report_to_stream(
                     row,
                     ingest_token,
@@ -735,7 +829,51 @@ async fn handle_dispatch_failure(
 
 #[cfg(test)]
 mod lease_batch_tests {
-    use super::next_batch_limit;
+    use super::{
+        SyntheticsLocationRecord, function_error_text, invoke_error_text, lambda_payload,
+        next_batch_limit, served_publicly, synthetics_jobs,
+    };
+
+    fn location(org_id: Option<&str>) -> SyntheticsLocationRecord {
+        location_on(org_id, "private-org1-dc1")
+    }
+
+    fn location_on(org_id: Option<&str>, pool: &str) -> SyntheticsLocationRecord {
+        SyntheticsLocationRecord {
+            id: "loc".into(),
+            org_id: org_id.map(str::to_string),
+            kind: "private".into(),
+            provider: "agent".into(),
+            region: "dc1".into(),
+            label: "dc1".into(),
+            pool: pool.into(),
+            enabled: true,
+            created_at: 1,
+            updated_at: 1,
+        }
+    }
+
+    #[test]
+    fn a_pool_claimed_by_a_private_location_is_never_leased_org_wide() {
+        assert!(served_publicly(None));
+        assert!(served_publicly(Some(&location(None))));
+        assert!(!served_publicly(Some(&location(Some("org1")))));
+        assert!(!served_publicly(Some(&location_on(
+            Some("org1"),
+            "corp-dc1"
+        ))));
+    }
+
+    /// F03 upgrade: a private row made before the `private-` rule cannot block a managed venue.
+    #[test]
+    fn a_legacy_private_row_on_a_managed_pool_does_not_block_it() {
+        for pool in [super::BROWSER_POOL, "net-aws-us-east-1"] {
+            assert!(
+                served_publicly(Some(&location_on(Some("org1"), pool))),
+                "{pool}"
+            );
+        }
+    }
 
     #[test]
     fn batch_limit_is_trimmed_to_the_tick_cap() {
@@ -743,5 +881,49 @@ mod lease_batch_tests {
         assert_eq!(next_batch_limit(10, 95, 100), 5);
         assert_eq!(next_batch_limit(10, 100, 100), 0);
         assert_eq!(next_batch_limit(10, 120, 100), 0);
+    }
+
+    #[test]
+    fn lambda_failures_keep_only_metadata() {
+        assert_eq!(
+            function_error_text("fn", "us-east-1", "Unhandled", Some("req-1")),
+            "Lambda function error (fn=fn region=us-east-1 kind=Unhandled request_id=req-1)"
+        );
+        assert_eq!(
+            invoke_error_text("fn", "us-east-1", None, None),
+            "Lambda invoke failed (fn=fn region=us-east-1 code=transport request_id=-)"
+        );
+        let source = include_str!("dispatcher.rs");
+        let (body, _) = source.split_once("#[cfg(test)]").unwrap();
+        assert!(!body.contains(".payload()"));
+        assert!(!body.contains("{e:#?}"));
+    }
+
+    #[test]
+    fn a_step_two_payload_carries_the_lease_and_no_probe_token() {
+        let row = synthetics_jobs::LeasedRow {
+            id: "job".into(),
+            synthetics_id: "check".into(),
+            synthetics_name: "name".into(),
+            org_id: "org".into(),
+            location: "aws-us-east-1".into(),
+            env: None,
+            pool: "aws-browser".into(),
+            scheduled_ts: 1,
+            valid_until: 2,
+            dispatch_attempts: 1,
+            run_id: "run".into(),
+            browser_devices: None,
+            steps_configured: 1,
+            metadata: "{}".into(),
+        };
+        let step2 = lambda_payload(&row, None, "o2oi_x", Some("o2lease_job.s"));
+        assert_eq!(step2["lease_token"], "o2lease_job.s");
+        assert!(step2.get("job_api_token").is_none());
+        assert!(!step2.to_string().contains("o2syn_"));
+
+        let step1 = lambda_payload(&row, Some("o2syn_t"), "o2oi_x", None);
+        assert_eq!(step1["job_api_token"], "o2syn_t");
+        assert!(step1.get("lease_token").is_none());
     }
 }

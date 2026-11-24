@@ -206,7 +206,15 @@ async fn run() -> Result<(), anyhow::Error> {
             );
             #[cfg(not(feature = "enterprise"))]
             let master_key: Option<String> = None;
-            if let Err(e) = infra::table::cipher::boot(master_key.as_deref()).await {
+            let cfg = config::get_config();
+            if let Err(e) = infra::table::cipher::boot_with_wraps(
+                master_key.as_deref(),
+                cfg.common.cipher_migrate_wraps,
+                infra::table::cipher::WrapFloor::parse(&cfg.common.cipher_wrap_floor)
+                    .expect("O2_CIPHER_WRAP_FLOOR was validated at startup"),
+            )
+            .await
+            {
                 job_init_tx.send(false).ok();
                 panic!("cipher master key boot failed: {e}");
             }
@@ -478,6 +486,8 @@ async fn run() -> Result<(), anyhow::Error> {
         if let Err(e) = db::service_versions::shutdown().await {
             log::error!("Failed to flush service version registry: {}", e);
         }
+
+        o2_enterprise::enterprise::secret_store::shutdown().await;
     }
 
     let db = infra::db::get_db().await;
@@ -512,6 +522,11 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::super_cluster::kv::init().await?;
         super_cluster_queue::init().await?;
     }
+
+    // Respell targets register before the store init spawns the respell job.
+    openobserve_core::alerts::destinations::register_respell_targets();
+    // After the super-cluster init: the store mode reads the same setting.
+    o2_enterprise::enterprise::secret_store::init();
 
     // Initialize enterprise AI components (agent and evaluation clients).
     if let Err(e) = o2_enterprise::enterprise::ai::init_ai_components() {

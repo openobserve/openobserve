@@ -901,7 +901,7 @@ pub async fn test_workflow(
     workflow.org_id = org_id.clone();
     // the run executes under a synthetic id; core keys history on this id only if it verifies
     let workflow_id = workflow.id.clone();
-    workflow.id = format!("test-{}", config::ider::uuid());
+    workflow.id = format!("test-{}", config::ider::ksuid());
 
     let is_draft = match query.get("draft") {
         Some(v) => v.as_str(),

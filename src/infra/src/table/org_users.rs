@@ -249,7 +249,7 @@ pub async fn add_with_flags(
         rum_token: Set(rum_token),
         created_at: Set(now),
         updated_at: Set(now),
-        id: Set(ider::uuid()),
+        id: Set(ider::ksuid()),
 
         allow_static_token: Set(allow_static_token),
     };
@@ -795,7 +795,7 @@ mod tests {
     async fn member_of(email: &str, orgs: &[&str]) {
         use super::super::entity::users as user_entity;
         user_entity::ActiveModel {
-            id: Set(ider::uuid()),
+            id: Set(ider::ksuid()),
             email: Set(email.to_string()),
             first_name: Set(String::new()),
             last_name: Set(String::new()),
@@ -815,7 +815,7 @@ mod tests {
         .await
         .unwrap();
         for org in orgs {
-            add(org, email, UserRole::Admin, &ider::uuid(), None)
+            add(org, email, UserRole::Admin, &ider::ksuid(), None)
                 .await
                 .unwrap();
         }

@@ -335,7 +335,7 @@ pub async fn create_integration(
 
     let now = chrono::Utc::now().timestamp_micros();
     let record = infra::table::incident_integrations::IncidentIntegrationRecord {
-        id: config::ider::uuid(),
+        id: config::ider::ksuid(),
         org_id: org_id.clone(),
         name: payload.name,
         source_type: payload.source_type.unwrap_or_else(|| "auto".to_string()),

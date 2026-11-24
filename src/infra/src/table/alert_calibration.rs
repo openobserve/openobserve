@@ -85,7 +85,7 @@ async fn write_config<C: ConnectionTrait>(
 
 fn upsert_statement(org: &str, patch: &ConfigPatch, now: i64) -> sea_orm::Insert<ActiveModel> {
     let row = ActiveModel {
-        id: Set(ider::uuid()),
+        id: Set(ider::ksuid()),
         org: Set(org.to_string()),
         enabled: Set(patch.enabled.unwrap_or(true)),
         frequency_minutes: Set(patch.frequency_minutes.unwrap_or(DEFAULT_FREQUENCY_MINUTES)),
