@@ -45,3 +45,15 @@ export const CUSTOM_SQL_PANEL_TYPES: readonly string[] = ["flame-graph", "logs"]
 
 export const isCustomSqlPanel = (type: unknown): boolean =>
   typeof type === "string" && CUSTOM_SQL_PANEL_TYPES.includes(type);
+
+/** Panel types that size each item by one measure, so they take one visible query and draw the first visible one. */
+export const ONE_QUERY_TYPES = ["treemap", "funnel"] as const;
+
+export type OneQueryType = (typeof ONE_QUERY_TYPES)[number];
+
+export const isOneQueryChart = (type: unknown): type is OneQueryType =>
+  typeof type === "string" && (ONE_QUERY_TYPES as readonly string[]).includes(type);
+
+/** Visible queries a one-query chart leaves undrawn. */
+export const undrawnQueryCount = (queries: { config?: { hide?: boolean } }[] | undefined): number =>
+  Math.max((queries ?? []).filter((query) => !query?.config?.hide).length - 1, 0);
