@@ -502,12 +502,36 @@ describe("PanelErrorButtons", () => {
     });
 
     it("counts treemap rows skipped for a size that is not a positive number", async () => {
-      const wrapper = mountAttached({ treemapNotice: { skippedRows: 2 } });
+      const wrapper = mountAttached({ treemapNotice: { skippedRows: 2, ignoredQueries: 0 } });
       const chip = wrapper.find('[data-test="panel-notice-chip-skipped-rows"]');
       expect(chip.text()).toBe("2 rows skipped");
       await openTooltip(chip.element);
       expect(bubble()?.textContent).toContain(
         "2 rows have a size that is not a positive number, so they are not drawn or counted in the totals.",
+      );
+      wrapper.unmount();
+    });
+
+    it("counts funnel rows left out for a value that is missing, not a number or negative", async () => {
+      const wrapper = mountAttached({ funnelNotice: { skippedRows: 6, ignoredQueries: 0 } });
+      const chip = wrapper.find('[data-test="panel-notice-chip-skipped-rows"]');
+      expect(chip.text()).toBe("6 rows skipped");
+      expect(wrapper.find('[data-test="panel-notice-chip-ignored-queries"]').exists()).toBe(false);
+      await openTooltip(chip.element);
+      expect(bubble()?.textContent).toContain(
+        "6 rows have a value that is missing, not a number or negative, so they are not drawn.",
+      );
+      wrapper.unmount();
+    });
+
+    it("says how many visible queries a one-query chart left undrawn", async () => {
+      const wrapper = mountAttached({ funnelNotice: { skippedRows: 0, ignoredQueries: 1 } });
+      const chip = wrapper.find('[data-test="panel-notice-chip-ignored-queries"]');
+      expect(chip.text()).toBe("1 query not drawn");
+      expect(wrapper.find('[data-test="panel-notice-chip-skipped-rows"]').exists()).toBe(false);
+      await openTooltip(chip.element);
+      expect(bubble()?.textContent).toContain(
+        "This chart draws only its first visible query, so 1 other query is left out.",
       );
       wrapper.unmount();
     });
