@@ -36,30 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="expanded ? 'max-lg:h-dvh' : ''"
       data-test="fleet-flow-overview-map"
     >
-      <div v-if="!forbidden" class="flex shrink-0 flex-wrap items-center justify-between gap-2 p-3">
-        <OToggleGroup
-          :model-value="telemetry"
-          mobile-dropdown
-          data-test="fleet-flow-overview-telemetry"
-          @update:model-value="(v) => onSignalChange(v as FlowSignal)"
-        >
-          <OToggleGroupItem
-            v-for="opt in telemetryOptions"
-            :key="opt.value"
-            :value="opt.value"
-            size="sm"
-          >
-            <template v-if="opt.dot" #icon-left>
-              <span
-                class="size-2 shrink-0 rounded-full"
-                :class="opt.dot"
-                aria-hidden="true"
-                :data-test="`fleet-flow-overview-telemetry-dot-${opt.value}`"
-              />
-            </template>
-            {{ opt.label }}
-          </OToggleGroupItem>
-        </OToggleGroup>
+      <div v-if="!forbidden" class="flex shrink-0 flex-wrap items-center justify-end gap-2 p-3">
         <div class="flex items-center gap-2">
           <ORefreshButton
             layout="inline"
@@ -319,9 +296,7 @@ import {
   useFlowIssues,
   worstSeverity,
   percent,
-  ratio,
   SEVERITY_ORDER,
-  SIGNAL_DOT,
   type IssueAction,
   type PathIssue,
   type PathSeverity,
@@ -361,9 +336,7 @@ const DESTINATION_ICON: Record<string, IconName> = {
   awss3: "inventory-2",
 };
 
-const COLUMN_ICON: Record<string, IconName> = { f: "dns", r: "input" };
-
-// A destination failing at least this share of its items, or a receiver refusing it, is rung like its issue.
+// A destination failing at least this share of its items is rung like its issue.
 const ISSUE_RATIO = 0.01;
 const QUEUE_WARNING = 0.8;
 
@@ -384,7 +357,7 @@ const { setViewport, zoomIn, zoomOut, fitView } = useVueFlow(flowId);
 // SVG fill on the background dots, the one place a token is read by var().
 const dotColor = "var(--color-border-strong)";
 // Layout is in screen pixels at zoom 1: readable text beats fitting everything on screen.
-const ROW = 104;
+const ROW = 128;
 const TOP = 24;
 const NODE_WIDTH = 144;
 const POPOVER_GAP = 12;
@@ -393,15 +366,8 @@ const canvasEl = ref<HTMLElement | null>(null);
 const canvasWidth = ref(0);
 let resizeObserver: ResizeObserver | null = null;
 
-const telemetry = ref<FlowSignal>("all");
 const timeWindow = ref<FlowWindow>("1h");
 const windows: FlowWindow[] = ["5m", "1h", "24h"];
-const telemetryOptions = computed(() => [
-  { value: "all", label: t("fleet.flow.all") },
-  { value: "logs", label: t("fleet.flow.logs"), dot: SIGNAL_DOT.logs },
-  { value: "metrics", label: t("fleet.flow.metrics"), dot: SIGNAL_DOT.metrics },
-  { value: "traces", label: t("fleet.flow.traces"), dot: SIGNAL_DOT.traces },
-]);
 
 const flowQuery = useFleetFlow(() => timeWindow.value);
 
@@ -443,11 +409,6 @@ function onWindowChange(next: FlowWindow) {
   analytics.track("fleet_flow_window_changed", { window: next });
 }
 
-function onSignalChange(next: FlowSignal) {
-  telemetry.value = next;
-  analytics.track("fleet_flow_signal_changed", { signal: next });
-}
-
 defineExpose({ refresh: retry });
 
 // An empty selection is no filter: everything shows until something is ticked.
@@ -457,7 +418,7 @@ const fleetShown = (id: string) => !checkedFleets.value.length || checkedFleets.
 const destinationShown = (id: string) =>
   !checkedDestinations.value.length || checkedDestinations.value.includes(id);
 const hiddenSeverities = ref<PathSeverity[]>([]);
-type Selection = { kind: "pipeline" | "fleet" | "node"; id: string };
+type Selection = { kind: "route" | "fleet" | "node"; id: string };
 const selection = ref<Selection | null>(null);
 const popover = ref({ x: 0, y: 0 });
 const popoverEl = ref<HTMLElement | null>(null);
@@ -519,7 +480,6 @@ const scoped = computed(() =>
   pipelines.value.filter(
     (p) =>
       fleetShown(p.fleet) &&
-      (telemetry.value === "all" || p.signal === telemetry.value) &&
       (!p.exporters.length || p.exporters.some((e) => destinationShown(e.destination))),
   ),
 );
@@ -590,6 +550,9 @@ const pipelineMap = computed(() =>
 );
 const mapNodeById = computed(() => new Map(pipelineMap.value.nodes.map((n) => [n.id, n])));
 const pipelineById = computed(() => new Map(pipelines.value.map((p) => [p.id, p])));
+const routeById = computed(
+  () => new Map(pipelineMap.value.edges.filter((e) => !e.branch).map((e) => [e.id, e])),
+);
 
 // One signal names its unit; a node serving several signals counts items.
 function nodeSignal(n: MapNode): FlowSignal {
@@ -608,14 +571,13 @@ function nodeRing(n: MapNode): PathSeverity | undefined {
     if (n.failedRatio >= ISSUE_RATIO || n.dropped > 0) return "error";
     if ((n.queue ?? 0) >= QUEUE_WARNING) return "warning";
   }
-  if (n.column === "receiver" && ratio(n.refused, n.rate) >= ISSUE_RATIO) return "warning";
   return undefined;
 }
 
 const highlighted = computed<Set<string> | null>(() => {
   const sel = selection.value;
   if (!sel) return null;
-  if (sel.kind === "pipeline") return new Set([sel.id]);
+  if (sel.kind === "route") return new Set(routeById.value.get(sel.id)?.pipelines ?? []);
   if (sel.kind === "fleet") {
     return new Set(pipelines.value.filter((p) => p.fleet === sel.id).map((p) => p.id));
   }
@@ -629,7 +591,7 @@ function nodeData(n: MapNode): FleetFlowNodeData {
     const issues = fleetIssueMap.value[n.name] ?? [];
     return {
       label,
-      icon: COLUMN_ICON.f,
+      icon: "dns",
       sublabel: fleetMeta(fleetById.value.get(n.name)),
       selected: sel?.kind === "fleet" && sel.id === n.name,
       outbound: true,
@@ -637,18 +599,15 @@ function nodeData(n: MapNode): FleetFlowNodeData {
       issueCount: issues.length,
     };
   }
-  const destination = n.column === "destination";
   return {
     label,
-    icon: destination
-      ? (DESTINATION_ICON[typeKey("exporter", destinationById.value.get(n.name)?.type ?? "")] ??
-        "cloud-upload")
-      : COLUMN_ICON[n.id[0]],
+    icon:
+      DESTINATION_ICON[typeKey("exporter", destinationById.value.get(n.name)?.type ?? "")] ??
+      "cloud-upload",
     sublabel: rateText(n.rate, nodeSignal(n)),
-    compact: !destination,
     selected: sel?.kind === "node" && sel.id === n.id,
     inbound: true,
-    outbound: !destination || n.failed > 0 || n.dropped > 0,
+    outbound: n.failed > 0 || n.dropped > 0,
     ring: nodeRing(n),
   };
 }
@@ -684,8 +643,9 @@ function edgeSummary(e: MapEdge): I18nText {
 const edges = computed<Edge<FleetFlowEdgeData>[]>(() => {
   const max = Math.max(0, ...pipelineMap.value.edges.map((e) => e.rate ?? 0));
   const focus = highlighted.value;
+  const route = selection.value?.kind === "route" ? selection.value.id : null;
   return pipelineMap.value.edges.map((e) => {
-    const lit = !!focus && e.pipelines.some((id) => focus.has(id));
+    const lit = route ? e.id === route : !!focus && e.pipelines.some((id) => focus.has(id));
     return {
       id: e.id,
       source: e.source,
@@ -694,7 +654,6 @@ const edges = computed<Edge<FleetFlowEdgeData>[]>(() => {
       ariaLabel: edgeSummary(e),
       zIndex: e.branch ? 2 : lit ? 1 : 0,
       data: {
-        signal: e.signal,
         width: strokeWidth(e.rate, max),
         branch: !!e.branch,
         label: edgeLabel(e),
@@ -715,18 +674,21 @@ const details = computed(() => {
   const sel = selection.value;
   // Polls keep the last data on error, so a 403 or a removed pipeline must hide stale details.
   if (!sel || forbidden.value) return null;
-  if (sel.kind === "pipeline") {
-    const p = pipelineById.value.get(sel.id);
-    if (!p) return null;
+  if (sel.kind === "route") {
+    const e = routeById.value.get(sel.id);
+    const fleet = e && mapNodeById.value.get(e.source);
+    const destination = e && mapNodeById.value.get(e.target);
+    if (!e || !fleet || !destination) return null;
+    const through = e.pipelines.map((id) => pipelineById.value.get(id)).filter((p) => !!p);
     return {
-      title: t("fleet.pipelines.pipelineTitle", {
-        fleet: raw(fleetName(p.fleet)),
-        pipeline: raw(p.name),
+      title: t("fleet.pipelines.routeTitle", {
+        fleet: nodeLabel(fleet),
+        destination: nodeLabel(destination),
       }),
-      throughput: perSecond(p.out_rate, p.signal),
-      issues: issuesOf(p),
-      configId: fleetById.value.get(p.fleet)?.config ?? null,
-      fleetId: p.fleet,
+      throughput: perSecond(e.rate, e.signal),
+      issues: uniqueIssues(through.flatMap(issuesOf)),
+      configId: fleetById.value.get(fleet.fleet)?.config ?? null,
+      fleetId: fleet.fleet,
     };
   }
   if (sel.kind === "fleet") {
@@ -801,8 +763,7 @@ function onNodeClick({ node, event }: NodeMouseEvent) {
 function onEdgeClick({ edge, event }: EdgeMouseEvent) {
   const e = pipelineMap.value.edges.find((x) => x.id === edge.id);
   if (!e) return;
-  if (e.branch) return select({ kind: "node", id: e.source }, event, false);
-  if (e.pipelines[0]) select({ kind: "pipeline", id: e.pipelines[0] }, event, false);
+  select({ kind: e.branch ? "node" : "route", id: e.branch ? e.source : e.id }, event, false);
 }
 
 function onOutsidePointer(event: PointerEvent) {

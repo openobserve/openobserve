@@ -207,11 +207,7 @@ pub(super) async fn replace_table_scan(
 
     let rewrite_start = std::time::Instant::now();
     let mut rewriter = ReplaceTableScanExec::new(union_exec);
-    let mut physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
-    // Before the pushdown rules: ProjectionPushdown folds the projection into the scan.
-    if redaction.is_protected() {
-        physical_plan = LiftRedaction.optimize(physical_plan, ctx.state().config_options())?;
-    }
+    let physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
     log::info!(
         "{}",
         search_inspector_fields(
@@ -233,6 +229,7 @@ pub(super) fn apply_pushdown_rules(
     trace_id: &str,
     ctx: &SessionContext,
     mut physical_plan: Arc<dyn ExecutionPlan>,
+    redaction: &ScanRedaction,
     aggregates: PrecomputedAggregates,
     scan_stats: &mut ScanStats,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
@@ -241,6 +238,11 @@ pub(super) fn apply_pushdown_rules(
         index_aggregate,
     } = aggregates;
     let cfg = get_config();
+
+    // Before the other pushdown rules: ProjectionPushdown folds the projection into the scan.
+    if redaction.is_protected() {
+        physical_plan = LiftRedaction.optimize(physical_plan, ctx.state().config_options())?;
+    }
 
     let pushdown_filter = FilterPushdown::new();
     physical_plan = pushdown_filter
