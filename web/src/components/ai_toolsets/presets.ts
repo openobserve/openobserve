@@ -47,12 +47,7 @@ export interface PresetRef {
 }
 
 /** The preset fields a review compares; credentials and limits are never among them. */
-export type PresetField =
-  | "url"
-  | "description"
-  | "allowed_tools"
-  | "write_tools"
-  | "tool_classes";
+export type PresetField = "url" | "description" | "allowed_tools" | "write_tools" | "tool_classes";
 
 export interface PresetDiff {
   field: PresetField;
@@ -62,12 +57,7 @@ export interface PresetDiff {
 
 export type PresetBadge = "updated" | "retired";
 
-const DATA_FIELDS: PresetField[] = [
-  "url",
-  "allowed_tools",
-  "write_tools",
-  "tool_classes",
-];
+const DATA_FIELDS: PresetField[] = ["url", "allowed_tools", "write_tools", "tool_classes"];
 
 export function renderUrl(template: string, params: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (_, name) => params[name] ?? "");

@@ -61,10 +61,7 @@ describe("AiToolsetTypePicker.vue", () => {
   it("groups cards under headings", () => {
     const w = createWrapper();
     const sections = w.findAll("[data-test^='ai-toolsets-section-']");
-    expect(sections.map((x) => x.find("h3").text())).toEqual([
-      "MCP servers",
-      "Skills",
-    ]);
+    expect(sections.map((x) => x.find("h3").text())).toEqual(["MCP servers", "Skills"]);
     expect(sections[0].findAll(".card-stub")).toHaveLength(3);
   });
 

@@ -234,9 +234,7 @@ describe("AddAiToolset.schema", () => {
 
     it("doesn't check MCP limits on another kind", () => {
       const skill = { ...base(), kind: "skill", skill: { content: "Use it." } };
-      expect(errorPaths({ ...skill, mcp: { ...skill.mcp, max_calls_per_turn: "0" } })).toEqual(
-        [],
-      );
+      expect(errorPaths({ ...skill, mcp: { ...skill.mcp, max_calls_per_turn: "0" } })).toEqual([]);
     });
   });
 

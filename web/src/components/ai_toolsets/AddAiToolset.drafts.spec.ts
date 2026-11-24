@@ -433,7 +433,7 @@ describe("AddAiToolset drafts", () => {
   it("restores a draft of the removed CLI kind as an MCP toolset that saves", async () => {
     writeEditorDraft(newScope, {
       data: {
-        name: "kube_cli",
+        name: "kube-cli",
         kind: "cli",
         description: "",
         mcp: { url: "", timeout_seconds: 30, headers: [] },
@@ -454,7 +454,7 @@ describe("AddAiToolset drafts", () => {
     await flushPromises();
     expect(aiToolsetsService.create).toHaveBeenCalledWith(
       ORG,
-      expect.objectContaining({ name: "kube_cli", kind: "mcp" }),
+      expect.objectContaining({ name: "kube-cli", kind: "mcp" }),
     );
   });
 
