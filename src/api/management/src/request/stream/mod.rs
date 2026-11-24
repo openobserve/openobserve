@@ -484,6 +484,7 @@ pub async fn delete_fields(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 409, description = "Enrichment table is read by a pipeline function", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "delete"})),

@@ -631,7 +631,8 @@ impl ExecutablePipeline {
                 print_event,
                 leaf_dest_stream: _leaf_dest_stream,
                 return_value_for_error: false, // pipelines do not support this
-                suppress_destinations: false,  // pipelines have no destination nodes
+                drop_on_abort: true,
+                suppress_destinations: false, // pipelines have no destination nodes
                 status_only_http_errors: false,
                 cancel: None,
                 flatten_records: true, // ingest depends on flattened records
@@ -922,6 +923,7 @@ impl ExecutablePipeline {
                 print_event: false, // do not print events for workflows
                 leaf_dest_stream: _leaf_dest_stream,
                 return_value_for_error: true,
+                drop_on_abort: false,
                 suppress_destinations: options.suppress_destinations,
                 status_only_http_errors: options.status_only_http_errors,
                 cancel: options.cancel.clone(),
@@ -1264,6 +1266,8 @@ struct ProcessMetadata {
     print_event: bool,
     leaf_dest_stream: Option<StreamParams>,
     return_value_for_error: bool,
+    // workflows forward an aborted row and report it, as before; only pipelines drop it
+    drop_on_abort: bool,
     suppress_destinations: bool,
     status_only_http_errors: bool,
     cancel: Option<CancellationToken>,
@@ -2072,7 +2076,7 @@ async fn process_function_node(
                         record = match failure {
                             None => res,
                             // an intentional `abort` drops the row and is not an error
-                            Some(failure) if failure.is_aborted() => {
+                            Some(failure) if failure.is_aborted() && metadata.drop_on_abort => {
                                 count += 1;
                                 continue;
                             }
@@ -2200,7 +2204,9 @@ async fn process_function_node(
                 *busy += vrl_arr_timer.elapsed();
                 let result = match failure {
                     None => res,
-                    Some(failure) if failure.is_aborted() => return count,
+                    Some(failure) if failure.is_aborted() && metadata.drop_on_abort => {
+                        return count;
+                    }
                     Some(failure) => {
                         let error = failure.into_detail();
                         let err_msg = format!(
@@ -3504,6 +3510,7 @@ mod tests {
             print_event: false,
             leaf_dest_stream: None,
             return_value_for_error: false,
+            drop_on_abort: false,
             suppress_destinations: false,
             status_only_http_errors: false,
             cancel: None,
@@ -4073,6 +4080,7 @@ mod tests {
             print_event: false,
             leaf_dest_stream: None,
             return_value_for_error: false,
+            drop_on_abort: true,
             suppress_destinations: false,
             status_only_http_errors: false,
             cancel: None,
@@ -4284,7 +4292,11 @@ mod tests {
     }
 
     /// Runs a VRL function node over `records`; returns what it forwarded and the errors it sent.
-    async fn run_vrl_function_node(source: &str, records: Vec<Value>) -> (Vec<Value>, Vec<String>) {
+    async fn run_vrl_function_node(
+        source: &str,
+        records: Vec<Value>,
+        drop_on_abort: bool,
+    ) -> (Vec<Value>, Vec<String>) {
         let program = transform::compile_vrl_function(source, "org-1")
             .unwrap()
             .program;
@@ -4319,7 +4331,11 @@ mod tests {
         };
         send_records(&input_tx, records).await;
         drop(input_tx);
-        process_node(dummy_metadata(1), node, Some(runtime), channels, Vec::new())
+        let metadata = ProcessMetadata {
+            drop_on_abort,
+            ..dummy_metadata(1)
+        };
+        process_node(metadata, node, Some(runtime), channels, Vec::new())
             .await
             .unwrap();
         let mut forwarded = vec![];
@@ -4339,6 +4355,7 @@ mod tests {
         let (forwarded, errors) = run_vrl_function_node(
             source,
             vec![json::json!({"drop": true}), json::json!({"drop": false})],
+            true,
         )
         .await;
         assert_eq!(forwarded, vec![json::json!({"drop": false})]);
@@ -4349,7 +4366,7 @@ mod tests {
     async fn test_vrl_runtime_error_forwards_the_original_row_and_reports() {
         let source = ".n = to_int!(.v)\n.";
         let record = json::json!({"v": "not a number"});
-        let (forwarded, errors) = run_vrl_function_node(source, vec![record.clone()]).await;
+        let (forwarded, errors) = run_vrl_function_node(source, vec![record.clone()], true).await;
         assert_eq!(forwarded, vec![record]);
         assert_eq!(errors.len(), 1);
     }
@@ -4357,17 +4374,33 @@ mod tests {
     #[tokio::test]
     async fn test_vrl_result_array_abort_drops_the_batch_without_an_error() {
         let source = "#ResultArray#\nabort\n.";
-        let (forwarded, errors) =
-            run_vrl_function_node(source, vec![json::json!({"a": 1}), json::json!({"a": 2})]).await;
+        let (forwarded, errors) = run_vrl_function_node(
+            source,
+            vec![json::json!({"a": 1}), json::json!({"a": 2})],
+            true,
+        )
+        .await;
         assert!(forwarded.is_empty(), "{forwarded:?}");
         assert!(errors.is_empty(), "{errors:?}");
+    }
+
+    #[tokio::test]
+    async fn test_vrl_abort_in_a_workflow_forwards_and_reports() {
+        let cases = ["if .drop == true { abort }\n.", "#ResultArray#\nabort\n."];
+        for source in cases {
+            let record = json::json!({"drop": true});
+            let (forwarded, errors) =
+                run_vrl_function_node(source, vec![record.clone()], false).await;
+            assert_eq!(forwarded, vec![record], "{source}");
+            assert_eq!(errors.len(), 1, "{source}: {errors:?}");
+        }
     }
 
     #[tokio::test]
     async fn test_vrl_result_array_error_forwards_the_batch_and_reports() {
         let source = "#ResultArray#\nx = string!(.[0].missing)\n.";
         let records = vec![json::json!({"a": 1}), json::json!({"a": 2})];
-        let (forwarded, errors) = run_vrl_function_node(source, records.clone()).await;
+        let (forwarded, errors) = run_vrl_function_node(source, records.clone(), true).await;
         assert_eq!(forwarded, records);
         assert_eq!(errors.len(), 1);
     }
@@ -4519,6 +4552,7 @@ mod tests {
             print_event: false,
             leaf_dest_stream: None,
             return_value_for_error: false,
+            drop_on_abort: false,
             suppress_destinations: false,
             status_only_http_errors: false,
             cancel: None,
