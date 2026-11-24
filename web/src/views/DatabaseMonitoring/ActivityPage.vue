@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTableColumnToggle
               :columns="columns"
               :column-visibility="columnVisibility"
+              :default-column-visibility="defaultColumnVisibility"
               :has-resized-columns="tableRef?.hasResizedColumns ?? false"
               @update:column-visibility="setColumnVisibility"
               @reset:column-sizes="tableRef?.resetColumnSizes?.()"
