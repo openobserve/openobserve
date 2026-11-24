@@ -123,12 +123,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="traces-search-bar-reset-filters-btn"
               variant="outline"
               size="sm-toolbar"
+              :aria-label="t('common.reset')"
               @click="resetFilters"
             >
               <template #icon-left>
                 <OIcon name="restart-alt" size="sm" class="shrink-0" />
               </template>
               <span v-if="!shouldHideToolbarButtonText">{{ t("common.reset") }}</span>
+              <OTooltip v-else :content="t('common.reset')" />
             </OButton>
           </template>
 

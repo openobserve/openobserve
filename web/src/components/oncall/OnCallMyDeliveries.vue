@@ -175,6 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-if="row.unread"
               class="bg-accent block size-2 rounded-full"
+              role="img"
               :aria-label="t('oncall.myDeliveriesNew')"
               :data-test="`oncall-my-delivery-unread-${row.latest.event_id}`"
             />

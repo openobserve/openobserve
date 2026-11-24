@@ -1,3 +1,8 @@
+export const promqlEscape = (value: string, quote: '"' | "'" = '"'): string =>
+  value.replace(/\\/g, "\\\\").replaceAll(quote, `\\${quote}`).replace(/\n/g, "\\n");
+
+export const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 export const parsePromQlQuery = (query: string) => {
   const meta = {
     metricName: "" as string | null,

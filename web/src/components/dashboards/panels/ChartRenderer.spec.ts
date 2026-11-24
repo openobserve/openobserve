@@ -34,8 +34,10 @@ import {
   TreemapChart,
   SunburstChart,
 } from "echarts/charts";
-import { applyLegendConfiguration } from "@/utils/dashboard/legendConfiguration";
-import { applySeriesOverrides } from "@/utils/dashboard/seriesOverrides";
+import {
+  applyLegendConfiguration,
+  createPieSlicePercent,
+} from "@/utils/dashboard/legendConfiguration";
 
 // Mock ECharts with comprehensive functionality
 vi.mock("echarts/core", () => ({
@@ -1555,6 +1557,31 @@ describe("ChartRenderer", () => {
       });
     });
 
+    it("keeps the legend selection when the pointer leaves the panel", async () => {
+      const echarts = await import("echarts/core");
+      const chart = (echarts.init as any).mock.results.at(-1).value;
+      const selected = { "Series 1": true, "Series 2": false };
+      chart.getOption.mockReturnValue({ legend: [{ selected }] });
+      chart.setOption.mockClear();
+      chart.dispatchAction.mockClear();
+
+      mockHoveredSeriesState.value.panelId = -1;
+      await flushPromises();
+
+      const restore = chart.dispatchAction.mock.calls.findIndex(
+        ([action]: any[]) => action?.type === "restore",
+      );
+      expect(restore).toBeGreaterThanOrEqual(0);
+      const reapply = chart.setOption.mock.calls.findIndex(
+        ([option]: any[]) => option?.legend?.[0]?.selected,
+      );
+      expect(reapply).toBeGreaterThanOrEqual(0);
+      expect(chart.setOption.mock.calls[reapply][0].legend[0].selected).toEqual(selected);
+      expect(chart.setOption.mock.invocationCallOrder[reapply]).toBeGreaterThan(
+        chart.dispatchAction.mock.invocationCallOrder[restore],
+      );
+    });
+
     const isolateFirstSlice = async (options: any) => {
       const echarts = await import("echarts/core");
       wrapper.unmount();
@@ -1648,44 +1675,40 @@ describe("ChartRenderer", () => {
     });
 
     it("recomputes a pie slice's override-decimals label over the visible slices", async () => {
-      const options: any = {
-        ...mockChartData.options,
-        legend: { show: true },
-        series: [
+      const config = {
+        show_legends: true,
+        override_config: [
           {
-            type: "pie",
-            label: {
-              show: true,
-              formatter: (params: { percent: number }) => `${params.percent.toFixed(1)}%`,
-            },
-            data: [
-              { name: "a", value: 10 },
-              { name: "b", value: 10 },
-            ],
+            field: { matchBy: "series", value: "a" },
+            config: [{ type: "decimals", value: 1 }],
           },
         ],
       };
-      applySeriesOverrides(
+      const slicePercent = createPieSlicePercent(config);
+      const series: any = {
+        type: "pie",
+        data: [
+          { name: "a", value: 10 },
+          { name: "b", value: 10 },
+        ],
+      };
+      series.label = {
+        show: true,
+        formatter: (params: { name: string; value: number }) => `${slicePercent(series, params)}%`,
+      };
+      const options: any = { ...mockChartData.options, series: [series] };
+      applyLegendConfiguration(
+        { type: "pie", config },
+        { value: { offsetWidth: 800, offsetHeight: 400 } },
+        mockHoveredSeriesState,
         options,
-        {
-          type: "pie",
-          config: {
-            override_config: [
-              {
-                field: { matchBy: "series", value: "a" },
-                config: [{ type: "decimals", value: 1 }],
-              },
-            ],
-          },
-        },
-        "light",
       );
-      const label = options.series[0].data[0].label;
-      expect(label.formatter()).toBe("50.0%");
+      const slice = series.data[0];
+      expect(series.label.formatter(slice)).toBe("50.0%");
 
       await isolateFirstSlice(options);
 
-      expect(label.formatter()).toBe("100.0%");
+      expect(series.label.formatter(slice)).toBe("100.0%");
     });
 
     it.each(["pie", "line"])(

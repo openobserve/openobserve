@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="tracePage"
     style="min-height: auto"
   >
+    <h1 class="sr-only">{{ t("menu.traces") }}</h1>
     <FirstDataPanel
       v-if="firstDataArrival"
       signal="traces"
