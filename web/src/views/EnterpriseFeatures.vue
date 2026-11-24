@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-wrap items-center gap-4">
           <div
             v-if="!isLoadingLicense"
-            class="rounded-default bg-badge-success-soft-bg text-badge-success-soft-text px-4 py-2 text-base font-bold"
+            class="rounded-default bg-success-500 px-4 py-2 text-base font-bold text-white"
           >
             {{ dialogConfig.badgeText }}
           </div>
