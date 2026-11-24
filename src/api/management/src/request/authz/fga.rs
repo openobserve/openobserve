@@ -899,7 +899,7 @@ pub async fn get_groups_for_user(Path(_path): Path<(String, String)>) -> Respons
     request_body(content = inline(UserGroup), description = "UserGroup", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
-        (status = 400, description = "Invalid group name or user id", content_type = "application/json", body = ()),
+        (status = 400, description = "Invalid group name, user id or role name", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -926,8 +926,16 @@ pub async fn create_group(
     {
         return MetaHttpResponse::bad_request("Invalid user id in group users");
     }
+    let roles = user_grp.roles.unwrap_or_default();
+    if !roles
+        .iter()
+        .all(|role| o2_openfga::authorizer::org_scoped_object("role", &org_id, role).is_some())
+    {
+        return MetaHttpResponse::bad_request("Invalid role name in group roles");
+    }
 
-    match o2_openfga::authorizer::groups::create_group(&org_id, &user_grp.name, users).await {
+    match o2_openfga::authorizer::groups::create_group(&org_id, &user_grp.name, users, roles).await
+    {
         Ok(_) => MetaHttpResponse::ok("Group created successfully"),
         Err(e) => failure_response(&e, "Failed to create group"),
     }
@@ -2084,22 +2092,24 @@ mod tests {
     #[tokio::test]
     async fn create_group_rejects_invalid_input_with_400() {
         init_ofga_test();
-        for (name, user) in [
-            ("test_group", "*"),
-            ("test_group", "a#b"),
-            ("test_group", ""),
-            ("", "user1"),
+        for (name, user, role) in [
+            ("test_group", "*", "role1"),
+            ("test_group", "a#b", "role1"),
+            ("test_group", "", "role1"),
+            ("", "user1", "role1"),
+            ("test_group", "user1", "a#b"),
+            ("test_group", "user1", ""),
         ] {
             let group = UserGroup {
                 name: name.to_string(),
                 users: Some(HashSet::from([user.to_string()])),
-                roles: None,
+                roles: Some(HashSet::from([role.to_string()])),
             };
             let resp = create_group(Path("test_org".to_string()), Json(group)).await;
             assert_eq!(
                 extract_status_code(&resp),
                 StatusCode::BAD_REQUEST,
-                "{name:?} {user:?}"
+                "{name:?} {user:?} {role:?}"
             );
         }
     }

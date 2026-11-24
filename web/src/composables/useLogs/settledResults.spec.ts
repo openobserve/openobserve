@@ -182,6 +182,7 @@ describe("resolveHistogramView", () => {
     loadingHistogram: false,
     histogramPoints: 0,
     liveMode: false,
+    streamPainted: false,
   };
 
   it("holds one placeholder until the first chart exists, with no empty state in between", () => {
@@ -205,6 +206,24 @@ describe("resolveHistogramView", () => {
     });
     expect(starting).toEqual({ phase: "chart", stale: true });
     expect(streaming).toEqual({ phase: "chart", stale: true });
+  });
+
+  it("never marks the first run's own streaming chart stale", () => {
+    expect(
+      resolveHistogramView({
+        ...base,
+        hasChart: true,
+        loadingHistogram: true,
+        histogramPoints: 12,
+        streamPainted: true,
+      }),
+    ).toEqual({ phase: "chart", stale: false });
+  });
+
+  it("marks the previous chart stale only until the re-run's first chunk has painted", () => {
+    const streaming = { ...base, hasChart: true, loadingHistogram: true, histogramPoints: 12 };
+    expect(resolveHistogramView(streaming).stale).toBe(true);
+    expect(resolveHistogramView({ ...streaming, streamPainted: true }).stale).toBe(false);
   });
 
   it("does not mark the chart stale while only the page changes", () => {

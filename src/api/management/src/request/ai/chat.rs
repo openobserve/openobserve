@@ -737,7 +737,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
                 .collect()
         });
 
-        let (tool_mcps, tool_clis, tool_skills) =
+        let (tool_mcps, tool_skills) =
             o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(org_id_str).await;
         let query_req = QueryRequest {
             model: if prompt_body.model.is_empty() {
@@ -755,11 +755,6 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
                 None
             } else {
                 Some(tool_mcps)
-            },
-            clis: if tool_clis.is_empty() {
-                None
-            } else {
-                Some(tool_clis)
             },
             skills: if tool_skills.is_empty() {
                 None
@@ -1192,7 +1187,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 .collect()
         });
 
-        let (tool_mcps, tool_clis, tool_skills) =
+        let (tool_mcps, tool_skills) =
             o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(&org_id_str).await;
         let query_req = QueryRequest {
             model: if prompt_body.model.is_empty() {
@@ -1210,11 +1205,6 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 None
             } else {
                 Some(tool_mcps)
-            },
-            clis: if tool_clis.is_empty() {
-                None
-            } else {
-                Some(tool_clis)
             },
             skills: if tool_skills.is_empty() {
                 None

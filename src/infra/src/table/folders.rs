@@ -102,6 +102,18 @@ pub async fn exists(
     Ok(exists)
 }
 
+/// [`exists`] from the primary, for a check that guards a write.
+pub async fn exists_primary(
+    org_id: &str,
+    folder_id: &str,
+    folder_type: FolderType,
+) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
+    Ok(get_model(client, org_id, folder_id, folder_type)
+        .await?
+        .is_some())
+}
+
 /// Lists all dashboard folders of the specified type.
 pub async fn list_folders(
     org_id: &str,

@@ -1084,6 +1084,7 @@ mod tests {
             histogram_offset: Some(0),
             sorted_by_time: true,
             sampling_config: None,
+            raw_streams: Default::default(),
         };
 
         let result = get_ts_col_order_by(&sql, "_timestamp", false);
@@ -1132,6 +1133,7 @@ mod tests {
             histogram_offset: Some(0),
             sorted_by_time: true,
             sampling_config: None,
+            raw_streams: Default::default(),
         };
 
         let (ts_col, is_descending) = get_ts_col_order_by(&sql, "_timestamp", false).unwrap();
@@ -1373,6 +1375,7 @@ mod tests {
             clear_cache: false,
             local_mode: None,
             agent_options: None,
+            raw_streams: None,
         };
         let file_path = "test_org/logs/test_stream".to_string();
         let is_aggregate = false;

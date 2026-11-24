@@ -79,6 +79,8 @@ message FlightSearchRequest {
     SearchInfo                   search_info = 2;
     IndexInfo                     index_info = 3;
     SuperClusterInfo      super_cluster_info = 4;
+    // `{stream_type}/{stream}` the user may read unredacted; a node that drops it redacts all.
+    repeated string              raw_streams = 5;
 }
 
 message QueryIdentifier {

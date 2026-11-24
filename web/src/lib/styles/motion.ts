@@ -35,7 +35,8 @@ export const STILL_LOADING_REPEAT_MS = 30_000;
 // Kept content dims only after this long, so a fast refetch neither flickers nor swallows a click.
 export const STALE_DIM_DELAY_MS = 150;
 
-export const STALE_DIM = "opacity-60";
+// Fades in, so a dim that starts just before the results land never shows as a flash.
+export const STALE_DIM = "opacity-60 transition-opacity duration-300 ease-in";
 
 // A CSS wait, not a timer, so every re-display restarts it; o2-motion-keep stops reduced motion zeroing the wait.
 export const LOADER_REVEAL =

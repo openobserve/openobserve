@@ -20,6 +20,7 @@ base64.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 config.workspace = true
+dashmap.workspace = true
 datafusion.workspace = true
 futures.workspace = true
 futures-util.workspace = true
