@@ -3327,6 +3327,10 @@ export class TracesPage {
     await this.servicesCatalogServiceLink(serviceName).click();
   }
 
+  async refreshServicesCatalog() {
+    await this.page.locator(this.servicesCatalogRefreshButton).click();
+  }
+
   async expectServiceSidePanelVisible() {
     await expect(this.page.locator('[data-test="service-graph-side-panel"]')).toBeVisible({ timeout: 15000 });
   }
