@@ -96,6 +96,21 @@ fn custom_roles_differ(requested: &[String], current: &[String]) -> bool {
     requested != current.iter().collect()
 }
 
+/// The OpenFGA org relations (old, new) for a base-role change, or None when OpenFGA sees no
+/// change. [pure]
+#[cfg(feature = "enterprise")]
+fn openfga_role_swap(old: &UserRole, new: &UserRole) -> Option<(String, String)> {
+    let relation = |role: &UserRole| {
+        if role.eq(&UserRole::User) || role.is_service_account() {
+            "allowed_user".to_string()
+        } else {
+            role.to_string()
+        }
+    };
+    let (old, new) = (relation(old), relation(new));
+    (old != new).then_some((old, new))
+}
+
 fn redact_token(token: &str) -> String {
     if token.is_empty() {
         return String::new();
@@ -614,8 +629,27 @@ pub async fn update_user(
 
     // Update the organization membership
     if is_org_updated {
-        if db::org_users::get(org_id, email).await.is_ok() {
-            if let Err(e) = db::org_users::update(
+        // OpenFGA first: a failed write must leave the stored role, which the UI shows, unchanged.
+        #[cfg(feature = "enterprise")]
+        let role_swap = match (&old_role, &new_role) {
+            (Some(old), Some(new)) if get_openfga_config().enabled => openfga_role_swap(old, new),
+            _ => None,
+        };
+        #[cfg(feature = "enterprise")]
+        if let Some((old, new)) = &role_swap {
+            log::debug!("updating openfga role for {email} from {old} to {new}");
+            if let Err(e) =
+                o2_openfga::authorizer::authz::update_user_role(old, new, email, org_id).await
+            {
+                log::error!("Error updating openfga role for {email} in {org_id} org : {e}");
+                return Ok(MetaHttpResponse::internal_error(
+                    "Failed to update user role",
+                ));
+            }
+        }
+
+        let membership_written = if db::org_users::get(org_id, email).await.is_ok() {
+            db::org_users::update(
                 org_id,
                 email,
                 new_user.role,
@@ -623,79 +657,72 @@ pub async fn update_user(
                 new_user.rum_token,
             )
             .await
-            {
+            .map_err(|e| {
                 log::error!("Error updating org user relation: {e}");
-                return Ok(MetaHttpResponse::internal_error(
-                    "Failed to update organization membership for user",
-                ));
+                "Failed to update organization membership for user"
+            })
+        } else {
+            db::org_users::add(
+                org_id,
+                email,
+                new_user.role,
+                &new_user.token,
+                new_user.rum_token,
+            )
+            .await
+            .map_err(|e| {
+                log::error!("Error adding org user relation: {e}");
+                "Failed to add organization membership for user"
+            })
+        };
+        if let Err(msg) = membership_written {
+            #[cfg(feature = "enterprise")]
+            if let Some((old, new)) = &role_swap
+                && let Err(e) =
+                    o2_openfga::authorizer::authz::update_user_role(new, old, email, org_id).await
+            {
+                log::error!(
+                    "Error undoing openfga role change for {email} in {org_id} org from {old} to {new}: {e}"
+                );
             }
-        } else if let Err(e) = db::org_users::add(
-            org_id,
-            email,
-            new_user.role,
-            &new_user.token,
-            new_user.rum_token,
-        )
-        .await
-        {
-            log::error!("Error adding org user relation: {e}");
-            return Ok(MetaHttpResponse::internal_error(
-                "Failed to add organization membership for user",
-            ));
+            return Ok(MetaHttpResponse::internal_error(msg));
         }
 
         #[cfg(feature = "enterprise")]
         {
             use o2_openfga::authorizer::{
-                authz::{get_user_crole_tuple, update_tuples, update_user_role},
+                authz::{get_user_crole_tuple, update_tuples},
                 roles::{get_role_key, get_user_crole_removal_tuples},
             };
 
             if get_openfga_config().enabled
-                && let Some(old) = old_role
-                && let Some(new) = new_role
+                && old_role.is_some()
+                && new_role.is_some()
+                && custom_roles_need_change
             {
-                if !old.eq(&new) {
-                    let mut old_str = old.to_string();
-                    let mut new_str = new.to_string();
-                    if old.eq(&UserRole::User) || old.is_service_account() {
-                        old_str = "allowed_user".to_string();
+                let mut write_tuples = vec![];
+                let mut delete_tuples = vec![];
+                custom_roles.iter().for_each(|crole| {
+                    if !existing_roles.contains(crole) {
+                        write_tuples.push(get_user_crole_tuple(org_id, crole, email));
                     }
-                    if new.eq(&UserRole::User) || new.is_service_account() {
-                        new_str = "allowed_user".to_string();
-                    }
-                    if old_str != new_str {
-                        log::debug!(
-                            "updating openfga role for {email} from {old_str} to {new_str}"
+                });
+                existing_roles.iter().for_each(|crole| {
+                    if !custom_roles.contains(crole) {
+                        get_user_crole_removal_tuples(
+                            email,
+                            &get_role_key(org_id, crole),
+                            &mut delete_tuples,
                         );
-                        update_user_role(&old_str, &new_str, email, org_id).await;
                     }
-                }
-                if custom_roles_need_change {
-                    let mut write_tuples = vec![];
-                    let mut delete_tuples = vec![];
-                    custom_roles.iter().for_each(|crole| {
-                        if !existing_roles.contains(crole) {
-                            write_tuples.push(get_user_crole_tuple(org_id, crole, email));
-                        }
-                    });
-                    existing_roles.iter().for_each(|crole| {
-                        if !custom_roles.contains(crole) {
-                            get_user_crole_removal_tuples(
-                                email,
-                                &get_role_key(org_id, crole),
-                                &mut delete_tuples,
-                            );
-                        }
-                    });
-                    if let Err(e) = update_tuples(write_tuples, delete_tuples).await {
-                        log::error!(
-                            "Error updating custom roles for user {email} in {org_id} org : {e}"
-                        );
-                        return Ok(MetaHttpResponse::internal_error(
-                            "Failed to update custom roles for user",
-                        ));
-                    }
+                });
+                if let Err(e) = update_tuples(write_tuples, delete_tuples).await {
+                    log::error!(
+                        "Error updating custom roles for user {email} in {org_id} org : {e}"
+                    );
+                    return Ok(MetaHttpResponse::internal_error(
+                        "Failed to update custom roles for user",
+                    ));
                 }
             }
         }
@@ -1729,6 +1756,35 @@ mod tests {
         assert!(custom_roles_differ(&["a".into()], &current));
         assert!(custom_roles_differ(&["c".into()], &[]));
         assert!(!custom_roles_differ(&[], &[]));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn openfga_role_swap_writes_only_when_the_openfga_relation_changes() {
+        let swap = |old: &str, new: &str| Some((old.to_string(), new.to_string()));
+        let cases = [
+            (UserRole::Viewer, UserRole::Editor, swap("viewer", "editor")),
+            (
+                UserRole::Admin,
+                UserRole::User,
+                swap("admin", "allowed_user"),
+            ),
+            (
+                UserRole::ServiceAccount,
+                UserRole::Viewer,
+                swap("allowed_user", "viewer"),
+            ),
+            (UserRole::User, UserRole::ServiceAccount, None),
+            (UserRole::SreAgent, UserRole::User, None),
+            (UserRole::Editor, UserRole::Editor, None),
+        ];
+        for (old, new, expected) in cases {
+            assert_eq!(
+                openfga_role_swap(&old, &new),
+                expected,
+                "{old:?} -> {new:?}"
+            );
+        }
     }
 
     #[test]

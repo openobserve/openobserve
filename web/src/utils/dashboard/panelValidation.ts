@@ -20,6 +20,7 @@ import {
   Y_AXIS_SCALES,
 } from "@/utils/dashboard/cartesianOptions";
 import { TOOLTIP_SORT_VALUES } from "@/utils/dashboard/tooltipSort";
+import { isOneQueryChart, type OneQueryType } from "@/utils/dashboard/chartTypeGroups";
 import { isAdditiveSizeField, SUNBURST_MAX_LEVELS } from "@/utils/dashboard/convertSunburstData";
 import { STAT_TEXT_MODES } from "@/utils/dashboard/metricOptions";
 import {
@@ -902,16 +903,22 @@ const validatePanelContentByType = (t: TranslateFn, panel: any, errors: string[]
   }
 };
 
-// Only the editor asks for one query; an imported multi-query treemap still loads and draws its first visible query.
-const validateTreemapQueries = (
+const ONE_QUERY_MESSAGES: Readonly<Record<OneQueryType, I18nKey>> = {
+  treemap: "dashboard.utils.treemapOneQuery",
+  funnel: "dashboard.utils.funnelOneQuery",
+};
+
+// Only the editor asks for one query; an imported multi-query panel still loads and draws its first visible query.
+const validateOneQueryChart = (
   t: TranslateFn,
   panel: { type?: string; queries?: { config?: { hide?: boolean } }[] } | null | undefined,
   errors: string[],
 ) => {
-  if (panel?.type !== "treemap") return;
+  const type = panel?.type;
+  if (!isOneQueryChart(type)) return;
   const queries = panel?.queries ?? [];
   if (queries.filter((query) => !query?.config?.hide).length > 1) {
-    errors.push(t("dashboard.utils.treemapOneQuery"));
+    errors.push(t(ONE_QUERY_MESSAGES[type]));
   }
 };
 
@@ -1416,7 +1423,7 @@ export const validatePanel = (
 
   // Validate panel content based on type
   validatePanelContentByType(t, panelData?.data, errors);
-  validateTreemapQueries(t, panelData?.data, errors);
+  validateOneQueryChart(t, panelData?.data, errors);
   validateHeatmapConfig(t, panelData, errors, isPromQLMode);
   validateCartesianConfig(t, panelData, errors, isPromQLMode);
   validatePanelTypeConfig(t, panelData, errors);

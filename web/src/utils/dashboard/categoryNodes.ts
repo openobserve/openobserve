@@ -42,12 +42,12 @@ const toNumber = (value: unknown): number | null => {
 const byValue = (a: TreemapNode, b: TreemapNode) => b.value - a.value;
 
 // A missing and an empty group are different answers, so each gets its own visible tile.
-const groupName = (key: string | null): string => {
+export const groupName = (key: string | null): string => {
   if (key === null) return gt("dashboard.utils.categoryNullGroup");
   return key === "" ? gt("dashboard.utils.categoryEmptyGroup") : key;
 };
 
-const isStandIn = (key: string | null) => key === null || key === "";
+export const isStandIn = (key: string | null) => key === null || key === "";
 
 /** The query parts the category builder reads: the group levels, the size field and whether the query is hidden. */
 export interface CategoryQuery {

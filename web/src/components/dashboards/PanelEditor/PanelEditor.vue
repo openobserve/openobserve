@@ -357,6 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @region-join-update="handleRegionJoinUpdate"
                         @sankey-notice-update="handleSankeyNoticeUpdate"
                         @treemap-notice-update="handleTreemapNoticeUpdate"
+                        @funnel-notice-update="handleFunnelNoticeUpdate"
                         @limit-number-of-series-warning-message-update="
                           handleLimitNumberOfSeriesWarningMessage
                         "
@@ -721,6 +722,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @region-join-update="handleRegionJoinUpdate"
                           @sankey-notice-update="handleSankeyNoticeUpdate"
                           @treemap-notice-update="handleTreemapNoticeUpdate"
+                          @funnel-notice-update="handleFunnelNoticeUpdate"
                           @limit-number-of-series-warning-message-update="
                             handleLimitNumberOfSeriesWarningMessage
                           "
@@ -1018,6 +1020,7 @@ const {
   handleRegionJoinUpdate,
   handleSankeyNoticeUpdate,
   handleTreemapNoticeUpdate,
+  handleFunnelNoticeUpdate,
   metaDataValue,
   seriesDataUpdate,
   collapseFieldList: baseCollapseFieldList,

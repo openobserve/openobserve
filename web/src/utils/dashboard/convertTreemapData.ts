@@ -19,6 +19,7 @@ import { getFieldLabel } from "./fieldLabel";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { labelColorOn, withLightness } from "./chartLabelContrast";
 import { buildTreemapNodes, paintByPalette, type TreemapNode } from "./categoryNodes";
+import { undrawnQueryCount } from "./chartTypeGroups";
 
 // Deeper trees break into tiles too small to read.
 export const TREEMAP_MAX_LEVELS = 5;
@@ -32,9 +33,10 @@ const LABEL_PADDING = 10;
 const CHILD_LIGHTNESS: [number, number] = [0.35, 0.6];
 const LABEL_FONT_SIZE = 12;
 
-/** Rows the treemap left out because their size is not a positive number. */
+/** What the treemap left out: rows whose size is not a positive number, and visible queries after the first. */
 export interface TreemapNotice {
   skippedRows: number;
+  ignoredQueries: number;
 }
 
 let measureContext: OffscreenCanvasRenderingContext2D | null | undefined;
@@ -128,7 +130,7 @@ export const convertTreemapData = (panelSchema: any, data: any, store: any) => {
     { ...panelSchema, queries: drawn < 0 ? [] : [panelSchema.queries[drawn]] },
     drawn < 0 ? [] : [rows[drawn]],
   );
-  const treemapNotice: TreemapNotice = { skippedRows };
+  const treemapNotice: TreemapNotice = { skippedRows, ignoredQueries: undrawnQueryCount(queries) };
   if (!nodes.length) {
     return { options: { series: [] }, extras: { panelId: panelSchema?.id, treemapNotice } };
   }
