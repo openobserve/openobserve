@@ -114,7 +114,7 @@ test.describe("Query Values variables - metrics and PromQL", { tag: ["@dashboard
     await qv.expectOptionValues("pv", ["search"]);
   });
 
-  test("C3: an OR filter blocks Save in PromQL with a message until the OR is removed", async ({ page }) => {
+  test("C3: an OR filter blocks Custom and Save in PromQL with a message until the OR is removed", async ({ page }) => {
     const qv = new PageManager(page).dashboardQueryVariable;
     const id = await startVariable(qv);
 
@@ -126,6 +126,11 @@ test.describe("Query Values variables - metrics and PromQL", { tag: ["@dashboard
     await qv.filters.toggleConnector("1");
     await qv.filters.expectConnector("1", "OR");
     await qv.setLanguage("promql");
+
+    await qv.modeCustom.click();
+    await expect(qv.drawerText(OR_MESSAGE)).toBeInViewport();
+    await qv.expectMode("auto");
+    await expect(qv.queryEditor).toBeHidden();
 
     await qv.expectSaveBlocked(qv.drawerText(OR_MESSAGE));
     expect((await fx.getDashboard(id)).variables.list.map((v) => v.name)).toEqual(["cl"]);

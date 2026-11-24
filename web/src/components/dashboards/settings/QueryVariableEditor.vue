@@ -97,6 +97,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </component>
+      <div
+        v-show="queryIssue"
+        class="text-input-error-text text-xs"
+        role="alert"
+        :data-error="queryIssue ? 'true' : undefined"
+        data-test="dashboard-variable-query-cycle-error"
+      >
+        {{ queryIssue }}
+      </div>
       <OText variant="meta">{{
         language === "sql"
           ? t("dashboard.queryVariable.sqlHelp")
@@ -294,6 +303,8 @@ interface PreviewState {
 
 const props = defineProps<{
   dashboardVariablesList?: any[];
+  /** A problem found on Save that only the query text can fix, such as a variable loop. */
+  queryIssue?: string;
 }>();
 
 const { t } = useI18nTyped();

@@ -290,13 +290,19 @@ test.describe("Query Values variables - Custom SQL", { tag: ["@dashboards", "@da
     await qv.expectOptionValues("svc", ["auth", "cart", "payments"]);
   });
 
-  test("a custom query that uses its own variable is blocked with a plain message", async ({ page }) => {
+  test("a custom query that uses its own variable is blocked with a plain message in view, gone once the query is fixed", async ({ page }) => {
     const qv = new PageManager(page).dashboardQueryVariable;
+    // The tester's window: at this height the message used to land below the column pickers, out of view.
+    await page.setViewportSize({ width: 1536, height: 770 });
     await startCustomVariable(qv);
     await qv.fillQuery(`SELECT DISTINCT service_name FROM "${S}" WHERE service_name = '$svc'`);
     const cycleError = page.locator('[data-test="dashboard-variable-query-cycle-error"]');
     await qv.expectSaveBlocked(cycleError);
     await expect(cycleError).toHaveText("svc can't depend on itself.");
+    await expect(cycleError).toBeInViewport();
+
+    await qv.fillQuery(`SELECT DISTINCT service_name FROM "${S}"`);
+    await expect(cycleError).toBeHidden();
   });
 
   test("deleting a variable another custom query uses warns before it is deleted", async ({ page }) => {

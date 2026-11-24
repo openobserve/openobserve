@@ -19,10 +19,11 @@ import { createStore } from "vuex";
 import i18n from "@/locales";
 import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
 
-const { getDashboard, labelValues, updateVariable } = vi.hoisted(() => ({
+const { getDashboard, labelValues, updateVariable, scrollIntoView } = vi.hoisted(() => ({
   getDashboard: vi.fn(),
   labelValues: vi.fn(),
   updateVariable: vi.fn(),
+  scrollIntoView: vi.fn(),
 }));
 
 vi.mock("vue-router", () => ({
@@ -56,6 +57,9 @@ vi.mock("@/components/QueryEditor.vue", () => ({
 }));
 
 import AddSettingVariable from "./AddSettingVariable.vue";
+
+// jsdom has no layout, so a blocked Save's scroll to its message is only recorded.
+Element.prototype.scrollIntoView = scrollIntoView;
 
 const store = createStore({
   state: { theme: "light", selectedOrganization: { identifier: "org" }, zoConfig: {} },
@@ -250,6 +254,115 @@ describe("AddSettingVariable with the real query editor", () => {
     await flushPromises();
     expect(vm.filterCycleError).toBe("");
     expect(updateVariable).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
+});
+
+describe("AddSettingVariable OR filters and blocked saves", () => {
+  const sqlMetricsVariable = {
+    ...autoPromqlVariable,
+    query_data: {
+      ...autoPromqlVariable.query_data,
+      query_type: "sql",
+      filter: [
+        { name: "env", operator: "=", value: "staging" },
+        { name: "job", operator: "=", value: "job-eu-west" },
+      ],
+    },
+  };
+  const selfLoop = {
+    name: "svc",
+    type: "query_values",
+    query_data: {
+      stream_type: "logs",
+      stream: "",
+      field: "",
+      max_record_size: null,
+      filter: [],
+      query: `SELECT service FROM "app" WHERE service != '$svc'`,
+      value_field: "service",
+    },
+  };
+
+  const mountWithOrFilters = async () => {
+    const wrapper = await mountForm(sqlMetricsVariable);
+    await click(wrapper, "dashboard-variable-filter-builder-connector-1");
+    expect(wrapper.vm.variableData.query_data.filter_group).toBeTruthy();
+    return wrapper;
+  };
+
+  beforeEach(() => {
+    updateVariable.mockReset();
+    scrollIntoView.mockReset();
+  });
+
+  it("keeps a PromQL variable with OR filters in Builder and shows why when Custom is clicked", async () => {
+    const wrapper = await mountWithOrFilters();
+    await click(wrapper, "dashboard-variable-query-language-promql");
+    await click(wrapper, "dashboard-variable-query-mode-custom");
+
+    expect(wrapper.vm.variableData.query_data.custom_query).toBe(false);
+    expect(wrapper.find('[data-test="dashboard-variable-query-editor"]').exists()).toBe(false);
+    const issues = wrapper.find('[data-test="dashboard-variable-filter-builder-issues"]');
+    expect(issues.text()).toContain("PromQL filters support AND only");
+    expect(scrollIntoView.mock.contexts).toContain(issues.element);
+    wrapper.unmount();
+  });
+
+  it("leaves the PromQL text empty instead of dropping OR filters on a language switch in Custom", async () => {
+    const wrapper = await mountWithOrFilters();
+    await click(wrapper, "dashboard-variable-query-mode-custom");
+    expect(editorText(wrapper)).toContain(`"env" = 'staging' OR "job" = 'job-eu-west'`);
+
+    await click(wrapper, "dashboard-variable-query-language-promql");
+    expect(editorText(wrapper)).toBe("");
+    wrapper.unmount();
+  });
+
+  it("brings a blocked Save's filter message into view", async () => {
+    const wrapper = await mountWithOrFilters();
+    await click(wrapper, "dashboard-variable-query-language-promql");
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(updateVariable).not.toHaveBeenCalled();
+    const issues = wrapper.find('[data-test="dashboard-variable-filter-builder-issues"]');
+    expect(scrollIntoView.mock.contexts).toContain(issues.element);
+    wrapper.unmount();
+  });
+
+  it("shows a custom query's loop under the query and brings it into view on Save", async () => {
+    const wrapper = await mountForm(selfLoop);
+    const vm = wrapper.vm as any;
+    await vm.onSubmit(vm.variableData);
+    await flushPromises();
+
+    const error = wrapper.find('[data-test="dashboard-variable-query-cycle-error"]');
+    expect(error.text()).toBe("svc can't depend on itself.");
+    const preview = wrapper.find('[data-test="dashboard-variable-query-preview"]').element;
+    expect(error.element.compareDocumentPosition(preview)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(scrollIntoView.mock.contexts).toContain(error.element);
+    expect(updateVariable).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("clears a custom query's loop message once the query no longer uses the variable", async () => {
+    const wrapper = await mountForm(selfLoop);
+    const vm = wrapper.vm as any;
+    await vm.onSubmit(vm.variableData);
+    await flushPromises();
+    expect(vm.filterCycleError).toBe("svc can't depend on itself.");
+
+    vm.setFormField("query_data.query", `SELECT service FROM "app" WHERE service = '$svc' OR 1=1`);
+    await flushPromises();
+    expect(vm.filterCycleError).toBe("svc can't depend on itself.");
+
+    vm.setFormField("query_data.query", `SELECT DISTINCT service FROM "app"`);
+    await flushPromises();
+    expect(vm.filterCycleError).toBe("");
+    expect(wrapper.find('[data-test="dashboard-variable-query-cycle-error"]').isVisible()).toBe(
+      false,
+    );
     wrapper.unmount();
   });
 });

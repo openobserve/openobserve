@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <DashboardHeader :title="title" backButton @back="close"> </DashboardHeader>
 
       <div
+        ref="formScrollRef"
         class="[&::-webkit-scrollbar-thumb]:rounded-default [&::-webkit-scrollbar-thumb]:bg-border-default min-h-0 flex-1 [scrollbar-width:thin] [scrollbar-color:var(--color-border-default)_transparent] overflow-y-auto px-0.75 pb-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent"
       >
         <OForm greedy id="add-setting-variable-form" :form="form" class="px-0.5">
@@ -212,15 +213,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="queryVariableEditorRef"
                 class="mt-4"
                 :dashboard-variables-list="dashboardVariablesList"
+                :query-issue="filterCycleError"
               />
-              <div
-                v-if="isCustomQuery"
-                v-show="filterCycleError"
-                class="text-status-error-text mt-2"
-                data-test="dashboard-variable-query-cycle-error"
-              >
-                {{ filterCycleError }}
-              </div>
               <div v-if="!isCustomQuery" class="mt-4 flex">
                 <OFormSelect
                   name="query_data.field"
@@ -296,6 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-show="filterCycleError"
                   class="text-status-error-text"
+                  :data-error="filterCycleError ? 'true' : undefined"
                   data-test="dashboard-variable-cycle-error"
                 >
                   {{ filterCycleError }}
@@ -581,6 +576,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
+import { scrollToFirstError } from "@/lib/forms/Form/scrollToFirstError";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormDate from "@/lib/forms/Date/OFormDate.vue";
@@ -588,6 +584,7 @@ import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import {
+  fitsPromqlSelector,
   makeAddSettingVariableSchema,
   type AddSettingVariableForm,
 } from "./AddSettingVariable.schema";
@@ -687,6 +684,7 @@ export default defineComponent({
       schema: addSettingVariableSchema,
       // forward to the onSubmit defined below (avoids a TDZ ref at setup time)
       onSubmit: (value) => onSubmit(value),
+      onSubmitInvalid: () => revealFormError(),
     });
 
     // Programmatic writes (cascades, edit-prefill, scope resets, array add/remove)
@@ -967,9 +965,11 @@ export default defineComponent({
     const isMultiSelectVariable = (name: string): boolean =>
       (props.dashboardVariablesList ?? []).some((v: any) => v.name === name && v.multiSelect);
 
+    // Without its OR filters a PromQL prefill would list values the Builder settings exclude, so none is written.
     const autoQueryFor = (language: QueryVariableLanguage): string => {
       const queryData = variableData.query_data as QueryVariableData | undefined;
       if (!queryData?.stream || !queryData?.field) return "";
+      if (language === "promql" && !fitsPromqlSelector(queryData.filter_group)) return "";
       return language === "promql"
         ? buildAutoPromqlQuery(queryData)
         : buildAutoSqlQuery(queryData, isMultiSelectVariable);
@@ -989,6 +989,15 @@ export default defineComponent({
       queryVariableEditorRef.value?.syncTypedQuery?.();
       if (mode === "auto") {
         setFormField("query_data.custom_query", false);
+        return;
+      }
+      // Custom could not carry the OR over, so the switch waits until the filters fit a selector.
+      if (
+        queryLanguage.value === "promql" &&
+        !fitsPromqlSelector(variableData.query_data?.filter_group)
+      ) {
+        filterBuilderRef.value?.validate();
+        void revealFormError();
         return;
       }
       const text = keptOrPrefilled(queryLanguage.value, variableData.query_data?.query ?? "");
@@ -1431,50 +1440,52 @@ export default defineComponent({
       }
     };
 
+    const findVariableCycle = async (value: AddSettingVariableForm): Promise<string> => {
+      // The form keeps a custom text typed before switching back to Builder; only what Save sends can loop.
+      const current = buildVariablePayload(value);
+      // need all variables to check for cycle
+      // get all variables data.
+      let variablesData: any = JSON.parse(
+        JSON.stringify(await getDashboard(store, route.query.dashboard, route.query.folder)),
+      )?.variables?.list;
+
+      // current updated variable data need to merge/update in above variablesData.
+      // temporary update variable list
+      // if edit mode, then update the variable data
+      if (editMode.value) {
+        //if name already exists
+        const variableIndex = variablesData.findIndex(
+          (variable: any) => variable.name == props.variableName,
+        );
+
+        variablesData[variableIndex] = current;
+      }
+      // else, it's a new variable.
+      else {
+        variablesData.push(current);
+      }
+
+      // now, need to check whether filter has cycle or not
+      // key: variable name
+      // value: { parentVariables: list of parent variable names, childVariables: list of child variable names }
+      let variablesDependencyGraph: any = buildVariablesDependencyGraph(variablesData);
+
+      // if graph has cycle, it will return the cycle path
+      // else it will return null
+      const hasCycle = isGraphHasCycle(variablesDependencyGraph);
+      return hasCycle ? describeVariableCycle(variablesDependencyGraph, hasCycle) : "";
+    };
+
+    // An older check finishing after a newer one must not put back a message the edits removed.
+    let cycleCheckRun = 0;
+
     // check if filter has cycle
     const isFilterHasCycle = async (value: AddSettingVariableForm) => {
+      const run = ++cycleCheckRun;
       try {
-        // The form keeps a custom text typed before switching back to Builder; only what Save sends can loop.
-        const current = buildVariablePayload(value);
-        // need all variables to check for cycle
-        // get all variables data.
-        let variablesData: any = JSON.parse(
-          JSON.stringify(await getDashboard(store, route.query.dashboard, route.query.folder)),
-        )?.variables?.list;
-
-        // current updated variable data need to merge/update in above variablesData.
-        // temporary update variable list
-        // if edit mode, then update the variable data
-        if (editMode.value) {
-          //if name already exists
-          const variableIndex = variablesData.findIndex(
-            (variable: any) => variable.name == props.variableName,
-          );
-
-          variablesData[variableIndex] = current;
-        }
-        // else, it's a new variable.
-        else {
-          variablesData.push(current);
-        }
-
-        // now, need to check whether filter has cycle or not
-        // key: variable name
-        // value: { parentVariables: list of parent variable names, childVariables: list of child variable names }
-        let variablesDependencyGraph: any = buildVariablesDependencyGraph(variablesData);
-
-        // if graph has cycle, it will return the cycle path
-        // else it will return null
-        const hasCycle = isGraphHasCycle(variablesDependencyGraph);
-        if (hasCycle) {
-          // filter has cycle, so show error and return
-          filterCycleError.value = describeVariableCycle(variablesDependencyGraph, hasCycle);
-          return true;
-        }
-
-        // above conditions passed, so remove filter cycle error and return false
-        filterCycleError.value = "";
-        return false;
+        const message = await findVariableCycle(value);
+        if (run === cycleCheckRun) filterCycleError.value = message;
+        return !!message;
       } catch (err: any) {
         showErrorNotification(
           err?.message ??
@@ -1485,6 +1496,25 @@ export default defineComponent({
         return true;
       }
     };
+
+    // A shown loop message follows the edits, so fixing the query clears it before the next Save.
+    watch(
+      formValues,
+      () => {
+        if (!filterCycleError.value) return;
+        const run = ++cycleCheckRun;
+        findVariableCycle(form.state.values as AddSettingVariableForm)
+          .then((message) => {
+            if (run === cycleCheckRun) filterCycleError.value = message;
+          })
+          .catch(() => {});
+      },
+      { deep: true },
+    );
+
+    const formScrollRef = ref<HTMLElement | null>(null);
+    // A blocked Save's message can sit below the fold or under the sticky footer.
+    const revealFormError = () => scrollToFirstError(formScrollRef.value ?? undefined);
 
     // @submit fires ONLY after the Zod schema passes — including the per-row
     // rules for the form-owned filter[]/options[] arrays (name/operator/value
@@ -1509,7 +1539,7 @@ export default defineComponent({
 
       // check if filter has cycle
       if (await isFilterHasCycle(value)) {
-        // filter has cycle, so show error and return
+        await revealFormError();
         return;
       }
 
@@ -1866,6 +1896,7 @@ export default defineComponent({
       title,
       onSubmit,
       filterBuilderRef,
+      formScrollRef,
       filterFields,
       loadFilterValues,
       filterVariableSuggestions,

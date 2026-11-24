@@ -35,6 +35,10 @@ const parseGroup = (group: unknown) => dashboardFilterCodec().parse(group as any
 const hasIncompleteCondition = (group: unknown): boolean =>
   leafConditions(parseGroup(group)).some((condition) => !isConditionComplete(condition));
 
+/** A PromQL selector ANDs its matchers, so a saved OR or nested group has no PromQL form. */
+export const fitsPromqlSelector = (filterGroup: unknown): boolean =>
+  !filterGroup || isFlatAnd(parseGroup(filterGroup));
+
 export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
   z
     .object({
@@ -200,11 +204,7 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
             message: t("filterBar.validation.incomplete"),
           });
         }
-        if (
-          isPromql &&
-          val.query_data?.filter_group &&
-          !isFlatAnd(parseGroup(val.query_data.filter_group))
-        ) {
+        if (isPromql && !fitsPromqlSelector(val.query_data?.filter_group)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["query_data", "filter_group"],
