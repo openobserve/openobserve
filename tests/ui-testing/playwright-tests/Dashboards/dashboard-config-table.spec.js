@@ -151,8 +151,8 @@ test.describe("Table — unique value color (ENT#702)", { tag: ["@dashboards", "
     const stream = `ovn_c702_${stamp}`;
     let dashboardId = null;
     try {
-      await ingestLogRows(stream, statusRows(STATUSES));
-      dashboardId = await createDashboard(uniqueValueColorDashboard(stamp, stream));
+      await ingestLogRows(page, stream, statusRows(STATUSES));
+      dashboardId = await createDashboard(page, uniqueValueColorDashboard(stamp, stream));
 
       const panelTable = new DashboardPanelTablePage(page);
       await panelTable.gotoDashboardView(dashboardId, { org: orgIdentifier(), period: "15m" });
@@ -172,7 +172,7 @@ test.describe("Table — unique value color (ENT#702)", { tag: ["@dashboards", "
       }
       expect(new Set([active[0], inactive[0], pending[0]]).size, "each distinct value gets its own colour").toBe(3);
     } finally {
-      await deleteSeededTablePanel({ stream, dashboardId });
+      await deleteSeededTablePanel(page, { stream, dashboardId });
     }
   });
 });
