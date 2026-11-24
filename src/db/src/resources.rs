@@ -281,8 +281,13 @@ pub async fn load_page(
     limit: usize,
 ) -> Result<SummaryPage> {
     if kind == ResourceKind::Stream {
-        let schemas = infra::schema::STREAM_SCHEMAS_LATEST.read().await;
-        return stream_page(org, schemas.keys(), after, limit);
+        // Streams are already in memory, so one page holds them all and the lock covers only the
+        // copy.
+        let ids = org_stream_ids(
+            org,
+            infra::schema::STREAM_SCHEMAS_LATEST.read().await.keys(),
+        );
+        return Ok(stream_page(org, ids));
     }
     require_sql_store()?;
     load_page_with(get_orm_client_rw().await, org, kind, after, limit).await
@@ -317,34 +322,25 @@ async fn load_page_with<C: ConnectionTrait>(
     Ok(SummaryPage { items, next })
 }
 
-/// Pages one org's logs, metrics and traces streams out of `org/type/name` schema cache keys.
-fn stream_page<'a>(
-    org: &str,
-    keys: impl Iterator<Item = &'a String>,
-    after: Option<&str>,
-    limit: usize,
-) -> Result<SummaryPage> {
-    ensure!(
-        (1..=MAX_PAGE_SIZE).contains(&limit),
-        "invalid source page size"
-    );
+/// Picks one org's logs, metrics and traces stream ids out of `org/type/name` schema cache keys.
+fn org_stream_ids<'a>(org: &str, keys: impl Iterator<Item = &'a String>) -> Vec<String> {
     let prefix = format!("{org}/");
-    let mut ids = keys
-        .filter_map(|key| key.strip_prefix(&prefix))
+    keys.filter_map(|key| key.strip_prefix(&prefix))
         .filter(|id| {
             id.split_once('/')
                 .is_some_and(|(signal, _)| matches!(signal, "logs" | "metrics" | "traces"))
-                && after.is_none_or(|after| *id > after)
         })
-        .collect::<Vec<_>>();
+        .map(str::to_owned)
+        .collect()
+}
+
+fn stream_page(org: &str, mut ids: Vec<String>) -> SummaryPage {
     ids.sort_unstable();
-    ids.truncate(limit);
-    let next = (ids.len() == limit).then(|| ids[limit - 1].to_owned());
     let items = ids
-        .into_iter()
+        .iter()
         .filter_map(|id| SummaryRow::stream(id).into_summary(org, ResourceKind::Stream))
         .collect();
-    Ok(SummaryPage { items, next })
+    SummaryPage { items, next: None }
 }
 
 fn summary_columns() -> String {
@@ -598,7 +594,7 @@ mod tests {
     }
 
     #[test]
-    fn stream_pages_come_from_cache_keys_of_one_org() {
+    fn stream_page_holds_every_cached_stream_of_one_org() {
         let keys = [
             "org/traces/payment",
             "org/logs/payment",
@@ -610,14 +606,13 @@ mod tests {
         ]
         .map(String::from);
         let ids = |page: &SummaryPage| page.items.iter().map(|r| r.id.clone()).collect::<Vec<_>>();
-        let first = stream_page("org", keys.iter(), None, 2).unwrap();
-        assert_eq!(ids(&first), ["logs/payment"]);
-        assert_eq!(first.next.as_deref(), Some("logs/payment"));
-        let rest = stream_page("org", keys.iter(), first.next.as_deref(), 2).unwrap();
-        assert_eq!(ids(&rest), ["metrics/cpu", "traces/payment"]);
-        assert_eq!(rest.items[1].name, "payment");
-        let end = stream_page("org", keys.iter(), rest.next.as_deref(), 2).unwrap();
-        assert!(end.items.is_empty() && end.next.is_none());
+        let page = stream_page("org", org_stream_ids("org", keys.iter()));
+        assert_eq!(
+            ids(&page),
+            ["logs/payment", "metrics/cpu", "traces/payment"]
+        );
+        assert_eq!(page.items[2].name, "payment");
+        assert!(page.next.is_none());
     }
 
     #[tokio::test]
