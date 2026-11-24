@@ -18,30 +18,10 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 
-// SearchBar.vue uses `defineAsyncComponent` as a free variable (not imported from vue).
-// In JSDOM, globalThis properties are accessible as free variables in module scope,
-// so we inject it via vi.hoisted() which runs before any module is evaluated.
-vi.hoisted(() => {
-  // SearchBar.vue uses defineAsyncComponent as a free variable (not imported from vue).
-  // In JSDOM globalThis properties act as free variables, so inject it here before module eval.
-  // Use the same data-test that the spec's vi.mock("@/components/CodeQueryEditor.vue") provides.
-  (globalThis as any).defineAsyncComponent = () => ({
-    name: "AsyncCodeQueryEditor",
-    template: '<div data-test="code-editor-stub"></div>',
-    props: ["query", "keywords", "functions", "editor-id"],
-    emits: ["update:query", "run-query"],
-    methods: {
-      setValue: () => {},
-      getCursorIndex: () => 0,
-      triggerAutoComplete: () => {},
-    },
-  });
-});
-
 import SearchBar from "./SearchBar.vue";
 
-vi.mock("@/composables/useLogs", () => ({
-  default: () => ({
+vi.mock("@/composables/useLogs/searchState", () => ({
+  searchState: () => ({
     searchObj: {
       data: {
         datetime: {
@@ -76,6 +56,7 @@ vi.mock("@/components/DateTime.vue", () => ({
 }));
 
 vi.mock("@/components/CodeQueryEditor.vue", () => ({
+  __esModule: true,
   default: {
     name: "CodeQueryEditor",
     template: '<div data-test="code-editor-stub"></div>',

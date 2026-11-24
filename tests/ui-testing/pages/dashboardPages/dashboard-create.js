@@ -3,6 +3,9 @@
 import testLogger from "../../playwright-tests/utils/test-logger.js";
 import { answerPanelLeaveIfShown } from "./panel-leave-dialog.js";
 
+// Longer than the 600ms live-preview debounce plus the panel loader's 50ms; with no list open, an idle Apply then has no run queued.
+const LIVE_PREVIEW_QUIET_MS = 1500;
+
 export default class DashboardCreate {
   /**
    * Constructor for the DashboardCreate object
@@ -24,6 +27,7 @@ export default class DashboardCreate {
       '[data-test="dashboard-if-no-panel-add-panel-btn"]'
     );
     this.applyQueryBtn = this.page.locator('[data-test="dashboard-apply"]');
+    this.applyQueryBtnIdle = this.page.locator('[data-test="dashboard-apply"]:enabled');
     this.backBtn = this.page.locator('[data-test="dashboard-back-btn"]');
     this.defaultFolderTab = this.page.locator(
       'button[data-test="dashboard-folder-tab-default"]'
@@ -615,5 +619,35 @@ export default class DashboardCreate {
   async applyButton() {
     await this.applyQueryBtn.waitFor({ state: "visible", timeout: 15000 });
     await this.applyQueryBtn.click();
+  }
+
+  // Enterprise swaps Apply for Cancel in place while a search runs, so a click racing the last edit's live-preview run cancels it.
+  async waitForLivePreviewQuiet(timeout = 60000) {
+    const idle = await this.page.evaluateHandle(() => ({ since: null }));
+    await this.page.waitForFunction(
+      ({ idle, quietMs }) => {
+        const apply = document.querySelector('[data-test="dashboard-apply"]');
+        if (!apply || apply.disabled) {
+          idle.since = null;
+          return false;
+        }
+        idle.since ??= performance.now();
+        return performance.now() - idle.since >= quietMs;
+      },
+      { idle, quietMs: LIVE_PREVIEW_QUIET_MS },
+      { timeout },
+    );
+    await idle.dispose();
+  }
+
+  /** Applies once no live-preview run is queued or in flight, and resolves when the applied run has finished. */
+  async applyAfterLivePreview() {
+    await this.waitForLivePreviewQuiet();
+    const [response] = await Promise.all([
+      this.page.waitForResponse((res) => new URL(res.url()).pathname.endsWith("/_search_stream"), { timeout: 60000 }),
+      this.applyButton(),
+    ]);
+    if (!response.ok()) throw new Error(`Apply search answered ${response.status()}`);
+    await this.applyQueryBtnIdle.waitFor({ state: "visible", timeout: 60000 });
   }
 }

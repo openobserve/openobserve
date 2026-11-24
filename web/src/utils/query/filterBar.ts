@@ -16,6 +16,7 @@
 import type { I18nKey } from "@/types/i18n";
 import { sqlIsNull, sqlLike, sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { escapeRegExp, promqlEscape } from "@/utils/query/promQLUtils";
 
 export type FilterFieldType = "string" | "number" | "boolean";
 
@@ -414,12 +415,6 @@ const groupToSql = (
 export const filterTreeToSql = (root: FilterGroup, fields: FilterField[]): string =>
   groupToSql(root, new Map(fields.map((field) => [field.name, field.type])), false);
 
-const escapePromValue = (value: string): string =>
-  value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
-
-export const escapePromRegexLiteral = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 const PROM_REGEX_META = ".*+?^${}()|[]\\";
 
 /** The values of a regex made only of escaped literals joined by `|`, as `is any of` writes it; null otherwise. */
@@ -450,18 +445,18 @@ const conditionToPromMatcher = (condition: FilterCondition): string => {
   const label = condition.field;
   switch (condition.operator) {
     case "neq":
-      return `${label}!="${escapePromValue(first)}"`;
+      return `${label}!="${promqlEscape(first)}"`;
     case "regex":
-      return `${label}=~"${escapePromValue(first)}"`;
+      return `${label}=~"${promqlEscape(first)}"`;
     case "not_regex":
-      return `${label}!~"${escapePromValue(first)}"`;
+      return `${label}!~"${promqlEscape(first)}"`;
     case "in":
     case "not_in": {
-      const alternation = condition.values.map(escapePromRegexLiteral).join("|");
-      return `${label}${condition.operator === "in" ? "=~" : "!~"}"${escapePromValue(alternation)}"`;
+      const alternation = condition.values.map(escapeRegExp).join("|");
+      return `${label}${condition.operator === "in" ? "=~" : "!~"}"${promqlEscape(alternation)}"`;
     }
     default:
-      return `${label}="${escapePromValue(first)}"`;
+      return `${label}="${promqlEscape(first)}"`;
   }
 };
 
