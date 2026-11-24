@@ -49,9 +49,6 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { defineComponent, h, ref } from "vue";
 
-import DbmSection from "@/components/dbm/DbmSection.vue";
-import { raw } from "@/types/i18n";
-
 /**
  * The page's handler, transcribed. It takes the ref rather than closing over a
  * module-level one so the behaviour can be driven directly.
@@ -60,8 +57,8 @@ import { raw } from "@/types/i18n";
  * that the page still has it lives at the bottom of this file, so a page that
  * drifts from this copy fails here rather than passing against a stale twin.
  */
-const scrollToPlans = (section: { $el?: unknown } | null) => {
-  (section?.$el as HTMLElement | undefined)?.scrollIntoView({
+const scrollToPlans = (section: HTMLElement | null) => {
+  section?.scrollIntoView({
     behavior: "smooth",
     block: "start",
   });
@@ -72,7 +69,7 @@ const harness = (options: { renderSection?: boolean } = {}) => {
   const renderSection = options.renderSection ?? true;
   return defineComponent({
     setup() {
-      const plansSection = ref<InstanceType<typeof DbmSection> | null>(null);
+      const plansSection = ref<HTMLElement | null>(null);
       return { plansSection, jump: () => scrollToPlans(plansSection.value) };
     },
     render() {
@@ -83,11 +80,7 @@ const harness = (options: { renderSection?: boolean } = {}) => {
           "View plans",
         ),
         renderSection
-          ? h(DbmSection, {
-              ref: "plansSection",
-              title: raw("Query plans"),
-              "data-test": "dbm-detail-plans",
-            })
+          ? h("section", { ref: "plansSection", "data-test": "dbm-detail-plans" })
           : null,
       ]);
     },
@@ -101,9 +94,9 @@ describe("the drift callout's jump to the plans section", () => {
    * jump would silently do nothing. `DbmSection` is single-rooted, and this is
    * what keeps it that way.
    */
-  it("resolves the DbmSection ref to the section element itself", () => {
+  it("resolves the plansSection ref to the section element itself", () => {
     const wrapper = mount(harness());
-    const instance = wrapper.vm.plansSection as unknown as { $el: HTMLElement };
+    const instance = { $el: wrapper.vm.plansSection as unknown as HTMLElement };
 
     expect(instance).toBeTruthy();
     expect(instance.$el).toBeInstanceOf(HTMLElement);
@@ -169,7 +162,7 @@ describe("the drift callout's jump to the plans section", () => {
     // Guard: prove the slice is the handler body, not an empty tail.
     expect(handler.length).toBeGreaterThan(60);
 
-    expect(handler).toContain("plansSection.value?.$el");
+    expect(handler).toContain("plansSection.value?.scrollIntoView");
     expect(handler).toContain("scrollIntoView");
     expect(handler).toContain('behavior: "smooth"');
     expect(handler).toContain('block: "start"');

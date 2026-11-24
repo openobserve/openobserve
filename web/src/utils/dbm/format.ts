@@ -535,3 +535,7 @@ export const dbmHttpError = (err: unknown): DbmHttpError => {
     message: serverMessage ?? String(err),
   };
 };
+
+/** Full date and time, for tooltips on a relative age. */
+export const formatDateTime = (micros: number): string =>
+  new Date(micros / 1000).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });

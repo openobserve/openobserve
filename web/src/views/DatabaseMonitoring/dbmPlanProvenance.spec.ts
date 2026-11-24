@@ -58,7 +58,7 @@ const plansSection = (): string => {
 /** The per-plan `<article>` loop body. */
 const planLoop = (): string => {
   const section = plansSection();
-  const at = section.indexOf('v-for="plan in plans"');
+  const at = section.indexOf('v-for="(plan, planIndex) in plans"');
   expect(at, "the plan list must exist").toBeGreaterThan(-1);
   return section.slice(at);
 };
@@ -66,7 +66,7 @@ const planLoop = (): string => {
 describe("per-row plan provenance", () => {
   it("moves the gap tag off the section header and onto generic rows only", () => {
     const section = plansSection();
-    const loopAt = section.indexOf('v-for="plan in plans"');
+    const loopAt = section.indexOf('v-for="(plan, planIndex) in plans"');
     const beforeLoop = section.slice(0, loopAt);
 
     // The header must not brand EVERY plan an estimate — with two producers
