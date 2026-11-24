@@ -841,7 +841,7 @@ pub async fn compare(
         {
             Some(row) => {
                 let mut summary = super::reads::summary(ctx, std::slice::from_ref(&row)).await?;
-                attach_not_serving_pods(ctx, &row, &mut summary).await;
+                attach_not_serving_pods(ctx, &row, &mut summary).await?;
                 // Only the automatic baseline is the one the stored evaluation judged against.
                 let prior = if automatic {
                     Some(
@@ -1259,37 +1259,63 @@ async fn attach_not_serving_pods(
     ctx: &crate::service_identity::api::Context,
     row: &infra::table::entity::service_version_verdicts::Model,
     summary: &mut Value,
-) {
+) -> Result<(), axum::response::Response> {
     // K1 and span-pod rows are read region-locally, so only the evaluating region can list pods.
     if summary["verdict"] != "not_serving" || row.cluster != config::get_cluster_name() {
-        return;
+        return Ok(());
     }
-    match super::deploys::not_serving_pods(&ctx.org, row).await {
+    let read = super::deploys::not_serving_pods(&ctx.org, row);
+    #[cfg(all(test, feature = "test-utils"))]
+    let read = async {
+        match tests::POD_EVIDENCE.try_with(Clone::clone) {
+            Ok(table) => Ok(table),
+            Err(_) => read.await,
+        }
+    };
+    match read.await {
         Ok(table) => {
-            use crate::service_identity::access;
-            let admin = access::org_wide_read(&ctx.org, &ctx.user).await;
-            let pods_ok = access::evidence(
-                &ctx.org,
-                &ctx.user,
-                &table.source_streams,
-                false,
-                admin,
-                &ctx.evidence,
-            )
-            .await;
-            let status_ok = access::evidence(
-                &ctx.org,
-                &ctx.user,
-                &table.status_streams,
-                false,
-                admin,
-                &ctx.evidence,
-            )
-            .await;
-            table.attach(summary, pods_ok, status_ok);
+            let admin = crate::service_identity::access::org_wide_read(&ctx.org, &ctx.user).await;
+            attach_pod_evidence(ctx, &table, summary, admin).await?;
         }
         Err(error) => log::warn!("[ServiceVersions] not_serving pods unavailable: {error}"),
     }
+    Ok(())
+}
+
+async fn attach_pod_evidence(
+    ctx: &crate::service_identity::api::Context,
+    table: &config::meta::service_identity::NotServingPods,
+    summary: &mut Value,
+    admin: bool,
+) -> Result<(), axum::response::Response> {
+    use crate::authz::list::authz_unavailable_response;
+
+    let pods_ok = ctx
+        .readable
+        .evidence(
+            &ctx.org,
+            &ctx.user,
+            &table.source_streams,
+            false,
+            admin,
+            &ctx.evidence,
+        )
+        .await
+        .map_err(authz_unavailable_response)?;
+    let status_ok = ctx
+        .readable
+        .evidence(
+            &ctx.org,
+            &ctx.user,
+            &table.status_streams,
+            false,
+            admin,
+            &ctx.evidence,
+        )
+        .await
+        .map_err(authz_unavailable_response)?;
+    table.attach(summary, pods_ok, status_ok);
+    Ok(())
 }
 
 fn redact_compare_evidence(response: &mut Value) {
@@ -1736,6 +1762,189 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
+    use crate::authz::list::ModeAnswers;
+
+    #[cfg(feature = "test-utils")]
+    tokio::task_local! {
+        pub(super) static POD_EVIDENCE: config::meta::service_identity::NotServingPods;
+    }
+
+    #[cfg(feature = "test-utils")]
+    #[tokio::test]
+    async fn compare_authz_answers_503_when_a_pod_evidence_check_fails() {
+        use axum::http::{StatusCode, header};
+        use config::meta::{
+            service_identity::{NotServingPod, NotServingPods},
+            stream::StreamType,
+        };
+        use serde_json::json;
+
+        use crate::{
+            authz::{
+                TypedStream, fake_checker,
+                list::{ListMode, UnavailableReason},
+            },
+            service_identity::{access::ReadableStreams, api::Context},
+        };
+
+        let now = now_micros();
+        let org = format!("compare_authz_{now}");
+        let user = "compare-evidence-failure@example.com";
+        let observation = seen("checkout", "v1", None, now - 600 * SECOND_MICRO_SECS);
+        let version = observation.to_record(&org, now);
+        seed_compare_not_serving(&version, &observation.source_stream, now).await;
+        let checker = fake_checker();
+        checker.set_list_mode(user, ListMode::On);
+        checker.grant_read(
+            user,
+            &TypedStream {
+                org_id: org.clone(),
+                stream_type: StreamType::Traces,
+                name: observation.source_stream.clone(),
+            },
+        );
+        let summary = observation.to_summary(&org, &version, now);
+        let readable = ReadableStreams::load(&org, user, std::slice::from_ref(&summary))
+            .await
+            .unwrap();
+        let ctx = Context {
+            org,
+            user: user.into(),
+            summaries: readable.visible(&[summary]),
+            readable,
+            evidence: Default::default(),
+            identity: Default::default(),
+            aliases: Default::default(),
+        };
+        checker.fail_object_check_once(user, UnavailableReason::Server(500));
+        let table = NotServingPods {
+            pods: vec![NotServingPod {
+                k8s_pod: "checkout-pod".into(),
+                since: version.first_seen,
+                ..Default::default()
+            }],
+            pods_total: 1,
+            source_streams: vec![format!("logs/{}", "x".repeat(300))],
+            ..Default::default()
+        };
+        // The visible trace summary anchors the service while the unreadable RUM arm skips search.
+        let request = json!({
+            "service": version.service_name,
+            "where": version.where_key,
+            "a": { "version": version.version },
+            "baseline": "previous",
+            "signals": ["rum"],
+        });
+        let response = POD_EVIDENCE
+            .scope(table, compare(&ctx, request))
+            .await
+            .unwrap_err();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.headers()[header::RETRY_AFTER], "3");
+        assert_eq!(response.headers()["x-o2-authz"], "unavailable");
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["error_code"], "authz_unavailable");
+        assert_eq!(checker.calls(user).object_checks, 1);
+    }
+
+    #[cfg(feature = "test-utils")]
+    async fn seed_compare_not_serving(
+        version: &config::meta::service_identity::ServiceVersionRecord,
+        stream: &str,
+        now: i64,
+    ) {
+        use config::meta::service_identity::NOT_SERVING_K8S_REASON;
+        use infra::table::{
+            entity::{service_version_deploys as deploys, service_version_verdicts as verdicts},
+            service_versions,
+        };
+        use sea_orm::{EntityTrait, IntoActiveModel};
+        use serde_json::json;
+        use sha2::{Digest, Sha256};
+
+        crate::service_identity::global_tables_for_tests().await;
+        infra::db::get_db().await.create_table().await.unwrap();
+        db::service_signals::advance_org_offset(&version.org_id, now)
+            .await
+            .unwrap();
+        let conn = infra::db::get_orm_client_rw().await;
+        service_versions::merge_upsert_many(conn, vec![version.clone()])
+            .await
+            .unwrap();
+        let cluster = config::get_cluster_name();
+        let source_streams = json!([format!("traces/{stream}")]).to_string();
+        let deploy_key = format!(
+            "{:x}",
+            Sha256::digest(
+                json!([
+                    version.org_id,
+                    version.service_name,
+                    version.where_key,
+                    cluster,
+                    version.version,
+                    version.first_seen,
+                ])
+                .to_string()
+                .as_bytes()
+            )
+        );
+        let verdict_key = format!("verdict-{}", version.org_id);
+        deploys::Entity::insert(
+            deploys::Model {
+                deploy_key: deploy_key.clone(),
+                org_id: version.org_id.clone(),
+                service_name: version.service_name.clone(),
+                where_key: version.where_key.clone(),
+                scope_key: version.scope_key.clone(),
+                cluster: cluster.clone(),
+                to_version: version.version.clone(),
+                to_version_key: version.version_key.clone(),
+                kind: "deploy".into(),
+                entry_source: "traffic".into(),
+                at: version.first_seen,
+                serving_versions: "[]".into(),
+                full_serving: "[]".into(),
+                source_streams: source_streams.clone(),
+                verdict_key: Some(verdict_key.clone()),
+                ..Default::default()
+            }
+            .into_active_model(),
+        )
+        .exec_without_returning(conn)
+        .await
+        .unwrap();
+        verdicts::Entity::insert(
+            verdicts::Model {
+                verdict_key,
+                deploy_key,
+                deploy_kind: "deploy".into(),
+                scope_key: version.scope_key.clone(),
+                version_key: version.version_key.clone(),
+                org_id: version.org_id.clone(),
+                service_name: version.service_name.clone(),
+                where_key: version.where_key.clone(),
+                version: version.version.clone(),
+                cluster,
+                verdict: "not_serving".into(),
+                state: "frozen".into(),
+                signal: "traces".into(),
+                baseline_rule: "none".into(),
+                baseline_rule_initial: "none".into(),
+                reason_code: NOT_SERVING_K8S_REASON.into(),
+                eval_start: version.first_seen,
+                window_end: now,
+                source_streams,
+                ..Default::default()
+            }
+            .into_active_model(),
+        )
+        .exec_without_returning(conn)
+        .await
+        .unwrap();
+    }
 
     /// Old rollup rows as the metrics series they now are, read through the arm builder.
     fn decode(rows: &[Value], version: &VersionImage) -> anyhow::Result<Aggregate> {
@@ -2369,6 +2578,7 @@ mod tests {
             readable: ReadableStreams {
                 traces: std::collections::HashSet::from(["t".into()]),
                 rum: false,
+                answers: ModeAnswers::Legacy,
             },
             evidence: Default::default(),
             identity: Default::default(),
@@ -2727,6 +2937,7 @@ mod tests {
             readable: ReadableStreams {
                 traces: std::collections::HashSet::from(["t".into()]),
                 rum: false,
+                answers: ModeAnswers::Legacy,
             },
             evidence: Default::default(),
             identity: Default::default(),

@@ -439,7 +439,7 @@ async fn readable_trace_streams(
         profiles: vec![],
     };
     let checker = crate::authz::active_checker();
-    crate::authz::readable_related_streams(checker.as_ref(), user_id, org_id, related)
+    crate::authz::legacy_readable_related_streams(checker.as_ref(), user_id, org_id, related)
         .await
         .traces
         .into_iter()

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod authz;
 mod base;
 pub mod oncall;
 pub mod promql;
@@ -29,6 +30,7 @@ const HELP_SUFFIX: &str =
 
 pub fn init() {
     let registry = prometheus::default_registry();
+    authz::register(registry);
     base::register(registry);
     promql::register(registry);
     oncall::register(registry);

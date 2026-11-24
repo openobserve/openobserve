@@ -643,6 +643,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "enterprise")]
     {
+        openobserve_core::authz::accounting::install_call_observer();
         tokio::task::spawn(db::ofga::watch());
         db::ofga::cache().await.expect("ofga model cache failed");
         o2_openfga::authorizer::authz::init_open_fga().await;

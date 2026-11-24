@@ -31,9 +31,9 @@ use infra::{
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde_json::{Value, json};
 
-use crate::service_identity::{
-    access,
-    api::{Context, env_filter_matches, scope_identity, set_scope_identity},
+use crate::{
+    authz::list::authz_unavailable_response,
+    service_identity::api::{Context, env_filter_matches, scope_identity, set_scope_identity},
 };
 
 pub async fn verdicts(ctx: &Context, params: &BTreeMap<String, String>) -> Result<Value, Response> {
@@ -113,7 +113,7 @@ pub async fn deploys(ctx: &Context, params: &BTreeMap<String, String>) -> Result
         if !env_filter_matches(&label, params) {
             continue;
         }
-        let authorized = deploy_readable(ctx, &row).await;
+        let authorized = deploy_readable(ctx, &row).await?;
         let verdict = if !authorized {
             json!({"restricted":true})
         } else {
@@ -257,7 +257,7 @@ pub async fn enrich_versions(ctx: &Context, versions: &mut [Value]) -> Result<()
         let mut restricted = false;
         let mut items = Vec::new();
         for row in rows {
-            restricted |= !deploy_readable(ctx, &row).await;
+            restricted |= !deploy_readable(ctx, &row).await?;
             items.push(json!({"at":row.at,"kind":row.kind,"from_version":row.from_version,"from_image":row.from_image,"cluster":row.cluster,"deploy_key":row.deploy_key}));
         }
         value["deploys"] = json!(items);
@@ -421,15 +421,18 @@ async fn summarize(
         let streams: Vec<String> =
             serde_json::from_str(&evidence.source_streams).map_err(unavailable)?;
         if streams.is_empty()
-            || !access::evidence(
-                &ctx.org,
-                &ctx.user,
-                &streams,
-                evidence.source_streams_overflow,
-                admin,
-                &ctx.evidence,
-            )
-            .await
+            || !ctx
+                .readable
+                .evidence(
+                    &ctx.org,
+                    &ctx.user,
+                    &streams,
+                    evidence.source_streams_overflow,
+                    admin,
+                    &ctx.evidence,
+                )
+                .await
+                .map_err(authz_unavailable_response)?
         {
             let mut restricted = json!({"verdict_key":row.verdict_key,"version_key":row.version_key,"service":row.service_name,"where_key":row.where_key,"version":row.version,"image":row.image,"restricted":true});
             count_verdict_images(row, &mut restricted).await?;
@@ -554,13 +557,16 @@ async fn count_verdict_images(row: &verdicts::Model, result: &mut Value) -> Resu
     Ok(())
 }
 
-async fn deploy_readable(ctx: &Context, row: &deploys::Model) -> bool {
+async fn deploy_readable(ctx: &Context, row: &deploys::Model) -> Result<bool, Response> {
     let Ok(streams) = serde_json::from_str::<Vec<String>>(&row.source_streams) else {
-        return false;
+        return Ok(false);
     };
+    if streams.is_empty() {
+        return Ok(false);
+    }
     let admin = crate::service_identity::access::org_wide_read(&ctx.org, &ctx.user).await;
-    !streams.is_empty()
-        && access::evidence(
+    ctx.readable
+        .evidence(
             &ctx.org,
             &ctx.user,
             &streams,
@@ -569,6 +575,7 @@ async fn deploy_readable(ctx: &Context, row: &deploys::Model) -> bool {
             &ctx.evidence,
         )
         .await
+        .map_err(authz_unavailable_response)
 }
 
 async fn filter_catalog(
@@ -811,6 +818,103 @@ fn error(status: StatusCode, message: &str) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "test-utils")]
+    #[tokio::test]
+    async fn deploys_answers_503_when_an_evidence_check_fails() {
+        use config::meta::{
+            service_identity::{EnvSource, WhereSummaryRecord},
+            stream::StreamType,
+        };
+        use sea_orm::IntoActiveModel;
+
+        use crate::{
+            authz::{
+                TypedStream, fake_checker,
+                list::{ListMode, UnavailableReason},
+            },
+            service_identity::access::ReadableStreams,
+        };
+
+        let org = format!("deploys_authz_{}", config::utils::time::now_micros());
+        let user = "deploys-evidence-failure@example.com";
+        let checker = fake_checker();
+        checker.set_list_mode(user, ListMode::On);
+        checker.grant_read(
+            user,
+            &TypedStream {
+                org_id: org.clone(),
+                stream_type: StreamType::Traces,
+                name: "t1".into(),
+            },
+        );
+        let summary = WhereSummaryRecord {
+            summary_key: org.clone(),
+            org_id: org.clone(),
+            service_name: "svc".into(),
+            where_key: "default".into(),
+            scope_key: org.clone(),
+            source_stream: "t1".into(),
+            signal: "traces".into(),
+            k8s_cluster: String::new(),
+            k8s_namespace: String::new(),
+            env: "default".into(),
+            env_source: EnvSource::Default,
+            env_source_value: String::new(),
+            envs: Vec::new(),
+            newest_version: "v1".into(),
+            newest_version_key: "v1".into(),
+            newest_first_seen: 1,
+            has_version: true,
+            first_seen: 1,
+            last_seen: 2,
+            purged_versions: 0,
+            updated_at: 2,
+        };
+        let readable = ReadableStreams::load(&org, user, std::slice::from_ref(&summary))
+            .await
+            .unwrap();
+        let ctx = Context {
+            org: org.clone(),
+            user: user.into(),
+            summaries: readable.visible(std::slice::from_ref(&summary)),
+            readable,
+            evidence: Default::default(),
+            identity: Default::default(),
+            aliases: Default::default(),
+        };
+        checker.fail_object_check_once(user, UnavailableReason::Server(500));
+
+        crate::service_identity::global_tables_for_tests().await;
+        let conn = get_orm_client_rw().await;
+        deploys::Entity::insert(
+            deploys::Model {
+                deploy_key: org.clone(),
+                org_id: org,
+                scope_key: summary.scope_key,
+                where_key: summary.where_key,
+                service_name: summary.service_name,
+                kind: "deploy".into(),
+                at: 1,
+                source_streams: json!([format!("logs/{}", "x".repeat(300))]).to_string(),
+                ..Default::default()
+            }
+            .into_active_model(),
+        )
+        .exec_without_returning(conn)
+        .await
+        .unwrap();
+        let params = BTreeMap::from([("service".into(), "svc".into())]);
+        let response = deploys(&ctx, &params).await.unwrap_err();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.headers()[axum::http::header::RETRY_AFTER], "3");
+        assert_eq!(response.headers()["x-o2-authz"], "unavailable");
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["error_code"], "authz_unavailable");
+    }
 
     #[test]
     fn a_catalog_row_shows_the_verdict_of_its_newest_deploy() {

@@ -55,7 +55,9 @@ impl Context {
         let summaries = db::service_identity::get_cached_summaries(org)
             .await
             .map_err(unavailable)?;
-        let readable = ReadableStreams::load(org, user, &summaries).await;
+        let readable = ReadableStreams::load(org, user, &summaries)
+            .await
+            .map_err(crate::authz::list::authz_unavailable_response)?;
         let summaries = readable.visible(&summaries);
         let overrides = infra::table::service_identity_rules::list(get_orm_client_rw().await, org)
             .await
@@ -439,7 +441,10 @@ pub async fn catalog(ctx: &Context, params: &BTreeMap<String, String>) -> Result
     let verdict_status = match super::signals::reads::enrich_catalog(ctx, &mut scopes, params).await
     {
         Ok(()) => "ok",
-        Err(response) if response.status() == StatusCode::SERVICE_UNAVAILABLE => {
+        Err(response)
+            if response.status() == StatusCode::SERVICE_UNAVAILABLE
+                && !response.headers().contains_key("x-o2-authz") =>
+        {
             if params.contains_key("verdict") {
                 return Err(error(
                     StatusCode::SERVICE_UNAVAILABLE,
@@ -1275,6 +1280,86 @@ mod tests {
     use config::meta::service_identity::AliasRow;
 
     use super::*;
+    use crate::authz::list::ModeAnswers;
+
+    #[cfg(feature = "test-utils")]
+    #[tokio::test]
+    async fn services_answers_503_when_an_evidence_check_fails() {
+        use config::meta::stream::StreamType;
+        use infra::table::entity::{
+            service_version_deploys as deploys, service_version_verdicts as verdicts,
+        };
+        use sea_orm::{EntityTrait, IntoActiveModel};
+
+        use crate::authz::{
+            TypedStream, fake_checker,
+            list::{ListMode, UnavailableReason},
+        };
+
+        let org = format!("services_authz_{}", now_micros());
+        let user = "services-evidence-failure@example.com";
+        let checker = fake_checker();
+        checker.set_list_mode(user, ListMode::On);
+        checker.grant_read(
+            user,
+            &TypedStream {
+                org_id: org.clone(),
+                stream_type: StreamType::Traces,
+                name: "t1".into(),
+            },
+        );
+        let mut summary = record("t1", &org);
+        summary.org_id.clone_from(&org);
+        let scope_key = summary.scope_key.clone();
+        let mut ctx = context(vec![summary]);
+        ctx.org.clone_from(&org);
+        ctx.user = user.into();
+        ctx.readable = ReadableStreams::load(&org, user, &ctx.summaries)
+            .await
+            .unwrap();
+        ctx.summaries = ctx.readable.visible(&ctx.summaries);
+        checker.fail_object_check_once(user, UnavailableReason::Server(500));
+
+        crate::service_identity::global_tables_for_tests().await;
+        let conn = get_orm_client_rw().await;
+        deploys::Entity::insert(
+            deploys::Model {
+                deploy_key: org.clone(),
+                org_id: org.clone(),
+                scope_key: scope_key.clone(),
+                to_version: "v1".into(),
+                ..Default::default()
+            }
+            .into_active_model(),
+        )
+        .exec_without_returning(conn)
+        .await
+        .unwrap();
+        verdicts::Entity::insert(
+            verdicts::Model {
+                verdict_key: org.clone(),
+                org_id: org,
+                scope_key,
+                version: "v1".into(),
+                source_streams: json!([format!("logs/{}", "x".repeat(300))]).to_string(),
+                ..Default::default()
+            }
+            .into_active_model(),
+        )
+        .exec_without_returning(conn)
+        .await
+        .unwrap();
+
+        let response = catalog(&ctx, &BTreeMap::new()).await.unwrap_err();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.headers()[axum::http::header::RETRY_AFTER], "3");
+        assert_eq!(response.headers()["x-o2-authz"], "unavailable");
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["error_code"], "authz_unavailable");
+    }
 
     fn record(stream: &str, scope: &str) -> WhereSummaryRecord {
         WhereSummaryRecord {
@@ -1345,12 +1430,14 @@ mod tests {
         let summaries = [record("allowed", "open"), record("hidden", "closed")];
         let visible = ReadableStreams::load(org, user, &summaries)
             .await
+            .unwrap()
             .visible(&summaries);
         let rows = raw_rows(&[("closed", "1.4.2", "1.4.2-a1b2c3d")]);
         assert_eq!(stripped_versions(&summaries, &rows), 1);
         assert_eq!(stripped_versions(&visible, &rows), 0);
         let none = ReadableStreams::load(org, "s8w-no-streams@example.com", &summaries)
             .await
+            .unwrap()
             .visible(&summaries);
         assert!(none.is_empty());
         assert_eq!(stripped_versions(&none, &rows), 0);
@@ -1397,6 +1484,7 @@ mod tests {
             readable: ReadableStreams {
                 traces: Default::default(),
                 rum: false,
+                answers: ModeAnswers::Legacy,
             },
             evidence: Default::default(),
             identity: OrgIdentity::default(),
@@ -1463,6 +1551,7 @@ mod tests {
             readable: ReadableStreams {
                 traces: Default::default(),
                 rum: false,
+                answers: ModeAnswers::Legacy,
             },
             evidence: Default::default(),
             identity: OrgIdentity::default(),
@@ -1562,6 +1651,7 @@ mod tests {
             readable: ReadableStreams {
                 traces: Default::default(),
                 rum: false,
+                answers: ModeAnswers::Legacy,
             },
             evidence: Default::default(),
             identity: OrgIdentity::default(),
@@ -1624,6 +1714,7 @@ mod tests {
             readable: ReadableStreams {
                 traces: Default::default(),
                 rum: false,
+                answers: ModeAnswers::Legacy,
             },
             evidence: Default::default(),
             identity: OrgIdentity::default(),
@@ -1901,6 +1992,7 @@ mod tests {
             readable: ReadableStreams {
                 traces: Default::default(),
                 rum: false,
+                answers: ModeAnswers::Legacy,
             },
             evidence: Default::default(),
             identity: OrgIdentity::default(),
