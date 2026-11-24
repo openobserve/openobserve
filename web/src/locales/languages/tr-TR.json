@@ -8199,6 +8199,8 @@
     "deleteDashboardsConfirmTitle": "Gösterge Panolarını Sil",
     "deleteDashboardsConfirmMsg": "{count} pano silmek istediğinize emin misiniz? | {count} pano silmek istediğinize emin misiniz?",
     "deleteDashboardsConfirmMsgPublicLinks": "{count} gösterge panosunu silmek istediğinizden emin misiniz? Herkese açık bağlantıları artık çalışmayacak ve silinecek. | {count} gösterge panosunu silmek istediğinizden emin misiniz? Herkese açık bağlantıları artık çalışmayacak ve silinecek.",
+    "deleteDashboardReportsWarning": "Silme işlemi bu raporu da siler: {names} | Silme işlemi bu {count} raporu da siler: {names}",
+    "deleteDashboardReportsWarningMore": "Silme işlemi bu {count} raporu da siler: {names} ve {more} tane daha",
     "edit": "Gösterge Panosunu Düzenle",
     "duplicate": "Gösterge Panosunu Çoğalt",
     "move_to_another_folder": "Başka bir Klasöre Taşı",

@@ -19,6 +19,9 @@ vi.mock("@/services/dashboards", async (importOriginal) => {
 });
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
+const listReports = vi.hoisted(() => vi.fn());
+vi.mock("@/services/reports", () => ({ default: { listByFolderId: listReports } }));
 import analytics from "@/services/product_analytics";
 import dashboardService from "@/services/dashboards";
 import { deleteDashboardById } from "@/utils/commons";
@@ -215,6 +218,10 @@ const createMockI18n = () => {
           newFolder: "New Folder",
           cancel: "Cancel",
           save: "Save",
+          deleteDashboardReportsWarning:
+            "Deleting also deletes this report: {names} | Deleting also deletes these {count} reports: {names}",
+          deleteDashboardReportsWarningMore:
+            "Deleting also deletes these {count} reports: {names} and {more} more",
         },
       },
     },
@@ -910,6 +917,153 @@ describe("Dashboards.vue", () => {
         messageName: "cpu-overview",
         okVariant: "destructive",
       });
+    });
+
+    const findDialog = (dataTest: string) =>
+      wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c) => c.vm.$attrs["data-test"] === dataTest);
+
+    // The list API returns one row per report and dashboard pair.
+    const reportsUsing = (...dashboardIds: string[][]) =>
+      listReports.mockResolvedValue({
+        data: dashboardIds.flatMap((ids, i) =>
+          ids.map((dashboard) => ({
+            report_id: `r${i}`,
+            name: `report-${i}`,
+            dashboards: [{ dashboard, folder: "default" }],
+          })),
+        ),
+      });
+
+    it("names only the first five reports when a dashboard feeds many", async () => {
+      reportsUsing(...Array.from({ length: 80 }, () => ["d1"]));
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      await wrapper.vm.showDeleteDialogFn({ row: { id: "d1", name: "cpu-overview" } });
+      await flushPromises();
+
+      expect(findDialog("dashboard-confirm-dialog").props("warningMessage")).toBe(
+        "Deleting also deletes these 80 reports: report-0, report-1, report-10, report-11, report-12 and 75 more",
+      );
+    });
+
+    it("lists only the reports left with no dashboard, not those that cover another one", async () => {
+      reportsUsing(["d1", "d2"], ["d2"], ["d1"]);
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      wrapper.vm.showDeleteDialogFn({ row: { id: "d1", name: "cpu-overview" } });
+      await flushPromises();
+
+      expect(findDialog("dashboard-confirm-dialog").props("warningMessage")).toBe(
+        "Deleting also deletes this report: report-2",
+      );
+    });
+
+    it("shows no reports warning when no report includes the dashboard", async () => {
+      reportsUsing(["d2"]);
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      wrapper.vm.showDeleteDialogFn({ row: { id: "d1", name: "cpu-overview" } });
+      await flushPromises();
+
+      expect(findDialog("dashboard-confirm-dialog").props("warningMessage")).toBeUndefined();
+    });
+
+    it("shows the clicked delete action loading until the reports warning is ready", async () => {
+      let resolveReports: (value: { data: [] }) => void = () => {};
+      listReports.mockReturnValue(new Promise((resolve) => (resolveReports = resolve)));
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      const opening = wrapper.vm.showDeleteDialogFn({ row: { id: "d1", name: "cpu-overview" } });
+      await nextTick();
+
+      expect(wrapper.vm.deleteLoadingId).toBe("d1");
+      expect(wrapper.vm.confirmDeleteDialog).toBe(false);
+      wrapper.vm.showDeleteDialogFn({ row: { id: "d2", name: "mem-overview" } });
+      expect(wrapper.vm.selectedDelete.id).toBe("d1");
+
+      resolveReports({ data: [] });
+      await opening;
+
+      expect(wrapper.vm.deleteLoadingId).toBeNull();
+      expect(wrapper.vm.confirmDeleteDialog).toBe(true);
+    });
+
+    it("shows the bulk delete button loading until the reports warning is ready", async () => {
+      let resolveReports: (value: { data: [] }) => void = () => {};
+      listReports.mockReturnValue(new Promise((resolve) => (resolveReports = resolve)));
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      const opening = wrapper.vm.openBulkDeleteDialog();
+      await nextTick();
+
+      expect(wrapper.vm.bulkDeleteLoading).toBe(true);
+      expect(wrapper.vm.confirmBulkDelete).toBe(false);
+
+      resolveReports({ data: [] });
+      await opening;
+
+      expect(wrapper.vm.bulkDeleteLoading).toBe(false);
+      expect(wrapper.vm.confirmBulkDelete).toBe(true);
+    });
+
+    it("opens the delete dialog without the warning when listing reports hangs", async () => {
+      listReports.mockReturnValue(new Promise(() => {}));
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        const opening = wrapper.vm.showDeleteDialogFn({ row: { id: "d1", name: "cpu-overview" } });
+        await vi.advanceTimersByTimeAsync(5000);
+        await opening;
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(wrapper.vm.confirmDeleteDialog).toBe(true);
+      expect(wrapper.vm.deleteLoadingId).toBeNull();
+      expect(findDialog("dashboard-confirm-dialog").props("warningMessage")).toBeUndefined();
+    });
+
+    it("still opens the delete dialog when reports cannot be listed", async () => {
+      listReports.mockRejectedValue({ response: { status: 403 } });
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      await wrapper.vm.showDeleteDialogFn({ row: { id: "d1", name: "cpu-overview" } });
+
+      expect(listReports).toHaveBeenLastCalledWith(
+        "test-org",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { silentForbidden: true },
+      );
+      expect(wrapper.vm.confirmDeleteDialog).toBe(true);
+      expect(findDialog("dashboard-confirm-dialog").props("warningMessage")).toBeUndefined();
+    });
+
+    it("names a report once when it covers several dashboards in a bulk delete", async () => {
+      reportsUsing(["d3", "d4"], ["d5"]);
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      await flushPromises();
+      wrapper.vm.selectedIds = ["d3", "d4"];
+      wrapper.vm.openBulkDeleteDialog();
+      await flushPromises();
+
+      expect(findDialog("dashboard-confirm-bulk-delete-dialog").props("warningMessage")).toBe(
+        "Deleting also deletes this report: report-0",
+      );
     });
 
     it("uses a destructive button in the bulk delete dialog", () => {
