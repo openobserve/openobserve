@@ -1352,6 +1352,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::ai::toolsets::prebuilt,
     openobserve_api_management::request::ai::toolsets::get,
     openobserve_api_management::request::ai::toolsets::list,
+    openobserve_api_management::request::ai::toolsets::list_for_agent,
     openobserve_api_management::request::ai::toolsets::update,
     openobserve_api_management::request::annotation_queues::archive_annotation_queue_items,
     openobserve_api_management::request::annotation_queues::clear_annotation_queue_items,

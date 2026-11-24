@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::{HashMap, HashSet};
+
 use axum::{
     Json,
     extract::{Path, Query},
@@ -20,13 +22,17 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::{meta::oncall::confidence::collides_with_first_party_tools, utils::time::now_micros};
-use infra::table::{ai_memory::ToolsetDelete, org_ai_toolsets::OrgToolset};
+use infra::table::{
+    ai_memory::ToolsetDelete, ai_toolset_health::ToolsetHealth as HealthRow,
+    org_ai_toolsets::OrgToolset,
+};
 use o2_enterprise::enterprise::{
     ai::{
         client::{DiscoverError, DiscoveredTool, McpEntry, get_agent_client},
         toolsets::{
             McpAuth, McpData, ToolsetCreateRequest, ToolsetHealth, ToolsetKind,
             ToolsetListResponse, ToolsetResponse, ToolsetUpdateRequest, merge_update_data,
+            needs_credentials,
             oauth::{TokenError, tokens},
             push::{colliding_names, normalize_tool_name},
             validate_data, validate_name, validate_update, without_dropped_keys,
@@ -43,6 +49,9 @@ use serde::{Deserialize, Serialize};
 use svix_ksuid::{Ksuid, KsuidLike};
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+
+const UNREADABLE: &str = "its settings can't be read";
+const SAME_AGENT_NAME: &str = "another toolset has the same agent name";
 
 /// Body of `_discover`: an unsaved config, or a saved toolset by `id` with unsaved `overrides`.
 #[derive(Default, Deserialize, utoipa::ToSchema)]
@@ -145,6 +154,183 @@ impl From<DiscoverError> for DiscoverFailure {
             }
         }
     }
+}
+
+/// One toolset as the agent may see it: an allowlist, so a field added to the stored config can't
+/// reach the model unless it is added here too.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct AgentToolset {
+    pub id: String,
+    pub name: String,
+    /// What the agent's names for its tools start with; MCP only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_prefix: Option<String>,
+    /// Why the agent gets nothing of this toolset, in a fixed text.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unavailable: Option<&'static str>,
+    pub kind: ToolsetKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Tool name globs offered to the agent; absent offers all.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed_tools: Option<Vec<String>>,
+    /// Tool name globs never offered, even when allowed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blocked_tools: Option<Vec<String>>,
+    /// Tool name globs that may change things; absent means every tool not marked read-only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub write_tools: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preset: Option<AgentToolsetPreset>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credential_type: Option<ToolsetCredentialType>,
+    /// A secret it names has no value in this region.
+    pub needs_credentials: bool,
+    pub region_only: bool,
+    /// Its last call outcomes in this region; absent before its first call.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub health: Option<AgentToolsetHealth>,
+}
+
+impl AgentToolset {
+    /// The rows `query` asks for, judged against all of the org's `rows`; a row of a kind this node
+    /// doesn't know is left out and, as in a turn, doesn't count against another's name.
+    fn from_rows(
+        rows: Vec<OrgToolset>,
+        query: &AgentListQuery,
+        health: &HashMap<String, HealthRow>,
+    ) -> Vec<Self> {
+        let known: Vec<(ToolsetKind, OrgToolset)> = rows
+            .into_iter()
+            .filter_map(|row| Some((row.kind.parse().ok()?, row)))
+            .collect();
+        let colliding = colliding_names(known.iter().map(|(_, row)| row.name.as_str()));
+        known
+            .into_iter()
+            .filter(|(_, row)| query.matches(row))
+            .map(|(kind, row)| Self::from_row(kind, row, &colliding, health))
+            .collect()
+    }
+
+    fn from_row(
+        kind: ToolsetKind,
+        row: OrgToolset,
+        colliding: &HashSet<String>,
+        health: &HashMap<String, HealthRow>,
+    ) -> Self {
+        let mut toolset = Self {
+            id: row.id,
+            name: row.name,
+            tool_prefix: None,
+            unavailable: None,
+            kind,
+            description: row.description,
+            allowed_tools: None,
+            blocked_tools: None,
+            write_tools: None,
+            preset: None,
+            credential_type: None,
+            needs_credentials: false,
+            region_only: row.region_only,
+            health: None,
+        };
+        // Another kind's `data` has no field the agent may see, and no calls of its own.
+        if kind == ToolsetKind::Mcp {
+            toolset.fill_mcp(row.data.as_deref(), health);
+        }
+        if colliding.contains(&normalize_tool_name(&toolset.name)) {
+            toolset.unavailable = Some(SAME_AGENT_NAME);
+        }
+        if toolset.unavailable.is_some() {
+            toolset.tool_prefix = None;
+        }
+        toolset
+    }
+
+    fn fill_mcp(&mut self, data: Option<&str>, health: &HashMap<String, HealthRow>) {
+        let agent_name = normalize_tool_name(&self.name);
+        self.health = health.get(&agent_name).map(AgentToolsetHealth::from);
+        self.tool_prefix = Some(format!("{agent_name}_"));
+        let data = data.and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok());
+        let Some((mcp, data)) =
+            data.and_then(|data| Some((McpData::deserialize(&data).ok()?, data)))
+        else {
+            // The parse error may quote a stored value, so it isn't logged.
+            log::warn!("toolset '{}' has unreadable data", self.name);
+            self.unavailable = Some(UNREADABLE);
+            return;
+        };
+        self.preset = data
+            .get("preset")
+            .and_then(|preset| AgentToolsetPreset::deserialize(preset).ok());
+        self.needs_credentials = needs_credentials(ToolsetKind::Mcp, Some(&data));
+        self.credential_type = Some(ToolsetCredentialType::from(&mcp.auth));
+        self.allowed_tools = mcp.policy.allowed_tools;
+        self.blocked_tools = mcp.policy.blocked_tools;
+        self.write_tools = mcp.policy.write_tools;
+    }
+}
+
+/// The shipped preset a toolset was saved from.
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct AgentToolsetPreset {
+    pub id: String,
+    pub revision: u32,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolsetCredentialType {
+    Headers,
+    OauthClientCredentials,
+}
+
+impl From<&McpAuth> for ToolsetCredentialType {
+    fn from(auth: &McpAuth) -> Self {
+        match auth {
+            McpAuth::Headers => Self::Headers,
+            McpAuth::OauthClientCredentials(_) => Self::OauthClientCredentials,
+        }
+    }
+}
+
+/// When a toolset's calls last succeeded and failed (microseconds), never the vendor's error.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct AgentToolsetHealth {
+    pub status: ToolsetHealthStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_ok_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_error_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failing_since: Option<i64>,
+}
+
+impl From<&HealthRow> for AgentToolsetHealth {
+    fn from(row: &HealthRow) -> Self {
+        Self {
+            status: if row.failing_since.is_some() {
+                ToolsetHealthStatus::Failing
+            } else {
+                ToolsetHealthStatus::Ok
+            },
+            last_ok_at: row.last_ok_at,
+            last_error_at: row.last_error_at,
+            failing_since: row.failing_since,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolsetHealthStatus {
+    Ok,
+    Failing,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct AgentToolsetList {
+    pub toolsets: Vec<AgentToolset>,
 }
 
 // ---------------------------------------------------------------------------
@@ -367,6 +553,73 @@ pub async fn list(
         }
         Err(e) => MetaHttpResponse::internal_error(e),
     }
+}
+
+/// Query parameters of `list_toolsets`.
+#[derive(Debug, Default, Deserialize)]
+pub struct AgentListQuery {
+    pub name: Option<String>,
+    pub kind: Option<String>,
+}
+
+impl AgentListQuery {
+    fn matches(&self, row: &OrgToolset) -> bool {
+        let name = row.name.to_lowercase();
+        self.name
+            .as_ref()
+            .is_none_or(|part| name.contains(&part.to_lowercase()))
+            && self.kind.as_ref().is_none_or(|kind| *kind == row.kind)
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/ai/toolsets/_list",
+    context_path = "/api",
+    tag = "AI",
+    operation_id = "list_toolsets",
+    summary = "List AI toolsets for the agent",
+    description = "Lists each AI toolset's tool limits, credential type and health status, without \
+                   URLs, credentials, skill content or error texts. \
+                   Only available in enterprise deployments.",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("name"   = Option<String>, Query, description = "Substring filter on name (case-insensitive)"),
+        ("kind"   = Option<String>, Query, description = "Exact filter on kind: mcp | skill | generic"),
+    ),
+    security(("Authorization" = [])),
+    responses(
+        (status = 200, description = "List of toolsets", content_type = "application/json", body = AgentToolsetList),
+        (status = 403, description = "Feature not supported", content_type = "application/json"),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "AI", "operation": "list"})),
+        ("x-o2-mcp" = json!({
+            "description": "List the org's AI toolsets (external MCP servers and skills) and which tools each one allows, blocks or treats as writes; a missing allowed_tools allows all, unless unavailable says why the agent gets none. It shows configuration, not whether a toolset connected on this turn, and leaves out the MCP servers of an operator's own config.yaml.",
+            "category": "ai",
+            "pinned": true
+        }))
+    )
+)]
+pub async fn list_for_agent(
+    Path(org_id): Path<String>,
+    Query(params): Query<AgentListQuery>,
+) -> Response {
+    // Unfiltered: a row the filter hides can still share a listed row's agent name.
+    let all = infra::table::org_ai_toolsets::ListFilter::default();
+    let rows = match infra::table::org_ai_toolsets::list(&org_id, all, None).await {
+        Ok(rows) => rows,
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+    let health = match infra::table::ai_toolset_health::list(&org_id).await {
+        Ok(health) => health,
+        Err(e) => {
+            log::warn!("failed to read toolset health for org={org_id}: {e}");
+            HashMap::new()
+        }
+    };
+    let toolsets = AgentToolset::from_rows(rows, &params, &health);
+    Json(AgentToolsetList { toolsets }).into_response()
 }
 
 // ---------------------------------------------------------------------------
@@ -1318,6 +1571,329 @@ mod tests {
             updated_at: 1,
             region_only: false,
             origin_region: None,
+        }
+    }
+
+    fn agent_list(
+        rows: Vec<OrgToolset>,
+        query: &AgentListQuery,
+        health: &HashMap<String, HealthRow>,
+    ) -> Vec<Value> {
+        AgentToolset::from_rows(rows, query, health)
+            .into_iter()
+            .map(|toolset| serde_json::to_value(toolset).unwrap())
+            .collect()
+    }
+
+    fn agent_view(row: OrgToolset) -> Value {
+        agent_list(vec![row], &AgentListQuery::default(), &HashMap::new()).remove(0)
+    }
+
+    #[test]
+    fn the_agent_s_list_shows_a_header_toolset_s_configuration_only() {
+        let mut stored = row(
+            "mcp",
+            json!({
+                "url": "https://u-secret@mcp.example.com/p-secret?key=q-secret",
+                "headers": {"X-Hname-secret": "h-secret"},
+                "timeout_seconds": 30,
+                "allowed_tools": ["search_*"],
+                "blocked_tools": ["delete_*"],
+                "write_tools": ["create_monitor"],
+                "tool_classes": [{"tool": "search_logs", "class": "logs"}],
+                "preset": {"id": "datadog", "revision": 3, "params": {"url": "pp-secret"}},
+                "future_field": "f-secret"
+            }),
+        );
+        stored.name = "Datadog_Prod".to_string();
+        stored.description = Some("Datadog, production".to_string());
+        stored.region_only = true;
+        let rows = HashMap::from([(
+            "datadog-prod".to_string(),
+            HealthRow {
+                org: "org".to_string(),
+                toolset: "datadog-prod".to_string(),
+                last_ok_at: Some(1),
+                last_error_at: Some(5),
+                failing_since: Some(3),
+                last_error: Some("401 v-secret".to_string()),
+            },
+        )]);
+        let item = agent_list(vec![stored], &AgentListQuery::default(), &rows).remove(0);
+        assert_eq!(
+            item,
+            json!({
+                "id": "t1",
+                "name": "Datadog_Prod",
+                "tool_prefix": "datadog-prod_",
+                "kind": "mcp",
+                "description": "Datadog, production",
+                "allowed_tools": ["search_*"],
+                "blocked_tools": ["delete_*"],
+                "write_tools": ["create_monitor"],
+                "preset": {"id": "datadog", "revision": 3},
+                "credential_type": "headers",
+                "needs_credentials": false,
+                "region_only": true,
+                "health": {
+                    "status": "failing",
+                    "last_ok_at": 1,
+                    "last_error_at": 5,
+                    "failing_since": 3
+                }
+            })
+        );
+        let text = item.to_string();
+        assert!(!text.contains("secret") && !text.contains("http"), "{text}");
+    }
+
+    #[test]
+    fn the_agent_s_list_never_shows_how_calls_are_graded() {
+        let item = agent_view(row(
+            "mcp",
+            json!({
+                "url": "https://mcp.example.com/mcp",
+                "tool_classes": [{"tool": "run-query", "class": "logs", "args": {"q": "^grade-me"}}]
+            }),
+        ));
+        assert!(item.get("tool_classes").is_none(), "{item}");
+        for part in ["run-query", "logs", "grade-me"] {
+            assert!(!item.to_string().contains(part), "{item}");
+        }
+    }
+
+    #[test]
+    fn the_agent_s_list_shows_only_the_type_of_an_oauth_credential() {
+        let item = agent_view(row(
+            "mcp",
+            json!({
+                "url": "https://u-secret.example.com/mcp",
+                "auth": {
+                    "type": "oauth_client_credentials",
+                    "token_url": "https://t-secret.example.com/token",
+                    "client_id": "id-secret",
+                    "client_secret": "",
+                    "scope": "sc-secret",
+                    "extra_params": {"en-secret": "ev-secret"},
+                    "client_auth": "basic"
+                }
+            }),
+        ));
+        assert_eq!(
+            item,
+            json!({
+                "id": "t1",
+                "name": "datadog-prod",
+                "tool_prefix": "datadog-prod_",
+                "kind": "mcp",
+                "credential_type": "oauth_client_credentials",
+                "needs_credentials": true,
+                "region_only": false
+            })
+        );
+    }
+
+    #[test]
+    fn the_agent_s_list_shows_no_content_of_a_skill_or_generic_toolset() {
+        let rows = HashMap::from([(
+            "datadog-prod".to_string(),
+            HealthRow {
+                org: "org".to_string(),
+                toolset: "datadog-prod".to_string(),
+                last_ok_at: Some(1),
+                last_error_at: None,
+                failing_since: None,
+                last_error: None,
+            },
+        )]);
+        for (kind, data) in [
+            ("skill", json!({"content": "c-secret"})),
+            (
+                "generic",
+                json!({"url": "g-secret", "allowed_tools": ["x"]}),
+            ),
+        ] {
+            let query = AgentListQuery::default();
+            assert_eq!(
+                agent_list(vec![row(kind, data)], &query, &rows).remove(0),
+                json!({
+                    "id": "t1",
+                    "name": "datadog-prod",
+                    "kind": kind,
+                    "needs_credentials": false,
+                    "region_only": false
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn the_agent_s_list_leaves_out_an_unknown_kind() {
+        let cli = row("cli", json!({"env": {"GH_TOKEN": "s3cret"}}));
+        let listed = agent_list(vec![cli], &AgentListQuery::default(), &HashMap::new());
+        assert!(listed.is_empty());
+    }
+
+    #[test]
+    fn an_mcp_row_whose_data_can_t_be_read_is_unavailable() {
+        let mut missing = row("mcp", json!({}));
+        missing.data = None;
+        let bad = row("mcp", json!({"url": 7, "allowed_tools": "s3cret"}));
+        for stored in [bad, missing] {
+            assert_eq!(
+                agent_view(stored),
+                json!({
+                    "id": "t1",
+                    "name": "datadog-prod",
+                    "unavailable": "its settings can't be read",
+                    "kind": "mcp",
+                    "needs_credentials": false,
+                    "region_only": false
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn rows_that_share_an_agent_name_are_unavailable_even_when_the_filter_hides_one() {
+        let named = |name: &str, kind: &str| OrgToolset {
+            name: name.to_string(),
+            ..row(
+                kind,
+                json!({"url": "https://mcp.example.com/mcp", "content": "x"}),
+            )
+        };
+        let by_name = |name: &str| AgentListQuery {
+            name: Some(name.to_string()),
+            kind: None,
+        };
+        let by_kind = |kind: &str| AgentListQuery {
+            name: None,
+            kind: Some(kind.to_string()),
+        };
+        // (the other row, the query, whether `Datadog Prod` is unavailable)
+        for (other, query, unavailable) in [
+            (named("datadog_prod", "mcp"), by_name("datadog p"), true),
+            (named("datadog_prod", "skill"), by_kind("mcp"), true),
+            (named("datadog_prod", "generic"), by_kind("mcp"), true),
+            (named("datadog_prod", "cli"), by_kind("mcp"), false),
+            (named("datadog-eu", "mcp"), by_name("DATADOG P"), false),
+        ] {
+            let label = format!("{} {} {query:?}", other.name, other.kind);
+            let rows = vec![named("Datadog Prod", "mcp"), other];
+            let listed = agent_list(rows, &query, &HashMap::new());
+            assert_eq!(listed.len(), 1, "{label}");
+            let item = &listed[0];
+            assert_eq!(item["name"], "Datadog Prod", "{label}");
+            if unavailable {
+                assert_eq!(
+                    item["unavailable"], "another toolset has the same agent name",
+                    "{label}"
+                );
+                assert!(item.get("tool_prefix").is_none(), "{label}");
+            } else {
+                assert!(item.get("unavailable").is_none(), "{label}");
+                assert_eq!(item["tool_prefix"], "datadog-prod_", "{label}");
+            }
+        }
+        let both = vec![named("Datadog Prod", "mcp"), named("datadog_prod", "skill")];
+        let listed = agent_list(both, &AgentListQuery::default(), &HashMap::new());
+        assert!(listed.iter().all(|t| t["unavailable"].is_string()));
+    }
+
+    #[test]
+    fn a_toolset_is_failing_until_a_call_succeeds() {
+        let at = |failing_since| HealthRow {
+            org: "org".to_string(),
+            toolset: "t".to_string(),
+            last_ok_at: Some(9),
+            last_error_at: Some(5),
+            failing_since,
+            last_error: None,
+        };
+        assert_eq!(
+            AgentToolsetHealth::from(&at(Some(3))).status,
+            ToolsetHealthStatus::Failing
+        );
+        assert_eq!(
+            AgentToolsetHealth::from(&at(None)).status,
+            ToolsetHealthStatus::Ok
+        );
+    }
+
+    #[test]
+    fn a_toolset_s_prefix_is_the_one_its_turn_uses() {
+        for (name, want) in [
+            ("Datadog Prod", "datadog-prod_"),
+            ("datadog_prod", "datadog-prod_"),
+            ("-GitHub!", "github_"),
+            ("é", "toolset_"),
+            ("kubectl", "kubectl_"),
+        ] {
+            let mut stored = row("mcp", json!({"url": "https://mcp.example.com/mcp"}));
+            stored.name = name.to_string();
+            assert_eq!(agent_view(stored)["tool_prefix"], want, "{name}");
+            assert_eq!(want, format!("{}_", normalize_tool_name(name)), "{name}");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_agent_s_list_filters_by_name_and_kind() {
+        if !crate::request::ai::memory::tests::meta_store().await {
+            return;
+        }
+        let org = format!("toolsets_agent_{}", config::ider::uuid());
+        for (name, kind, data) in [
+            (
+                "datadog-prod",
+                "mcp",
+                json!({"url": "https://a.example/mcp"}),
+            ),
+            (
+                "datadog-eu",
+                "mcp",
+                json!({"url": "https://b.example/mcp", "headers": {"K": "s3cret"}}),
+            ),
+            ("datadog-runbook", "skill", json!({"content": "s3cret"})),
+            ("datadog-cli", "cli", json!({"env": {"T": "s3cret"}})),
+        ] {
+            let mut entry = row(kind, data);
+            entry.id = String::new();
+            entry.org = org.clone();
+            entry.name = name.to_string();
+            infra::table::org_ai_toolsets::add(entry).await.unwrap();
+        }
+        for (name, kind, want) in [
+            (
+                None,
+                None,
+                vec!["datadog-eu", "datadog-prod", "datadog-runbook"],
+            ),
+            (Some("PROD"), None, vec!["datadog-prod"]),
+            (None, Some("skill"), vec!["datadog-runbook"]),
+            (
+                Some("datadog"),
+                Some("mcp"),
+                vec!["datadog-eu", "datadog-prod"],
+            ),
+            (None, Some("cli"), vec![]),
+        ] {
+            let query = AgentListQuery {
+                name: name.map(str::to_string),
+                kind: kind.map(str::to_string),
+            };
+            let resp = list_for_agent(Path(org.clone()), Query(query)).await;
+            assert_eq!(resp.status(), StatusCode::OK);
+            let body = body_of(resp).await;
+            assert!(!body.to_string().contains("s3cret"), "{body}");
+            let mut names: Vec<&str> = body["toolsets"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|t| t["name"].as_str().unwrap())
+                .collect();
+            names.sort();
+            assert_eq!(names, want, "{name:?} {kind:?}");
         }
     }
 

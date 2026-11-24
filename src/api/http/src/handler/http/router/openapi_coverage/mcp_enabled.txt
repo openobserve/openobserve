@@ -108,6 +108,9 @@ all ExtendAlertMute
 all ExtendDowntime
 all ExtractPatterns
 all GenerateSql
+ent GetAiMyMemory
+ent GetAiOrgMemory
+ent GetAiToolsetMemory
 all GetAlert
 ent GetAlertCalibrationConfig
 ent GetAlertCalibrationRunRecords
@@ -428,6 +431,7 @@ ent listWorkflows
 ent list_prompt_activity
 ent list_prompt_versions
 ent list_prompts
+ent list_toolsets
 ent match_prompts
 ent move_prompt_label
 ent promoteDraftWorkflow

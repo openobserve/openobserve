@@ -2062,6 +2062,7 @@ fn service_route_table() -> Router {
             .route("/{org_id}/ai/toolsets/_discover", post(ai::toolsets::discover))
             .route("/{org_id}/ai/toolsets/_resync", post(ai::toolsets::resync))
             .route("/{org_id}/ai/toolsets/prebuilt", get(ai::toolsets::prebuilt))
+            .route("/{org_id}/ai/toolsets/_list", get(ai::toolsets::list_for_agent))
             .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).delete(ai::toolsets::delete))
             .route("/{org_id}/ai/toolsets/{id}/memory", get(ai::memory::get_toolset_memory).put(ai::memory::update_toolset_memory))
             .route("/{org_id}/ai/toolsets/{id}/memory/revisions", get(ai::memory::list_toolset_memory_revisions))
