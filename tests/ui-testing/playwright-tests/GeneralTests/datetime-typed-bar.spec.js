@@ -11,6 +11,8 @@ const PageManager = require('../../pages/page-manager.js');
  */
 
 const LOG_STAMP = '2026-07-23T10:10:00Z';
+// Logs write period/from/to to the URL only when a search runs, and a search needs a stream.
+const STREAM = 'e2e_automate';
 
 test.describe("DateTime typed range bar testcases", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -27,6 +29,7 @@ test.describe("DateTime typed range bar testcases", () => {
   test("applies a typed rolling range and writes it to the URL as period", {
     tag: ['@datetime-picker', '@all', '@P0']
   }, async ({ page }) => {
+    await pm.logsPage.selectStream(STREAM);
     await pm.dateTimePickerPage.openPicker();
     await expect(pm.dateTimePickerPage.rangeBarInput).toBeFocused();
 
@@ -35,6 +38,7 @@ test.describe("DateTime typed range bar testcases", () => {
     await pm.dateTimePickerPage.rangeBarInput.press('Enter');
 
     await pm.dateTimePickerPage.expectPickerClosed();
+    await pm.logsPage.clickRefreshButton();
     await expect(page).toHaveURL(/[?&]period=2h(&|$)/);
     expect(await pm.dateTimePickerPage.getTriggerLabel()).toContain('Past 2 Hours');
   });
@@ -42,6 +46,7 @@ test.describe("DateTime typed range bar testcases", () => {
   test("applies a pasted log stamp as a fixed range without a period", {
     tag: ['@datetime-picker', '@all', '@P1']
   }, async ({ page }) => {
+    await pm.logsPage.selectStream(STREAM);
     await pm.dateTimePickerPage.openPicker();
     await pm.dateTimePickerPage.seedClipboard(LOG_STAMP);
     await pm.dateTimePickerPage.clickPaste();
@@ -50,6 +55,7 @@ test.describe("DateTime typed range bar testcases", () => {
     await pm.dateTimePickerPage.rangeBarInput.press('Enter');
 
     await pm.dateTimePickerPage.expectPickerClosed();
+    await pm.logsPage.clickRefreshButton();
     await expect(page).toHaveURL(/[?&]from=\d+/);
     await expect(page).toHaveURL(/[?&]to=\d+/);
     await expect(page).not.toHaveURL(/[?&]period=/);
