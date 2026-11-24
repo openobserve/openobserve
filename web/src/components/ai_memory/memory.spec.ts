@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { PendingEdit } from "@/services/ai_memory";
-import { authorLabel, diffLines, formatBytes, groupPending, memoryLine } from "./memory";
+import { authorLabel, editsDiff, formatBytes, groupPending, memoryLine } from "./memory";
 
 const edit = (id: string, extra: Partial<PendingEdit> = {}): PendingEdit => ({
   id,
@@ -68,18 +68,14 @@ describe("ai memory helpers", () => {
     ]);
   });
 
-  it("diffs two texts by line", () => {
-    expect(diffLines("a\nb\nc", "a\nc\nd")).toEqual([
-      { kind: "same", text: "a" },
-      { kind: "removed", text: "b" },
-      { kind: "same", text: "c" },
-      { kind: "added", text: "d" },
-    ]);
-    expect(diffLines("", "x")).toEqual([{ kind: "added", text: "x" }]);
-    const big = (tag: string) => Array.from({ length: 8000 }, (_, i) => `${tag}${i}`).join("\n");
-    const huge = diffLines(`top\n${big("a")}`, `top\n${big("b")}`);
-    expect(huge[0]).toEqual({ kind: "same", text: "top" });
-    expect(huge.filter((l) => l.kind === "removed")).toHaveLength(8000);
+  it("turns proposed edits into the text removed and the text added", () => {
+    expect(
+      editsDiff([
+        { op: "replace", old: "a", new: "b" },
+        { op: "remove", old: "c" },
+        { op: "add", section: "Services", text: "d" },
+      ]),
+    ).toEqual({ original: "a\nc", modified: "b\n[Services] d" });
   });
 
   it("formats sizes and authors", () => {

@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
+import { defineComponent, h } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -26,8 +27,8 @@ vi.mock("@/services/ai_memory", () => ({
     get: vi.fn(),
     update: vi.fn(),
     pending: vi.fn(),
-    accept: vi.fn(() => Promise.resolve({})),
-    discard: vi.fn(() => Promise.resolve({})),
+    accept: vi.fn(() => Promise.resolve({ data: { results: [] } })),
+    discard: vi.fn(() => Promise.resolve({ data: { results: [] } })),
     revisions: vi.fn(),
     revision: vi.fn(),
     revert: vi.fn(() => Promise.resolve({})),
@@ -40,6 +41,107 @@ vi.mock("@/services/ai_toolsets", () => ({
     ),
   },
 }));
+
+// A light OTable: rows through cell slots, selection, row actions, loading and error states.
+const OTableStub = defineComponent({
+  props: [
+    "data",
+    "columns",
+    "loading",
+    "error",
+    "selection",
+    "selectedIds",
+    "rowActions",
+    "rowKey",
+  ],
+  inheritAttrs: false,
+  emits: ["row-click", "update:selectedIds", "retry"],
+  setup(props, { slots, emit }) {
+    return () => {
+      if (props.loading) return h("div", { "data-test": "table-loading" });
+      if (props.error)
+        return h("div", { "data-test": "table-error" }, [
+          props.error,
+          h("button", { "data-test": "table-retry", onClick: () => emit("retry") }),
+        ]);
+      if (!props.data.length) return h("div", { "data-test": "table-empty" }, slots.empty?.());
+      return h("div", [
+        slots["toolbar"]?.(),
+        slots["toolbar-trailing"]?.(),
+        props.selectedIds?.length ? h("div", slots["selection-actions"]?.()) : null,
+        ...props.data.map((row: any) =>
+          h("div", { "data-test": "row", onClick: () => emit("row-click", row) }, [
+            props.selection === "multiple"
+              ? h("input", {
+                  type: "checkbox",
+                  "data-test": "row-select",
+                  onClick: (e: Event) => e.stopPropagation(),
+                  onChange: () =>
+                    emit("update:selectedIds", [...props.selectedIds, row[props.rowKey]]),
+                })
+              : null,
+            ...props.columns
+              .filter((c: any) => !c.isAction)
+              .map((c: any) =>
+                slots[`cell-${c.id}`]
+                  ? h("span", slots[`cell-${c.id}`]!({ row }))
+                  : h("span", String(row[c.accessorKey] ?? "")),
+              ),
+            ...(props.rowActions ?? [])
+              .filter((a: any) => a.visible?.(row) ?? true)
+              .map((a: any) =>
+                h("button", {
+                  "data-test": a.dataTest(row),
+                  onClick: (e: Event) => {
+                    e.stopPropagation();
+                    a.onSelect(row);
+                  },
+                }),
+              ),
+          ]),
+        ),
+      ]);
+    };
+  },
+});
+
+const ODialogStub = defineComponent({
+  props: ["open", "title", "primaryButtonLabel", "secondaryButtonLabel", "primaryButtonDataTest"],
+  emits: ["click:primary", "click:secondary", "update:open"],
+  setup(props, { slots, emit, attrs }) {
+    return () =>
+      props.open
+        ? h("div", { "data-test": attrs["data-test"] }, [
+            h("h2", props.title),
+            slots["header-right"]?.(),
+            slots.default?.(),
+            slots.footer?.(),
+            props.secondaryButtonLabel
+              ? h("button", {
+                  "data-test": "dlg-secondary",
+                  onClick: () => emit("click:secondary"),
+                })
+              : null,
+            props.primaryButtonLabel
+              ? h("button", {
+                  "data-test": props.primaryButtonDataTest ?? "dlg-primary",
+                  onClick: () => emit("click:primary"),
+                })
+              : null,
+          ])
+        : null;
+  },
+});
+
+const editorStub = defineComponent({
+  props: ["target", "title", "embedded", "formId"],
+  expose: [],
+  emits: ["saved"],
+  setup:
+    (_p, { emit }) =>
+    () =>
+      h("button", { "data-test": "editor", onClick: () => emit("saved") }),
+});
 
 const pendingEdit = (id: string, extra: Record<string, unknown> = {}) => ({
   id,
@@ -59,20 +161,22 @@ const pendingEdit = (id: string, extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-const setup = (canApply: boolean) => {
-  vi.mocked(aiMemory.get).mockResolvedValue({
-    data: {
-      scope: "org",
-      content: "",
-      rev: 1,
-      size_bytes: 0,
-      max_bytes: 16384,
-      agent_memory_writes: null,
-      agent_memory_writes_effective: "review",
-      pending_count: 3,
-      can_apply: canApply,
-    },
-  } as any);
+const memory = (extra: Record<string, unknown> = {}) => ({
+  scope: "org",
+  content: "old text",
+  rev: 2,
+  size_bytes: 2048,
+  max_bytes: 16384,
+  agent_memory_writes: null,
+  agent_memory_writes_effective: "review",
+  pending_count: 3,
+  updated_at: 1_700_000_000_000_000,
+  can_apply: true,
+  ...extra,
+});
+
+const setup = (canApply = true) => {
+  vi.mocked(aiMemory.get).mockResolvedValue({ data: memory({ can_apply: canApply }) } as any);
   vi.mocked(aiMemory.pending).mockResolvedValue({
     data: {
       pending: [
@@ -82,186 +186,333 @@ const setup = (canApply: boolean) => {
       ],
     },
   } as any);
+  vi.mocked(aiMemory.revisions).mockResolvedValue({
+    data: {
+      revisions: [
+        { ...pendingEdit("r2"), state: "applied", rev: 2, edits: null, content: "new" },
+        { ...pendingEdit("r1"), state: "applied", rev: 1, edits: null, content: "old" },
+      ],
+    },
+  } as any);
+  vi.mocked(aiMemory.revision).mockImplementation(
+    (_o, _t, id) =>
+      Promise.resolve({
+        data: {
+          ...pendingEdit(id),
+          state: "applied",
+          rev: id === "r2" ? 2 : 1,
+          edits: null,
+          content: id === "r2" ? "new" : "old",
+        },
+      }) as any,
+  );
 };
 
-const mountPage = async (tab: string) => {
+const mountPage = async () => {
   const w = mount(AiMemory, {
     global: {
       plugins: [i18n, store, router],
       provide: { store },
-      stubs: { OPageLayout: { template: "<div><slot name='header-tabs' /><slot /></div>" } },
+      stubs: {
+        OPageLayout: { template: "<div><slot name='actions' /><slot /></div>" },
+        OTable: OTableStub,
+        ODialog: ODialogStub,
+        ODrawer: ODialogStub,
+        AiMemoryEditor: editorStub,
+        ConfirmDialog: {
+          props: ["modelValue"],
+          emits: ["update:ok", "update:cancel"],
+          template:
+            "<div v-if='modelValue' data-test='confirm'><button data-test='confirm-ok' @click=\"$emit('update:ok')\" /></div>",
+        },
+        DiffViewer: {
+          props: ["original", "modified"],
+          template: "<div data-test='diff'>{{ original }}>{{ modified }}</div>",
+        },
+        ODropdown: {
+          template: "<div><slot name='trigger' /><div data-test='menu'><slot /></div></div>",
+        },
+        ODropdownItem: {
+          emits: ["select"],
+          template: "<div role='option' @click=\"$emit('select')\"><slot /></div>",
+        },
+        ORefreshButton: true,
+        OTimeCell: true,
+      },
     },
   });
   await flushPromises();
-  (w.vm as any).$.setupState.tab = tab;
-  await flushPromises();
   return w;
+};
+
+const openPending = async (w: any) => {
+  await w.find('[data-test="ai-memory-review-pending-btn"]').trigger("click");
+  await flushPromises();
+};
+const pendingRowEls = (w: any) =>
+  w.findAll('[data-test="ai-memory-pending-drawer"] [data-test="row"]');
+const openHistory = async (w: any, idx = 0) => {
+  await w
+    .findAll('[data-test="row"]')
+    [idx].find(idx ? '[data-test="ai-memory-ts1-history"]' : '[data-test="ai-memory-org-history"]')
+    .trigger("click");
+  await flushPromises();
 };
 
 describe("AiMemory page", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("groups pending edits, shows their flags and accepts a group or the selection", async () => {
-    setup(true);
-    const w = await mountPage("pending");
-    const groups = w.findAll('[data-test="ai-memory-pending-group"]');
-    expect(groups).toHaveLength(2);
-    expect(groups[0].text()).toContain("proposed 2 times");
-    expect(groups[0].find('[data-test="ai-memory-flag-states_absence"]').exists()).toBe(true);
-    expect(groups[0].find('[data-test="ai-memory-flag-suppression_text"]').exists()).toBe(true);
-    expect(groups[1].text()).toContain("grafana");
+  it("lists the org memory and each toolset memory and opens one in the drawer", async () => {
+    setup();
+    const w = await mountPage();
+    const rows = w.findAll('[data-test="row"]');
+    expect(rows).toHaveLength(2);
+    expect(rows[0].text()).toContain("2.0 KiB / 16.0 KiB");
+    expect(rows[1].text()).toContain("grafana");
+    await rows[1].trigger("click");
+    expect(w.find('[data-test="ai-memory-drawer"] h2').text()).toBe("grafana");
+    expect(w.find('[data-test="editor"]').exists()).toBe(true);
+    await w.find('[data-test="editor"]').trigger("click");
+    await flushPromises();
+    expect(w.find('[data-test="ai-memory-drawer"]').exists()).toBe(false);
+    expect(aiMemory.get).toHaveBeenCalledTimes(4);
+  });
 
-    await groups[0].find('[data-test="ai-memory-accept"]').trigger("click");
+  it("shows Used in, keeps org first and offers row actions", async () => {
+    setup();
+    vi.mocked(aiMemory.get).mockImplementation(((_o: string, target: any) =>
+      Promise.resolve({
+        data: memory(
+          target.scope === "org"
+            ? {}
+            : { rev: 0, pending_count: 0, updated_at: 1_700_000_000_000_000 },
+        ),
+      })) as any);
+    const w = await mountPage();
+    const rows = w.findAll('[data-test="row"]');
+    expect(rows[0].find('[data-test="ai-memory-org-edit"]').exists()).toBe(true);
+    expect(rows[0].find('[data-test="ai-memory-org-review-pending"]').exists()).toBe(true);
+    expect(rows[1].find('[data-test="ai-memory-ts1-history"]').exists()).toBe(true);
+    expect(rows[1].find('[data-test="ai-memory-ts1-review-pending"]').exists()).toBe(false);
+    const rowsVm = (w.vm as any).$.setupState.memoryRows;
+    expect(rowsVm[0].updated).not.toBeNull();
+    expect(rowsVm[1].updated).toBeNull();
+  });
+
+  it("has no tabs and shows the pending count on the header button", async () => {
+    setup();
+    const w = await mountPage();
+    expect(w.find('[data-test="ai-memory-tabs"]').exists()).toBe(false);
+    expect(w.find('[data-test="ai-memory-review-pending-btn"]').text()).toContain("2");
+    expect(w.find('[data-test="ai-memory-pending-drawer"]').exists()).toBe(false);
+  });
+
+  it("hides the header button when nothing is pending", async () => {
+    setup();
+    vi.mocked(aiMemory.pending).mockResolvedValue({ data: { pending: [] } } as any);
+    const w = await mountPage();
+    expect(w.find('[data-test="ai-memory-review-pending-btn"]').exists()).toBe(false);
+  });
+
+  it("View history opens the drawer on the newest revision with its diff against the previous", async () => {
+    setup();
+    const w = await mountPage();
+    await openHistory(w, 1);
+    const drawer = w.find('[data-test="ai-memory-history-drawer"]');
+    expect(drawer.find("h2").text()).toBe("History · grafana");
+    expect(aiMemory.revisions).toHaveBeenCalledWith(expect.any(String), {
+      scope: "toolset",
+      toolsetId: "ts1",
+    });
+    expect(drawer.find('[data-test="ai-memory-history-selector"]').text()).toContain("Revision 2");
+    expect(drawer.find('[data-test="ai-memory-history-selector"]').text()).toContain("Current");
+    expect(drawer.find('[data-test="ai-memory-history-meta"]').text()).toContain(
+      "Reason: seen in RCA",
+    );
+    expect(drawer.find('[data-test="ai-memory-history-compare"]').text()).toBe(
+      "Changes from revision 1",
+    );
+    expect(drawer.find('[data-test="ai-memory-diff"]').text()).toBe("old>new");
+    expect(drawer.find('[data-test="ai-memory-revert"]').exists()).toBe(false);
+  });
+
+  it("choosing an older revision updates the meta and diff, and reverts after confirming", async () => {
+    setup();
+    const w = await mountPage();
+    await openHistory(w);
+    await w.find('[data-test="ai-memory-history-option-1"]').trigger("click");
+    await flushPromises();
+    const drawer = w.find('[data-test="ai-memory-history-drawer"]');
+    expect(drawer.find('[data-test="ai-memory-history-selector"]').text()).toContain("Revision 1");
+    expect(drawer.find('[data-test="ai-memory-history-compare"]').text()).toBe("First version");
+    expect(drawer.find('[data-test="ai-memory-diff"]').text()).toBe(">old");
+    expect(drawer.find('[data-test="ai-memory-revert"]').text()).toBe("Revert to revision 1");
+    await drawer.find('[data-test="ai-memory-revert"]').trigger("click");
+    expect(aiMemory.revert).not.toHaveBeenCalled();
+    vi.mocked(aiMemory.revisions).mockClear();
+    vi.mocked(aiMemory.get).mockClear();
+    await w.find('[data-test="confirm-ok"]').trigger("click");
+    await flushPromises();
+    expect(aiMemory.revert).toHaveBeenCalledWith(expect.any(String), { scope: "org" }, 1);
+    expect(aiMemory.revisions).toHaveBeenCalledTimes(1);
+    expect(aiMemory.get).toHaveBeenCalled();
+    expect(drawer.find('[data-test="ai-memory-history-selector"]').text()).toContain("Revision 2");
+  });
+
+  it("shows skeletons while the revisions load", async () => {
+    setup();
+    vi.mocked(aiMemory.revisions).mockReturnValue(new Promise(() => {}) as any);
+    const w = await mountPage();
+    await openHistory(w);
+    expect(w.find('[data-test="ai-memory-history-loading"]').exists()).toBe(true);
+  });
+
+  it("View history on a memory that was never saved shows the empty state", async () => {
+    setup();
+    vi.mocked(aiMemory.get).mockResolvedValue({ data: memory({ rev: 0 }) } as any);
+    vi.mocked(aiMemory.revisions).mockResolvedValue({ data: { revisions: [] } } as any);
+    const w = await mountPage();
+    await openHistory(w);
+    const drawer = w.find('[data-test="ai-memory-history-drawer"]');
+    expect(drawer.text()).toContain("No history yet");
+    expect(drawer.find('[data-test="ai-memory-history-selector"]').exists()).toBe(false);
+  });
+
+  it("row Review pending opens the pending drawer filtered to the memory", async () => {
+    setup();
+    const w = await mountPage();
+    await w.find('[data-test="ai-memory-org-review-pending"]').trigger("click");
+    await flushPromises();
+    const st = (w.vm as any).$.setupState;
+    expect(w.find('[data-test="ai-memory-pending-drawer"]').exists()).toBe(true);
+    expect(st.pendingFilter).toBe("Org memory");
+    expect(w.findAll('[data-test="ai-memory-pending-drawer"] [data-test="row"]')).toHaveLength(1);
+  });
+
+  it("shows pending changes as rows with flags and accepts one from its row action", async () => {
+    setup();
+    const w = await mountPage();
+    await openPending(w);
+    const rows = pendingRowEls(w);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].text()).toContain("proposed 2 times");
+    expect(rows[0].find('[data-test="ai-memory-flag-states_absence"]').exists()).toBe(true);
+    expect(rows[0].find('[data-test="ai-memory-flag-suppression_text"]').exists()).toBe(true);
+    expect(w.text()).not.toContain("Accept all");
+    await rows[0].find('[data-test^="ai-memory-accept-"]').trigger("click");
     await flushPromises();
     expect(aiMemory.accept).toHaveBeenCalledWith(expect.any(String), ["p1", "p2"]);
+  });
 
-    const boxes = w.findAll('[data-test="ai-memory-pending-select"]');
+  it("accepts the selection and asks before discarding it", async () => {
+    setup();
+    const w = await mountPage();
+    await openPending(w);
+    const boxes = w.findAll('[data-test="row-select"]');
     await boxes[0].trigger("change");
-    await boxes[1].trigger("change");
+    (w.vm as any).$.setupState.selectedIds = (w.vm as any).$.setupState.pendingRows.map(
+      (r: any) => r.id,
+    );
+    await flushPromises();
+    await w.find('[data-test="ai-memory-accept-selected"]').trigger("click");
+    await flushPromises();
+    expect(aiMemory.accept).toHaveBeenCalledWith(expect.any(String), ["p1", "p2", "p3"]);
+
+    (w.vm as any).$.setupState.selectedIds = (w.vm as any).$.setupState.pendingRows.map(
+      (r: any) => r.id,
+    );
+    await flushPromises();
     await w.find('[data-test="ai-memory-discard-selected"]').trigger("click");
+    expect(aiMemory.discard).not.toHaveBeenCalled();
+    await w.find('[data-test="confirm-ok"]').trigger("click");
     await flushPromises();
     expect(aiMemory.discard).toHaveBeenCalledWith(expect.any(String), ["p1", "p2", "p3"]);
   });
 
-  it("reports each id's result and keeps a failed one with its reason", async () => {
-    setup(true);
+  it("names a failed change only when one failed and keeps it with its reason", async () => {
+    setup();
     vi.mocked(aiMemory.accept).mockResolvedValueOnce({
       data: {
         results: [
-          { id: "p1", status: 200 },
-          { id: "p2", status: 200 },
           { id: "p3", status: 409, code: "edit_conflict", message: "text to replace not found" },
         ],
       },
     } as any);
-    const w = await mountPage("pending");
-    vi.mocked(aiMemory.pending).mockResolvedValueOnce({
-      data: { pending: [pendingEdit("p3", { scope: "toolset", scope_key: "ts1" })] },
-    } as any);
-    await w.find('[data-test="ai-memory-accept-all"]').trigger("click");
+    const w = await mountPage();
+    await openPending(w);
+    await pendingRowEls(w)[1].find('[data-test^="ai-memory-accept-"]').trigger("click");
     await flushPromises();
-    expect(aiMemory.accept).toHaveBeenCalledWith(expect.any(String), ["p1", "p2", "p3"]);
-    expect(w.findAll('[data-test="ai-memory-pending-group"]')).toHaveLength(1);
     expect(w.find('[data-test="ai-memory-pending-failure"]').text()).toContain(
       "text to replace not found",
     );
   });
 
-  it("discards everything shown with Discard all", async () => {
-    setup(true);
-    const w = await mountPage("pending");
-    await w.find('[data-test="ai-memory-discard-all"]').trigger("click");
+  it("opens a review dialog with the diff and accepts from it", async () => {
+    setup();
+    const w = await mountPage();
+    await openPending(w);
+    await pendingRowEls(w)[0].trigger("click");
+    const dialog = w.find('[data-test="ai-memory-review-dialog"]');
+    expect(dialog.find('[data-test="ai-memory-diff"]').text()).toBe("a>b");
+    await dialog.find('[data-test="ai-memory-review-accept"]').trigger("click");
     await flushPromises();
-    expect(aiMemory.discard).toHaveBeenCalledWith(expect.any(String), ["p1", "p2", "p3"]);
+    expect(aiMemory.accept).toHaveBeenCalledWith(expect.any(String), ["p1", "p2"]);
   });
 
-  it("shows pending edits read-only to people who can't approve", async () => {
+  it("hides the decision controls from a reader without the write grant", async () => {
     setup(false);
-    const w = await mountPage("pending");
-    expect(w.findAll('[data-test="ai-memory-pending-group"]')).toHaveLength(2);
-    expect(w.find('[data-test="ai-memory-accept"]').exists()).toBe(false);
-    expect(w.find('[data-test="ai-memory-accept-selected"]').exists()).toBe(false);
-    expect(w.find('[data-test="ai-memory-accept-all"]').exists()).toBe(false);
-    expect(w.find('[data-test="ai-memory-pending-select"]').exists()).toBe(false);
+    const w = await mountPage();
+    await openPending(w);
+    expect(w.find('[data-test="row-select"]').exists()).toBe(false);
+    expect(w.find('[data-test^="ai-memory-accept-"]').exists()).toBe(false);
   });
 
-  it("opens a revision with its diff, author, reason and evidence, and reverts to it", async () => {
-    setup(true);
-    const rev = {
-      ...pendingEdit("r4"),
-      rev: 4,
-      state: "applied",
-      updated_by: "user:ann@example.com",
-      evidence: [{ call_ref: "abc123", tool: "search_logs" }],
-    };
-    vi.mocked(aiMemory.revisions).mockResolvedValue({ data: { revisions: [rev] } } as any);
-    vi.mocked(aiMemory.revision).mockResolvedValue({ data: rev } as any);
-    const w = await mountPage("history");
-    await w.find('[data-test="ai-memory-revision"]').trigger("click");
-    await flushPromises();
-    const dialog = document.body.querySelector('[data-test="ai-memory-revision-dialog"]')!;
-    expect(dialog.textContent).toContain("ann@example.com");
-    expect(dialog.textContent).toContain("seen in RCA");
-    expect(dialog.textContent).toContain("- a");
-    expect(dialog.textContent).toContain("+ b");
-    expect(dialog.querySelector('[data-test="ai-memory-evidence"]')!.textContent).toContain(
-      "abc123",
-    );
-    (document.body.querySelector('[data-test="ai-memory-revert"]') as HTMLElement).click();
-    await flushPromises();
-    expect(aiMemory.revert).toHaveBeenCalledWith(expect.any(String), { scope: "org" }, 4);
-    w.unmount();
+  it("shows the empty state in the history drawer when there are no revisions", async () => {
+    setup();
+    vi.mocked(aiMemory.revisions).mockResolvedValue({ data: { revisions: [] } } as any);
+    const w = await mountPage();
+    await openHistory(w);
+    expect(w.find('[data-test="ai-memory-history-drawer"]').text()).toContain("No history yet");
   });
 
-  it("diffs a saved snapshot against the applied text before it", async () => {
-    setup(true);
-    const snap = (id: string, rev: number, content?: string) => ({
-      ...pendingEdit(id),
-      rev,
-      state: "applied",
-      edits: null,
-      content,
+  it("shows an error with Retry in the history drawer", async () => {
+    setup();
+    vi.mocked(aiMemory.revisions).mockRejectedValueOnce({
+      response: { data: { message: "nope" } },
     });
-    vi.mocked(aiMemory.revisions).mockResolvedValue({
-      data: { revisions: [snap("r5", 5), snap("r4", 4), snap("r3", 3)] },
-    } as any);
-    vi.mocked(aiMemory.revision).mockImplementation(
-      (_o, _t, id) =>
-        Promise.resolve({
-          data: id === "r5" ? snap("r5", 5, "keep\nnew") : snap("r4", 4, "keep\nold"),
-        }) as any,
-    );
-    const w = await mountPage("history");
-    await w.findAll('[data-test="ai-memory-revision"]')[0].trigger("click");
+    const w = await mountPage();
+    await openHistory(w);
+    const drawer = w.find('[data-test="ai-memory-history-drawer"]');
+    expect(drawer.find('[data-test="ai-memory-history-error"]').text()).toContain("nope");
+    await drawer.find('[data-test="ai-memory-history-retry"]').trigger("click");
     await flushPromises();
-    expect(vi.mocked(aiMemory.revision).mock.calls.map((c) => c[2])).toEqual(["r5", "r4"]);
-    const diff = document.body.querySelector('[data-test="ai-memory-diff"]')!.textContent!;
-    expect(diff).toContain("- old");
-    expect(diff).toContain("+ new");
-    w.unmount();
+    expect(drawer.find('[data-test="ai-memory-history-selector"]').exists()).toBe(true);
   });
 
-  it("drops a revision that arrives after the selection changed, and reverts the memory it opened", async () => {
-    setup(true);
-    const rev = { ...pendingEdit("r4"), rev: 4, state: "applied" };
-    vi.mocked(aiMemory.revisions).mockResolvedValue({ data: { revisions: [rev] } } as any);
-    let resolve!: (v: any) => void;
-    vi.mocked(aiMemory.revision).mockImplementationOnce(
-      () => new Promise((r) => (resolve = r)) as any,
-    );
-    const w = await mountPage("history");
-    await w.find('[data-test="ai-memory-revision"]').trigger("click");
-    (w.vm as any).$.setupState.historyKey = "ts1";
+  it("shows an error with Retry, not an empty state, when a load fails", async () => {
+    setup();
+    vi.mocked(aiMemory.pending).mockRejectedValueOnce({ response: { data: { message: "boom" } } });
+    const w = await mountPage();
+    await openPending(w);
+    const drawer = w.find('[data-test="ai-memory-pending-drawer"]');
+    expect(drawer.find('[data-test="table-error"]').text()).toContain("boom");
+    expect(drawer.find('[data-test="table-empty"]').exists()).toBe(false);
+    await drawer.find('[data-test="table-retry"]').trigger("click");
     await flushPromises();
-    resolve({ data: rev });
-    await flushPromises();
-    expect(document.body.querySelector('[data-test="ai-memory-revision-dialog"]')).toBeNull();
-
-    vi.mocked(aiMemory.revision).mockResolvedValue({ data: rev } as any);
-    await w.find('[data-test="ai-memory-revision"]').trigger("click");
-    await flushPromises();
-    (w.vm as any).$.setupState.historyKey = "org";
-    await flushPromises();
-    (document.body.querySelector('[data-test="ai-memory-revert"]') as HTMLElement).click();
-    await flushPromises();
-    expect(aiMemory.revert).toHaveBeenCalledWith(
-      expect.any(String),
-      { scope: "toolset", toolsetId: "ts1" },
-      4,
-    );
-    w.unmount();
+    expect(drawer.findAll('[data-test="row"]')).toHaveLength(2);
   });
 
-  it("hides Revert from people who can't write memory", async () => {
-    setup(false);
-    const rev = { ...pendingEdit("r4"), rev: 4, state: "applied" };
-    vi.mocked(aiMemory.revisions).mockResolvedValue({ data: { revisions: [rev] } } as any);
-    vi.mocked(aiMemory.revision).mockResolvedValue({ data: rev } as any);
-    const w = await mountPage("history");
-    await w.find('[data-test="ai-memory-revision"]').trigger("click");
+  it("shows a skeleton while the first load is in flight", async () => {
+    setup();
+    vi.mocked(aiMemory.get).mockReturnValue(new Promise(() => {}) as any);
+    const w = mount(AiMemory, {
+      global: {
+        plugins: [i18n, store, router],
+        provide: { store },
+        stubs: { OPageLayout: { template: "<div><slot /></div>" }, OTable: OTableStub },
+      },
+    });
     await flushPromises();
-    expect(document.body.querySelector('[data-test="ai-memory-revision-dialog"]')).not.toBeNull();
-    expect(document.body.querySelector('[data-test="ai-memory-revert"]')).toBeNull();
-    w.unmount();
+    expect(w.find('[data-test="table-loading"]').exists()).toBe(true);
   });
 });

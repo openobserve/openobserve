@@ -15,7 +15,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OPageLayout
-    class="min-h-[inherit]"
     :title="isEditing ? t('aiToolset.update') : t('aiToolset.add')"
     :back="{
       label: t('aiToolset.header'),
@@ -24,214 +23,235 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-    <!-- Inline page form. The form is created in setup() via useOForm (headless)
-         so this owner can read `kind`/arrays/skill content reactively to drive
-         the v-if/v-for below; it's handed to <OForm :form="form">. The Save
-         button lives inside <OForm> as type="submit", so Enter + click both
-         submit natively (no form-id). -->
-    <OForm id="add-ai-toolset-form" :form="form" v-slot="{ isSubmitting }">
-      <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
-      <div style="height: calc(100vh - 120px)" class="overflow-auto">
-        <div class="mx-4 mt-4 max-w-2xl">
-          <!-- Name -->
-          <div class="o2-input mb-4">
-            <OFormInput
-              data-test="ai-toolset-name-input"
-              name="name"
-              :label="t('aiToolset.name')"
-              required
-              class="showLabelOnTop w-full"
-              :readonly="isEditing"
-              :disabled="isEditing"
-            />
-          </div>
-
-          <!-- Kind -->
-          <div class="o2-input mb-4">
-            <OFormSelect
-              data-test="ai-toolset-kind-select"
-              name="kind"
-              :label="t('aiToolset.kind')"
-              required
-              :options="kindOptions"
-              labelKey="label"
-              valueKey="value"
-              class="showLabelOnTop w-full"
-              :disabled="isEditing"
-            />
-          </div>
-
-          <!-- Description -->
-          <div class="o2-input mb-4">
-            <OFormTextarea
-              data-test="ai-toolset-description-input"
-              name="description"
-              :label="t('aiToolset.description')"
-              class="showLabelOnTop w-full"
-            />
-          </div>
-          <div v-if="superCluster" class="mb-4">
-            <OFormSwitch
-              name="region_only"
-              :label="t('aiToolset.regionOnly')"
-              data-test="ai-toolset-region-only"
-            />
-            <div class="text-text-secondary text-xs">{{ t("aiToolset.regionOnlyHint") }}</div>
-          </div>
+    <!-- The form is created in setup() via useOForm (headless) so this owner can read
+         `kind`/arrays/skill content reactively to drive the v-if/v-for below; it is
+         handed to <OForm :form="form">. The OSaveBar's Save is type="submit", so
+         Enter + click both submit natively. -->
+    <OForm id="add-ai-toolset-form" :form="form" class="flex min-h-0 flex-1 flex-col">
+      <div class="min-h-0 flex-1 overflow-auto px-4 pt-3 pb-4">
+        <div class="flex w-full max-w-5xl flex-col gap-4">
+          <OFormSection
+            variant="plain"
+            :title="t('aiToolset.details')"
+            data-test="ai-toolset-section-details"
+          >
+            <div class="flex flex-col gap-4">
+              <div class="flex gap-4">
+                <div :class="presetOpened ? 'w-full' : 'w-1/2'">
+                  <OFormInput
+                    data-test="ai-toolset-name-input"
+                    name="name"
+                    :label="t('aiToolset.name')"
+                    required
+                    :readonly="isEditing"
+                    :disabled="isEditing"
+                  />
+                </div>
+                <div v-if="!presetOpened" class="w-1/2">
+                  <OFormSelect
+                    data-test="ai-toolset-kind-select"
+                    name="kind"
+                    :label="t('aiToolset.kind')"
+                    required
+                    :options="kindOptions"
+                    labelKey="label"
+                    valueKey="value"
+                    :disabled="isEditing"
+                  />
+                </div>
+              </div>
+              <OFormTextarea
+                data-test="ai-toolset-description-input"
+                name="description"
+                :label="t('aiToolset.description')"
+              />
+              <div v-if="superCluster" class="flex flex-col gap-1">
+                <OFormSwitch
+                  name="region_only"
+                  :label="t('aiToolset.regionOnly')"
+                  data-test="ai-toolset-region-only"
+                  off-tone="neutral"
+                  state-text
+                />
+                <div class="text-text-secondary text-xs">{{ t("aiToolset.regionOnlyHint") }}</div>
+              </div>
+            </div>
+          </OFormSection>
 
           <!-- MCP fields -->
           <template v-if="selectedKind === 'mcp'">
-            <div class="mb-3 text-base font-medium font-semibold">
-              {{ t("aiToolset.mcpConfig") }}
-            </div>
-            <template v-if="mcpPreset">
-              <div v-for="param in mcpPreset.params ?? []" :key="param.name" class="o2-input mb-4">
-                <label class="mb-1 block text-sm">{{ param.label }}</label>
-                <select
-                  v-if="param.options?.length"
-                  class="border-border-default rounded-default w-full border px-2 py-1"
-                  :value="presetParams[param.name]"
-                  :data-test="`ai-toolset-preset-param-${param.name}`"
-                  @change="setPresetParam(param.name, ($event.target as HTMLSelectElement).value)"
-                >
-                  <option v-for="option in param.options" :key="option" :value="option">
-                    {{ option }}
-                  </option>
-                </select>
-                <input
-                  v-else
-                  class="border-border-default rounded-default w-full border px-2 py-1"
-                  :placeholder="param.placeholder"
-                  :value="presetParams[param.name]"
-                  data-o2-privacy="mask"
-                  :data-test="`ai-toolset-preset-param-${param.name}`"
-                  @input="setPresetParam(param.name, ($event.target as HTMLInputElement).value)"
-                />
-              </div>
-              <div v-if="mcpPreset.help" class="text-text-secondary mb-4 text-xs">
-                {{ mcpPreset.help }}
-              </div>
-            </template>
-            <div class="o2-input mb-4">
-              <OFormInput
-                :placeholder="raw('https://api.example.com/mcp/')"
-                data-test="ai-toolset-mcp-url"
-                data-o2-privacy="mask"
-                name="mcp.url"
-                :label="t('aiToolset.mcpUrl')"
-                required
-                class="showLabelOnTop w-full"
-              />
-            </div>
-            <div class="o2-input mb-4">
-              <OFormInput
-                data-test="ai-toolset-mcp-timeout"
-                name="mcp.timeout_seconds"
-                :label="t('aiToolset.timeoutSeconds')"
-                class="showLabelOnTop w-full"
-                type="number"
-                min="1"
-              />
-            </div>
-            <!-- Headers — form-owned dynamic array-field (mcp.headers[i].*) -->
-            <div class="mb-2 text-sm font-medium">{{ t("aiToolset.headers") }}</div>
-            <div v-for="(header, idx) in mcpHeaders" :key="idx" class="mb-2 flex items-start gap-2">
-              <OFormInput
-                :name="`mcp.headers[${idx}].key`"
-                :label="t('aiToolset.headerKey')"
-                class="o2-input flex-1"
-              />
-              <OFormInput
-                :name="`mcp.headers[${idx}].value`"
-                :label="t('aiToolset.headerValue')"
-                data-o2-privacy="mask"
-                class="o2-input flex-1"
-                :type="header.visible ? 'text' : 'password'"
+            <div ref="connectionAnchor">
+              <OFormSection
+                variant="plain"
+                :title="t('aiToolset.connection')"
+                :description="mcpPreset?.help ? raw(mcpPreset.help) : undefined"
+                data-test="ai-toolset-section-connection"
               >
-                <template #icon-right>
-                  <OIcon
-                    :name="header.visible ? 'visibility-off' : 'visibility'"
-                    size="sm"
-                    class="cursor-pointer"
-                    @click="toggleHeaderVisible(idx)"
+                <div class="flex flex-col gap-4">
+                  <template v-if="mcpPreset">
+                    <template v-for="param in mcpPreset.params ?? []" :key="param.name">
+                      <OFormSelect
+                        v-if="param.options?.length"
+                        :name="`mcp.preset_params.${param.name}`"
+                        :label="raw(param.label)"
+                        required
+                        :options="param.options"
+                        :data-test="`ai-toolset-preset-param-${param.name}`"
+                        @update:model-value="(v: string) => setPresetParam(param.name, v)"
+                      />
+                      <OFormInput
+                        v-else
+                        :name="`mcp.preset_params.${param.name}`"
+                        :label="raw(param.label)"
+                        required
+                        :placeholder="raw(param.placeholder)"
+                        data-o2-privacy="mask"
+                        :data-test="`ai-toolset-preset-param-${param.name}`"
+                        @update:model-value="(v: string) => setPresetParam(param.name, v)"
+                      />
+                    </template>
+                  </template>
+                  <OFormInput
+                    :placeholder="raw('https://api.example.com/mcp/')"
+                    data-test="ai-toolset-mcp-url"
+                    data-o2-privacy="mask"
+                    name="mcp.url"
+                    :label="t('aiToolset.mcpUrl')"
+                    required
                   />
-                </template>
-              </OFormInput>
-              <OButton
-                :aria-label="t('common.delete')"
-                variant="ghost-destructive"
-                size="icon-xs-sq"
-                class="mt-6"
-                @click="removeHeader(idx)"
-              >
-                <OIcon name="delete" size="xs" />
-              </OButton>
+                  <OFormInput
+                    data-test="ai-toolset-mcp-timeout"
+                    name="mcp.timeout_seconds"
+                    :label="t('aiToolset.timeoutSeconds')"
+                    type="number"
+                    min="1"
+                  />
+                  <!-- Headers — form-owned dynamic array-field (mcp.headers[i].*) -->
+                  <div class="flex flex-col gap-1">
+                    <div
+                      class="o-input-label text-compact text-input-label-text flex items-center leading-tight font-medium"
+                    >
+                      {{ t("aiToolset.headers") }}
+                    </div>
+                    <div class="flex flex-col gap-2">
+                      <div
+                        v-for="(_header, idx) in mcpHeaders"
+                        :key="idx"
+                        class="flex items-start gap-2"
+                      >
+                        <div class="w-5/12">
+                          <OFormInput
+                            :name="`mcp.headers[${idx}].key`"
+                            :placeholder="t('aiToolset.headerKey')"
+                            :aria-label="t('aiToolset.headerKey')"
+                          />
+                        </div>
+                        <div class="w-5/12">
+                          <OFormInput
+                            :name="`mcp.headers[${idx}].value`"
+                            type="password"
+                            revealable
+                            data-o2-privacy="mask"
+                            :placeholder="t('aiToolset.headerValue')"
+                            :aria-label="t('aiToolset.headerValue')"
+                          />
+                        </div>
+                        <OButton
+                          variant="ghost"
+                          size="icon-xs-sq"
+                          icon-left="delete"
+                          :aria-label="t('common.delete')"
+                          :title="t('common.delete')"
+                          @click="removeHeader(idx)"
+                        />
+                      </div>
+                      <div>
+                        <OButton
+                          variant="outline"
+                          size="sm-action"
+                          icon-left="add"
+                          @click="addHeader"
+                        >
+                          {{ t("aiToolset.addHeader") }}
+                        </OButton>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    role="group"
+                    aria-labelledby="ai-toolset-oauth-heading"
+                    aria-describedby="ai-toolset-oauth-hint"
+                    class="flex flex-col gap-4"
+                    data-test="ai-toolset-oauth"
+                  >
+                    <div class="flex flex-col gap-1">
+                      <div
+                        id="ai-toolset-oauth-heading"
+                        class="o-input-label text-compact text-input-label-text flex items-center leading-tight font-medium"
+                      >
+                        {{ t("aiToolset.oauthClientCredentials") }}
+                      </div>
+                      <div id="ai-toolset-oauth-hint" class="text-text-secondary text-xs">
+                        {{ t("aiToolset.oauthHint") }}
+                      </div>
+                    </div>
+                    <OFormInput
+                      data-test="ai-toolset-token-url"
+                      data-o2-privacy="mask"
+                      name="mcp.auth.token_url"
+                      :label="t('aiToolset.tokenUrl')"
+                    />
+                    <div class="flex items-start gap-4 max-md:flex-col">
+                      <div class="w-1/2 max-md:w-full">
+                        <OFormInput
+                          data-test="ai-toolset-client-id"
+                          name="mcp.auth.client_id"
+                          :label="t('aiToolset.clientId')"
+                          autocomplete="off"
+                        />
+                      </div>
+                      <div class="w-1/2 max-md:w-full">
+                        <OFormInput
+                          data-test="ai-toolset-client-secret"
+                          data-o2-privacy="mask"
+                          name="mcp.auth.client_secret"
+                          :label="t('aiToolset.clientSecret')"
+                          type="password"
+                          revealable
+                          autocomplete="new-password"
+                        />
+                      </div>
+                    </div>
+                    <OFormInput
+                      data-test="ai-toolset-scope"
+                      name="mcp.auth.scope"
+                      :label="t('aiToolset.scope')"
+                    />
+                  </div>
+                </div>
+              </OFormSection>
             </div>
-            <OButton variant="outline" size="sm" class="mb-4" @click="addHeader" icon-left="add">
-              {{ t("aiToolset.addHeader") }}
-            </OButton>
-            <div
-              role="group"
-              aria-labelledby="ai-toolset-oauth-heading"
-              aria-describedby="ai-toolset-oauth-hint"
-              data-test="ai-toolset-oauth"
-            >
-              <div id="ai-toolset-oauth-heading" class="mb-2 text-sm font-medium">
-                {{ t("aiToolset.oauthClientCredentials") }}
-              </div>
-              <div id="ai-toolset-oauth-hint" class="text-text-secondary mb-2 text-xs">
-                {{ t("aiToolset.oauthHint") }}
-              </div>
-              <div class="o2-input mb-4">
-                <OFormInput
-                  data-test="ai-toolset-token-url"
-                  data-o2-privacy="mask"
-                  name="mcp.auth.token_url"
-                  :label="t('aiToolset.tokenUrl')"
-                  class="showLabelOnTop w-full"
-                />
-              </div>
-              <div class="o2-input mb-4">
-                <OFormInput
-                  data-test="ai-toolset-client-id"
-                  name="mcp.auth.client_id"
-                  :label="t('aiToolset.clientId')"
-                  class="showLabelOnTop w-full"
-                  autocomplete="off"
-                />
-              </div>
-              <div class="o2-input mb-4">
-                <OFormInput
-                  data-test="ai-toolset-client-secret"
-                  data-o2-privacy="mask"
-                  name="mcp.auth.client_secret"
-                  :label="t('aiToolset.clientSecret')"
-                  class="showLabelOnTop w-full"
-                  type="password"
-                  revealable
-                  autocomplete="new-password"
-                />
-              </div>
-              <div class="o2-input mb-4">
-                <OFormInput
-                  data-test="ai-toolset-scope"
-                  name="mcp.auth.scope"
-                  :label="t('aiToolset.scope')"
-                  class="showLabelOnTop w-full"
-                />
-              </div>
-            </div>
+
             <div ref="toolPickerAnchor">
-              <AiToolsetToolPicker
-                :lists="toolLists"
-                :tools="discoveredTools"
-                :status="discoveryStatus"
-                :error="discoveryError"
-                :preset-tools="mcpPreset ? (toolLists.allowed ?? []).length : undefined"
-                @update:lists="setToolLists"
-                @remove="removeOtherEntry"
-                @refresh="discoverTools"
-              />
+              <OFormSection
+                variant="plain"
+                :title="t('aiToolset.tools')"
+                data-test="ai-toolset-section-tools"
+              >
+                <AiToolsetToolPicker
+                  :lists="toolLists"
+                  :tools="discoveredTools"
+                  :status="discoveryStatus"
+                  :error="discoveryError"
+                  :can-refresh="!!mcpUrl.trim()"
+                  :preset-tools="mcpPreset ? (toolLists.allowed ?? []).length : undefined"
+                  :preset-name="mcpPreset?.label"
+                  @update:lists="setToolLists"
+                  @remove="removeOtherEntry"
+                  @refresh="connect"
+                  @go-connection="focusConnection"
+                />
+              </OFormSection>
             </div>
           </template>
 
@@ -239,49 +259,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                into the form (skill.content); its required rule lives in the
                schema and the error shows after the first submit (R3). -->
           <template v-if="selectedKind === 'skill'">
-            <div class="mb-2 text-base font-medium font-semibold">
-              {{ t("aiToolset.skillConfig") }}
-            </div>
-            <div class="text-text-muted mb-1 text-xs">{{ t("aiToolset.skillContent") }} *</div>
-            <QueryEditor
-              data-test="ai-toolset-skill-content"
-              editor-id="skill-content-editor"
-              class="rounded-default border-card-glass-border mb-3 min-h-100! w-full resize-y overflow-auto border"
-              language="markdown"
-              :query="skillContent"
-              @update:query="(v: string) => setSkillContent(v)"
-            />
-            <div v-if="skillContentError" class="text-error-500 -mt-3 mb-4 text-xs">
-              {{ t("aiToolset.skillContentRequired") }}
-            </div>
+            <OFormSection
+              variant="plain"
+              required
+              :title="t('aiToolset.skillDefinition')"
+              data-test="ai-toolset-section-skill"
+            >
+              <div class="flex flex-col gap-1">
+                <QueryEditor
+                  data-test="ai-toolset-skill-content"
+                  editor-id="skill-content-editor"
+                  class="rounded-default border-card-glass-border min-h-100! w-full resize-y overflow-auto border"
+                  language="markdown"
+                  :query="skillContent"
+                  @update:query="(v: string) => setSkillContent(v)"
+                />
+                <div v-if="skillContentError" class="text-input-error-text text-xs">
+                  {{ t("aiToolset.skillContentRequired") }}
+                </div>
+              </div>
+            </OFormSection>
           </template>
         </div>
-
-        <!-- Footer -->
-        <div
-          class="border-border-default sticky bottom-0 flex items-center justify-end gap-2 border-t px-4 py-3"
-          :class="'bg-surface-base'"
-        >
-          <OButton
-            data-test="ai-toolset-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            :disabled="isSubmitting"
-            @click="closeEditor"
-          >
-            {{ t("common.cancel") }}
-          </OButton>
-          <OButton
-            data-test="ai-toolset-save-btn"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            :loading="isSubmitting"
-          >
-            {{ isEditing ? t("common.update") : t("common.save") }}
-          </OButton>
-        </div>
       </div>
+
+      <OSaveBar
+        :mode="isEditing ? 'edit' : 'create'"
+        class="shrink-0 px-4"
+        :loaded="formReady"
+        data-test="ai-toolset-save-bar"
+        save-data-test="ai-toolset-save-btn"
+        cancel-data-test="ai-toolset-cancel-btn"
+        discard-data-test="ai-toolset-discard-btn"
+        @cancel="closeEditor"
+      />
     </OForm>
     <EditorDraftDialogs :draft="toolsetDraft" />
   </OPageLayout>
@@ -294,7 +305,6 @@ import {
   ref,
   computed,
   onMounted,
-  onBeforeUnmount,
   nextTick,
   shallowRef,
   watch,
@@ -303,8 +313,9 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
+import OSaveBar from "@/lib/forms/SaveBar/OSaveBar.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
@@ -325,7 +336,14 @@ import {
   type OtherEntry,
   type ToolLists,
 } from "./toolPicker";
-import { defaultParams, paramsFromUrl, presetData, renderUrl, type Preset } from "./presets";
+import {
+  defaultParams,
+  paramsFromUrl,
+  presetData,
+  renderUrl,
+  stripPresetName,
+  type Preset,
+} from "./presets";
 import {
   authFromData,
   authPayload,
@@ -351,7 +369,7 @@ const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEdi
 type SecretPair = { key: string; value: string };
 
 interface AiToolsetDraftData extends Omit<AddAiToolsetForm, "mcp"> {
-  mcp: Omit<AddAiToolsetForm["mcp"], "headers" | "auth"> & {
+  mcp: Omit<AddAiToolsetForm["mcp"], "headers" | "auth" | "preset_params"> & {
     headers: SecretPair[];
     auth: ToolsetAuth;
   };
@@ -362,7 +380,8 @@ export default defineComponent({
   components: {
     OPageLayout,
     OButton,
-    OIcon,
+    OSaveBar,
+    OFormSection,
     OForm,
     OFormInput,
     OFormTextarea,
@@ -569,15 +588,19 @@ export default defineComponent({
     const presets = ref<Preset[]>([]);
     // The MCP preset the form was opened with, and its URL template's fields.
     const mcpPreset = ref<Preset | null>(null);
-    const presetParams = ref<Record<string, string>>({});
+    // Off until the saved toolset and presets are in, so the bar shows no change count early.
+    const formReady = ref(false);
+    // Opened from a preset card, so the Type select is hidden.
+    const presetOpened = ref(false);
 
     const applyMcpPreset = (preset: Preset) => {
       mcpPreset.value = preset;
-      presetParams.value = defaultParams(preset);
-      const data = presetData(preset, presetParams.value);
+      const params = defaultParams(preset);
+      form.setFieldValue("mcp.preset_params", params);
+      const data = presetData(preset, params);
       form.setFieldValue("kind", "mcp");
       if (!form.state.values.name) form.setFieldValue("name", preset.id);
-      form.setFieldValue("description", preset.description ?? "");
+      form.setFieldValue("description", stripPresetName(preset.description ?? "", preset.label));
       form.setFieldValue("mcp.url", data.url);
       form.setFieldValue(
         "mcp.headers",
@@ -595,9 +618,27 @@ export default defineComponent({
     const setPresetParam = (name: string, value: string) => {
       const preset = mcpPreset.value;
       if (!preset) return;
-      presetParams.value = { ...presetParams.value, [name]: value };
-      form.setFieldValue("mcp.url", renderUrl(preset.url_template ?? "", presetParams.value));
+      const params = {
+        ...(form.state.values as AddAiToolsetForm).mcp.preset_params,
+        [name]: value,
+      };
+      form.setFieldValue("mcp.url", renderUrl(preset.url_template ?? "", params));
     };
+
+    // A URL typed by hand or restored sets the fields; one that doesn't fit the template needs none.
+    const syncPresetParams = () => {
+      const preset = mcpPreset.value;
+      if (!preset) return;
+      const { url = "", preset_params } = (form.state.values as AddAiToolsetForm).mcp;
+      const template = preset.url_template ?? "";
+      if (Object.keys(preset_params).length && url === renderUrl(template, preset_params)) return;
+      const defaults = defaultParams(preset);
+      form.setFieldValue(
+        "mcp.preset_params",
+        url === renderUrl(template, defaults) ? defaults : (paramsFromUrl(template, url) ?? {}),
+      );
+    };
+    watch(() => formValues.value.mcp?.url, syncPresetParams);
 
     const loadPresets = async () => {
       const org = store.state.selectedOrganization.identifier;
@@ -619,12 +660,6 @@ export default defineComponent({
     const addHeader = () =>
       form.pushFieldValue("mcp.headers", { key: "", value: "", visible: false });
     const removeHeader = (i: number) => form.removeFieldValue("mcp.headers", i);
-    const toggleHeaderVisible = (i: number) => {
-      const cur = !!(form.state.values as AddAiToolsetForm).mcp?.headers?.[i]?.visible;
-      form.setFieldValue(`mcp.headers[${i}].visible`, !cur, {
-        dontUpdateMeta: true,
-      });
-    };
 
     // A discovery only spells out what is shown; the form's own lists change when the admin does.
     const formLists = (mcp: AddAiToolsetForm["mcp"] | undefined): ToolLists => ({
@@ -664,7 +699,6 @@ export default defineComponent({
     const discoverTools = async () => {
       const values = form.state.values as AddAiToolsetForm;
       if (values.kind !== "mcp" || !readyToDiscover(values.mcp)) return;
-      clearTimeout(discoveryTimer);
       const org = store.state.selectedOrganization.identifier;
       const key = discoveryKey(values.mcp);
       const target = discoveryTarget();
@@ -700,8 +734,6 @@ export default defineComponent({
       }
     };
 
-    // Discovery follows its request, so it also runs when an edit loads.
-    let discoveryTimer: ReturnType<typeof setTimeout> | undefined;
     const mcpEndpoint = computed(() =>
       formValues.value.kind === "mcp" ? discoveryKey(formValues.value.mcp) : "",
     );
@@ -712,12 +744,21 @@ export default defineComponent({
       discoveredTools.value = null;
       discoveryStatus.value = "idle";
       discoveryError.value = "";
-      clearTimeout(discoveryTimer);
-      if (key) discoveryTimer = setTimeout(discoverTools, 800);
     });
-    onBeforeUnmount(() => clearTimeout(discoveryTimer));
+
+    const mcpUrl = computed(() =>
+      formValues.value.kind === "mcp" ? (formValues.value.mcp?.url ?? "") : "",
+    );
 
     const toolPickerAnchor = ref<HTMLElement | null>(null);
+    const connectionAnchor = ref<HTMLElement | null>(null);
+    const focusConnection = () => {
+      connectionAnchor.value?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+      connectionAnchor.value?.querySelector<HTMLElement>("input, button, textarea")?.focus();
+    };
+    // Half-typed credentials can't be listed with, so Connect leads back to them.
+    const connect = () =>
+      readyToDiscover(formValues.value.mcp) ? discoverTools() : focusConnection();
 
     // Skill content (Monaco editor — no OForm* equivalent) bridged into the form.
     const setSkillContent = (value: string) =>
@@ -747,6 +788,7 @@ export default defineComponent({
         if (toolset.kind === "mcp") {
           const list = (v: unknown) => (Array.isArray(v) ? (v as string[]) : null);
           record.mcp = {
+            preset_params: {},
             url: data.url || "",
             timeout_seconds: data.timeout_seconds ?? 30,
             headers: Object.entries(data.headers || {}).map(([k, v]) => ({
@@ -793,15 +835,16 @@ export default defineComponent({
     // Set while the leave dialog's Save runs, so a successful save does not close the editor itself.
     let leaveSave: { saved: boolean } | null = null;
 
-    // View state (password visibility) and auth keys the form never edits are not drafted.
+    // View state, auth keys the form never edits and URL copies (`preset_params`) are not drafted.
     const toolsetSnapshot = (): AiToolsetDraftData => {
       const values = formValues.value;
       const { extra: _extra, ...auth } = values.mcp.auth;
+      const { preset_params: _params, ...mcp } = values.mcp;
       const pairs = (rows: { key?: string; value?: string }[] | undefined) =>
         (rows ?? []).map((row) => ({ key: row.key ?? "", value: row.value ?? "" }));
       return {
         ...values,
-        mcp: { ...values.mcp, headers: pairs(values.mcp?.headers), auth },
+        mcp: { ...mcp, headers: pairs(mcp.headers), auth },
         skill: { ...values.skill },
       };
     };
@@ -925,8 +968,14 @@ export default defineComponent({
         form.reset({
           ...data,
           ...locked,
-          mcp: { ...data.mcp, headers: withHidden(data.mcp.headers), auth },
+          mcp: {
+            ...data.mcp,
+            preset_params: {},
+            headers: withHidden(data.mcp.headers),
+            auth,
+          },
         } as AddAiToolsetForm);
+        syncPresetParams();
         notKeptRows.value = new Map(
           notKeptPaths.flatMap((path) => {
             const key = headerKeyOf(path, data);
@@ -978,17 +1027,19 @@ export default defineComponent({
       const query = router.currentRoute.value.query;
       if (!id && query.kind === "skill") form.setFieldValue("kind", "skill");
       const opened = !id && presets.value.find((p) => p.id === query.preset);
+      presetOpened.value = !!opened;
       if (opened && opened.kind === "mcp") applyMcpPreset(opened);
       // A deleted toolset still starts the draft, so a draft left for it is dropped with a notice.
       await toolsetDraft.start();
-      if (mcpPreset.value) {
-        const url = (form.state.values as AddAiToolsetForm).mcp.url ?? "";
-        presetParams.value =
-          paramsFromUrl(mcpPreset.value.url_template ?? "", url) ?? presetParams.value;
-      }
+      formReady.value = true;
       if (loaded === "gone") {
         emit("cancel:hideform");
         return;
+      }
+      // A saved toolset already has its credentials, so its tools load on open; new ones wait for Connect.
+      if (id && formValues.value.kind === "mcp" && mcpUrl.value) {
+        await nextTick();
+        discoverTools();
       }
       if (query.section === "tools") {
         await nextTick();
@@ -1000,8 +1051,6 @@ export default defineComponent({
       superCluster,
       raw,
       t,
-      // Exposed for the theme-aware footer background (`store.state.theme`).
-      store,
       // 🔑 Options-API: the form MUST be returned so `:form` resolves in the
       // template (else <OForm> gets no form and validation silently no-ops).
       form,
@@ -1019,11 +1068,15 @@ export default defineComponent({
       discoveryError,
       discoverTools,
       toolPickerAnchor,
+      formReady,
+      connectionAnchor,
+      focusConnection,
+      connect,
+      mcpUrl,
       addHeader,
       removeHeader,
-      toggleHeaderVisible,
       mcpPreset,
-      presetParams,
+      presetOpened,
       setPresetParam,
       // Skill (Monaco content bridged into the form)
       skillContent,

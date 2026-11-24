@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPopover side="bottom" align="end" content-class="w-[28rem] max-h-[70vh] overflow-auto p-3">
+  <OPopover
+    side="bottom"
+    align="end"
+    content-class="w-[min(26rem,calc(100vw-1.5rem))] max-h-[70vh] overflow-auto p-3"
+  >
     <template #trigger>
       <OButton
         variant="ghost"
@@ -24,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aria-label="t('aiMemory.header')"
       >
         <OIcon name="psychology" size="sm" />
+        <OTooltip :content="t('aiMemory.header')" />
       </OButton>
     </template>
     <div data-test="ai-memory-panel">
@@ -46,6 +51,7 @@ import { computed, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { useI18nTyped } from "@/types/i18n";
 import AiMemoryEditor from "./AiMemoryEditor.vue";

@@ -39,7 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size === 'compact' ? 'size-8' : 'size-10',
         unavailable
           ? 'bg-section-header-bg text-text-disabled'
-          : 'bg-tabs-active-bg text-tabs-active-text group-hover:bg-accent group-hover:text-text-inverse',
+          : iconSurface === 'plain'
+            ? 'border-border-default text-accent border bg-white'
+            : 'bg-tabs-active-bg text-tabs-active-text group-hover:bg-accent group-hover:text-text-inverse',
       ]"
     >
       <OIcon :name="icon" size="md" />
@@ -87,8 +89,10 @@ const props = withDefaults(
     size?: "default" | "compact";
     /** Keeps the reason focusable while preventing the unavailable action. */
     unavailable?: boolean;
+    /** "plain" keeps a white tile in both themes, so brand logos stay readable. */
+    iconSurface?: "tinted" | "plain";
   }>(),
-  { size: "default", unavailable: false },
+  { size: "default", unavailable: false, iconSurface: "tinted" },
 );
 
 const emit = defineEmits<{ click: [event: MouseEvent] }>();

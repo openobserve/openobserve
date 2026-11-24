@@ -266,6 +266,7 @@ describe("AddAiToolset.schema", () => {
         region_only: false,
         mcp: {
           url: "",
+          preset_params: {},
           timeout_seconds: 30,
           headers: [],
           auth: { token_url: "", client_id: "", client_secret: "", scope: "", extra: {} },

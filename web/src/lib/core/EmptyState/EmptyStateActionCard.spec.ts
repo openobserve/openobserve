@@ -59,6 +59,13 @@ describe("EmptyStateActionCard", () => {
     expect(tileSpan.classes()).toContain("bg-tabs-active-bg");
   });
 
+  it("uses a white tile with no hover fill when iconSurface is plain", () => {
+    const tileSpan = mountCard({ iconSurface: "plain" }).find("button span.rounded-default");
+    expect(tileSpan.classes()).toContain("bg-white");
+    expect(tileSpan.classes()).not.toContain("bg-tabs-active-bg");
+    expect(tileSpan.classes()).not.toContain("group-hover:bg-accent");
+  });
+
   // ── Chevron rendering ─────────────────────────────────────────────────────
 
   it("renders the chevron-right icon by default", () => {

@@ -52,6 +52,8 @@ export const makeAddAiToolsetSchema = (
       // Validated only when kind === "mcp" (see superRefine); number inputs emit strings.
       mcp: z.object({
         url: z.string().optional(),
+        // A preset's URL-template fields; the URL is rebuilt from them, so none is saved or drafted.
+        preset_params: z.record(z.string(), z.string()).optional().default({}),
         timeout_seconds: z.coerce.number().optional(),
         headers: z.array(secretRowSchema).optional().default([]),
         auth: z
@@ -115,6 +117,9 @@ export const makeAddAiToolsetSchema = (
             path: ["mcp", ...path],
             message: t(message),
           });
+        for (const [param, value] of Object.entries(val.mcp.preset_params)) {
+          if (!value.trim()) refuse(["preset_params", param], "aiToolset.presetParamRequired");
+        }
         if (usesClientCredentials(auth)) {
           if (!auth.token_url?.trim()) {
             refuse(["auth", "token_url"], "aiToolset.tokenUrlRequired");
@@ -158,6 +163,7 @@ export const addAiToolsetDefaults = (): AddAiToolsetForm => ({
   // A new custom MCP starts with every tool off; the picker turns tools on.
   mcp: {
     url: "",
+    preset_params: {},
     timeout_seconds: 30,
     headers: [],
     auth: emptyAuth(),

@@ -15,20 +15,19 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  addTypedTool,
-  allowAll,
-  allowReadOnly,
+  blockedByGlob,
+  globPrefix,
   globMatches,
   mayWrite,
   otherEntries,
   prefillFromDiscovery,
   removeEntry,
-  setByGlob,
+  expandGlobs,
+  setToolOn,
   setToolState,
   toolState,
   toolsetBadges,
   failingSince,
-  typedToolError,
   type DiscoveredTool,
   type ToolLists,
 } from "./toolPicker";
@@ -60,11 +59,6 @@ describe("toolPicker", () => {
     const l = lists({ allowed: ["update.*"], write: ["update.*"] });
     expect(toolState(l, { name: "update_monitor" })).toBe("write");
     expect(toolState(lists({ allowed: ["*"], blocked: ["a.b"] }), { name: "a_b" })).toBe("off");
-  });
-
-  it("locks the control of a tool that another spelling decides, but not its own", () => {
-    expect(setByGlob(lists({ allowed: ["update.monitor"] }), "update_monitor")).toBe(true);
-    expect(setByGlob(lists({ allowed: ["update.monitor"] }), "update.monitor")).toBe(false);
   });
 
   it("matches globs like the agent: * is any run, the rest literal, whole name", () => {
@@ -107,12 +101,6 @@ describe("toolPicker", () => {
     expect(toolState(next, create)).toBe("write");
   });
 
-  it("locks the control of a tool a glob decides", () => {
-    const l = lists({ allowed: ["search_*"] });
-    expect(setByGlob(l, "search_logs")).toBe(true);
-    expect(setByGlob(l, "create_monitor")).toBe(false);
-  });
-
   it("prefills a row saved without allowed_tools as today's behaviour", () => {
     const l = prefillFromDiscovery({ allowed: null, blocked: null, write: null }, tools);
     expect(l).toEqual({
@@ -148,9 +136,9 @@ describe("toolPicker", () => {
     expect(set.write).toEqual(["search_*", "gone_tool"]);
     expect(toolState(set, { name: "search_added_later", read_only_hint: true })).toBe("write");
     expect(toolState(set, create)).toBe("allowed");
-    const writes = ["search_*", "create_monitor", "gone_tool", "wipe_index"];
-    expect(allowAll(row, tools).write).toEqual(writes);
-    expect(allowReadOnly(row, tools).write).toEqual(["search_*", "gone_tool"]);
+    const off = setToolOn(row, wipe, false, tools);
+    expect(off.allowed).toEqual(["search_*", "create_monitor", "gone_tool"]);
+    expect(off.write).toEqual(["search_*", "create_monitor", "gone_tool"]);
   });
 
   it("adds a tool under its normalized name, never as a wildcard", () => {
@@ -159,13 +147,16 @@ describe("toolPicker", () => {
     expect(on).toEqual({ allowed: ["run_all"], blocked: null, write: ["run_all"] });
     expect(toolState(on, star)).toBe("write");
     expect(toolState(on, { name: "run_x_all" })).toBe("off");
-    expect(setByGlob(on, star.name)).toBe(false);
+    expect(expandGlobs(on, star.name, [star])).toBe(on);
     expect(otherEntries(on, [star])).toEqual([]);
     expect(setToolState(on, star.name, "off")).toEqual(lists());
     const row = { allowed: null, blocked: null, write: null };
     expect(prefillFromDiscovery(row, [star, { name: "a.b" }]).allowed).toEqual(["run_all", "a_b"]);
     // A stored `run*all` is a wildcard, so it isn't the tool's own entry.
-    expect(setByGlob(lists({ allowed: ["run*all"] }), star.name)).toBe(true);
+    expect(blockedByGlob(lists({ blocked: ["run*all"] }), star.name)).toBe(true);
+    expect(expandGlobs(lists({ allowed: ["run*all"] }), star.name, [star]).allowed).toEqual([
+      "run_all",
+    ]);
     expect(otherEntries(lists({ allowed: ["run*all"] }), [star])).toHaveLength(1);
   });
 
@@ -181,20 +172,42 @@ describe("toolPicker", () => {
     expect(setToolState(row, dotted.name, "off").allowed).toEqual([]);
   });
 
-  it("Allow all turns tagged tools on as can change things; Allow read-only only the rest", () => {
-    expect(allowAll(lists(), tools)).toEqual({
+  it("turns a tool that may write on as a write and a read-only one as allowed", () => {
+    const all = tools.reduce((acc, tool) => setToolOn(acc, tool, true, tools), lists());
+    expect(all).toEqual({
       allowed: ["search_logs", "create_monitor", "wipe_index"],
       blocked: null,
       write: ["create_monitor", "wipe_index"],
     });
-    expect(allowReadOnly(allowAll(lists(), tools), tools)).toEqual({
-      allowed: ["search_logs"],
+    expect(setToolOn(all, create, false, tools)).toEqual({
+      allowed: ["search_logs", "wipe_index"],
       blocked: null,
-      write: [],
+      write: ["wipe_index"],
     });
   });
 
-  it("keeps entries naming no listed tool under Other entries, and removes one on request", () => {
+  it("changes nothing for a tool already in that state, and keeps a stored write entry", () => {
+    const l = lists({ allowed: ["create_monitor"], write: [] });
+    expect(setToolOn(l, create, true, tools)).toBe(l);
+    expect(setToolOn(l, search, false, tools)).toBe(l);
+    const marked = lists({ write: ["search_logs"] });
+    expect(setToolOn(marked, search, true, tools).write).toEqual(["search_logs"]);
+  });
+
+  it("lifts an exact block, but can't turn on a tool a blocked glob or other spelling keeps off", () => {
+    const exact = lists({ blocked: ["search_logs"] });
+    expect(setToolOn(exact, search, true, tools)).toMatchObject({
+      allowed: ["search_logs"],
+      blocked: [],
+    });
+    const glob = lists({ blocked: ["search_*"] });
+    expect(blockedByGlob(glob, "search_logs")).toBe(true);
+    expect(setToolOn(glob, search, true, tools)).toBe(glob);
+    expect(blockedByGlob(lists({ blocked: ["update.monitor"] }), "update_monitor")).toBe(true);
+    expect(blockedByGlob(lists({ blocked: ["update.monitor"] }), "update.monitor")).toBe(false);
+  });
+
+  it("lists entries naming no listed tool, and removes one on request", () => {
     const l = lists({
       allowed: ["search_logs", "get_*", "gone_tool"],
       blocked: ["delete_*"],
@@ -207,53 +220,47 @@ describe("toolPicker", () => {
       { list: "blocked", entry: "delete_*" },
       { list: "write", entry: "gone_tool" },
     ]);
-    const next = setToolState(l, "search_logs", "off");
-    expect(otherEntries(next, tools)).toEqual(others);
+    expect(otherEntries(l, null).map((o) => o.entry)).toContain("search_logs");
+    expect(otherEntries(setToolState(l, "search_logs", "off"), tools)).toEqual(others);
     expect(removeEntry(l, { list: "blocked", entry: "delete_*" }).blocked).toEqual([]);
-  });
-
-  it("refuses a glob in the typed tool name", () => {
-    expect(typedToolError("run_*")).toBe("glob");
-    expect(typedToolError("*")).toBe("glob");
-    expect(typedToolError("run_query")).toBeNull();
-    expect(addTypedTool(lists(), "*", false)).toEqual(lists());
-  });
-
-  it("adds a typed tool name when the server can't be listed", () => {
-    let l = addTypedTool(lists(), "  run_query ", false);
-    l = addTypedTool(l, "restart_pod", true);
-    l = addTypedTool(l, "   ", true);
-    expect(l).toEqual({
-      allowed: ["run_query", "restart_pod"],
-      blocked: null,
-      write: ["restart_pod"],
+    expect(removeEntry(l, { list: "allowed", entry: "get_*" })).toEqual({
+      ...l,
+      allowed: ["search_logs", "gone_tool"],
     });
-    expect(otherEntries(l, null).map((o) => o.entry)).toEqual([
-      "run_query",
-      "restart_pod",
-      "restart_pod",
+  });
+
+  it("expands only the globs that match the tool, into the discovered names they match", () => {
+    const l = lists({ allowed: ["gone", "search_*", "zzz_*"], write: null });
+    expect(expandGlobs(l, "search_logs", tools).allowed).toEqual(["gone", "zzz_*", "search_logs"]);
+    expect(expandGlobs(l, "create_monitor", tools)).toBe(l);
+    expect(expandGlobs(lists({ allowed: null }), "search_logs", tools).allowed).toEqual([
+      "search_logs",
+      "create_monitor",
+      "wipe_index",
+    ]);
+    const spelled = lists({ allowed: ["update.monitor"] });
+    const underscored = { name: "update_monitor" };
+    expect(expandGlobs(spelled, "update_monitor", [underscored]).allowed).toEqual([
+      "update_monitor",
     ]);
   });
 
-  it.each([
-    ["no allowlist", null, ["*"]],
-    ["an explicit allowlist", ["search_logs", "create_monitor"], ["search_logs", "create_monitor"]],
-    ["a glob allowlist", ["get_*", "create_monitor"], ["get_*", "create_monitor"]],
-  ])("counts all that %s allows as writes when a tool is typed", (_label, allowed, writes) => {
-    const row = lists({ allowed, write: null });
-    const read = addTypedTool(row, "run_query", false);
-    expect(read.allowed).toEqual([...(allowed ?? []), "run_query"]);
-    expect(read.write).toEqual(writes);
-    expect(addTypedTool(row, "run_query", true).write).toEqual([...writes, "run_query"]);
-    // The second typed tool finds write_tools set and adds no more.
-    expect(addTypedTool(read, "other", false).write).toEqual(writes);
+  it("turns off a tool a glob allows and leaves the glob's other tools on", () => {
+    const l = lists({ allowed: ["*"], write: null });
+    const off = setToolOn(l, create, false, tools);
+    expect(off.allowed).toEqual(["search_logs", "wipe_index"]);
+    expect(toolState(off, search)).toBe("allowed");
+    expect(toolState(off, create)).toBe("off");
   });
 
-  it("writes the state picked for a typed tool that was already allowed", () => {
-    const row = lists({ allowed: ["a", "b"], write: null });
-    expect(addTypedTool(row, "a", false).write).toEqual(["b"]);
-    expect(addTypedTool(row, "a", true).write).toEqual(["a", "b"]);
-    expect(addTypedTool(lists({ allowed: ["a"], write: [] }), "b", false).write).toEqual([]);
+  it.each([
+    ["no allowlist", null, ["create_monitor"]],
+    ["an explicit allowlist", ["search_logs", "other"], ["other"]],
+    ["a glob allowlist", ["get_*", "other"], ["get_*", "other"]],
+  ])("counts what %s allows but isn't known read-only as writes", (_label, allowed, writes) => {
+    const row = lists({ allowed, blocked: ["wipe_index"], write: null });
+    const set = setToolOn(row, wipe, true, tools);
+    expect(set.write).toEqual([...writes, "wipe_index"]);
   });
 
   it("derives each list badge from the saved data", () => {
@@ -278,5 +285,13 @@ describe("toolPicker", () => {
     expect(failingSince({ ...failing, last_error_at: now - 16 * min }, now)).toBeNull();
     expect(failingSince({ ...failing, failing_since: null }, now)).toBeNull();
     expect(failingSince(null, now)).toBeNull();
+  });
+});
+
+describe("globPrefix", () => {
+  it("returns the literal start of a glob", () => {
+    expect(globPrefix("apm_*")).toBe("apm_");
+    expect(globPrefix("*_read")).toBeNull();
+    expect(globPrefix("exact")).toBeNull();
   });
 });

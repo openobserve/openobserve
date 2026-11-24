@@ -50,60 +50,16 @@ export function groupPending(pending: PendingEdit[]): PendingGroup[] {
   return [...groups.values()];
 }
 
-export interface DiffLine {
-  kind: "same" | "removed" | "added";
-  text: string;
-}
-
-// Past this many line pairs the LCS table would stall the tab, so the middle is shown replaced.
-const MAX_DIFF_CELLS = 250_000;
-
-/** A line diff of two texts: shared ends kept, the middle by longest common subsequence. */
-export function diffLines(before: string, after: string): DiffLine[] {
-  const x = before ? before.split("\n") : [];
-  const y = after ? after.split("\n") : [];
-  let head = 0;
-  while (head < x.length && head < y.length && x[head] === y[head]) head++;
-  let tail = 0;
-  while (
-    tail < x.length - head &&
-    tail < y.length - head &&
-    x[x.length - 1 - tail] === y[y.length - 1 - tail]
-  )
-    tail++;
-  const same = (lines: string[]) => lines.map((text): DiffLine => ({ kind: "same", text }));
-  const middle = diffMiddle(x.slice(head, x.length - tail), y.slice(head, y.length - tail));
-  return [...same(x.slice(0, head)), ...middle, ...same(x.slice(x.length - tail))];
-}
-
-function diffMiddle(a: string[], b: string[]): DiffLine[] {
-  if (a.length * b.length > MAX_DIFF_CELLS) {
-    return [
-      ...a.map((text): DiffLine => ({ kind: "removed", text })),
-      ...b.map((text): DiffLine => ({ kind: "added", text })),
-    ];
+/** The old and new text of a change, for a diff: proposed edits as their removed and added lines. */
+export function editsDiff(edits: MemoryEdit[]): { original: string; modified: string } {
+  const original: string[] = [];
+  const modified: string[] = [];
+  for (const e of edits) {
+    if ("old" in e) original.push(e.old);
+    if ("new" in e) modified.push(e.new);
+    if ("text" in e) modified.push(`[${e.section}] ${e.text}`);
   }
-  const lcs = a.map(() => new Array<number>(b.length + 1).fill(0));
-  lcs.push(new Array<number>(b.length + 1).fill(0));
-  for (let i = a.length - 1; i >= 0; i--) {
-    for (let j = b.length - 1; j >= 0; j--) {
-      lcs[i][j] = a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
-    }
-  }
-  const out: DiffLine[] = [];
-  let [i, j] = [0, 0];
-  while (i < a.length || j < b.length) {
-    if (i < a.length && j < b.length && a[i] === b[j]) {
-      out.push({ kind: "same", text: a[i] });
-      i++;
-      j++;
-    } else if (j < b.length && (i === a.length || lcs[i][j + 1] >= lcs[i + 1][j])) {
-      out.push({ kind: "added", text: b[j++] });
-    } else {
-      out.push({ kind: "removed", text: a[i++] });
-    }
-  }
-  return out;
+  return { original: original.join("\n"), modified: modified.join("\n") };
 }
 
 export function formatBytes(bytes: number): string {

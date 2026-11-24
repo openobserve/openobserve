@@ -30,7 +30,7 @@ export interface ToolLists {
 
 export type ToolState = "off" | "allowed" | "write";
 
-/** Which list an "Other entries" row came from. */
+/** Which list an entry naming no listed tool came from. */
 export interface OtherEntry {
   list: keyof ToolLists;
   entry: string;
@@ -87,11 +87,13 @@ export function toolState(lists: ToolLists, tool: DiscoveredTool): ToolState {
 const isOwn = (entry: string, name: string) =>
   !isGlob(entry) && (entry === name || entry === toolKey(name));
 
-/** A glob or another spelling, not the exact name, decides this tool, so its control can't change it. */
-export function setByGlob(lists: ToolLists, name: string): boolean {
-  return [lists.allowed, lists.blocked, lists.write].some((list) =>
-    (list ?? []).some((g) => !isOwn(g, name) && globMatches(g, name)),
-  );
+// A glob, or another spelling of the name, that decides this tool without being its own entry.
+const decidesOther = (entry: string, name: string) =>
+  !isOwn(entry, name) && globMatches(entry, name);
+
+/** A blocked glob, not the exact name, keeps this tool off, so its checkbox can't turn it on. */
+export function blockedByGlob(lists: ToolLists, name: string): boolean {
+  return (lists.blocked ?? []).some((entry) => decidesOther(entry, name));
 }
 
 const without = (list: string[] | null, name: string) =>
@@ -137,21 +139,7 @@ export function prefillFromDiscovery(lists: ToolLists, tools: DiscoveredTool[]):
   return { ...lists, write: keysOf(tools.filter((t) => toolState(lists, t) === "write")) };
 }
 
-/** "Allow all" turns every tool on, tagged ones as "can change things"; globs keep their say. */
-export function allowAll(lists: ToolLists, tools: DiscoveredTool[]): ToolLists {
-  return tools
-    .filter((t) => !setByGlob(lists, t.name))
-    .reduce((acc, t) => setToolState(acc, t.name, mayWrite(t) ? "write" : "allowed", tools), lists);
-}
-
-/** "Allow read-only" turns on only the tools the server marks read-only; the rest go off. */
-export function allowReadOnly(lists: ToolLists, tools: DiscoveredTool[]): ToolLists {
-  return tools
-    .filter((t) => !setByGlob(lists, t.name))
-    .reduce((acc, t) => setToolState(acc, t.name, mayWrite(t) ? "off" : "allowed", tools), lists);
-}
-
-/** Entries naming no listed tool (globs, typed names, tools the server dropped); saved as they are. */
+/** Entries naming no listed tool (globs, tools the server dropped); saved as they are. */
 export function otherEntries(lists: ToolLists, tools: DiscoveredTool[] | null): OtherEntry[] {
   const rows: OtherEntry[] = [];
   for (const list of ["allowed", "blocked", "write"] as const) {
@@ -166,16 +154,38 @@ export function removeEntry(lists: ToolLists, { list, entry }: OtherEntry): Tool
   return { ...lists, [list]: lists[list]?.filter((e) => e !== entry) ?? null };
 }
 
-/** Why a typed tool name can't be added; the field takes exact names, never globs. */
-export function typedToolError(name: string): "glob" | null {
-  return name.includes("*") ? "glob" : null;
+/** The literal start of a glob such as `apm_*`, or null for an exact name or a leading `*`. */
+export function globPrefix(entry: string): string | null {
+  if (!isGlob(entry)) return null;
+  return entry.split("*")[0] || null;
 }
 
-/** A typed tool name, for when the server can't be listed. */
-export function addTypedTool(lists: ToolLists, name: string, canWrite: boolean): ToolLists {
-  const trimmed = name.trim();
-  if (!trimmed || typedToolError(trimmed)) return lists;
-  return setToolState(lists, trimmed, canWrite ? "write" : "allowed");
+/** Spells out the allowed globs that match `name` as the tools they match, so it can go off alone. */
+export function expandGlobs(lists: ToolLists, name: string, tools: DiscoveredTool[]): ToolLists {
+  if (lists.allowed === null) return { ...lists, allowed: keysOf(tools) };
+  const globs = lists.allowed.filter((entry) => decidesOther(entry, name));
+  if (!globs.length) return lists;
+  const kept = lists.allowed.filter((entry) => !globs.includes(entry));
+  const matched = tools.filter(
+    (t) => matchesAny(globs, t.name) && !kept.some((entry) => isOwn(entry, t.name)),
+  );
+  return { ...lists, allowed: [...kept, ...keysOf(matched)] };
+}
+
+/** Turns one listed tool on or off; one that may write goes on as a write, so read-only turns refuse it. */
+export function setToolOn(
+  lists: ToolLists,
+  tool: DiscoveredTool,
+  on: boolean,
+  tools: DiscoveredTool[],
+): ToolLists {
+  const { name } = tool;
+  if ((toolState(lists, tool) !== "off") === on) return lists;
+  if (!on) return setToolState(expandGlobs(lists, name, tools), name, "off", tools);
+  if (blockedByGlob(lists, name)) return lists;
+  const writes = mayWrite(tool) || matchesAny(lists.write, name);
+  const from = lists.allowed === null ? expandGlobs(lists, name, tools) : lists;
+  return setToolState(from, name, writes ? "write" : "allowed", tools);
 }
 
 /** The list page's badges for a saved MCP toolset's `data`. */

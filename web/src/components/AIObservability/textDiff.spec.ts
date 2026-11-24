@@ -31,6 +31,14 @@ describe("diffLines", () => {
     expect(diffStats(diffLines("a\nb\nc", "a"))).toEqual({ added: 0, removed: 2 });
   });
 
+  it("treats empty text as no lines, so a first version is only additions", () => {
+    const rows = diffLines("", "lets do this");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].left).toBeNull();
+    expect(rows[0].right?.segments).toEqual([{ text: "lets do this", changed: true }]);
+    expect(diffStats(rows)).toEqual({ added: 1, removed: 0 });
+  });
+
   it("numbers each side independently", () => {
     const rows = diffLines("x\na", "a");
     expect(

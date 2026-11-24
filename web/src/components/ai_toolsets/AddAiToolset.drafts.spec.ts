@@ -56,6 +56,14 @@ vi.mock("@/services/ai_toolsets", () => ({
               allowed_tools: ["search_datadog_logs", "search_datadog_spans"],
               write_tools: [],
             },
+            {
+              id: "grafana",
+              kind: "mcp",
+              label: "Grafana",
+              revision: 1,
+              url_template: "{url}",
+              params: [{ name: "url", label: "URL" }],
+            },
           ],
         },
       }),
@@ -229,7 +237,7 @@ describe("AddAiToolset drafts", () => {
     window.dispatchEvent(new Event("pagehide"));
     expect(readEditorDraft(editScope)).toBeNull();
 
-    click("ai-toolset-cancel-btn");
+    click("ai-toolset-back-btn");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).toBeNull();
     expect(router.currentRoute.value.query.action).toBeUndefined();
@@ -283,6 +291,20 @@ describe("AddAiToolset drafts", () => {
       mcp: { url: "https://mcp.datadoghq.eu/v1/mcp", allowed_tools: ["search_datadog_logs"] },
     });
     expect(form().state.values.mcp.extra.preset).toEqual({ id: "datadog", revision: 1 });
+    expect(form().state.values.mcp).toMatchObject({ preset_params: { site: "datadoghq.eu" } });
+  });
+
+  it("never drafts a preset's URL fields, which can be a URL that carries a credential", async () => {
+    await mountPage({ action: "add", preset: "grafana" });
+    await fillField("ai-toolset-preset-param-url", "https://g.example/mcp?token=s3cret-tok");
+    await flushPromises();
+    expect(form().state.values.mcp.url).toBe("https://g.example/mcp?token=s3cret-tok");
+    await edit({ description: "My Grafana" });
+    window.dispatchEvent(new Event("pagehide"));
+    const stored = localStorage.getItem(editorDraftKey(newScope)) ?? "";
+    expect(stored).toContain("My Grafana");
+    expect(stored).not.toContain("s3cret-tok");
+    expect(stored).not.toContain("preset_params");
   });
 
   it("an edit draft refills unchanged headers by name and blocks Save on a changed one", async () => {
