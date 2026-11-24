@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "enterprise")]
+mod audit_reporting;
 #[cfg(feature = "cloud")]
 pub mod cloud_events;
 #[cfg(feature = "enterprise")]
@@ -54,8 +56,6 @@ impl audit::AuditPublisher for CoreAuditPublisher {
         &self,
         request: proto::cluster_rpc::IngestionRequest,
     ) -> Result<proto::cluster_rpc::IngestionResponse, anyhow::Error> {
-        crate::ingestion::ingestion_service::ingest(request)
-            .await
-            .map_err(|error| anyhow::anyhow!(error.to_string()))
+        audit_reporting::publish(request).await
     }
 }
