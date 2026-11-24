@@ -27681,9 +27681,9 @@
       "sessionCount": "no sessions | {count} session | {count} sessions",
       "searchPlaceholder": "Search query text, table or application…",
       "perspective": {
-        "waiting": "Who's stuck",
+        "waiting": "Who's Stuck",
         "waitingHint": "One row per session that is waiting on a lock, longest wait first.",
-        "blocking": "Who's blocking",
+        "blocking": "Who's Blocking",
         "blockingHint": "The session holding the lock, with everything stuck behind it."
       },
       "columns": {
@@ -27694,11 +27694,15 @@
         "waiting": "Waiting",
         "sessionQuery": "Session and what it's running",
         "application": "Application",
-        "blocking": "Blocking"
+        "blocking": "Blocking",
+        "allOnInstance": "All waits here are on {instance}.",
+        "allInApp": "All waits here come from {app}.",
+        "waitingHint": "Red: waiting {red} or longer. Amber: {amber} or longer. Bars are sized against the longest wait shown."
       },
       "coverage": {
         "summary": "The longest wait is {longest}. Every wait traces back to {roots} holding a lock open.",
-        "summaryCapped": "More sessions were waiting than we could read at once. Of the ones we have, the longest wait is {longest} and they trace back to {roots} holding a lock open.",
+        "summaryCapped": "Of the ones we have, the longest wait is {longest} and they trace back to {roots} holding a lock open.",
+        "cappedShort": "More sessions were waiting than could be read.",
         "summaryOneRoot": "one session",
         "summaryManyRoots": "{count} sessions",
         "checked": "Checked every {interval} seconds; last look {time}.",
@@ -27719,7 +27723,10 @@
         "buffer": "a data page to be read",
         "lock": "a lock"
       },
-      "deep": "{count} deep",
+      "deep": "{count} ahead",
+      "deepHint": "Waiting behind {count} other session in this chain. | Waiting behind {count} other sessions in this chain.",
+      "lockType": "Lock type: {type}",
+      "blockerState": "State: {state}",
       "notWaiting": "not waiting",
       "longestWait": "Longest wait",
       "holdsTheLock": "Holds the lock everyone wants",
