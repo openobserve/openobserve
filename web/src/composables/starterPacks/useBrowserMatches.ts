@@ -22,6 +22,8 @@ import {
   type Ref,
 } from "vue";
 
+import store from "@/stores";
+
 import type { FindMoreResult, FindMoreSource } from "./findMore";
 import { packs } from "./usePackCatalog";
 
@@ -46,7 +48,12 @@ interface OrgState {
   copy: BrowserMatchCopy | null;
 }
 
-export const matchesKey = (org: string) => `o2.starterPacks.browserMatches.${org}`;
+// Users share a browser, so one user's matches must never show to the next.
+export const matchesKey = (org: string, email: string) =>
+  `o2.starterPacks.browserMatches.${org}.${email}`;
+
+const signedIn = (): string =>
+  String((store.state.userInfo as { email?: string } | null)?.email ?? "");
 
 const isBuiltIn = (packId: string) => packs().some(({ id }) => id === packId);
 
@@ -54,7 +61,7 @@ const builtInOnly = (sources: FindMoreSource[]) =>
   sources.filter(({ packId }) => !!packId && isBuiltIn(packId));
 
 // Shared by every caller in the tab, so a save on Home updates the header at once.
-const orgs = new Map<string, OrgState>();
+const copies = new Map<string, OrgState>();
 
 // Storage can be missing or throw (private mode, blocked site data), so every access is guarded.
 const readJson = (key: string): unknown => {
@@ -96,17 +103,17 @@ const parseCopy = (value: unknown): BrowserMatchCopy | null => {
   };
 };
 
-const stateOf = (org: string): OrgState => {
-  let state = orgs.get(org);
+const stateOf = (key: string, stored: boolean): OrgState => {
+  let state = copies.get(key);
   if (!state) {
-    state = reactive<OrgState>({ copy: parseCopy(readJson(matchesKey(org))) });
-    orgs.set(org, state);
+    state = reactive<OrgState>({ copy: stored ? parseCopy(readJson(key)) : null });
+    copies.set(key, state);
   }
   return state;
 };
 
 /** Forgets the in-memory copies, so the next read comes from storage. */
-export const resetBrowserMatches = () => orgs.clear();
+export const resetBrowserMatches = () => copies.clear();
 
 /** This browser's last match result for an org; no network calls. */
 export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
@@ -128,7 +135,10 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
   markRemoved(packId: string): void;
   clear(): void;
 } {
-  const state = computed(() => stateOf(toValue(org)));
+  // Without a known user any key could be read by the next one, so the copy stays in memory.
+  const stored = computed(() => !!signedIn());
+  const key = computed(() => matchesKey(toValue(org), signedIn()));
+  const state = computed(() => stateOf(key.value, stored.value));
   const copy = computed(() => state.value.copy);
   const visible = computed(() => {
     const installed = copy.value?.installedPackIds ?? [];
@@ -142,7 +152,7 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
 
   const setCopy = (next: BrowserMatchCopy) => {
     state.value.copy = next;
-    writeJson(matchesKey(toValue(org)), next);
+    if (stored.value) writeJson(key.value, next);
   };
 
   const saveBuiltIn = (
@@ -198,8 +208,9 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
 
   const clear = () => {
     state.value.copy = null;
+    if (!stored.value) return;
     try {
-      window.localStorage.removeItem(matchesKey(toValue(org)));
+      window.localStorage.removeItem(key.value);
     } catch {
       // The in-memory copy is gone for this tab either way.
     }
