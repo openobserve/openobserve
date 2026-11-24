@@ -439,12 +439,7 @@ pub async fn search_http2_stream(
 
     #[cfg(feature = "enterprise")]
     // Check permissions for each stream
-    let permission_resource_type =
-        if req.search_type == Some(config::meta::search::SearchEventType::Insights) {
-            StreamPermissionResourceType::Insights
-        } else {
-            StreamPermissionResourceType::Search
-        };
+    let permission_resource_type = stream_resource_type(req.search_type, extract_patterns);
 
     #[cfg(not(feature = "enterprise"))]
     if let Some(res) = crate::search::digest_query_refusal(&req.query.sql, stream_type, &trace_id) {
@@ -1049,6 +1044,21 @@ async fn with_suggestion_source(
     Err((err, suggest_from))
 }
 
+/// The permission a stream search needs; Patterns and Insights have their own grants. [pure]
+#[cfg(feature = "enterprise")]
+fn stream_resource_type(
+    search_type: Option<config::meta::search::SearchEventType>,
+    extract_patterns: bool,
+) -> StreamPermissionResourceType {
+    use config::meta::search::SearchEventType::Insights;
+
+    match (extract_patterns, search_type) {
+        (true, _) => StreamPermissionResourceType::PatternExtract,
+        (false, Some(Insights)) => StreamPermissionResourceType::Insights,
+        (false, _) => StreamPermissionResourceType::Search,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use axum::{
@@ -1135,5 +1145,30 @@ mod tests {
         )
         .await;
         assert_protected(resp).await;
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_stream_resource_type_follows_the_feature_run() {
+        use config::meta::search::SearchEventType::{Insights, UI};
+
+        use super::{StreamPermissionResourceType as R, stream_resource_type};
+
+        let cases = [
+            (None, false, "search"),
+            (Some(UI), false, "search"),
+            (Some(Insights), false, "insights"),
+            (None, true, "patterns"),
+            (Some(UI), true, "patterns"),
+            (Some(Insights), true, "patterns"),
+        ];
+        for (search_type, extract_patterns, expected) in cases {
+            let got = match stream_resource_type(search_type, extract_patterns) {
+                R::Search => "search",
+                R::Insights => "insights",
+                R::PatternExtract => "patterns",
+            };
+            assert_eq!(got, expected, "{search_type:?} patterns={extract_patterns}");
+        }
     }
 }

@@ -14,15 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{
-    extract::{FromRequestParts, Path},
-    response::{IntoResponse, Response},
+    body::Bytes,
+    extract::Path,
+    http::{Method, Uri},
+    response::Response,
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use {
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
-    openobserve_core::authz::StreamPermissionResourceType, search_service::streaming,
+    openobserve_core::authz::{StreamPermissionResourceType, check_cipher_key_permissions},
+    search_service::streaming,
     tokio::sync::mpsc,
 };
 
@@ -69,33 +72,17 @@ use crate::common::utils::http::client_search_type;
 #[axum::debug_handler]
 pub async fn extract_patterns(
     Path((org_id, stream_name)): Path<(String, String)>,
-    in_req: axum::extract::Request,
+    Headers(user_email): Headers<UserEmail>,
+    method: Method,
+    uri: Uri,
+    // `Bytes` honours the router's DefaultBodyLimit; a raw body read does not.
+    body: Bytes,
 ) -> Response {
-    // Extract headers manually to avoid conflict with body extraction
-    let (mut parts, body) = in_req.into_parts();
-
-    // Extract UserEmail from headers
-    let user_email = match Headers::<UserEmail>::from_request_parts(&mut parts, &()).await {
-        Ok(Headers(email)) => email,
-        Err(e) => return e.into_response(),
-    };
-
     let user_id = user_email.user_id;
-
-    // Extract body bytes
-    let body = match axum::body::to_bytes(body, usize::MAX).await {
-        Ok(bytes) => bytes,
-        Err(e) => {
-            return MetaHttpResponse::bad_request(format!("Failed to read request body: {}", e));
-        }
-    };
 
     #[cfg(feature = "enterprise")]
     {
         let trace_id = config::ider::generate_trace_id();
-
-        // Store body bytes for auditing
-        let body_bytes = body.clone();
 
         log::info!(
             "[PATTERNS trace_id {trace_id}] Pattern extraction requested for {org_id}/{stream_name}"
@@ -120,10 +107,10 @@ pub async fn extract_patterns(
 
         // Create audit context
         let audit_ctx = Some(search::AuditContext {
-            method: parts.method.to_string(),
-            path: parts.uri.path().to_string(),
-            query_params: parts.uri.query().unwrap_or("").to_string(),
-            body: String::from_utf8_lossy(&body_bytes).to_string(),
+            method: method.to_string(),
+            path: uri.path().to_string(),
+            query_params: uri.query().unwrap_or("").to_string(),
+            body: String::from_utf8_lossy(&body).to_string(),
         });
 
         // Create a channel to receive search results
@@ -159,20 +146,20 @@ pub async fn extract_patterns(
             );
             return res;
         }
+        if let Some(res) = check_cipher_key_permissions(&org_id, &user_id, &req.query.sql).await {
+            return res;
+        }
 
         // Size limit for pattern extraction (max logs to analyze). This bounds the
         // sample the clustering runs on. NOTE: per-pattern volume sparklines are
         // NOT derived from this sample — the UI fetches an exact, tantivy-indexed
         // histogram per pattern — so this only needs to be a representative sample
         // for cluster discovery, not a time-uniform one.
-        if req.query.size == 0 || req.query.size == -1 {
-            let o2_cfg = get_o2_config();
-            req.query.size = if o2_cfg.log_patterns.max_logs_for_extraction > 0 {
-                o2_cfg.log_patterns.max_logs_for_extraction as i64
-            } else {
-                config::get_config().limit.query_default_limit
-            };
-        }
+        req.query.size = streaming::extraction_size(
+            req.query.size,
+            get_o2_config().log_patterns.max_logs_for_extraction,
+            config::get_config().limit.query_default_limit,
+        );
 
         // Extraction deliberately does not use row-group sampling.
         //
@@ -270,6 +257,8 @@ pub async fn extract_patterns(
     {
         drop(org_id);
         drop(stream_name);
+        drop(method);
+        drop(uri);
         drop(body);
         drop(user_id);
         MetaHttpResponse::forbidden("Pattern extraction is an enterprise feature")
