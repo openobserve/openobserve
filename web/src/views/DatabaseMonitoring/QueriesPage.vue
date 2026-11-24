@@ -121,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :active-id="activeInsightId"
           :baseline="baseline"
           @filter="toggleInsightFilter"
+          @clear="activeInsightId = null"
         />
         <!-- Nothing failed means nothing to narrow to; it stays while active so it can be cleared. -->
         <OCheckbox
@@ -587,7 +588,7 @@ import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
-import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
+import type { DbmScopeFilter } from "@/utils/dbm/scopeFilter";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -1923,7 +1924,7 @@ const toggleInsightFilter = (insight: DbmInsight) => {
 };
 
 /** What a reader does next, on the row they are already looking at; the row click opens the query. */
-const rowActions: OTableRowAction[] = (() => {
+const rowActions = computed<OTableRowAction[]>(() => {
   const action = (
     id: string,
     icon: OTableRowAction["icon"],
@@ -1947,7 +1948,7 @@ const rowActions: OTableRowAction[] = (() => {
       disabled: () => (aiLock.locked.value ? aiLock.lockedReason.value : false),
     },
   ];
-})();
+});
 
 const onRowAction = async (id: string, row: QueryRow) => {
   analytics.track("dbm_row_action_clicked", { page: "queries", action: id });

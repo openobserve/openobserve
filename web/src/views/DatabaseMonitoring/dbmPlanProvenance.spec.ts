@@ -118,4 +118,15 @@ describe("per-row plan provenance", () => {
       `est→act is gated on "${nearest}" — null actuals mean "not measured", never 0`,
     ).toMatch(/actualRows\s*!==\s*null/);
   });
+
+  it("keeps the tag in a fixed-width slot and shows plan durations to one decimal", () => {
+    const loop = planLoop();
+    expect(loop).toMatch(/min-w-32[^>]*data-test="dbm-detail-plan-tag-slot"/);
+    expect(loop).toContain("planDuration(plan.avgDurationMs)");
+    expect(source()).toContain("Number(ms.toFixed(1))");
+  });
+
+  it("has no header sub-label on the Callers table", () => {
+    expect(source()).not.toContain("headerSubLabel");
+  });
 });

@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     • It is SAMPLED, not continuous. The disclosure line states the interval the
       server inferred, and says plainly that a query shorter than the gap
       between two samples can run and finish unseen. Our shipped default is 10s,
-      not Datadog's 1 Hz, so no interval is ever assumed — an uninferable one
+      not a 1 Hz feed, so no interval is ever assumed — an uninferable one
       degrades to non-numeric copy instead.
     • The sample is already FILTERED by the collector: idle sessions older than
       the newest running query are dropped unless they block someone. So this is
@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #trailing>
           <div class="ms-auto flex items-center gap-1">
+            <DbmRecommendationMenu :items="recommendationItems" />
             <OTableColumnToggle
               :columns="columns"
               :column-visibility="columnVisibility"
@@ -161,10 +162,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ raw(row.query ?? "") || raw("—") }}
             </OTruncatedText>
             <div
+              v-if="!uniformInstance && row.db_instance"
               class="text-text-secondary flex min-h-4 min-w-0 items-center gap-1 text-xs"
               data-test="dbm-activity-meta"
             >
-              <OTruncatedText v-if="!uniformInstance && row.db_instance">
+              <OTruncatedText>
                 {{ row.db_instance }}
                 <OTooltip :content="raw(engineName(row.db_system))" />
               </OTruncatedText>
@@ -314,6 +316,9 @@ import { useRoute, useRouter } from "vue-router";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
+import DbmRecommendationMenu, {
+  type DbmRecommendationMenuItem,
+} from "@/components/dbm/DbmRecommendationMenu.vue";
 import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -341,6 +346,7 @@ import {
   activityEmptyCause,
   activityQueryDetailTarget,
   activitySampleTotal,
+  activityTimeSortKey,
   buildActivityRows,
   buildStateSummary,
   buildWaitBreakdown,
@@ -354,6 +360,7 @@ import {
   waitBucketLabelParts,
   waitTotals,
 } from "@/utils/dbm/activity";
+import { buildRecommendations, recommendationRuleParams } from "@/utils/dbm/recommendations";
 import { formatAge, formatCount, formatPercent } from "@/utils/dbm/format";
 import { emptyColumnIds } from "@/utils/dbm/emptyColumns";
 import { engineName, uniformValue } from "@/utils/dbm/uniformValue";
@@ -511,7 +518,7 @@ const allRows = computed(() =>
         ? raw(row.state.toLowerCase() === "running" ? "active" : row.state)
         : t("dbm.activity.state.unknown"),
       stateRaw: row.state && row.state.toLowerCase() === "running" ? row.state : null,
-      timeMs: row.runningMs ?? row.lastQueryMs,
+      timeSort: activityTimeSortKey(row),
       // `blocking_pids` is the SOLE blocked-ness predicate (E2/E3) — the `{}`
       // sentinel means unblocked, and the server already parsed it to an array.
       blockedByLabel: row.blocked ? raw(row.blocking_pids?.join(", ") ?? "") : null,
@@ -527,6 +534,25 @@ const allRows = computed(() =>
         : null,
     };
   }),
+);
+
+const recommendationItems = computed<DbmRecommendationMenuItem[]>(() =>
+  buildRecommendations({ sessions: sessions.value, indexes: [], blocking: [], serverMetrics: null })
+    .filter((rec) => rec.id === "long-running-query")
+    .map((rec, i) => {
+      const { key, params } = recommendationRuleParams(rec.id);
+      return {
+        key: `${rec.id}-${i}`,
+        id: rec.id,
+        tone: rec.tone,
+        title: t("dbm.recommendations.long-running-query.title"),
+        body: t("dbm.recommendations.long-running-query.body", {
+          pid: rec.subject || "?",
+          duration: formatDurationMs(rec.evidence.runningMs ?? 0),
+        }),
+        rule: t(key as Parameters<typeof t>[0], params),
+      };
+    }),
 );
 
 /**
@@ -621,7 +647,7 @@ const columns = computed<OTableColumnDef<ActivityTableRow>[]>(() => [
     : []),
   {
     id: "time",
-    accessorKey: "timeMs",
+    accessorKey: "timeSort",
     header: t("dbm.activity.columns.time"),
     size: 150,
     sortable: true,

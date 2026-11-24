@@ -26995,9 +26995,7 @@
       "unknownNote": "Nada para medir no intervalo e nos filtros que selecionou.",
       "lineHealthy": "Está a ver {percent}% do tempo desta base de dados — os {count} tipos de consulta mais pesados.",
       "lineRemainder": "Está a ver {percent}% do tempo desta base de dados. O restante está em consultas mais leves que não listamos uma a uma.",
-      "lineStale": "A nossa contagem está {minutes} minutos atrasada, pelo que as consultas mais recentes podem ainda não estar aqui.",
       "lineTruncated": "Havia mais dados no último período do que conseguimos processar, pelo que os números mais recentes estão subestimados.",
-      "lineTruncatedStale": "Havia mais dados no último período do que conseguimos processar, e a nossa contagem está {minutes} minutos atrasada — os números mais recentes estão subestimados, e as consultas mais recentes podem ainda não estar aqui.",
       "lineGap": "Faltam {minutes} minutos nesta janela. A nossa contagem parou às {stopped} e só consegue recuar {reach} minutos, pelo que nada cobre {from}–{to}.",
       "lineSubset": "Filtrou por {filter}, pelo que estas percentagens descrevem as linhas apresentadas, não a base de dados inteira.",
       "lineHealthyAll": "Está a ver todas as consultas que foram executadas. As velocidades aqui são medidas em cada chamada, pelo que são exatas.",
@@ -27008,10 +27006,7 @@
       "lineExactSlowestSchema": "Todas as bases de dados estão a comunicar. As velocidades são exatas por esquema; uma base de dados com vários esquemas mostra o esquema mais lento.",
       "lineSubsetUnnamed": "Os seus filtros reduzem isto abaixo do nível em que estes totais são somados, pelo que as percentagens descrevem as linhas apresentadas em vez da base de dados inteira.",
       "lineQuery": "Os tempos são medidos a partir da sua aplicação, pelo que incluem o tempo de rede e qualquer espera por uma ligação livre.",
-      "lineUncodedErrors": "{percent} das falhas aqui foram devolvidas sem código de motivo, pelo que podem ser contadas, mas não explicadas.",
-      "lineSubsetStale": "Filtrou por {filter}, e a nossa contagem está {minutes} minutos atrasada — estas percentagens descrevem as linhas apresentadas, e as consultas mais recentes podem ainda não estar aqui.",
-      "lineSubsetUnnamedStale": "Os seus filtros reduzem isto abaixo do nível em que estes totais são somados, e a nossa contagem está {minutes} minutos atrasada — as percentagens descrevem as linhas apresentadas, e as consultas mais recentes podem ainda não estar aqui.",
-      "lineCountedToBehind": "Contado até {time}; estamos {minutes} minutos atrasados."
+      "lineUncodedErrors": "{percent} das falhas aqui foram devolvidas sem código de motivo, pelo que podem ser contadas, mas não explicadas."
     },
     "breakdown": {
       "loading": "A descobrir para onde o tempo foi…",
@@ -27558,7 +27553,6 @@
         "occurrencesTitle": "Todas as {count} vezes em que este par entrou em deadlock",
         "occurrencesHint": "Selecione um ponto para o carregar acima",
         "lostLabel": "{pid} perdeu",
-        "bothSidesLose": "Ambos os lados são cancelados quase igualmente — {a} vs {b}. Nenhuma das aplicações é o problema; a ordem é.",
         "oneSideLoses": "{app} é cancelado todas as vezes.",
         "showAbove": "Mostrar acima",
         "copy": "Copiar SQL",

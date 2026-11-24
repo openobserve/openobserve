@@ -74,11 +74,6 @@ export interface DeadlockPair {
   queries: [string, string];
   /** The applications on each side, deduped and display-ordered. */
   applications: string[];
-  /**
-   * Neither side is consistently the victim. That alternation is the signature
-   * of a symmetric lock-ordering bug and is invisible in any single event.
-   */
-  victimAlternates: boolean;
   /** How many times each application was the cancelled side; unnamed sides are skipped. */
   victimAppCounts: Record<string, number>;
 }
@@ -139,21 +134,14 @@ export const groupDeadlocks = (events: DeadlockEvent[]): DeadlockPair[] => {
     const sorted = [...bucket].sort((a, b) => b.timestamp - a.timestamp);
     const newest = sorted[0];
 
-    const victimPids = new Set<string>();
     const victimAppCounts: Record<string, number> = {};
     for (const event of sorted) {
       for (const p of event.participants) {
         if (!p.victim) continue;
-        if (p.pid != null) victimPids.add(String(p.pid));
         const app = p.application?.trim();
         if (app) victimAppCounts[app] = (victimAppCounts[app] ?? 0) + 1;
       }
     }
-    const losses = [...victimPids];
-    // Both sides lost at least once: no single application is "the problem",
-    // the ordering is.
-    const victimAlternates = losses.length > 1;
-
     const objects = [...new Set(sorted.flatMap((e) => e.objects ?? []))];
     const applications = [...new Set(newest.participants.map(participantLabel).filter(Boolean))];
     const queries = newest.participants.map((p) => normalizeDeadlockQuery(p.query));
@@ -170,7 +158,6 @@ export const groupDeadlocks = (events: DeadlockEvent[]): DeadlockPair[] => {
       objects,
       queries: [queries[0] ?? "", queries[1] ?? ""],
       applications,
-      victimAlternates,
       victimAppCounts,
     });
   }
@@ -179,6 +166,13 @@ export const groupDeadlocks = (events: DeadlockEvent[]): DeadlockPair[] => {
   // one still happening sorts above the one that stopped.
   return pairs.sort((a, b) => b.count - a.count || b.lastSeen - a.lastSeen);
 };
+
+/** `` `shop`.`accounts` `` -> `shop.accounts`. */
+export const stripQuotes = (name: string): string => name.replace(/[`"']/g, "");
+
+/** MySQL reports threads, not pids; the wrong noun sends the DBA to the wrong system view. */
+export const isThreadEngine = (dbSystem: string | null | undefined): boolean =>
+  (dbSystem ?? "").toLowerCase().includes("mysql");
 
 /** The cancelled side of an event, if the log said which. */
 export const victimOf = (event: DeadlockEvent): DeadlockParticipant | null =>

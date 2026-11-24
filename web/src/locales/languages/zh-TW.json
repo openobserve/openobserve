@@ -26990,9 +26990,7 @@
       "unknownNote": "您選擇的範圍和篩選條件中沒有可測量的資料。",
       "lineHealthy": "您看到的是此資料庫時間的 {percent}%——最重的 {count} 種查詢。",
       "lineRemainder": "您看到的是此資料庫時間的 {percent}%。其餘分散在較輕量的查詢中，我們不會逐一列出。",
-      "lineStale": "我們的計數落後 {minutes} 分鐘，因此最新的查詢可能尚未出現。",
       "lineTruncated": "最後一段的資料量超出我們能接收的量，因此最新的數字被低估。",
-      "lineTruncatedStale": "最後一段的資料量超出我們能接收的量，且我們的計數落後 {minutes} 分鐘——最新數字被低估，最新的查詢可能尚未出現。",
       "lineGap": "此時間視窗缺少 {minutes} 分鐘。我們的計數在 {stopped} 停止，且只能回溯 {reach} 分鐘，因此沒有資料涵蓋 {from}–{to}。",
       "lineSubset": "您已篩選至 {filter}，因此這些百分比描述的是顯示的列，而非整個資料庫。",
       "lineHealthyAll": "您看到的是所有執行過的查詢。這裡的速度是針對每次呼叫測量的，因此是精確的。",
@@ -27003,10 +27001,7 @@
       "lineExactSlowestSchema": "所有資料庫皆有回報。速度依各結構描述精確計算；含多個結構描述的資料庫會顯示最慢的那一個。",
       "lineSubsetUnnamed": "您的篩選條件將此範圍縮小到低於這些總計的彙總層級，因此百分比描述的是顯示的列，而非整個資料庫。",
       "lineQuery": "時間是從您的應用程式測量，因此包含網路時間以及等待可用連線的時間。",
-      "lineUncodedErrors": "{percent} 的失敗沒有回傳原因代碼，因此可以被計數但無法解釋。",
-      "lineSubsetStale": "您已篩選至 {filter}，而我們的計數落後 {minutes} 分鐘——這些百分比描述的是顯示的列，且最新的查詢可能尚未出現。",
-      "lineSubsetUnnamedStale": "您的篩選條件將此範圍縮小到低於這些總計的彙總層級，且我們的計數落後 {minutes} 分鐘——百分比描述的是顯示的列，且最新的查詢可能尚未出現。",
-      "lineCountedToBehind": "計數截至 {time}；我們落後 {minutes} 分鐘。"
+      "lineUncodedErrors": "{percent} 的失敗沒有回傳原因代碼，因此可以被計數但無法解釋。"
     },
     "breakdown": {
       "loading": "正在計算時間的去向…",
@@ -27553,7 +27548,6 @@
         "occurrencesTitle": "此配對死結的所有 {count} 次",
         "occurrencesHint": "選取一個點以載入上方該項目",
         "lostLabel": "{pid} 失敗",
-        "bothSidesLose": "雙方被取消的次數大致相同 — {a} 對 {b}。問題不在任一個應用程式，而是順序。",
         "oneSideLoses": "{app} 每次都被取消。",
         "showAbove": "在上方顯示",
         "copy": "複製 SQL",

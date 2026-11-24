@@ -20,7 +20,7 @@ import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 
 import DbmFilterBar from "./DbmFilterBar.vue";
-import type { DbmScopeFilter } from "./DbmScopeFilters.vue";
+import type { DbmScopeFilter } from "@/utils/dbm/scopeFilter";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 

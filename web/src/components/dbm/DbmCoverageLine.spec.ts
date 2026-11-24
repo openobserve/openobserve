@@ -225,6 +225,12 @@ describe("DbmCoverageLine", () => {
       expect(trailer(wrapper)).toContain("25 minutes behind");
     });
 
+    it("reads a 40 hour lag as hours, not raw minutes", () => {
+      const wrapper = mountLine({ inline: true, freshness: behindBy(2400) });
+      expect(trailer(wrapper)).toContain("40 hours behind");
+      expect(trailer(wrapper)).not.toContain("2400");
+    });
+
     it("does not cry lag over a minute or two of ordinary rollup delay", () => {
       const wrapper = mountLine({ inline: true, freshness: behindBy(3) });
       expect(trailer(wrapper)).toContain("last half-minute");

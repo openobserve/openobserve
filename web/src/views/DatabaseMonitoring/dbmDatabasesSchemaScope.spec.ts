@@ -19,7 +19,7 @@ import { createMemoryHistory, createRouter, RouterView, type Router } from "vue-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DatabasesResponse, QueryStatsRow } from "@/services/db_monitoring";
-import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
+import type { DbmScopeFilter } from "@/utils/dbm/scopeFilter";
 
 vi.mock("vuex", () => ({
   useStore: () => ({

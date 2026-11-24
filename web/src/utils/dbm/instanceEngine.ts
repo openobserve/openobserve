@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
+import type { DbmScopeFilter } from "@/utils/dbm/scopeFilter";
 import type { DbmInstanceHit } from "@/services/db_monitoring";
 import { raw, type I18nText } from "@/types/i18n";
 
 /**
  * Display-only: when an instance is selected, show its engine on the Engine
- * filter and lock it. Never touches the filter models or the URL.
+ * filter and lock it, only when every hit for that name has the same engine. Never touches the filter models or the URL.
  */
 export const applyInstanceEngine = (
   filters: DbmScopeFilter[],
@@ -27,7 +27,8 @@ export const applyInstanceEngine = (
   reason: I18nText,
 ): DbmScopeFilter[] => {
   const instance = filters.find((f) => f.key === "instance")?.value;
-  const engine = instance ? hits.find((h) => h.db_instance === instance)?.db_system : undefined;
+  const engines = new Set(hits.filter((h) => h.db_instance === instance).map((h) => h.db_system));
+  const engine = instance && engines.size === 1 ? [...engines][0] : undefined;
   if (!engine) return filters;
   return filters.map((f) =>
     f.key === "system"

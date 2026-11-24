@@ -502,3 +502,15 @@ export const tableHealthColumns = (
     },
   },
 ];
+
+/** One decimal, shared by the label and its tone so 9.96 reads "10.0%" AND turns amber. */
+export const roundBloat = (pct: number): number => Math.round(pct * 10) / 10;
+
+export const bloatTone = (pct: number): string => {
+  const shown = roundBloat(pct);
+  return shown >= 20
+    ? "bg-status-error-text"
+    : shown >= 10
+      ? "bg-status-warning-text"
+      : "bg-accent";
+};

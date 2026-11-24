@@ -26995,9 +26995,7 @@
       "unknownNote": "Nie ma czego mierzyć w wybranym zakresie i przy wybranych filtrach.",
       "lineHealthy": "Widzisz {percent}% czasu tej bazy danych — najcięższe rodzaje zapytań ({count}).",
       "lineRemainder": "Widzisz {percent}% czasu tej bazy danych. Reszta to lżejsze zapytania, których nie wymieniamy pojedynczo.",
-      "lineStale": "Nasze zliczanie jest opóźnione o {minutes} min, więc najnowsze zapytania mogą jeszcze się tu nie pojawić.",
       "lineTruncated": "W ostatnim odcinku było więcej danych, niż mogliśmy przyjąć, więc najnowsze liczby są zaniżone.",
-      "lineTruncatedStale": "W ostatnim odcinku było więcej danych, niż mogliśmy przyjąć, a nasze zliczanie jest opóźnione o {minutes} min — najnowsze liczby są zaniżone, a najnowsze zapytania mogą jeszcze się tu nie pojawić.",
       "lineGap": "W tym oknie brakuje {minutes} min. Nasze zliczanie zatrzymało się o {stopped} i może sięgnąć tylko {reach} min wstecz, więc nic nie obejmuje przedziału {from}–{to}.",
       "lineSubset": "Zawęziłeś do {filter}, więc te wartości procentowe opisują wyświetlane wiersze, a nie całą bazę danych.",
       "lineHealthyAll": "Widzisz każde zapytanie, które zostało wykonane. Czasy są tutaj mierzone dla każdego wywołania, więc są dokładne.",
@@ -27008,10 +27006,7 @@
       "lineExactSlowestSchema": "Wszystkie bazy danych raportują. Szybkości są dokładne dla każdego schematu; baza danych z kilkoma schematami pokazuje najwolniejszy z nich.",
       "lineSubsetUnnamed": "Twoje filtry zawężają to poniżej poziomu, na którym sumują się te wartości, więc wartości procentowe opisują wyświetlane wiersze, a nie całą bazę danych.",
       "lineQuery": "Czasy są mierzone z poziomu Twojej aplikacji, więc obejmują czas sieci i oczekiwanie na wolne połączenie.",
-      "lineUncodedErrors": "{percent} błędów tutaj nie miało kodu przyczyny, więc można je policzyć, ale nie wyjaśnić.",
-      "lineSubsetStale": "Zawęziłeś do {filter}, a nasze zliczanie jest opóźnione o {minutes} min — te wartości procentowe opisują wyświetlane wiersze, a najnowsze zapytania mogą jeszcze się tu nie pojawić.",
-      "lineSubsetUnnamedStale": "Twoje filtry zawężają to poniżej poziomu, na którym sumują się te wartości, a nasze zliczanie jest opóźnione o {minutes} min — wartości procentowe opisują wyświetlane wiersze, a najnowsze zapytania mogą jeszcze się tu nie pojawić.",
-      "lineCountedToBehind": "Zliczono do {time}; jesteśmy opóźnieni o {minutes} min."
+      "lineUncodedErrors": "{percent} błędów tutaj nie miało kodu przyczyny, więc można je policzyć, ale nie wyjaśnić."
     },
     "breakdown": {
       "loading": "Ustalamy, gdzie podział się czas…",
@@ -27558,7 +27553,6 @@
         "occurrencesTitle": "Wszystkie przypadki zakleszczenia tej pary ({count})",
         "occurrencesHint": "Wybierz punkt, aby załadować go powyżej",
         "lostLabel": "{pid} przegrało",
-        "bothSidesLose": "Obie strony są anulowane mniej więcej równo — {a} vs {b}. Żadna aplikacja nie jest problemem; problemem jest kolejność.",
         "oneSideLoses": "{app} jest anulowane za każdym razem.",
         "showAbove": "Pokaż powyżej",
         "copy": "Kopiuj SQL",

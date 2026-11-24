@@ -26995,9 +26995,7 @@
       "unknownNote": "Seçtiğiniz aralık ve filtrelerde ölçülecek bir şey yok.",
       "lineHealthy": "Bu veritabanının süresinin %{percent}'ini görüyorsunuz — en ağır {count} sorgu türü.",
       "lineRemainder": "Bu veritabanının süresinin %{percent}'ini görüyorsunuz. Geri kalanı tek tek listelemediğimiz daha hafif sorgularda.",
-      "lineStale": "Sayımımız {minutes} dakika geride, bu yüzden en yeni sorgular henüz burada olmayabilir.",
       "lineTruncated": "Son bölümde alabileceğimizden daha fazla veri vardı, bu yüzden en yeni sayılar eksik hesaplandı.",
-      "lineTruncatedStale": "Son bölümde alabileceğimizden daha fazla veri vardı ve sayımımız {minutes} dakika geride — en yeni sayılar eksik hesaplandı ve en son sorgular henüz burada olmayabilir.",
       "lineGap": "Bu pencerede {minutes} dakika eksik. Sayımımız {stopped} saatinde durdu ve yalnızca {reach} dakika geriye gidebiliyor, bu yüzden {from}–{to} aralığını hiçbir şey kapsamıyor.",
       "lineSubset": "{filter} filtresini uyguladınız, bu yüzden bu yüzdeler gösterilen satırları tanımlıyor, tüm veritabanını değil.",
       "lineHealthyAll": "Çalışan her sorguyu görüyorsunuz. Buradaki hızlar her çağrı üzerinden ölçülür, bu yüzden tamdırlar.",
@@ -27008,10 +27006,7 @@
       "lineExactSlowestSchema": "Tüm veritabanları rapor veriyor. Hızlar şema başına kesindir; birden çok şeması olan bir veritabanı en yavaş olanı gösterir.",
       "lineSubsetUnnamed": "Filtreleriniz bunu bu toplamların toplandığı seviyenin altına daraltıyor, bu yüzden yüzdeler tüm veritabanı yerine gösterilen satırları tanımlıyor.",
       "lineQuery": "Zamanlamalar uygulamanızdan ölçülür, bu yüzden ağ süresini ve boş bir bağlantı için bekleme süresini içerir.",
-      "lineUncodedErrors": "Buradaki hataların %{percent}'i bir neden kodu olmadan döndü, bu yüzden sayılabilirler ancak açıklanamazlar.",
-      "lineSubsetStale": "{filter} filtresini uyguladınız ve sayımımız {minutes} dakika geride — bu yüzdeler gösterilen satırları tanımlıyor ve en son sorgular henüz burada olmayabilir.",
-      "lineSubsetUnnamedStale": "Filtreleriniz bunu bu toplamların toplandığı seviyenin altına daraltıyor ve sayımımız {minutes} dakika geride — yüzdeler gösterilen satırları tanımlıyor ve en son sorgular henüz burada olmayabilir.",
-      "lineCountedToBehind": "{time} saatine kadar sayıldı; {minutes} dakika gerideyiz."
+      "lineUncodedErrors": "Buradaki hataların %{percent}'i bir neden kodu olmadan döndü, bu yüzden sayılabilirler ancak açıklanamazlar."
     },
     "breakdown": {
       "loading": "Zamanın nereye gittiği hesaplanıyor…",
@@ -27558,7 +27553,6 @@
         "occurrencesTitle": "Bu çiftin deadlock olduğu tüm {count} kez",
         "occurrencesHint": "Yukarıdakini yüklemek için bir nokta seçin",
         "lostLabel": "{pid} kaybetti",
-        "bothSidesLose": "Her iki taraf da yaklaşık eşit şekilde iptal ediliyor — {a} vs {b}. Hiçbir uygulama sorun değil; sorun sıralama.",
         "oneSideLoses": "{app} her seferinde iptal ediliyor.",
         "showAbove": "Yukarıda göster",
         "copy": "SQL'i kopyala",

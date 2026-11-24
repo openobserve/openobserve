@@ -49,7 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test-tone="tone"
     :data-test-unmatched="metrics.unmatchedReason ?? undefined"
   >
-    <template v-if="hasReading">
+    <OSkeleton
+      v-if="loading"
+      class="h-5 w-24 rounded-full"
+      data-test="dbm-instance-health-loading"
+    />
+    <template v-else-if="hasReading">
       <!-- Status and its detail on the left; the trend on the right at full cell height, so the detail never wraps under it. -->
       <div class="flex w-full min-w-0 items-center gap-2">
         <div class="flex w-40 min-w-0 shrink-0 flex-col items-start gap-0.5">
@@ -145,9 +150,16 @@ import { computed } from "vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
 import type { SparklinePoint } from "@/lib/data/Sparkline/OSparkline.types";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatCount, formatLagBytes, formatLagSeconds, formatPercent } from "@/utils/dbm/format";
+import {
+  CACHE_HIT_POOR,
+  SATURATION_DANGER,
+  hasThresholdedReading,
+  healthIssues,
+} from "@/utils/dbm/healthIssues";
 import type { DbmRowMetrics, DbmUnmatchedReason } from "@/utils/dbm/instanceMetrics";
 
 const props = defineProps<{
@@ -155,16 +167,11 @@ const props = defineProps<{
   /** Which engine reported this row — it decides the lag unit and the copy. */
   engine: string;
   dataTest?: string;
+  /** The instance-metrics read is still in flight, so a missing reading is not yet a verdict. */
+  loading?: boolean;
 }>();
 
 const { t } = useI18nTyped();
-
-/**
- * Where the row stops being ordinary. Postgres refuses connections at the
- * limit, and the last few are reserved for superusers, so the warning has to
- * arrive before the cliff rather than at it.
- */
-const SATURATION_DANGER = 0.9;
 
 /**
  * Engines whose RECEIVER publishes no connection limit. Kept for hint CHOICE
@@ -314,9 +321,6 @@ const absenceTooltip = computed<I18nText>(() =>
   raw(`${absence.value.label} — ${absence.value.hint}`),
 );
 
-/** Below this, the database is going to disk for most of its reads. */
-const CACHE_HIT_POOR = 0.9;
-
 const cacheLabel = computed<I18nText>(() =>
   t("dbm.instanceMetrics.cacheHit", { percent: formatPercent(props.metrics.cacheHitRatio, 0) }),
 );
@@ -345,33 +349,37 @@ const deadlocksLabel = computed<I18nText>(() =>
  * Replication lag has no threshold, so it is never an issue.
  */
 const issues = computed(() => {
-  const items: { id: string; label: I18nText; severity: "error" | "warning" }[] = [];
-  const { cacheHitRatio, deadlocks, saturation } = props.metrics;
-  if (saturation.ratio !== null && saturation.ratio >= SATURATION_DANGER) {
-    items.push({
-      id: "connections",
-      label: t("dbm.instanceMetrics.connectionsIssue", {
-        percent: formatPercent(saturation.ratio, 0),
-      }),
-      severity: "error",
-    });
-  }
-  if (cacheHitRatio !== null && cacheHitRatio < CACHE_HIT_POOR) {
-    items.push({ id: "cache", label: cacheLabel.value, severity: "warning" });
-  }
-  if (deadlocks !== null && deadlocks > 0) {
-    items.push({ id: "deadlocks", label: deadlocksLabel.value, severity: "error" });
-  }
-  return items;
+  const { saturation } = props.metrics;
+  return healthIssues(props.metrics).map((item) => ({
+    ...item,
+    label:
+      item.id === "connections"
+        ? t("dbm.instanceMetrics.connectionsIssue", {
+            percent: formatPercent(saturation.ratio, 0),
+          })
+        : item.id === "cache"
+          ? cacheLabel.value
+          : deadlocksLabel.value,
+  }));
 });
 
 const isCritical = computed(() => issues.value.some((item) => item.severity === "error"));
 
+// Nothing thresholded was measured, so "Healthy" would be a claim without evidence.
+const notAssessed = computed(() => !issues.value.length && !hasThresholdedReading(props.metrics));
+
 const statusVariant = computed(() =>
-  isCritical.value ? "error-soft" : issues.value.length ? "warning-soft" : "success-soft",
+  isCritical.value
+    ? "error-soft"
+    : issues.value.length
+      ? "warning-soft"
+      : notAssessed.value
+        ? "default-soft"
+        : "success-soft",
 );
 
 const statusLabel = computed<I18nText>(() => {
+  if (notAssessed.value) return t("dbm.instanceMetrics.status.notAssessed");
   if (!issues.value.length) return t("dbm.instanceMetrics.status.healthy");
   const word = isCritical.value
     ? t("dbm.instanceMetrics.status.critical")

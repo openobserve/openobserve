@@ -374,6 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <DbmInstanceHealthCell
               :metrics="row.metrics"
               :engine="row.db_system"
+              :loading="metricsLoading"
               data-test="dbm-databases-instance-health"
             />
           </div>
@@ -462,7 +463,7 @@ import DbmInstanceHealthCell from "@/components/dbm/DbmInstanceHealthCell.vue";
 import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
-import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
+import type { DbmScopeFilter } from "@/utils/dbm/scopeFilter";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -518,7 +519,7 @@ import useStreams from "@/composables/useStreams";
 import { foldServerInstanceMetrics } from "@/utils/dbm/instanceMetricsRead";
 import type { DbmInstanceMetricSet, DbmRowMetrics } from "@/utils/dbm/instanceMetrics";
 import { unionFleetRows, type DbmServerInstanceRef } from "@/utils/dbm/fleetRows";
-import { healthSortValue } from "@/utils/dbm/healthScalar";
+import { healthColumnSortValue } from "@/utils/dbm/healthIssues";
 import { APP_SOURCE_QUALIFIER } from "@/utils/dbm/overlapMetrics";
 import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
 import { hasDbmTraceVantage } from "@/composables/dbm/useDbmTraceVantage";
@@ -614,6 +615,7 @@ const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
 
 /** What the receiver said, keyed by `(system, host)`. Empty until it answers. */
 const instanceMetrics = ref<Map<string, DbmInstanceMetricSet>>(new Map());
+const metricsLoading = ref(false);
 /** Streams that errored, so an unmatched row can blame the read and not the DBA. */
 const failedMetricStreams = ref<string[]>([]);
 /**
@@ -934,18 +936,9 @@ const sortValue = (row: DatabaseRow, column: string): string | number | null => 
       return row.p99_ns ?? 0;
     case "load":
       return row.total_time_ns ?? 0;
-    // "Which needs attention first", as against `load`'s "which is busiest".
-    // Unknown health sorts ABOVE every measured instance rather than below it:
-    // an instance we cannot see is the risk, and burying it under the healthy
-    // ones is how a fleet page answers the question with the wrong row.
+    // Follows what the cell shows: no reading first, then severity, issue count, connection share.
     case "attention":
-      return healthSortValue(row.metrics);
-    case "instanceHealth":
-      // Sorts on saturation, which is the one instance figure that is
-      // comparable across engines and the reason the column exists. A row with
-      // no ratio sorts below every measured one rather than above them, so
-      // "most saturated first" cannot be led by rows carrying no reading.
-      return row.metrics?.saturation.ratio ?? -1;
+      return healthColumnSortValue(row.metrics);
     default:
       return null;
   }
@@ -1180,6 +1173,7 @@ const { traceCount, probeTracePresence } = useDbmTracePresence(getStreams);
  */
 const loadInstanceMetrics = async (token: number) => {
   if (!org.value) return;
+  metricsLoading.value = true;
   try {
     const response = await dbMonitoringService.getInstanceMetrics(org.value, {
       startTime: current.value.startTime,
@@ -1206,6 +1200,8 @@ const loadInstanceMetrics = async (token: number) => {
     if (requestSeq.isStale(token)) return;
     instanceMetrics.value = new Map();
     failedMetricStreams.value = [];
+  } finally {
+    if (!requestSeq.isStale(token)) metricsLoading.value = false;
   }
 };
 
@@ -1420,7 +1416,7 @@ const rowStyle = (row: TableRow) => {
 };
 
 // Query-shaped actions need traffic to point at; the row click already opens Metrics.
-const rowActions: OTableRowAction<TableRow>[] = [
+const rowActions = computed<OTableRowAction<TableRow>[]>(() => [
   {
     id: "queries",
     icon: "search",
@@ -1441,7 +1437,7 @@ const rowActions: OTableRowAction<TableRow>[] = [
     },
     dataTest: () => "dbm-databases-row-actions-alert",
   },
-];
+]);
 
 const onRowAction = (id: string, row: DatabaseRow) => {
   analytics.track("dbm_row_action_clicked", { page: "databases", action: id });

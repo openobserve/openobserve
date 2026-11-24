@@ -48,7 +48,7 @@
 
 import { computed, onActivated, ref, type ComputedRef, type Ref } from "vue";
 
-import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
+import type { DbmScopeFilter } from "@/utils/dbm/scopeFilter";
 import { createDbmFilterEntry, optionsFrom, type DbmFilterEntrySpec } from "@/utils/dbm/filters";
 import { useDbmFleetInstances } from "@/composables/dbm/useDbmFleetInstances";
 import type { DbmInstanceHit } from "@/services/db_monitoring";

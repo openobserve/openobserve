@@ -26995,9 +26995,7 @@
       "unknownNote": "Rien à mesurer dans la plage et les filtres que vous avez choisis.",
       "lineHealthy": "Vous voyez {percent}% du temps de cette base de données — les {count} types de requêtes les plus lourds.",
       "lineRemainder": "Vous voyez {percent}% du temps de cette base de données. Le reste est dans des requêtes plus légères que nous ne listons pas une par une.",
-      "lineStale": "Notre comptage a {minutes} minutes de retard, donc les requêtes les plus récentes peuvent ne pas encore être là.",
       "lineTruncated": "Il y avait plus de données dans la dernière période que ce que nous pouvions absorber, donc les nombres les plus récents sont sous-estimés.",
-      "lineTruncatedStale": "Il y avait plus de données dans la dernière période que ce que nous pouvions absorber, et notre comptage a {minutes} minutes de retard — les nombres les plus récents sont sous-estimés, et les requêtes les plus récentes peuvent ne pas encore être là.",
       "lineGap": "{minutes} minutes manquent dans cette fenêtre. Notre comptage s'est arrêté à {stopped} et ne peut remonter que {reach} minutes en arrière, donc rien ne couvre {from}–{to}.",
       "lineSubset": "Vous avez filtré sur {filter}, donc ces pourcentages décrivent les lignes affichées, pas toute la base de données.",
       "lineHealthyAll": "Vous voyez chaque requête qui a été exécutée. Les vitesses ici sont mesurées sur chaque appel, donc elles sont exactes.",
@@ -27008,10 +27006,7 @@
       "lineExactSlowestSchema": "Toutes les bases de données remontent des données. Les vitesses sont exactes par schéma ; une base de données comportant plusieurs schémas affiche le plus lent.",
       "lineSubsetUnnamed": "Vos filtres réduisent cela en dessous du niveau auquel ces totaux s'additionnent, donc les pourcentages décrivent les lignes affichées plutôt que toute la base de données.",
       "lineQuery": "Les temps sont mesurés depuis votre application, donc ils incluent le temps réseau et toute attente d'une connexion disponible.",
-      "lineUncodedErrors": "{percent} des échecs ici sont revenus sans code de raison, donc ils peuvent être comptés mais pas expliqués.",
-      "lineSubsetStale": "Vous avez filtré sur {filter}, et notre comptage a {minutes} minutes de retard — ces pourcentages décrivent les lignes affichées, et les requêtes les plus récentes peuvent ne pas encore être là.",
-      "lineSubsetUnnamedStale": "Vos filtres réduisent cela en dessous du niveau auquel ces totaux s'additionnent, et notre comptage a {minutes} minutes de retard — les pourcentages décrivent les lignes affichées, et les requêtes les plus récentes peuvent ne pas encore être là.",
-      "lineCountedToBehind": "Compté jusqu'à {time} ; nous avons {minutes} minutes de retard."
+      "lineUncodedErrors": "{percent} des échecs ici sont revenus sans code de raison, donc ils peuvent être comptés mais pas expliqués."
     },
     "breakdown": {
       "loading": "Calcul en cours de la répartition du temps…",
@@ -27558,7 +27553,6 @@
         "occurrencesTitle": "Les {count} fois où cette paire a provoqué un blocage",
         "occurrencesHint": "Sélectionnez un point pour charger l'entrée ci-dessus",
         "lostLabel": "{pid} a perdu",
-        "bothSidesLose": "Les deux côtés sont annulés à peu près également — {a} contre {b}. Aucune des deux applications n'est le problème ; c'est l'ordre.",
         "oneSideLoses": "{app} est annulé à chaque fois.",
         "showAbove": "Afficher ci-dessus",
         "copy": "Copier SQL",

@@ -123,8 +123,6 @@ const props = withDefaults(
     windowEnd?: number;
     /** Renders as a toolbar note instead of a full-width line. */
     inline?: boolean;
-    /** With `inline`, the icon alone, for a toolbar with no room left for text. */
-    compact?: boolean;
   }>(),
   {
     hits: () => [],
@@ -135,7 +133,6 @@ const props = withDefaults(
     filterLabel: null,
     subject: "list",
     inline: false,
-    compact: false,
   },
 );
 
@@ -312,13 +309,23 @@ interface CoverageEntry {
  * One entry, most-degrading first. Only one is shown: the reader needs the
  * worst problem and a way in, not a full inventory of qualifiers.
  */
+/** Minutes up to an hour, then hours, then days from 48 h, so "2400 min" reads as "40 hours". */
+const lagText = (minutes: number, short: boolean): I18nText => {
+  const suffix = short ? "Short" : "";
+  if (minutes <= 60) return t(`dbm.coverage.lagMinutes${suffix}`, { n: minutes });
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return t(`dbm.coverage.lagHours${suffix}`, { n: hours });
+  return t(`dbm.coverage.lagDays${suffix}`, { n: Math.round(hours / 24) });
+};
+
 const entry = computed<CoverageEntry>(() => {
   const mk = (variant: CoverageVariant | null, short: I18nText, long: I18nText = short) => ({
     variant,
     short,
     long,
   });
-  const minutes = behindMinutes.value ?? 0;
+  const lagLong = lagText(behindMinutes.value ?? 0, false);
+  const lagShort = lagText(behindMinutes.value ?? 0, true);
   const stale = isStale.value;
   // Nothing on screen: the empty state is doing the explaining.
   if (isEmpty.value) return mk(null, t("dbm.coverage.unknownNote"));
@@ -361,8 +368,8 @@ const entry = computed<CoverageEntry>(() => {
     return stale
       ? mk(
           "warning",
-          t("dbm.coverage.bannerStale", { minutes }),
-          t("dbm.coverage.lineSubsetStale", { filter: props.filterLabel, minutes }),
+          t("dbm.coverage.bannerStale", { lag: lagShort }),
+          t("dbm.coverage.lineSubsetStale", { filter: props.filterLabel, lag: lagLong }),
         )
       : mk(
           "info",
@@ -374,8 +381,8 @@ const entry = computed<CoverageEntry>(() => {
     return stale
       ? mk(
           "warning",
-          t("dbm.coverage.bannerStale", { minutes }),
-          t("dbm.coverage.lineSubsetUnnamedStale", { minutes }),
+          t("dbm.coverage.bannerStale", { lag: lagShort }),
+          t("dbm.coverage.lineSubsetUnnamedStale", { lag: lagLong }),
         )
       : mk("info", t("dbm.coverage.bannerSubsetUnnamed"), t("dbm.coverage.lineSubsetUnnamed"));
   }
@@ -384,16 +391,16 @@ const entry = computed<CoverageEntry>(() => {
     return stale
       ? mk(
           "warning",
-          t("dbm.coverage.bannerTruncatedStale", { minutes }),
-          t("dbm.coverage.lineTruncatedStale", { minutes }),
+          t("dbm.coverage.bannerTruncatedStale", { lag: lagShort }),
+          t("dbm.coverage.lineTruncatedStale", { lag: lagLong }),
         )
       : mk("warning", t("dbm.coverage.bannerTruncated"), t("dbm.coverage.lineTruncated"));
   }
   if (stale) {
     return mk(
       "warning",
-      t("dbm.coverage.bannerStale", { minutes }),
-      t("dbm.coverage.lineStale", { minutes }),
+      t("dbm.coverage.bannerStale", { lag: lagShort }),
+      t("dbm.coverage.lineStale", { lag: lagLong }),
     );
   }
   if (bigRemainder.value) {
@@ -448,7 +455,7 @@ const noteDetail = computed<I18nText>(() => {
   if (!c) return summary.value;
   const counted =
     c.behind !== null
-      ? t("dbm.coverage.lineCountedToBehind", { time: c.time, minutes: c.behind })
+      ? t("dbm.coverage.lineCountedToBehind", { time: c.time, lag: lagText(c.behind, false) })
       : t("dbm.coverage.lineCountedTo", { time: c.time });
   return raw(`${summary.value} ${counted}`);
 });

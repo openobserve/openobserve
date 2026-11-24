@@ -56,7 +56,7 @@ export interface DbmChartTheme {
  */
 // Each unit takes over once the slowest sample is ten of it, so ticks stay short numbers.
 const AXIS_UNITS = [
-  { ns: 36e13, suffix: "h", from: 36e13 * 10 },
+  { ns: 3.6e12, suffix: "h", from: 3.6e12 * 10 },
   { ns: 6e10, suffix: "min", from: 6e10 * 10 },
   { ns: 1e9, suffix: "s" },
   { ns: 1e6, suffix: "ms" },

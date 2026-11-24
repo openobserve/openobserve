@@ -342,6 +342,16 @@ export interface ActivityRow extends ActivitySession {
   xactStartMs: number | null;
 }
 
+// Above any realistic query duration (~31,000 years in ms), so running always outranks idle.
+const RUNNING_SORT_BASE = 1e15;
+
+/** Sort key for the Time column: running sessions first (longest first when descending), then idle ones. */
+export const activityTimeSortKey = (row: {
+  runningMs: number | null;
+  lastQueryMs: number | null;
+}): number =>
+  row.runningMs !== null ? RUNNING_SORT_BASE + row.runningMs : (row.lastQueryMs ?? -1);
+
 /** A finite number, or null. Keeps a real `0` (a sub-millisecond query). */
 const finite = (value: number | null | undefined): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -412,7 +422,7 @@ export interface ActivitySampleDisclosure {
  * What the page is allowed to claim about its own fidelity.
  *
  * There is deliberately no fallback interval. Our shipped default is 10s, not
- * Datadog's 1 Hz, and substituting a number we did not measure would imply a
+ * a 1 Hz feed, and substituting a number we did not measure would imply a
  * fidelity we do not ship.
  */
 export const sampleDisclosure = (

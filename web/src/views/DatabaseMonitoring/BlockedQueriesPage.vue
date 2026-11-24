@@ -69,6 +69,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip side="bottom" :content="t('dbm.blocked.perspective.blockingHint')" />
           </OToggleGroupItem>
         </OToggleGroup>
+        <DbmRecommendationMenu
+          :items="recommendationItems"
+          :empty-text="t('dbm.recommendations.menuEmptyBlocked')"
+        />
       </DbmFilterBar>
       <OTable
         :enable-column-resize="true"
@@ -308,6 +312,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-application="{ row }">
           <span class="text-text-body font-mono text-xs">
             {{ raw(row.application ?? "—") }}
+            <OTooltip
+              v-if="row.applicationState"
+              :content="t('dbm.blocked.blockerState', { state: row.applicationState })"
+            />
           </span>
         </template>
 
@@ -402,8 +410,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
+          <!-- A search that matched nothing is not an absence of waits. -->
+          <OEmptyState
+            v-if="!loading && searchHidEverything"
+            preset="no-search-results"
+            data-test="dbm-blocked-no-matches"
+            @action="clearSearch"
+          />
           <DbmLockEmptyState
-            v-if="!loading && notCollecting"
+            v-else-if="!loading && notCollecting"
             :healthy="false"
             :title="t('dbm.blocked.notCollecting.title')"
             :description="t('dbm.blocked.notCollecting.description')"
@@ -447,6 +462,9 @@ import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
+import DbmRecommendationMenu, {
+  type DbmRecommendationMenuItem,
+} from "@/components/dbm/DbmRecommendationMenu.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import DbmTerminateSql from "@/components/dbm/DbmTerminateSql.vue";
@@ -483,6 +501,8 @@ import {
   chainsFromSamples,
   DEFAULT_BLOCKING_PERSPECTIVE,
   flattenChains,
+  isEngineState,
+  formatSeconds,
   isIdleBlocker,
   isNotablyLongestWait,
   parseBlockingSamples,
@@ -494,6 +514,7 @@ import {
 } from "@/utils/dbm/blocking";
 import { countClaim, formatAge, formatClock } from "@/utils/dbm/format";
 import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
+import { buildRecommendations, recommendationRuleParams } from "@/utils/dbm/recommendations";
 import { DBM_STATUS_TONES } from "@/utils/dbm/tones";
 import { engineName, uniformValue } from "@/utils/dbm/uniformValue";
 
@@ -596,6 +617,8 @@ interface BlockedRow {
   kind: "root" | "waiting-blocking" | "waiting";
   blockerPid: number | null;
   blockerApplication?: string | null;
+  /** MySQL's transaction state for the row, kept out of the app columns. */
+  applicationState?: string | null;
   longestWait: boolean;
   pill: { label: I18nText; tone: string } | null;
   pillNote: I18nText | null;
@@ -642,7 +665,7 @@ const waitingRows = computed<BlockedRow[]>(() => {
       isLast: true,
       pid: row.blocked_pid,
       query: row.blocked_query,
-      application: row.blocked_application,
+      application: isEngineState(row.blocked_application) ? null : row.blocked_application,
       db_system: row.db_system,
       db_instance: row.db_instance,
       waitingOnPid: null,
@@ -682,7 +705,8 @@ const blockingRows = computed<BlockedRow[]>(() =>
       isLast: row.isLast,
       pid: row.pid,
       query: row.query,
-      application: row.application,
+      application: isEngineState(row.application) ? null : row.application,
+      applicationState: isEngineState(row.application) ? row.application : null,
       db_system: row.db_system,
       db_instance: row.db_instance,
       waitingOnPid: row.waitingOnPid,
@@ -730,8 +754,6 @@ const metaVisible = (row: BlockedRow) =>
     row.longestWait,
   );
 
-// MySQL reports the blocker's engine state ("RUNNING") where Postgres reports an app name.
-const isEngineState = (value: string | null | undefined) => !!value && /^[A-Z_ ]+$/.test(value);
 const blockerName = (row: BlockedRow) =>
   isEngineState(row.blockerApplication) ? null : (row.blockerApplication ?? null);
 const DEPTH_CHIP_CLASS =
@@ -802,15 +824,16 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
           accessorKey: "waitSeconds",
           header: t("dbm.blocked.columns.waiting"),
           size: 120,
-          meta: { align: "right", headerTooltip: waitingHeaderTip },
+          meta: { align: "right", headerTooltip: waitingHeaderTip.value },
         },
         {
           id: "actions",
           header: t("dbm.common.actions"),
           isAction: true,
-          size: 92,
+          // Ask-AI button + the copyable statement + the row menu, not three icons.
+          size: 440,
           enableSorting: false,
-          meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
+          meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
         },
       ]
     : [
@@ -852,7 +875,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
           accessorKey: "waitSeconds",
           header: t("dbm.blocked.columns.waiting"),
           size: 120,
-          meta: { align: "right", headerTooltip: waitingHeaderTip },
+          meta: { align: "right", headerTooltip: waitingHeaderTip.value },
         },
         {
           id: "actions",
@@ -867,7 +890,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
 
 /** Only what the handler actually implements — a control that does nothing is
  *  worse than no control. */
-const rowActions: OTableRowAction[] = [
+const rowActions = computed<OTableRowAction[]>(() => [
   {
     id: "copy",
     icon: "content-copy",
@@ -882,7 +905,33 @@ const rowActions: OTableRowAction[] = [
     onSelect: (row) => onRowAction("alert", row),
     dataTest: () => "dbm-blocked-row-actions-alert",
   },
-];
+]);
+
+// The search runs on the server, so no rows plus a typed term means the term hid them.
+const searchHidEverything = computed(() => !!search.value.trim() && !tableRows.value.length);
+const clearSearch = () => {
+  search.value = "";
+  void load();
+};
+
+const recommendationItems = computed<DbmRecommendationMenuItem[]>(() =>
+  buildRecommendations({ blocking: samples.value, sessions: [], indexes: [], serverMetrics: null })
+    .filter((rec) => rec.id === "high-impact-blocker")
+    .map((rec, i) => {
+      const { key, params } = recommendationRuleParams(rec.id);
+      return {
+        key: `${rec.id}-${i}`,
+        id: rec.id,
+        tone: rec.tone,
+        title: t("dbm.recommendations.high-impact-blocker.title"),
+        body: t("dbm.recommendations.high-impact-blocker.body", {
+          pid: rec.evidence.pid ?? "—",
+          count: rec.evidence.blockedCount ?? 0,
+        }),
+        rule: t(key as Parameters<typeof t>[0], params),
+      };
+    }),
+);
 
 const longestWait = computed(() =>
   samples.value.reduce((max, s) => Math.max(max, s.wait_seconds ?? 0), 0),
@@ -1061,10 +1110,6 @@ const notCollectingChecks = computed<DbmLockCheck[]>(() =>
 );
 
 // ── formatting ──────────────────────────────────────────────────────────────
-
-/** Sub-minute waits read in seconds with one decimal — 4.8s, not 5s. */
-const formatSeconds = (seconds: number): string =>
-  seconds >= 60 ? `${Math.round(seconds / 60)}m` : `${seconds.toFixed(1)}s`;
 
 const waitTone = (share: number) =>
   share >= WAIT_TONE_RULES.critical

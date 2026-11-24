@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * The DBM Metrics tab's THEMED SECTION catalog — the Datadog-style semantic
+ * The DBM Metrics tab's THEMED SECTION catalog — a semantic
  * grouping (Activity · Locks · Replication · Indexes · Blocks · Vacuum · Host),
  * declared as data the way `llmInsightsPanels` declares the LLM dashboard.
  *
@@ -24,7 +24,7 @@
  *                   Open-in-Metrics-Explorer handoff.
  *  • `sql-rate`   — per-minute rates diffed from the CUMULATIVE per-query
  *                   counters riding top_query samples (calls, exec time): the
- *                   by-query throughput and latency charts Datadog draws from
+ *                   by-query throughput and latency charts drawn from
  *                   pg_stat_statements, at poll resolution instead of the
  *                   15-minute rollup cadence of `_o2_db_stats`.
  *  • `sql-server` — the database's OWN per-query counters riding top_query

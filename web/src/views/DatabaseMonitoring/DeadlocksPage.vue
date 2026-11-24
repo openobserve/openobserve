@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="index === 0 ? 'text-text-body' : 'text-text-muted'"
             >
               {{ raw(app.name) }}
-              <OTooltip v-if="app.pid" :content="t('dbm.deadlocks.detail.pid', { pid: app.pid })" />
+              <OTooltip v-if="app.pid" :content="t(pidKeyFor(row.dbSystem), { pid: app.pid })" />
             </OTruncatedText>
             <span v-if="!row.appDetails.length" class="text-text-muted">{{ raw("—") }}</span>
           </div>
@@ -209,10 +209,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex flex-col items-end leading-tight">
             <span class="text-text-heading text-compact font-mono font-medium tabular-nums">
               {{ row.objectCount || raw("—") }}
+              <OTooltip v-if="row.objectsTip" :content="raw(row.objectsTip)" />
             </span>
             <span v-if="row.tables.length" class="text-text-secondary text-3xs max-w-full truncate">
               {{ raw(row.tables[0]) }}
-              <OTooltip v-if="row.objectsTip" :content="raw(row.objectsTip)" />
             </span>
           </div>
         </template>
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="focus-visible:ring-accent absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full focus-visible:ring-2 focus-visible:outline-none max-md:before:absolute max-md:before:-inset-2"
                         :class="
                           point.id === row.selectedEvent?.id
-                            ? 'bg-status-error-text ring-accent ring-2'
+                            ? 'bg-status-error-text ring-accent z-10 ring-2'
                             : 'bg-status-error-text/80 hover:bg-status-error-text'
                         "
                         :style="leftPercent(point.offset)"
@@ -339,8 +339,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="text-text-secondary text-3xs mx-1.5 flex justify-between tabular-nums"
                       data-test="dbm-deadlocks-occurrences-axis"
                     >
-                      <span>{{ formatClock(row.firstSeen) }}</span>
-                      <span>{{ formatClock(row.lastSeen) }}</span>
+                      <span>{{ axisLabel(row.firstSeen, row.lastSeen, row.firstSeen) }}</span>
+                      <span>{{ axisLabel(row.firstSeen, row.lastSeen, row.lastSeen) }}</span>
                     </div>
                   </div>
                 </div>
@@ -444,7 +444,10 @@ import {
   groupDeadlocks,
   hasOppositeRowOrder,
   isDeadlockStorm,
+  isThreadEngine,
   parseDeadlockEvents,
+  stripQuotes,
+  victimOf,
   DEADLOCK_DOMINANT_SHARE,
   type DeadlockPair,
 } from "@/utils/dbm/deadlocks";
@@ -453,6 +456,7 @@ import {
   discriminatingPart,
   formatAge,
   formatClock,
+  formatDateTime,
   formatLagSeconds,
   formatPercent,
   formatWhenWithAge,
@@ -548,6 +552,7 @@ interface DeadlockRow {
   applications: string[];
   /** The application name with its process id, for the name's tooltip. */
   appDetails: { name: string; pid: string }[];
+  dbSystem: string;
   objects: string[];
   /** Table names only, quotes stripped; transaction ids live in `objectsTip`. */
   tables: string[];
@@ -634,7 +639,11 @@ const victimSummaryFor = (pair: DeadlockPair): I18nText | null => {
       y: counts[1][1],
     });
   }
-  return counts.length ? t("dbm.deadlocks.detail.oneSideLoses", { app: counts[0][0] }) : null;
+  // "Every time" only holds when each event's victim is this app.
+  const victimEvents = pair.events.filter((e) => victimOf(e)).length;
+  return counts.length === 1 && counts[0][1] === victimEvents
+    ? t("dbm.deadlocks.detail.oneSideLoses", { app: counts[0][0] })
+    : null;
 };
 
 const selectedEventFor = (pair: DeadlockPair): DeadlockEvent | null => {
@@ -642,32 +651,40 @@ const selectedEventFor = (pair: DeadlockPair): DeadlockEvent | null => {
   return pair.events.find((e) => e.id === chosen) ?? pair.events[0] ?? null;
 };
 
-/** `` `shop`.`accounts` `` -> `shop.accounts`. */
-const stripQuotes = (name: string) => name.replace(/[`"']/g, "");
+const pidKeyFor = (dbSystem: string) =>
+  isThreadEngine(dbSystem) ? "dbm.deadlocks.detail.thread" : "dbm.deadlocks.detail.pid";
 const isTransaction = (name: string) => /^transaction\b/i.test(name.trim());
 
 const causeFor = (oppositeRowOrder: boolean) =>
   oppositeRowOrder ? t("dbm.deadlocks.chips.oppositeOrder") : raw("");
 
 /** The shared shape of the "Rows fought over" and "Applications" cells, for pairs and events alike. */
-const cellFacts = (objects: string[], participants: DeadlockParticipant[]) => {
+const cellFacts = (objects: string[], participants: DeadlockParticipant[], dbSystem: string) => {
   const names = objects.map(stripQuotes);
   const tables = names.filter((n) => !isTransaction(n));
   const transactions = [
-    ...names.filter(isTransaction),
-    ...participants
-      .map((p) => p.transaction_id)
-      .filter(Boolean)
-      .map((id) => `transaction ${id}`),
+    ...new Set([
+      ...names.filter(isTransaction),
+      ...participants
+        .map((p) => p.transaction_id)
+        .filter(Boolean)
+        .map((id) => `transaction ${id}`),
+    ]),
   ];
-  const appDetails = participants
-    .filter((p) => p.application?.trim())
-    .map((p) => ({ name: p.application!.trim(), pid: p.pid != null ? String(p.pid) : "" }));
+  const appDetails = participants.flatMap((p) => {
+    const app = p.application?.trim();
+    if (app) return [{ name: app, pid: p.pid != null ? String(p.pid) : "" }];
+    return p.pid != null
+      ? [{ name: t(pidKeyFor(dbSystem), { pid: p.pid }) as string, pid: "" }]
+      : [];
+  });
   return {
     tables,
-    objectCount: tables.length,
-    objectsTip: [...tables, ...new Set(transactions)].join(", "),
+    // A lock on a bare transaction has no table to count, so count the transactions.
+    objectCount: tables.length || transactions.length,
+    objectsTip: [...tables, ...transactions].join(", "),
     appDetails: appDetails.filter((a, i) => appDetails.findIndex((b) => b.name === a.name) === i),
+    dbSystem,
   };
 };
 
@@ -686,7 +703,11 @@ const pairRows = computed<DeadlockRow[]>(() =>
       db_system: pair.db_system,
       db_instance: pair.db_instance,
       applications: pair.applications,
-      ...cellFacts(pair.objects, selectedEvent?.participants ?? []),
+      ...cellFacts(
+        pair.objects,
+        pair.events.flatMap((e) => e.participants),
+        pair.db_system,
+      ),
       objects: pair.objects,
       cause: causeFor(hasOppositeRowOrder(pair)),
       firstSeen: pair.firstSeen,
@@ -725,7 +746,7 @@ const eventRows = computed<DeadlockRow[]>(() =>
         applications: event.participants
           .map((p) => p.application ?? (p.pid != null ? String(p.pid) : ""))
           .filter(Boolean),
-        ...cellFacts(event.objects ?? [], event.participants),
+        ...cellFacts(event.objects ?? [], event.participants, event.db_system),
         objects: event.objects ?? [],
         cause: raw(""),
         firstSeen: event.timestamp,
@@ -835,7 +856,7 @@ const visibleColumns = computed(() =>
 
 /** Only what the handler implements. "Show the deadlock" was a no-op anyway —
  *  a row click already expands the cycle in place. */
-const rowActions: OTableRowAction[] = [
+const rowActions = computed<OTableRowAction[]>(() => [
   {
     id: "top-queries",
     icon: "filter-list",
@@ -857,7 +878,7 @@ const rowActions: OTableRowAction[] = [
     onSelect: (row) => onRowAction("alert", row),
     dataTest: () => "dbm-deadlocks-row-actions-alert",
   },
-];
+]);
 
 /**
  * The window's counts, over the rows below. "Not collecting" is an em dash
@@ -916,9 +937,11 @@ const bannerSummary = computed<I18nText>(() =>
   ),
 );
 
-/** Date and time, for the "Last one" tooltip: the cell itself only has room for the age. */
-const formatDateTime = (micros: number) =>
-  new Date(micros / 1000).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
+/** End labels carry the date only when the span crosses days. */
+const axisLabel = (first: number, last: number, micros: number) =>
+  new Date(first / 1000).toDateString() === new Date(last / 1000).toDateString()
+    ? formatClock(micros)
+    : `${new Date(micros / 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${formatClock(micros)}`;
 
 // ── the two empty states ────────────────────────────────────────────────────
 
@@ -1053,7 +1076,7 @@ const formatClockMs = (micros: number): string => {
 };
 
 /** A dot's position along its lane, as a percentage of the pair's time span. */
-const leftPercent = (offset: number) => ({ left: `${Math.round(offset * 100)}%` });
+const leftPercent = (offset: number) => ({ left: `${(offset * 100).toFixed(2)}%` });
 
 /**
  * The critical-state rail, as design-token geometry rather than an arbitrary

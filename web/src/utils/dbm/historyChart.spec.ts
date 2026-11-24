@@ -91,6 +91,16 @@ describe("samples chart axis and legend", () => {
     expect(formatAxisNs(1.5e9, { ns: 1e9, suffix: "s" })).toBe("1.5s");
   });
 
+  it("labels the axis in hours once the slowest sample is ten hours", () => {
+    const option = buildSamplesOption(
+      [{ timestamp: at(0), durationNs: 36e12, isError: false }],
+      theme,
+      formatNs,
+      { ok: "ok", error: "error" },
+    ) as { yAxis: { axisLabel: { formatter: (v: number) => string } } };
+    expect(option.yAxis.axisLabel.formatter(7.2e12)).toBe("2h");
+  });
+
   it("lists only the series that have points", () => {
     const names = { ok: "ok", error: "error" };
     const okOnly = buildSamplesOption([ok], theme, formatNs, names) as {

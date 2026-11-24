@@ -77,6 +77,10 @@ describe("dbm metrics tab wiring", () => {
     expect(page).toContain("useDbmScopeFilters");
   });
 
+  it("sends the engine the Engine select shows, not a stale system", () => {
+    expect(page).toMatch(/system:\s*lockedEngine\.value \?\? scopeParams\.value\.system/);
+  });
+
   it("hands the dashboards engine microseconds, not milliseconds", () => {
     // `new Date(µs)` round-trips the microsecond count through .getTime();
     // dividing by 1000 renders a 1970 window. See LLMSchemaPanel.

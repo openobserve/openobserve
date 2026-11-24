@@ -55,7 +55,7 @@ describe("the fleet page opens on health, not on volume", () => {
    */
   it("names a column that exists and is backed by the health scalar", () => {
     expect(source).toMatch(/id: "attention"/);
-    expect(source).toMatch(/case "attention":\s*\n\s*return healthSortValue\(row\.metrics\)/);
+    expect(source).toMatch(/case "attention":\s*\n\s*return healthColumnSortValue\(row.metrics\)/);
   });
 
   /**

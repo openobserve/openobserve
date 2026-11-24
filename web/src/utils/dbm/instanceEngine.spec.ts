@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
+import type { DbmScopeFilter } from "@/utils/dbm/scopeFilter";
 import { raw } from "@/types/i18n";
 
 import { applyInstanceEngine } from "./instanceEngine";
@@ -51,5 +51,11 @@ describe("applyInstanceEngine", () => {
       expect(system.value).toBe("mysql");
       expect(system.disabled).toBeUndefined();
     }
+  });
+
+  it("leaves Engine enabled when the instance name exists on two engines", () => {
+    const both = [...hits, { db_system: "mysql", db_instance: "pg-1" }];
+    const out = applyInstanceEngine([f("instance", "pg-1"), f("system", null)], both, raw("why"));
+    expect(out.find((x) => x.key === "system")!.disabled).toBeUndefined();
   });
 });

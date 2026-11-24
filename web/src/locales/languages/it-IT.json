@@ -26995,9 +26995,7 @@
       "unknownNote": "Niente da misurare nell'intervallo e nei filtri che hai selezionato.",
       "lineHealthy": "Stai vedendo il {percent}% del tempo di questo database — i {count} tipi di query più pesanti.",
       "lineRemainder": "Stai vedendo il {percent}% del tempo di questo database. Il resto è in query più leggere che non elenchiamo una per una.",
-      "lineStale": "Il nostro conteggio è in ritardo di {minutes} minuti, quindi le query più recenti potrebbero non essere ancora qui.",
       "lineTruncated": "C'erano più dati nell'ultimo tratto di quanto potessimo ricevere, quindi i numeri più recenti sono sottostimati.",
-      "lineTruncatedStale": "C'erano più dati nell'ultimo tratto di quanto potessimo ricevere, e il nostro conteggio è in ritardo di {minutes} minuti — i numeri più recenti sono sottostimati, e le query più recenti potrebbero non essere ancora qui.",
       "lineGap": "{minutes} minuti mancano in questa finestra. Il nostro conteggio si è fermato alle {stopped} e può risalire solo di {reach} minuti, quindi nulla copre {from}–{to}.",
       "lineSubset": "Hai filtrato su {filter}, quindi queste percentuali descrivono le righe mostrate, non l'intero database.",
       "lineHealthyAll": "Stai vedendo ogni query eseguita. Le velocità qui sono misurate su ogni chiamata, quindi sono esatte.",
@@ -27008,10 +27006,7 @@
       "lineExactSlowestSchema": "Tutti i database stanno riportando dati. Le velocità sono esatte per schema; un database con più schemi mostra quello più lento.",
       "lineSubsetUnnamed": "I tuoi filtri restringono questo al di sotto del livello a cui questi totali vengono sommati, quindi le percentuali descrivono le righe mostrate piuttosto che l'intero database.",
       "lineQuery": "I tempi sono misurati dalla tua applicazione, quindi includono il tempo di rete e l'attesa per una connessione libera.",
-      "lineUncodedErrors": "{percent} dei fallimenti qui sono tornati senza un codice di motivo, quindi possono essere contati ma non spiegati.",
-      "lineSubsetStale": "Hai filtrato su {filter}, e il nostro conteggio è in ritardo di {minutes} minuti — queste percentuali descrivono le righe mostrate, e le query più recenti potrebbero non essere ancora qui.",
-      "lineSubsetUnnamedStale": "I tuoi filtri restringono questo al di sotto del livello a cui questi totali vengono sommati, e il nostro conteggio è in ritardo di {minutes} minuti — le percentuali descrivono le righe mostrate, e le query più recenti potrebbero non essere ancora qui.",
-      "lineCountedToBehind": "Conteggiato fino a {time}; siamo in ritardo di {minutes} minuti."
+      "lineUncodedErrors": "{percent} dei fallimenti qui sono tornati senza un codice di motivo, quindi possono essere contati ma non spiegati."
     },
     "breakdown": {
       "loading": "Stiamo calcolando dove è andato il tempo…",
@@ -27558,7 +27553,6 @@
         "occurrencesTitle": "Tutte le {count} volte in cui questa coppia è andata in deadlock",
         "occurrencesHint": "Seleziona un punto per caricare quello sopra",
         "lostLabel": "{pid} ha perso",
-        "bothSidesLose": "Entrambe le parti vengono annullate in modo più o meno equo — {a} contro {b}. Nessuna delle due applicazioni è il problema; è l'ordine.",
         "oneSideLoses": "{app} viene annullato ogni volta.",
         "showAbove": "Mostra sopra",
         "copy": "Copia SQL",

@@ -26948,7 +26948,7 @@
       "title": "Insights",
       "empty": "Nothing stands out against this comparison period.",
       "showRows": "Show this query | Show these {count} queries",
-      "clearFilter": "Clear filter",
+      "clearFilter": "Clear Insight Filter",
       "alsoAffects": "and {count} other query | and {count} other queries",
       "showLess": "Show less",
       "more": "{count} more | {count} more",
@@ -27000,9 +27000,9 @@
       "unknownNote": "Nothing to measure in the range and filters you've picked.",
       "lineHealthy": "You're seeing {percent}% of this database's time — the {count} heaviest kinds of query.",
       "lineRemainder": "You're seeing {percent}% of this database's time. The rest is in lighter queries we don't list one by one.",
-      "lineStale": "Our counting is {minutes} minutes behind, so the most recent queries may not be here yet.",
+      "lineStale": "Our counting is {lag} behind, so the most recent queries may not be here yet.",
       "lineTruncated": "There was more data in the last stretch than we could take in, so the newest numbers are undercounts.",
-      "lineTruncatedStale": "There was more data in the last stretch than we could take in, and our counting is {minutes} minutes behind — the newest numbers are undercounts, and the most recent queries may not be here yet.",
+      "lineTruncatedStale": "There was more data in the last stretch than we could take in, and our counting is {lag} behind — the newest numbers are undercounts, and the most recent queries may not be here yet.",
       "lineGap": "{minutes} minutes are missing from this window. Our counting stopped at {stopped} and can only reach back {reach} minutes, so nothing covers {from}–{to}.",
       "lineSubset": "You've filtered to {filter}, so these percentages describe the rows shown, not the whole database.",
       "lineHealthyAll": "You're seeing every query that ran. Speeds here are measured across every call, so they're exact.",
@@ -27014,18 +27014,18 @@
       "lineSubsetUnnamed": "Your filters narrow this below the level these totals add up at, so the percentages describe the rows shown rather than the whole database.",
       "lineQuery": "Timings are measured from your application, so they include network time and any wait for a free connection.",
       "lineUncodedErrors": "{percent} of the failures here came back without a reason code, so they can be counted but not explained.",
-      "lineSubsetStale": "You've filtered to {filter}, and our counting is {minutes} minutes behind — these percentages describe the rows shown, and the most recent queries may not be here yet.",
-      "lineSubsetUnnamedStale": "Your filters narrow this below the level these totals add up at, and our counting is {minutes} minutes behind — the percentages describe the rows shown, and the most recent queries may not be here yet.",
-      "lineCountedToBehind": "Counted up to {time}; we're {minutes} minutes behind.",
+      "lineSubsetStale": "You've filtered to {filter}, and our counting is {lag} behind — these percentages describe the rows shown, and the most recent queries may not be here yet.",
+      "lineSubsetUnnamedStale": "Your filters narrow this below the level these totals add up at, and our counting is {lag} behind — the percentages describe the rows shown, and the most recent queries may not be here yet.",
+      "lineCountedToBehind": "Counted up to {time}; we're {lag} behind.",
       "details": "Details",
       "bannerYesterday": "yesterday {time}",
       "bannerToday": "today {time}",
       "bannerGapToday": "No data from {from} to {to} today ({minutes} min). Collection may have stopped.",
       "bannerGap": "No data from {from} to {to} ({minutes} min). Collection may have stopped.",
       "bannerNeverAggregated": "Still counting this range. First numbers usually appear within 15 minutes.",
-      "bannerStale": "Counting is {minutes} min behind. The newest queries may be missing.",
+      "bannerStale": "Counting is {lag} behind. The newest queries may be missing.",
       "bannerTruncated": "Too much recent data to take in. The newest numbers are undercounts.",
-      "bannerTruncatedStale": "Newest numbers are undercounts, and counting is {minutes} min behind.",
+      "bannerTruncatedStale": "Newest numbers are undercounts, and counting is {lag} behind.",
       "bannerSubset": "Filtered to {filter}. Percentages describe the rows shown.",
       "bannerSubsetUnnamed": "Filters narrow this view. Percentages describe the rows shown.",
       "bannerShare": "Showing {percent}% of this database's time.",
@@ -27036,7 +27036,13 @@
       "tipBlendedSpeeds": "Over longer ranges these are blended across time windows, so they are close but not exact.",
       "tipSlowestSchema": "A database with several schemas shows its slowest one.",
       "tipRowsShown": "Percentages describe the rows shown.",
-      "tipQueryTimings": "Timings include network time and waits for a free connection."
+      "tipQueryTimings": "Timings include network time and waits for a free connection.",
+      "lagMinutes": "{n} minutes",
+      "lagHours": "{n} hours",
+      "lagDays": "{n} days",
+      "lagMinutesShort": "{n} min",
+      "lagHoursShort": "{n} h",
+      "lagDaysShort": "{n} d"
     },
     "breakdown": {
       "loading": "Working out where the time went…",
@@ -27517,7 +27523,8 @@
         "columnHints": {
           "took": "In-database time from statement start to completion, as the engine measured it. Not what any caller experienced — network and connection wait aren't included."
         }
-      }
+      },
+      "allInNamespace": "All calls here run in {namespace}."
     },
     "rowChips": {
       "new": "New to this list",
@@ -27924,7 +27931,8 @@
         "healthy": "Healthy",
         "warning": "Warning",
         "critical": "Critical",
-        "issues": "{count} issue | {count} issues"
+        "issues": "{count} issue | {count} issues",
+        "notAssessed": "Not Assessed"
       },
       "noLimitHint": "The receiver for this engine does not publish a connection limit on its own, so only the count is shown. The setup card's connection-limit recipe (sqlquery/mysql_limits) collects max_connections and turns this into a percentage.",
       "trendLabel": "Connections across the selected window",
@@ -28015,7 +28023,10 @@
       "enginePartialTitle": "Some checks did not run",
       "enginePartialDescription": "The unused-index check needs an index scan counter, which is not collected for this engine, so an empty list here is not an all-clear.",
       "allClearTitle": "Nothing crossed a threshold",
-      "allClearDescription": "Every check ran and none crossed its threshold in this time range."
+      "allClearDescription": "Every check ran and none crossed its threshold in this time range.",
+      "menuEmpty": "No recommendations right now.",
+      "menuEmptyTables": "No recommendations for these tables.",
+      "menuEmptyBlocked": "No blocking sessions need attention."
     }
   },
   "oncall": {

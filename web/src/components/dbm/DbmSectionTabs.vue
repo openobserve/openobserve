@@ -78,12 +78,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            pushes no following tab. Only a tab that WILL have a count gets one. -->
         <OSkeleton
           v-if="section.count == null && section.countPending"
-          class="h-4.5 w-11 rounded-full"
+          class="h-5 w-12 rounded-full"
           :data-test="`dbm-section-tab-count-loading-${section.key}`"
         />
         <span
           v-else-if="section.count != null"
-          class="text-2xs inline-flex min-w-11 items-baseline justify-center gap-1 rounded-full px-1.5 py-1 leading-none font-bold"
+          class="text-2xs inline-flex h-5 min-w-12 items-center justify-center gap-1 rounded-full px-1.5 leading-none font-bold"
           :class="
             section.key === activeTab
               ? 'bg-badge-primary-soft-bg text-badge-primary-soft-text'

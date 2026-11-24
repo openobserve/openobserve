@@ -26995,9 +26995,7 @@
       "unknownNote": "在您选择的时间范围和筛选条件下，没有可度量的内容。",
       "lineHealthy": "您看到的是此数据库时间的 {percent}% — 最重的 {count} 类查询。",
       "lineRemainder": "您看到的是此数据库时间的 {percent}%。其余部分在较轻的查询中，我们不逐一列出。",
-      "lineStale": "我们的统计滞后 {minutes} 分钟，因此最新的查询可能尚未出现在这里。",
       "lineTruncated": "最后一段时间的数据量超过了我们的处理能力，因此最新的数字可能少计了。",
-      "lineTruncatedStale": "最后一段时间的数据量超过了我们的处理能力，而且我们的统计滞后 {minutes} 分钟——最新的数字可能少计了，最新的查询也可能尚未出现在这里。",
       "lineGap": "此窗口缺少 {minutes} 分钟。我们的统计在 {stopped} 停止，只能回溯 {reach} 分钟，因此 {from}–{to} 之间没有任何数据。",
       "lineSubset": "您已筛选为 {filter}，因此这些百分比描述的是显示的行，而不是整个数据库。",
       "lineHealthyAll": "您看到的是运行过的每个查询。这里的速度是对每次调用进行衡量的，因此它们是精确的。",
@@ -27008,10 +27006,7 @@
       "lineExactSlowestSchema": "所有数据库均已上报。速度按各 Schema 精确显示；包含多个 Schema 的数据库会显示其中最慢的一个。",
       "lineSubsetUnnamed": "您的筛选条件将数据范围缩小到这些总计无法累加的程度，因此百分比描述的是显示的行，而不是整个数据库。",
       "lineQuery": "计时是从您的应用程序端测量的，因此它们包括网络时间以及等待可用连接的时间。",
-      "lineUncodedErrors": "此处的失败中有 {percent} 返回时没有原因代码，因此它们可以被计数但无法解释。",
-      "lineSubsetStale": "您已筛选为 {filter}，而且我们的统计滞后 {minutes} 分钟——这些百分比描述的是显示的行，最新的查询也可能尚未出现在这里。",
-      "lineSubsetUnnamedStale": "您的筛选条件将数据范围缩小到这些总计无法累加的程度，而且我们的统计滞后 {minutes} 分钟——百分比描述的是显示的行，最新的查询也可能尚未出现在这里。",
-      "lineCountedToBehind": "已统计至 {time}；我们滞后 {minutes} 分钟。"
+      "lineUncodedErrors": "此处的失败中有 {percent} 返回时没有原因代码，因此它们可以被计数但无法解释。"
     },
     "breakdown": {
       "loading": "正在分析时间的去向…",
@@ -27558,7 +27553,6 @@
         "occurrencesTitle": "这对操作死锁的所有 {count} 次",
         "occurrencesHint": "选择一个点以加载上方相应的记录",
         "lostLabel": "{pid} 落败",
-        "bothSidesLose": "双方被取消的频率大致相当 — {a} vs {b}。两个应用程序都不是问题所在；问题在于顺序。",
         "oneSideLoses": "{app} 每次都被取消。",
         "showAbove": "在上方显示",
         "copy": "复制 SQL",

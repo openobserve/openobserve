@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-text-secondary px-2 py-1.5 text-xs"
         data-test="dbm-insights-empty"
       >
-        {{ t("dbm.insights.empty") }}
+        {{ emptyText ?? t("dbm.recommendations.menuEmpty") }}
       </p>
       <div
         v-for="item in items"
@@ -84,7 +84,7 @@ export interface DbmRecommendationMenuItem {
   rule: I18nText;
 }
 
-defineProps<{ items: DbmRecommendationMenuItem[] }>();
+defineProps<{ items: DbmRecommendationMenuItem[]; emptyText?: I18nText }>();
 
 const { t } = useI18nTyped();
 </script>

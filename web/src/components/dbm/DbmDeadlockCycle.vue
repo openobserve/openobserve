@@ -187,7 +187,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { DeadlockEvent, DeadlockParticipant } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { survivorOf, victimOf } from "@/utils/dbm/deadlocks";
+import { isThreadEngine, stripQuotes, survivorOf, victimOf } from "@/utils/dbm/deadlocks";
 
 const props = withDefaults(
   defineProps<{
@@ -215,10 +215,16 @@ const victim = computed(() => victimOf(props.event));
 const survivor = computed(() => survivorOf(props.event));
 
 /** The contested object — what the fix is actually about. */
-const objectLabel = computed(() => props.event.objects?.[0] ?? "");
+const objectLabel = computed(() => stripQuotes(props.event.objects?.[0] ?? ""));
 
 const appOf = (p: DeadlockParticipant | null) => p?.application?.trim() ?? "";
-const pidLabel = (p: DeadlockParticipant | null) => (p?.pid != null ? `pid ${p.pid}` : "");
+const pidLabel = (p: DeadlockParticipant | null) => {
+  if (p?.pid == null) return "";
+  const key = isThreadEngine(props.event.db_system)
+    ? "dbm.deadlocks.detail.thread"
+    : "dbm.deadlocks.detail.pid";
+  return t(key, { pid: p.pid });
+};
 
 // Same naming on both sides: app name, else pid; pid is added when the apps collide.
 const sideLabel = (p: DeadlockParticipant | null) => {

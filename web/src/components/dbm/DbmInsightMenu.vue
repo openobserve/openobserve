@@ -16,57 +16,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   DbmInsightMenu — the insights as one filter-row button + popover list.
-  Each row does what the old strip item did: emit `filter`, and the active one
-  clears itself. Titles and sentences mirror DbmInsightStrip.
+  Each row emits `filter`, and the active one clears itself.
 -->
 <template>
   <!-- Always shown, so switching the comparison never makes the row jump; an empty list says so. -->
-  <OPopover align="end">
-    <template #trigger>
-      <OButton variant="outline" size="sm" class="shrink-0" data-test="dbm-insights">
-        {{ t("dbm.insights.title") }}
-        <OTag
-          :label="raw(String(ranked.length))"
-          size="xs"
-          class="ms-1"
-          data-test="dbm-insights-count"
-        />
-      </OButton>
-    </template>
-    <div class="flex w-96 max-w-full flex-col p-1" data-test="dbm-insights-panel">
-      <p
-        v-if="!ranked.length"
-        class="text-text-secondary px-2 py-1.5 text-xs"
-        data-test="dbm-insights-empty"
-      >
-        {{ t("dbm.insights.empty") }}
-      </p>
-      <button
-        v-for="insight in ranked"
-        :key="insight.id"
-        type="button"
-        class="hover:bg-surface-subtle rounded-default flex cursor-pointer items-start gap-2 px-2 py-1.5 text-left"
-        :class="activeId === insight.id ? 'bg-surface-accent-active' : ''"
-        :data-test="`dbm-insight-item-${insight.id}`"
-        @click="emit('filter', insight)"
-      >
-        <span
-          class="rounded-default mt-0.5 grid size-4.5 shrink-0 place-items-center"
-          :class="DBM_SOFT_TONES[insight.tone]"
+  <span class="flex shrink-0 items-center gap-1">
+    <OPopover align="end">
+      <template #trigger>
+        <OButton
+          :variant="activeInsight ? 'outline-primary' : 'outline'"
+          size="sm"
+          class="shrink-0"
+          data-test="dbm-insights"
         >
-          <OIcon :name="DBM_TONE_ICONS[insight.tone]" size="xs" />
-        </span>
-        <span class="flex min-w-0 flex-col leading-tight">
-          <span class="text-text-heading text-xs font-semibold">{{ titleOf(insight) }}</span>
-          <span class="text-text-secondary text-2xs">{{ sentenceOf(insight) }}</span>
-          <OTruncatedText class="text-text-secondary text-3xs font-mono">
-            {{ subjectOf(insight) }}
-          </OTruncatedText>
-        </span>
-        <OTooltip side="left" :content="ruleOf(insight)" />
-      </button>
-    </div>
-  </OPopover>
+          {{ activeInsight ? titleOf(activeInsight) : t("dbm.insights.title") }}
+          <OTag
+            :label="raw(String(ranked.length))"
+            size="xs"
+            class="ms-1"
+            data-test="dbm-insights-count"
+          />
+        </OButton>
+      </template>
+      <div class="flex w-96 max-w-full flex-col p-1" data-test="dbm-insights-panel">
+        <p
+          v-if="!ranked.length"
+          class="text-text-secondary px-2 py-1.5 text-xs"
+          data-test="dbm-insights-empty"
+        >
+          {{ t("dbm.insights.empty") }}
+        </p>
+        <button
+          v-for="insight in ranked"
+          :key="insight.id"
+          type="button"
+          class="hover:bg-surface-subtle rounded-default flex cursor-pointer items-start gap-2 px-2 py-1.5 text-left"
+          :class="activeId === insight.id ? 'bg-surface-accent-active' : ''"
+          :data-test="`dbm-insight-item-${insight.id}`"
+          @click="emit('filter', insight)"
+        >
+          <span
+            class="rounded-default mt-0.5 grid size-4.5 shrink-0 place-items-center"
+            :class="DBM_SOFT_TONES[insight.tone]"
+          >
+            <OIcon :name="DBM_TONE_ICONS[insight.tone]" size="xs" />
+          </span>
+          <span class="flex min-w-0 flex-col leading-tight">
+            <span class="text-text-heading text-xs font-semibold">{{ titleOf(insight) }}</span>
+            <span class="text-text-secondary text-2xs">{{ sentenceOf(insight) }}</span>
+            <OTruncatedText class="text-text-secondary text-3xs font-mono">
+              {{ subjectOf(insight) }}
+            </OTruncatedText>
+          </span>
+          <OTooltip side="left" :content="ruleOf(insight)" />
+        </button>
+      </div>
+    </OPopover>
+    <OButton
+      v-if="activeInsight"
+      variant="outline"
+      size="sm"
+      :aria-label="t('dbm.insights.clearFilter')"
+      data-test="dbm-insights-clear"
+      @click="emit('clear')"
+    >
+      <OIcon name="close" size="xs" />
+      <OTooltip side="bottom" :content="t('dbm.insights.clearFilter')" />
+    </OButton>
+  </span>
 </template>
 
 <script setup lang="ts">
@@ -99,7 +116,7 @@ const props = withDefaults(
   { activeId: null, baseline: "previous" },
 );
 
-const emit = defineEmits<{ (e: "filter", insight: DbmInsight): void }>();
+const emit = defineEmits<{ (e: "filter", insight: DbmInsight): void; (e: "clear"): void }>();
 
 const { t } = useI18nTyped();
 
@@ -112,6 +129,8 @@ const ranked = computed(() =>
     return (b.evidence.share ?? 0) - (a.evidence.share ?? 0);
   }),
 );
+
+const activeInsight = computed(() => props.insights.find((i) => i.id === props.activeId) ?? null);
 
 const contextOf = (insight: DbmInsight) => {
   const row = insight.evidence.row;

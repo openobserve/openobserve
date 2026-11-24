@@ -545,7 +545,7 @@ export interface DbmLoadPanelLabels {
 export const dbmSqlEscape = (value: string) => value.replace(/'/g, "''");
 
 /**
- * The Datadog-style load chart: AVERAGE ACTIVE SESSIONS per time bucket,
+ * The database load chart: AVERAGE ACTIVE SESSIONS per time bucket,
  * stacked by the chosen dimension, from the server-vantage activity samples.
  *
  * Three claims the SQL must keep true:

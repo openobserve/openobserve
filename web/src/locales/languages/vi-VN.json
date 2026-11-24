@@ -26995,9 +26995,7 @@
       "unknownNote": "Không có gì để đo trong phạm vi và bộ lọc bạn đã chọn.",
       "lineHealthy": "Bạn đang xem {percent}% thời gian của cơ sở dữ liệu này — {count} loại truy vấn nặng nhất.",
       "lineRemainder": "Bạn đang xem {percent}% thời gian của cơ sở dữ liệu này. Phần còn lại nằm trong các truy vấn nhẹ hơn mà chúng tôi không liệt kê từng cái.",
-      "lineStale": "Việc đếm của chúng tôi chậm {minutes} phút, vì vậy các truy vấn gần đây nhất có thể chưa có ở đây.",
       "lineTruncated": "Có nhiều dữ liệu hơn trong đoạn cuối so với những gì chúng tôi có thể tiếp nhận, vì vậy các con số mới nhất bị đếm thiếu.",
-      "lineTruncatedStale": "Có nhiều dữ liệu hơn trong đoạn cuối so với những gì chúng tôi có thể tiếp nhận, và việc đếm của chúng tôi chậm {minutes} phút — các con số mới nhất bị đếm thiếu, và các truy vấn gần đây nhất có thể chưa có ở đây.",
       "lineGap": "{minutes} phút bị thiếu trong cửa sổ này. Việc đếm của chúng tôi dừng lúc {stopped} và chỉ có thể lùi lại {reach} phút, vì vậy không có gì bao phủ {from}–{to}.",
       "lineSubset": "Bạn đã lọc theo {filter}, vì vậy các tỷ lệ phần trăm này mô tả các hàng được hiển thị, không phải toàn bộ cơ sở dữ liệu.",
       "lineHealthyAll": "Bạn đang xem mọi truy vấn đã chạy. Tốc độ ở đây được đo trên mọi lệnh gọi, vì vậy chúng chính xác.",
@@ -27008,10 +27006,7 @@
       "lineExactSlowestSchema": "Tất cả cơ sở dữ liệu đều đang gửi dữ liệu. Tốc độ chính xác theo từng lược đồ; cơ sở dữ liệu có nhiều lược đồ sẽ hiển thị lược đồ chậm nhất.",
       "lineSubsetUnnamed": "Bộ lọc của bạn thu hẹp phạm vi này xuống dưới mức mà các tổng này cộng lại, vì vậy tỷ lệ phần trăm mô tả các hàng được hiển thị thay vì toàn bộ cơ sở dữ liệu.",
       "lineQuery": "Thời gian được đo từ ứng dụng của bạn, vì vậy chúng bao gồm thời gian mạng và thời gian chờ kết nối trống.",
-      "lineUncodedErrors": "{percent} số lỗi ở đây trả về mà không có mã lý do, vì vậy chúng có thể được đếm nhưng không giải thích được.",
-      "lineSubsetStale": "Bạn đã lọc theo {filter}, và việc đếm của chúng tôi chậm {minutes} phút — các tỷ lệ phần trăm này mô tả các hàng được hiển thị, và các truy vấn gần đây nhất có thể chưa có ở đây.",
-      "lineSubsetUnnamedStale": "Bộ lọc của bạn thu hẹp phạm vi này xuống dưới mức mà các tổng này cộng lại, và việc đếm của chúng tôi chậm {minutes} phút — các tỷ lệ phần trăm mô tả các hàng được hiển thị, và các truy vấn gần đây nhất có thể chưa có ở đây.",
-      "lineCountedToBehind": "Đã đếm đến {time}; chúng tôi chậm {minutes} phút."
+      "lineUncodedErrors": "{percent} số lỗi ở đây trả về mà không có mã lý do, vì vậy chúng có thể được đếm nhưng không giải thích được."
     },
     "breakdown": {
       "loading": "Đang tính toán thời gian đã đi đâu…",
@@ -27558,7 +27553,6 @@
         "occurrencesTitle": "Tất cả {count} lần cặp này deadlock",
         "occurrencesHint": "Chọn một điểm để tải cái ở trên",
         "lostLabel": "{pid} đã thua",
-        "bothSidesLose": "Cả hai bên đều bị hủy gần như tương đương — {a} so với {b}. Không ứng dụng nào là vấn đề; thứ tự mới là vấn đề.",
         "oneSideLoses": "{app} bị hủy mỗi lần.",
         "showAbove": "Hiển thị ở trên",
         "copy": "Sao chép SQL",

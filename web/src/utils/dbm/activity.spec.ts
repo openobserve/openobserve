@@ -28,6 +28,7 @@ import {
   activityDisclosureLines,
   activityEmptyCause,
   activityQueryDetailTarget,
+  activityTimeSortKey,
   activitySampleTotal,
   buildActivityRows,
   buildStateSummary,
@@ -985,7 +986,7 @@ describe("sampleDisclosure", () => {
   });
 
   /**
-   * Our shipped default is 10s, NOT Datadog's 1 Hz. The disclosure must never
+   * Our shipped default is 10s, not a 1 Hz feed. The disclosure must never
    * imply a fidelity we do not ship, so there is no default-to-1 anywhere.
    */
   it("never substitutes a default interval it did not measure", () => {
@@ -1048,7 +1049,7 @@ describe("activityDisclosureLines", () => {
   });
 
   /**
-   * Our shipped default is 10s, not Datadog's 1 Hz. With no inferred interval
+   * Our shipped default is 10s, not a 1 Hz feed. With no inferred interval
    * the copy must degrade to a non-numeric sentence rather than printing a
    * broken string or inventing a rate we do not ship.
    */
@@ -1410,5 +1411,20 @@ describe("activityQueryDetailTarget", () => {
       fingerprint: "fp",
       system: "mysql",
     });
+  });
+});
+
+describe("activityTimeSortKey", () => {
+  it("ranks running sessions above idle ones, each by its own duration", () => {
+    const key = activityTimeSortKey;
+    expect(key({ runningMs: 10, lastQueryMs: null })).toBeGreaterThan(
+      key({ runningMs: null, lastQueryMs: 900_000 }),
+    );
+    expect(key({ runningMs: 20, lastQueryMs: null })).toBeGreaterThan(
+      key({ runningMs: 10, lastQueryMs: null }),
+    );
+    expect(key({ runningMs: null, lastQueryMs: 5 })).toBeGreaterThan(
+      key({ runningMs: null, lastQueryMs: null }),
+    );
   });
 });

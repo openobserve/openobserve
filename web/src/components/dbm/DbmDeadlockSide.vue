@@ -121,6 +121,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { DeadlockParticipant } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { isThreadEngine, stripQuotes } from "@/utils/dbm/deadlocks";
 
 const props = withDefaults(
   defineProps<{
@@ -159,7 +160,7 @@ const roleLabel = computed<I18nText>(() =>
 const pidLabel = computed<I18nText>(() => {
   const pid = props.participant.pid;
   if (pid == null) return raw("");
-  return props.dbSystem.toLowerCase().includes("mysql")
+  return isThreadEngine(props.dbSystem)
     ? t("dbm.deadlocks.detail.thread", { pid })
     : t("dbm.deadlocks.detail.pid", { pid });
 });
@@ -171,7 +172,7 @@ const pidLabel = computed<I18nText>(() => {
 const waitSentence = computed<I18nText | null>(() => {
   const target = props.participant.lock_target;
   if (!target) return null;
-  return t("dbm.deadlocks.detail.waitingForRow", { target });
+  return t("dbm.deadlocks.detail.waitingForRow", { target: stripQuotes(target) });
 });
 
 const rawLock = computed<I18nText | null>(() => {

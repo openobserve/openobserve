@@ -864,24 +864,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Per-row provenance (E-C): only GENERIC rows keep the gap
                      tag — they are the never-executed NULL-bound estimate.
                      Executed rows are labelled as what they are instead. -->
-                    <OTag
-                      v-if="plan.planSource === 'auto_explain'"
-                      variant="success-soft"
-                      size="xs"
-                      :data-test="`dbm-detail-plan-source-executed-${plan.planHash}`"
-                    >
-                      {{ t("dbm.detail.plans.executedLabel") }}
-                      <OTooltip side="top" :content="t('dbm.detail.plans.executedTooltip')" />
-                    </OTag>
-                    <OTag
-                      v-else
-                      type="dataConfidence"
-                      value="gap"
-                      :data-test="`dbm-detail-plan-source-generic-${plan.planHash}`"
-                    >
-                      {{ t("dbm.detail.plans.sourceLabel") }}
-                      <OTooltip side="top" :content="t('dbm.detail.plans.sourceTooltip')" />
-                    </OTag>
+                    <span class="min-w-32" data-test="dbm-detail-plan-tag-slot">
+                      <OTag
+                        v-if="plan.planSource === 'auto_explain'"
+                        variant="success-soft"
+                        size="xs"
+                        :data-test="`dbm-detail-plan-source-executed-${plan.planHash}`"
+                      >
+                        {{ t("dbm.detail.plans.executedLabel") }}
+                        <OTooltip side="top" :content="t('dbm.detail.plans.executedTooltip')" />
+                      </OTag>
+                      <OTag
+                        v-else
+                        type="dataConfidence"
+                        value="gap"
+                        :data-test="`dbm-detail-plan-source-generic-${plan.planHash}`"
+                      >
+                        {{ t("dbm.detail.plans.sourceLabel") }}
+                        <OTooltip side="top" :content="t('dbm.detail.plans.sourceTooltip')" />
+                      </OTag>
+                    </span>
                     <!-- No "share of calls" here (W2): it divided this plan's calls
                      by a window total summed from a DELTA feed whose first
                      emission per statement carries the entire
@@ -906,8 +908,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{
                         t("dbm.detail.plans.capturedDurations", {
-                          avg: formatNs(plan.avgDurationMs * 1e6),
-                          max: formatNs((plan.maxDurationMs ?? plan.avgDurationMs) * 1e6),
+                          avg: planDuration(plan.avgDurationMs),
+                          max: planDuration(plan.maxDurationMs ?? plan.avgDurationMs),
                           count: plan.executions ?? 1,
                         })
                       }}
@@ -1332,6 +1334,7 @@ import {
   serverMetricsTiles,
   type DbmServerMetrics,
 } from "@/utils/dbm/serverMetrics";
+import { formatDurationMs } from "@/utils/dbm/activity";
 import { foldCallingServices, showsCallingServices } from "@/utils/dbm/callingServices";
 import { buildHistorySeries, errorRateValues, qpsValues, seriesValues } from "@/utils/dbm/history";
 import {
@@ -1912,6 +1915,10 @@ const identityChips = computed(() => {
   return chips;
 });
 
+// One decimal under a second ("683.6ms"), the coarser shared duration format above it.
+const planDuration = (ms: number) =>
+  ms < 1000 ? `${Number(ms.toFixed(1))}ms` : formatDurationMs(ms);
+
 /**
  * "First seen in top queries" — never "first executed".
  *
@@ -2393,7 +2400,6 @@ const endpointColumns = computed<OTableColumnDef<EndpointCallerRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("p95"),
       headerTooltip: raw(
         `${t("dbm.queries.columnHints.p95")} ${t("dbm.coverage.tipQueryTimings")}`,
       ),

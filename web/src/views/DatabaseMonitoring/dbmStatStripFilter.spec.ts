@@ -47,3 +47,22 @@ describe("the Failed Only checkbox filters the list", () => {
     expect(clear.slice(0, clear.indexOf("};"))).toContain("statFilter.value = null");
   });
 });
+
+describe("list pages follow locale and show the active insight", () => {
+  it.each(["QueriesPage.vue", "SamplesPage.vue"])("%s builds rowActions as computed", (file) => {
+    expect(read(file)).toMatch(/const rowActions = computed<OTableRowAction\[\]>\(/);
+  });
+
+  it("the insight button shows the active insight and a clear control", () => {
+    const menu = readFileSync(join(here, "../../components/dbm/DbmInsightMenu.vue"), "utf8");
+    expect(menu).toContain("activeInsight ? titleOf(activeInsight)");
+    expect(menu).toContain('data-test="dbm-insights-clear"');
+    expect(read("QueriesPage.vue")).toContain('@clear="activeInsightId = null"');
+  });
+
+  it("Slowest calls folds uniform values into the Query header tooltip", () => {
+    const source = read("SamplesPage.vue");
+    expect(source).toContain("uniformValue(rows.value, (r) => r.serviceName)");
+    expect(source).toContain("queryHeaderTip.value");
+  });
+});

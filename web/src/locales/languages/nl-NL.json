@@ -26995,9 +26995,7 @@
       "unknownNote": "Niets te meten in het bereik en de filters die je hebt gekozen.",
       "lineHealthy": "Je ziet {percent}% van de tijd van deze database — de {count} zwaarste soorten query's.",
       "lineRemainder": "Je ziet {percent}% van de tijd van deze database. De rest zit in lichtere query's die we niet één voor één vermelden.",
-      "lineStale": "Onze telling loopt {minutes} minuten achter, dus de meest recente query's zijn mogelijk nog niet hier.",
       "lineTruncated": "Er was meer data in het laatste deel dan we konden verwerken, dus de nieuwste cijfers zijn onderschattingen.",
-      "lineTruncatedStale": "Er was meer data in het laatste deel dan we konden verwerken, en onze telling loopt {minutes} minuten achter — de nieuwste cijfers zijn onderschattingen, en de meest recente query's zijn mogelijk nog niet hier.",
       "lineGap": "{minutes} minuten ontbreken in dit venster. Onze telling stopte om {stopped} en kan slechts {reach} minuten teruggaan, dus niets dekt {from}–{to}.",
       "lineSubset": "Je hebt gefilterd op {filter}, dus deze percentages beschrijven de getoonde rijen, niet de hele database.",
       "lineHealthyAll": "Je ziet elke query die draaide. Snelheden hier zijn gemeten over elke aanroep, dus ze zijn exact.",
@@ -27008,10 +27006,7 @@
       "lineExactSlowestSchema": "Alle databases rapporteren. Snelheden zijn exact per schema; een database met meerdere schema's toont het traagste schema.",
       "lineSubsetUnnamed": "Je filters beperken dit tot onder het niveau waarop deze totalen worden opgeteld, dus de percentages beschrijven de getoonde rijen in plaats van de hele database.",
       "lineQuery": "Tijden worden gemeten vanuit je applicatie, dus ze omvatten netwerktijd en eventueel wachten op een vrije verbinding.",
-      "lineUncodedErrors": "{percent} van de mislukkingen hier kwam terug zonder een redencode, dus ze kunnen worden geteld maar niet verklaard.",
-      "lineSubsetStale": "Je hebt gefilterd op {filter}, en onze telling loopt {minutes} minuten achter — deze percentages beschrijven de getoonde rijen, en de meest recente query's zijn mogelijk nog niet hier.",
-      "lineSubsetUnnamedStale": "Je filters beperken dit tot onder het niveau waarop deze totalen worden opgeteld, en onze telling loopt {minutes} minuten achter — de percentages beschrijven de getoonde rijen, en de meest recente query's zijn mogelijk nog niet hier.",
-      "lineCountedToBehind": "Geteld tot {time}; we lopen {minutes} minuten achter."
+      "lineUncodedErrors": "{percent} van de mislukkingen hier kwam terug zonder een redencode, dus ze kunnen worden geteld maar niet verklaard."
     },
     "breakdown": {
       "loading": "Bezig met uitzoeken waar de tijd naartoe ging…",
@@ -27558,7 +27553,6 @@
         "occurrencesTitle": "Alle {count} keer dat dit paar deadlockte",
         "occurrencesHint": "Selecteer een punt om die hierboven te laden",
         "lostLabel": "{pid} verloor",
-        "bothSidesLose": "Beide kanten worden ongeveer even vaak geannuleerd — {a} vs {b}. Geen van beide applicaties is het probleem; de volgorde wel.",
         "oneSideLoses": "{app} wordt elke keer geannuleerd.",
         "showAbove": "Toon hierboven",
         "copy": "Kopieer SQL",

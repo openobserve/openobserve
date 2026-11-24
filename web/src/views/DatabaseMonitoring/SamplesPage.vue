@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="tableRef"
         :enable-column-resize="true"
         :data="rows"
-        :columns="columns"
+        :columns="visibleColumns"
         row-key="rowKey"
         :loading="loading"
         :frame="false"
@@ -139,14 +139,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- The statement, with where it ran under it. -->
         <template #cell-query="{ row }">
-          <DbmQueryCell
-            :text="raw(row.queryText)"
-            :db-system="row.dbSystem"
-            :meta-items="[
-              { key: 'instance', label: raw(row.dbInstance ?? '') },
-              { key: 'namespace', label: raw(row.dbNamespace ?? '') },
-            ]"
-          />
+          <div class="flex min-w-0 flex-col gap-px">
+            <OTruncatedText class="text-text-code font-mono text-xs">
+              {{ row.queryText || raw("—") }}
+            </OTruncatedText>
+            <div
+              v-if="metaOf(row)"
+              class="text-text-secondary min-h-4 min-w-0 text-xs"
+              data-test="dbm-samples-meta"
+            >
+              <OTruncatedText :tooltip="raw(metaOf(row))">
+                {{ metaOf(row) }}
+              </OTruncatedText>
+              <OTooltip v-if="row.dbSystem" :content="raw(engineName(row.dbSystem))" />
+            </div>
+          </div>
         </template>
 
         <template #cell-timestamp="{ row }">
@@ -324,7 +331,7 @@ import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptySt
 import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
-import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
+import type { DbmScopeFilter } from "@/utils/dbm/scopeFilter";
 import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
 import DbmLockEmptyState, {
   type DbmLockCheck,
@@ -333,6 +340,8 @@ import DbmLockEmptyState, {
 import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
@@ -351,6 +360,7 @@ import { useDbmSearchEmpty } from "@/composables/dbm/useDbmSearchEmpty";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { createDbmFilterEntry, optionsFrom } from "@/utils/dbm/filters";
 import { countClaim, formatNs } from "@/utils/dbm/format";
+import { engineName, uniformValue } from "@/utils/dbm/uniformValue";
 import { buildSamplesOption } from "@/utils/dbm/historyChart";
 import {
   buildSampleRows,
@@ -539,7 +549,7 @@ const isFiltered = computed(
 );
 
 // The licence lock stays visible as the disabled reason, so a locked trace is explained, not hidden.
-const rowActions: OTableRowAction[] = [
+const rowActions = computed<OTableRowAction[]>(() => [
   {
     id: "trace",
     icon: "account-tree",
@@ -549,7 +559,26 @@ const rowActions: OTableRowAction[] = [
     onSelect: (row) => openSampleTrace(row),
     dataTest: (row) => `dbm-samples-trace-${row.rowKey}`,
   },
-];
+]);
+
+// Values every row shares move to the Query header tooltip instead of repeating per row.
+const uniformInstance = computed(() => uniformValue(rows.value, (r) => r.dbInstance));
+const uniformNamespace = computed(() => uniformValue(rows.value, (r) => r.dbNamespace));
+const uniformService = computed(() => uniformValue(rows.value, (r) => r.serviceName));
+const queryHeaderTip = computed(() =>
+  [
+    uniformService.value && t("dbm.queries.allFromApp", { app: uniformService.value }),
+    uniformInstance.value && t("dbm.queries.allOnInstance", { instance: uniformInstance.value }),
+    uniformNamespace.value &&
+      t("dbm.samples.allInNamespace", { namespace: uniformNamespace.value }),
+  ]
+    .filter(Boolean)
+    .join(" "),
+);
+const metaOf = (row: DbmSampleRow) =>
+  [!uniformInstance.value && row.dbInstance, !uniformNamespace.value && row.dbNamespace]
+    .filter(Boolean)
+    .join(" · ");
 
 const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
   {
@@ -559,6 +588,7 @@ const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
     // Unsized, it took an even share and truncated every statement inside its SELECT list.
     size: 480,
     sortable: false,
+    meta: { headerTooltip: queryHeaderTip.value ? raw(queryHeaderTip.value) : undefined },
   },
   {
     id: "timestamp",
@@ -604,6 +634,11 @@ const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
     meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
   },
 ]);
+
+// A Service that is the same on every row is stated once in the Query header tooltip.
+const visibleColumns = computed(() =>
+  columns.value.filter((c) => !(c.id === "service" && uniformService.value)),
+);
 
 // ─── The database-reported fallback list ─────────────────────────────────────
 

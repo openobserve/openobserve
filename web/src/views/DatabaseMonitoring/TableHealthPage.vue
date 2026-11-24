@@ -58,7 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         search-data-test="dbm-table-health-search"
         :filters="dimensionFilters"
       >
-        <DbmRecommendationMenu :items="recommendationItems" />
+        <DbmRecommendationMenu
+          :items="recommendationItems"
+          :empty-text="t('dbm.recommendations.menuEmptyTables')"
+        />
         <template #trailing>
           <div class="ms-auto flex min-w-0 items-center gap-1">
             <OTableColumnToggle
@@ -170,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :fill-class="bloatTone(row.dead_tup_pct)"
             />
             <span class="text-text-body text-xs tabular-nums">
-              {{ `${row.dead_tup_pct.toFixed(1)}%` }}
+              {{ `${roundBloat(row.dead_tup_pct).toFixed(1)}%` }}
             </span>
           </div>
           <span v-else class="text-text-muted text-xs">{{ raw("—") }}</span>
@@ -250,6 +253,8 @@ import {
   tableHealthEmptyCause,
   tableHealthRows,
   tableSizeLabel,
+  roundBloat,
+  bloatTone,
   tupleCountDisclosure,
   vacuumLabel,
   vacuumTimeMicros,
@@ -264,14 +269,11 @@ import {
   type DbmRecommendation,
   type IndexHealthRow,
 } from "@/utils/dbm/recommendations";
-import { countClaim } from "@/utils/dbm/format";
+import { countClaim, formatDateTime } from "@/utils/dbm/format";
 import { engineName, uniformValue } from "@/utils/dbm/uniformValue";
 
 const { t } = useI18nTyped();
 
-// 20% is Postgres's default autovacuum_vacuum_scale_factor; 10% is a lead-in.
-const bloatTone = (pct: number) =>
-  pct >= 20 ? "bg-status-error-text" : pct >= 10 ? "bg-status-warning-text" : "bg-accent";
 const route = useRoute();
 const router = useRouter();
 
@@ -409,9 +411,6 @@ const columns = computed<OTableColumnDef[]>(() =>
 );
 
 const VACUUM_COLUMNS = ["last_autovacuum", "last_vacuum", "last_analyze"] as const;
-
-const formatDateTime = (micros: number) =>
-  new Date(micros / 1000).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
 
 // ─── W11 · Recommendations ───────────────────────────────────────────────────
 

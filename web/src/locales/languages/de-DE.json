@@ -26995,9 +26995,7 @@
       "unknownNote": "In dem ausgewählten Zeitraum und mit den gewählten Filtern gibt es nichts zu messen.",
       "lineHealthy": "Sie sehen {percent}% der Zeit dieser Datenbank — die {count} schwersten Arten von Abfragen.",
       "lineRemainder": "Sie sehen {percent}% der Zeit dieser Datenbank. Der Rest entfällt auf leichtere Abfragen, die wir nicht einzeln auflisten.",
-      "lineStale": "Unsere Zählung ist {minutes} Minuten hinterher, daher sind die neuesten Abfragen möglicherweise noch nicht hier.",
       "lineTruncated": "Im letzten Abschnitt gab es mehr Daten, als wir aufnehmen konnten, daher sind die neuesten Zahlen unterzählt.",
-      "lineTruncatedStale": "Im letzten Abschnitt gab es mehr Daten, als wir aufnehmen konnten, und unsere Zählung ist {minutes} Minuten hinterher — die neuesten Zahlen sind unterzählt, und die neuesten Abfragen sind möglicherweise noch nicht hier.",
       "lineGap": "{minutes} Minuten fehlen in diesem Fenster. Unsere Zählung wurde bei {stopped} gestoppt und kann nur {reach} Minuten zurückreichen, daher deckt nichts {from}–{to} ab.",
       "lineSubset": "Sie haben auf {filter} gefiltert, daher beschreiben diese Prozentsätze die angezeigten Zeilen, nicht die gesamte Datenbank.",
       "lineHealthyAll": "Sie sehen jede Abfrage, die ausgeführt wurde. Die Geschwindigkeiten hier werden über jeden Aufruf gemessen, sind also exakt.",
@@ -27008,10 +27006,7 @@
       "lineExactSlowestSchema": "Alle Datenbanken melden. Die Geschwindigkeiten sind pro Schema exakt; eine Datenbank mit mehreren Schemas zeigt ihr langsamstes.",
       "lineSubsetUnnamed": "Ihre Filter grenzen dies unter die Ebene ein, auf der diese Summen gebildet werden, daher beschreiben die Prozentsätze die angezeigten Zeilen statt der gesamten Datenbank.",
       "lineQuery": "Zeiten werden von Ihrer Anwendung aus gemessen, daher enthalten sie Netzwerkzeit und Wartezeit auf eine freie Verbindung.",
-      "lineUncodedErrors": "{percent} der Fehler hier kamen ohne einen Grundcode zurück, daher können sie gezählt, aber nicht erklärt werden.",
-      "lineSubsetStale": "Sie haben auf {filter} gefiltert, und unsere Zählung ist {minutes} Minuten hinterher — diese Prozentsätze beschreiben die angezeigten Zeilen, und die neuesten Abfragen sind möglicherweise noch nicht hier.",
-      "lineSubsetUnnamedStale": "Ihre Filter grenzen dies unter die Ebene ein, auf der diese Summen gebildet werden, und unsere Zählung ist {minutes} Minuten hinterher — die Prozentsätze beschreiben die angezeigten Zeilen, und die neuesten Abfragen sind möglicherweise noch nicht hier.",
-      "lineCountedToBehind": "Gezählt bis {time}; wir sind {minutes} Minuten hinterher."
+      "lineUncodedErrors": "{percent} der Fehler hier kamen ohne einen Grundcode zurück, daher können sie gezählt, aber nicht erklärt werden."
     },
     "breakdown": {
       "loading": "Wird ermittelt, wohin die Zeit gegangen ist…",
@@ -27558,7 +27553,6 @@
         "occurrencesTitle": "Alle {count} Male, in denen dieses Paar in einen Deadlock geriet.",
         "occurrencesHint": "Wählen Sie einen Punkt aus, um diesen oben zu laden.",
         "lostLabel": "{pid} verloren",
-        "bothSidesLose": "Beide Seiten werden etwa gleich häufig abgebrochen — {a} vs. {b}. Keine der Anwendungen ist das Problem; die Reihenfolge ist es.",
         "oneSideLoses": "{app} wird jedes Mal abgebrochen.",
         "showAbove": "Oben anzeigen",
         "copy": "SQL kopieren",

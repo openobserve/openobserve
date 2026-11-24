@@ -613,6 +613,15 @@ describe("DbmSectionTabs", () => {
       );
     });
 
+    it("gives the skeleton and the badge the same height and minimum width", async () => {
+      const wrapper = mountLoading({ countsLoading: true });
+      const skeleton = wrapper.find('[data-test="dbm-section-tab-count-loading-queries"]');
+      expect(skeleton.classes()).toEqual(expect.arrayContaining(["h-5", "w-12"]));
+      await wrapper.setProps({ queryCount: 34, countsLoading: false });
+      const badge = wrapper.find('[data-test="dbm-section-tab-badge-queries"]');
+      expect(badge.classes()).toEqual(expect.arrayContaining(["h-5", "min-w-12"]));
+    });
+
     it("swaps the skeleton for the badge when the count arrives", async () => {
       const wrapper = mountLoading({ countsLoading: true });
       await wrapper.setProps({ queryCount: 34, countsLoading: false });

@@ -18,6 +18,8 @@ import { describe, expect, it } from "vitest";
 import i18n from "@/locales";
 
 import {
+  bloatTone,
+  roundBloat,
   tableHealthColumns,
   tableHealthEmptyCause,
   tableHealthRows,
@@ -318,5 +320,14 @@ describe("tableHealthColumns · magnitude bars", () => {
       "13.0 MB",
     );
     expect((by.get("dead_tup_pct")?.meta?.format as (v: unknown) => string)(2.98)).toBe("3.0%");
+  });
+});
+
+describe("bloat tone", () => {
+  it("uses the displayed rounded value", () => {
+    expect(roundBloat(9.96)).toBe(10);
+    expect(bloatTone(9.96)).toBe("bg-status-warning-text");
+    expect(bloatTone(19.96)).toBe("bg-status-error-text");
+    expect(bloatTone(9.94)).toBe("bg-accent");
   });
 });

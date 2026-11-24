@@ -282,3 +282,26 @@ describe("DbmInstanceHealthCell with an empty read", () => {
     expect(hint).not.toContain("ZO_DB_MONITORING");
   });
 });
+
+describe("DbmInstanceHealthCell loading and not-assessed states", () => {
+  it("shows a skeleton, not a dash, while the metrics read is in flight", () => {
+    const wrapper = mount(DbmInstanceHealthCell, {
+      props: { metrics: absentMetrics("no-data", null), engine: "postgresql", loading: true },
+      global: { plugins: [i18n] },
+    });
+    expect(wrapper.find("[data-test='dbm-instance-health-loading']").exists()).toBe(true);
+    expect(wrapper.find("[data-test='dbm-instance-health-reason']").exists()).toBe(false);
+  });
+
+  it("does not say Healthy when no thresholded metric was measured", () => {
+    const wrapper = mountWith(
+      metrics({
+        saturation: { state: "no-limit", used: 20, limit: null, ratio: null },
+        cacheHitRatio: null,
+        deadlocks: null,
+      }),
+    );
+    const status = wrapper.find("[data-test='dbm-databases-health-status']").text();
+    expect(status).toBe("Not Assessed");
+  });
+});

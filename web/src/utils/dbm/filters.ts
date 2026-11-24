@@ -31,7 +31,7 @@
 
 import type { Ref } from "vue";
 
-import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
+import type { DbmScopeFilter } from "@/utils/dbm/scopeFilter";
 import { raw, type I18nText } from "@/types/i18n";
 
 /**

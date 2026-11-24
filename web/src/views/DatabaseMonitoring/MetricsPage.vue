@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   Metrics — the databases' own gauges and counters over the window, plus the
-  Datadog-style load-by-wait-event chart.
+  load-by-wait-event chart.
 
   Every chart is a SELF-QUERYING dashboard panel: this page calls no
   `db_monitoring` endpoint for chart data. The only fetch it owns is the
@@ -429,8 +429,13 @@ const displayFilters = computed(() =>
   applyInstanceEngine(dimensionFilters.value, fleetHits.value, raw(t("dbm.filters.setByInstance"))),
 );
 
+// The panels must query the engine the Engine select shows, so a locked engine overrides a stale system.
+const lockedEngine = computed(
+  () => displayFilters.value.find((f) => f.key === "system" && f.disabled)?.value ?? null,
+);
+
 const scope = computed<DbmMetricsScope>(() => ({
-  system: scopeParams.value.system ?? null,
+  system: lockedEngine.value ?? scopeParams.value.system ?? null,
   instance: scopeParams.value.instance ?? null,
   namespace: scopeParams.value.namespace ?? null,
 }));
@@ -518,7 +523,7 @@ const hasMetricStreams = computed(
   () => sections.value.featured.length > 0 || sections.value.groups.length > 0,
 );
 
-/** Which dimension the load chart stacks by — the Datadog-style slicer. */
+/** Which dimension the load chart stacks by. */
 const loadBreakdown = ref<DbmLoadBreakdown>("waitEvent");
 
 const breakdownOptions = computed<SelectOption[]>(() =>
