@@ -307,11 +307,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="font-mono text-xs tabular-nums"
             :class="missing(row.p50_ns) ? 'text-text-muted' : 'text-text-body'"
           >
+            <OTooltip
+              v-if="row.kind === 'service'"
+              side="bottom"
+              :content="t('dbm.breakdown.worstQuerySpeed')"
+            />
             {{ missing(row.p50_ns) ? raw("—") : formatNs(row.p50_ns) }}
           </span>
         </template>
         <template #cell-p95="{ row }">
-          <span class="text-compact font-mono font-medium tabular-nums" :class="p95Tone(row)">
+          <!-- An app row reports its worst query's percentile (percentiles do not pool), which can far exceed its parent's. -->
+          <span
+            class="text-compact font-mono font-medium tabular-nums"
+            :class="p95Tone(row)"
+            :data-test="row.kind === 'service' ? 'dbm-databases-app-p95' : undefined"
+          >
+            <OTooltip
+              v-if="row.kind === 'service'"
+              side="bottom"
+              :content="t('dbm.breakdown.worstQuerySpeed')"
+            />
             {{ missing(row.p95_ns) ? raw("—") : formatNs(row.p95_ns) }}
           </span>
         </template>
@@ -320,6 +335,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="font-mono text-xs tabular-nums"
             :class="missing(row.p99_ns) ? 'text-text-muted' : 'text-text-body'"
           >
+            <OTooltip
+              v-if="row.kind === 'service'"
+              side="bottom"
+              :content="t('dbm.breakdown.worstQuerySpeed')"
+            />
             {{ missing(row.p99_ns) ? raw("—") : formatNs(row.p99_ns) }}
           </span>
         </template>

@@ -27031,6 +27031,7 @@
     "breakdown": {
       "loading": "Working out where the time went…",
       "kindApp": "App",
+      "worstQuerySpeed": "Slowest query under this app. Speeds cannot be combined across queries, so this is the worst query's value, not the app's overall speed.",
       "kindSchema": "Schema",
       "shareOf": "Share of {parent}",
       "noSchema": "No schema reported",
