@@ -631,7 +631,11 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
     else {
         return Err(DashboardError::DashboardNotFound);
     };
-    table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
+    let orphaned_reports =
+        table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
+    for (report_id, report_folder_id) in orphaned_reports {
+        reports::forget_deleted(org_id, &report_id, &report_folder_id).await;
+    }
     // Keep the org's "pin to Home" setting from dangling on a deleted dashboard.
     reconcile_home_dashboard_on_delete(org_id, dashboard_id).await;
     // A public link must not outlive its dashboard; a failure shows it as "dashboard deleted".
@@ -695,7 +699,12 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), DashboardError> {
         &broadcast,
         |(dashboard_id, folder_id): (String, String)| async move {
             forget_dashboard(org_id, &dashboard_id, &folder_id).await?;
-            table::dashboards::delete_from_folder(org_id, &folder_id, &dashboard_id).await?;
+            let orphaned =
+                table::dashboards::delete_from_folder(org_id, &folder_id, &dashboard_id).await?;
+            // Deleted before the reports step lists rows, so their tuples go here.
+            for (report_id, report_folder_id) in orphaned {
+                reports::forget_deleted(org_id, &report_id, &report_folder_id).await;
+            }
             Ok(())
         },
     )

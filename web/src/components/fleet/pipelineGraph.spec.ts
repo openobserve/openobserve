@@ -65,22 +65,23 @@ const traces = pipeline({
 const byId = <T extends { id: string }>(list: T[]) => new Map(list.map((x) => [x.id, x]));
 
 describe("buildPipelineMap", () => {
-  it("lays out three columns: fleet, receiver, destination", () => {
+  it("lays out two columns, fleet then destination, with no receivers between them", () => {
     const map = buildPipelineMap([logs, traces], layout);
-    const columns = ["fleet", "receiver", "destination"].map((c) =>
+    const columns = ["fleet", "destination"].map((c) =>
       map.nodes.filter((n) => n.column === c).map((n) => n.id),
     );
-    expect(columns).toEqual([["f:prod"], ["r:prod|filelog", "r:prod|otlp"], ["d:d_o2", "d:d_s3"]]);
+    expect(columns).toEqual([["f:prod"], ["d:d_o2", "d:d_s3"]]);
+    expect(map.nodes.every((n) => ["fleet", "destination", "sink"].includes(n.column))).toBe(true);
     const xs = columns.map((ids) => byId(map.nodes).get(ids[0])!.x);
-    expect(xs).toEqual([...xs].sort((a, b) => a - b));
-    expect(new Set(xs).size).toBe(3);
+    expect(xs[0]).toBeLessThan(xs[1]);
   });
 
-  it("splits a destination's rate over the receivers by their share of the pipeline input", () => {
-    const edges = byId(buildPipelineMap([logs], layout).edges);
-    expect(edges.get("rd:prod|filelog|d_o2|logs")?.rate).toBe(150);
-    expect(edges.get("rd:prod|otlp|d_o2|logs")?.rate).toBe(50);
-    expect(edges.get("rd:prod|filelog|d_s3|logs")?.rate).toBe(300);
+  it("draws one line from the fleet to each destination, carrying its exporter's rate", () => {
+    const edges = buildPipelineMap([logs], layout).edges.filter((e) => !e.branch);
+    expect(edges.map((e) => [e.id, e.source, e.target, e.rate])).toEqual([
+      ["fd:prod|d_o2", "f:prod", "d:d_o2", 200],
+      ["fd:prod|d_s3", "f:prod", "d:d_s3", 400],
+    ]);
   });
 
   it("merges every exporter sending to one destination, across fleets, into one node", () => {
@@ -111,20 +112,21 @@ describe("buildPipelineMap", () => {
       pipelines: ["prod/logs", "edge/logs"],
     });
     const edges = byId(map.edges);
-    expect(edges.get("rd:prod|otlp|d_o2|logs")?.rate).toBe(100);
-    expect(edges.get("rd:edge|otlp|d_o2|logs")?.rate).toBe(30);
+    expect(edges.get("fd:prod|d_o2")?.rate).toBe(100);
+    expect(edges.get("fd:edge|d_o2")?.rate).toBe(30);
   });
 
-  it("keeps one line per signal, so a shared receiver and destination carry each signal apart", () => {
+  it("merges every signal a fleet sends to one destination into one line counted in items", () => {
     const map = buildPipelineMap([logs, traces], layout);
     const edges = byId(map.edges);
-    expect(edges.get("fr:prod|otlp|logs")?.rate).toBe(100);
-    expect(edges.get("fr:prod|otlp|traces")?.rate).toBe(80);
-    expect(edges.get("rd:prod|otlp|d_o2|logs")?.signal).toBe("logs");
-    expect(edges.get("rd:prod|otlp|d_o2|traces")?.signal).toBe("traces");
+    expect(map.edges.filter((e) => !e.branch)).toHaveLength(2);
+    expect(edges.get("fd:prod|d_o2")).toMatchObject({
+      rate: 280,
+      signal: "all",
+      pipelines: ["prod/logs", "prod/traces"],
+    });
+    expect(edges.get("fd:prod|d_s3")?.signal).toBe("logs");
     expect(byId(map.nodes).get("d:d_o2")?.rate).toBe(280);
-    expect(byId(map.nodes).get("r:prod|otlp")?.rate).toBe(180);
-    expect(byId(map.nodes).get("d:d_o2")?.pipelines).toEqual(["prod/logs", "prod/traces"]);
   });
 
   it("draws a failure branch off the failing destination with its failed share", () => {
@@ -182,13 +184,13 @@ describe("buildPipelineMap", () => {
     expect(branch?.branch).toEqual({ kind: "dropped", ratio: 0.1 });
   });
 
-  it("counts a receiver fanned out to two pipelines of one signal once", () => {
+  it("adds up two pipelines of one signal sending to one destination, keeping their unit", () => {
     const copy = pipeline({ ...logs, name: "logs/copy", id: "prod/logs/copy" });
-    const map = buildPipelineMap([logs, copy], layout);
-    expect(byId(map.nodes).get("r:prod|filelog")?.rate).toBe(300);
+    const edge = byId(buildPipelineMap([logs, copy], layout).edges).get("fd:prod|d_o2");
+    expect(edge).toMatchObject({ rate: 400, signal: "logs" });
   });
 
-  it("keeps a missing rate null, and a receiver without rates shares equally", () => {
+  it("keeps a missing rate null, so an unmeasured route never reads as zero", () => {
     const silent = pipeline({
       fleet: "edge",
       name: "logs",
@@ -199,9 +201,8 @@ describe("buildPipelineMap", () => {
       exporters: [exporter("otlp", "d_o2", 10), exporter("debug", "d_dbg", null)],
     });
     const edges = byId(buildPipelineMap([silent], layout).edges);
-    expect(edges.get("fr:edge|a|logs")?.rate).toBeNull();
-    expect(edges.get("rd:edge|a|d_o2|logs")?.rate).toBe(5);
-    expect(edges.get("rd:edge|a|d_dbg|logs")?.rate).toBeNull();
+    expect(edges.get("fd:edge|d_o2")?.rate).toBe(10);
+    expect(edges.get("fd:edge|d_dbg")?.rate).toBeNull();
   });
 });
 
