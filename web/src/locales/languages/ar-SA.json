@@ -1309,7 +1309,7 @@
     "removeFilter": "إزالة الفلتر",
     "clearAll": "مسح جميع الفلاتر",
     "toggleConnector": "التبديل بين AND و OR",
-    "selectedCount": "لم يتم تحديد أي قيمة | تم تحديد قيمة واحدة | تم تحديد {count} قيم",
+    "selectedCount": "لم يتم تحديد أي قيمة | تم تحديد {count} قيمة | تم تحديد {count} قيم",
     "numberOrVariable": "أدخل رقمًا أو $variable",
     "numberOnly": "أدخل رقمًا",
     "query": "الاستعلام",
