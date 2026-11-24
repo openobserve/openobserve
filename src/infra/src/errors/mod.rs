@@ -218,6 +218,10 @@ pub enum PutDashboardError {
     MissingOwner,
     #[error("error putting dashboard with missing inner data for version {0}")]
     MissingInnerData(i32),
+    #[error("error updating dashboard that does not exist in the folder")]
+    NotFound,
+    #[error("error putting dashboard changed by a concurrent write")]
+    Conflict,
 }
 
 #[derive(ThisError, Debug)]

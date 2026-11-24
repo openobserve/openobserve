@@ -91,10 +91,13 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
         }
     });
 
+    // The submitter's permission at run time, so a revoke also reaches a queued job.
+    let raw_streams = job_raw_streams(&job).await?;
+
     // 3. check if the job is previous running (get error then retry, be cancel then retry) (case 1)
     //    or do not have previous run (case 2)
     if job.partition_num.is_none() {
-        let res = handle_search_partition(&job).await;
+        let res = handle_search_partition(&job, &raw_streams).await;
         if let Err(e) = res {
             set_job_error_message(&job.id, &job.trace_id, &e.to_string()).await?;
             log::error!(
@@ -106,7 +109,8 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     }
 
     // 4. get all partition jobs from `search_job_partitions` table
-    let req = job_request(&job)?;
+    let mut req = job_request(&job)?;
+    req.raw_streams = Some(raw_streams);
     let limit = if req.query.size > 0 {
         req.query.size
     } else {
@@ -194,10 +198,14 @@ where
 
 // 1. call search_partition to get all time range
 // 2. write to database
-async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
+async fn handle_search_partition(
+    job: &Job,
+    raw_streams: &search::RawStreams,
+) -> Result<(), anyhow::Error> {
     let stream_type = StreamType::from(job.stream_type.as_str());
     let req = job_request(job)?;
-    let partition_req = SearchPartitionRequest::from(&req);
+    let mut partition_req = SearchPartitionRequest::from(&req);
+    partition_req.raw_streams = Some(raw_streams.clone());
     let res = grpc_search_partition(
         &job.trace_id,
         &job.org_id,
@@ -213,6 +221,19 @@ async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
     set_partition_num(&job.id, res.partitions.len() as i64)
         .await
         .map_err(|e| e.into())
+}
+
+/// Resolved once per run and carried by every partition's gRPC request; audits each raw read.
+async fn job_raw_streams(job: &Job) -> Result<search::RawStreams, anyhow::Error> {
+    let req = job_request(job)?;
+    Ok(crate::raw_streams::resolve_and_audit(
+        &job.trace_id,
+        &job.org_id,
+        StreamType::from(job.stream_type.as_str()),
+        Some(&job.user_id),
+        &req.query.sql,
+    )
+    .await)
 }
 
 /// Parses the job request with named zones pinned at the job end, so partitions share one offset.
