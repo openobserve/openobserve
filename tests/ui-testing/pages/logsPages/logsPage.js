@@ -2211,6 +2211,17 @@ export class LogsPage {
             .toContainText(`1 to ${size}`, { timeout: 30000 });
     }
 
+    /** Run the query and return the event count summed over the histogram buckets of `stream`. */
+    async runQueryAndSumHistogram(stream) {
+        const histogram = this.page.waitForResponse((r) =>
+            r.url().includes('is_ui_histogram=true') && (r.request().postData() || '').includes(stream),
+        { timeout: 30000 });
+        await this.clickRefreshButton();
+        const body = await (await histogram).text();
+        const counts = [...body.matchAll(/"zo_sql_num":\s*(\d+)/g)].map((m) => Number(m[1]));
+        return counts.reduce((sum, count) => sum + count, 0);
+    }
+
     /**
      * Wait until the banner reports the expected total.
      *

@@ -7,7 +7,7 @@ const { getAuthHeaders, getOrgIdentifier } = require('../../utils/cloud-auth.js'
 const ERROR_SPANS = 90;
 const ERROR_FILTER = "span_status = 'ERROR'";
 const RED_PANELS = ['Rate', 'Errors', 'Duration'];
-// The operations table search is the panel's only UI search; panel names stay URL-encoded in the request.
+// On its default Operations tab the table is the panel's only UI search; panel names stay URL-encoded in the request.
 const SIDE_PANEL_QUERIES = ['results', 'Rate', 'Errors', 'Duration%20p95'];
 const SERVICE = 'e2e-sequenced-errors';
 // Search windows are microseconds; two requests of one run land within a second of each other.
@@ -73,7 +73,7 @@ async function reloadAndSettle(page, tracesPage) {
 const isPanelRequest = (request) => request.sql.includes(`'${SERVICE}'`);
 const windowOf = ({ startTime, endTime }) => ({ startTime, endTime });
 
-// The rows query is the only one that totals requests per service without filtering on one service.
+// Only a catalog load totals requests per service without filtering on one service; all its queries share one window.
 function catalogWindow(capture) {
   const loads = capture.requests.filter((r) => /\bAS total_requests\b/.test(r.sql) && !isPanelRequest(r));
   expect(loads.length, 'the catalog must have loaded its rows').toBeGreaterThan(0);
@@ -273,10 +273,16 @@ test.describe('Traces search window and error state (#15130, ENT#2805, ENT#2806)
     await expectPanelWindow(capture, rowsWindow, 'every side panel query must use the window the rows were loaded with');
     expect(catalogWindow(capture), 'opening the panel must not reload the rows').toEqual(rowsWindow);
 
+    const refreshedAt = nowUs();
     await pm.tracesPage.refreshServicesCatalog();
-    await expect.poll(() => catalogWindow(capture).endTime, { timeout: 20000, message: 'a refresh must load the rows for a newer window' })
-      .toBeGreaterThan(rowsWindow.endTime + SAME_WINDOW_US);
-    await expectPanelWindow(capture, catalogWindow(capture), 'every side panel query must follow the refreshed rows window');
+    await expect.poll(() => catalogWindow(capture).endTime, { timeout: 20000, message: 'a refresh must load the rows for a window ending now' })
+      .toBeGreaterThanOrEqual(refreshedAt);
+    const refreshedWindow = catalogWindow(capture);
+    await expectPanelWindow(capture, refreshedWindow, 'every side panel query must follow the refreshed rows window');
     capture.stop();
+
+    const panelWindows = new Set(capture.requests.filter(isPanelRequest).map((r) => JSON.stringify(windowOf(r))));
+    expect([...panelWindows], 'the panel must never query a window the rows were not loaded with')
+      .toEqual([rowsWindow, refreshedWindow].map((w) => JSON.stringify(w)));
   });
 });
