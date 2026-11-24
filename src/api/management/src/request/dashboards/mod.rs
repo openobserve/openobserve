@@ -929,23 +929,23 @@ mod tests {
         );
     }
 
-    // 500 Internal Server Error
     #[test]
-    fn test_update_missing_hash_is_internal_error() {
+    fn test_update_missing_hash_is_bad_request() {
         assert_eq!(
             status(DashboardError::UpdateMissingHash),
-            StatusCode::INTERNAL_SERVER_ERROR
+            StatusCode::BAD_REQUEST
         );
     }
 
     #[test]
-    fn test_put_missing_title_is_internal_error() {
+    fn test_put_missing_title_is_bad_request() {
         assert_eq!(
             status(DashboardError::PutMissingTitle),
-            StatusCode::INTERNAL_SERVER_ERROR
+            StatusCode::BAD_REQUEST
         );
     }
 
+    // 500 Internal Server Error
     #[test]
     fn test_create_default_folder_is_internal_error() {
         assert_eq!(

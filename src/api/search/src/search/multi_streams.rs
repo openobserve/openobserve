@@ -75,6 +75,15 @@ use crate::{
     search::{error_utils::map_error_to_http_response, utils::SearchStreamGuard},
 };
 
+/// The per-query stream tasks require a search type. Default it to `Other` like the
+/// single-stream handler does, so a request without `search_type` returns results
+/// instead of a stream with only progress events and `[[DONE]]`.
+fn default_stream_search_type(
+    search_type: Option<search::SearchEventType>,
+) -> Option<search::SearchEventType> {
+    search_type.or(Some(search::SearchEventType::Other))
+}
+
 /// Only documents `_search_multi`: with `per_query_response` each hit is one query's rows.
 struct MultiSearchResponse;
 
@@ -1281,6 +1290,7 @@ pub async fn search_multi_stream(
     let search_event_context = search_type
         .as_ref()
         .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
+    let search_type = default_stream_search_type(search_type);
 
     let fallback_order_by_col = get_fallback_order_by_col_from_request(&query);
 
@@ -1641,7 +1651,20 @@ mod tests {
     use openobserve_api_common::extractors::Headers;
     use openobserve_core::auth::UserEmail;
 
-    use super::{around_multi, parse_simple_multi_stream_request};
+    use super::{around_multi, default_stream_search_type, parse_simple_multi_stream_request};
+
+    #[test]
+    fn test_default_stream_search_type() {
+        use config::meta::search::SearchEventType;
+        assert_eq!(
+            default_stream_search_type(None),
+            Some(SearchEventType::Other)
+        );
+        assert_eq!(
+            default_stream_search_type(Some(SearchEventType::UI)),
+            Some(SearchEventType::UI)
+        );
+    }
 
     #[test]
     fn test_parse_simple_multi_stream_request_use_index() {
