@@ -85,6 +85,8 @@ struct HookCall {
     org_id: String,
     trigger_id: String,
     caller_ip: String,
+    login_ip: Option<String>,
+    user_agent: Option<String>,
     path: String,
     query: Option<String>,
     now_us: i64,
@@ -108,11 +110,25 @@ impl HookCall {
             org_id,
             trigger_id,
             caller_ip: client_ip(ip),
+            login_ip: ip.map(|ip| ip.0.to_string()),
+            user_agent: crate::request::audit_user_agent(req.headers()),
             path: uri.path().to_string(),
             query: uri.query().map(str::to_string),
             now_us: now_micros(),
             poll,
         }
+    }
+
+    fn audit_message(
+        &self,
+        code: u16,
+        body: serde_json::Value,
+    ) -> o2_enterprise::enterprise::common::auditor::AuditMessage {
+        let mut message =
+            enqueue::hook_audit_message(&self.org_id, &self.trigger_id, &self.path, code, body);
+        message.login_ip = self.login_ip.clone();
+        message.user_agent = self.user_agent.clone();
+        message
     }
 }
 
@@ -401,10 +417,7 @@ fn over_limits(call: &HookCall, auth: &Authenticated) -> bool {
 
 async fn dry_run(call: &HookCall, auth: &Authenticated, input: HookInput) -> Response {
     enqueue::write_audit(|| {
-        enqueue::hook_audit_message(
-            &call.org_id,
-            &call.trigger_id,
-            &call.path,
+        call.audit_message(
             StatusCode::OK.as_u16(),
             enqueue::dry_run_audit_body(&auth.credential_prefix, &call.caller_ip),
         )
@@ -460,10 +473,7 @@ async fn answer(call: &HookCall, auth: &Authenticated, outcome: EnqueueOutcome) 
     };
     let status_url = enqueue::status_url(&call.org_id, &call.trigger_id, run_id);
     enqueue::write_audit(|| {
-        enqueue::hook_audit_message(
-            &call.org_id,
-            &call.trigger_id,
-            &call.path,
+        call.audit_message(
             status.as_u16(),
             enqueue::accepted_audit_body(run_id, &auth.credential_prefix, &call.caller_ip, replay),
         )
@@ -618,10 +628,7 @@ async fn note_rejection(call: &HookCall, reason: HookReason) {
         return;
     }
     enqueue::write_audit(|| {
-        enqueue::hook_audit_message(
-            &call.org_id,
-            &call.trigger_id,
-            &call.path,
+        call.audit_message(
             reason.status(),
             serde_json::json!({"rejected": reason.code(), "caller_ip": call.caller_ip}),
         )

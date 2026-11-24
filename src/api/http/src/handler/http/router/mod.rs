@@ -774,6 +774,11 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                     link_id: caller.link_id.clone(),
                     jti: caller.jti.clone(),
                 });
+        let login_ip = request
+            .extensions()
+            .get::<config::axum::middlewares::RealIp>()
+            .map(|ip| ip.0.to_string());
+        let user_agent = openobserve_api_management::request::audit_user_agent(request.headers());
 
         // Extract body
         let (parts, body) = request.into_parts();
@@ -820,8 +825,8 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             });
 
             audit(AuditMessage {
-                login_ip: None,
-                user_agent: None,
+                login_ip,
+                user_agent,
                 user_email,
                 org_id,
                 _timestamp: now_micros(),

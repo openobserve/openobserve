@@ -101,6 +101,8 @@ struct ChatAudit {
     protocol: Protocol,
     body: String,
     delegated: Option<DelegatedAudit>,
+    login_ip: Option<String>,
+    user_agent: Option<String>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -108,6 +110,7 @@ impl ChatAudit {
     /// A Slack turn is audited without the question text, which stays in Slack.
     fn new(
         headers: &axum::http::HeaderMap,
+        login_ip: Option<String>,
         delegated: Option<&DelegatedCaller>,
         user_id: &str,
         org_id: &str,
@@ -136,14 +139,16 @@ impl ChatAudit {
                 link_id: caller.link_id.clone(),
                 jti: caller.jti.clone(),
             }),
+            login_ip,
+            user_agent: crate::request::audit_user_agent(headers),
         }
     }
 
     /// Built here, not by `report_with_protocol`, which has no `delegated` parameter (request 20).
     fn message(&self, code: u16, error_message: Option<String>) -> AuditMessage {
         AuditMessage {
-            login_ip: None,
-            user_agent: None,
+            login_ip: self.login_ip.clone(),
+            user_agent: self.user_agent.clone(),
             user_email: self.user_id.clone(),
             org_id: self.org_id.clone(),
             _timestamp: config::utils::time::now_micros(),
@@ -1087,6 +1092,10 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         let delegated = caller.is_some();
         let audit = ChatAudit::new(
             &parts.headers,
+            parts
+                .extensions
+                .get::<config::axum::middlewares::RealIp>()
+                .map(|ip| ip.0.to_string()),
             caller,
             &user_id,
             &org_id_str,
@@ -2036,6 +2045,7 @@ mod tests {
         let caller = bridge_caller();
         let audit = ChatAudit::new(
             &slack_event_headers(),
+            None,
             Some(&caller),
             "ann@acme.io",
             "prod",
@@ -2056,6 +2066,7 @@ mod tests {
         let caller = bridge_caller();
         let audit = ChatAudit::new(
             &slack_event_headers(),
+            None,
             Some(&caller),
             "ann@acme.io",
             "prod",
@@ -2086,6 +2097,7 @@ mod tests {
         let body = prompt(serde_json::json!({}));
         let audit = ChatAudit::new(
             &slack_event_headers(),
+            None,
             None,
             "ann@acme.io",
             "prod",
