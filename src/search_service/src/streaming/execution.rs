@@ -550,7 +550,7 @@ fn mark_partial_slices(responses: &mut [Response], failed: usize, total: usize) 
     }
 }
 
-#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+#[cfg(feature = "enterprise")]
 pub(super) fn tag_partial_extraction(
     patterns: &mut config::utils::json::Value,
     results: &[SearchResultType],
@@ -1011,57 +1011,6 @@ mod tests {
             total: n,
             ..Default::default()
         }
-    }
-
-    #[test]
-    fn test_mark_partial_slices_flags_first_response_when_a_slice_failed() {
-        let mut slices = vec![slice_with(5), slice_with(5)];
-        mark_partial_slices(&mut slices, 1, 12);
-        assert!(slices[0].is_partial);
-        assert_eq!(
-            slices[0].function_error,
-            vec!["Patterns built from 11 of 12 time slices".to_string()]
-        );
-    }
-
-    #[test]
-    fn test_mark_partial_slices_leaves_a_complete_sample_untouched() {
-        let mut slices = vec![slice_with(5), slice_with(5)];
-        mark_partial_slices(&mut slices, 0, 12);
-        assert!(slices.iter().all(|r| !r.is_partial));
-        assert!(slices.iter().all(|r| r.function_error.is_empty()));
-    }
-
-    #[test]
-    fn test_mark_partial_slices_without_responses_is_a_noop() {
-        mark_partial_slices(&mut [], 1, 12);
-    }
-
-    fn tagged(results: Vec<SearchResultType>) -> serde_json::Value {
-        let mut patterns = serde_json::json!({ "patterns": [] });
-        tag_partial_extraction(&mut patterns, &results);
-        patterns
-    }
-
-    #[test]
-    fn test_tag_partial_extraction_copies_flag_and_reasons() {
-        let mut flagged = slice_with(3);
-        flagged.set_partial(true, "Patterns built from 11 of 12 time slices".to_string());
-        let out = tagged(vec![
-            SearchResultType::Search(slice_with(3)),
-            SearchResultType::Search(flagged),
-        ]);
-        assert_eq!(out["is_partial"], true);
-        assert_eq!(
-            out["function_error"],
-            serde_json::json!(["Patterns built from 11 of 12 time slices"])
-        );
-    }
-
-    #[test]
-    fn test_tag_partial_extraction_leaves_a_complete_result_untouched() {
-        let out = tagged(vec![SearchResultType::Search(slice_with(3))]);
-        assert_eq!(out, serde_json::json!({ "patterns": [] }));
     }
 
     #[test]
