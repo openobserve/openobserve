@@ -2038,6 +2038,33 @@ export class LogsPage {
         }
     }
 
+    // Polling can miss a fast run's loading state, and the previous run's "complete" state and rows stay up until it.
+    async armRunLoadingObserver() {
+        await this.page.evaluate(([runBtn, title]) => {
+            const run = { clicked: false, loading: false };
+            window.__o2LogsRun?.observer.disconnect();
+            run.observer = new MutationObserver(() => {
+                if (!run.clicked || run.loading) return;
+                run.loading = [...document.querySelectorAll(title)].some(
+                    el => el.getClientRects().length > 0 && el.getAttribute('data-search-state') === 'loading'
+                );
+                if (run.loading) run.observer.disconnect();
+            });
+            document.addEventListener('click', e => {
+                if (e.target.closest?.(runBtn)) run.clicked = true;
+            }, { capture: true, once: true });
+            run.observer.observe(document.body, {
+                subtree: true, childList: true, attributes: true, attributeFilter: ['data-search-state'],
+            });
+            window.__o2LogsRun = run;
+        }, [this.queryButton, this.paginationRowCountTitle]);
+    }
+
+    /** Wait until the run clicked after armRunLoadingObserver() has entered its loading state. */
+    async expectRunLoadingObserved(timeout = 30000) {
+        await this.page.waitForFunction(() => window.__o2LogsRun?.loading === true, null, { timeout });
+    }
+
     async clickRunQueryButtonAndVerifyStreamingResponse() {
         const orgName = getOrgIdentifier() || 'default';
         testLogger.debug("[DEBUG] Setting up response listener before clicking run query button");
@@ -2048,6 +2075,7 @@ export class LogsPage {
             return url.includes(`/api/${orgName}/_search`) && method === 'POST';
         });
         
+        await this.armRunLoadingObserver();
         await this.clickRunQueryButton();
         
         const searchResponse = await searchPromise;
@@ -2058,10 +2086,9 @@ export class LogsPage {
         const responseUrl = searchResponse.url();
         if (responseUrl.includes('_search_stream')) {
             testLogger.debug("[DEBUG] Received streaming response (SSE format)");
-            const responseText = await searchResponse.text();
-            testLogger.debug("[DEBUG] Streaming response text (first 200 chars):", responseText.substring(0, 200));
-            expect(responseText).toBeDefined();
-            expect(responseText.length).toBeGreaterThan(0);
+            // The page aborts the SSE fetch, so CDP may drop its body; prove this run settled with rows on screen.
+            await this.expectRunLoadingObserved();
+            expect(await this.getResultHitsCount()).toBeGreaterThan(0);
         } else {
             testLogger.debug("[DEBUG] Received JSON response");
             const searchData = await searchResponse.json();
