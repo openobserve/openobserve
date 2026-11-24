@@ -51,6 +51,9 @@ export class SyntheticsResultsPage {
       evidenceEmpty: '[data-test="synthetics-evidence-empty"]',
       errorBanner: '[data-test="synthetics-run-detail-steps-error-banner"]',
       errorSource: '[data-test="synthetics-run-detail-error-source"]',
+      errorType: '[data-test="synthetics-run-detail-error-type"]',
+      runDetailPage: '[data-test="synthetics-run-detail"]',
+      stepDotCell: '[data-test="o2-table-cell-step"]',
       viewErrorButton: '[data-test="synthetics-run-detail-step-view-error-btn"]',
       errorFullscreen: '[data-test="synthetics-run-detail-step-error-fullscreen"]',
       screenshotThumb: '[data-test="synthetics-run-detail-step-screenshot-thumb"]',
@@ -63,6 +66,7 @@ export class SyntheticsResultsPage {
   }
 
   kpi(key) { return `[data-test="monitor-runs-kpi-${key}"]`; }
+  stepBadge(index) { return `[data-test="synthetics-journey-step-badge-${index}"]`; }
   statusFilter(key) { return `[data-test="monitor-runs-status-filter-${key}"]`; }
   stepErrorCard(rowId) { return `[data-test="synthetics-run-detail-step-error-card-${rowId}"]`; }
   relativePeriod(suffix) { return `[data-test="date-time-relative-${suffix}-btn"]`; }
@@ -87,6 +91,62 @@ export class SyntheticsResultsPage {
     await expect(this.page.locator(this.locators.statusBadge)).toBeVisible({ timeout: 60000 });
     await expect(this.page.locator(this.locators.infoSkeleton)).toHaveCount(0, { timeout: 60000 });
     testLogger.navigation('Synthetics run detail', { checkId, runId, executionId });
+  }
+
+  // No readiness wait here: callers hold the run query back on purpose.
+  async openRunDetailPage(orgId, checkId, runId, executionId) {
+    await this.page.goto(`/web/synthetics/${checkId}/results/run/${runId}/${executionId}?org_identifier=${orgId}`);
+  }
+
+  async holdRunQuery(runId) {
+    let release;
+    let markHeld;
+    const released = new Promise((resolve) => { release = resolve; });
+    const held = new Promise((resolve) => { markHeld = resolve; });
+    await this.page.route(/\/_search/, async (route) => {
+      if (!this.requestNamesRun(route.request(), runId)) return route.continue();
+      markHeld();
+      await released;
+      return route.continue();
+    });
+    return { held, release };
+  }
+
+  // The SQL may be base64-encoded when the org has sql_base64_enabled.
+  requestNamesRun(request, runId) {
+    const raw = request.postData() ?? '';
+    if (raw.includes(runId)) return true;
+    let sql = '';
+    try { sql = String(JSON.parse(raw)?.query?.sql ?? ''); } catch { return false; }
+    return Buffer.from(sql, 'base64').toString('utf-8').includes(runId);
+  }
+
+  // Samples across `ms`, so a badge that renders and then goes away still fails the check.
+  async expectNoStatusBadgeFor(ms) {
+    await expect(this.page.locator(this.locators.runDetailPage)).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.locators.infoSkeleton)).toBeVisible({ timeout: 30000 });
+    const deadline = Date.now() + ms;
+    while (Date.now() < deadline) {
+      expect(await this.page.locator(this.locators.statusBadge).count(), 'no status badge while the run is loading').toBe(0);
+      await this.page.waitForTimeout(250);
+    }
+  }
+
+  async expectErrorHeadline(text) {
+    await expect(this.page.locator(this.locators.errorType)).toHaveText(text, { timeout: 30000 });
+  }
+
+  async expectDrawerErrorHeadline(text) {
+    const drawer = this.page.locator(this.locators.drawer);
+    await expect(drawer).toBeVisible({ timeout: 30000 });
+    await expect(drawer.locator(this.locators.errorType)).toHaveText(text, { timeout: 30000 });
+  }
+
+  stepDotWithBadge(index, badgeText) {
+    const row = this.page.locator(this.locators.row).filter({
+      has: this.page.locator(this.stepBadge(index)).filter({ hasText: badgeText }),
+    });
+    return row.locator(this.locators.stepDotCell).locator('span').first();
   }
 
   async triggerRun() { await this.page.locator(this.locators.triggerRunButton).click(); }

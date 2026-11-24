@@ -33,6 +33,7 @@ const {
   checkPayload,
   request,
   apiBase,
+  seedRuns,
   cleanupWorkerEntities,
 } = require('../utils/synthetics-helpers.js');
 
@@ -300,6 +301,37 @@ test.describe('Synthetics list', { tag: ['@synthetics', '@all'] }, () => {
     await pm.syntheticsListPage.expectRowVisible(a.id);
     await pm.syntheticsListPage.expectRowVisible(b.id);
     await pm.syntheticsListPage.expectRowCount(2);
+  });
+
+  test('status cards above the list filter it to their status', { tag: ['@P1'] }, async ({ page }, testInfo) => {
+    const stem = uniqueName('cards', testInfo);
+    const failing = await createCheck(page, 'http', testInfo, { name: `${stem}_failing` });
+    const passing = await createCheck(page, 'http', testInfo, { name: `${stem}_passing` });
+    testLogger.info('Seeding a failed run and a passed run', { failing: failing.id, passing: passing.id });
+    await seedRuns(page, failing, [{ template: 'http_failed' }]);
+    await seedRuns(page, passing, [{ template: 'http_passed' }]);
+
+    const list = pm.syntheticsListPage;
+    await list.goto(ORG);
+    await list.search(stem);
+    await list.expectRowCount(2);
+
+    testLogger.info('Filtering to failing checks');
+    await list.selectStatusCard('failed');
+    await list.expectStatusCardPressed('passed', false);
+    await list.expectRowVisible(failing.id);
+    await list.expectRowAbsent(passing.id);
+
+    testLogger.info('Filtering to passing checks');
+    await list.selectStatusCard('passed');
+    await list.expectStatusCardPressed('failed', false);
+    await list.expectRowVisible(passing.id);
+    await list.expectRowAbsent(failing.id);
+
+    testLogger.info('Back to every check through Total');
+    await list.selectStatusCard('total');
+    await list.expectStatusCardPressed('passed', false);
+    await list.expectRowCount(2);
   });
 
   test('names render as text, never as markup', { tag: ['@P2'] }, async ({ page }, testInfo) => {

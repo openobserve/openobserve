@@ -16,7 +16,7 @@
 // SyntheticsSettingsPage — Settings → Synthetics Locations (meta org only) and IAM → Synthetics Tokens.
 
 import { expect } from '@playwright/test';
-import { selectOSelectOption } from '../alertsPages/oselectHelpers.js';
+import { openOSelectDropdown, selectOSelectOption } from '../alertsPages/oselectHelpers.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class SyntheticsSettingsPage {
@@ -32,6 +32,8 @@ export class SyntheticsSettingsPage {
       formDrawer: '[data-test="synthetics-location-form-drawer"]',
       labelField: '[data-test="synthetics-location-label-input-field"]',
       providerSelect: '[data-test="synthetics-location-provider-select"]',
+      providerTrigger: '[data-test="synthetics-location-provider-select-trigger"]',
+      providerOption: '[data-test="synthetics-location-provider-select-option"]',
       customProviderField: '[data-test="synthetics-location-custom-provider-input-field"]',
       regionField: '[data-test="synthetics-location-region-input-field"]',
       drawerPrimary: '[data-test="o-drawer-primary-btn"]',
@@ -86,6 +88,22 @@ export class SyntheticsSettingsPage {
     if (provider) await selectOSelectOption(this.page, this.locators.providerSelect, provider);
     if (customProvider !== undefined) await this.page.locator(this.locators.customProviderField).fill(customProvider);
     if (region !== undefined) await this.page.locator(this.locators.regionField).fill(region);
+  }
+
+  async offeredProviders() {
+    await openOSelectDropdown(this.page, this.page.locator(this.locators.providerSelect));
+    const options = this.page.locator(this.locators.providerOption);
+    await expect(options.first()).toBeVisible({ timeout: 15000 });
+    const values = await options.evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-test-value')));
+    await this.page.keyboard.press('Escape');
+    await expect(options).toHaveCount(0, { timeout: 10000 });
+    return values;
+  }
+
+  async expectProviderLocked(label) {
+    const trigger = this.page.locator(this.locators.formDrawer).locator(this.locators.providerTrigger);
+    await expect(trigger).toBeDisabled({ timeout: 15000 });
+    await expect(trigger).toContainText(label);
   }
 
   async submitLocationForm() {

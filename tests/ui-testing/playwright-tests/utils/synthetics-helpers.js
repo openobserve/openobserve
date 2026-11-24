@@ -318,6 +318,37 @@ async function ingestOrThrow(page, stream, records) {
   }
 }
 
+// Resolves on count >= 1, which covers the whole batch because each stream is one ingest call; false is a hard failure.
+async function ingestAndWait(page, check, rows, steps) {
+  await ingestOrThrow(page, RESULTS_STREAM, rows);
+  if (steps.length) await ingestOrThrow(page, STEP_RESULTS_STREAM, steps);
+  const searchable = await waitForFieldValueSearchable(page, RESULTS_STREAM, 'synthetics_id', check.id, SEED_WAIT_MS);
+  if (!searchable) throw new Error(`Seeded rows for ${check.id} never became searchable in ${RESULTS_STREAM}`);
+  if (steps.length) {
+    const stepsSearchable = await waitForFieldValueSearchable(page, STEP_RESULTS_STREAM, 'synthetics_id', check.id, SEED_WAIT_MS);
+    if (!stepsSearchable) throw new Error(`Seeded step rows for ${check.id} never became searchable in ${STEP_RESULTS_STREAM}`);
+  }
+}
+
+async function seedRuns(page, check, runs) {
+  const templates = loadFixture('results.json');
+  const stepTemplates = loadFixture('step-results.json');
+  const nowMs = Date.now();
+  const rows = [];
+  const steps = [];
+  runs.forEach(({ template: key, ageSec = 60, overrides = {} }, i) => {
+    const template = templates[key];
+    if (!template) throw new Error(`fixtures/synthetics/results.json has no "${key}" template`);
+    const built = materialize(template, stepTemplates, check, (nowMs - ageSec * 1000 - i * 250) * 1000);
+    const { step_template: _st, ...row } = { ...built.row, ...overrides };
+    rows.push(row);
+    steps.push(...built.steps);
+  });
+  await ingestAndWait(page, check, rows, steps);
+  testLogger.info('Synthetics runs seeded', { checkId: check.id, count: rows.length });
+  return rows.map((r) => ({ runId: r.run_id, executionId: r.execution_id, timestamp: r._timestamp }));
+}
+
 // Seeds both result streams for one check; row i lands at offsetsMin[i % length] minutes ago with a sub-second spread.
 async function seedResults(page, check, scenario, offsetsMin = [-1, -2, -3]) {
   const templates = loadFixture('results.json');
@@ -336,17 +367,7 @@ async function seedResults(page, check, scenario, offsetsMin = [-1, -2, -3]) {
     steps.push(...built.steps);
   });
 
-  const ingestRows = rows.map(({ key: _key, step_template: _st, ...r }) => r);
-  await ingestOrThrow(page, RESULTS_STREAM, ingestRows);
-  if (steps.length) await ingestOrThrow(page, STEP_RESULTS_STREAM, steps);
-
-  // Resolves on count >= 1, which covers the whole batch because each stream is one ingest call; false is a hard failure.
-  const searchable = await waitForFieldValueSearchable(page, RESULTS_STREAM, 'synthetics_id', check.id, SEED_WAIT_MS);
-  if (!searchable) throw new Error(`Seeded rows for ${check.id} never became searchable in ${RESULTS_STREAM}`);
-  if (steps.length) {
-    const stepsSearchable = await waitForFieldValueSearchable(page, STEP_RESULTS_STREAM, 'synthetics_id', check.id, SEED_WAIT_MS);
-    if (!stepsSearchable) throw new Error(`Seeded step rows for ${check.id} never became searchable in ${STEP_RESULTS_STREAM}`);
-  }
+  await ingestAndWait(page, check, rows.map(({ key: _key, step_template: _st, ...r }) => r), steps);
 
   const pick = (key) => rows.find((r) => r.key === key) ?? null;
   const ref = (r) => r && { runId: r.run_id, executionId: r.execution_id, timestamp: r._timestamp };
@@ -367,6 +388,42 @@ async function seedResults(page, check, scenario, offsetsMin = [-1, -2, -3]) {
   };
   testLogger.info('Synthetics results seeded', { checkId: check.id, scenario, counts: seeded.counts });
   return seeded;
+}
+
+async function createAlertTemplate(page, name, appliesTo = []) {
+  const { status, body } = await request(page, 'post', `${baseUrl()}/api/${getOrgIdentifier()}/alerts/templates`, {
+    name,
+    body: '{"text":"{alert_name}"}',
+    type: 'http',
+    title: '',
+    applies_to: appliesTo,
+  });
+  if (status !== 200) throw new Error(`Template create failed: HTTP ${status} — ${JSON.stringify(body)}`);
+  return name;
+}
+
+// A public reserved host, because the SSRF guard refuses loopback unless the server opts in; disabled checks never send.
+async function createAlertDestination(page, name, template) {
+  const { status, body } = await request(page, 'post', `${baseUrl()}/api/${getOrgIdentifier()}/alerts/destinations`, {
+    name,
+    url: 'https://example.com/synthetics-e2e-never-called',
+    method: 'post',
+    template,
+    type: 'http',
+  });
+  if (status !== 200) throw new Error(`Destination create failed: HTTP ${status} — ${JSON.stringify(body)}`);
+  return name;
+}
+
+// The check that uses a destination must be deleted first, or the server refuses.
+async function deleteAlertDestinationAndTemplate(page, destination, template) {
+  const org = getOrgIdentifier();
+  if (destination) await request(page, 'delete', `${baseUrl()}/api/${org}/alerts/destinations/${encodeURIComponent(destination)}`);
+  if (template) await request(page, 'delete', `${baseUrl()}/api/${org}/alerts/templates/${encodeURIComponent(template)}`);
+}
+
+async function deleteCheck(page, id) {
+  return request(page, 'delete', `${apiBase()}/${id}?folder=default`);
 }
 
 // Skips the shared location because other workers may still be creating checks on it.
@@ -398,5 +455,10 @@ module.exports = {
   createSyntheticsFolder,
   listTokens,
   seedResults,
+  seedRuns,
+  createAlertTemplate,
+  createAlertDestination,
+  deleteAlertDestinationAndTemplate,
+  deleteCheck,
   cleanupWorkerEntities,
 };

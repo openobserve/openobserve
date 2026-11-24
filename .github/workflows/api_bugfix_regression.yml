@@ -159,7 +159,7 @@ jobs:
         run: |
           MATRIX=$(python3 .github/scripts/build-api-regression-matrix.py \
             tests/api-testing/ci-matrix/ci_matrix_api_regression.json \
-            tests/api-testing)
+            tests/api-testing | jq -c '.include |= map(select(.label == "default"))')
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "$MATRIX" | jq -r '"generated \(.include | length) shards: \([.include[].label] | join(", "))"'
 

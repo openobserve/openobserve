@@ -231,3 +231,56 @@ def folder_payload(*, name: str | None = None, description: str = "") -> dict[st
         "name": name or unique_name("folder"),
         "description": description,
     }
+
+
+def synthetics_location_id(prefix: str = "apitest") -> str:
+    # Not `-<digits>`: 3+ dash parts of lowercase letters ending in a numeric part get an `aws-` prefix on check save.
+    return f"{prefix}-{uuid.uuid4().hex[:8]}-loc"
+
+
+def synthetics_location_payload(location_id: str, *, label: str = "API test location") -> dict[str, Any]:
+    """Public probe location create body; public rows are root-only and visible to every org."""
+    return {
+        "kind": "public",
+        "id": location_id,
+        "provider": "apitest",
+        "region": "us-east-1",
+        "label": label,
+        "enabled": True,
+    }
+
+
+def synthetics_check_config(check_type: str) -> dict[str, Any]:
+    configs: dict[str, dict[str, Any]] = {
+        "http": {
+            "method": "GET",
+            "timeout_ms": 10000,
+            "follow_redirects": True,
+            "headers": [],
+            "assertions": [{"field": "status_code", "operator": "eq", "value": 200}],
+        },
+        "tcp": {"port": 443, "timeout_ms": 10000},
+        "tls": {"port": 443, "timeout_ms": 10000, "min_days_until_expiry": 30, "verify_chain": True, "verify_hostname": True},
+        "ssh": {"port": 22, "username": "apitest", "auth": {"type": "password", "secret": ""}, "timeout_ms": 10000},
+        "browser": {
+            "steps": [{"id": "step-navigate", "action": "navigate", "url": "https://example.com"}],
+            "browser_devices": [{"browser": "chromium", "device": "desktop"}],
+        },
+    }
+    return configs[check_type]
+
+
+def synthetics_check_payload(check_type: str, location_id: str, **overrides: Any) -> dict[str, Any]:
+    """Synthetic check create body; disabled so the scheduler never claims it unless a test enables it."""
+    payload: dict[str, Any] = {
+        "name": unique_name(f"synth_api_{check_type}"),
+        "type": check_type,
+        "target": "https://example.com" if check_type in ("http", "browser") else "example.com",
+        "enabled": False,
+        "retries": 0,
+        "locations": [location_id],
+        "frequency": {"type": "minutes", "interval": 5, "cron": ""},
+        "config": synthetics_check_config(check_type),
+    }
+    payload.update(overrides)
+    return payload

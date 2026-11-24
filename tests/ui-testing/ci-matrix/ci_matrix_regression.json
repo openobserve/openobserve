@@ -313,7 +313,12 @@
       "synthetics-15060-full-text-on-hover.spec.js",
       "synthetics-ent2691-destination-delete-guard.spec.js",
       "synthetics-ent3140-run-detail-steps.spec.js",
-      "synthetics-16697-hidden-template-override.spec.js"
+      "synthetics-16697-hidden-template-override.spec.js",
+      "synthetics-16383-schedule-reopen.spec.js",
+      "synthetics-16181-cron-timezone.spec.js",
+      "synthetics-16308-location-provider.spec.js",
+      "synthetics-16327-run-detail-states.spec.js",
+      "synthetics-16493-list-cells.spec.js"
     ],
     "disabled": [],
     "synthetics_enabled": "true",
