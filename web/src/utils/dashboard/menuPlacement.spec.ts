@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { placeMenu } from "./menuPlacement";
+import { keepPlacement, placeMenu } from "./menuPlacement";
 
 const VIEWPORT = { width: 1000, height: 800 };
 const MENU = { width: 280, height: 40 };
@@ -43,5 +43,23 @@ describe("placeMenu", () => {
 
   it("flips both ways in the bottom-right corner", () => {
     expect(placeMenu({ x: 995, y: 795 }, MENU, VIEWPORT)).toEqual({ left: 712, top: 752 });
+  });
+});
+
+describe("keepPlacement", () => {
+  it("a menu flipped above the cursor keeps its top when rows leave its bottom", () => {
+    const placed = placeMenu({ x: 100, y: 790 }, { width: 280, height: 200 }, VIEWPORT);
+    expect(placed).toEqual({ left: 100, top: 590 });
+    // Shorter now: it would fit below the cursor, but it neither re-flips nor moves.
+    expect(
+      keepPlacement(placed.top, { x: 100, y: 790 }, { width: 280, height: 80 }, VIEWPORT),
+    ).toEqual(placed);
+  });
+
+  it("a menu that grows past the bottom edge is pulled up only as far as needed", () => {
+    expect(keepPlacement(700, { x: 100, y: 700 }, { width: 280, height: 150 }, VIEWPORT)).toEqual({
+      left: 100,
+      top: 642,
+    });
   });
 });

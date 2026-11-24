@@ -965,17 +965,17 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.contextMenuVisible).toBe(false);
     });
 
-    it("right-click lists the View rows, a divider, then Create alert", async () => {
+    it("right-click lists Create alert, a divider, then the View rows", async () => {
       asBuild("oss");
       await rightClickPoint({ allowAlertCreation: true });
       const menu = wrapper.find('[data-test="alert-context-menu"]');
       expect(menu.find('[data-test="point-menu-item-view-logs"]').exists()).toBe(true);
       expect(menu.find('[data-test="alert-context-menu-above"]').exists()).toBe(true);
       expect(menu.findComponent({ name: "OSeparator" }).exists()).toBe(true);
-      // The rows come first.
+      // The alert items come first, so rows that resolve or leave change only the bottom.
       const html = menu.html();
-      expect(html.indexOf("point-menu-item-view-logs")).toBeLessThan(
-        html.indexOf("alert-context-menu-above"),
+      expect(html.indexOf("alert-context-menu-above")).toBeLessThan(
+        html.indexOf("point-menu-item-view-logs"),
       );
     });
 

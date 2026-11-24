@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import AlertContextMenu from "./AlertContextMenu.vue";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
@@ -453,14 +453,40 @@ describe("AlertContextMenu Component", () => {
         global: { stubs: { teleport: { template: "<slot />" } } },
       });
 
-    it("lists the rows first, then a divider, then the alert items", () => {
+    it("lists the alert items first, then a divider, then the rows", () => {
       wrapper = mountWithRows();
       const html = wrapper.html();
       expect(wrapper.find("[data-test='row']").exists()).toBe(true);
       expect(wrapper.findComponent({ name: "OSeparator" }).exists()).toBe(true);
-      expect(html.indexOf('data-test="row"')).toBeLessThan(
-        html.indexOf("alert-context-menu-above"),
+      expect(html.indexOf("alert-context-menu-above")).toBeLessThan(
+        html.indexOf('data-test="row"'),
       );
+    });
+
+    it("keeps its corner when the rows change size, instead of re-flipping", async () => {
+      // Near the bottom edge the menu opens above the cursor.
+      const sizes = { width: 280, height: 200 };
+      const restore = [
+        vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(() => sizes.width),
+        vi
+          .spyOn(HTMLElement.prototype, "offsetHeight", "get")
+          .mockImplementation(() => sizes.height),
+      ];
+      try {
+        wrapper = mountWithRows({ visible: false, x: 100, y: window.innerHeight - 10 });
+        await wrapper.setProps({ visible: true });
+        await flushPromises();
+        const top = () => wrapper.find("[data-test='alert-context-menu']").attributes("style");
+        const flipped = top();
+        expect(flipped).toContain(`top: ${window.innerHeight - 10 - 200}px`);
+        // A pending row disappears: the menu is shorter and would now fit below, but it stays.
+        sizes.height = 80;
+        await wrapper.setProps({ contentKey: "rows-changed" });
+        await flushPromises();
+        expect(top()).toBe(flipped);
+      } finally {
+        restore.forEach((spy) => spy.mockRestore());
+      }
     });
 
     it("without alert items it shows only the rows, with no divider", () => {

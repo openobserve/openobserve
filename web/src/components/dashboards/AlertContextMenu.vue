@@ -24,9 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click.stop
       data-test="alert-context-menu"
     >
-      <!-- A chart point's View logs / traces / metrics rows, above the alert items. -->
-      <slot name="points" />
-      <OSeparator v-if="$slots.points && showAlert" class="my-1" />
       <template v-if="showAlert && locked">
         <div
           v-for="item in lockedItems"
@@ -90,6 +87,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</span>
         </div>
       </template>
+      <!-- A chart point's View logs / traces / metrics rows, below the alert items: a row that
+           resolves or disappears changes only the bottom of the menu. -->
+      <OSeparator v-if="$slots.points && showAlert" class="my-1" />
+      <slot name="points" />
     </div>
   </teleport>
 </template>
@@ -100,7 +101,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { useI18nTyped } from "@/types/i18n";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
-import { placeMenu } from "@/utils/dashboard/menuPlacement";
+import { keepPlacement, placeMenu } from "@/utils/dashboard/menuPlacement";
 
 export default defineComponent({
   name: "AlertContextMenu",
@@ -158,11 +159,17 @@ export default defineComponent({
     });
 
     const menuSize = ref({ width: 0, height: 0 });
+    // The top edge the first full-size measure gave the menu. Later size changes (a point row
+    // resolving or leaving) keep it, so the menu never flips up or down and the alert items at its
+    // top stay put.
+    const placedTop = ref<number | null>(null);
+    const viewport = () => ({ width: window.innerWidth, height: window.innerHeight });
     const menuStyle = computed(() => {
-      const { left, top } = placeMenu({ x: props.x, y: props.y }, menuSize.value, {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
+      const click = { x: props.x, y: props.y };
+      const { left, top } =
+        placedTop.value === null
+          ? placeMenu(click, menuSize.value, viewport())
+          : keepPlacement(placedTop.value, click, menuSize.value, viewport());
       return { left: `${left}px`, top: `${top}px` };
     });
 
@@ -241,8 +248,16 @@ export default defineComponent({
         width: menuRef.value?.offsetWidth ?? 0,
         height: menuRef.value?.offsetHeight ?? 0,
       };
+      if (placedTop.value === null && menuSize.value.height > 0) {
+        placedTop.value = placeMenu({ x: props.x, y: props.y }, menuSize.value, viewport()).top;
+      }
     };
     watch([valueText, forecastText, () => props.seriesRole, () => props.contentKey], () => {
+      if (props.visible) measure();
+    });
+    // A new right-click is a new menu: placed afresh at the new cursor.
+    watch([() => props.x, () => props.y], () => {
+      placedTop.value = null;
       if (props.visible) measure();
     });
 
@@ -252,6 +267,7 @@ export default defineComponent({
         if (newVisible) {
           // The size is known only once rendered; until then the menu sits at the click.
           menuSize.value = { width: 0, height: 0 };
+          placedTop.value = null;
           measure();
           setTimeout(() => {
             document.addEventListener("click", handleClickOutside);

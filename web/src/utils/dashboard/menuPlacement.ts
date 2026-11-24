@@ -20,6 +20,8 @@ interface Size {
 
 const MARGIN = 8;
 
+const clamp = (value: number, max: number) => Math.max(MARGIN, Math.min(value, max));
+
 /** Where a menu opened at a click goes: beside the click, flipped left or up where it would leave the viewport. */
 export const placeMenu = (
   click: { x: number; y: number },
@@ -34,3 +36,18 @@ export const placeMenu = (
     top: Math.max(MARGIN, Math.min(top, viewport.height - menu.height - MARGIN)),
   };
 };
+
+/**
+ * A placed menu whose height changed: it keeps its top edge, so its first items stay where they
+ * were and it never flips between above and below the click; pulled up only as far as needed to
+ * stay inside the viewport. Its side of the click is placed afresh, as a wider item may need.
+ */
+export const keepPlacement = (
+  placedTop: number,
+  click: { x: number; y: number },
+  menu: Size,
+  viewport: Size,
+): { left: number; top: number } => ({
+  left: placeMenu(click, menu, viewport).left,
+  top: clamp(placedTop, viewport.height - menu.height - MARGIN),
+});
