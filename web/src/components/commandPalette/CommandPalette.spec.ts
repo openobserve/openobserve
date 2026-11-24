@@ -246,19 +246,13 @@ describe("Command K palette", () => {
       types: ["dashboard"],
     });
   });
-  it("starts each resource group at three and offers no link past the palette", async () => {
+  it("previews three per type with no show more, leaving the type filter to see the rest", async () => {
     await setup();
     await search("payment");
     expect(document.querySelectorAll('[data-test^="command-entry-function:"]')).toHaveLength(3);
-    expect(document.querySelector('a[href*="/search/resources"]')).toBeNull();
-    const more = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find((b) =>
-      b.textContent?.includes("Show more"),
-    )!;
-    more.click();
-    await flushPromises();
-    expect(document.querySelectorAll('[data-test^="command-entry-function:"]')).toHaveLength(6);
+    expect(document.body.textContent).not.toContain("Show more");
   });
-  it("lists every match of a selected type without a show more step", async () => {
+  it("lists every match of a selected type", async () => {
     await setup();
     await search("payment");
     vi.advanceTimersByTime(1);
@@ -267,10 +261,6 @@ describe("Command K palette", () => {
     await vi.advanceTimersByTimeAsync(200);
     await flushPromises();
     expect(document.querySelectorAll('[data-test^="command-entry-function:"]')).toHaveLength(6);
-    const more = Array.from(document.querySelectorAll("button")).some((b) =>
-      b.textContent?.includes("Show more"),
-    );
-    expect(more).toBe(false);
   });
   it("treats a denied source as settled, not as partial results to retry", async () => {
     vi.mocked(resources.search).mockResolvedValue({

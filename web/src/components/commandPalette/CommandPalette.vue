@@ -41,9 +41,6 @@ const peerKinds = computed(() =>
 );
 const query = ref("");
 const type = ref<ResourceKind | "all">("all");
-const expanded = ref<ResourceKind[]>([]);
-// A single selected type is the whole list, so only the mixed view collapses its groups.
-const showsAll = (kind: ResourceKind) => type.value !== "all" || expanded.value.includes(kind);
 const activeKey = ref<string | null>(null);
 const offline = ref(!navigator.onLine);
 const openVersion = ref(0);
@@ -156,7 +153,7 @@ const groups = computed(() =>
   RESOURCE_KINDS.map((kind) => {
     const all = search.data.value?.hits.filter((hit) => hit.type === kind) ?? [];
     const source = search.data.value?.sources.find((s) => s.type === kind);
-    const entries: Entry[] = all.slice(0, showsAll(kind) ? undefined : 3).flatMap((hit) => {
+    const entries: Entry[] = all.slice(0, type.value === "all" ? 3 : undefined).flatMap((hit) => {
       const route = resourceRoute(hit, org.value);
       return route
         ? [
@@ -169,7 +166,7 @@ const groups = computed(() =>
           ]
         : [];
     });
-    return { kind, entries, count: all.length, source };
+    return { kind, entries, source };
   }).filter((g) => g.entries.length || (!!g.source && retryable(g.source))),
 );
 const entries = computed(() => [
@@ -235,7 +232,6 @@ watch(
     if (open) {
       query.value = "";
       type.value = "all";
-      expanded.value = [];
       activeKey.value = null;
       openVersion.value += 1;
     }
@@ -243,7 +239,6 @@ watch(
 );
 watch([query, type, org, subject], () => {
   activeKey.value = null;
-  expanded.value = [];
 });
 watch(type, async () => {
   await nextTick();
@@ -411,13 +406,6 @@ onScopeDispose(() => {
                 >{{ entry.sub }}</OTruncatedText
               ></OButton
             ></RouterLink
-          >
-          <OButton
-            v-if="group.count > 3 && !showsAll(group.kind)"
-            variant="ghost"
-            size="xs"
-            @click="expanded.push(group.kind)"
-            >{{ t("commandPalette.showMore") }}</OButton
           >
           <OText v-if="group.source?.status !== 'complete'" variant="meta" role="status">{{
             group.source?.reason === "loading"
