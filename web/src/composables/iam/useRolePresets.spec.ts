@@ -48,12 +48,14 @@ const MODULES = [
   "sourcemaps",
   "rum_analytics",
   "settings",
+  "logs_unredacted",
 ];
 
 // Mirrors useRolePermissionTree.modifyResourcePermissions for the resources in this fixture.
 const HIDDEN: Record<string, string[]> = {
   settings: ["AllowList", "AllowDelete", "AllowPost"],
   rum_analytics: ["AllowList", "AllowGet"],
+  logs_unredacted: ["AllowList", "AllowDelete", "AllowPost", "AllowPut"],
 };
 
 const node = (
@@ -575,7 +577,8 @@ describe("useRolePresets - stream presets", () => {
     expect(keys).toContain(`settings:${ALL}:AllowGet`);
     expect(keys).not.toContain(`settings:${ALL}:AllowList`);
     expect(keys.some((key) => key.startsWith("rum_analytics:"))).toBe(false);
-    expect(keys).toHaveLength(MODULES.length * 2 - 3);
+    expect(keys.some((key) => key.startsWith("logs_unredacted:"))).toBe(false);
+    expect(keys).toHaveLength(MODULES.length * 2 - 5);
     expect(mockToast).not.toHaveBeenCalled();
   });
 });

@@ -117,6 +117,7 @@ pub async fn get_agent_signals(
         clear_cache: false,
         local_mode: Some(false),
         agent_options: None,
+        raw_streams: None,
     };
 
     let trace_id = config::ider::generate();
@@ -414,6 +415,7 @@ async fn fetch_arm_aggregate(org_id: &str, arm: &CompareArm) -> ArmAggregate {
         clear_cache: false,
         local_mode: Some(false),
         agent_options: None,
+        raw_streams: None,
     };
 
     let trace_id = config::ider::generate();
@@ -479,6 +481,7 @@ async fn fetch_arm_failures(
         clear_cache: false,
         local_mode: Some(false),
         agent_options: None,
+        raw_streams: None,
     };
 
     let trace_id = config::ider::generate();

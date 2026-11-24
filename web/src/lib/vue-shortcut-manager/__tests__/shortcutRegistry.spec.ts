@@ -80,6 +80,7 @@ const GATED_IN_OSS = [
   "shortcuts.pages.llmProviders",
   "shortcuts.pages.aiToolsets",
   "shortcuts.pages.orgManagement",
+  "shortcuts.pages.userManagement",
   "shortcuts.pages.actions",
   "shortcuts.pages.evalTemplates",
   "shortcuts.pages.scorers",
@@ -149,12 +150,17 @@ describe("shortcut cheatsheet OSS gating", () => {
     // Cloud-only pages stay hidden on a pure enterprise build.
     expect(pages.has("shortcuts.pages.iamInvitations")).toBe(false);
     expect(pages.has("shortcuts.pages.orgManagement")).toBe(false);
+    expect(pages.has("shortcuts.pages.userManagement")).toBe(false);
   });
 
   it("shows cloud-only pages on cloud and hides the enterprise-only ones", () => {
     const pages = visiblePages(CLOUD);
     expect(pages.has("shortcuts.pages.iamInvitations")).toBe(true);
     expect(pages.has("shortcuts.pages.orgManagement")).toBe(true);
+    expect(pages.has("shortcuts.pages.userManagement")).toBe(true);
+    expect(visiblePages({ ...CLOUD, isMetaOrg: false }).has("shortcuts.pages.userManagement")).toBe(
+      false,
+    );
     // Enterprise-only pages (incl. _meta-org cluster pages) stay hidden on cloud.
     for (const p of [
       "shortcuts.pages.regexPatterns",

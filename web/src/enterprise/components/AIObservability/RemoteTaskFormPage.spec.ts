@@ -40,7 +40,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...a: any[]) => toast(
 
 import RemoteTaskFormPage from "./RemoteTaskFormPage.vue";
 
-const report = { rawRequest: "{}", rawResponse: "{}", statusCode: 200, latencyMs: 42 };
+const report = { rawRequest: "{}", statusCode: 200, latencyMs: 42 };
 
 function mountForm() {
   return mount(RemoteTaskFormPage, {
@@ -478,7 +478,6 @@ describe("RemoteTaskFormPage — test connection", () => {
           rowId: "sample-0",
           status: "ok",
           rawRequest: "{}",
-          rawResponse: "{}",
           httpStatus: 200,
           latencyMs: 42,
           attempts: 1,
@@ -528,7 +527,6 @@ describe("RemoteTaskFormPage — test connection", () => {
           rowId: "sample-0",
           status: "ok",
           rawRequest: "{}",
-          rawResponse: "{}",
           latencyMs: 5,
           attempts: 1,
         },
@@ -548,7 +546,6 @@ describe("RemoteTaskFormPage — test connection", () => {
           rowId: "sample-0",
           status: "skipped",
           rawRequest: "{}",
-          rawResponse: "{}",
           httpStatus: 200,
           latencyMs: 5,
           attempts: 1,
@@ -570,7 +567,6 @@ describe("RemoteTaskFormPage — test connection", () => {
           rowId: "sample-0",
           status: "error",
           rawRequest: "{}",
-          rawResponse: "",
           httpStatus: 401,
           latencyMs: 5,
           attempts: 1,
@@ -596,7 +592,6 @@ describe("RemoteTaskFormPage — test connection", () => {
           rowId: "sample-0",
           status: "error",
           rawRequest: "{}",
-          rawResponse: "",
           httpStatus,
           latencyMs: 5,
           attempts: 1,

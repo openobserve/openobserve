@@ -142,7 +142,6 @@ pub use config::utils::str::{
     is_valid_email,
 };
 
-#[cfg(feature = "enterprise")]
 pub fn is_ofga_object_visible(
     org_id: &str,
     object_type: &str,

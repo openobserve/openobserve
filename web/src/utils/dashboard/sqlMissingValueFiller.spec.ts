@@ -808,4 +808,46 @@ describe("fillMissingValues", () => {
     expect(catA).toBeDefined();
     expect(catB).toBeDefined();
   });
+
+  it("returns the rows unfilled when an in-range row falls between slots (no breakdown)", () => {
+    const start = Date.UTC(2024, 0, 15, 10, 0, 0);
+    const processedData = [
+      { ts: "2024-01-15T10:00:30", value: 7 },
+      { ts: "2024-01-15T10:01:00", value: 2 },
+    ];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("bar"),
+      makeResultMetaData(60),
+      makeMetadata({ startTime: start * 1000, endTime: (start + 120000) * 1000 }),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      null,
+    );
+
+    expect(result).toEqual(processedData);
+  });
+
+  it("returns the rows unfilled when an in-range row falls between slots (with breakdown)", () => {
+    const start = Date.UTC(2024, 0, 15, 10, 0, 0);
+    const processedData = [
+      { ts: "2024-01-15T10:00:00", service: "api", value: 1 },
+      { ts: "2024-01-15T10:00:30", service: "api", value: 9 },
+    ];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("stacked"),
+      makeResultMetaData(60),
+      makeMetadata({ startTime: start * 1000, endTime: (start + 60000) * 1000 }),
+      ["ts"],
+      ["value"],
+      [],
+      ["service"],
+      null,
+    );
+
+    expect(result).toEqual(processedData);
+  });
 });

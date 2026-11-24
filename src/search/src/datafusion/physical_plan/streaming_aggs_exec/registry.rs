@@ -68,6 +68,29 @@ pub fn get_partition_strategy(id: &str) -> Option<StreamingAggsPartitionStrategy
     GLOBAL_CACHE.id_cache.get_partition_strategy(id)
 }
 
+/// The redaction digest the id's cache key was built with; its searches must match it.
+pub fn set_redaction_digest(id: &str, digest: Option<String>) {
+    GLOBAL_CACHE.id_cache.set_redaction_digest(id, digest);
+}
+
+/// `None` when the id is unknown; `Some(None)` when its cache key holds no protected stream.
+pub fn get_redaction_digest(id: &str) -> Option<Option<String>> {
+    GLOBAL_CACHE
+        .id_cache
+        .get(id)
+        .map(|item| item.redaction_digest)
+}
+
+/// The user whose partition request registered the id; only that user may search with it.
+pub fn set_owner(id: &str, owner: Option<String>) {
+    GLOBAL_CACHE.id_cache.set_owner(id, owner);
+}
+
+/// `None` when the id is unknown; `Some(None)` when it was registered without a user.
+pub fn get_owner(id: &str) -> Option<Option<String>> {
+    GLOBAL_CACHE.id_cache.get(id).map(|item| item.owner)
+}
+
 /// Collected statistics for files
 /// Cache is invalided when file size or last modification has changed
 pub struct StreamingAggsCache {
@@ -248,6 +271,18 @@ impl StreamingIdCache {
             .peek(k)
             .and_then(|v| v.get_partition_strategy())
     }
+
+    pub fn set_redaction_digest(&self, k: &str, digest: Option<String>) {
+        if let Some(item) = self.data.write().get_mut(k) {
+            item.redaction_digest = digest;
+        }
+    }
+
+    pub fn set_owner(&self, k: &str, owner: Option<String>) {
+        if let Some(item) = self.data.write().get_mut(k) {
+            item.owner = owner;
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -259,6 +294,8 @@ pub struct StreamingIdItem {
     cache_file_path: String,
     cache_interval: i64, // Cache interval in minutes
     partition_strategy: Option<StreamingAggsPartitionStrategy>,
+    redaction_digest: Option<String>,
+    owner: Option<String>,
 }
 
 impl StreamingIdItem {
@@ -276,6 +313,8 @@ impl StreamingIdItem {
             cache_file_path,
             cache_interval,
             partition_strategy: None,
+            redaction_digest: None,
+            owner: None,
         }
     }
 
