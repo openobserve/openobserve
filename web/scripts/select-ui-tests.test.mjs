@@ -74,6 +74,13 @@ write({
   "web/src/one.ts": `export const one = import.meta.glob("./one/?.json");`,
   "web/src/one/a.json": "{}",
   "web/src/one.spec.ts": `import { one } from "./one";`,
+  "src/config/parity.json": "{}",
+  "web/src/utils/parity.spec.ts": `import p from "../../../src/config/parity.json";`,
+  "src/config/shared.ts": "export const s = 1;",
+  "src/config/raw.json": "1",
+  "web/src/utils/raw.spec.ts": `import r from "../../../src/config/raw.json?inline";`,
+  "web/index.html": "<html></html>",
+  "web/src/utils/shared.spec.ts": `import { s } from "../../../src/config/shared";`,
 });
 const base = commit();
 
@@ -111,6 +118,42 @@ test("app code loaded by the setup file runs everything", () => {
   assert.equal(r.mode, "full");
   assert.match(r.reason, /^loaded by setupTests for every spec: web\/src\/utils\/q\.ts$/);
   assert.equal(r.setupHits, 1);
+});
+
+test("a changed file outside web/ that a web file imports runs everything", () => {
+  const r = run({
+    "src/config/parity.json": `{"a":1}`,
+    "web/src/utils/a.ts": "export const a = 3;",
+  });
+  assert.equal(r.mode, "full");
+  assert.equal(r.reason, "web/ imports a changed file outside web/: src/config/parity.json");
+});
+
+test("an extensionless import of a changed file outside web/ runs everything", () => {
+  const r = run({
+    "src/config/shared.ts": "export const s = 2;",
+    "web/src/utils/a.ts": "export const a = 3;",
+  });
+  assert.equal(r.reason, "web/ imports a changed file outside web/: src/config/shared.ts");
+});
+
+test("index.html runs everything, since a spec reads it from disk", () => {
+  assert.equal(run({ "web/index.html": "<html>2</html>" }).mode, "full");
+  assert.equal(run({ "web/index.html": null }).mode, "full");
+});
+
+test("a query-suffixed import of a changed file outside web/ runs everything", () => {
+  const r = run({ "src/config/raw.json": "2", "web/.prettierignore": "x" });
+  assert.equal(r.reason, "web/ imports a changed file outside web/: src/config/raw.json");
+});
+
+test("a change outside web/ runs the specs that read files from disk", () => {
+  const r = run({ "src/other/x.rs": "//", "web/.prettierignore": "x" });
+  assert.ok(r.specs.includes(FS_HELPER_SPEC));
+});
+
+test("the shard durations file runs everything", () => {
+  assert.equal(run({ "web/scripts/ui-shard-durations.json": "{" }).mode, "full");
 });
 
 test("an added locale key selects only the specs that read locale files", () => {

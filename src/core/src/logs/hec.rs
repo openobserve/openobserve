@@ -254,6 +254,9 @@ pub async fn preflight_streams(
 /// double-deliver every remote-destination record unless a no-side-effect mode
 /// were threaded through `process_batch` and every node type. Those rejections
 /// are answered from the write outcome instead (code 6 / code 8).
+///
+/// A record over `ZO_COLS_PER_RECORD_LIMIT` is also refused only in the write, on every stream:
+/// UDS packing there can bring it under the limit, so a count here would refuse records it keeps.
 pub async fn preflight_records(
     org_id: &str,
     streams: Vec<(String, Vec<json::Value>)>,

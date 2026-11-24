@@ -1,6 +1,6 @@
 ---
 name: bug-me-not
-description: File a well-structured bug in the right OpenObserve repo (openobserve, or the private repo when a private repo config sits next to this checkout) from a short description and an optional screenshot or recording. Matches the repo's issue template, writes the bug as a prioritised plain-English checklist with collapsed technical details, asks only for the fields you did not give, sets the issue type to Bug, labels it `bug-me-not`, and hands it to autofix triage. Use when the user says "bug-me-not", "file a bug", "raise an issue for this", or "log this bug".
+description: File a well-structured bug in the right OpenObserve repo (openobserve, or the private repo when a private repo config sits next to this checkout), or an infra ticket (environment, cluster, CI runner, cloud, networking/DNS, database or access problem) in the infra repo that config names, from a short description and an optional screenshot or recording. Matches the repo's issue template, writes the bug as a prioritised plain-English checklist with collapsed technical details, asks only for the fields you did not give, sets the issue type to Bug, labels it `bug-me-not`, and hands it to autofix triage; an infra ticket instead follows the infra repo's live issue form and skips `bug-me-not` and triage. Use when the user says "bug-me-not", "file a bug", "raise an issue for this", "log this bug", or "raise an infra ticket".
 ---
 
 # bug-me-not
@@ -9,17 +9,17 @@ Turns "this is broken" plus an optional screenshot or video into a GitHub issue 
 
 ## Input
 
-`[media_path] <description> [repo=openobserve|<private repo name>] [priority=P0|P1|P2|P3] [severity=Blocker|Major|Minor|Trivial] [regression=yes|no]`
+`[media_path] <description> [repo=openobserve|<private repo name>|infra] [priority=P0|P1|P2|P3] [severity=Blocker|Major|Minor|Trivial] [regression=yes|no]`
 
-Only `description` is required. Accept bare tokens (`private P2 Minor no`) or `key=value` pairs; `oss` means openobserve and `private` means the private repo. `media_path` is a screenshot (`.png`/`.jpg`) or recording (`.mov`/`.mp4`); if the user has a file open or selected in the IDE, use that. Remember which fields were given: you ask only for the rest. No description → ask for it first.
+Only `description` is required. Accept bare tokens (`private P2 Minor no`) or `key=value` pairs; `oss` means openobserve, `private` means the private repo, and `infra` means the infra repo (see Infra mode). `media_path` is a screenshot (`.png`/`.jpg`) or recording (`.mov`/`.mp4`); if the user has a file open or selected in the IDE, use that. Remember which fields were given: you ask only for the rest. No description → ask for it first.
 
 ## Repos
 
-Run `"<this checkout>/.claude/skills/bounty-board/scripts/checkouts.sh"`. It prints `openobserve=<path>` and, when a private repo config is found next to this checkout, `private=<path>` and `private_repo=<name>`. Then `cat "<private path>/.claude/bounty-board.private.json"` for the private repo's facts: `repo`, `bug_labels`, `issue_template`, `edition`, `file_here_when`. No config found → only openobserve is available; if the user asked for the private repo, say "no private-repo config found next to this checkout" and stop.
+Run `"<this checkout>/.claude/skills/bounty-board/scripts/checkouts.sh"`. It prints `openobserve=<path>` and, when a private repo config is found next to this checkout, `private=<path>` and `private_repo=<name>`. Then `cat "<private path>/.claude/bounty-board.private.json"` for the private repo's facts: `repo`, `bug_labels`, `issue_template`, `edition`, `file_here_when`, and the optional `infra` block. No config found → only openobserve is available; if the user asked for the private repo, say "no private-repo config found next to this checkout" and stop.
 
 | Repo | Template | Bug label | Edition |
 |---|---|---|---|
-| `openobserve/openobserve` | `.github/ISSUE_TEMPLATE/bug-report-template-latest.yaml` | `☢️ Bug` | `OSS` |
+| `openobserve/openobserve` | `.github/ISSUE_TEMPLATE/1-bug-report.yaml` | `☢️ Bug` | `OSS` |
 | `openobserve/<config repo>` | config `issue_template`, read in the private checkout | first of config `bug_labels` that exists in the repo | config `edition` |
 
 Every issue also gets `bug-me-not`, which is what sends it to autofix triage. Never copy anything from the private config into an openobserve issue.
@@ -30,6 +30,24 @@ GitHub Issue Type is a separate, org-level field, so the same ids work in every 
 `openobserve/openobserve` is public. Never put secrets, tokens, customer data, or internal hostnames in an openobserve issue. If a bug shows up in the open-source UI or flow but is caused by private code, file it in the private repo instead, so openobserve issues never name private paths.
 
 **Security bugs are never filed as issues.** Anything that lets someone bypass auth or RBAC, read or change another org's or user's data, inject code or queries, leak secrets, or crash a server on purpose is a vulnerability: stop before filing, file nothing in any repo, and tell the user to report it privately as `SECURITY.md` says (GitHub → Security → "Report a vulnerability", or security@openobserve.ai). A public issue with **Where:** and **Proposed fix:** would be a disclosure with exploit pointers.
+
+## Infra mode
+
+For a problem with an environment, cluster, CI runners, cloud resources, networking/DNS, database operations or access (or an area in the config's `infra.file_here_when`), not product code, or when the user passes `infra`. The infra repo's facts come only from the private config's `infra` block: `repo`, `file_here_when`, and `forms` (`problem` / `change` / `upgrade` / `access` → form file name). No private config or no `infra` block → say "no infra repo configured next to this checkout" and stop.
+
+Steps 0 and 1, the security rule and the Rules apply unchanged; these steps replace 2 to 7:
+1. **Pick the form.** Something broken → `problem`; a change to existing setup → `change`; a version bump → `upgrade`; access or permissions → `access`. Unsure → ask, your pick first.
+2. **Read it live.** `gh api 'repos/openobserve/<infra repo>/contents/.github/ISSUE_TEMPLATE/<form file>' -q .content | base64 -d`. Take its top-level `title`, `labels` and `type`, and its `body` fields in order, skipping `markdown` blocks.
+3. **Fill the fields** in form order. A dropdown answer is one of the form's exact option labels, never an invented one; a multi-select joins its picks with `, `; a value not in the list → the form's `Other` option plus its "other" input. Choose dropdowns yourself when the description makes them clear (e.g. "blocking" → the most urgent option; an OpenObserve deployment misbehaving on an environment → the cluster option). One `AskUserQuestion` call, only for required fields (`validations.required: true`) still empty. Never invent versions, commits, times or names.
+4. **Write the body.** Each filled field is `### <label>`, a blank line, then the answer; leave out an optional field with no answer. Title: the form's `title` prefix, then the environment and the symptom, e.g. `[Problem]: <env>: <symptom>`. Internal hostnames, pod and environment names belong here because the infra repo is private; secrets and tokens never do.
+5. **Show the draft and wait.** Print the title, labels, type and full body, and name the optional fields left out so the user can add them; create nothing until the user says OK.
+6. **File and set the type.** Write the body to `<tmp>/body.md` and quote as in step 6a. `gh issue create` does not apply the form's labels or type, so pass every form label and then set the type; confirm the PATCH prints the form's `type`.
+   ```bash
+   gh issue create --repo 'openobserve/<infra repo>' --title '<title>' --label '<label 1>' --label '<label 2>' --body-file "<tmp>/body.md"
+   gh api -X PATCH 'repos/openobserve/<infra repo>/issues/<N>' -f type='<form type>' -q '.type.name'
+   ```
+   No `bug-me-not` label and no autofix triage: infra fixes are not code PRs, and labels are never created in another team's repo. If a form label is missing, file without it and say so.
+7. **Report** the issue URL, form, labels and type.
 
 ## Procedure
 
@@ -48,7 +66,7 @@ Shell variables do not survive between Bash tool calls, so commands below use pl
 
 State in one line what you observed. Without media, say the bug was not visually verified.
 
-**2. Pick the repo.** Suggest one from the feature area, leaning toward where the code lives: the private repo when the area matches its config `file_here_when` list or the code you find in step 4 lives in the private checkout; otherwise openobserve (logs, metrics, traces, dashboards, alerts, pipelines, streams, ingestion, RUM, reports, general UI and styling). Without a private config, the answer is always openobserve.
+**2. Pick the repo.** Suggest one from the feature area, leaning toward where the code lives: the private repo when the area matches its config `file_here_when` list or the code you find in step 4 lives in the private checkout; otherwise openobserve (Logs, Metrics, Traces & Profiles · Dashboards & Reports · Alerts, Incidents & SLOs · Ingestion, Streams & Pipelines · RUM, Product Analytics & Synthetics · general UI / Styling). Without a private config, the answer is always openobserve. A problem with an environment, cluster, CI runners, cloud resources, networking/DNS, database operations or access, rather than product code, goes to Infra mode instead.
 
 Never file before the repo is confirmed (step 3), unless the user named it.
 
@@ -57,14 +75,17 @@ Never file before the repo is confirmed (step 3), unless the user named it.
 2. Priority: `P0 - Critical`, `P1 - High`, `P2 - Medium`, `P3 - Low` (suggest P2 for a UI or cosmetic bug).
 3. Severity: `Blocker`, `Major`, `Minor`, `Trivial` (suggest Minor for a UI or cosmetic bug).
 4. Is this a regression?: `No` / `Yes` (default No unless the user said it used to work).
+5. Edition: `OSS` / `Enterprise` / `Cloud`, only when it cannot be inferred (see below).
 
 If everything was given, skip this step.
 
-Pick the affected-functionality checkboxes yourself, never ask: the functional area, plus `UI / Styling` when the bug is visible in the UI. Use the chosen template's exact option labels, read from the template file itself (the `affected-functionalities` checkboxes). openobserve's are: Home & Login · Logs / Metrics / Traces · Dashboards · Alerts · Streams, Pipelines & Functions · Ingestion · Real User Monitoring (RUM) · Reports · IAM & Management · UI / Styling · Unknown / Other. The private template has its own list; never mix the two.
+Pick the affected-functionality checkboxes yourself, never ask: the functional area, plus `UI / Styling` when the bug is visible in the UI; `Unknown / Other` only as a last resort. Use the exact option labels read from the chosen template's `affected-functionalities` checkboxes (both repos share one list). Cheat sheet: Logs, Metrics/PromQL, Traces, Service Graph, Profiles → `Logs, Metrics, Traces & Profiles` · Dashboards, panels, Reports, public links → `Dashboards & Reports` · Alerts, Incidents, SLOs, Downtimes, Workflows, Actions, destinations → `Alerts, Incidents & SLOs` · Ingestion, Streams/schema, Pipelines, Functions, Enrichment tables → `Ingestion, Streams & Pipelines` · RUM, session replay, Product Analytics, Synthetics, Status pages → `RUM, Product Analytics & Synthetics` · Kubernetes/Infra, DB Monitoring, SIEM → `Infra, Database & Security Monitoring` · O2 AI assistant, AutoObserve, AI Observability / LLM Evals → `AI` · Login/SSO, IAM/RBAC, SDR, Orgs, Settings, License, Usage → `Access, Settings & Admin` · speed, storage/compaction, API, Helm, install, upgrade, images → `Platform, Performance & Deployment`.
+
+Pick `Edition` yourself from the environment the user gave: a cloud URL → `Cloud`; an enterprise build or an Enterprise-only feature → `Enterprise`; any other build → `OSS`. Ask only when it cannot be inferred (no environment given and the feature exists in every edition).
 
 **4. Find the code.** For each problem, locate where it happens in the current checkout of the target repo (grep / read, read-only): the file, the function, the mechanism. This feeds the `Where:` line, and it is what autofix triage checks the item against later. If you cannot find it, write what you know and say "not located" rather than guessing a path.
 
-**5. Write the body.** Templates drift; read the chosen repo's live template and follow its labels if they changed. Headings below match the templates as of October 2026.
+**5. Write the body.** Templates drift; read the chosen repo's live template and follow its labels if they changed. Headings below match the templates as of November 2026.
 
 The Bug Description is always a checklist, even for one problem:
 - Each item's visible line is plain English: what the user sees. No code identifiers, paths, function names, or jargon there.
@@ -115,11 +136,14 @@ The Bug Description is always a checklist, even for one problem:
 
 1. <numbered, concrete steps that lead to the bug>
 
+### Edition
+
+<OSS | Enterprise | Cloud>
+
 ### Environment Details
 
 ```yaml
 Version: <from the About page if visible, else Unknown>
-Edition: <the repo's edition from the table above>
 Environment: <env or URL if visible, else omit the line>
 OS: <if known, else Unknown>
 Browser: <if known, else Unknown>
@@ -154,7 +178,7 @@ c. Run autofix triage on the new issue: follow `/bounty-board triage <REPO> <N>`
 **7. Report.**
 - The issue URL.
 - One line on what you verified from the media, or that it was text-only.
-- Repo, priority, severity, regression, affected areas.
+- Repo, edition, priority, severity, regression, affected areas.
 - The triage outcome: posted (accepted items or declined), skipped by the user, or not run and why.
 - Media: `gh` cannot upload images or videos. Give the original media path and ask the user to drag it into the issue. Offer `open <media>` and `gh issue view <N> --repo 'openobserve/<REPO>' --web` so both are ready side by side.
 
@@ -163,3 +187,4 @@ c. Run autofix triage on the new issue: follow `/bounty-board triage <REPO> <N>`
 - Never close an issue, and never tick an issue's checkboxes; those are for whoever fixes the item.
 - One issue per run. Several problems in the same area go in one checklist; unrelated problems are separate runs.
 - Never create or rename labels unless the user asks.
+- Nothing you file carries AI attribution (`Claude`, "Generated with", 🤖, `Co-Authored-By`) or names a colleague, except a handle the user gives for a form field that asks for one, such as an approver.

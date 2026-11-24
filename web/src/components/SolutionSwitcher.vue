@@ -74,10 +74,10 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
         size="sm"
         :icon-left="current.icon"
         icon-right="expand-more"
-        class="font-semibold tracking-tight md:max-xl:max-w-full md:max-xl:min-w-0"
+        class="font-semibold tracking-tight max-xl:max-w-full max-xl:min-w-0"
         data-test="solution-switcher"
       >
-        <span class="md:max-xl:truncate">{{ t(current.labelKey) }}</span>
+        <span class="max-xl:truncate max-md:sr-only">{{ t(current.labelKey) }}</span>
         <BetaBadge
           v-if="securityAlpha && current.key === 'security'"
           stage="alpha"

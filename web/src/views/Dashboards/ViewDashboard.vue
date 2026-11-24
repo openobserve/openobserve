@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   :variant="refreshOptionsVariant"
                   size="icon-toolbar"
-                  class="w-5"
+                  class="w-6"
                   :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
                   data-test="dashboard-refresh-options-btn"
                   icon-left="arrow-drop-down"
@@ -1324,16 +1324,23 @@ export default defineComponent({
         }
       }
 
+      // Saves are scoped to the folder in the URL, so a link without one could open but never save.
+      if (!route.query.folder) {
+        if (playlistReporters.missing("notFound")) return;
+        showErrorNotification(t("dashboard.viewDashboard.failedToLoadDashboard"));
+        router.replace({
+          path: "/dashboards",
+          query: { folder: "default", org_identifier: store.state.selectedOrganization.identifier },
+        });
+        return;
+      }
+
       const recentScope = captureRecentVisitScope();
       const recentId = String(route.query.dashboard ?? "");
-      const recentFolder = String(route.query.folder ?? "default");
+      const recentFolder = String(route.query.folder);
       let dashboard;
       try {
-        dashboard = await getDashboard(
-          store,
-          route.query.dashboard,
-          route.query.folder ?? "default",
-        );
+        dashboard = await getDashboard(store, route.query.dashboard, route.query.folder);
 
         if (!dashboard || typeof dashboard !== "object" || !Object.keys(dashboard).length) {
           if (playlistReporters.missing("notFound")) return;

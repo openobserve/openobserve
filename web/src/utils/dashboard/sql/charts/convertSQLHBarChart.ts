@@ -16,6 +16,7 @@
 import { calculateWidthText } from "../../chartDimensionUtils";
 import { getAxisLabel } from "../../fieldLabel";
 import { largestLabel } from "../shared/contextBuilder";
+import { breakdownValueLabel } from "../../sqlProcessData";
 import { type SQLContext } from "../shared/types";
 import { barStyleSeriesProps, barTrackMax, pinBarTrackAxis, seriesDataMax } from "../../barTrack";
 
@@ -71,7 +72,10 @@ export function applyHBarChart(ctx: SQLContext): void {
     // breakDownKeys will be 0 or 1
     const breakDownMaxLabel =
       calculateWidthText(
-        breakDownKeys.reduce((str: any, it: any) => largestLabel(getAxisDataFromKey(it)), ""),
+        breakDownKeys.reduce(
+          (str: any, it: any) => largestLabel(getAxisDataFromKey(it).map(breakdownValueLabel)),
+          "",
+        ),
       ) + 16;
 
     options.yAxis.forEach((it: any) => {
