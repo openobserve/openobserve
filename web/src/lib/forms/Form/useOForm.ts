@@ -45,6 +45,8 @@ export interface UseOFormOptions<T extends Record<string, unknown>> {
    * TanStack's `isSubmitting` true for the whole save (drives the Save spinner).
    */
   onSubmit?: (_values: T) => unknown | Promise<unknown>;
+  /** Runs when a submit is rejected by validation, e.g. to bring an error the fields can't mark into view. */
+  onSubmitInvalid?: () => void;
   /** `"leave"` shows a changed field's error when the user leaves it; `"submit"` (default) waits for the first submit. */
   validateOn?: FormValidateOn;
   /** Groups of fields checked together (leave mode); a shared message prints once, on each group's last member. */
@@ -99,6 +101,7 @@ export function useOForm<T extends Record<string, unknown>>(options: UseOFormOpt
     onSubmit: async ({ value }) => {
       await options.onSubmit?.(value as T);
     },
+    onSubmitInvalid: () => options.onSubmitInvalid?.(),
   });
   if (onLeave) {
     trackLeaveDisplay(form as unknown as LeaveTrackedForm, (options.coupled ?? []) as string[][]);

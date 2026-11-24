@@ -142,6 +142,7 @@ defineExpose<FilterBuilderExpose>({ focus, validate });
       v-if="groupMessages.length"
       class="text-input-error-text flex flex-col text-xs"
       role="alert"
+      data-error="true"
       :data-test="`${dataTest}-issues`"
     >
       <span v-for="message in groupMessages" :key="message">{{ message }}</span>
