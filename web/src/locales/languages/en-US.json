@@ -26763,7 +26763,8 @@
       "reload": "Refresh",
       "lastRefreshed": "Last refreshed {age}",
       "loadFailed": "Could not load database data. Try again, or narrow the time range.",
-      "actions": "Actions"
+      "actions": "Actions",
+      "createAlert": "Create Alert"
     },
     "header": {
       "title": "Databases",
@@ -26826,7 +26827,7 @@
         "p99": "Slowest 1%",
         "services": "Used by",
         "load": "Database time",
-        "attention": "Needs attention"
+        "attention": "Health"
       },
       "summary": {
         "databases": "Databases",
@@ -26836,9 +26837,11 @@
       },
       "databaseCount": "1 database | {count} databases",
       "openQueries": "See its queries",
+      "openTopQueries": "Open Top Queries",
       "viewMetrics": "View metrics",
       "alertMe": "Alert me",
       "columnHints": {
+        "instance": "Expand a database to see its schemas, then the apps that query each schema.",
         "qps": "Calls per second — this window's calls divided by its length, so a 15-minute view and a 4-hour view stay comparable.",
         "p50": "Half of all calls finished faster than this. Measured from completed calls in your application's traces.",
         "p95": "The slow tail — 1 call in 20 took at least this long. Measured from completed calls in your application's traces.",
@@ -27027,6 +27030,9 @@
     },
     "breakdown": {
       "loading": "Working out where the time went…",
+      "kindApp": "App",
+      "kindSchema": "Schema",
+      "shareOf": "Share of {parent}",
       "noSchema": "No schema reported",
       "noService": "Caller not identified",
       "nothingToAttribute": "We have this database's totals but no per-query rows in this range, so we can't say which service spent the time.",
@@ -27882,6 +27888,18 @@
       "columnHint": "Connections against the limit, from the metrics your collector already sends. Blank until a receiver reports this instance.",
       "connectionsOf": "{used} of {limit} connections",
       "connectionsNoLimit": "{used} connections",
+      "connectionsIssue": "{percent} connections",
+      "connectionsInUse": "{percent} of connections in use",
+      "connectionsOfPercent": "{used} of {limit} ({percent})",
+      "rowConnections": "Connections",
+      "rowCacheHit": "Cache hit",
+      "rowDeadlocks": "Deadlocks",
+      "status": {
+        "healthy": "Healthy",
+        "warning": "Warning",
+        "critical": "Critical",
+        "issues": "{count} issue | {count} issues"
+      },
       "noLimitHint": "The receiver for this engine does not publish a connection limit on its own, so only the count is shown. The setup card's connection-limit recipe (sqlquery/mysql_limits) collects max_connections and turns this into a percentage.",
       "trendLabel": "Connections across the selected window",
       "cacheHit": "Cache hit {percent}",

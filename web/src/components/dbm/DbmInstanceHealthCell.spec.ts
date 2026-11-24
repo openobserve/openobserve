@@ -14,12 +14,21 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
 import { absentMetrics, type DbmRowMetrics } from "@/utils/dbm/instanceMetrics";
 
 import DbmInstanceHealthCell from "./DbmInstanceHealthCell.vue";
+
+// The real tooltip portals its body only while open; render it inline instead.
+vi.mock("@/lib/overlay/Tooltip/OTooltip.vue", () => ({
+  default: {
+    name: "OTooltip",
+    props: ["content"],
+    template: '<div data-test="tip">{{ content }}<slot name="content" /></div>',
+  },
+}));
 
 type CellMetrics = DbmRowMetrics & { engine?: string };
 
@@ -54,8 +63,8 @@ describe("DbmInstanceHealthCell", () => {
 
   it("still shows the count behind the percentage, so the figure is checkable", () => {
     const wrapper = mountWith(metrics());
-    expect(wrapper.text()).toContain("20");
-    expect(wrapper.text()).toContain("100");
+    const tip = wrapper.find("[data-test='tip']").text();
+    expect(tip).toContain("20 of 100 (20%)");
   });
 
   // Every MySQL instance is permanently in this state, because mysqlreceiver
@@ -107,7 +116,7 @@ describe("DbmInstanceHealthCell", () => {
         saturation: { state: "no-limit", used: 20, limit: null, ratio: null },
       }),
     );
-    const hint = wrapper.findComponent({ name: "OTooltip" }).props("content") as string;
+    const hint = wrapper.find("[data-test='tip']").text();
     expect(hint).not.toContain("does not publish");
     // ...and still says SOMETHING, because a bare count with no explanation is
     // the silence this column exists to avoid.
@@ -126,7 +135,7 @@ describe("DbmInstanceHealthCell", () => {
         saturation: { state: "no-limit", used: 20, limit: null, ratio: null },
       }),
     );
-    const hint = wrapper.findComponent({ name: "OTooltip" }).props("content") as string;
+    const hint = wrapper.find("[data-test='tip']").text();
     expect(hint).toContain("does not publish");
     expect(hint).toMatch(/recipe|mysql_limits/i);
     expect(hint).toContain("max_connections");
@@ -146,21 +155,24 @@ describe("DbmInstanceHealthCell", () => {
       }),
     );
     expect(wrapper.text()).toContain("26%");
-    expect(wrapper.text()).toContain("40");
-    expect(wrapper.text()).toContain("151");
+    expect(wrapper.find("[data-test='tip']").text()).toContain("40 of 151");
   });
 
   // Four metric streams are read for these. Computing them and rendering
   // nothing is a round trip per stream spent on nothing.
   it("shows the cache hit ratio the read paid for", () => {
-    expect(mountWith(metrics({ cacheHitRatio: 0.9 })).text()).toContain("90");
+    expect(
+      mountWith(metrics({ cacheHitRatio: 0.9 }))
+        .find("[data-test='tip']")
+        .text(),
+    ).toMatch(/Cache hit\s*90%/);
   });
 
   it("shows replication lag in BYTES for Postgres", () => {
     const wrapper = mountWith(
       metrics({ engine: "postgresql", replicationLag: { value: 4096, unit: "bytes" } }),
     );
-    expect(wrapper.find("[data-test='dbm-instance-health-lag']").text()).toMatch(/KB|B\b/);
+    expect(wrapper.find("[data-test='tip']").text()).toMatch(/KB|B\b/);
   });
 
   // Same role, other unit. Printing "4 KB behind" for a replica 4096 seconds
@@ -169,7 +181,7 @@ describe("DbmInstanceHealthCell", () => {
     const wrapper = mountWith(
       metrics({ engine: "mysql", replicationLag: { value: 4096, unit: "seconds" } }),
     );
-    const text = wrapper.find("[data-test='dbm-instance-health-lag']").text();
+    const text = wrapper.find("[data-test='tip']").text();
     expect(text).not.toMatch(/KB|MB/);
   });
 
@@ -225,14 +237,14 @@ describe("DbmInstanceHealthCell", () => {
   // not a decoration.
   it("draws the connection trend when there is a series to draw", () => {
     const wrapper = mountWith(metrics());
-    expect(wrapper.find("[data-test='dbm-instance-health-trend-sparkline']").exists()).toBe(true);
+    expect(wrapper.find("[data-test='dbm-databases-health-trend-sparkline']").exists()).toBe(true);
   });
 
   it("draws no trend when only one reading exists — two points make a trend", () => {
     const wrapper = mountWith(
       metrics({ connectionSeries: [20], connectionPoints: [{ timestamp: 1, value: 20 }] }),
     );
-    expect(wrapper.find("[data-test='dbm-instance-health-trend-sparkline']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='dbm-databases-health-trend-sparkline']").exists()).toBe(false);
   });
 
   it("warns once saturation is high, so a row near its limit stands out", () => {

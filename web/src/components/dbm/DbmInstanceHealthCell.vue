@@ -44,83 +44,98 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="flex min-w-0 flex-col items-end gap-0.5"
+    class="flex min-h-9 min-w-0 flex-col items-start justify-center gap-0.5"
     :data-test="dataTest"
     :data-test-tone="tone"
     :data-test-unmatched="metrics.unmatchedReason ?? undefined"
   >
-    <template v-if="metrics.saturation.state === 'measured'">
-      <div class="flex items-center gap-1.5">
-        <OSparkline
-          v-if="hasTrend"
-          :points="trendPoints"
-          shape="area"
-          :tone="tone"
-          size="xs"
-          :aria-label="t('dbm.instanceMetrics.trendLabel')"
-          data-test="dbm-instance-health-trend"
-        />
-        <span class="font-mono text-xs font-medium tabular-nums" :class="ratioToneClass">
-          {{ formatPercent(metrics.saturation.ratio, 0) }}
-        </span>
+    <template v-if="hasReading">
+      <!-- Status and its detail on the left; the trend on the right at full cell height, so the detail never wraps under it. -->
+      <div class="flex w-full min-w-0 items-center gap-2">
+        <div class="flex w-40 min-w-0 shrink-0 flex-col items-start gap-0.5">
+          <OTag
+            :variant="statusVariant"
+            size="xs"
+            shape="rounded"
+            data-test="dbm-databases-health-status"
+          >
+            {{ statusLabel }}
+          </OTag>
+          <div
+            v-if="issues.length"
+            class="flex min-w-0 items-center gap-x-1 truncate text-xs"
+            :class="isCritical ? 'text-status-error-text' : 'text-status-warning-text'"
+            data-test="dbm-databases-health-issues"
+          >
+            <template v-for="(item, index) in issues" :key="item.id">
+              <span v-if="index > 0" aria-hidden="true">{{ raw("·") }}</span>
+              <span :data-test="`dbm-instance-health-${item.id}`">{{ item.label }}</span>
+            </template>
+          </div>
+          <span v-else class="text-text-secondary text-xs" data-test="dbm-databases-health-fact">
+            {{ inlineLabel }}
+          </span>
+        </div>
+        <div v-if="hasTrend" class="w-24 shrink-0">
+          <OSparkline
+            :points="trendPoints"
+            shape="area"
+            :tone="tone"
+            size="sm"
+            :aria-label="t('dbm.instanceMetrics.trendLabel')"
+            data-test="dbm-databases-health-trend"
+          />
+        </div>
       </div>
-      <span class="text-text-secondary text-3xs font-mono tabular-nums">
-        {{ connectionsLabel }}
-      </span>
-    </template>
 
-    <!-- A count with no denominator. Shown, but never as a share of anything. -->
-    <template v-else-if="metrics.saturation.state === 'no-limit'">
-      <div class="flex items-center gap-1.5">
-        <OSparkline
-          v-if="hasTrend"
-          :points="trendPoints"
-          shape="area"
-          tone="default"
-          size="xs"
-          :aria-label="t('dbm.instanceMetrics.trendLabel')"
-          data-test="dbm-instance-health-trend"
-        />
-        <span class="text-text-body font-mono text-xs tabular-nums">
-          {{ formatCount(metrics.saturation.used) }}
-        </span>
-      </div>
-      <span class="text-text-secondary text-3xs">{{ connectionsLabel }}</span>
-      <OTooltip side="left" :content="noLimitHint" />
+      <!-- The numbers live here, so the row stays calm. -->
+      <OTooltip side="left">
+        <template #content>
+          <div
+            class="grid grid-cols-[auto_auto] gap-x-4 gap-y-1 text-xs"
+            data-test="dbm-databases-health-tooltip"
+          >
+            <span class="text-text-secondary">{{ t("dbm.instanceMetrics.rowConnections") }}</span>
+            <span class="text-right">{{ connectionsValue }}</span>
+            <template v-if="metrics.cacheHitRatio !== null">
+              <span class="text-text-secondary">{{ t("dbm.instanceMetrics.rowCacheHit") }}</span>
+              <span
+                class="text-right"
+                :class="cacheIsIssue ? 'text-status-warning-text' : undefined"
+                >{{ formatPercent(metrics.cacheHitRatio, 0) }}</span
+              >
+            </template>
+            <template v-if="metrics.deadlocks !== null">
+              <span class="text-text-secondary">{{ t("dbm.instanceMetrics.rowDeadlocks") }}</span>
+              <span
+                class="text-right"
+                :class="metrics.deadlocks > 0 ? 'text-status-error-text' : undefined"
+                >{{ metrics.deadlocks }}</span
+              >
+            </template>
+            <span class="text-text-secondary">{{ t("dbm.instanceMetrics.lagLabel") }}</span>
+            <span class="text-right">{{ lagValue }}</span>
+            <span
+              v-if="metrics.saturation.state === 'no-limit'"
+              class="text-text-secondary col-span-2"
+              >{{ noLimitHint }}</span
+            >
+          </div>
+        </template>
+      </OTooltip>
     </template>
 
     <!-- Nothing to show, and always a reason why — in the TOOLTIP, not on the
-         row. A visible sentence under every dash would, on the common fleets
-         (a pooler, one engine with no receiver), turn the whole column into
-         one truncated sentence repeated per row: noise wearing the costume of
-         honesty. The dash keeps the per-row hover explanation, and the column
-         header's own hint carries the fresh-install story once. -->
+         row, so a fleet of dashes does not become one sentence repeated. -->
     <template v-else>
       <span
-        class="text-text-muted font-mono text-xs"
+        class="text-text-muted text-xs"
         data-test="dbm-instance-health-reason"
         :data-test-reason-label="absence.label"
         >{{ raw("—") }}</span
       >
       <OTooltip side="left" :content="absenceTooltip" />
     </template>
-
-    <!-- The rest of what the receiver sent. Each appears only when it says
-         something: a cache ratio nobody measured, a replica with no lag metric
-         and a database with no deadlocks are all silence, not zeroes. -->
-    <div
-      v-if="secondary.length"
-      class="text-text-secondary text-3xs flex flex-wrap items-center justify-end gap-1.5"
-    >
-      <span
-        v-for="item in secondary"
-        :key="item.id"
-        :class="item.tone"
-        :data-test="`dbm-instance-health-${item.id}`"
-      >
-        {{ item.label }}
-      </span>
-    </div>
   </div>
 </template>
 
@@ -129,6 +144,7 @@ import { computed } from "vue";
 
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
 import type { SparklinePoint } from "@/lib/data/Sparkline/OSparkline.types";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatCount, formatLagBytes, formatLagSeconds, formatPercent } from "@/utils/dbm/format";
@@ -172,8 +188,9 @@ const tone = computed(() => {
   return ratio !== null && ratio >= SATURATION_DANGER ? "danger" : "default";
 });
 
-const ratioToneClass = computed(() =>
-  tone.value === "danger" ? "text-status-error-text" : "text-text-heading",
+const hasReading = computed(
+  () =>
+    props.metrics.saturation.state === "measured" || props.metrics.saturation.state === "no-limit",
 );
 
 // Gated on the same array `trendPoints` reads: the two must agree, or the
@@ -200,14 +217,24 @@ const trendPoints = computed<SparklinePoint[]>(() => {
   return out;
 });
 
-const connectionsLabel = computed<I18nText>(() =>
-  props.metrics.saturation.limit === null
-    ? t("dbm.instanceMetrics.connectionsNoLimit", {
-        used: formatCount(props.metrics.saturation.used),
+const connectionsValue = computed<I18nText>(() => {
+  const { used, limit, ratio } = props.metrics.saturation;
+  return limit === null || ratio === null
+    ? raw(formatCount(used))
+    : t("dbm.instanceMetrics.connectionsOfPercent", {
+        used: formatCount(used),
+        limit: formatCount(limit),
+        percent: formatPercent(ratio, 0),
+      });
+});
+
+const inlineLabel = computed<I18nText>(() =>
+  props.metrics.saturation.ratio !== null
+    ? t("dbm.instanceMetrics.connectionsIssue", {
+        percent: formatPercent(props.metrics.saturation.ratio, 0),
       })
-    : t("dbm.instanceMetrics.connectionsOf", {
+    : t("dbm.instanceMetrics.connectionsNoLimit", {
         used: formatCount(props.metrics.saturation.used),
-        limit: formatCount(props.metrics.saturation.limit),
       }),
 );
 
@@ -290,42 +317,66 @@ const absenceTooltip = computed<I18nText>(() =>
 /** Below this, the database is going to disk for most of its reads. */
 const CACHE_HIT_POOR = 0.9;
 
-/**
- * Cache hit, replication lag and deadlocks. Each is read from its own stream
- * and each is opt-in upstream, so most rows show none of them — which is why
- * they are a wrapping list rather than three fixed slots.
- */
-const secondary = computed(() => {
-  const items: { id: string; label: I18nText; tone: string }[] = [];
-  const { cacheHitRatio, replicationLag, deadlocks } = props.metrics;
+const cacheLabel = computed<I18nText>(() =>
+  t("dbm.instanceMetrics.cacheHit", { percent: formatPercent(props.metrics.cacheHitRatio, 0) }),
+);
 
-  if (cacheHitRatio !== null) {
+const lagValue = computed<string>(() => {
+  const lag = props.metrics.replicationLag;
+  if (lag === null) return "—";
+  return lag.unit === "seconds" ? formatLagSeconds(lag.value) : formatLagBytes(lag.value);
+});
+
+const cacheIsIssue = computed(
+  () => props.metrics.cacheHitRatio !== null && props.metrics.cacheHitRatio < CACHE_HIT_POOR,
+);
+
+const deadlocksLabel = computed<I18nText>(() =>
+  t(
+    "dbm.instanceMetrics.deadlocks",
+    { count: props.metrics.deadlocks ?? 0 },
+    props.metrics.deadlocks ?? 0,
+  ),
+);
+
+/**
+ * What is wrong, from the same colour rules this cell always used: connections
+ * at the danger line and deadlocks are errors, a poor cache hit is a warning.
+ * Replication lag has no threshold, so it is never an issue.
+ */
+const issues = computed(() => {
+  const items: { id: string; label: I18nText; severity: "error" | "warning" }[] = [];
+  const { cacheHitRatio, deadlocks, saturation } = props.metrics;
+  if (saturation.ratio !== null && saturation.ratio >= SATURATION_DANGER) {
     items.push({
-      id: "cache",
-      label: t("dbm.instanceMetrics.cacheHit", { percent: formatPercent(cacheHitRatio, 0) }),
-      // A database reading most of its blocks from disk is the finding here.
-      tone: cacheHitRatio < CACHE_HIT_POOR ? "text-status-warning-text" : "",
+      id: "connections",
+      label: t("dbm.instanceMetrics.connectionsIssue", {
+        percent: formatPercent(saturation.ratio, 0),
+      }),
+      severity: "error",
     });
   }
-  if (replicationLag !== null) {
-    items.push({
-      id: "lag",
-      label:
-        replicationLag.unit === "seconds"
-          ? t("dbm.instanceMetrics.lagSeconds", { value: formatLagSeconds(replicationLag.value) })
-          : t("dbm.instanceMetrics.lagBytes", { value: formatLagBytes(replicationLag.value) }),
-      tone: "",
-    });
+  if (cacheHitRatio !== null && cacheHitRatio < CACHE_HIT_POOR) {
+    items.push({ id: "cache", label: cacheLabel.value, severity: "warning" });
   }
-  // Zero deadlocks is the ordinary state of a healthy database, and a chip on
-  // every row is noise rather than signal.
   if (deadlocks !== null && deadlocks > 0) {
-    items.push({
-      id: "deadlocks",
-      label: t("dbm.instanceMetrics.deadlocks", { count: deadlocks }, deadlocks),
-      tone: "text-status-error-text",
-    });
+    items.push({ id: "deadlocks", label: deadlocksLabel.value, severity: "error" });
   }
   return items;
+});
+
+const isCritical = computed(() => issues.value.some((item) => item.severity === "error"));
+
+const statusVariant = computed(() =>
+  isCritical.value ? "error-soft" : issues.value.length ? "warning-soft" : "success-soft",
+);
+
+const statusLabel = computed<I18nText>(() => {
+  if (!issues.value.length) return t("dbm.instanceMetrics.status.healthy");
+  const word = isCritical.value
+    ? t("dbm.instanceMetrics.status.critical")
+    : t("dbm.instanceMetrics.status.warning");
+  const count = issues.value.length;
+  return raw(`${word} · ${t("dbm.instanceMetrics.status.issues", { count }, count)}`);
 });
 </script>
