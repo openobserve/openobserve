@@ -1240,10 +1240,14 @@ export default defineComponent({
     let stopHistoryRestore: (() => void) | undefined;
     onMounted(() => {
       registerBeforeAppReload();
-      stopHistoryRestore = useLogsHistoryRestore(router, () => {
-        replaceNextLogsWrite();
-        requestLogsReapply(true, "url");
-      });
+      stopHistoryRestore = useLogsHistoryRestore(
+        router,
+        () => {
+          replaceNextLogsWrite();
+          requestLogsReapply(true, "url");
+        },
+        () => searchObj.data.stream.selectedStream.join(","),
+      );
     });
 
     onActivated(() => {

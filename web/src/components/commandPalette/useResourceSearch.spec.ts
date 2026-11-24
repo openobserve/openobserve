@@ -156,6 +156,35 @@ describe("Command K search lifecycle", () => {
     await flushPromises();
     expect(s.search.data.value?.hits.map((hit) => hit.id)).toEqual(["d"]);
   });
+  it("ignores a poll answer that lands after a fresh fetch", async () => {
+    vi.useFakeTimers();
+    let finishPoll!: (value: ResourceSearchResponse) => void;
+    const fresh: ResourceSearchResponse = {
+      hits: [{ type: "function", id: "new", name: "pay", route_ref: { function_name: "new" } }],
+      sources: [{ type: "function", status: "complete", has_more: false }],
+      took_ms: 0,
+    };
+    vi.mocked(resources.search)
+      .mockResolvedValueOnce({
+        hits: [],
+        sources: [{ type: "function", status: "unavailable", has_more: null, reason: "loading" }],
+        took_ms: 0,
+      })
+      .mockReturnValueOnce(new Promise((resolve) => (finishPoll = resolve)) as never)
+      .mockResolvedValue(fresh);
+    const s = setup("function");
+    await typeQuery(s, "pay");
+    await vi.advanceTimersByTimeAsync(1000);
+    await s.search.refetch();
+    await flushPromises();
+    finishPoll({
+      hits: [],
+      sources: [{ type: "function", status: "unavailable", has_more: null, reason: "loading" }],
+      took_ms: 0,
+    });
+    await flushPromises();
+    expect(s.search.data.value?.hits.map((hit) => hit.id)).toEqual(["new"]);
+  });
   it("cancels a request on identity switch and never shows the old account result", async () => {
     vi.useFakeTimers();
     let resolve!: (r: ResourceSearchResponse) => void;

@@ -17,8 +17,12 @@ import type { Router } from "vue-router";
 
 import { changedParams, VIEW_STATE_PARAMS } from "@/composables/useLogs/useLogsUrl";
 
-/** Calls `onRestore` when Back/Forward lands on a different Logs search, so the page can re-read the URL. */
-export function useLogsHistoryRestore(router: Router, onRestore: () => void): () => void {
+/** Calls `onRestore` when Back/Forward, or a link to a stream Logs does not show, changes the search. */
+export function useLogsHistoryRestore(
+  router: Router,
+  onRestore: () => void,
+  shownStreams: () => string = () => "",
+): () => void {
   let popPending = false;
   const stopListen = router.options.history.listen((_to, _from, info) => {
     popPending = info.type === "pop";
@@ -26,7 +30,14 @@ export function useLogsHistoryRestore(router: Router, onRestore: () => void): ()
   const stopAfter = router.afterEach((to, from, failure) => {
     const isPop = popPending;
     popPending = false;
-    if (!isPop || failure || to.name !== "logs" || from.name !== "logs") return;
+    if (failure || to.name !== "logs" || from.name !== "logs") return;
+    if (!isPop) {
+      const stream = to.query.stream;
+      // Logs writes its own selection to the URL, so only a stream it does not show came from a link.
+      if (typeof stream === "string" && stream !== from.query.stream && stream !== shownStreams())
+        onRestore();
+      return;
+    }
     if (changedParams(from.query, to.query).some((key) => !VIEW_STATE_PARAMS.has(key))) {
       onRestore();
     }

@@ -134,6 +134,10 @@ export function useResourceSearch(input: {
     ),
     retryFailed,
     refetch: () => {
+      // Supersedes in-flight polls and retries, whose older answers would cover the fresh one.
+      sequence += 1;
+      clearTimeout(pollTimer);
+      retrying.value = false;
       retryError.value = null;
       patches.value = [];
       return query.refetch();

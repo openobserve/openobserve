@@ -3502,8 +3502,8 @@ export default defineComponent({
         await handleActionQuery(action);
         consumingAlertIntent = true;
         try {
+          // `action` stays: a list response that lands later closes the form when it is missing.
           const query = { ...router.currentRoute.value.query };
-          delete query.action;
           delete query.palette_intent;
           await router.replace({ query });
         } finally {

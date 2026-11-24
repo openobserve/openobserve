@@ -2082,14 +2082,23 @@ const onSearchModeChange = (mode: TraceSearchMode) => {
 };
 
 watch(
-  () => [router.currentRoute.value.name, router.currentRoute.value.query.tab] as const,
-  ([routeName, tab]) => {
+  () =>
+    [
+      router.currentRoute.value.name,
+      router.currentRoute.value.query.tab,
+      router.currentRoute.value.query.stream,
+    ] as const,
+  ([routeName, tab, stream], [, , previousStream]) => {
     // A cached page applies the URL it returns to on activation, not while it sits in the cache.
     if (routeName !== "traces" || !pageActive.value) return;
     const mode = supportedTraceSearchMode(tab);
     if (mode !== searchObj.meta.searchMode) {
-      const stream = router.currentRoute.value.query.stream;
-      if (typeof stream === "string" && stream !== searchObj.data.stream.selectedStream.value) {
+      // The stream watcher loads a stream the URL moved to; only then does it own the reload.
+      if (
+        typeof stream === "string" &&
+        stream !== previousStream &&
+        stream !== searchObj.data.stream.selectedStream.value
+      ) {
         searchObj.meta.searchMode = mode;
         return;
       }
@@ -2587,9 +2596,11 @@ const applyStreamChange = async (newStream: string) => {
 
 watch(
   () => [router.currentRoute.value.name, router.currentRoute.value.query.stream] as const,
-  async ([routeName, stream]) => {
+  async ([routeName, stream], [, previousStream]) => {
     if (routeName !== "traces" || !pageActive.value || !pageLoaded) return;
-    if (typeof stream !== "string" || stream === searchObj.data.stream.selectedStream.value) return;
+    // With auto-run off the picked stream is not in the URL yet, so an unchanged URL must not undo it.
+    if (typeof stream !== "string" || stream === previousStream) return;
+    if (stream === searchObj.data.stream.selectedStream.value) return;
     if (!searchObj.data.stream.streamLists.some((s: any) => s.value === stream)) return;
     const org = store.state.selectedOrganization.identifier;
     searchObj.data.stream.selectedStream = { label: stream, value: stream };

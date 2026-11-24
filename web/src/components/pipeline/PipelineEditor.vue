@@ -841,15 +841,14 @@ const getPipeline = (): Promise<boolean> => {
   const recentScope = captureRecentVisitScope();
   const org = store.state.selectedOrganization.identifier;
 
+  const stale = () =>
+    store.state.selectedOrganization.identifier !== org ||
+    router.currentRoute.value.query.id !== route.query.id ||
+    router.currentRoute.value.name !== "pipelineEditor";
   return pipelineService
     .getPipelines(org)
     .then(async (response) => {
-      if (
-        store.state.selectedOrganization.identifier !== org ||
-        router.currentRoute.value.query.id !== route.query.id ||
-        router.currentRoute.value.name !== "pipelineEditor"
-      )
-        return false;
+      if (stale()) return false;
       const _pipeline = response.data.list.find(
         (pipeline: Pipeline) => pipeline.pipeline_id === route.query.id,
       );
@@ -909,6 +908,7 @@ const getPipeline = (): Promise<boolean> => {
       return true;
     })
     .catch((error) => {
+      if (stale()) return false;
       toast({
         message: error?.message || t("pipeline.failedToLoadPipeline"),
         variant: "error",

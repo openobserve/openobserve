@@ -60,6 +60,20 @@ describe("useLogsHistoryRestore", () => {
     expect(onRestore).not.toHaveBeenCalled();
   });
 
+  it("restores when a link moves the open page to a stream it does not show", async () => {
+    const router = await makeRouter();
+    const onRestore = vi.fn();
+    let shown = "app";
+    stop = useLogsHistoryRestore(router, onRestore, () => shown);
+    await router.push({ name: "logs", query: { stream: "web" } });
+    await settle();
+    expect(onRestore).toHaveBeenCalledTimes(1);
+    shown = "api";
+    await router.push({ name: "logs", query: { stream: "api" } });
+    await settle();
+    expect(onRestore).toHaveBeenCalledTimes(1);
+  });
+
   it("does not restore when Back leaves for another page", async () => {
     const router = await makeRouter();
     await router.push({ name: "home" });

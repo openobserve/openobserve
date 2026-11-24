@@ -312,6 +312,16 @@ impl State {
     /// Makes room for `bytes` in place of the entry's current charge, evicting least recently
     /// used other orgs while over budget.
     fn charge(&mut self, key: &Key, bytes: usize, max_bytes: usize) -> bool {
+        // Only other orgs are evictable, so an org that overflows on its own must not clear them.
+        let own: usize = self
+            .entries
+            .iter()
+            .filter(|(other, _)| other.org == key.org && *other != key)
+            .map(|(_, entry)| entry.bytes)
+            .sum();
+        if own + bytes > max_bytes {
+            return false;
+        }
         loop {
             let current = self.entries.get(key).map_or(0, |entry| entry.bytes);
             let used: usize = self.entries.values().map(|entry| entry.bytes).sum();
@@ -711,5 +721,35 @@ mod tests {
             full.catalog.ensure("org", &[ResourceKind::Function]).await,
             Err(SearchError::Overloaded)
         ));
+    }
+
+    #[test]
+    fn an_org_that_cannot_fit_on_its_own_keeps_other_orgs() {
+        let now = Instant::now();
+        let mut state = State {
+            entries: HashMap::new(),
+            pending: 0,
+        };
+        for (org, kind) in [
+            ("other", ResourceKind::Function),
+            ("org", ResourceKind::Dashboard),
+        ] {
+            let mut entry = Entry::new(now);
+            entry.bytes = 60;
+            state.entries.insert(Key::new(org, kind), entry);
+        }
+        let key = Key::new("org", ResourceKind::Function);
+        assert!(!state.charge(&key, 50, 100));
+        assert!(
+            state
+                .entries
+                .contains_key(&Key::new("other", ResourceKind::Function))
+        );
+        assert!(state.charge(&key, 30, 100));
+        assert!(
+            !state
+                .entries
+                .contains_key(&Key::new("other", ResourceKind::Function))
+        );
     }
 }
