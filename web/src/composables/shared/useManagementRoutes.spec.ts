@@ -647,9 +647,23 @@ describe("useManagementRoutes", () => {
       expect(orgMgmtRoute.component).toBeDefined();
     });
 
-    it("should have exactly 14 children routes when cloud is enabled", () => {
+    it("should have a guarded userManagement route when cloud", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(14); // 7 base (incl. alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 2 cloud
+      const userMgmtRoute = routes[0].children.find(
+        (child: any) => child.name === "userManagement",
+      );
+      expect(userMgmtRoute.path).toBe("user_management");
+      expect(userMgmtRoute.component).toBeDefined();
+      const mockTo = { path: "/settings/user_management" };
+      const mockFrom = { path: "/settings" };
+      const mockNext = vi.fn();
+      userMgmtRoute.beforeEnter(mockTo, mockFrom, mockNext);
+      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+    });
+
+    it("should have exactly 15 children routes when cloud is enabled", () => {
+      const routes = useManagementRoutes();
+      expect(routes[0].children).toHaveLength(15); // 7 base (incl. alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 3 cloud
     });
   });
 
@@ -664,9 +678,9 @@ describe("useManagementRoutes", () => {
       expect(routes[0].children.length).toBeGreaterThan(10);
     });
 
-    it("should have exactly 28 children routes when both enterprise and cloud are enabled", () => {
+    it("should have exactly 29 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(28); // 7 base (incl. alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 14 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings) + 2 cloud
+      expect(routes[0].children).toHaveLength(29); // 7 base (incl. alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 14 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings) + 3 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {

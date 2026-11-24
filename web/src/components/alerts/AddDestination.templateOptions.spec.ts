@@ -57,7 +57,7 @@ const mountComp = (props: Record<string, any> = {}) =>
         PrebuiltDestinationSelector: { template: "<div />" },
         DestinationTestResult: {
           template: "<div />",
-          props: ["result", "showSuccessResponseBody"],
+          props: ["result"],
         },
         AddUser: {
           template: "<div />",

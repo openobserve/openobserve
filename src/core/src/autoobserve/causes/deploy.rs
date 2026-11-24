@@ -37,11 +37,18 @@ pub const EVIDENCE: &str = "evidence_streams";
 pub const EVIDENCE_OVERFLOW: &str = "evidence_overflow";
 
 pub async fn read(ask: &ChangeAsk) -> (Checked, Vec<ChangeRecord>) {
+    read_on(infra::db::get_orm_client_ro().await, ask).await
+}
+
+/// [read] on a given connection; the primary sees a deploy committed a moment ago.
+pub async fn read_on<C: ConnectionTrait>(
+    conn: &C,
+    ask: &ChangeAsk,
+) -> (Checked, Vec<ChangeRecord>) {
     let streams = issue_streams(ask);
     if streams.is_empty() {
         return (Checked::Ok, Vec::new());
     }
-    let conn = infra::db::get_orm_client_ro().await;
     match deploys(conn, ask, &streams).await {
         Ok(answer) => answer,
         Err(e) => failed(OssSource::Deploys, &ask.org, e),

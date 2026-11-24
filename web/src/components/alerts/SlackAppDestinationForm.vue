@@ -371,7 +371,6 @@ async function sendTest(): Promise<void> {
       success: !!res.data?.success,
       timestamp: Date.now(),
       error: res.data?.error,
-      responseBody: res.data?.responseBody,
     };
   } catch (error) {
     const reason = slackAppSaveRefusal(error);
@@ -713,7 +712,6 @@ const onChannelSearch = (q: string) => {
         v-if="testResult"
         :result="testResult"
         :is-loading="testing"
-        :show-success-response-body="true"
         @retry="sendTest"
       />
 

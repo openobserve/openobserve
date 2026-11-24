@@ -26,6 +26,7 @@ use chrono::Utc;
 use config::{
     META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
+        agent_format,
         search::{
             AgentSearchMode, Request, ResultSchemaResponse, SearchEventType,
             SearchHistoryHitResponse, SearchHistoryRequest, SearchPartitionRequest,
@@ -69,7 +70,6 @@ use crate::common::{
     },
 };
 
-pub mod agent_format;
 pub(crate) mod around;
 pub mod error_utils;
 pub mod multi_streams;
@@ -928,6 +928,7 @@ pub async fn build_search_request_per_field(
         clear_cache: req.clear_cache,
         local_mode: None,
         agent_options: None,
+        raw_streams: None,
     };
 
     let size = req.query.size;
@@ -1112,6 +1113,7 @@ async fn values_inner(
         clear_cache: get_clear_cache_from_request(query),
         local_mode: None,
         agent_options: None,
+        raw_streams: None,
     };
 
     req.use_cache = get_use_cache_from_request(query);
@@ -2412,6 +2414,7 @@ mod tests {
                 sampling_ratio: None,
                 search_type: None,
                 timezone: None,
+                raw_streams: None,
             }),
         )
         .await;

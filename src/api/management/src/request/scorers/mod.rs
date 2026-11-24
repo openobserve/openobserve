@@ -647,10 +647,11 @@ async fn run_scorer_test(
                 }
                 Err(e) => {
                     let latency = start.elapsed();
+                    log::warn!("[Scorer] org {org_id}: LLM judge test failed: {e}");
                     Ok(ScorerTestResponseBody {
                         success: false,
                         latency_ms: latency.as_millis() as i64,
-                        error: Some(format!("{e}")),
+                        error: Some(judge_test_error(&e)),
                         ..Default::default()
                     })
                 }
@@ -705,7 +706,7 @@ async fn run_scorer_test(
                         value_categorical: output.value.as_str().map(|s| s.to_string()),
                         value_boolean: output.value.as_bool(),
                         reasoning: output.reasoning,
-                        raw_response: Some(output.raw_response),
+                        raw_response: None,
                         model_used: None,
                         latency_ms: latency.as_millis() as i64,
                         prompt_tokens: None,
@@ -717,10 +718,11 @@ async fn run_scorer_test(
                 }
                 Err(e) => {
                     let latency = start.elapsed();
+                    log::warn!("[Scorer] org {org_id}: remote scorer test failed: {e}");
                     Ok(ScorerTestResponseBody {
                         success: false,
                         latency_ms: latency.as_millis() as i64,
-                        error: Some(format!("{e}")),
+                        error: Some(remote_scorer_test_error(&e)),
                         ..Default::default()
                     })
                 }
@@ -729,9 +731,114 @@ async fn run_scorer_test(
     }
 }
 
+/// A failed LLM judge test's error by failure class, as the provider's own text can echo its body.
+fn judge_test_error(error: &anyhow::Error) -> String {
+    use o2_enterprise::enterprise::llm_evaluations::error_kind::EvalErrorKind;
+    let kind = EvalErrorKind::classify(error);
+    if let Some(message) = failure_class_error(kind, "provider") {
+        return message;
+    }
+    match kind {
+        EvalErrorKind::ParseError => "The provider's answer could not be read as a score",
+        _ => "Scoring failed. Check the provider settings.",
+    }
+    .to_string()
+}
+
+/// A failed remote scorer test's error by error type and kind, never the endpoint's text.
+fn remote_scorer_test_error(error: &anyhow::Error) -> String {
+    use infra::outbound_http::OutboundError;
+    use o2_enterprise::enterprise::llm_evaluations::error_kind::EvalErrorKind;
+    let outbound = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<OutboundError>());
+    let unreached = match outbound {
+        // Our own URL and header rule text, never the endpoint's answer.
+        Some(OutboundError::Policy(message)) => return message.clone(),
+        Some(OutboundError::ResponseTooLarge(_) | OutboundError::InvalidResponse(_)) => {
+            return "The scorer endpoint did not return a valid result".to_string();
+        }
+        Some(OutboundError::Connect(_) | OutboundError::Transport(_)) => true,
+        Some(OutboundError::Timeout) => false,
+        None => error.chain().any(|cause| cause.is::<reqwest::Error>()),
+    };
+    let kind = EvalErrorKind::classify(error);
+    if let Some(message) = failure_class_error(kind, "scorer endpoint") {
+        return message;
+    }
+    match kind {
+        EvalErrorKind::ParseError => "The scorer endpoint did not return a valid result",
+        EvalErrorKind::MappingError => "The scorer request template is invalid",
+        _ if unreached => "Couldn't reach the scorer endpoint",
+        _ => "Scoring failed. Check the scorer settings.",
+    }
+    .to_string()
+}
+
+/// The wording the judge and remote scorer tests share for a failure class of the called service.
+fn failure_class_error(
+    kind: o2_enterprise::enterprise::llm_evaluations::error_kind::EvalErrorKind,
+    service: &str,
+) -> Option<String> {
+    use o2_enterprise::enterprise::llm_evaluations::error_kind::EvalErrorKind;
+    match kind {
+        EvalErrorKind::ProviderAuth => Some(format!("The {service} rejected the credentials")),
+        EvalErrorKind::RateLimited => Some(format!(
+            "The {service} is rate limiting requests; try again later"
+        )),
+        EvalErrorKind::Timeout => Some(format!("The {service} did not respond in time")),
+        EvalErrorKind::Provider5xx => Some(format!("The {service} failed to answer")),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_failed_judge_test_names_the_failure_class_only() {
+        use infra::outbound_http::OutboundError;
+        use o2_enterprise::enterprise::llm_evaluations::error_kind::{
+            ClassifiedError, EvalErrorKind,
+        };
+        let status = |code| anyhow::Error::new(ClassifiedError::http_status(code, "remote-body"));
+        let kind = |kind| anyhow::Error::new(ClassifiedError::new(kind, "remote-body"));
+        let judge: Vec<String> = [
+            status(401),
+            status(429),
+            status(408),
+            status(503),
+            status(400),
+            kind(EvalErrorKind::ParseError),
+        ]
+        .iter()
+        .map(judge_test_error)
+        .collect();
+        let remote: Vec<String> = [
+            status(401),
+            status(429),
+            status(503),
+            kind(EvalErrorKind::ParseError),
+            kind(EvalErrorKind::MappingError),
+            anyhow::Error::new(OutboundError::Timeout),
+            anyhow::Error::new(OutboundError::Connect("remote-body".to_string())),
+            anyhow::anyhow!("Remote scorer returned code 'BAD': remote-body"),
+        ]
+        .iter()
+        .map(remote_scorer_test_error)
+        .collect();
+        for messages in [&judge, &remote] {
+            let distinct: std::collections::HashSet<_> = messages.iter().collect();
+            assert_eq!(distinct.len(), messages.len(), "{messages:?}");
+            assert!(
+                !messages.iter().any(|m| m.contains("remote-body")),
+                "{messages:?}"
+            );
+        }
+        let policy = anyhow::Error::new(OutboundError::Policy("policy-text".to_string()));
+        assert_eq!(remote_scorer_test_error(&policy), "policy-text");
+    }
 
     #[test]
     fn test_scorer_error_conversion() {

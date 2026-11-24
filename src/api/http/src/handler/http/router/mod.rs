@@ -1382,6 +1382,14 @@ fn service_route_table() -> Router {
             "/{org_id}/organizations/{target_org_id}/resurrect",
             post(organization::org::resurrect_org_deletion),
         )
+        .route(
+            "/{org_id}/organizations/{target_org_id}/block",
+            post(organization::org::block_org),
+        )
+        .route(
+            "/{org_id}/organizations/{target_org_id}/unblock",
+            post(organization::org::unblock_org),
+        )
         .route("/{org_id}/settings", get(organization::settings::get).post(organization::settings::create))
         .route("/{org_id}/settings/logo", post(organization::settings::upload_logo).delete(organization::settings::delete_logo))
         .route("/{org_id}/settings/logo/text", post(organization::settings::set_logo_text).delete(organization::settings::delete_logo_text))
@@ -1568,6 +1576,12 @@ fn service_route_table() -> Router {
         .route("/v2/{org_id}/alerts/{alert_id}/export", post(alerts::export_alert))
         .route("/v2/{org_id}/alerts/bulk", delete(alerts::delete_alert_bulk))
         .route("/v2/{org_id}/alerts/{alert_id}/enable", patch(alerts::enable_alert))
+        .route("/v2/{org_id}/alert_leases", get(alerts::leases::list_org_alert_leases))
+        .route("/v2/{org_id}/alerts/{alert_id}/leases", get(alerts::leases::list_alert_leases))
+        .route("/v2/{org_id}/alerts/{alert_id}/leases/{lease_id}/end", post(alerts::leases::end_alert_lease))
+        .route("/v2/{org_id}/alerts/{alert_id}/leases/{lease_id}/extend", post(alerts::leases::extend_alert_lease))
+        .route("/v2/{org_id}/alerts/{alert_id}/leases/{lease_id}/keep", post(alerts::leases::keep_alert_lease))
+        .route("/v2/{org_id}/alerts/{alert_id}/creates_incident", patch(alerts::leases::set_alert_creates_incident))
         .route("/v2/{org_id}/alerts/{alert_id}/ack", post(alerts::ack::ack_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/unack", post(alerts::ack::unack_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/acks", get(alerts::ack::list_alert_acks))
@@ -2343,6 +2357,7 @@ fn service_route_table() -> Router {
                 get(organization::org::all_organizations)
                     .delete(organization::org::initiate_org_deletion),
             )
+            .route("/{org_id}/all_users", get(users::all_users))
             .route(
                 "/{org_id}/extend_trial_period",
                 put(organization::org::extend_trial_period),

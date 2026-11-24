@@ -489,6 +489,9 @@ pub async fn get_job_result(
         if let Some(res) = check_permissions(&model, &org_id, &user_id).await {
             return res;
         }
+        if let Some(res) = check_unredacted_access(&model, &org_id, &user_id).await {
+            return res;
+        }
         if let Some(res) = check_license(&model) {
             return res;
         }
@@ -793,6 +796,35 @@ async fn check_permissions(job: &JobModel, org_id: &str, user_id: &str) -> Optio
         }
     }
     None
+}
+
+// A job stores what its submitter could read, so its results may hold raw protected values.
+#[cfg(feature = "enterprise")]
+async fn check_unredacted_access(job: &JobModel, org_id: &str, user_id: &str) -> Option<Response> {
+    if job.user_id == user_id {
+        return None;
+    }
+    let stream_type = StreamType::from(job.stream_type.as_str());
+    let allowed = match json::from_str::<Request>(&job.payload) {
+        Ok(req) => {
+            search_service::raw_streams::may_read_unredacted(
+                org_id,
+                stream_type,
+                &req.query.sql,
+                user_id,
+            )
+            .await
+        }
+        Err(_) => false,
+    };
+    if allowed {
+        return None;
+    }
+    Some(MetaHttpResponse::forbidden(format!(
+        "[Job_Id: {}] The results may hold unredacted data; only the job owner or a user allowed \
+         to read the protected streams unredacted can view them",
+        job.id
+    )))
 }
 
 // Search-jobs RBAC is org-level, so it cannot keep one user from changing another's job.
