@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { buildSamplesOption } from "./historyChart";
+import { buildSamplesOption, formatAxisNs } from "./historyChart";
 
 const INTERVAL = 15 * 60 * 1_000_000;
 const T0 = 1_700_000_000_000_000;
@@ -79,5 +79,27 @@ describe("buildSamplesOption", () => {
         expect(Array.isArray(point)).toBe(true);
       }
     }
+  });
+});
+
+describe("samples chart axis and legend", () => {
+  const ok = { timestamp: at(0), durationNs: 3_400_000_000, isError: false };
+
+  it("labels the duration axis in one unit without trailing zeros", () => {
+    expect(formatAxisNs(0, { ns: 1e9, suffix: "s" })).toBe("0s");
+    expect(formatAxisNs(2e9, { ns: 1e9, suffix: "s" })).toBe("2s");
+    expect(formatAxisNs(1.5e9, { ns: 1e9, suffix: "s" })).toBe("1.5s");
+  });
+
+  it("lists only the series that have points", () => {
+    const names = { ok: "ok", error: "error" };
+    const okOnly = buildSamplesOption([ok], theme, formatNs, names) as {
+      legend: { data: string[] };
+    };
+    expect(okOnly.legend.data).toEqual(["ok"]);
+    const both = buildSamplesOption([ok, { ...ok, isError: true }], theme, formatNs, names) as {
+      legend: { data: string[] };
+    };
+    expect(both.legend.data).toEqual(["ok", "error"]);
   });
 });

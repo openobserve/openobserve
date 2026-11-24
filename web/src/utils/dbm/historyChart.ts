@@ -54,6 +54,22 @@ export interface DbmChartTheme {
  *
  * Errored samples are marked so a cluster of failures is visible as a group.
  */
+// Each unit takes over once the slowest sample is ten of it, so ticks stay short numbers.
+const AXIS_UNITS = [
+  { ns: 36e13, suffix: "h", from: 36e13 * 10 },
+  { ns: 6e10, suffix: "min", from: 6e10 * 10 },
+  { ns: 1e9, suffix: "s" },
+  { ns: 1e6, suffix: "ms" },
+  { ns: 1e3, suffix: "us" },
+  { ns: 1, suffix: "ns" },
+] as const satisfies readonly { ns: number; suffix: string; from?: number }[];
+
+/** An axis tick in the axis's single unit, at most one decimal and none when whole. */
+export const formatAxisNs = (value: number, unit: { ns: number; suffix: string }): string => {
+  const scaled = value / unit.ns;
+  return `${Number.isInteger(scaled) ? scaled : Number(scaled.toFixed(1))}${unit.suffix}`;
+};
+
 export const buildSamplesOption = (
   samples: { timestamp: number; durationNs: number; isError: boolean }[],
   theme: DbmChartTheme,
@@ -72,9 +88,18 @@ export const buildSamplesOption = (
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
   };
 
+  // One unit for the whole axis, picked from the slowest sample, so ticks read 0s, 1s, 2s rather than 0us, 1.00s.
+  const maxNs = samples.reduce((max, s) => Math.max(max, s.durationNs), 0);
+  const axisUnit =
+    AXIS_UNITS.find((u) => maxNs >= ("from" in u ? u.from : u.ns)) ??
+    AXIS_UNITS[AXIS_UNITS.length - 1];
+  const hasErrors = samples.some((s) => s.isError);
+
   return {
     grid: { left: 8, right: 8, top: 16, bottom: 28, containLabel: true },
     legend: {
+      // A legend entry with no points sends the reader looking for dots that are not there.
+      data: hasErrors ? [names.ok, names.error] : [names.ok],
       bottom: 0,
       left: 0,
       icon: "roundRect",
@@ -120,7 +145,7 @@ export const buildSamplesOption = (
     yAxis: {
       type: "value",
       splitNumber: 3,
-      axisLabel: { color: theme.axisLabel, formatter: (v: number) => formatNs(v) },
+      axisLabel: { color: theme.axisLabel, formatter: (v: number) => formatAxisNs(v, axisUnit) },
       splitLine: { lineStyle: { type: "dashed", width: 1, color: theme.splitLine } },
     },
     series: [
