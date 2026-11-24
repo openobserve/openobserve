@@ -20,12 +20,26 @@
 
 import { isUnaryOperator, unaryOperatorText } from "@/utils/alerts/conditionsFormatter";
 
+const READABLE_OPERATORS: Record<string, string> = {
+  re_match: "matches regex",
+  re_not_match: "does not match regex",
+};
+
+// The backend folds case for any operator carrying the flag, so the card says so whatever the operator.
+const operatorText = (item: any): string => {
+  const spelled = item.operator || "=";
+  const operator = READABLE_OPERATORS[String(spelled).toLowerCase()] ?? spelled;
+  return item.case_insensitive === true || item.ignore_case === true
+    ? `${operator} (ignore case)`
+    : operator;
+};
+
 const leafPreview = (item: any): string => {
   const column = item.column || "field";
-  const operator = item.operator || "=";
-  if (isUnaryOperator(operator)) {
-    return `${column} ${unaryOperatorText(operator)}`;
+  if (isUnaryOperator(item.operator)) {
+    return `${column} ${unaryOperatorText(item.operator)}`;
   }
+  const operator = operatorText(item);
   if (Array.isArray(item.value)) {
     return `${column} ${operator} (${item.value.map((v: unknown) => `'${v}'`).join(", ")})`;
   }
