@@ -43,18 +43,6 @@ describe("LLM content Markdown with real parsing and sanitization", () => {
     expect(render(content, type).get(".message-content").text()).toContain(token);
   });
 
-  it.each([
-    "<EMAIL_ADDRESS> and <PERSON_1>",
-    "<b>literal HTML</b>",
-    '<img src=x onerror="alert(1)">',
-    "<script>alert(1)</script>",
-    "<div>\n<EMAIL_ADDRESS>\n</div>",
-  ])("displays HTML-like message content as inert text: %s", (content) => {
-    const message = render([{ role: "user", content }]).get(".message-content");
-    expect(message.text()).toBe(content);
-    expect(message.find("b, img, script, div, [onerror]").exists()).toBe(false);
-  });
-
   it("preserves Markdown, escaped entities, code and image markers", () => {
     const content = `**Email**: ${token} &amp; &lt;PERSON_1&gt;\n\n\`${token}\`\n\n[Image: https://example.com/image.png]`;
     const message = render([{ role: "assistant", content }]).get(".message-content");
@@ -111,6 +99,80 @@ describe.each([
     },
   ],
 ] as const)("%s Markdown behavior", (_name, renderMessage) => {
+  it.each([
+    ["inline break", "first<br>second", "br", ""],
+    ["superscript", "x<sup>2</sup>", "sup", "2"],
+    ["bold", "<b>bold</b>", "b", "bold"],
+    ["mixed-case tags", "<DiV>first<BR/>x<SUP>2</sUp></dIv>", "div sup", "2"],
+    ["Markdown table break", "| Name |\n| --- |\n| first<br>second |", "td br", ""],
+    [
+      "HTML table",
+      "<table>\n<thead><tr><th>Name</th></tr></thead>\n<tbody><tr><td>Alice</td></tr></tbody>\n</table>",
+      "table tbody td",
+      "Alice",
+    ],
+  ])("renders safe HTML: %s", (_name, content, selector, text) => {
+    const message = renderMessage(content);
+    expect(message.querySelector(selector)?.textContent).toBe(text);
+  });
+
+  it.each([
+    "<EMAIL_ADDRESS> and <PERSON_1>",
+    token,
+    "<custom-element>unknown</custom-element>",
+    '<instructions title="quoted > value">unknown</instructions>',
+  ])("preserves unknown tags and placeholders: %s", (content) => {
+    const message = renderMessage(content);
+    expect(message.textContent?.trim()).toBe(content);
+    expect(
+      message.querySelector("email_address, person_1, custom-element, instructions"),
+    ).toBeNull();
+  });
+
+  it.each(["div", "pre", "code"])("preserves placeholders and entities inside %s", (tag) => {
+    const message = renderMessage(
+      `<${tag}>\n<EMAIL_ADDRESS> <span>${token}</span> <PERSON_1> &amp;\n</${tag}>`,
+    );
+    expect(message.querySelector(tag)?.textContent?.trim()).toBe(
+      `<EMAIL_ADDRESS> ${token} <PERSON_1> &`,
+    );
+    expect(message.querySelector("span")?.textContent).toBe(token);
+  });
+
+  it("parses Markdown inside unknown wrappers nested in safe HTML blocks", () => {
+    const message = renderMessage(
+      "<div>\n<instructions>\nDo **X**.\n- a\n- b\n</instructions>\n</div>",
+    );
+    expect(message.querySelector("div strong")?.textContent).toBe("X");
+    expect(message.querySelectorAll("div li")).toHaveLength(2);
+    expect(message.querySelector("div")?.textContent).toContain("<instructions>");
+    expect(message.querySelector("div")?.textContent).toContain("</instructions>");
+    expect(message.querySelector("instructions")).toBeNull();
+  });
+
+  it("renders HTML and Markdown images with dangerous attributes removed", () => {
+    const message = renderMessage(
+      '<img src="https://example.com/image.png" alt="HTML image" onerror="alert(1)">\n\n![Markdown image](https://example.com/markdown.png)',
+    );
+    const images = message.querySelectorAll("img");
+    expect(images).toHaveLength(2);
+    expect(images[0].getAttribute("src")).toBe("https://example.com/image.png");
+    expect(images[0].getAttribute("alt")).toBe("HTML image");
+    expect(images[1].getAttribute("src")).toBe("https://example.com/markdown.png");
+    expect(message.querySelector("[onerror]")).toBeNull();
+  });
+
+  it("keeps scripts inert and sanitizes unsafe HTML and Markdown URLs", () => {
+    const message = renderMessage(
+      '<div><script>alert(1)</script><a href="javascript:alert(1)" onclick="alert(2)">HTML</a></div>\n\n[Markdown](javascript:alert(3))',
+    );
+    expect(message.querySelector("script, [onclick]")).toBeNull();
+    expect(message.textContent).toContain("<script>alert(1)</script>");
+    const links = message.querySelectorAll("a");
+    expect(links).toHaveLength(2);
+    expect(Array.from(links, (link) => link.getAttribute("href"))).toEqual([null, null]);
+  });
+
   it("parses Markdown inside literal tag blocks", () => {
     const message = renderMessage("<instructions>\nDo **X**.\n- a\n- b\n</instructions>");
     expect(message.querySelector("strong")?.textContent).toBe("X");

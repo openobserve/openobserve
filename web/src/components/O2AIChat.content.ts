@@ -20,6 +20,7 @@ import { marked } from "marked";
 import type { ChatMessage } from "@/ts/interfaces/chat";
 import type { TranslateFn } from "@/types/i18n";
 import { UNAUTHORIZED_MESSAGE_KEY } from "@/utils/authErrors";
+import { SAFE_HTML_TAGS } from "@/utils/safeHtml";
 
 // Register VRL as a JavaScript alias (type assertion)
 hljs.registerLanguage("vrl", () => hljs.getLanguage("javascript") as any);
@@ -249,42 +250,7 @@ export function chatErrorMessage(error: any, t: TranslateFn): string {
 
 // Read-only views render other people's chats: only the markup markdown produces, nothing interactive or remote.
 const STRICT_PURIFY = {
-  ALLOWED_TAGS: [
-    "a",
-    "b",
-    "blockquote",
-    "br",
-    "code",
-    "del",
-    "div",
-    "em",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "hr",
-    "i",
-    "img",
-    "li",
-    "ol",
-    "p",
-    "pre",
-    "s",
-    "span",
-    "strong",
-    "sub",
-    "sup",
-    "table",
-    "tbody",
-    "td",
-    "tfoot",
-    "th",
-    "thead",
-    "tr",
-    "ul",
-  ],
+  ALLOWED_TAGS: SAFE_HTML_TAGS,
   ALLOWED_ATTR: ["href", "title", "alt", "src", "class", "colspan", "rowspan", "align", "start"],
   ALLOW_DATA_ATTR: false,
   ALLOW_ARIA_ATTR: false,
