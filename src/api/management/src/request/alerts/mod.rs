@@ -1779,7 +1779,7 @@ pub async fn list_alert_groups(
     // org scoping and not-found behaviour as every other alert read — a raw
     // state-table query would happily serve another org's group labels, which
     // carry host and service names.
-    let (folder_id, _alert) = match alert::get_by_id(client, &org_id, ksuid).await {
+    let (folder_id, alert) = match alert::get_by_id(client, &org_id, ksuid).await {
         Ok((folder, alert)) => (folder.folder_id, alert),
         Err(e) => return e.into(),
     };
@@ -1788,7 +1788,7 @@ pub async fn list_alert_groups(
         &org_id,
         &user_email.user_id,
         "GET",
-        security::marks_siem(_alert.context_attributes.as_ref()),
+        security::marks_siem(alert.context_attributes.as_ref()),
     )
     .await
     {
@@ -1834,7 +1834,7 @@ pub async fn list_alert_groups(
                         &alert_id,
                         &folder_id,
                         &StdHashMap::new(),
-                        &_alert.tags,
+                        &alert.tags,
                         &g.group_key,
                         now,
                     )

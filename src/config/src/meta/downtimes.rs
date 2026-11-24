@@ -80,7 +80,7 @@ impl Downtime {
 pub struct DowntimeTarget {
     pub module: TargetModule,
     pub folders: TargetFolders,
-    /// Read only when the module has tags (alerts and synthetics); any one listed tag matches.
+    /// Read only when the module has tags (alerts and synthetics); the item needs every one.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

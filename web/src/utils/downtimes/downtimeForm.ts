@@ -146,7 +146,7 @@ const emptyTarget = (): TargetFormValues => ({
 
 export const hasIdentity = (module: TargetModule): boolean => module !== "synthetics";
 
-/** Modules whose items carry tags a target can name; a target's tags match any one of them. */
+/** Modules whose items carry tags a target can name; every tag of a target must be on the item. */
 export const hasTags = (module: TargetModule): boolean =>
   module === "alerts" || module === "synthetics";
 

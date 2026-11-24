@@ -810,6 +810,32 @@ mod tests {
     }
 
     #[test]
+    fn an_alerts_target_with_tags_mutes_only_alerts_carrying_every_tag() {
+        let mut tagged = target(TargetModule::Alerts);
+        tagged.tags = vec!["a".to_string(), "b".to_string()];
+        let mut by_tags = row("d1", vec![tagged], 0, 10 * HOUR);
+        by_tags.condition = None;
+        let rows = vec![by_tags];
+        let dims = HashMap::new();
+        let tags = |t: &[&str]| t.iter().map(|t| t.to_string()).collect::<Vec<_>>();
+        let muted = |t: &[String]| {
+            active_in(
+                &rows,
+                TargetModule::Alerts,
+                &item("a1", "default", &dims, t),
+                HOUR,
+            )
+            .is_some()
+        };
+        assert!(
+            muted(&tags(&["a", "b", "c"])),
+            "a superset of the tags is muted"
+        );
+        assert!(!muted(&tags(&["a"])), "one of the tags is not enough");
+        assert!(!muted(&[]), "an untagged alert is not muted");
+    }
+
+    #[test]
     fn active_in_matches_the_module_target_inside_the_window_only() {
         let rows = vec![row(
             "d1",
