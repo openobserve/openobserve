@@ -107,14 +107,13 @@ describe("Command K palette", () => {
 
   it("renders every enabled resource type as a peer toggle in order", async () => {
     await setup();
-    expect(document.querySelector('[data-test="command-more-types"]')).toBeNull();
+    expect(document.querySelector('[data-test="command-types-next"]')).toBeNull();
     expect(
       [...document.querySelectorAll('[data-test^="command-type-"]')].map((element) =>
         element.getAttribute("data-test"),
       ),
     ).toEqual(
       [
-        "all",
         "stream",
         "dashboard",
         "alert",
@@ -126,35 +125,45 @@ describe("Command K palette", () => {
       ].map((kind) => `command-type-${kind}`),
     );
   });
-  it("scrolls the toggle group's overflowing viewport on narrow screens", async () => {
+  it("scrolls the type row sideways by wheel or drag without toggling a type", async () => {
     await setup();
     const strip = document
-      .querySelector('[data-test="command-type-all"]')!
+      .querySelector('[data-test="command-type-stream"]')!
       .closest<HTMLElement>('[role="group"]')!;
     Object.defineProperties(strip, {
       clientWidth: { value: 220 },
       scrollWidth: { value: 874 },
     });
-    Object.defineProperties(strip.parentElement!, {
-      clientWidth: { value: 220 },
-      scrollWidth: { value: 220 },
-    });
-    const scrollBy = vi.fn();
-    strip.scrollBy = scrollBy;
-    const next = document.querySelector<HTMLButtonElement>('[data-test="command-types-next"]')!;
-    const previous = document.querySelector<HTMLButtonElement>(
-      '[data-test="command-types-previous"]',
-    )!;
-    strip.dispatchEvent(new Event("scroll"));
+    strip.dispatchEvent(new WheelEvent("wheel", { deltaY: 120, bubbles: true, cancelable: true }));
+    expect(strip.scrollLeft).toBe(120);
+    const item = document.querySelector<HTMLElement>('[data-test="command-type-user"]')!;
+    const pointer = (type: string, clientX: number) =>
+      Object.assign(new MouseEvent(type, { clientX, button: 0, bubbles: true }), {
+        pointerType: "mouse",
+      });
+    vi.advanceTimersByTime(1);
+    item.dispatchEvent(pointer("pointerdown", 300));
+    window.dispatchEvent(pointer("pointermove", 260));
+    expect(strip.scrollLeft).toBe(160);
+    window.dispatchEvent(pointer("pointerup", 260));
+    item.click();
     await flushPromises();
-    expect(previous.disabled).toBe(true);
-    next.click();
-    expect(scrollBy).toHaveBeenLastCalledWith({ left: 154, behavior: "smooth" });
-    strip.scrollLeft = 654;
-    strip.dispatchEvent(new Event("scroll"));
+    expect(item.getAttribute("data-state")).toBe("off");
+  });
+  it("toggles a type on and back off to search every type", async () => {
+    await setup();
+    await search("payment");
+    const item = document.querySelector<HTMLElement>('[data-test="command-type-function"]')!;
+    item.click();
     await flushPromises();
-    expect(next.disabled).toBe(true);
-    expect(previous.disabled).toBe(false);
+    await vi.advanceTimersByTimeAsync(200);
+    await flushPromises();
+    expect(vi.mocked(resources.search).mock.calls.at(-1)?.[1].types).toEqual(["function"]);
+    item.click();
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(200);
+    await flushPromises();
+    expect(vi.mocked(resources.search).mock.calls.at(-1)?.[1].types).toBeUndefined();
   });
   it("preserves the selected resource identity when a preceding group arrives", async () => {
     vi.mocked(resources.search)
@@ -226,6 +235,8 @@ describe("Command K palette", () => {
     input.value = "payment";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     await flushPromises();
+    // Vue drops an event stamped no later than its listener, and fake timers freeze the clock.
+    vi.advanceTimersByTime(1);
     document.querySelector<HTMLElement>('[data-test="command-type-dashboard"]')!.click();
     await flushPromises();
     await vi.advanceTimersByTimeAsync(200);

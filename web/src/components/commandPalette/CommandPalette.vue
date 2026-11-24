@@ -47,36 +47,44 @@ const offline = ref(!navigator.onLine);
 const openVersion = ref(0);
 const typeStrip = ref<{ $el: HTMLElement } | null>(null);
 const typeViewport = computed(() => typeStrip.value?.$el ?? null);
-const atTypeStart = ref(true);
-const atTypeEnd = ref(true);
-function updateTypeScroll() {
+// A vertical wheel or a mouse drag over the type row scrolls it sideways.
+function onTypeWheel(event: WheelEvent) {
   const strip = typeViewport.value;
-  atTypeStart.value = !strip || Math.abs(strip.scrollLeft) <= 0;
-  atTypeEnd.value =
-    !strip || Math.abs(strip.scrollLeft) + strip.clientWidth >= strip.scrollWidth - 1;
+  if (!strip || strip.scrollWidth <= strip.clientWidth) return;
+  if (Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+  event.preventDefault();
+  strip.scrollLeft += event.deltaY * (getComputedStyle(strip).direction === "rtl" ? -1 : 1);
 }
-function scrollTypes(direction: number) {
+let typeDrag: { x: number; left: number; moved: boolean } | null = null;
+function onTypeDrag(event: PointerEvent) {
   const strip = typeViewport.value;
-  if (strip)
-    strip.scrollBy({
-      left:
-        strip.clientWidth *
-        direction *
-        (getComputedStyle(strip).direction === "rtl" ? -1 : 1) *
-        0.7,
-      behavior: "smooth",
-    });
+  if (!strip || !typeDrag) return;
+  const delta = event.clientX - typeDrag.x;
+  if (!typeDrag.moved && Math.abs(delta) < 4) return;
+  typeDrag.moved = true;
+  strip.scrollLeft = typeDrag.left - delta;
 }
-let typeObserver: ResizeObserver | undefined;
-watch(typeViewport, (strip) => {
-  typeObserver?.disconnect();
-  if (strip && typeof ResizeObserver !== "undefined") {
-    typeObserver = new ResizeObserver(updateTypeScroll);
-    typeObserver.observe(strip);
-  }
-  updateTypeScroll();
+function endTypeDrag() {
+  window.removeEventListener("pointermove", onTypeDrag);
+  // The click that ends a drag lands after pointerup, so the flag must outlive this event.
+  setTimeout(() => (typeDrag = null));
+}
+function onTypePointerDown(event: PointerEvent) {
+  const strip = typeViewport.value;
+  if (!strip || event.pointerType !== "mouse" || event.button !== 0) return;
+  typeDrag = { x: event.clientX, left: strip.scrollLeft, moved: false };
+  window.addEventListener("pointermove", onTypeDrag);
+  window.addEventListener("pointerup", endTypeDrag, { once: true });
+}
+function onTypeClick(event: MouseEvent) {
+  if (!typeDrag?.moved) return;
+  event.preventDefault();
+  event.stopPropagation();
+}
+onScopeDispose(() => {
+  window.removeEventListener("pointermove", onTypeDrag);
+  window.removeEventListener("pointerup", endTypeDrag);
 });
-onScopeDispose(() => typeObserver?.disconnect());
 const search = useResourceSearch({ open: toRef(props, "open"), org, subject, query, type });
 const pages = computed(() =>
   palettePages(
@@ -183,9 +191,9 @@ const localGroups = computed(() =>
     { id: "actions", label: t("commandPalette.actions"), entries: actionEntries.value },
   ].filter((g) => g.entries.length),
 );
+// Clicking the selected type clears it, which searches every type again.
 function setType(value: unknown) {
-  if (value === "all" || RESOURCE_KINDS.some((kind) => kind === value))
-    type.value = value as ResourceKind | "all";
+  type.value = RESOURCE_KINDS.find((kind) => kind === value) ?? "all";
 }
 function onKeydown(event: KeyboardEvent) {
   if (event.isComposing || !["INPUT", "TEXTAREA"].includes((event.target as HTMLElement)?.tagName))
@@ -244,7 +252,6 @@ watch(type, async () => {
   typeViewport.value
     ?.querySelector<HTMLElement>(`[data-test="command-type-${type.value}"]`)
     ?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  updateTypeScroll();
 });
 watch(
   entries,
@@ -289,51 +296,29 @@ onScopeDispose(() => {
         data-test="command-palette-input"
         @keydown="onKeydown"
       />
-      <div class="flex min-w-0 items-center gap-2">
-        <OButton
-          variant="ghost"
-          size="icon-xs"
-          icon-left="chevron-left"
-          :aria-label="t('common.previous')"
-          :disabled="atTypeStart"
-          data-test="command-types-previous"
-          @click="scrollTypes(-1)"
-        />
-        <div class="min-w-0 flex-1">
-          <OToggleGroup
-            ref="typeStrip"
-            :model-value="type"
-            class="max-w-full overflow-x-auto"
-            @scroll="updateTypeScroll"
-            @update:model-value="setType"
+      <div
+        class="min-w-0"
+        @wheel="onTypeWheel"
+        @pointerdown="onTypePointerDown"
+        @click.capture="onTypeClick"
+      >
+        <OToggleGroup
+          ref="typeStrip"
+          :model-value="type"
+          deselectable
+          class="max-w-full overflow-x-auto"
+          @update:model-value="setType"
+        >
+          <OToggleGroupItem
+            v-for="kind in peerKinds"
+            :key="kind"
+            :value="kind"
+            size="sm"
+            :icon-left="KIND_ICONS[kind]"
+            :data-test="`command-type-${kind}`"
+            >{{ t(KIND_LABELS[kind]) }}</OToggleGroupItem
           >
-            <OToggleGroupItem
-              value="all"
-              size="sm"
-              icon-left="search"
-              data-test="command-type-all"
-              >{{ t("commandPalette.all") }}</OToggleGroupItem
-            >
-            <OToggleGroupItem
-              v-for="kind in peerKinds"
-              :key="kind"
-              :value="kind"
-              size="sm"
-              :icon-left="KIND_ICONS[kind]"
-              :data-test="`command-type-${kind}`"
-              >{{ t(KIND_LABELS[kind]) }}</OToggleGroupItem
-            >
-          </OToggleGroup>
-        </div>
-        <OButton
-          variant="ghost"
-          size="icon-xs"
-          icon-left="chevron-right"
-          :aria-label="t('common.next')"
-          :disabled="atTypeEnd"
-          data-test="command-types-next"
-          @click="scrollTypes(1)"
-        />
+        </OToggleGroup>
       </div>
       <OText v-if="offline" role="status" variant="meta">{{ t("commandPalette.offline") }}</OText>
       <OText v-if="history.storageFailed.value" role="status" variant="meta">{{

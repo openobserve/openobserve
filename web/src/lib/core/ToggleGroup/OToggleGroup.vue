@@ -21,6 +21,7 @@ const props = withDefaults(defineProps<ToggleGroupProps>(), {
   labelPosition: "left",
   reorderable: false,
   mobileDropdown: false,
+  deselectable: false,
 });
 
 const emit = defineEmits<ToggleGroupEmits>();
@@ -349,7 +350,10 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
       v-bind="dragListeners"
       @update:model-value="
         (v) => {
-          if (type === 'single' && (v === null || v === undefined || v === '')) return;
+          if (type === 'single' && (v === null || v === undefined || v === '')) {
+            if (deselectable) emit('update:modelValue', null);
+            return;
+          }
           emit('update:modelValue', v);
         }
       "
@@ -385,7 +389,10 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
     v-bind="dragListeners"
     @update:model-value="
       (v) => {
-        if (type === 'single' && (v === null || v === undefined || v === '')) return;
+        if (type === 'single' && (v === null || v === undefined || v === '')) {
+          if (deselectable) emit('update:modelValue', null);
+          return;
+        }
         emit('update:modelValue', v);
       }
     "

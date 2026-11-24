@@ -34488,7 +34488,6 @@
   "commandPalette": {
     "title": "Search pages, resources, and actions",
     "placeholder": "Search names and IDs",
-    "all": "All",
     "moreTypes": "More types",
     "pages": "Pages",
     "actions": "Create",

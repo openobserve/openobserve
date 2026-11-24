@@ -34490,7 +34490,6 @@
   "commandPalette": {
     "title": "페이지, 리소스 및 작업 검색",
     "placeholder": "이름 및 ID 검색",
-    "all": "전체",
     "moreTypes": "추가 유형",
     "pages": "페이지",
     "actions": "만들기",

@@ -34490,7 +34490,6 @@
   "commandPalette": {
     "title": "搜索页面、资源和操作",
     "placeholder": "搜索名称和 ID",
-    "all": "全部",
     "moreTypes": "更多类型",
     "pages": "页面",
     "actions": "创建",

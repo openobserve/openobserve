@@ -65,6 +65,16 @@ describe("OToggleGroup", () => {
     expect(wrapper.emitted("update:modelValue")).toBeDefined();
   });
 
+  it("keeps a single selection unless the group is deselectable", async () => {
+    const items = [{ value: "left", label: "Left" }];
+    const locked = mountGroup({ modelValue: "left" }, items);
+    await locked.find("button").trigger("click");
+    expect(locked.emitted("update:modelValue")).toBeUndefined();
+    const clearable = mountGroup({ modelValue: "left", deselectable: true }, items);
+    await clearable.find("button").trigger("click");
+    expect(clearable.emitted("update:modelValue")).toEqual([[null]]);
+  });
+
   // --- v-model: active item has data-state=on ---
 
   it('marks the active item with data-state="on"', async () => {

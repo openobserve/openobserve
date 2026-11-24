@@ -34490,7 +34490,6 @@
   "commandPalette": {
     "title": "Rechercher des pages, ressources et actions",
     "placeholder": "Rechercher des noms et ID",
-    "all": "Tout",
     "moreTypes": "Autres types",
     "pages": "Pages",
     "actions": "Créer",

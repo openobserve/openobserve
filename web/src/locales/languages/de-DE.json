@@ -34490,7 +34490,6 @@
   "commandPalette": {
     "title": "Seiten, Ressourcen und Aktionen suchen",
     "placeholder": "Namen und IDs suchen",
-    "all": "Alle",
     "moreTypes": "Weitere Typen",
     "pages": "Seiten",
     "actions": "Erstellen",

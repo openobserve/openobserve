@@ -34485,7 +34485,6 @@
   "commandPalette": {
     "title": "搜尋頁面、資源和操作",
     "placeholder": "搜尋名稱和 ID",
-    "all": "全部",
     "moreTypes": "更多類型",
     "pages": "頁面",
     "actions": "建立",
