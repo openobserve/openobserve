@@ -40,7 +40,6 @@ export class DateTimePickerPage {
         this.rangeBarInput = page.locator('[data-test="date-time-range-input"] input');
         this.rangeBarStatus = page.locator('[data-test="date-time-range-status"]');
         this.gateMessage = page.locator('[data-test="date-time-gate-message"]');
-        this.zoomOutBtn = page.locator('[data-test="date-time-zoom-out-btn"]');
         this.copyConfirm = page.locator('[data-test="copy-confirm"]');
 
         // Shift buttons — Previous / Next flank the trigger (rendered when

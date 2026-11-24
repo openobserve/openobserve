@@ -3,7 +3,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
 /**
- * E2E coverage for the typed range bar, the `t` shortcut and zoom out on the logs
+ * E2E coverage for the typed range bar and the `t` shortcut on the logs
  * page. The URL is the contract: logs read `period` before `from`/`to`, so a fixed
  * range must drop `period` and a rolling one must carry it.
  *
@@ -70,18 +70,5 @@ test.describe("DateTime typed range bar testcases", () => {
     await page.keyboard.press('t');
     await expect(pm.dateTimePickerPage.panel).toBeHidden();
     await expect(page.locator(pm.logsPage.queryEditorViewLines)).toContainText('t');
-  });
-
-  test("zooms a fixed range out and drops period from the URL", {
-    tag: ['@datetime-picker', '@all', '@P1']
-  }, async ({ page }) => {
-    await pm.dateTimePickerPage.prevShiftBtn.click();
-    await expect(page).not.toHaveURL(/[?&]period=/);
-    const fromBefore = new URL(page.url()).searchParams.get('from');
-
-    await pm.dateTimePickerPage.zoomOutBtn.click();
-
-    await expect(page).not.toHaveURL(/[?&]period=/);
-    await expect.poll(() => new URL(page.url()).searchParams.get('from')).not.toBe(fromBefore);
   });
 });

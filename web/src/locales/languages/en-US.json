@@ -884,7 +884,6 @@
     "pasteRange": "Paste time range",
     "dateRangeCopiedAs": "Copied {text}",
     "dateRangeCopiedWithOffset": "Copied with UTC{offset}",
-    "zoomOutRange": "Zoom out",
     "dateRangePasted": "Date range pasted",
     "dateRangePasteError": "Could not parse date range",
     "dateRangePasteEmpty": "Clipboard is empty. Copy a date range first.",

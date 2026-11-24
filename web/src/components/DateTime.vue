@@ -60,10 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="{
             [selectedType + 'type']: !disableRelative,
             hideRelative: disableRelative,
-            'md:min-w-71.5': !disableRelative && selectedType === 'absolute' && !showRangeZoom,
+            'md:min-w-71.5': !disableRelative && selectedType === 'absolute',
             'w-fit': disableRelative,
             'h-auto! rounded-none! border-0!': !hideRangeShift,
-            'md:px-2!': showRangeZoom,
             'border-select-border! enabled:hover:border-select-border-hover! w-full':
               fieldAppearance,
           }"
@@ -90,7 +89,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="arrow-drop-down"
               size="sm"
               class="date-time-arrow ms-auto text-lg! transition-transform duration-250"
-              :class="showRangeZoom ? 'md:hidden' : ''"
           /></template>
         </OButton>
       </template>
@@ -421,24 +419,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="date-time-next-btn"
         variant="ghost"
         size="icon-xs-sq"
-        class="border-button-outline-border h-auto! border-s!"
-        :class="showRangeZoom ? 'max-md:rounded-e-default! rounded-none!' : 'rounded-s-none!'"
+        class="border-button-outline-border h-auto! rounded-s-none! border-s!"
         icon-left="chevron-right"
         :aria-label="t('common.next')"
         :disabled="disable || isNextShiftDisabled()"
         @click.prevent.stop="shiftTimeRange('next')"
-      />
-    </OTooltip>
-    <OTooltip v-if="showRangeZoom" :content="zoomOutTooltip">
-      <OButton
-        data-test="date-time-zoom-out-btn"
-        variant="ghost"
-        size="icon-xs-sq"
-        class="border-button-outline-border h-auto! rounded-s-none! border-s! max-md:hidden"
-        icon-left="zoom-out"
-        :aria-label="zoomOutTooltip"
-        :disabled="disable || zoomOutBlocked !== null"
-        @click.prevent.stop="zoomOut"
       />
     </OTooltip>
     <span class="sr-only" aria-live="polite" data-test="date-time-range-live">{{ liveLabel }}</span>
@@ -588,10 +573,6 @@ interface PickerSelection {
   seededEnd: { date: string; time: string } | null;
   exactRange: ExactRange | null;
 }
-
-type ZoomTarget =
-  | { kind: "rolling"; value: number; spanUs: number }
-  | { kind: "fixed"; startUs: number; endUs: number; spanUs: number };
 
 interface StepOrigin {
   period: string;
@@ -2328,54 +2309,6 @@ export default defineComponent({
       if (props.autoApply || props.applyPresets) saveDate("relative", "host");
     };
 
-    const zoomOutTarget = (): ZoomTarget => {
-      if (isRolling()) {
-        const value = Number(relativeValue.value) * 2;
-        return { kind: "rolling", value, spanUs: rollingSpanMicros(value, relativePeriod.value) };
-      }
-      const { startTime, endTime } = getConsumableDateTime();
-      const span = endTime - startTime;
-      // The half that would pass now is added to the start, so the window still doubles.
-      const endUs = Math.min(endTime + Math.round(span / 2), forwardCeilingMicros());
-      return { kind: "fixed", startUs: endUs - span * 2, endUs, spanUs: span * 2 };
-    };
-
-    const zoomOutBlocked = computed<GateReason | null>(() => {
-      const target = zoomOutTarget();
-      if (
-        target.kind === "rolling" &&
-        target.value > (MAX_CUSTOM_RELATIVE_VALUE[relativePeriod.value] ?? Infinity)
-      )
-        return "out-of-range";
-      if (!(target.spanUs > 0)) return "order";
-      return target.kind === "rolling"
-        ? rollingGate(target.value, relativePeriod.value)
-        : gateOf(target.startUs, target.endUs, rangeLimits.value);
-    });
-
-    const zoomOutTooltip = computed(
-      () => gateText(zoomOutBlocked.value) ?? t("common.zoomOutRange"),
-    );
-
-    const showRangeZoom = computed(
-      () => !props.hideRangeShift && !props.disableRelative && !props.fieldAppearance,
-    );
-
-    const zoomOut = () => {
-      if (zoomOutBlocked.value !== null) return;
-      const target = zoomOutTarget();
-      stepOrigin = null;
-      menuOpen.value = false;
-      if (target.kind === "rolling") {
-        relativeValue.value = target.value;
-        rollingFold.value = null;
-        saveDate("relative");
-        return;
-      }
-      stageAbsolute(target.startUs, target.endUs);
-      saveDate("absolute");
-    };
-
     const forwardCeilingMicros = () => maxDateEndUs.value ?? Date.now() * 1000;
 
     const isPrevShiftDisabled = () => {
@@ -2865,10 +2798,6 @@ export default defineComponent({
       gateNow,
       gateMessage,
       spanLimitText,
-      zoomOut,
-      zoomOutBlocked,
-      zoomOutTooltip,
-      showRangeZoom,
       onCustomValueFocus,
       onCustomValueBlur,
       setRelativeDate,
