@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use ::datafusion::logical_expr::ScalarUDF;
 use arrow_schema::Schema;
@@ -40,6 +43,7 @@ impl ScanRedaction {
         schema: &Schema,
         raw: bool,
     ) -> Result<Self, Error> {
+        use arrow_schema::DataType;
         use o2_enterprise::enterprise::re_patterns::{
             get_pattern_manager, search_redact_udf::sdr_redact_udf,
         };
@@ -64,9 +68,7 @@ impl ScanRedaction {
                 schema.field_with_name(field).is_ok_and(|f| {
                     matches!(
                         f.data_type(),
-                        arrow_schema::DataType::Utf8
-                            | arrow_schema::DataType::LargeUtf8
-                            | arrow_schema::DataType::Utf8View
+                        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View
                     )
                 })
             })
@@ -101,7 +103,7 @@ impl ScanRedaction {
     }
 
     /// The protected fields plus the raw-copy columns; empty for an unprotected stream.
-    pub(super) fn redacted_columns(&self) -> std::collections::HashSet<String> {
+    pub(super) fn redacted_columns(&self) -> HashSet<String> {
         if self.protected {
             redacted_columns(&self.udfs)
         } else {
