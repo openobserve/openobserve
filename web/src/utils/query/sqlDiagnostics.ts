@@ -52,6 +52,8 @@ export interface SqlErrorRange {
    */
   endColumn?: number;
   error: string;
+  /** Defaults to an error marker; a warning does not suggest the query is wrong. */
+  severity?: "warning";
 }
 
 // ─── Message templates ────────────────────────────────────────────────────────

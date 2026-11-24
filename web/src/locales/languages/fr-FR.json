@@ -1445,6 +1445,7 @@
     "queryEditorLabel": "Éditeur de requête :",
     "addFieldToTable": "Ajouter un champ au tableau",
     "removeFieldFromTable": "Retirer un champ du tableau",
+    "groupByThisField": "Regrouper par ce champ",
     "rows": "lignes",
     "resetFields": "Réinitialiser les champs de table sélectionnés",
     "metrics": "Métriques",
@@ -17329,7 +17330,100 @@
     "searchTypeOthers": "Autres"
   },
   "traces": {
+    "groups": {
+      "label": "Regrouper par",
+      "grouped": "Regroupé par {field}",
+      "count": "{count} groupe | {count} groupes",
+      "clear": "Effacer le regroupement",
+      "spans": "Spans",
+      "errors": "Erreurs",
+      "errorPct": "Erreur %",
+      "p50": "p50",
+      "p95": "p95",
+      "p95Tooltip": "Approximatif",
+      "p99": "p99",
+      "rate": "Débit",
+      "rateTooltip": "Spans sur la plage de temps sélectionnée",
+      "noValue": "(aucune valeur)",
+      "showingOf": "Affichage de {shown} sur ~{total} valeurs",
+      "openTraces": "Ouvrir les traces",
+      "empty": "Aucun span ne correspond à ce filtre dans la plage de temps sélectionnée",
+      "loadFailed": "Impossible de charger les groupes"
+    },
     "nlNeedsSql": "Cette question nécessite SQL ; ouvrez-la dans Logs",
+    "scope": {
+      "label": "Portée",
+      "all": "Tous les spans",
+      "allDesc": "Tous les spans qui correspondent au filtre",
+      "root": "Spans racines",
+      "rootDesc": "Spans sans parent, où chaque trace commence",
+      "entrypoint": "Spans de point d'entrée",
+      "entrypointDesc": "Spans de serveur ou de consommateur, plus tout span racine",
+      "rootUnavailable": "Ce flux n'a pas de champ reference_parent_span_id",
+      "allShort": "Tous",
+      "rootShort": "Racine",
+      "entrypointShort": "Entrée",
+      "allHint": "Tous les spans de la plage de temps",
+      "rootHint": "Uniquement le premier span de chaque trace",
+      "entrypointHint": "Spans de serveur et de consommateur, plus les racines",
+      "chip": "Portée : {scope}"
+    },
+    "sqlMode": {
+      "actionUnavailable": "Pas encore disponible en mode SQL",
+      "drillDownDisabled": "L'exploration détaillée n'est pas disponible en mode SQL",
+      "putConditionInWhere": "En mode SQL, placez la condition dans votre clause WHERE",
+      "rowsCount": "{count} ligne | {count} lignes",
+      "histogramLossWarning": "Cette forme de requête peut perdre des spans entre les partitions temporelles",
+      "openInSpans": "Ouvrir dans la vue Spans",
+      "runsInSpans": "SQL s'exécute dans la vue Spans",
+      "backToTraces": "Retour aux traces",
+      "sqlKept": "Votre SQL est conservé. Activez SQL pour le récupérer.",
+      "statementInTraces": {
+        "title": "La vue Traces accepte un filtre, pas un SELECT",
+        "subqueryTitle": "La vue Traces ne peut pas exécuter de sous-requête",
+        "description": "SQL s'exécute dans la vue Spans."
+      },
+      "noTraceIdHint": "Ces lignes n'ont pas de trace_id, elles n'ouvrent donc pas de trace.",
+      "addTraceId": "Ajouter trace_id",
+      "openTrace": "Ouvrir la trace",
+      "openingTrace": "Ouverture de la trace",
+      "firstTraces": "{count} première trace | {count} premières traces",
+      "firstRows": "{count} première ligne | {count} premières lignes",
+      "conditionAdded": "Ajout de {condition} au WHERE",
+      "conditionRemoved": "Suppression de la condition {field} du WHERE",
+      "editWhereToRemove": "Modifiez le WHERE pour supprimer la condition {field}",
+      "undo": "Annuler",
+      "inAllColumn": "dans {column}",
+      "awaitingRun": {
+        "spansTitle": "Exécutez la requête pour voir les résultats",
+        "description": "Aucune requête n'a encore été exécutée. Le bouton Exécuter la requête envoie le SQL présent dans l'éditeur."
+      },
+      "errors": {
+        "fieldNotFoundTitle": "Champ introuvable : {field}",
+        "fieldNotFoundDesc": "Un champ au nom similaire existe dans ce flux.",
+        "didYouMean": "Vouliez-vous dire {field} ?",
+        "didYouMeanDesc": "Remplace {field} dans la requête, puis l'exécute",
+        "outOfMemoryTitle": "Cette requête a manqué de mémoire",
+        "outOfMemoryDesc": "Les requêtes sur de longues périodes peuvent utiliser plus de mémoire que le serveur ne l'autorise.",
+        "useLastHour": "Utiliser la dernière heure",
+        "useLastHourDesc": "Réduit la plage temporelle, puis exécute la requête",
+        "missingStreamTitle": "Nom du flux manquant après FROM",
+        "missingStreamDesc": "Indiquez le nom du flux après FROM, par exemple FROM \"{stream}\".",
+        "noFullTextTitle": "Ce flux n'a pas de champs de texte intégral.",
+        "noFullTextDesc": "match_all ne recherche que les champs de texte intégral. Recherchez plutôt un champ avec str_match."
+      },
+      "matchAllEmpty": {
+        "title": "Aucun span trouvé",
+        "description": "Rien ne correspond à cette requête dans la fenêtre sélectionnée. Le flux n'a peut-être aucun champ de texte intégral rempli, donc match_all n'a peut-être rien à rechercher.",
+        "searchOneField": "Rechercher dans un seul champ",
+        "searchOneFieldDesc": "Exécute {call}"
+      },
+      "strayKeyword": "Le serveur ignore {word} entre le nom du flux et WHERE. Supprimez-le ou déplacez la condition dans le WHERE.",
+      "joinLongRange": "Une JOIN sur plus d'une heure peut manquer de mémoire. Réduisez la plage temporelle si la requête échoue.",
+      "partialResults": "Le résultat a été tronqué à la limite de lignes, donc certaines lignes manquent. Ajoutez un LIMIT ou réduisez la requête.",
+      "allFieldsNote": "Les champs hors du schéma du flux sont stockés dans {column}. Utilisez json_get_str({column}, 'field').",
+      "maybeInAll": "Ce champ est peut-être stocké dans {column}"
+    },
     "redActions": {
       "menuGroupDashboards": "Tableaux de bord",
       "addRedToDashboard": "Ajouter les graphiques RED au tableau de bord",
@@ -17347,6 +17441,42 @@
         "days": "Ce graphique conserve les barres de {count} jours que vous voyez actuellement."
       }
     },
+    "redCaption": {
+      "about": "À propos de ce graphique",
+      "matched": "Graphiques : tous les spans correspondants",
+      "matchedCount": "Graphiques : {count} span correspondant | Graphiques : tous les {count} spans correspondants",
+      "noneMatched": "Graphiques : 0 span correspondant",
+      "cte": "Graphiques : spans issus de la CTE {name}",
+      "branches": "Graphiques : spans correspondant à {count} branche | Graphiques : spans correspondant à l'une des {count} branches (chevauchements comptés une fois)",
+      "joinMatched": "Graphiques : spans du côté gauche dans les traces où votre jointure a trouvé une correspondance",
+      "joinLeft": "Graphiques : spans du côté gauche correspondant à votre WHERE",
+      "inner": "Graphiques : spans issus de la requête interne",
+      "stream": "Graphiques : tous les spans de {stream} · filtre de votre requête non appliqué",
+      "count": "{count} span | {count} spans",
+      "notApplied": "{clauses} non appliquées",
+      "scope": "Portée : tous les spans (votre SQL décide)",
+      "clause": {
+        "groupBy": "GROUP BY",
+        "having": "HAVING",
+        "distinct": "DISTINCT",
+        "orderBy": "ORDER BY",
+        "limit": "LIMIT",
+        "offset": "OFFSET",
+        "window": "fonction de fenêtrage",
+        "qualify": "QUALIFY",
+        "outerWhere": "WHERE externe",
+        "bothSidesWhere": "WHERE des deux côtés",
+        "join": "jointure"
+      }
+    },
+    "redCharts": {
+      "loadFailed": "Impossible de charger ce graphique",
+      "notTraces": "Les graphiques nécessitent un flux de traces. Votre requête lit {stream}.",
+      "unreadable": "Les graphiques ne peuvent pas déterminer quels spans votre requête sélectionne.",
+      "shape": "Les graphiques ne peuvent pas déterminer quels spans cette requête sélectionne.",
+      "noData": "Aucune donnée",
+      "showAllSpans": "Afficher tous les spans dans {stream}"
+    },
     "latencyHeatmap": {
       "title": "Durée",
       "tooltipSpans": "{count} span | {count} spans",
@@ -17357,7 +17487,6 @@
         "errors": "Erreurs"
       },
       "noData": "Aucune donnée",
-      "unavailable": "La carte thermique de latence n'est pas disponible pour cette recherche",
       "loadFailed": "Échec du chargement de la carte thermique de latence",
       "selection": {
         "label": "Sélection de la carte de chaleur",

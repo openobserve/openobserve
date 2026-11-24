@@ -1445,6 +1445,7 @@
     "queryEditorLabel": "Query-editor:",
     "addFieldToTable": "Veld aan tabel toevoegen",
     "removeFieldFromTable": "Veld uit tabel verwijderen",
+    "groupByThisField": "Groepeer op dit veld",
     "rows": "rijen",
     "resetFields": "Geselecteerde tabelvelden opnieuw instellen",
     "metrics": "Metrieken",
@@ -17329,7 +17330,100 @@
     "searchTypeOthers": "Overige"
   },
   "traces": {
+    "groups": {
+      "label": "Groepeer op",
+      "grouped": "Gegroepeerd op {field}",
+      "count": "{count} groep | {count} groepen",
+      "clear": "Groepering wissen",
+      "spans": "Spans",
+      "errors": "Fouten",
+      "errorPct": "Fout %",
+      "p50": "p50",
+      "p95": "p95",
+      "p95Tooltip": "Bij benadering",
+      "p99": "p99",
+      "rate": "Snelheid",
+      "rateTooltip": "Spans binnen het geselecteerde tijdsbereik",
+      "noValue": "(geen waarde)",
+      "showingOf": "{shown} van ~{total} waarden weergegeven",
+      "openTraces": "Traces openen",
+      "empty": "Geen spans voldoen aan dit filter in het geselecteerde tijdsbereik",
+      "loadFailed": "Kon de groepen niet laden"
+    },
     "nlNeedsSql": "Deze vraag vereist SQL; open deze in logs",
+    "scope": {
+      "label": "Bereik",
+      "all": "Alle spans",
+      "allDesc": "Elke span die aan het filter voldoet",
+      "root": "Root-spans",
+      "rootDesc": "Spans zonder parent, waar elke trace begint",
+      "entrypoint": "Entry-point-spans",
+      "entrypointDesc": "Server- of consumerspans, plus elke root-span",
+      "rootUnavailable": "Deze stream heeft geen veld reference_parent_span_id",
+      "allShort": "Alle",
+      "rootShort": "Root",
+      "entrypointShort": "Entry",
+      "allHint": "Elke span in het tijdsbereik",
+      "rootHint": "Alleen de eerste span van elke trace",
+      "entrypointHint": "Server- en consumerspans, plus roots",
+      "chip": "Bereik: {scope}"
+    },
+    "sqlMode": {
+      "actionUnavailable": "Nog niet beschikbaar in SQL-modus",
+      "drillDownDisabled": "Inzoomen is niet beschikbaar in SQL-modus",
+      "putConditionInWhere": "Zet de voorwaarde in SQL-modus in je WHERE-clausule",
+      "rowsCount": "{count} rij | {count} rijen",
+      "histogramLossWarning": "Deze queryvorm kan spans kwijtraken over tijdspartities",
+      "openInSpans": "Openen in Spans-weergave",
+      "runsInSpans": "SQL wordt uitgevoerd in de Spans-weergave",
+      "backToTraces": "Terug naar Traces",
+      "sqlKept": "Je SQL blijft bewaard. Zet SQL aan om het terug te krijgen.",
+      "statementInTraces": {
+        "title": "De Traces-weergave verwacht een filter, geen SELECT",
+        "subqueryTitle": "De Traces-weergave kan geen subquery uitvoeren",
+        "description": "SQL wordt uitgevoerd in de Spans-weergave."
+      },
+      "noTraceIdHint": "Deze rijen hebben geen trace_id en openen dus geen trace.",
+      "addTraceId": "trace_id toevoegen",
+      "openTrace": "Trace openen",
+      "openingTrace": "Trace wordt geopend",
+      "firstTraces": "Eerste {count} trace | Eerste {count} traces",
+      "firstRows": "Eerste {count} rij | Eerste {count} rijen",
+      "conditionAdded": "{condition} toegevoegd aan de WHERE",
+      "conditionRemoved": "De voorwaarde {field} uit de WHERE verwijderd",
+      "editWhereToRemove": "Bewerk de WHERE om de voorwaarde {field} te verwijderen",
+      "undo": "Ongedaan maken",
+      "inAllColumn": "in {column}",
+      "awaitingRun": {
+        "spansTitle": "Voer de query uit om resultaten te zien",
+        "description": "Er is nog niets uitgevoerd. Met Query uitvoeren wordt de SQL in de editor verzonden."
+      },
+      "errors": {
+        "fieldNotFoundTitle": "Veld niet gevonden: {field}",
+        "fieldNotFoundDesc": "Er bestaat een veld met een vergelijkbare naam in deze stream.",
+        "didYouMean": "Bedoelde je {field}?",
+        "didYouMeanDesc": "Vervangt {field} in de query en voert deze vervolgens uit",
+        "outOfMemoryTitle": "Deze query had onvoldoende geheugen",
+        "outOfMemoryDesc": "Query's over lange perioden kunnen meer geheugen gebruiken dan de server toestaat.",
+        "useLastHour": "Laatste 1 uur gebruiken",
+        "useLastHourDesc": "Beperkt het tijdsbereik en voert de query vervolgens uit",
+        "missingStreamTitle": "Streamnaam ontbreekt na FROM",
+        "missingStreamDesc": "Schrijf de streamnaam na FROM, bijvoorbeeld FROM \"{stream}\".",
+        "noFullTextTitle": "Deze stream heeft geen full-textvelden",
+        "noFullTextDesc": "match_all doorzoekt alleen full-textvelden. Doorzoek in plaats daarvan één veld met str_match."
+      },
+      "matchAllEmpty": {
+        "title": "Geen spans gevonden",
+        "description": "Niets kwam overeen met deze query in het geselecteerde venster. De stream heeft mogelijk geen gevulde full-textvelden, waardoor match_all niets te doorzoeken heeft.",
+        "searchOneField": "Doorzoek in plaats daarvan één veld",
+        "searchOneFieldDesc": "Voert {call} uit"
+      },
+      "strayKeyword": "De server negeert {word} tussen de streamnaam en WHERE. Verwijder het of verplaats de voorwaarde naar de WHERE.",
+      "joinLongRange": "Een JOIN over meer dan 1 uur kan het geheugen uitputten. Beperk het tijdsbereik als de query mislukt.",
+      "partialResults": "Het resultaat is afgekapt op de rijlimiet, dus er ontbreken rijen. Voeg een LIMIT toe of beperk de query.",
+      "allFieldsNote": "Velden buiten het streamschema worden opgeslagen in {column}. Gebruik json_get_str({column}, 'field').",
+      "maybeInAll": "Dit veld wordt mogelijk opgeslagen in {column}"
+    },
     "redActions": {
       "menuGroupDashboards": "Dashboards",
       "addRedToDashboard": "RED-grafieken aan dashboard toevoegen",
@@ -17347,6 +17441,42 @@
         "days": "Deze grafiek behoudt de balken van {count} dagen die je nu ziet."
       }
     },
+    "redCaption": {
+      "about": "Over deze grafiek",
+      "matched": "Grafieken: alle overeenkomende spans",
+      "matchedCount": "Grafieken: {count} overeenkomende span | Grafieken: alle {count} overeenkomende spans",
+      "noneMatched": "Grafieken: 0 overeenkomende spans",
+      "cte": "Grafieken: spans uit CTE {name}",
+      "branches": "Grafieken: spans die overeenkomen met een van de {count} vertakking | Grafieken: spans die overeenkomen met een van de {count} vertakkingen (overlap eenmaal geteld)",
+      "joinMatched": "Grafieken: spans aan de linkerkant in traces waar je join overeenkwam",
+      "joinLeft": "Grafieken: spans aan de linkerkant die overeenkomen met je WHERE",
+      "inner": "Grafieken: spans uit de binnenste query",
+      "stream": "Grafieken: alle spans in {stream} · filter van je query niet toegepast",
+      "count": "{count} span | {count} spans",
+      "notApplied": "{clauses} niet toegepast",
+      "scope": "Bereik: alle spans (je SQL bepaalt)",
+      "clause": {
+        "groupBy": "GROUP BY",
+        "having": "HAVING",
+        "distinct": "DISTINCT",
+        "orderBy": "ORDER BY",
+        "limit": "LIMIT",
+        "offset": "OFFSET",
+        "window": "vensterfunctie",
+        "qualify": "QUALIFY",
+        "outerWhere": "outer WHERE",
+        "bothSidesWhere": "WHERE aan beide zijden",
+        "join": "join"
+      }
+    },
+    "redCharts": {
+      "loadFailed": "Kan deze grafiek niet laden",
+      "notTraces": "Grafieken hebben een traces-stream nodig. Je query leest {stream}.",
+      "unreadable": "Grafieken kunnen niet aflezen welke spans je query selecteert.",
+      "shape": "Grafieken kunnen niet bepalen welke spans deze query selecteert.",
+      "noData": "Geen gegevens",
+      "showAllSpans": "Toon alle spans in {stream}"
+    },
     "latencyHeatmap": {
       "title": "Duur",
       "tooltipSpans": "{count} span | {count} spans",
@@ -17357,7 +17487,6 @@
         "errors": "Fouten"
       },
       "noData": "Geen gegevens",
-      "unavailable": "De latentie-heatmap is niet beschikbaar voor deze zoekopdracht",
       "loadFailed": "Kan de latentie-heatmap niet laden",
       "selection": {
         "label": "Heatmapselectie",

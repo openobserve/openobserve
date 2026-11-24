@@ -1445,6 +1445,7 @@
     "queryEditorLabel": "查询编辑器：",
     "addFieldToTable": "添加字段到表格",
     "removeFieldFromTable": "从表格中移除字段",
+    "groupByThisField": "按此字段分组",
     "rows": "行",
     "resetFields": "重置选定的表格字段",
     "metrics": "指标",
@@ -17329,7 +17330,100 @@
     "searchTypeOthers": "其他"
   },
   "traces": {
+    "groups": {
+      "label": "分组依据",
+      "grouped": "按 {field} 分组",
+      "count": "{count} 个分组 | {count} 个分组",
+      "clear": "清除分组",
+      "spans": "Span 数",
+      "errors": "错误数",
+      "errorPct": "错误率",
+      "p50": "p50",
+      "p95": "p95",
+      "p95Tooltip": "近似值",
+      "p99": "p99",
+      "rate": "速率",
+      "rateTooltip": "所选时间范围内的 Span 数",
+      "noValue": "（无值）",
+      "showingOf": "显示 {shown} 个值，共约 {total} 个",
+      "openTraces": "打开追踪",
+      "empty": "所选时间范围内没有 Span 匹配此过滤器",
+      "loadFailed": "无法加载分组"
+    },
     "nlNeedsSql": "此问题需要用 SQL，请在日志中打开",
+    "scope": {
+      "label": "范围",
+      "all": "所有 Span",
+      "allDesc": "匹配过滤器的每个 Span",
+      "root": "根 Span",
+      "rootDesc": "没有父级的 Span，即每条追踪的起点",
+      "entrypoint": "入口点 Span",
+      "entrypointDesc": "服务端或消费端 Span，以及任意根 Span",
+      "rootUnavailable": "此数据流没有 reference_parent_span_id 字段",
+      "allShort": "全部",
+      "rootShort": "根",
+      "entrypointShort": "入口",
+      "allHint": "时间范围内的所有 Span",
+      "rootHint": "仅每条追踪的第一个 Span",
+      "entrypointHint": "服务端和消费端 Span，以及根 Span",
+      "chip": "范围：{scope}"
+    },
+    "sqlMode": {
+      "actionUnavailable": "SQL 模式下尚不可用",
+      "drillDownDisabled": "SQL 模式下无法下钻",
+      "putConditionInWhere": "在 SQL 模式下，请将条件放入 WHERE 子句",
+      "rowsCount": "{count} 行 | {count} 行",
+      "histogramLossWarning": "此查询形态可能会跨时间分区丢失 Span",
+      "openInSpans": "在 Span 视图中打开",
+      "runsInSpans": "SQL 在 Span 视图中运行",
+      "backToTraces": "返回追踪",
+      "sqlKept": "您的 SQL 已保留。重新开启 SQL 即可找回。",
+      "statementInTraces": {
+        "title": "追踪视图接受过滤器，而不是 SELECT",
+        "subqueryTitle": "追踪视图无法运行子查询",
+        "description": "SQL 在 Span 视图中运行。"
+      },
+      "noTraceIdHint": "这些行没有 trace_id，因此无法打开追踪。",
+      "addTraceId": "添加 trace_id",
+      "openTrace": "打开追踪",
+      "openingTrace": "正在打开追踪",
+      "firstTraces": "前 {count} 条追踪 | 前 {count} 条追踪",
+      "firstRows": "前 {count} 行 | 前 {count} 行",
+      "conditionAdded": "已将 {condition} 添加到 WHERE",
+      "conditionRemoved": "已从 WHERE 中移除 {field} 条件",
+      "editWhereToRemove": "编辑 WHERE 以移除 {field} 条件",
+      "undo": "撤销",
+      "inAllColumn": "位于 {column}",
+      "awaitingRun": {
+        "spansTitle": "运行查询以查看结果",
+        "description": "尚未运行任何查询。运行查询会发送编辑器中的 SQL。"
+      },
+      "errors": {
+        "fieldNotFoundTitle": "未找到字段：{field}",
+        "fieldNotFoundDesc": "此数据流中存在名称相似的字段。",
+        "didYouMean": "您指的是 {field} 吗？",
+        "didYouMeanDesc": "在查询中替换 {field}，然后运行查询",
+        "outOfMemoryTitle": "此查询内存不足",
+        "outOfMemoryDesc": "长时间范围的查询可能使用超过服务器允许的内存。",
+        "useLastHour": "使用最近 1 小时",
+        "useLastHourDesc": "缩小时间范围，然后运行查询",
+        "missingStreamTitle": "FROM 后缺少数据流名称",
+        "missingStreamDesc": "在 FROM 后写入数据流名称，例如 FROM \"{stream}\"。",
+        "noFullTextTitle": "此数据流没有全文检索字段",
+        "noFullTextDesc": "match_all 仅搜索全文检索字段。请改用 str_match 搜索单个字段。"
+      },
+      "matchAllEmpty": {
+        "title": "未找到 Span",
+        "description": "在所选时间窗口内没有匹配此查询的内容。该数据流可能没有已填充的全文检索字段，因此 match_all 可能没有可搜索的内容。",
+        "searchOneField": "改为搜索单个字段",
+        "searchOneFieldDesc": "运行 {call}"
+      },
+      "strayKeyword": "服务器会忽略数据流名称与 WHERE 之间的 {word}。请将其移除，或将条件移入 WHERE。",
+      "joinLongRange": "超过 1 小时的 JOIN 可能导致内存不足。如果查询失败，请缩小时间范围。",
+      "partialResults": "结果在行数上限处被截断，因此缺少部分行。请添加 LIMIT 或缩小查询范围。",
+      "allFieldsNote": "数据流 schema 之外的字段存储在 {column} 中。使用 json_get_str({column}, 'field')。",
+      "maybeInAll": "此字段可能存储在 {column} 中"
+    },
     "redActions": {
       "menuGroupDashboards": "仪表盘",
       "addRedToDashboard": "将 RED 图表添加到仪表盘",
@@ -17347,6 +17441,42 @@
         "days": "此图表将保留您现在看到的 {count} 天柱状条。"
       }
     },
+    "redCaption": {
+      "about": "关于此图表",
+      "matched": "图表：所有匹配的 Span",
+      "matchedCount": "图表：{count} 个匹配的 Span | 图表：全部 {count} 个匹配的 Span",
+      "noneMatched": "图表：0 个 Span 匹配",
+      "cte": "图表：来自 CTE {name} 的 Span",
+      "branches": "图表：匹配任一分支的 Span（共 {count} 个） | 图表：匹配 {count} 个分支中任一分支的 Span（重叠仅计一次）",
+      "joinMatched": "图表：join 匹配的追踪中的左侧 Span",
+      "joinLeft": "图表：匹配 WHERE 的左侧 Span",
+      "inner": "图表：来自内层查询的 Span",
+      "stream": "图表：{stream} 中的所有 Span · 未应用查询的过滤器",
+      "count": "{count} 个 Span | {count} 个 Span",
+      "notApplied": "未应用 {clauses}",
+      "scope": "范围：所有 Span（由您的 SQL 决定）",
+      "clause": {
+        "groupBy": "GROUP BY",
+        "having": "HAVING",
+        "distinct": "DISTINCT",
+        "orderBy": "ORDER BY",
+        "limit": "LIMIT",
+        "offset": "OFFSET",
+        "window": "窗口函数",
+        "qualify": "QUALIFY",
+        "outerWhere": "外层 WHERE",
+        "bothSidesWhere": "两侧的 WHERE",
+        "join": "join"
+      }
+    },
+    "redCharts": {
+      "loadFailed": "无法加载此图表",
+      "notTraces": "图表需要追踪数据流。您的查询读取的是 {stream}。",
+      "unreadable": "图表无法解析您的查询选取了哪些 Span。",
+      "shape": "图表无法确定此查询选取了哪些 Span。",
+      "noData": "无数据",
+      "showAllSpans": "显示 {stream} 中的所有 Span"
+    },
     "latencyHeatmap": {
       "title": "持续时间",
       "tooltipSpans": "{count} 个 Span | {count} 个 Span",
@@ -17357,7 +17487,6 @@
         "errors": "错误"
       },
       "noData": "无数据",
-      "unavailable": "此搜索无法使用延迟热力图",
       "loadFailed": "加载延迟热力图失败",
       "selection": {
         "label": "热力图选择",
