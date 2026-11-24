@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="emit('ask-ai')"
         >
           <template #icon-left>
-            <OIcon name="auto-awesome" size="sm" class="text-text-secondary shrink-0" />
+            <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
           </template>
           {{ t("traces.noEvents.askAi") }}
         </OButton>
@@ -81,7 +81,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -91,6 +90,7 @@ import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue
 import OButton from "@/lib/core/Button/OButton.vue";
 import useTraces from "@/composables/useTraces";
 import useWidenRange from "@/composables/useWidenRange";
+import { useAiIcon } from "@/composables/useAiIcon";
 import { getConsumableRelativeTime } from "@/utils/date";
 import DOMPurify from "dompurify";
 
@@ -112,6 +112,7 @@ const props = defineProps<{
 
 const { t } = useI18nTyped();
 const store = useStore();
+const { aiIconSrc } = useAiIcon();
 const emit = defineEmits<{
   "jump-to-stream-data": [fromUs: number, toUs: number];
   "ask-ai": [];

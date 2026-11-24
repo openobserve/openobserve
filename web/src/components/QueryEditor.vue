@@ -91,10 +91,14 @@
         :aria-label="t('search.aiModeIconAlt')"
         :disabled="props.disableAi"
         @click="onAiToggleClick"
-        class="rounded-default absolute! top-0.75 z-100 size-7! min-h-7! min-w-7!"
+        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-0.75 z-100 size-7! min-h-7! min-w-7! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
         :class="props.hasExpandButton ? 'right-9' : 'right-1'"
       >
-        <AiSparkleIcon class="text-text-secondary" />
+        <img
+          :src="nlpIcon"
+          alt=""
+          class="h-4.5 w-4.5 transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert"
+        />
         <span
           v-if="!aiAccess.allowed"
           aria-hidden="true"
@@ -146,7 +150,6 @@
 </template>
 
 <script setup lang="ts">
-import AiSparkleIcon from "@/components/common/AiSparkleIcon.vue";
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";

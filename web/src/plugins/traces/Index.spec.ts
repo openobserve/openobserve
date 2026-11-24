@@ -2455,10 +2455,10 @@ describe("Index.vue (Main Traces Page)", () => {
       const bar = wrapper.findComponent('[data-test="logs-search-bar"]');
       bar.vm.$emit("filterBuilderGrowth", 54);
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90 + 54);
+      expect(wrapper.vm.splitterModel).toBe(85 + 54);
       bar.vm.$emit("filterBuilderGrowth", null);
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(85);
     });
 
     it("should keep one pane height when the builder changes in the same tick as leaving the Spans view", async () => {
@@ -2659,7 +2659,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(85);
     });
 
     it("should render the second-level container with full-height class", async () => {

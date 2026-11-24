@@ -223,11 +223,12 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
-  // AI entry points are neutral secondary buttons; a second hue would compete with the accent.
+  // AI-themed gradient — purple→pink gradient background, white text
   "ai-gradient": [
-    "bg-button-outline-bg text-button-outline-text border border-button-outline-border",
-    "enabled:hover:bg-button-outline-hover-bg enabled:hover:border-button-outline-hover-border",
-    "enabled:active:bg-button-outline-active-bg",
+    "bg-gradient-ai text-white border-0",
+    "enabled:hover:shadow-md enabled:hover:shadow-ai-accent/40",
+    "enabled:active:opacity-90",
+    "focus-visible:ring-3 focus-visible:ring-ai-accent",
     "disabled:opacity-50",
   ].join(" "),
   // On-dark primary — white background with primary color text, for use on dark gradient panels

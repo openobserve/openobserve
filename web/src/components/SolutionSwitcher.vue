@@ -71,10 +71,10 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
     <template #trigger>
       <OButton
         variant="ghost"
-        size="sm"
+        size="sm-toolbar"
         :icon-left="current.icon"
         icon-right="expand-more"
-        class="font-semibold tracking-tight max-xl:max-w-full max-xl:min-w-0"
+        class="header-quiet-btn font-medium max-xl:max-w-full max-xl:min-w-0"
         data-test="solution-switcher"
       >
         <span class="max-xl:truncate max-md:sr-only">{{ t(current.labelKey) }}</span>

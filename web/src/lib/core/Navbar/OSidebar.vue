@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 /** Grouped one-row sidebar for the modern skin; same entries and gates as the classic rail. */
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, useId, watch } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -25,9 +25,6 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import { useTrialPaywall } from "@/composables/useTrialPaywall";
-import { useTheme } from "@/composables/useTheme";
-import { getImageURL } from "@/utils/zincutils";
-import config from "@/aws-exports";
 import type { NavItem, RailEntry, SubnavChild } from "./ONavbar.types";
 import { groupNavLinks } from "./navGroups";
 import { isGateOpen, useNavGateContext } from "./useNavGateContext";
@@ -372,35 +369,6 @@ const sectionTitle = (s: SidebarSection) => (s.titleKey ? t(s.titleKey) : undefi
 const headingIdBase = useId();
 const headingId = (scope: string, group: string, s: ChildSection) =>
   s.titleKey ? `${headingIdBase}-${scope}-${group}-${s.key}` : undefined;
-const { isDark } = useTheme();
-const zo = computed(() => store.state.zoConfig ?? {});
-// Same precedence as the classic header: theme-matched image, then either image, then text.
-const customLogo = computed(() => {
-  if (config.isEnterprise !== "true") return { text: "", img: "", isSet: false };
-  const text: string = zo.value.custom_logo_text || "";
-  const raw64: string | null =
-    (isDark.value
-      ? (zo.value.custom_logo_dark_img ?? zo.value.custom_logo_img)
-      : (zo.value.custom_logo_img ?? zo.value.custom_logo_dark_img)) ?? null;
-  const img = raw64 ? `data:image; base64, ${raw64}` : "";
-  return { text, img, isSet: !!(text || img) };
-});
-const showSelfLogo = computed(
-  () =>
-    !customLogo.value.isSet ||
-    (zo.value.custom_hide_self_logo === false && !(collapsed.value && customLogo.value.img)),
-);
-const selfLogoSrc = computed(() =>
-  getImageURL(
-    collapsed.value || customLogo.value.isSet
-      ? isDark.value
-        ? "images/common/openobserve_mark_dark.svg"
-        : "images/common/openobserve_mark_light.svg"
-      : isDark.value
-        ? "images/common/openobserve_latest_dark_2.svg"
-        : "images/common/openobserve_latest_light_2.svg",
-  ),
-);
 </script>
 
 <template>
@@ -412,42 +380,6 @@ const selfLogoSrc = computed(() =>
     class="bg-surface-chrome-deeper flex h-full min-h-0 shrink-0 flex-col overflow-hidden transition-[width] duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
     :class="collapsible ? (collapsed ? 'w-13' : 'w-[9.6875rem]') : 'w-full'"
   >
-    <div
-      v-if="collapsible"
-      class="flex h-10 shrink-0 items-center"
-      :class="collapsed ? 'justify-center px-2' : 'px-4'"
-    >
-      <RouterLink
-        :to="linkTo('/')"
-        class="inline-flex min-w-0 items-center gap-2 text-inherit no-underline"
-        data-test="sidebar-logo"
-        :aria-label="raw('OpenObserve')"
-      >
-        <span
-          v-if="customLogo.text && !collapsed"
-          class="truncate text-lg font-semibold"
-          data-test="sidebar-custom-logo-text"
-          >{{ customLogo.text }}</span
-        >
-        <img
-          v-if="customLogo.img"
-          class="block max-h-7 w-auto min-w-0 shrink object-contain"
-          :class="collapsed ? 'max-w-10' : 'max-w-37.5'"
-          :src="customLogo.img"
-          :alt="t('common.customLogoAlt')"
-          data-test="sidebar-custom-logo"
-        />
-        <img
-          v-if="showSelfLogo"
-          class="block w-auto shrink-0"
-          :class="collapsed || customLogo.isSet ? 'h-5' : 'h-7'"
-          :src="selfLogoSrc"
-          alt=""
-          data-test="sidebar-openobserve-logo"
-        />
-      </RouterLink>
-    </div>
-
     <div class="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-2">
       <div
         v-if="loading"

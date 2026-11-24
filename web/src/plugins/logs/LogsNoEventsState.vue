@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="emit('ask-ai')"
           >
             <template #icon-left>
-              <OIcon name="auto-awesome" size="sm" class="text-text-secondary shrink-0" />
+              <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
             </template>
             {{ t("logs.noEvents.askAi") }}
           </OButton>
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useAiIcon } from "@/composables/useAiIcon";
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -150,6 +150,7 @@ const emit = defineEmits<{
   "ask-ai": [];
 }>();
 
+const { aiIconSrc } = useAiIcon();
 const { t } = useI18nTyped();
 
 // The server sends a list of messages, which can arrive as an array or as its JSON text.

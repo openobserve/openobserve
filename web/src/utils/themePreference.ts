@@ -28,12 +28,14 @@ const read = (key: string): string | null => {
   }
 };
 
-/** Saved choice; someone who once picked light or dark keeps it, everyone else follows the OS. */
+/** Saved choice, else the OS. A legacy "dark" was a deliberate pick (light was the old default), so it stays; a legacy "light" cannot be told apart from that default, so it follows the OS. */
 export const getThemePreference = (): ThemePreference => {
   const pref = read(PREF_KEY);
   if (pref === "system" || pref === "light" || pref === "dark") return pref;
-  const legacy = read("theme");
-  return legacy === "light" || legacy === "dark" ? legacy : "system";
+  const migrated: ThemePreference = read("theme") === "dark" ? "dark" : "system";
+  // Saved once, because the app keeps rewriting "theme" with the resolved mode.
+  setThemePreference(migrated);
+  return migrated;
 };
 
 export const systemThemeMode = (): "light" | "dark" =>

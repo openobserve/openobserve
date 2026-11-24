@@ -210,6 +210,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OPageHeaderStatus fallback />
 
+        <!-- ENTERPRISE: plan info, set apart from the icon cluster (as on main) -->
+        <OButton
+          variant="ghost"
+          size="sm-toolbar"
+          class="max-md:hidden md:max-xl:min-w-0"
+          data-test="upgrade-to-enterprise-btn"
+          :aria-label="enterpriseButtonTooltip"
+          @click="openEnterpriseDialog"
+        >
+          <template #icon-left>
+            <OIcon
+              :name="
+                config.isEnterprise === 'true' || config.isCloud === 'true'
+                  ? 'verified'
+                  : 'card-giftcard'
+              "
+              size="sm"
+            />
+          </template>
+          <span class="md:max-xl:truncate">{{ enterpriseButtonText }}</span>
+          <OTooltip
+            side="left"
+            align="end"
+            :side-offset="8"
+            max-width="15rem"
+            :content="enterpriseButtonTooltip"
+          />
+        </OButton>
+
         <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
         <OrganizationSelector
           class="header-org"
@@ -217,6 +246,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :current="userClickedOrg"
           @select="handleOrgSelection"
         />
+
+        <!-- Splits the text controls (plan, org) from the icon group. -->
+        <span aria-hidden="true" class="bg-border-control/50 h-5 w-px shrink-0 max-md:hidden" />
 
         <div class="header-utility-icons flex items-center gap-x-2 md:max-xl:shrink-0">
           <!-- AI CHAT TOGGLE: Enterprise/Cloud feature to toggle AI chat panel.
@@ -231,18 +263,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="aiLicenseLocked ? 'menu-link-ai-locked' : 'menu-link-ai-item'"
               :aria-label="aiButtonLabel"
               :aria-pressed="store.state.isAiChatEnabled && !aiLicenseLocked ? 'true' : 'false'"
+              class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
               :class="store.state.isAiChatEnabled && !aiLicenseLocked ? 'ai-btn-active' : ''"
+              @mouseenter="aiHovered = true"
+              @mouseleave="aiHovered = false"
             >
-              <svg
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden="true"
-                class="text-text-secondary size-4 shrink-0"
-              >
-                <path
-                  d="M12 2c-.78 5.16-4.84 9.22-10 10 5.16.78 9.22 4.84 10 10 .78-5.16 4.84-9.22 10-10-5.16-.78-9.22-4.84-10-10"
-                />
-              </svg>
+              <img
+                alt=""
+                :src="aiBtnLogo"
+                class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
+              />
               <OLockBadge v-if="!aiAccess.allowed || aiLicenseLocked" class="-end-2! -top-1!" />
               <OTooltip
                 side="bottom"
@@ -272,34 +302,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <component :is="slackIcon" class="size-4 shrink-0" />
             <OTooltip side="top" align="center" :content="raw('Slack')" />
-          </OButton>
-
-          <OButton
-            variant="ghost"
-            size="sm-toolbar"
-            class="max-md:hidden md:max-xl:min-w-0"
-            data-test="upgrade-to-enterprise-btn"
-            :aria-label="enterpriseButtonTooltip"
-            @click="openEnterpriseDialog"
-          >
-            <template #icon-left>
-              <OIcon
-                :name="
-                  config.isEnterprise === 'true' || config.isCloud === 'true'
-                    ? 'info-outline'
-                    : 'card-giftcard'
-                "
-                size="sm"
-              />
-            </template>
-            <span class="md:max-xl:truncate">{{ enterpriseButtonText }}</span>
-            <OTooltip
-              side="left"
-              align="end"
-              :side-offset="8"
-              max-width="15rem"
-              :content="enterpriseButtonTooltip"
-            />
           </OButton>
 
           <!-- HELP MENU: Contains links to docs, API, and about page -->
@@ -370,12 +372,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-toolbar"
+                class="bg-badge-primary-soft-bg! text-badge-primary-soft-text! hover:brightness-95"
                 data-test="header-my-account-profile-icon"
                 :aria-label="
                   user.given_name ? user.given_name + ' ' + user.family_name : user.email
                 "
               >
-                <OIcon :name="user.picture ? user.picture : 'person'" size="sm" class="size-5!" />
+                <img
+                  v-if="user.picture"
+                  :src="user.picture"
+                  alt=""
+                  class="size-6 rounded-full object-cover"
+                />
+                <OIcon
+                  v-else
+                  name="person"
+                  size="sm"
+                  class="text-badge-primary-soft-text! size-5!"
+                />
                 <OTooltip
                   side="top"
                   align="center"
@@ -639,6 +653,14 @@ export default defineComponent({
     const { featureName } = useFeatureNames();
     const router = useRouter();
     const { isDark } = useTheme();
+    const aiHovered = ref(false);
+    const aiBtnLogo = computed(() =>
+      getImageURL(
+        isDark.value || aiHovered.value
+          ? "images/common/ai_icon_dark.svg"
+          : "images/common/ai_icon_gradient.svg",
+      ),
+    );
 
     const homeUrl = computed(() => {
       if (!router) return "/";
@@ -866,6 +888,8 @@ export default defineComponent({
     };
 
     return {
+      aiHovered,
+      aiBtnLogo,
       securityAccess,
       isDark,
       t,

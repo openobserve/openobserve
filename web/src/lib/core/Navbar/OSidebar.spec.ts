@@ -125,32 +125,12 @@ describe("OSidebar", () => {
     expect(localStorage.getItem("o2-sidebar-collapsed")).toBe("true");
   });
 
-  it("tops the nav with a home logo and no org switcher, swapping to the mark when collapsed", async () => {
+  it("keeps the logo out of the nav, expanded or collapsed", async () => {
     await mountAt("/logs");
-    const logo = () => wrapper.find("[data-test='sidebar-openobserve-logo']");
-    expect(wrapper.find("[data-test='sidebar-logo']").attributes("href")).toContain("/");
-    expect(logo().attributes("src")).toContain("openobserve_latest_light_2");
-    expect(wrapper.find("[data-test='navbar-organizations-select']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='sidebar-logo']").exists()).toBe(false);
     await wrapper.find("[data-test='sidebar-collapse-toggle']").trigger("click");
-    expect(logo().attributes("src")).toContain("openobserve_mark");
-  });
-
-  it("shows an enterprise custom logo in place of the wordmark, beside the mark unless hidden", async () => {
-    const was = config.isEnterprise;
-    (config as { isEnterprise: string }).isEnterprise = "true";
-    try {
-      await mountAt("/logs", { custom_logo_img: "AAAA", custom_hide_self_logo: false });
-      expect(wrapper.find("[data-test='sidebar-custom-logo']").attributes("src")).toContain("AAAA");
-      expect(wrapper.find("[data-test='sidebar-openobserve-logo']").attributes("src")).toContain(
-        "openobserve_mark",
-      );
-      wrapper.unmount();
-      await mountAt("/logs", { custom_logo_text: "Acme", custom_hide_self_logo: true });
-      expect(wrapper.find("[data-test='sidebar-custom-logo-text']").text()).toBe("Acme");
-      expect(wrapper.find("[data-test='sidebar-openobserve-logo']").exists()).toBe(false);
-    } finally {
-      (config as { isEnterprise: string }).isEnterprise = was;
-    }
+    expect(wrapper.find("[data-test='sidebar-logo']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='navbar-organizations-select']").exists()).toBe(false);
   });
 
   it("ends the bottom group with an always-visible Collapse row that turns icon-only", async () => {

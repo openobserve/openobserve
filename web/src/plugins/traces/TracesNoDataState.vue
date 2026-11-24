@@ -95,10 +95,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           v-if="aiEnabled"
+          variant="ai"
           data-test="traces-no-data-ask-ai-btn"
           @click="emit('ask-ai')"
         >
-          <OIcon name="auto-awesome" size="sm" class="text-text-secondary shrink-0" />
+          <img :src="aiIconSrc" class="h-3.5 w-3.5 shrink-0" alt="" />
           {{ t("traces.noData.askAi") }}
         </EmptyStateIngestionChip>
       </div>
@@ -107,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useAiIcon } from "@/composables/useAiIcon";
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
@@ -129,6 +130,7 @@ defineSlots<{
   status?(): unknown;
 }>();
 
+const { aiIconSrc } = useAiIcon();
 const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();

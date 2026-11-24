@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } from "vue";
 import { isNavigationFailure, useRouter } from "vue-router";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -416,6 +417,7 @@ useShortcuts([
               :class="open ? 'rotate-180' : ''"
             />
           </template>
+          <OTooltip v-if="!open" side="bottom" :content="t('common.switchOrganization')" />
         </OButton>
       </template>
 

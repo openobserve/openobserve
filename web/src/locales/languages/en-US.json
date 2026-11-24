@@ -1156,6 +1156,7 @@
     "chooseFiles": "Choose files",
     "chooseAFile": "Choose a file",
     "loadingWorkspace": "Loading your workspace",
+    "switchOrganization": "Switch Organization",
     "stillLoadingWorkspace": "Still loading your workspace",
     "loadingEllipsis": "Loading...",
     "field": "Field",

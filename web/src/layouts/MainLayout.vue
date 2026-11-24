@@ -54,6 +54,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </header>
 
+    <div class="flex shrink-0">
+      <div
+        v-if="store.state.printMode !== true && !focusMode && !store.state.kioskMode"
+        class="bg-surface-chrome-deeper flex h-10 w-[9.6875rem] shrink-0 items-center px-4 max-md:hidden"
+        data-test="main-layout-logo"
+      >
+        <OSidebarLogo />
+      </div>
+      <div
+        class="o2-app-header min-w-0 flex-1"
+        :class="store.state.printMode === true || store.state.kioskMode ? 'hidden' : ''"
+      >
+        <AppHeader
+          :store="store"
+          :router="router"
+          :config="config"
+          :user="user"
+          :slack-icon="slackIcon"
+          :zo-backend-url="zoBackendUrl"
+          :lang-list="langList"
+          :selected-language="selectedLanguage"
+          :selected-org="selectedOrg"
+          :user-clicked-org="userClickedOrg"
+          :organizations="orgOptions"
+          @update:selected-org="selectedOrg = $event"
+          @update-organization="updateOrganization"
+          @go-to-home="goToHome"
+          @go-to-about="goToAbout"
+          @toggleAIChat="toggleAIChat"
+          @open-slack="openSlack"
+          @navigateToOpenAPI="navigateToOpenAPI"
+          @navigate-to-docs="navigateToDocs"
+          @change-language="changeLanguage"
+          @open-predefined-themes="openPredefinedThemes"
+          @open-shortcuts="openShortcutsList"
+          @open-command-palette="commandPaletteOpen = true"
+          @toggle-mobile-nav="mobileNavOpen = !mobileNavOpen"
+          @signout="signout"
+        />
+      </div>
+    </div>
+
     <div class="flex min-h-0 flex-1">
       <OSidebar
         v-if="store.state.printMode !== true && !focusMode && !store.state.kioskMode"
@@ -107,38 +149,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </ODrawer>
 
       <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div
-          class="o2-app-header shrink-0"
-          :class="store.state.printMode === true || store.state.kioskMode ? 'hidden' : ''"
-        >
-          <AppHeader
-            :store="store"
-            :router="router"
-            :config="config"
-            :user="user"
-            :slack-icon="slackIcon"
-            :zo-backend-url="zoBackendUrl"
-            :lang-list="langList"
-            :selected-language="selectedLanguage"
-            :selected-org="selectedOrg"
-            :user-clicked-org="userClickedOrg"
-            :organizations="orgOptions"
-            @update:selected-org="selectedOrg = $event"
-            @update-organization="updateOrganization"
-            @go-to-home="goToHome"
-            @go-to-about="goToAbout"
-            @toggleAIChat="toggleAIChat"
-            @open-slack="openSlack"
-            @navigateToOpenAPI="navigateToOpenAPI"
-            @navigate-to-docs="navigateToDocs"
-            @change-language="changeLanguage"
-            @open-predefined-themes="openPredefinedThemes"
-            @open-shortcuts="openShortcutsList"
-            @open-command-palette="commandPaletteOpen = true"
-            @toggle-mobile-nav="mobileNavOpen = !mobileNavOpen"
-            @signout="signout"
-          />
-        </div>
         <div class="flex h-full min-h-0 min-w-0 flex-1">
           <!-- Main Panel -->
           <main
@@ -281,6 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { configFullQuery } from "@/services/config.queries";
 import { orgSettingsQuery } from "@/services/organizations.queries";
 import OSidebar from "@/lib/core/Navbar/OSidebar.vue";
+import OSidebarLogo from "@/lib/core/Navbar/OSidebarLogo.vue";
 import { useRouteEnterFade } from "@/layouts/useRouteEnterFade";
 import { PAGE_ENTRANCE_KEY } from "@/lib/core/PageLayout/pageEntrance";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
@@ -422,6 +433,7 @@ export default defineComponent({
     "keep-alive": KeepAlive,
     OAccessBoundary,
     OSidebar,
+    OSidebarLogo,
     "router-view": RouterView,
     SlackIcon,
     ManagementIcon,

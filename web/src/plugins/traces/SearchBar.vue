@@ -739,10 +739,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-toolbar"
           :aria-label="t('search.aiModeIconAlt')"
-          class="rounded-default absolute! top-0.75 right-1 z-51 size-7! min-h-7! min-w-7!"
+          class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! absolute! top-0.75 right-1 z-51 size-7! min-h-7! min-w-7! hover:shadow-md"
           @click="openAiFromBuilder"
         >
-          <AiSparkleIcon class="text-text-secondary" />
+          <img
+            :src="aiIcon"
+            alt=""
+            class="h-4.5 w-4.5 group-hover:brightness-0 group-hover:invert"
+          />
           <OTooltip :content="t('nlMode.toggle')" />
         </OButton>
         <UnifiedQueryEditor
@@ -823,7 +827,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import AiSparkleIcon from "@/components/common/AiSparkleIcon.vue";
 // @ts-nocheck
 import {
   defineComponent,
@@ -861,6 +864,8 @@ import { buildTracesRedPanels, tracesBucketNotice } from "./metrics/tracesRedPan
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
+import { getImageURL } from "@/utils/zincutils";
 
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
@@ -944,7 +949,6 @@ import {
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
-    AiSparkleIcon,
     OPageHeaderStatus,
     OSeparator,
     DateTime,
@@ -1215,6 +1219,12 @@ export default defineComponent({
       () => filterBuilderOn.value && !searchObj.meta.sqlMode && !nlpMode.value,
     );
     // The AI button holds the corner slot in both modes: QueryEditor's own, or the builder's copy.
+    const { isDark } = useTheme();
+    const aiIcon = computed(() =>
+      getImageURL(
+        isDark.value ? "images/common/ai_icon_dark.svg" : "images/common/ai_icon_gradient.svg",
+      ),
+    );
     const filterBuilderToggleRight = computed(() => (isAiEnabled.value ? "2.25rem" : "0.25rem"));
     const openAiFromBuilder = () =>
       (queryEditorRef.value as { openAiMode?: () => void } | null)?.openAiMode?.();
@@ -2099,6 +2109,7 @@ export default defineComponent({
       toggleFilterBuilder,
       showFilterBuilder,
       filterBuilderToggleRight,
+      aiIcon,
       openAiFromBuilder,
       filterBuilderFields,
       filterBuilderRef,

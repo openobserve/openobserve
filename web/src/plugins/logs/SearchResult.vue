@@ -312,8 +312,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tabindex="gridLockReason ? 0 : undefined"
             :aria-disabled="gridLockReason ? true : undefined"
             :aria-describedby="gridLockReason ? 'logs-pagination-reason' : undefined"
-            class="inline-flex justify-end"
-            :class="paginationMaxPages === 5 ? 'min-w-54' : 'min-w-39'"
+            class="inline-flex justify-start"
+            :class="paginationMaxPages === 5 ? 'min-w-[11.25rem]' : 'min-w-[8rem]'"
           >
             <OPagination
               v-if="

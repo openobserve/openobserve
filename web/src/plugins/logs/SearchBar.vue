@@ -1006,8 +1006,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
 
-          <!-- Share Link -->
-          <div class="p-2" data-test="logs-search-bar-menu-share-link-btn">
+          <!-- Share Link: only in the menu on narrow screens; upfront otherwise. -->
+          <div
+            v-if="shouldMoveShareToMenu"
+            class="p-2"
+            data-test="logs-search-bar-menu-share-link-btn"
+          >
             <ShareButton
               :url="shareURL"
               variant="outline"
@@ -1019,7 +1023,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <ODropdownSeparator />
+          <ODropdownSeparator v-if="shouldMoveShareToMenu" />
 
           <!-- HISTORY -->
           <ODropdownGroup :label="t('search.menuGroupHistory')">
@@ -1251,6 +1255,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
           </ODropdownGroup>
         </ODropdown>
+        <ShareButton
+          v-if="!shouldMoveShareToMenu"
+          data-test="logs-search-bar-share-link-btn"
+          :url="shareURL"
+          variant="ghost"
+          size="icon-toolbar"
+          :disabled="!!shareReason"
+          :tooltip="shareReason || undefined"
+          button-class="toolbar-btn-rest order-3"
+        />
       </div>
     </div>
     <!-- pe-1.5 mirrors the editor's ms-1.5 so the editor area sits at 10px on
@@ -1295,7 +1309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before>
             <div
               ref="queryEditorBoxRef"
-              class="bg-surface-base focus-within:after:ring-focus-ring-accent relative flex h-full flex-col overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-50 focus-within:after:ring-1 focus-within:after:ring-inset [&_.logs-query-editor]:ring-0!"
+              class="bg-surface-base relative flex h-full flex-col overflow-hidden [&_.logs-query-editor]:ring-0!"
               @keydown.capture="onRecentEditorKeydown"
               @pointerdown.capture="noteEditorPointer"
               :class="{ 'fn-editor-open': showFunctionEditor }"
@@ -1356,10 +1370,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="!searchObj.data.stream.selectedStream.length"
                 :aria-label="t('search.aiModeIconAlt')"
                 @click="openAiFromBuilder"
-                class="rounded-default absolute! top-0.75 z-51 size-7! min-h-7! min-w-7!"
+                class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! absolute! top-0.75 z-51 size-7! min-h-7! min-w-7! hover:shadow-md"
                 :style="{ right: aiButtonRight }"
               >
-                <AiSparkleIcon class="text-text-secondary" />
+                <img
+                  :src="aiIcon"
+                  alt=""
+                  class="h-4.5 w-4.5 group-hover:brightness-0 group-hover:invert"
+                />
                 <span
                   v-if="!aiAccess.allowed"
                   aria-hidden="true"
@@ -1790,7 +1808,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import AiSparkleIcon from "@/components/common/AiSparkleIcon.vue";
 // @ts-nocheck
 import { saveFunctionMutation } from "@/services/jstransform.queries";
 import {
@@ -2043,7 +2060,6 @@ const replaceExistingFieldCondition = (
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
-    AiSparkleIcon,
     OPageHeaderStatus,
     CreateAlertAction,
     SqlFilterBuilder,
@@ -2416,6 +2432,11 @@ export default defineComponent({
     // Mirrors QueryEditor's floating AI button; the builder shows its own copy in the same corner slot.
     const aiButtonShown = computed(
       () => !aiAccess.value.allowed || Boolean(store.state.zoConfig.ai_enabled),
+    );
+    const aiIcon = computed(() =>
+      getImageURL(
+        isDark.value ? "images/common/ai_icon_dark.svg" : "images/common/ai_icon_gradient.svg",
+      ),
     );
     const aiButtonRight = computed(() =>
       searchObj.meta.showTransformEditor ? "0.25rem" : "2.25rem",
@@ -5506,6 +5527,7 @@ export default defineComponent({
       aiAccess,
       aiButtonShown,
       aiButtonRight,
+      aiIcon,
       openAiFromBuilder,
       filterBuilderToggleRight,
       filterBuilderFields,
