@@ -12,19 +12,18 @@ afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
 });
-function setup(initialType: ResourceKind | "all" = "all", initialOffset = 0) {
+function setup(initialType: ResourceKind | "all" = "all") {
   const open = ref(true),
     org = ref("acme"),
     subject = ref("alice"),
     query = ref(""),
-    type = ref<ResourceKind | "all">(initialType),
-    offset = ref(initialOffset);
+    type = ref<ResourceKind | "all">(initialType);
   let search!: ReturnType<typeof useResourceSearch>;
   wrappers.push(
     mount(
       defineComponent({
         setup() {
-          search = useResourceSearch({ open, org, subject, query, type, offset });
+          search = useResourceSearch({ open, org, subject, query, type });
           return () => h("div");
         },
       }),
@@ -93,23 +92,6 @@ describe("Command K search lifecycle", () => {
     });
     await flushPromises();
     expect(s.search.data.value?.sources.every((source) => source.status === "complete")).toBe(true);
-  });
-  it("polls a loading page with its offset so the pager and hits stay in step", async () => {
-    vi.useFakeTimers();
-    vi.mocked(resources.search)
-      .mockResolvedValueOnce({
-        hits: [],
-        sources: [{ type: "function", status: "unavailable", has_more: null, reason: "loading" }],
-        took_ms: 0,
-      })
-      .mockResolvedValue(empty);
-    const s = setup("function", 40);
-    await typeQuery(s, "pay");
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(vi.mocked(resources.search).mock.calls[1][1]).toMatchObject({
-      types: ["function"],
-      offset: 40,
-    });
   });
   it("manual retry asks only failed sources and keeps successful groups", async () => {
     vi.useFakeTimers();

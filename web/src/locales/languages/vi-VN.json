@@ -34500,14 +34500,11 @@
     "recentUnavailable": "Mục này hiện không khả dụng",
     "loading": "Đang tìm…",
     "showMore": "Hiện thêm",
-    "continueSearch": "Tiếp tục tìm loại này",
     "partial": "Một số kết quả không khả dụng",
     "failed": "Không thể hoàn tất tìm kiếm",
     "offline": "Bạn đang ngoại tuyến. Vẫn xem được truy cập gần đây.",
     "sourceUnavailable": "Loại tài nguyên này hiện không khả dụng",
     "emptyHelp": "Nhập tên hoặc ID để tìm",
-    "globalShortcut": "Mở tìm kiếm toàn cục",
-    "searchAgain": "Tìm lại",
-    "resourceSearch": "Tìm tài nguyên"
+    "globalShortcut": "Mở tìm kiếm toàn cục"
   }
 }

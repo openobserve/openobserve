@@ -40,7 +40,6 @@ async function setup() {
       ].map((name) => ({ path: `/${name}`, name, component: view })),
       { path: "/", name: "home", component: view },
       { path: "/functions", name: "functionList", component: view },
-      { path: "/search/resources", name: "resourceSearch", component: view },
     ],
   });
   await router.push("/");
@@ -247,15 +246,11 @@ describe("Command K palette", () => {
       types: ["dashboard"],
     });
   });
-  it("starts each resource group at three and provides a condition-preserving continuation link", async () => {
+  it("starts each resource group at three and offers no link past the palette", async () => {
     await setup();
     await search("payment");
     expect(document.querySelectorAll('[data-test^="command-entry-function:"]')).toHaveLength(3);
-    const continuation = Array.from(document.querySelectorAll<HTMLAnchorElement>("a")).find((a) =>
-      a.href.includes("/search/resources"),
-    )!;
-    expect(continuation.href).toContain("type=function");
-    expect(continuation.href).toContain("q=payment");
+    expect(document.querySelector('a[href*="/search/resources"]')).toBeNull();
     const more = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find((b) =>
       b.textContent?.includes("Show more"),
     )!;

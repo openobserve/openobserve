@@ -34500,14 +34500,11 @@
     "recentUnavailable": "هذا العنصر غير متاح حاليًا",
     "loading": "جارٍ البحث…",
     "showMore": "عرض المزيد",
-    "continueSearch": "متابعة البحث في هذا النوع",
     "partial": "بعض النتائج غير متاحة",
     "failed": "تعذر إكمال البحث",
     "offline": "أنت غير متصل. الزيارات الأخيرة لا تزال متاحة.",
     "sourceUnavailable": "نوع المورد غير متاح حاليًا",
     "emptyHelp": "أدخل اسمًا أو معرّفًا للبحث",
-    "globalShortcut": "فتح البحث العام",
-    "searchAgain": "البحث مجددًا",
-    "resourceSearch": "البحث عن الموارد"
+    "globalShortcut": "فتح البحث العام"
   }
 }

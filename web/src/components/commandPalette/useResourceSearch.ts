@@ -23,13 +23,11 @@ export function useResourceSearch(input: {
   subject: Ref<string>;
   query: Ref<string>;
   type: Ref<ResourceKind | "all">;
-  offset?: Ref<number>;
-  limit?: number;
 }) {
   const scope = ++scopeSequence;
   const client = useQueryClient();
   const debouncing = ref(true);
-  const params = ref<ResourceSearchParams>({ q: "", limit: input.limit ?? 20 });
+  const params = ref<ResourceSearchParams>({ q: "", limit: 20 });
   const patches = ref<ResourceSearchResponse[]>([]);
   const retrying = ref<false | "manual" | "poll">(false);
   const retryError = ref<unknown>(null);
@@ -55,7 +53,7 @@ export function useResourceSearch(input: {
     client.removeQueries({ queryKey: previousScope });
   };
   watch(
-    [input.open, input.org, input.subject, input.query, input.type, () => input.offset?.value],
+    [input.open, input.org, input.subject, input.query, input.type],
     () => {
       sequence += 1;
       debouncing.value = eligible.value;
@@ -69,8 +67,7 @@ export function useResourceSearch(input: {
         params.value = {
           q: input.query.value.trim(),
           types: input.type.value === "all" ? undefined : [input.type.value],
-          limit: input.limit ?? 20,
-          offset: input.offset?.value || undefined,
+          limit: 20,
         };
         debouncing.value = false;
       }, 200);

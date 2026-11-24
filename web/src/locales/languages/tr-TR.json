@@ -34500,14 +34500,11 @@
     "recentUnavailable": "Bu öğe şu anda kullanılamıyor",
     "loading": "Aranıyor…",
     "showMore": "Daha fazla göster",
-    "continueSearch": "Bu türü aramaya devam et",
     "partial": "Bazı sonuçlar kullanılamıyor",
     "failed": "Arama tamamlanamadı",
     "offline": "Çevrimdışısınız. Son ziyaretler kullanılabilir.",
     "sourceUnavailable": "Bu kaynak türü şu anda kullanılamıyor",
     "emptyHelp": "Kaynak aramak için ad veya kimlik girin",
-    "globalShortcut": "Genel aramayı aç",
-    "searchAgain": "Yeniden ara",
-    "resourceSearch": "Kaynak arama"
+    "globalShortcut": "Genel aramayı aç"
   }
 }

@@ -312,8 +312,7 @@ where
 pub fn mask_log_url(url: &str) -> String {
     let masked = mask_slack_callback_query(&mask_share_tokens(url));
     if let Some((path, _)) = masked.split_once('?')
-        && (path.trim_end_matches('/').ends_with("/resources/_search")
-            || path.trim_end_matches('/').ends_with("/search/resources"))
+        && path.trim_end_matches('/').ends_with("/resources/_search")
     {
         return format!("{path}?…");
     }
@@ -452,7 +451,6 @@ mod tests {
         for url in [
             "/api/acme/resources/_search?q=private-name&offset=40",
             "https://observe.invalid/o2/api/acme/resources/_search?%71=private-name&q=other-name",
-            "https://observe.invalid/web/search/resources?type=dashboard&q=private-name",
         ] {
             let masked = mask_log_url(url);
             assert!(masked.ends_with("?…"));

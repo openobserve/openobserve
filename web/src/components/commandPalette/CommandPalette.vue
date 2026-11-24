@@ -229,12 +229,6 @@ async function navigate(
   setTimeout(() => markStreamPick(null));
   if (!failure) emit("update:open", false);
 }
-function continuation(kind: ResourceKind): RouteLocationRaw {
-  return {
-    name: "resourceSearch",
-    query: { org_identifier: org.value, type: kind, q: query.value },
-  };
-}
 watch(
   () => props.open,
   (open) => {
@@ -424,15 +418,6 @@ onScopeDispose(() => {
             size="xs"
             @click="expanded.push(group.kind)"
             >{{ t("commandPalette.showMore") }}</OButton
-          >
-          <RouterLink
-            v-if="group.source?.has_more"
-            :to="continuation(group.kind)"
-            custom
-            v-slot="{ href, navigate: go }"
-            ><OButton as="a" :href="href" variant="ghost" size="xs" @click="navigate($event, go)">{{
-              t("commandPalette.continueSearch")
-            }}</OButton></RouterLink
           >
           <OText v-if="group.source?.status !== 'complete'" variant="meta" role="status">{{
             group.source?.reason === "loading"

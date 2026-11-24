@@ -34500,14 +34500,11 @@
     "recentUnavailable": "Dit item is momenteel niet beschikbaar",
     "loading": "Zoeken…",
     "showMore": "Meer tonen",
-    "continueSearch": "Dit type verder doorzoeken",
     "partial": "Sommige resultaten zijn niet beschikbaar",
     "failed": "Zoeken kon niet worden voltooid",
     "offline": "Offline. Recente bezoeken blijven beschikbaar.",
     "sourceUnavailable": "Dit brontype is niet beschikbaar",
     "emptyHelp": "Voer een naam of ID in",
-    "globalShortcut": "Globaal zoeken openen",
-    "searchAgain": "Opnieuw zoeken",
-    "resourceSearch": "Bronnen zoeken"
+    "globalShortcut": "Globaal zoeken openen"
   }
 }

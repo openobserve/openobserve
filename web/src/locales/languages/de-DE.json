@@ -34500,14 +34500,11 @@
     "recentUnavailable": "Dieser Eintrag ist derzeit nicht verfügbar",
     "loading": "Suche…",
     "showMore": "Mehr anzeigen",
-    "continueSearch": "Diesen Typ weitersuchen",
     "partial": "Einige Ergebnisse sind nicht verfügbar",
     "failed": "Suche konnte nicht abgeschlossen werden",
     "offline": "Offline. Letzte Besuche bleiben verfügbar.",
     "sourceUnavailable": "Dieser Ressourcentyp ist nicht verfügbar",
     "emptyHelp": "Name oder ID zum Suchen eingeben",
-    "globalShortcut": "Globale Suche öffnen",
-    "searchAgain": "Erneut suchen",
-    "resourceSearch": "Ressourcensuche"
+    "globalShortcut": "Globale Suche öffnen"
   }
 }
