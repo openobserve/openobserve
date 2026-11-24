@@ -141,7 +141,7 @@
                       <span class="w-36">
                         <OSelect
                           :model-value="gapBefore(current, stepIndex)"
-                          :options="gapOptions"
+                          :options="withCurrent(gapOptions, gapBefore(current, stepIndex))"
                           size="sm"
                           :data-test="`oncall-policy-step-delay-${current.priority}-${stepIndex}`"
                           @update:model-value="(v: any) => setGap(current!, stepIndex, Number(v))"
@@ -163,7 +163,7 @@
                         <OSelect
                           v-if="stepIndex === 0"
                           :model-value="step.after_micros"
-                          :options="leadGapOptions"
+                          :options="withCurrent(leadGapOptions, step.after_micros)"
                           appearance="inline"
                           size="sm"
                           :data-test="`oncall-policy-step-delay-${current.priority}-0`"
@@ -1071,6 +1071,14 @@ const leadGapOptions = computed(() => [
   { label: t("oncall.ladderNow"), value: 0 },
   ...gapOptions.value,
 ]);
+
+/// A delay saved outside the presets joins the list, or the select shows raw microseconds.
+function withCurrent(options: { label: string; value: number }[], current: number) {
+  if (options.some((o) => o.value === current)) return options;
+  return [...options, { label: `+${formatMicrosDuration(current)}`, value: current }].sort(
+    (a, b) => a.value - b.value,
+  );
+}
 
 /// Gap-preserving: removing a step pulls the ones below it up by its wait,
 /// keeping their spacing — the ladder gets shorter, not sparser.

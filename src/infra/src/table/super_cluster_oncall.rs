@@ -355,11 +355,14 @@ pub async fn put_policy(policy: &EscalationPolicy) -> Result<(), errors::Error> 
         .await?
     {
         Some(existing) => {
+            // Once saved stays saved: a stale copy from another region must not unmark it.
+            let saved = policy.saved_by_person || existing.saved_by_person;
             let mut active: oncall_policies::ActiveModel = existing.into();
             active.rungs = Set(rungs);
             active.destinations = Set(destinations);
             active.l0_json = Set(l0_json);
             active.template = Set(policy.template.clone());
+            active.saved_by_person = Set(saved);
             active.updated_at = Set(now);
             active.update(client).await?;
         }
@@ -372,6 +375,7 @@ pub async fn put_policy(policy: &EscalationPolicy) -> Result<(), errors::Error> 
                 destinations: Set(destinations),
                 l0_json: Set(l0_json),
                 template: Set(policy.template.clone()),
+                saved_by_person: Set(policy.saved_by_person),
                 created_at: Set(now),
                 updated_at: Set(now),
             }

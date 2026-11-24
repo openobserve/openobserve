@@ -631,6 +631,7 @@ fn to_response(e: anyhow::Error) -> Response {
         Some(OncallError::NameTaken(_))
         | Some(OncallError::IsDefaultTeam(_))
         | Some(OncallError::TeamNamedByAlerts { .. })
+        | Some(OncallError::TeamHasOpenPages { .. })
         | Some(OncallError::PathTaken(_)) => StatusCode::CONFLICT,
         Some(OncallError::Invalid(_)) => StatusCode::BAD_REQUEST,
         Some(OncallError::Verification(refusal)) => return refusal_response(refusal),
@@ -1046,7 +1047,7 @@ pub async fn update_team(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
-        (status = 409, description = "Conflict: the org's default team, or named by alerts", content_type = "application/json", body = Object),
+        (status = 409, description = "Conflict: the org's default team, named by alerts, or still holding open pages", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
@@ -2104,6 +2105,24 @@ fn broken_link(status: StatusCode, reason: &str) -> Response {
     html_page(status, ack_page::broken_link_html(reason, &pages))
 }
 
+/// The ack link's answer to a page action the rule refused or cannot find. [no-fail]
+#[cfg(feature = "enterprise")]
+fn ack_link_problem(e: openobserve_core::alerts::ack::AckError) -> Response {
+    use openobserve_core::alerts::ack::AckError;
+
+    match e {
+        // The link has no session, so its refusal names nobody who could act instead.
+        AckError::Refused(_) => broken_link(
+            StatusCode::FORBIDDEN,
+            "You can't acknowledge this page from this link",
+        ),
+        AckError::NotFound => MetaHttpResponse::not_found("Response not found"),
+        e @ (AckError::Conflict(_) | AckError::Internal(_)) => {
+            crate::request::alerts::ack::error_response(e)
+        }
+    }
+}
+
 /// The ack link's refusal for a locked license or a bad org: the same HTML page, never JSON.
 #[cfg(feature = "enterprise")]
 fn ack_status_refusal(
@@ -2140,6 +2159,19 @@ async fn team_of(record: &config::meta::oncall::Response) -> Option<config::meta
             tracing::error!("[oncall] ack page team {team_id}: {e}");
             None
         })
+}
+
+/// The full name of whoever acknowledged a linked record; unreadable is only logged.
+#[cfg(feature = "enterprise")]
+async fn acker_name(record: &config::meta::oncall::Response) -> Option<String> {
+    let by = record.acked_by.as_deref()?;
+    match infra::table::users::get(by).await {
+        Ok(user) => Some(format!("{} {}", user.first_name, user.last_name)),
+        Err(e) => {
+            tracing::warn!("[oncall] ack page acknowledger {by}: {e}");
+            None
+        }
+    }
 }
 
 #[utoipa::path(
@@ -2192,11 +2224,17 @@ pub async fn acknowledge(
         .await;
         // The one rule, then the core; a second click only shows the page as it stands.
         let just_acked = if this_click {
-            let problem =
-                match page_problem(&claims.org_id, &claims.response_id, &claims.user_email).await {
-                    Ok(p) => p,
-                    Err(resp) => return resp,
-                };
+            let problem = match page_problem_of(
+                &claims.org_id,
+                &claims.response_id,
+                &claims.user_email,
+                openobserve_core::alerts::ack::Act::Ack,
+            )
+            .await
+            {
+                Ok(p) => p,
+                Err(e) => return ack_link_problem(e),
+            };
             match page_is_closed(&claims.org_id, &claims.response_id).await {
                 Ok(true) => false,
                 Ok(false) => match acknowledge_page(
@@ -2229,11 +2267,17 @@ pub async fn acknowledge(
                 Err(e) => return internal_error("acknowledge", &e),
             };
         let team = team_of(&record).await;
+        let acker = acker_name(&record).await;
         html_page(
             StatusCode::OK,
             ack_page::outcome_html(
                 &ack_page::PageFacts::of(&record, team.as_ref()),
-                &ack_page::AckOutcome::of(&record, &claims.user_email, just_acked),
+                &ack_page::AckOutcome::of(
+                    &record,
+                    &claims.user_email,
+                    just_acked,
+                    acker.as_deref(),
+                ),
                 &page_url(&claims.org_id, &claims.response_id),
             ),
         )
@@ -2298,6 +2342,7 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
                 Err(e) => return internal_error("ack_page", &e),
             };
         let team = team_of(&record).await;
+        let acker = acker_name(&record).await;
         html_page(
             StatusCode::OK,
             ack_page::get_html(
@@ -2306,6 +2351,7 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
                 &ack_page::PageFacts::of(&record, team.as_ref()),
                 &record,
                 &claims.user_email,
+                acker.as_deref(),
                 &page_url(&claims.org_id, &claims.response_id),
             ),
         )
@@ -3467,7 +3513,14 @@ pub async fn handoff_response(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        let problem = match page_problem(&org_id, &response_id, &user_email.user_id).await {
+        let problem = match page_problem_for(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            openobserve_core::alerts::ack::Act::HandOff,
+        )
+        .await
+        {
             Ok(p) => p,
             Err(resp) => return resp,
         };
@@ -3638,7 +3691,14 @@ pub async fn escalate_response(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+        if let Err(resp) = page_problem_for(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            openobserve_core::alerts::ack::Act::Escalate,
+        )
+        .await
+        {
             return resp;
         }
         if infra::table::oncall_responses::get(&org_id, &response_id)
@@ -4768,6 +4828,16 @@ async fn may_touch_unavailability(org_id: &str, caller: &str, subject: &str, ver
     allowed(org_id, caller, CONFIG, verb).await
 }
 
+/// The grants withdrawing `subject`'s absence costs `caller`: none for your own. [pure]
+#[cfg(feature = "enterprise")]
+fn withdrawal_grants(caller: &str, subject: &str) -> &'static [(&'static str, &'static str)] {
+    if caller.eq_ignore_ascii_case(subject) {
+        &[]
+    } else {
+        &[(RESPONSES, "DELETE"), (CONFIG, "DELETE")]
+    }
+}
+
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/unavailability",
@@ -4918,7 +4988,8 @@ pub async fn delete_unavailability(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed(&org_id, &user_email.user_id, RESPONSES, "DELETE").await {
+        // The grant that entering one takes: the common case is somebody withdrawing their own.
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         // Read before the inner lock: once the row is gone, whose absence it was is unanswerable.
@@ -4932,10 +5003,10 @@ pub async fn delete_unavailability(
             Ok(None) => return MetaHttpResponse::not_found("unavailability not found"),
             Err(e) => return to_response(e),
         };
-        if !may_touch_unavailability(&org_id, &user_email.user_id, &existing.user_email, "DELETE")
-            .await
-        {
-            return MetaHttpResponse::forbidden("Forbidden");
+        for (resource, verb) in withdrawal_grants(&user_email.user_id, &existing.user_email) {
+            if !allowed(&org_id, &user_email.user_id, resource, verb).await {
+                return MetaHttpResponse::forbidden("Forbidden");
+            }
         }
         match o2_enterprise::enterprise::oncall::service::delete_unavailability(
             &org_id,
@@ -5792,6 +5863,16 @@ async fn carry_page_history_into_incident(
     }
 }
 
+/// The timeline note a promotion leaves, naming the incident as people know it. [pure]
+#[cfg(feature = "enterprise")]
+fn promotion_note(title: Option<&str>, incident_id: &str) -> String {
+    let name = title
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .unwrap_or(incident_id);
+    format!("promoted to incident {name}")
+}
+
 /// A promotion may raise the severity, never lower what woke somebody, so it is discarded.
 #[cfg(feature = "enterprise")]
 fn promoted_severity(
@@ -5947,7 +6028,7 @@ pub async fn promote_to_incident(
             &org_id,
             &response_id,
             &user_email.user_id,
-            &format!("promoted to incident {}", incident.id),
+            &promotion_note(incident.title.as_deref(), &incident.id),
         )
         .await
         {
@@ -6223,6 +6304,48 @@ mod tests {
                 !String::from_utf8_lossy(body).contains("organization is not active"),
                 "{body:?}"
             );
+        }
+    }
+
+    /// A refused link click lands on the link page, 403, and names nobody who could act.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_refused_ack_link_renders_the_link_page_and_names_nobody() {
+        use config::meta::alerts::ack::{ActRefusal, OnCallPersonRef, PersonRef};
+        use openobserve_core::alerts::ack::AckError;
+
+        let refusal = ActRefusal {
+            message: "Only an admin, an editor or the alert's on-call responder can acknowledge it"
+                .into(),
+            on_call: vec![OnCallPersonRef {
+                email: "ona@o2.ai".into(),
+                name: Some("Ona Call".into()),
+                team: "platform".into(),
+            }],
+            can_act: vec![PersonRef {
+                email: "ada@o2.ai".into(),
+                name: Some("Ada Min".into()),
+            }],
+            ..Default::default()
+        };
+        let resp = ack_link_problem(AckError::Refused(refusal));
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        assert!(
+            resp.headers()[axum::http::header::CONTENT_TYPE]
+                .to_str()
+                .unwrap()
+                .starts_with("text/html")
+        );
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+        assert!(
+            html.contains("You can't acknowledge this page from this link."),
+            "{html}"
+        );
+        for leak in ["ona@o2.ai", "Ona Call", "ada@o2.ai", "Ada Min", "can_act"] {
+            assert!(!html.contains(leak), "{leak} leaked: {html}");
         }
     }
 
@@ -7060,6 +7183,34 @@ mod tests {
             promoted_severity(5, Some(IncidentSeverity::P4)),
             IncidentSeverity::P4
         );
+    }
+
+    /// The note names the incident by its title; only an untitled one falls back to its id.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_promotion_note_names_the_incident_by_its_title() {
+        let cases = [
+            (Some("checkout down"), "promoted to incident checkout down"),
+            (Some("  "), "promoted to incident inc_1"),
+            (None, "promoted to incident inc_1"),
+        ];
+        for (title, want) in cases {
+            assert_eq!(promotion_note(title, "inc_1"), want, "{title:?}");
+        }
+    }
+
+    /// Your own absence costs no more than entering it; somebody else's still needs both DELETEs.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_withdrawing_an_absence_costs_what_entering_it_did_only_when_it_is_yours() {
+        let cases: [(&str, &[(&str, &str)]); 3] = [
+            ("ana@o2.ai", &[]),
+            ("ANA@o2.ai", &[]),
+            ("bo@o2.ai", &[(RESPONSES, "DELETE"), (CONFIG, "DELETE")]),
+        ];
+        for (subject, want) in cases {
+            assert_eq!(withdrawal_grants("ana@o2.ai", subject), want, "{subject}");
+        }
     }
 
     /// An address that differs only in case is still your own profile.

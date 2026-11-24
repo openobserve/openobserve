@@ -1504,6 +1504,37 @@ describe("the first step's delay", () => {
     expect((between.props("options") as { value: number }[]).map((o) => o.value)).not.toContain(0);
   });
 
+  /// A delay saved outside the preset list must still read as a duration, never raw microseconds.
+  it("names a delay that is not a preset in minutes", async () => {
+    const wrapper = mount(OnCallPolicyEditor, {
+      props: {
+        teamId: "team_1",
+        policy: {
+          ...policy,
+          rungs: [
+            {
+              priority: 1,
+              steps: [
+                { after_micros: 120_000_000, targets: [{ kind: "on_call_now" }] },
+                { after_micros: 240_000_000, targets: [{ kind: "next_on_call" }] },
+              ],
+              channels: ["email"],
+            },
+          ],
+        },
+        open: true,
+      },
+      global: { plugins: [i18n, store], stubs },
+    });
+    await flushPromises();
+
+    for (const id of ["oncall-policy-step-delay-1-0", "oncall-policy-step-delay-1-1"]) {
+      const select = wrapper.findComponent(`[data-test="${id}"]`);
+      const options = select.props("options") as { label: string; value: number }[];
+      expect(options.find((o) => o.value === select.props("modelValue"))?.label).toBe("+2m");
+    }
+  });
+
   /// Holding the first page must not close the gaps below it — the whole
   /// ladder shifts, keeping its spacing.
   it("shifts the whole ladder when the first page is held", async () => {
