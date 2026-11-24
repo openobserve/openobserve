@@ -143,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!serverListShown"
             :columns="columns"
             :column-visibility="columnVisibility"
+            :default-column-visibility="defaultColumnVisibility"
             :has-resized-columns="tableRef?.hasResizedColumns ?? false"
             @update:column-visibility="setColumnVisibility"
             @reset:column-sizes="tableRef?.resetColumnSizes?.()"
@@ -200,6 +201,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enable-column-resize="true"
         :row-class="rowClass"
         :get-row-style="rowStyle"
+        :row-actions="rowActions"
+        row-actions-more-data-test="dbm-queries-row-more-actions"
         data-test="dbm-queries-table"
         @update:sort-by="onSortChange"
         @row-click="onRowClick"
@@ -431,15 +434,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
 
-        <template #cell-actions="{ row }">
-          <DbmRowActions
-            v-if="!row.isOther && !row.isFold"
-            :actions="rowActions"
-            data-test="dbm-queries-row-actions"
-            @action="(id) => onRowAction(id, row)"
-          />
-        </template>
-
         <template #cell-services="{ row }">
           <DbmServiceList :services="row.services" data-test="dbm-queries-service" />
         </template>
@@ -582,7 +576,6 @@ import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
 import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
-import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
 import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
@@ -596,7 +589,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -1936,31 +1929,37 @@ const toggleInsightFilter = (insight: DbmInsight) => {
   activeInsightId.value = activeInsightId.value === insight.id ? null : insight.id;
 };
 
-/** The four things a reader does next, on the row they are already looking at. */
-const rowActions = computed<DbmRowAction[]>(() => [
-  { id: "open", icon: "chevron-right", label: t("dbm.queries.actions.open") },
-  { id: "traces", icon: "account-tree", label: t("dbm.queries.actions.traces") },
-  { id: "copy", icon: "content-copy", label: t("dbm.queries.actions.copy") },
-  { id: "alert", icon: "shield", label: t("dbm.queries.actions.alert") },
-  // Absent when AI is off, locked when the license lacks it.
-  ...(aiLock.locked.value
-    ? [
-        {
-          id: "ai",
-          icon: "brain-circuit",
-          label: t("dbm.ai.rowSuggestFix"),
-          lockedReason: aiLock.lockedReason.value,
-        } as DbmRowAction,
-      ]
-    : aiEnabled.value
-      ? [{ id: "ai", icon: "brain-circuit", label: t("dbm.ai.rowSuggestFix") } as DbmRowAction]
-      : []),
-]);
+/** What a reader does next, on the row they are already looking at; the row click opens the query. */
+const rowActions: OTableRowAction[] = (() => {
+  const action = (
+    id: string,
+    icon: OTableRowAction["icon"],
+    label: OTableRowAction["label"],
+  ): OTableRowAction => ({
+    id,
+    icon,
+    label,
+    visible: (row) => !row.isOther && !row.isFold,
+    onSelect: (row) => onRowAction(id, row),
+    dataTest: () => `dbm-queries-row-actions-${id}`,
+  });
+  return [
+    action("traces", "account-tree", t("dbm.queries.actions.traces")),
+    action("copy", "content-copy", t("dbm.queries.actions.copy")),
+    action("alert", "notifications-active", t("dbm.common.createAlert")),
+    {
+      ...action("ai", "brain-circuit", t("dbm.ai.rowSuggestFix")),
+      // Absent when AI is off, locked when the license lacks it.
+      visible: (row) => !row.isOther && !row.isFold && (aiLock.locked.value || aiEnabled.value),
+      disabled: () => (aiLock.locked.value ? aiLock.lockedReason.value : false),
+    },
+  ];
+})();
 
 const onRowAction = async (id: string, row: QueryRow) => {
   analytics.track("dbm_row_action_clicked", { page: "queries", action: id });
-  if (id === "open" || id === "traces") {
-    openQueryDetail(row, id === "traces" ? "samples" : undefined);
+  if (id === "traces") {
+    openQueryDetail(row, "samples");
     return;
   }
   if (id === "ai") {

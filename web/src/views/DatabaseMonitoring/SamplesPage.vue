@@ -109,6 +109,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         table-id="dbm-samples"
         persist-columns
         :column-visibility="columnVisibility"
+        :row-actions="rowActions"
+        row-actions-more-data-test="dbm-samples-row-more-actions"
         :total-count-exact="!truncated"
         data-test="dbm-samples-table"
         @row-click="onRowClick"
@@ -179,43 +181,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           />
           <span v-else class="text-text-muted">{{ raw("—") }}</span>
-        </template>
-
-        <template #cell-actions="{ row }">
-          <OTooltip
-            v-if="sampleTraceFilter(row) && tracesLock.locked.value"
-            side="left"
-            :content="tracesLock.lockedReason.value"
-          >
-            <span class="inline-flex">
-              <OButton
-                variant="ghost"
-                size="icon-sm"
-                disabled
-                :aria-label="t('dbm.samples.viewTrace')"
-                :data-test="`dbm-samples-trace-${row.rowKey}`"
-              >
-                <template #icon-left>
-                  <OIcon
-                    name="lock"
-                    class="text-icon-locked"
-                    size="sm"
-                    :data-test="`dbm-samples-trace-lock-${row.rowKey}`"
-                  />
-                </template>
-              </OButton>
-            </span>
-          </OTooltip>
-          <OButton
-            v-else-if="sampleTraceFilter(row)"
-            variant="ghost"
-            size="icon-sm"
-            icon-left="open-in-new"
-            :data-test="`dbm-samples-trace-${row.rowKey}`"
-            @click.stop="openSampleTrace(row)"
-          >
-            <OTooltip side="left" :content="t('dbm.samples.viewTrace')" />
-          </OButton>
         </template>
 
         <template v-if="countLine || streamsFailed > 0" #footer-note>
@@ -367,14 +332,11 @@ import DbmLockEmptyState, {
 } from "@/components/dbm/DbmLockEmptyState.vue";
 import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import dbMonitoringService, { type ServerSampleRow } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -575,6 +537,19 @@ const isFiltered = computed(
     !!envFilter.value ||
     !!serviceFilter.value,
 );
+
+// The licence lock stays visible as the disabled reason, so a locked trace is explained, not hidden.
+const rowActions: OTableRowAction[] = [
+  {
+    id: "trace",
+    icon: "open-in-new",
+    label: t("dbm.samples.viewTrace"),
+    visible: (row) => !!sampleTraceFilter(row),
+    disabled: () => (tracesLock.locked.value ? tracesLock.lockedReason.value : false),
+    onSelect: (row) => openSampleTrace(row),
+    dataTest: (row) => `dbm-samples-trace-${row.rowKey}`,
+  },
+];
 
 const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
   {

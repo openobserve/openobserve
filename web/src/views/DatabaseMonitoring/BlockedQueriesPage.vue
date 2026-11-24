@@ -337,10 +337,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :instance="row.db_instance"
               data-test="dbm-blocked-terminate"
             />
-            <DbmRowActions
+            <OTableRowActions
               :actions="rowActions"
-              data-test="dbm-blocked-row-actions"
-              @action="(id) => onRowAction(id, row)"
+              :row="row"
+              more-data-test="dbm-blocked-row-more-actions"
             />
           </div>
         </template>
@@ -419,7 +419,6 @@ import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import DbmTerminateSql from "@/components/dbm/DbmTerminateSql.vue";
@@ -428,8 +427,9 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTableRowActions from "@/lib/core/Table/sub-components/OTableRowActions.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -793,10 +793,22 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
 
 /** Only what the handler actually implements — a control that does nothing is
  *  worse than no control. */
-const rowActions = computed<DbmRowAction[]>(() => [
-  { id: "copy", icon: "content-copy", label: t("dbm.blocked.rowActions.copy") },
-  { id: "alert", icon: "shield", label: t("dbm.blocked.rowActions.alertMe") },
-]);
+const rowActions: OTableRowAction[] = [
+  {
+    id: "copy",
+    icon: "content-copy",
+    label: t("dbm.blocked.rowActions.copy"),
+    onSelect: (row) => onRowAction("copy", row),
+    dataTest: () => "dbm-blocked-row-actions-copy",
+  },
+  {
+    id: "alert",
+    icon: "notifications-active",
+    label: t("dbm.common.createAlert"),
+    onSelect: (row) => onRowAction("alert", row),
+    dataTest: () => "dbm-blocked-row-actions-alert",
+  },
+];
 
 const longestWait = computed(() =>
   samples.value.reduce((max, s) => Math.max(max, s.wait_seconds ?? 0), 0),

@@ -92,6 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         table-id="dbm-deadlocks"
         persist-columns
         :get-row-style="rowStyle"
+        :row-actions="rowActions"
+        row-actions-more-data-test="dbm-deadlocks-row-more-actions"
         :total-count-exact="!truncated"
         data-test="dbm-deadlocks-table"
       >
@@ -244,14 +246,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-        </template>
-
-        <template #cell-actions="{ row }">
-          <DbmRowActions
-            :actions="rowActions"
-            data-test="dbm-deadlocks-row-actions"
-            @action="(id) => onRowAction(id, row)"
-          />
         </template>
 
         <!-- The cycle, IN PLACE. Never a drawer: a drawer covers the rows it is
@@ -411,7 +405,6 @@ import DbmDeadlockCycle from "@/components/dbm/DbmDeadlockCycle.vue";
 import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
 import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
 import DbmLockEmptyState, {
   type DbmLockCheck,
@@ -422,7 +415,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -767,11 +760,29 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
 
 /** Only what the handler implements. "Show the deadlock" was a no-op anyway —
  *  a row click already expands the cycle in place. */
-const rowActions = computed<DbmRowAction[]>(() => [
-  { id: "top-queries", icon: "filter-list", label: t("dbm.deadlocks.rowActions.topQueries") },
-  { id: "copy", icon: "content-copy", label: t("dbm.deadlocks.rowActions.copy") },
-  { id: "alert", icon: "shield", label: t("dbm.deadlocks.rowActions.alert") },
-]);
+const rowActions: OTableRowAction[] = [
+  {
+    id: "top-queries",
+    icon: "filter-list",
+    label: t("dbm.deadlocks.rowActions.topQueries"),
+    onSelect: (row) => onRowAction("top-queries", row),
+    dataTest: () => "dbm-deadlocks-row-actions-top-queries",
+  },
+  {
+    id: "copy",
+    icon: "content-copy",
+    label: t("dbm.deadlocks.rowActions.copy"),
+    onSelect: (row) => onRowAction("copy", row),
+    dataTest: () => "dbm-deadlocks-row-actions-copy",
+  },
+  {
+    id: "alert",
+    icon: "notifications-active",
+    label: t("dbm.common.createAlert"),
+    onSelect: (row) => onRowAction("alert", row),
+    dataTest: () => "dbm-deadlocks-row-actions-alert",
+  },
+];
 
 /**
  * The window's counts, over the rows below. "Not collecting" is an em dash
