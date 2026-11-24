@@ -322,6 +322,19 @@ describe("row navigation entries (item 4a)", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  it("binds a plain t to open the time range, once and in the Global group", () => {
+    expect(getShortcutDef("timeRangeOpen")).toMatchObject({
+      key: "t",
+      descriptionKey: "shortcuts.actions.timeRangeOpen",
+    });
+    expect(groupOf("timeRangeOpen")?.pageKey).toBe("shortcuts.pages.global");
+    expect(groupOf("timeRangeOpen")?.scope).toBeUndefined();
+    const plainT = SHORTCUT_REGISTRY.flatMap((g) => g.shortcuts).filter((e) =>
+      [e.key, ...(e.keys ?? []), e.keyForMac, e.keyForWindows].includes("t"),
+    );
+    expect(plainT.map((e) => e.id)).toEqual(["timeRangeOpen"]);
+  });
+
   it("binds J/K in the logs and traces scopes", () => {
     expect(getShortcutDef("logsNextRow")).toMatchObject({ key: "j", scope: "logs" });
     expect(getShortcutDef("logsPrevRow")).toMatchObject({ key: "k", scope: "logs" });

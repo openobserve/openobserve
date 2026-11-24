@@ -5,19 +5,17 @@ const PageManager = require('../../pages/page-manager.js');
 /**
  * E2E coverage for the DateTime picker Copy / Paste feature (PR #13374).
  *
- * The grammar of the paste parser is already exhaustively unit-tested in
- * web/src/utils/dateTimeRangeParse.spec.ts. These tests cover the UI wiring the
- * unit tests cannot reach: the buttons, the toasts, the forced switch to the
- * Absolute tab, the clipboard payload shape, and the difference between the
+ * The grammar of the paste parser is unit-tested in
+ * web/src/utils/timeRangeInput/__tests__. These tests cover the UI wiring the
+ * unit tests cannot reach: the buttons, the toasts, the clipboard text, the
+ * typed bar a non-range paste lands in, and the difference between the
  * auto-apply (Logs) and manual-apply (Metrics) hosts of the component.
  *
  * Assertion strategy — copy-back round-trip:
- * `getConsumableDateTime()` resolves the selection through `store.state.timezone`,
- * so a displayed HH:mm:ss depends on whichever timezone the picker is sitting in.
- * Pasting an epoch value, then clicking Copy and comparing the JSON payload, is
- * exact and independent of the runner's timezone. Wall-clock assertions are used
- * only for timezone-naive input formats, where the picker echoes back the literal
- * time it was given.
+ * Copy on the Absolute tab writes an ISO pair with offsets, so pasting an epoch
+ * value, then copying it back, is exact and independent of the runner's
+ * timezone. Wall-clock assertions are used only for timezone-naive input
+ * formats, where the picker echoes back the literal time it was given.
  */
 
 // Fixed past anchor: 2026-07-23T10:00:00Z .. 2026-07-23T11:00:00Z.
@@ -25,11 +23,8 @@ const PageManager = require('../../pages/page-manager.js');
 // the past so no calendar max-date restriction can clamp it.
 const ANCHOR_START_MICROS = 1784800800000000;
 const ANCHOR_END_MICROS = 1784804400000000;
-// 10:10:00Z — 10 min from the start, 50 min from the end, so the proximity rule
-// in applySingleDateTime() must replace the START.
+// 10:10:00Z — a lone stamp, which the bar previews as a window around it.
 const NEAR_START_MICROS = 1784801400000000;
-// 10:50:00Z — the mirror case, which must replace the END.
-const NEAR_END_MICROS = 1784803800000000;
 
 const MICROS_PER_SECOND = 1_000_000;
 
@@ -74,59 +69,40 @@ test.describe("DateTime Picker Copy Paste testcases", () => {
     });
 
     // TC-02
-    test("should copy a relative range as an absolute epoch payload", {
+    test("should copy a relative range as rolling now-<n><unit> text", {
       tag: ['@datetime-picker', '@all', '@smoke', '@P0']
     }, async () => {
       testLogger.info('Copying the default relative range');
 
       await pm.dateTimePickerPage.selectRelativePeriod('15-m');
       await pm.dateTimePickerPage.clickCopy();
-      await pm.dateTimePickerPage.expectCopySuccessToast();
+      await pm.dateTimePickerPage.expectCopySuccessToast('Copied now-15m');
 
-      // Copy resolves a relative selection to a concrete absolute window, so the
-      // payload must be a pair of epoch-microsecond numbers spanning ~15 minutes.
-      const payload = await pm.dateTimePickerPage.readCopiedRange();
-      expect(payload.end_date).toBeGreaterThan(payload.start_date);
+      expect(await pm.dateTimePickerPage.readClipboard()).toBe('now-15m');
 
-      const spanSeconds = (payload.end_date - payload.start_date) / MICROS_PER_SECOND;
-      // Tolerance absorbs the sub-second drift between the two Date() calls in
-      // getConsumableDateTime(); the window itself is exactly 15 minutes.
-      expect(spanSeconds).toBeGreaterThan(895);
-      expect(spanSeconds).toBeLessThan(905);
-
-      testLogger.info('Relative range copied as absolute epoch payload', { spanSeconds });
+      testLogger.info('Relative range copied as rolling text');
     });
 
     // TC-03
-    test("should restore the original window when a copied range is pasted back", {
+    test("should restore the rolling range when a copied range is pasted back", {
       tag: ['@datetime-picker', '@all', '@P0']
     }, async () => {
       testLogger.info('Copying a 1 hour range, changing it, then pasting it back');
 
       await pm.dateTimePickerPage.selectRelativePeriod('1-h');
       await pm.dateTimePickerPage.clickCopy();
-      const copied = await pm.dateTimePickerPage.readCopiedRange();
+      expect(await pm.dateTimePickerPage.readClipboard()).toBe('now-1h');
 
       // Move the selection somewhere else so the paste has something to undo.
       await pm.dateTimePickerPage.selectRelativePeriod('6-h');
       await pm.dateTimePickerPage.clickPaste();
 
       await pm.dateTimePickerPage.expectPasteSuccessToast();
-      // Paste always forces the picker onto the Absolute tab.
-      await pm.dateTimePickerPage.expectAbsolutePanelActive();
+      // An auto-apply host applies a full range at once and closes; it stays rolling.
+      await pm.dateTimePickerPage.expectPickerClosed();
+      expect(await pm.dateTimePickerPage.getTriggerLabel()).toContain('Past 1 Hour');
 
-      // Read the restored window back through Copy — timezone independent.
-      await pm.dateTimePickerPage.clickCopy();
-      const restored = await pm.dateTimePickerPage.readCopiedRange();
-
-      // The copied payload carries sub-second precision but the picker stores the
-      // selection at second resolution, so compare on whole seconds.
-      expect(Math.floor(restored.start_date / MICROS_PER_SECOND))
-        .toBe(Math.floor(copied.start_date / MICROS_PER_SECOND));
-      expect(Math.floor(restored.end_date / MICROS_PER_SECOND))
-        .toBe(Math.floor(copied.end_date / MICROS_PER_SECOND));
-
-      testLogger.info('Copied range restored exactly');
+      testLogger.info('Copied range restored as the same rolling range');
     });
 
     // TC-04
@@ -194,6 +170,7 @@ test.describe("DateTime Picker Copy Paste testcases", () => {
       await pm.dateTimePickerPage.clickPaste();
 
       await pm.dateTimePickerPage.expectPasteSuccessToast();
+      await pm.dateTimePickerPage.ensurePickerOpen();
       await pm.dateTimePickerPage.expectAbsolutePanelActive();
 
       // This format carries no offset, so it is wall-clock time in the picker's
@@ -215,6 +192,7 @@ test.describe("DateTime Picker Copy Paste testcases", () => {
       await pm.dateTimePickerPage.clickPaste();
 
       await pm.dateTimePickerPage.expectPasteSuccessToast();
+      await pm.dateTimePickerPage.ensurePickerOpen();
       await pm.dateTimePickerPage.expectAbsolutePanelActive();
       await pm.dateTimePickerPage.expectAbsoluteTimeFields('10:00:00', '11:00:00');
 
@@ -222,47 +200,29 @@ test.describe("DateTime Picker Copy Paste testcases", () => {
     });
 
     // TC-09
-    test("should apply a single pasted value to the start when it is closer to the start", {
+    test("should put a single pasted timestamp in the bar for review", {
       tag: ['@datetime-picker', '@all', '@P1']
     }, async () => {
-      testLogger.info('Pasting a single value nearer the start of the current range');
+      testLogger.info('Pasting a single value, which needs a second look before it applies');
 
-      // Establish a known 10:00-11:00 window first.
-      await pm.dateTimePickerPage.pasteAndReadBackRange(
-        `${ANCHOR_START_MICROS} - ${ANCHOR_END_MICROS}`
-      );
+      const labelBeforePaste = await pm.dateTimePickerPage.getTriggerLabel();
+      await pm.dateTimePickerPage.seedClipboard(`${NEAR_START_MICROS}`);
+      await pm.dateTimePickerPage.clickPaste();
 
-      // 10:10 is 10 min from the start and 50 min from the end, so the proximity
-      // rule must move the START and leave the END alone.
-      const range = await pm.dateTimePickerPage.pasteAndReadBackRange(`${NEAR_START_MICROS}`);
+      // A lone stamp reads as a window around it, so it waits in the bar for Enter.
+      await pm.dateTimePickerPage.expectRangeBarText(`${NEAR_START_MICROS}`, 'valid');
+      await expect(pm.dateTimePickerPage.toastByMessage(pm.dateTimePickerPage.pastedToastMessage)).toHaveCount(0);
+      expect(await pm.dateTimePickerPage.getTriggerLabel()).toBe(labelBeforePaste);
 
-      expect(range.start_date).toBe(NEAR_START_MICROS);
-      expect(range.end_date).toBe(ANCHOR_END_MICROS);
+      await pm.dateTimePickerPage.rangeBarInput.press('Enter');
+      await pm.dateTimePickerPage.expectPickerClosed();
+      expect(await pm.dateTimePickerPage.getTriggerLabel()).not.toBe(labelBeforePaste);
 
-      testLogger.info('Single value replaced the start boundary');
-    });
-
-    // TC-10
-    test("should apply a single pasted value to the end when it is closer to the end", {
-      tag: ['@datetime-picker', '@all', '@P1']
-    }, async () => {
-      testLogger.info('Pasting a single value nearer the end of the current range');
-
-      await pm.dateTimePickerPage.pasteAndReadBackRange(
-        `${ANCHOR_START_MICROS} - ${ANCHOR_END_MICROS}`
-      );
-
-      // 10:50 is 50 min from the start and 10 min from the end — mirror of TC-09.
-      const range = await pm.dateTimePickerPage.pasteAndReadBackRange(`${NEAR_END_MICROS}`);
-
-      expect(range.start_date).toBe(ANCHOR_START_MICROS);
-      expect(range.end_date).toBe(NEAR_END_MICROS);
-
-      testLogger.info('Single value replaced the end boundary');
+      testLogger.info('Single value previewed in the bar, then applied');
     });
 
     // TC-11
-    test("should reject unparseable text and leave the current range untouched", {
+    test("should put unreadable text in the bar and leave the current range untouched", {
       tag: ['@datetime-picker', '@all', '@P2']
     }, async () => {
       testLogger.info('Pasting text that matches no supported format');
@@ -273,13 +233,13 @@ test.describe("DateTime Picker Copy Paste testcases", () => {
       await pm.dateTimePickerPage.seedClipboard('not a date range at all');
       await pm.dateTimePickerPage.clickPaste();
 
-      await pm.dateTimePickerPage.expectPasteErrorToast();
-      // A failed paste must not force the switch to Absolute...
+      // The bar says why it cannot read the text; no error toast.
+      await pm.dateTimePickerPage.expectRangeBarText('not a date range at all', 'invalid');
+      await expect(pm.dateTimePickerPage.toastByMessage(pm.dateTimePickerPage.pasteErrorToastMessage)).toHaveCount(0);
       await pm.dateTimePickerPage.expectRelativePanelActive();
-      // ...nor disturb the selection that was already in force.
       expect(await pm.dateTimePickerPage.getTriggerLabel()).toBe(labelBeforePaste);
 
-      testLogger.info('Unparseable paste rejected without side effects', { labelBeforePaste });
+      testLogger.info('Unparseable paste shown in the bar without side effects', { labelBeforePaste });
     });
 
     // TC-12
