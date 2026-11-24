@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div ref="scrollEl" class="min-w-0 flex-1 overflow-y-auto" data-test="dbm-metrics-body">
           <OContent class="flex flex-col gap-2.5 py-2.5">
             <DbmSection
+              sticky-header
               :ref="(el: unknown) => setSectionRef('load', el)"
               :title="t('dbm.metrics.load.title')"
               header-align="center"
@@ -69,36 +70,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #hint>
                 <!-- Reads as part of the heading — "Database load · By user ▾" —
                  the way the folder picker reads inside a page description. -->
-                <OSelect
-                  v-model="loadBreakdown"
-                  :options="breakdownOptions"
-                  size="sm"
-                  appearance="inline"
-                  :searchable="false"
-                  class="shrink-0"
-                  :aria-label="t('panel.breakdown')"
-                  data-test="dbm-metrics-load-breakdown"
-                />
+                <!-- OSelect fills its box, so the wrapper sets the width. -->
+                <div class="w-40 shrink-0">
+                  <OSelect
+                    v-model="loadBreakdown"
+                    :options="breakdownOptions"
+                    size="sm"
+                    :searchable="false"
+                    class="w-full"
+                    :aria-label="t('panel.breakdown')"
+                    data-test="dbm-metrics-load-breakdown"
+                  />
+                </div>
               </template>
               <template #actions>
                 <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  icon-left="info-outline"
-                  class="ms-auto"
-                  :aria-label="t('dbm.metrics.load.about')"
-                  data-test="dbm-load-info"
-                >
-                  <OTooltip side="bottom" :content="t('dbm.metrics.load.hint')" />
-                </OButton>
-                <OButton
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   icon-right="arrow-forward"
+                  class="ms-auto"
                   data-test="dbm-metrics-view-activity"
                   @click="openActivity"
                 >
                   {{ t("dbm.metrics.load.viewActivity") }}
+                </OButton>
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="info-outline"
+                  :aria-label="t('dbm.metrics.load.about')"
+                  data-test="dbm-load-info"
+                >
+                  <OTooltip side="bottom" :content="t('dbm.metrics.load.hint')" />
                 </OButton>
               </template>
               <div class="relative h-64 w-full px-3 pb-3" data-test="dbm-metrics-load-chart">
@@ -151,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              Activity's rollup and Blocks' server counters read DBM streams,
              so they answer even on an org whose receivers ship no metrics. -->
             <DbmSection
+              sticky-header
               v-for="section in catalogSections"
               :key="`catalog-${section.key}`"
               :ref="(el: unknown) => setSectionRef(section.key, el)"
@@ -244,6 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template v-else>
               <DbmSection
+                sticky-header
                 v-if="sections.featured.length"
                 :ref="(el: unknown) => setSectionRef('featured', el)"
                 :title="t('dbm.metrics.sections.featured')"
@@ -280,6 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <DbmSection
+                sticky-header
                 v-for="group in filteredGroups"
                 :key="group.system"
                 :ref="(el: unknown) => setSectionRef(`group-${group.system}`, el)"
@@ -642,7 +648,14 @@ const setSectionRef = (key: string, component: unknown) => {
  */
 const jumpTo = (key: string) => {
   activeSection.value = key;
-  sectionEls.get(key)?.scrollIntoView({ behavior: "auto", block: "start" });
+  const el = sectionEls.get(key);
+  const box = scrollEl.value;
+  if (!el || !box) return;
+  // Scroll only the chart column: scrollIntoView also scrolls every scrollable ancestor, which pushed the whole app up.
+  box.scrollTo({
+    top: box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top,
+    behavior: "auto",
+  });
 };
 
 function ensureSpy(): IntersectionObserver | null {

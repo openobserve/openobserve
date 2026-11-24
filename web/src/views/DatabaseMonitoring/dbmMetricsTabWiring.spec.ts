@@ -92,7 +92,9 @@ describe("dbm metrics tab wiring", () => {
   });
 
   it("jumps sections INSTANTLY — a smooth scroll would detonate every lazy panel passed", () => {
-    expect(page).toContain('scrollIntoView({ behavior: "auto"');
+    expect(page).toContain('behavior: "auto"');
+    // scrollIntoView also scrolls the app's own ancestors, shifting the whole shell.
+    expect(page).not.toContain("scrollIntoView(");
     expect(page).not.toContain('"smooth"');
     expect(page).toContain("DbmMetricsRail");
   });
