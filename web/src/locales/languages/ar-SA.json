@@ -1309,7 +1309,9 @@
     "removeFilter": "إزالة الفلتر",
     "clearAll": "مسح جميع الفلاتر",
     "toggleConnector": "التبديل بين AND و OR",
-    "selectedCount": "No values selected | {count} value selected | {count} values selected",
+    "selectedCount": "لم يتم تحديد أي قيمة | تم تحديد {count} قيمة | تم تحديد {count} قيم",
+    "numberOrVariable": "أدخل رقمًا أو $variable",
+    "numberOnly": "أدخل رقمًا",
     "query": "الاستعلام",
     "builderTooltip": "أنشئ الفلاتر باختيار الحقول والشروط والقيم",
     "queryTooltip": "اكتب الاستعلام بنفسك",
@@ -1349,7 +1351,9 @@
       "notStartsWith": "لا يبدأ بـ",
       "notEndsWith": "لا ينتهي بـ",
       "isEmpty": "فارغ",
-      "isNotEmpty": "غير فارغ"
+      "isNotEmpty": "غير فارغ",
+      "matchesRegex": "يطابق التعبير النمطي",
+      "notMatchesRegex": "لا يطابق التعبير النمطي"
     },
     "types": {
       "string": "نص",
@@ -21640,6 +21644,7 @@
     },
     "noEvents": {
       "title": "لم يتم العثور على أحداث",
+      "queryWarning": "تحذير تنفيذ الاستعلام",
       "descNoFilters": "لم يتم العثور على أي أحداث في {range}.",
       "descWithFilters": "لم يطابق <strong>هذا الاستعلام</strong> أي شيء في النافذة المحددة. يحتوي التدفق على بيانات هنا — حاول تخفيف أحد الفلاتر في شريط الاستعلام.",
       "descOutOfRange": "نافذة الزمن الخاصة بك لا تحتوي على أي بيانات من هذا التدفق. انتقل إلى آخر مرة تم فيها رؤية البيانات.",

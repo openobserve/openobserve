@@ -190,6 +190,7 @@ export const OPERATORS: Record<FilterOperatorId, FilterOperatorDef> = {
     id: "regex",
     symbol: "re_match",
     promqlSymbol: "=~",
+    nameKey: "filterBar.operatorNames.matchesRegex",
     labelKey: "filterBar.operators.regex",
     arity: "one",
   },
@@ -197,6 +198,7 @@ export const OPERATORS: Record<FilterOperatorId, FilterOperatorDef> = {
     id: "not_regex",
     symbol: "re_not_match",
     promqlSymbol: "!~",
+    nameKey: "filterBar.operatorNames.notMatchesRegex",
     labelKey: "filterBar.operators.notRegex",
     arity: "one",
   },
@@ -278,7 +280,8 @@ const NUMERIC_TYPES = new Set([
   "number",
 ]);
 
-const NUMBER_PATTERN = /^-?\d+(\.\d+)?([eE][-+]?\d+)?$/;
+/** A number the SQL writer leaves unquoted. */
+export const NUMBER_PATTERN = /^-?\d+(\.\d+)?([eE][-+]?\d+)?$/;
 
 let idCounter = 0;
 

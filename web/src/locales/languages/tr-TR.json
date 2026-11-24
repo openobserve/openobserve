@@ -1310,6 +1310,8 @@
     "clearAll": "Tüm filtreleri temizle",
     "toggleConnector": "AND ve OR arasında geçiş yap",
     "selectedCount": "Değer seçilmedi | {count} değer seçildi | {count} değer seçildi",
+    "numberOrVariable": "Sayı veya $variable girin",
+    "numberOnly": "Sayı girin",
     "query": "Sorgu",
     "builderTooltip": "Alanları, koşulları ve değerleri seçerek filtreler oluşturun",
     "queryTooltip": "Sorguyu kendiniz yazın",
@@ -1349,7 +1351,9 @@
       "notStartsWith": "İle başlamaz",
       "notEndsWith": "İle bitmez",
       "isEmpty": "Boş",
-      "isNotEmpty": "Boş değil"
+      "isNotEmpty": "Boş değil",
+      "matchesRegex": "Regex ile eşleşir",
+      "notMatchesRegex": "Regex ile eşleşmez"
     },
     "types": {
       "string": "Metin",
@@ -21640,6 +21644,7 @@
     },
     "noEvents": {
       "title": "Olay bulunamadı",
+      "queryWarning": "Sorgu yürütme uyarısı",
       "descNoFilters": "{range} 'de hiçbir olay bulunamadı. Sonuçları yüklemek için zaman aralığını genişletmeyi deneyin.",
       "descWithFilters": "Seçilen aralıkta <strong>bu sorguyla</strong> eşleşen hiçbir şey yok. Akışta bu aralıkta veri var; sorgu çubuğundaki bir filtreyi gevşetmeyi deneyin.",
       "descOutOfRange": "Zaman pencereniz bu akıştan herhangi bir veri içermiyor. Verinin en son görüldüğü zamana geçin.",

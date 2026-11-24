@@ -497,3 +497,59 @@ describe("buildConditionPreview list values", () => {
     );
   });
 });
+
+describe("buildConditionPreview operator wording", () => {
+  it("marks a case-insensitive contains", () => {
+    const node = { ...cond("level", "contains", "err"), case_insensitive: true };
+    expect(buildConditionPreview(node)).toBe("level contains (ignore case) 'err'");
+  });
+
+  it("leaves a plain contains unmarked", () => {
+    expect(buildConditionPreview(cond("level", "contains", "err"))).toBe("level contains 'err'");
+  });
+
+  it("marks any operator that carries the flag, legacy ignore_case included", () => {
+    const node = group([
+      { ...cond("a", "in", ["x", "y"]), case_insensitive: true },
+      { ...cond("b", "=", "y", "AND"), ignore_case: true },
+      cond("c", "=", "z", "AND"),
+    ]);
+    expect(buildConditionPreview(node)).toBe(
+      "a in (ignore case) ('x', 'y') and b = (ignore case) 'y' and c = 'z'",
+    );
+  });
+
+  it("names regex operators in words", () => {
+    expect(buildConditionPreview(cond("msg", "re_match", "^a"))).toBe("msg matches regex '^a'");
+    expect(
+      buildConditionPreview({ ...cond("msg", "re_not_match", "^a"), case_insensitive: true }),
+    ).toBe("msg does not match regex (ignore case) '^a'");
+  });
+
+  it("drops legacy ignore_case on the extended operators, as the backend does", () => {
+    expect(buildConditionPreview({ ...cond("msg", "re_match", "^a"), ignore_case: true })).toBe(
+      "msg matches regex '^a'",
+    );
+    for (const op of ["in", "NOT IN", "Starts With", "ends_with", "regex"]) {
+      const node = { ...cond("msg", op, "a"), ignore_case: true };
+      expect(buildConditionPreview(node)).not.toContain("ignore case");
+    }
+  });
+
+  it("keeps case_insensitive on the extended operators", () => {
+    expect(
+      buildConditionPreview({ ...cond("msg", "re_match", "^a"), case_insensitive: true }),
+    ).toBe("msg matches regex (ignore case) '^a'");
+  });
+
+  it("keeps legacy ignore_case on the original operators", () => {
+    expect(buildConditionPreview({ ...cond("msg", "contains", "a"), ignore_case: true })).toBe(
+      "msg contains (ignore case) 'a'",
+    );
+  });
+
+  it("keeps unary operators unflagged", () => {
+    const node = { ...cond("a", "is_null", ""), case_insensitive: true };
+    expect(buildConditionPreview(node)).not.toContain("ignore case");
+  });
+});

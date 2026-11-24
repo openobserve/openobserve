@@ -1310,6 +1310,8 @@
     "clearAll": "Effacer tous les filtres",
     "toggleConnector": "Basculer entre AND et OR",
     "selectedCount": "Aucune valeur sélectionnée | {count} valeur sélectionnée | {count} valeurs sélectionnées",
+    "numberOrVariable": "Saisissez un nombre ou $variable",
+    "numberOnly": "Saisissez un nombre",
     "query": "Requête",
     "builderTooltip": "Construisez des filtres en choisissant des champs, des conditions et des valeurs",
     "queryTooltip": "Écrivez la requête vous-même",
@@ -1349,7 +1351,9 @@
       "notStartsWith": "Ne commence pas par",
       "notEndsWith": "Ne se termine pas par",
       "isEmpty": "Est vide",
-      "isNotEmpty": "N'est pas vide"
+      "isNotEmpty": "N'est pas vide",
+      "matchesRegex": "Correspond à la regex",
+      "notMatchesRegex": "Ne correspond pas à la regex"
     },
     "types": {
       "string": "Texte",
@@ -21640,6 +21644,7 @@
     },
     "noEvents": {
       "title": "Aucun événement trouvé",
+      "queryWarning": "Avertissement d'exécution de requête",
       "descNoFilters": "Aucun événement n'a été trouvé dans {range}. Essayez d'élargir la plage de temps pour charger les résultats.",
       "descWithFilters": "Rien ne correspond à <strong>cette requête</strong> dans la fenêtre sélectionnée. Essayez d'élargir la plage horaire, d'assouplir un filtre ou de réinitialiser la requête.",
       "descOutOfRange": "Votre fenêtre temporelle ne contient aucune donnée de ce flux. Accédez au moment où des données ont été vues pour la dernière fois.",

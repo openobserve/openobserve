@@ -1310,6 +1310,8 @@
     "clearAll": "Xóa tất cả bộ lọc",
     "toggleConnector": "Chuyển đổi giữa AND và OR",
     "selectedCount": "Chưa chọn giá trị nào | Đã chọn {count} giá trị | Đã chọn {count} giá trị",
+    "numberOrVariable": "Nhập một số hoặc $variable",
+    "numberOnly": "Nhập một số",
     "query": "Truy vấn",
     "builderTooltip": "Tạo bộ lọc bằng cách chọn trường, điều kiện và giá trị",
     "queryTooltip": "Tự viết truy vấn",
@@ -1349,7 +1351,9 @@
       "notStartsWith": "Không bắt đầu bằng",
       "notEndsWith": "Không kết thúc bằng",
       "isEmpty": "Trống",
-      "isNotEmpty": "Không trống"
+      "isNotEmpty": "Không trống",
+      "matchesRegex": "Khớp regex",
+      "notMatchesRegex": "Không khớp regex"
     },
     "types": {
       "string": "Văn bản",
@@ -21640,6 +21644,7 @@
     },
     "noEvents": {
       "title": "Không tìm thấy sự kiện nào",
+      "queryWarning": "Cảnh báo thực thi truy vấn",
       "descNoFilters": "Không tìm thấy sự kiện nào trong {range}.",
       "descWithFilters": "Không có gì khớp với <strong>truy vấn này</strong> trong cửa sổ đã chọn. Stream có dữ liệu ở đây — hãy thử nới lỏng bộ lọc trên thanh truy vấn.",
       "descOutOfRange": "Khung thời gian của bạn không chứa bất kỳ dữ liệu nào từ stream này. Chuyển đến thời điểm dữ liệu được thấy lần cuối.",
