@@ -1310,6 +1310,7 @@
     "clearAll": "Alle filters wissen",
     "toggleConnector": "Schakel tussen AND en OR",
     "selectedCount": "Geen waarden geselecteerd | {count} waarde geselecteerd | {count} waarden geselecteerd",
+    "numberOrVariable": "Voer een getal of $variable in",
     "query": "Query",
     "builderTooltip": "Bouw filters door velden, voorwaarden en waarden te kiezen",
     "queryTooltip": "Schrijf de query zelf",
@@ -1349,7 +1350,9 @@
       "notStartsWith": "Begint niet met",
       "notEndsWith": "Eindigt niet met",
       "isEmpty": "Is leeg",
-      "isNotEmpty": "Is niet leeg"
+      "isNotEmpty": "Is niet leeg",
+      "matchesRegex": "Komt overeen met regex",
+      "notMatchesRegex": "Komt niet overeen met regex"
     },
     "types": {
       "string": "Tekst",
@@ -21573,6 +21576,7 @@
     },
     "noEvents": {
       "title": "Geen gebeurtenissen gevonden",
+      "queryError": "De query gaf een fout terug",
       "descNoFilters": "Er zijn geen gebeurtenissen gevonden in {range}.",
       "descWithFilters": "Er kwam niets overeen met <strong>deze query</strong> in het geselecteerde venster. De stream bevat hier wel gegevens — probeer een filter in de querybalk te versoepelen.",
       "descOutOfRange": "Je tijdvenster bevat geen gegevens uit deze stream. Spring naar het moment waarop de gegevens voor het laatst zijn gezien.",

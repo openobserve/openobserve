@@ -1310,6 +1310,7 @@
     "clearAll": "Alle Filter zurücksetzen",
     "toggleConnector": "Zwischen AND und OR wechseln",
     "selectedCount": "Keine Werte ausgewählt | {count} Wert ausgewählt | {count} Werte ausgewählt",
+    "numberOrVariable": "Zahl oder $variable eingeben",
     "query": "Abfrage",
     "builderTooltip": "Filter erstellen, indem Sie Felder, Bedingungen und Werte auswählen",
     "queryTooltip": "Abfrage selbst schreiben",
@@ -1349,7 +1350,9 @@
       "notStartsWith": "Beginnt nicht mit",
       "notEndsWith": "Endet nicht mit",
       "isEmpty": "Ist leer",
-      "isNotEmpty": "Ist nicht leer"
+      "isNotEmpty": "Ist nicht leer",
+      "matchesRegex": "Entspricht Regex",
+      "notMatchesRegex": "Entspricht nicht Regex"
     },
     "types": {
       "string": "Text",
@@ -21573,6 +21576,7 @@
     },
     "noEvents": {
       "title": "Keine Ereignisse gefunden",
+      "queryError": "Die Abfrage hat einen Fehler zurückgegeben",
       "descNoFilters": "In {range} wurden keine Ereignisse gefunden.",
       "descWithFilters": "Im ausgewählten Fenster stimmte nichts mit <strong>dieser Abfrage</strong> überein. Versuchen Sie, den Zeitraum zu erweitern, einen Filter zu lockern oder die Abfrage zurückzusetzen.",
       "descOutOfRange": "Ihr Zeitfenster enthält keine Daten aus diesem Stream. Springen Sie zu dem Zeitpunkt, an dem zuletzt Daten gesehen wurden.",

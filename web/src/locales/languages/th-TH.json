@@ -1310,6 +1310,7 @@
     "clearAll": "ล้างตัวกรองทั้งหมด",
     "toggleConnector": "สลับระหว่าง AND และ OR",
     "selectedCount": "ไม่ได้เลือกค่า | เลือก {count} ค่า | เลือก {count} ค่า",
+    "numberOrVariable": "ป้อนตัวเลขหรือ $variable",
     "query": "คิวรี",
     "builderTooltip": "สร้างตัวกรองโดยเลือกฟิลด์ เงื่อนไข และค่า",
     "queryTooltip": "เขียนคิวรีด้วยตนเอง",
@@ -1349,7 +1350,9 @@
       "notStartsWith": "ไม่เริ่มต้นด้วย",
       "notEndsWith": "ไม่ลงท้ายด้วย",
       "isEmpty": "ว่าง",
-      "isNotEmpty": "ไม่ว่าง"
+      "isNotEmpty": "ไม่ว่าง",
+      "matchesRegex": "ตรงกับ regex",
+      "notMatchesRegex": "ไม่ตรงกับ regex"
     },
     "types": {
       "string": "ข้อความ",
@@ -21571,6 +21574,7 @@
     },
     "noEvents": {
       "title": "No events found",
+      "queryError": "คิวรีส่งคืนข้อผิดพลาด",
       "descNoFilters": "No events were found in {range}.",
       "descWithFilters": "Nothing matched <strong>this query</strong> in the selected window. The stream has data here — try relaxing a filter in the query bar.",
       "descOutOfRange": "Your time window doesn't contain any data from this stream. Jump to when data was last seen.",

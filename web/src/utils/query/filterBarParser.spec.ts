@@ -268,3 +268,26 @@ describe("parseShorthand", () => {
     expect(parseShorthand("level=")).toBeNull();
   });
 });
+
+describe("parseShorthand quoted values", () => {
+  const valueOf = (text: string) => parseShorthand(text)?.value;
+
+  it("unescapes a quote and a backslash inside double quotes", () => {
+    expect(valueOf(String.raw`client="a\"b"`)).toBe('a"b');
+    expect(valueOf(String.raw`client="a\\b"`)).toBe(String.raw`a\b`);
+  });
+
+  it("keeps other backslashes, so a regex or a path reads as typed", () => {
+    expect(valueOf(String.raw`path=~"\d+\.x"`)).toBe(String.raw`\d+\.x`);
+    expect(valueOf(String.raw`dir="C:\temp"`)).toBe(String.raw`C:\temp`);
+  });
+
+  it("keeps an unterminated double-quoted value as raw text", () => {
+    expect(valueOf(String.raw`client="a\"`)).toBe(String.raw`"a\"`);
+  });
+
+  it("leaves single-quoted SQL values as before", () => {
+    expect(valueOf("name='it''s'")).toBe("it''s");
+    expect(valueOf(String.raw`name='a\'`)).toBe("a\\");
+  });
+});

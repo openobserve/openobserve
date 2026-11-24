@@ -1310,6 +1310,7 @@
     "clearAll": "Clear all filters",
     "toggleConnector": "Switch between AND and OR",
     "selectedCount": "No values selected | {count} value selected | {count} values selected",
+    "numberOrVariable": "Enter a number or a $variable",
     "query": "Query",
     "builderTooltip": "Build filters by picking fields, conditions and values",
     "queryTooltip": "Write the query yourself",
@@ -1349,7 +1350,9 @@
       "notStartsWith": "Not Starts With",
       "notEndsWith": "Not Ends With",
       "isEmpty": "Is Empty",
-      "isNotEmpty": "Is Not Empty"
+      "isNotEmpty": "Is Not Empty",
+      "matchesRegex": "Matches Regex",
+      "notMatchesRegex": "Does Not Match Regex"
     },
     "types": {
       "string": "Text",
@@ -21571,6 +21574,7 @@
     },
     "noEvents": {
       "title": "No events found",
+      "queryError": "The query returned an error",
       "descNoFilters": "No events were found in {range}.",
       "descWithFilters": "Nothing matched <strong>this query</strong> in the selected window. The stream has data here — try relaxing a filter in the query bar.",
       "descOutOfRange": "Your time window doesn't contain any data from this stream. Jump to when data was last seen.",

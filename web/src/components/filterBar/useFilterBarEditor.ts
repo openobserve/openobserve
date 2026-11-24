@@ -59,8 +59,9 @@ export const operatorName = (
   const op = OPERATORS[id];
   const own = names?.[id];
   if (own) return t(own);
+  if (dialect === "promql" && op.promqlSymbol) return raw(op.promqlSymbol);
   if (op.nameKey) return t(op.nameKey);
-  return raw(dialect === "promql" && op.promqlSymbol ? op.promqlSymbol : op.symbol);
+  return raw(op.symbol);
 };
 
 export interface FilterBarDraft {
@@ -124,6 +125,26 @@ const rankByMatch = (
   return [...prefix, ...inner];
 };
 
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// Descriptions match on whole words, so the "in" inside "contains" does not rank Contains ahead of IN.
+const operatorTier = (needle: string, names: string[], description: string): number => {
+  const lower = names.map((name) => name.toLowerCase());
+  if (lower.some((name) => name.startsWith(needle))) return 0;
+  if (lower.some((name) => name.split(/[\s()]+/).some((word) => word.startsWith(needle)))) return 1;
+  const word = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(needle)}($|[^\\p{L}\\p{N}])`, "u");
+  return word.test(description.toLowerCase()) ? 2 : -1;
+};
+
+const NUMBER_VALUE = /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i;
+const VARIABLE_VALUE = /^\$([\w-]+|\{[\w-]+(:[\w-]+)?\})$/;
+
+/** A number, or a dashboard variable (`$x`, `${x}`, `${x:csv}`, `(${x})`) the query resolves later. */
+export const isNumberOrVariable = (value: string): boolean => {
+  const bare = value.startsWith("(") && value.endsWith(")") ? value.slice(1, -1) : value;
+  return NUMBER_VALUE.test(value) || VARIABLE_VALUE.test(bare);
+};
+
 export function useFilterBarEditor(options: FilterBarEditorOptions) {
   const { tree, fields, config, t } = options;
   const dialect = computed<FilterDialect>(() => config.value.dialect);
@@ -154,6 +175,8 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   const fieldMap = computed(() => new Map(fields.value.map((field) => [field.name, field])));
   const typeOf = (field: string): FilterFieldType => fieldMap.value.get(field)?.type ?? "string";
   const draftType = computed<FilterFieldType>(() => typeOf(draft.value?.field ?? ""));
+  // Only typed text is checked; a value picked from the list, a saved one included, is taken as listed.
+  const acceptsTyped = (value: string) => draftType.value !== "number" || isNumberOrVariable(value);
   const arityOf = (id: FilterOperatorId) => arityFor(config.value, id);
   const multiValue = computed(() =>
     draft.value?.operator ? arityOf(draft.value.operator) === "many" : false,
@@ -312,28 +335,27 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
 
   const operatorSuggestions = computed<ChipInputSuggestion[]>(() => {
     const needle = text.value.trim().toLowerCase();
-    return operatorIdsOf(draft.value?.field ?? "")
-      .map((id) => OPERATORS[id])
-      .filter((op) => {
-        if (!needle) return true;
-        const name = operatorName(
-          op.id,
-          dialect.value,
-          t,
-          config.value.operatorNames,
-        ).toLowerCase();
-        return (
-          name.startsWith(needle) ||
-          op.symbol.toLowerCase().startsWith(needle) ||
-          t(op.labelKey).toLowerCase().includes(needle)
-        );
-      })
-      .map((op) => ({
-        key: op.id,
-        label: operatorName(op.id, dialect.value, t, config.value.operatorNames),
-        detail: t(op.labelKey),
-        selected: editPart.value === "operator" && editedNode.value?.operator === op.id,
-      }));
+    const ops = operatorIdsOf(draft.value?.field ?? "").map((id) => OPERATORS[id]);
+    const ranked = needle
+      ? ops
+          .map((op) => ({
+            op,
+            tier: operatorTier(
+              needle,
+              [operatorName(op.id, dialect.value, t, config.value.operatorNames), op.symbol],
+              t(op.labelKey),
+            ),
+          }))
+          .filter(({ tier }) => tier >= 0)
+          .sort((a, b) => a.tier - b.tier)
+          .map(({ op }) => op)
+      : ops;
+    return ranked.map((op) => ({
+      key: op.id,
+      label: operatorName(op.id, dialect.value, t, config.value.operatorNames),
+      detail: t(op.labelKey),
+      selected: editPart.value === "operator" && editedNode.value?.operator === op.id,
+    }));
   });
 
   const valueSuggestions = computed<ChipInputSuggestion[]>(() => {
@@ -346,7 +368,11 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     const typedPicks = multiValue.value ? [...chosen].filter((v) => !loaded.includes(v)) : [];
     const pinned = editedValue.value !== null ? [editedValue.value] : typedPicks;
     const source = [...pinned, ...loaded.filter((v) => !pinned.includes(v))];
-    const ranked = rankByMatch(source, needle).slice(0, MAX_ROWS);
+    const matched = rankByMatch(source, needle);
+    // `Error` and `error` are different values; the one typed exactly comes first and takes Enter.
+    const ranked = (
+      source.includes(needle) ? [needle, ...matched.filter((v) => v !== needle)] : matched
+    ).slice(0, MAX_ROWS);
     const named = (value: string) => options.valueLabel?.value?.(draft.value?.field ?? "", value);
     const rows: ChipInputSuggestion[] = ranked.map((value) => {
       const name = named(value);
@@ -357,7 +383,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
         selected: multiValue.value && chosen.has(value),
       };
     });
-    if (needle && !source.includes(needle)) {
+    if (needle && !source.includes(needle) && acceptsTyped(needle)) {
       const row: ChipInputSuggestion = {
         key: CUSTOM_KEY,
         label: t("filterBar.useValue", { value: needle }),
@@ -366,11 +392,20 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
       // Typed text is a pattern or bound for other operators, so only exact text matches defer to a known value.
       const exact =
         draftType.value === "string" && EXACT_VALUE_OPERATORS.has(draft.value!.operator!);
+      const lower = needle.toLowerCase();
+      const caseOnly = ranked.some((value) => value.toLowerCase() === lower);
       if (valuesAtLimit.value && !chosen.has(needle)) return rows;
-      if (exact && rows.length) rows.push(row);
+      if (exact && rows.length && !caseOnly) rows.push(row);
       else rows.unshift(row);
     }
     return rows;
+  });
+
+  /** One line in place of the list while typed text cannot be committed. */
+  const valueHint = computed<I18nText | undefined>(() => {
+    if (step.value !== "value" || editedValue.value !== null) return undefined;
+    const typed = text.value.trim();
+    return typed && !acceptsTyped(typed) ? t("filterBar.numberOrVariable") : undefined;
   });
 
   const extraRows = computed<ChipInputSuggestion[]>(() => {
@@ -582,7 +617,8 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
 
   function onEnter() {
     if (step.value === "value") {
-      if (text.value.trim()) return addValue(text.value.trim());
+      const typed = text.value.trim();
+      if (typed) return acceptsTyped(typed) ? addValue(typed) : undefined;
       if (multiValue.value && draft.value?.values.length) return commitDraft();
       return;
     }
@@ -597,8 +633,8 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   }
 
   function onSeparator() {
-    if (step.value === "value" && multiValue.value && text.value.trim())
-      addValue(text.value.trim());
+    const typed = text.value.trim();
+    if (step.value === "value" && multiValue.value && typed && acceptsTyped(typed)) addValue(typed);
   }
 
   /** Puts `node` at the caret; at the front of a group the old first item takes the connector typed for the join. */
@@ -999,6 +1035,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     atConditionLimit,
     valuesAtLimit,
     fieldEmptyText,
+    valueHint,
     arityOf,
     reset,
   };

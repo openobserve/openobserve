@@ -1310,6 +1310,7 @@
     "clearAll": "Borrar todos los filtros",
     "toggleConnector": "Alternar entre AND y OR",
     "selectedCount": "Ningún valor seleccionado | {count} valor seleccionado | {count} valores seleccionados",
+    "numberOrVariable": "Ingrese un número o $variable",
     "query": "Consulta",
     "builderTooltip": "Crea filtros eligiendo campos, condiciones y valores",
     "queryTooltip": "Escribe la consulta tú mismo",
@@ -1349,7 +1350,9 @@
       "notStartsWith": "No empieza por",
       "notEndsWith": "No termina en",
       "isEmpty": "Está vacío",
-      "isNotEmpty": "No está vacío"
+      "isNotEmpty": "No está vacío",
+      "matchesRegex": "Coincide con regex",
+      "notMatchesRegex": "No coincide con regex"
     },
     "types": {
       "string": "Texto",
@@ -21573,6 +21576,7 @@
     },
     "noEvents": {
       "title": "No se encontraron eventos",
+      "queryError": "La consulta devolvió un error",
       "descNoFilters": "No se encontró ningún evento en {range}.",
       "descWithFilters": "No hay nada que coincida con <strong>esta consulta</strong> en la ventana seleccionada. Intente ampliar el intervalo de tiempo, suavizar un filtro o restablecer la consulta.",
       "descOutOfRange": "Tu ventana de tiempo no contiene datos de este stream. Salta a cuando se vieron datos por última vez.",

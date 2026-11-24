@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import QueryFilterBar from "./QueryFilterBar.vue";
+import { isNumberOrVariable } from "./useFilterBarEditor";
 import {
   emptyFilterGroup,
   filterTreeToSql,
@@ -835,4 +836,131 @@ describe("QueryFilterBar", () => {
     await press("Enter");
     expect(rowKeys()).toEqual(["eq", "neq", "regex", "not_regex", "in", "not_in"]);
   });
+});
+
+describe("QueryFilterBar typed values", () => {
+  const CUSTOM = "\u0000custom";
+  const listText = () =>
+    document.body.querySelector('[data-test="query-filter-bar-suggest"]')?.textContent ?? "";
+
+  async function startValue(field: string, operator: "eq" | "in", values: string[]) {
+    const state = mountBar({ loadValues: vi.fn(async () => values) });
+    await openBar();
+    await type(field);
+    await press("Enter");
+    if (operator === "in") await type("any");
+    await press("Enter");
+    if (values.length) await vi.waitFor(() => expect(rowKeys()).toContain(values[0]));
+    return state;
+  }
+
+  it("ranks an exact-case match first, so Enter picks Error over error", async () => {
+    const state = await startValue("level", "eq", ["error", "Error"]);
+    await type("Error");
+    await vi.waitFor(() => expect(rowKeys()[0]).toBe("Error"));
+    await press("Enter");
+    expect(sql(state)).toBe("level = 'Error'");
+  });
+
+  it("puts the typed value ahead of a match that differs only in case", async () => {
+    const state = await startValue("level", "eq", ["error", "warn"]);
+    await type("Error");
+    await vi.waitFor(() => expect(rowKeys()).toEqual([CUSTOM, "error"]));
+    await press("Enter");
+    expect(sql(state)).toBe("level = 'Error'");
+  });
+
+  it("keeps prefix matches ahead of the typed value for partial text", async () => {
+    await startValue("level", "eq", ["error", "warn"]);
+    await type("err");
+    await vi.waitFor(() => expect(rowKeys()).toEqual(["error", CUSTOM]));
+  });
+
+  it("ticks the typed case in IN and leaves the other case alone", async () => {
+    const state = await startValue("level", "in", ["error", "warn"]);
+    await type("Error");
+    await vi.waitFor(() => expect(rowKeys()[0]).toBe(CUSTOM));
+    await press("Enter");
+    await type("warn");
+    await vi.waitFor(() => expect(rowKeys()[0]).toBe("warn"));
+    await press("Enter");
+    await press("Enter");
+    expect(sql(state)).toBe("level IN ('Error', 'warn')");
+  });
+
+  it("refuses non-numeric text on a number field and says what it takes", async () => {
+    const state = await startValue("status", "eq", []);
+    await type("abc");
+    expect(rowKeys()).not.toContain(CUSTOM);
+    expect(listText()).toContain("Enter a number or a $variable");
+    await press("Enter");
+    expect(sql(state)).toBe("");
+    expect(input()!.value).toBe("abc");
+  });
+
+  it("takes a number or a dashboard variable typed into a number field", async () => {
+    const state = await startValue("status", "in", []);
+    for (const value of ["-5", "0.25", "${status:csv}"]) {
+      await type(` ${value} `);
+      await press(",");
+    }
+    await type("12px");
+    await press(",");
+    expect(input()!.value).toBe("12px");
+    await type("");
+    await press("Enter");
+    expect(state.tree.items[0]).toMatchObject({ values: ["-5", "0.25", "${status:csv}"] });
+  });
+});
+
+describe("QueryFilterBar operator search", () => {
+  async function operatorsFor(needle: string, dialect?: "promql") {
+    mountBar(dialect ? { dialect } : {});
+    await openBar();
+    await type("level");
+    await press("Enter");
+    await type(needle);
+    return rowKeys();
+  }
+
+  it("ranks IN first for `in` and still lists NOT IN, ahead of contains", async () => {
+    const keys = await operatorsFor("IN");
+    expect(keys[0]).toBe("in");
+    expect(keys).toContain("not_in");
+    expect(keys).not.toContain("contains");
+  });
+
+  it("finds the regex operators by their readable name and by re_match", async () => {
+    expect(await operatorsFor("regex")).toEqual(["regex", "not_regex"]);
+    wrapper?.unmount();
+    expect(await operatorsFor("re_match")).toEqual(["regex"]);
+  });
+
+  it("names regex operators in words on SQL chips and keeps =~ in PromQL", async () => {
+    mountBar({ modelValue: parseSqlFilter("re_match(level, 'a.*')")! });
+    expect(segment("level", "operator").text()).toBe("Matches Regex");
+    wrapper?.unmount();
+    mountBar({ dialect: "promql", modelValue: parseSqlFilter("re_match(level, 'a.*')")! });
+    expect(segment("level", "operator").text()).toBe("=~");
+  });
+});
+
+describe("isNumberOrVariable", () => {
+  it.each([
+    "42",
+    "-5",
+    "0.25",
+    "-0.5",
+    "1e3",
+    "+7",
+    "$status",
+    "${status}",
+    "${status:csv}",
+    "(${status})",
+  ])("accepts %s", (value) => expect(isNumberOrVariable(value)).toBe(true));
+
+  it.each(["abc", "12px", "--5", ".", "NaN", "Infinity", "4 2", "1,000", "$", "($x"])(
+    "refuses %s",
+    (value) => expect(isNumberOrVariable(value)).toBe(false),
+  );
 });

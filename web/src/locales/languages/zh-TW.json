@@ -1310,6 +1310,7 @@
     "clearAll": "清除所有篩選條件",
     "toggleConnector": "在 AND 與 OR 之間切換",
     "selectedCount": "未選取值 | 已選取 {count} 個值 | 已選取 {count} 個值",
+    "numberOrVariable": "輸入數字或 $variable",
     "query": "查詢",
     "builderTooltip": "透過挑選欄位、條件和值來建立篩選條件",
     "queryTooltip": "自行撰寫查詢",
@@ -1349,7 +1350,9 @@
       "notStartsWith": "不以此開頭",
       "notEndsWith": "不以此結尾",
       "isEmpty": "為空",
-      "isNotEmpty": "不為空"
+      "isNotEmpty": "不為空",
+      "matchesRegex": "符合規則運算式",
+      "notMatchesRegex": "不符合規則運算式"
     },
     "types": {
       "string": "文字",
@@ -21568,6 +21571,7 @@
     },
     "noEvents": {
       "title": "找不到事件",
+      "queryError": "查詢傳回錯誤",
       "descNoFilters": "在 {range} 內找不到任何事件。請嘗試放寬時間範圍以載入結果。",
       "descWithFilters": "在選定的時段內，沒有任何項目符合<strong>此查詢</strong>。此串流在此處有資料 — 請嘗試放寬查詢列中的篩選條件。",
       "descOutOfRange": "您的時段不包含此串流的任何資料。請跳至上次出現資料的時間。",
