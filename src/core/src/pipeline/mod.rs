@@ -297,6 +297,25 @@ fn qualified_org<'a>(stream: &'a StreamParams, org: &'a str) -> &'a str {
     }
 }
 
+/// Whether a user realtime pipeline other than `pipeline` itself already reads `stream`. [pure]
+fn stream_in_use_by_another(
+    existing: &[Pipeline],
+    pipeline: &Pipeline,
+    stream: &StreamParams,
+) -> bool {
+    let org = pipeline.org.as_str();
+    existing.iter().any(|other| match &other.source {
+        PipelineSource::Realtime(source) => {
+            other.id != pipeline.id
+                && other.is_user()
+                && source.stream_name == stream.stream_name
+                && source.stream_type == stream.stream_type
+                && qualified_org(source, org) == qualified_org(stream, org)
+        }
+        PipelineSource::Scheduled(_) => false,
+    })
+}
+
 #[tracing::instrument(skip(pipeline))]
 pub async fn save_pipeline(pipeline: Pipeline) -> Result<(), PipelineError> {
     save_pipeline_checked(pipeline, None).await
@@ -329,16 +348,9 @@ pub async fn save_pipeline_checked(
     // Evaluation pipelines: any number allowed, no exclusivity check
     if pipeline.is_user()
         && let PipelineSource::Realtime(stream) = &pipeline.source
-        && pipeline::list_streams_with_pipeline(&pipeline.org)
+        && pipeline::list_by_org(&pipeline.org)
             .await
-            .is_ok_and(|list| {
-                list.iter().any(|existing| {
-                    existing.stream_name == stream.stream_name
-                        && existing.stream_type == stream.stream_type
-                        && qualified_org(existing, &pipeline.org)
-                            == qualified_org(stream, &pipeline.org)
-                })
-            })
+            .is_ok_and(|list| stream_in_use_by_another(&list, &pipeline, stream))
     {
         return Err(PipelineError::StreamInUse);
     }
@@ -908,6 +920,56 @@ mod tests {
         assert!(
             matches!(&updated, Err(PipelineError::InvalidPipeline(msg)) if msg.contains("scheduled query")),
             "{updated:?}"
+        );
+    }
+
+    fn realtime_pipeline(id: &str, org: &str) -> Pipeline {
+        let mut pipeline: Pipeline = serde_json::from_value(serde_json::json!({
+            "pipeline_id": id,
+            "name": id,
+            "nodes": [
+                {
+                    "id": "src",
+                    "data": {"node_type": "stream", "org_id": org, "stream_name": "overwrite_src", "stream_type": "logs"},
+                    "position": {"x": 0.0, "y": 0.0},
+                    "io_type": "input"
+                },
+                {
+                    "id": "dst",
+                    "data": {"node_type": "stream", "org_id": org, "stream_name": "overwrite_dst", "stream_type": "logs"},
+                    "position": {"x": 0.0, "y": 100.0},
+                    "io_type": "output"
+                }
+            ],
+            "edges": [{"id": "esrc-dst", "source": "src", "target": "dst"}]
+        }))
+        .unwrap();
+        pipeline.org = org.to_string();
+        pipeline.validate().unwrap();
+        pipeline
+    }
+
+    #[tokio::test]
+    async fn overwriting_a_realtime_pipeline_does_not_count_its_own_stream_as_in_use() {
+        use super::{PipelineError, save_user_pipeline_checked};
+
+        if !meta_store().await {
+            return;
+        }
+        let stored = realtime_pipeline("overwrite_rt_pl", "overwrite_org");
+        super::db::set(&stored).await.unwrap();
+
+        let overwrite = save_user_pipeline_checked(stored.clone(), Some(&Reached)).await;
+        let other = realtime_pipeline("overwrite_rt_other", "overwrite_org");
+        let other = save_user_pipeline_checked(other, Some(&Reached)).await;
+        super::delete_pipeline(&stored.id).await.unwrap();
+        assert!(
+            matches!(overwrite, Err(PipelineError::Refused(_))),
+            "{overwrite:?}"
+        );
+        assert!(
+            matches!(other, Err(PipelineError::StreamInUse)),
+            "{other:?}"
         );
     }
 
