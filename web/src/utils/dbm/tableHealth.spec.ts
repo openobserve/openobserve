@@ -114,15 +114,22 @@ describe("tableSizeLabel", () => {
 });
 
 describe("vacuumLabel", () => {
+  const pg = { engine: "postgresql" };
+
   it("says NEVER rather than rendering a blank cell", () => {
     // The recipe COALESCEs a null vacuum time to '' and the backend drops it,
-    // so null here means "never vacuumed" — a finding, not missing data. A
-    // blank cell reads as "we do not know", which is the opposite claim.
-    expect(vacuumLabel(null, t)).toBe(t("dbm.tableHealth.never"));
+    // so null here means "never vacuumed" — a finding, not missing data.
+    expect(vacuumLabel(null, pg, t)).toBe(t("dbm.tableHealth.never"));
   });
 
-  it("passes a real timestamp through for the renderer to format", () => {
-    expect(vacuumLabel("2026-08-11 23:39:57.939725+00", t)).toBe("2026-08-11 23:39:57.939725+00");
+  it("says a dash, not NEVER, where the engine has no vacuum", () => {
+    expect(vacuumLabel(null, { engine: "mysql" }, t)).toBe("—");
+  });
+
+  it("renders a real timestamp as a relative age", () => {
+    const stamp = new Date(Date.now() - 3 * 3_600_000).toISOString();
+    expect(vacuumLabel(stamp, pg, t)).toBe("3h ago");
+    expect(vacuumLabel("2026-08-11 23:39:57.939725+00", pg, t)).toMatch(/ago$/);
   });
 });
 
@@ -253,11 +260,9 @@ describe("tableHealthColumns · magnitude bars", () => {
    * "most scans of any table since an unobserved point in time", which reads as
    * a severity it is not. Those columns keep their number and no bar.
    */
-  it("bars the size columns and the bloat percentage", () => {
+  it("bars only the bloat percentage", () => {
     const by = columnsById();
-    for (const id of ["total_bytes", "heap_bytes", "overheadBytes", "dead_tup_pct"]) {
-      expect(by.get(id)?.meta?.bar, `column "${id}" should render a magnitude bar`).toBeTruthy();
-    }
+    expect(by.get("dead_tup_pct")?.meta?.bar).toBeTruthy();
   });
 
   it("puts no bar on the lifetime counters or the tuple estimates", () => {
@@ -290,11 +295,11 @@ describe("tableHealthColumns · magnitude bars", () => {
     expect(by.get("dead_tup_pct")?.meta?.bar).toBe("percent");
   });
 
-  /** The size bars are relative to the biggest table in the list. */
-  it("scales the size bars against the column max", () => {
+  // A size bar relative to the largest table read as a glitch on small tables.
+  it("puts no bar on the size columns", () => {
     const by = columnsById();
     for (const id of ["total_bytes", "heap_bytes", "overheadBytes"]) {
-      expect(by.get(id)?.meta?.bar).toBe("max");
+      expect(by.get(id)?.meta?.bar).toBeUndefined();
     }
   });
 
@@ -312,6 +317,6 @@ describe("tableHealthColumns · magnitude bars", () => {
     expect((by.get("total_bytes")?.meta?.format as (v: unknown) => string)(13_639_680)).toBe(
       "13.0 MB",
     );
-    expect((by.get("dead_tup_pct")?.meta?.format as (v: unknown) => string)(2.98)).toBe("2.98%");
+    expect((by.get("dead_tup_pct")?.meta?.format as (v: unknown) => string)(2.98)).toBe("3.0%");
   });
 });

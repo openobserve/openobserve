@@ -35,9 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   about a check that never ran, which is the one wrong answer this surface can
   give.
 
-  W11 adds a RECOMMENDATIONS strip above the table: deterministic checks over
-  the same feed plus index stats, activity and blocking. Each states what it
-  measured and which threshold it crossed, and none asserts a cause — see
+  W11 adds an Insights menu in the filter row: the table-relevant deterministic
+  checks over the same feed plus index stats. Each states what it measured and
+  which threshold it crossed, and none asserts a cause — see
   `utils/dbm/recommendations.ts`. They are plain predicates, NOT AI, and are
   deliberately not gated on `ai_enabled`/`isEnterprise`: DBM is all-OSS.
 -->
@@ -58,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         search-data-test="dbm-table-health-search"
         :filters="dimensionFilters"
       >
+        <DbmRecommendationMenu :items="recommendationItems" />
         <template #trailing>
           <div class="ms-auto flex min-w-0 items-center gap-1">
             <OTableColumnToggle
@@ -68,9 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:column-visibility="setColumnVisibility"
               @reset:column-sizes="tableRef?.resetColumnSizes?.()"
             />
-            <!-- "Nothing found" and "not collected for this engine" stay apart: the second is no all-clear. -->
+            <!-- An empty menu on an engine without index stats is no all-clear. -->
             <DbmToolbarNote
-              v-if="!loading && !collapsedRecommendations.length"
+              v-if="!loading && recommendationsEmpty === 'engine-partial'"
               v-bind="recommendationsNote"
             />
             <DbmToolbarNote
@@ -109,26 +110,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @action="onRefresh()"
           />
         </template>
-        <!-- Magnitude bars. The bar ACCOMPANIES the formatted number, never
-             replaces it: `tableSizeLabel` and the two-decimal percentage are
-             the honest measurements, and the bar only makes their relative size
-             scannable. Which columns qualify, and why the lifetime counters do
-             not, is argued at `TableHealthBarScale`. -->
-        <!-- The three byte columns are one cell three times: same formatter,
-             same tone, each scaled to its OWN column's worst row (a shared
-             reference would make the heap bar a copy of the total bar). Only
-             the field and the data-test differ, so they are a loop. -->
-        <template
-          v-for="column in SIZE_BAR_COLUMNS"
-          :key="column.key"
-          #[`cell-${column.key}`]="{ row }"
-        >
-          <ODataBarCell
-            :value="row[column.key]"
-            :max="sizeColumnMax[column.key]"
-            :display="tableSizeLabel(row[column.key])"
-            :data-test="`dbm-table-health-${column.dataTest}-${row.rowKey}`"
-          />
+        <template #cell-total_bytes="{ row }">
+          <span
+            class="text-text-body text-xs tabular-nums"
+            :data-test="`dbm-table-health-total-bytes-${row.rowKey}`"
+          >
+            {{ tableSizeLabel(row.total_bytes) }}
+          </span>
+        </template>
+
+        <!-- The table name with its instance beneath, unless every row shares one. -->
+        <template #cell-qualifiedName="{ row }">
+          <div class="flex min-w-0 flex-col">
+            <OTruncatedText>{{ row.qualifiedName }}</OTruncatedText>
+            <div
+              v-if="!uniformInstance && row.instance"
+              class="text-text-secondary flex min-h-4 min-w-0 items-center gap-1 text-xs"
+              data-test="dbm-table-health-meta"
+            >
+              <OTruncatedText>
+                {{ row.instance }}
+                <OTooltip :content="raw(engineName(row.engine ?? ''))" />
+              </OTruncatedText>
+            </div>
+          </div>
+        </template>
+
+        <template v-for="id in VACUUM_COLUMNS" :key="id" #[`cell-${id}`]="{ row }">
+          <span class="text-text-body text-xs" :data-test="`dbm-table-health-${id}-${row.rowKey}`">
+            {{ vacuumLabel(row[id], row, t) }}
+            <OTooltip
+              v-if="vacuumTimeMicros(row[id])"
+              :content="raw(formatDateTime(vacuumTimeMicros(row[id])!))"
+            />
+          </span>
         </template>
 
         <!-- Already a 0-100 proportion, so its 100% reference is the literal
@@ -144,70 +159,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              bar, and the recommendation strip is where a threshold becomes a
              stated finding. -->
         <template #cell-dead_tup_pct="{ row }">
-          <ODataBarCell
-            :value="row.dead_tup_pct"
-            :max="100"
-            :display="row.dead_tup_pct == null ? '—' : `${row.dead_tup_pct.toFixed(2)}%`"
-            :variant="
-              (row.dead_tup_pct ?? 0) >= 20
-                ? 'danger'
-                : (row.dead_tup_pct ?? 0) >= 10
-                  ? 'warning'
-                  : 'default'
-            "
+          <div
+            v-if="row.dead_tup_pct != null"
+            class="flex items-center justify-end gap-1.5"
             :data-test="`dbm-table-health-dead-tup-pct-${row.rowKey}`"
-          />
-        </template>
-
-        <!-- The disclosures live here, always visible, never behind a hover.
-             A reader who does not see them will read a lifetime counter as a
-             per-window one. -->
-        <template #subheader>
-          <!-- Gated on `!loading`: a verdict on first paint would assert one before any data answered. -->
-          <section
-            v-if="!loading && collapsedRecommendations.length"
-            class="border-border-subtle bg-surface-base px-page-edge flex flex-col gap-1.5 border-b py-2"
-            data-test="dbm-recommendations"
           >
-            <div class="flex items-baseline gap-2">
-              <span class="text-text-heading text-xs font-semibold">
-                {{ t("dbm.recommendations.title") }}
-              </span>
-              <span class="text-text-secondary text-2xs">
-                {{ t("dbm.recommendations.subtitle") }}
-              </span>
-            </div>
-            <!-- One row per rule: collapseRecommendations keeps each rule's worst item and discloses the rest. -->
-            <ul class="flex flex-col gap-1">
-              <li
-                v-for="entry in collapsedRecommendations"
-                :key="entry.rec.id"
-                class="flex items-center gap-2"
-                :data-test="`dbm-recommendation-${entry.rec.id}`"
-              >
-                <span
-                  class="rounded-default grid size-4.5 shrink-0 place-items-center"
-                  :class="DBM_SOFT_TONES[entry.rec.tone]"
-                >
-                  <OIcon :name="DBM_TONE_ICONS[entry.rec.tone]" size="xs" />
-                </span>
-                <span class="text-text-heading text-xs font-semibold whitespace-nowrap">
-                  {{ t(`dbm.recommendations.${entry.rec.id}.title`) }}
-                </span>
-                <span class="text-text-secondary text-2xs">{{
-                  recommendationBody(entry.rec)
-                }}</span>
-                <span
-                  v-if="entry.hiddenCount > 0"
-                  class="text-text-secondary text-2xs whitespace-nowrap italic"
-                  :data-test="`dbm-recommendation-more-${entry.rec.id}`"
-                >
-                  {{ t("dbm.recommendations.andMore", { count: entry.hiddenCount }) }}
-                </span>
-                <OTooltip side="bottom" :content="recommendationRule(entry.rec)" />
-              </li>
-            </ul>
-          </section>
+            <DbmShareBar
+              :share="row.dead_tup_pct / 100"
+              track-class="h-1.5 w-13 shrink-0"
+              :fill-class="bloatTone(row.dead_tup_pct)"
+            />
+            <span class="text-text-body text-xs tabular-nums">
+              {{ `${row.dead_tup_pct.toFixed(1)}%` }}
+            </span>
+          </div>
+          <span v-else class="text-text-muted text-xs">{{ raw("—") }}</span>
         </template>
 
         <template #empty>
@@ -258,23 +224,22 @@ import { computed, ref, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
+import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
 import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
-// The shared in-cell magnitude bar from the core Table library — the same one
-// QueryDetailPage already uses. Preferred over the traces plugin's
-// ServiceCatalogBarCell, which is equivalent but lives under plugins/traces/
-// and would make this the first DBM view reaching across a plugin boundary.
-import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import DbmRecommendationMenu, {
+  type DbmRecommendationMenuItem,
+} from "@/components/dbm/DbmRecommendationMenu.vue";
 import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService from "@/services/db_monitoring";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
 import { useDbmScopeFilters } from "@/composables/dbm/useDbmScopeFilters";
@@ -286,23 +251,27 @@ import {
   tableHealthRows,
   tableSizeLabel,
   tupleCountDisclosure,
+  vacuumLabel,
+  vacuumTimeMicros,
   type TableHealthCoverage,
   type TableHealthEmptyCause,
   type TableHealthRow,
 } from "@/utils/dbm/tableHealth";
 import {
   buildRecommendations,
-  collapseRecommendations,
   recommendationRuleParams,
   recommendationsEmptyCause,
   type DbmRecommendation,
   type IndexHealthRow,
 } from "@/utils/dbm/recommendations";
-import { countClaim, formatCount } from "@/utils/dbm/format";
-import { formatDurationMs } from "@/utils/dbm/activity";
-import { DBM_SOFT_TONES, DBM_TONE_ICONS } from "@/utils/dbm/tones";
+import { countClaim } from "@/utils/dbm/format";
+import { engineName, uniformValue } from "@/utils/dbm/uniformValue";
 
 const { t } = useI18nTyped();
+
+// 20% is Postgres's default autovacuum_vacuum_scale_factor; 10% is a lead-in.
+const bloatTone = (pct: number) =>
+  pct >= 20 ? "bg-status-error-text" : pct >= 10 ? "bg-status-warning-text" : "bg-accent";
 const route = useRoute();
 const router = useRouter();
 
@@ -408,13 +377,14 @@ const notCollectingChecks = computed<DbmLockCheck[]>(() => [
   { id: "range", status: "note", title: t("dbm.tableHealth.checkRange"), detail: raw("") },
 ]);
 
-/**
- * Sizes lead, because "which table is eating the disk" is the question that
- * opens this page. The lifetime counters are present but hidden by default:
- * they are the columns most easily misread, and W11 is what turns them into a
- * verdict.
- */
+// Heap/index sizes and the lifetime counters start hidden to keep the table scannable; a saved user choice still wins.
 const defaultColumnVisibility = {
+  heap_bytes: false,
+  overheadBytes: false,
+  seq_scan_count: false,
+  idx_scan_count: false,
+  autovacuum_count: false,
+  last_vacuum: false,
   seq_tup_read: false,
   frozen_xid_age: false,
   last_analyze: false,
@@ -427,94 +397,40 @@ const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("dbm-t
 if (!Object.keys(columnVisibility.value).length)
   columnVisibility.value = { ...defaultColumnVisibility };
 
-const columns = computed<OTableColumnDef[]>(() => tableHealthColumns(t));
+const uniformInstance = computed(() => uniformValue(rows.value, (r) => r.instance));
 
-/**
- * The 100% reference for each barred size column, taken over the rows CURRENTLY
- * RENDERED (post-search) rather than the full feed — a bar has to be readable
- * against what is on screen, and scaling to a filtered-out row would leave every
- * visible bar stubby for no reason the reader can see.
- *
- * Only the size columns need one. `dead_tup_pct` is already a percentage and is
- * scaled against 100 in the template; see `TableHealthBarScale` for why the
- * lifetime counters get no bar at all.
- */
-/** The byte columns that carry a magnitude bar. */
-type SizeBarColumn = "total_bytes" | "heap_bytes" | "overheadBytes";
+const columns = computed<OTableColumnDef[]>(() =>
+  tableHealthColumns(
+    t,
+    uniformInstance.value
+      ? t("dbm.tableHealth.columns.allOnInstance", { instance: uniformInstance.value })
+      : undefined,
+  ),
+);
 
-/**
- * The byte columns that render as a magnitude bar. The `data-test` is spelled
- * out rather than derived: `overheadBytes` would kebab to `overhead-bytes` and
- * `total_bytes` would not, so a derivation here would be two rules pretending
- * to be one.
- */
-const SIZE_BAR_COLUMNS: { key: SizeBarColumn; dataTest: string }[] = [
-  { key: "total_bytes", dataTest: "total-bytes" },
-  { key: "heap_bytes", dataTest: "heap-bytes" },
-  { key: "overheadBytes", dataTest: "overhead-bytes" },
-];
+const VACUUM_COLUMNS = ["last_autovacuum", "last_vacuum", "last_analyze"] as const;
 
-const sizeColumnMax = computed(() => {
-  const max = (key: SizeBarColumn) => rows.value.reduce((acc, r) => Math.max(acc, r[key] ?? 0), 0);
-  return {
-    total_bytes: max("total_bytes"),
-    heap_bytes: max("heap_bytes"),
-    overheadBytes: max("overheadBytes"),
-  };
-});
+const formatDateTime = (micros: number) =>
+  new Date(micros / 1000).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
 
 // ─── W11 · Recommendations ───────────────────────────────────────────────────
 
-/** The three inputs the rules predicate on, beyond the table feed itself. */
+/** Index health, the one input beyond the table feed that the page-level rules read. */
 const indexHits = shallowRef<IndexHealthRow[]>([]);
 const indexCountersAreCumulative = ref(false);
 /**
- * The two rule inputs that are PROJECTIONS of the shared fan-out's own
- * responses — the long-running-query rule reads the activity sample, the
- * high-impact-blocker rule the blocking sample. Read from the snapshot rather
- * than refetched: a second request over the same window could disagree with
- * the badge sitting beside it.
- *
- * Always arrays, never `undefined`. This is the exact field that once arrived
- * unset from a cross-page cache hit and threw `samples is not iterable` out of
- * `chainsFromSamples`; the snapshot's uniform shape is what makes that
- * unrepresentable now. See useDbmTabCounts.
- */
-const sessions = computed(() => tabCountsContext.counts.value.sessions);
-const blockingSamples = computed(() => tabCountsContext.counts.value.blockingSamples);
-
-/**
- * The rules, run over whatever arrived. Every predicate lives in
- * `utils/dbm/recommendations.ts` and is unit-tested there; this page only
- * supplies inputs and renders, so the page and the tests cannot disagree about
- * what fires.
+ * The rules, run over what this page loaded. Session and blocking rules are not
+ * table findings, so they get no input and only the unused-index rule can fire.
  */
 const recommendations = computed<DbmRecommendation[]>(() =>
   buildRecommendations({
     indexes: indexHits.value,
-    // Copied out of the snapshot: it exposes readonly arrays (no reader may
-    // mutate the shared state), and the rule inputs are mutable types. The
-    // session copy is per-row because `blocking_pids` is itself a readonly
-    // array in the snapshot.
-    sessions: sessions.value.map((row) => ({
-      ...row,
-      blocking_pids: row.blocking_pids ? [...row.blocking_pids] : row.blocking_pids,
-    })),
-    blocking: [...blockingSamples.value],
-    // The high-row-count rule reads ONE statement's server-side counters, which
-    // this page does not fetch — it is surfaced on Query detail, where that
-    // request already happens. Passing null here states "not evaluated" rather
-    // than fabricating an input.
+    sessions: [],
+    blocking: [],
+    // Not fetched here; it is surfaced on Query detail where that request already happens.
     serverMetrics: null,
-  }),
+  }).filter((rec) => rec.id === "unused-index"),
 );
-
-/**
- * One row per RULE for rendering. The rules emit one entry per detected item,
- * which on a busy database is dozens of lines; each collapsed entry carries the
- * count it stands for so the strip can say how many it is not showing.
- */
-const collapsedRecommendations = computed(() => collapseRecommendations(recommendations.value));
 
 /**
  * Which empty state applies, or `null` when there is a list to show. The engine
@@ -551,45 +467,24 @@ const caveats = computed(() => [
   ...(indexCountersAreCumulative.value ? [t("dbm.recommendations.countersCumulative")] : []),
 ]);
 
-/**
- * The headline sentence, with the numbers the rule measured. The switch is
- * exhaustive over the closed `DbmRecommendationId` union — no default, so a
- * new rule id fails to compile here instead of rendering silently blank.
- */
-const recommendationBody = (rec: DbmRecommendation): I18nText => {
-  const e = rec.evidence;
-  switch (rec.id) {
-    case "unused-index": {
-      const [schema, relation, index] = rec.subject.split(".");
-      return t("dbm.recommendations.unused-index.body", {
+const recommendationItems = computed<DbmRecommendationMenuItem[]>(() =>
+  recommendations.value.map((rec, i) => {
+    const [schema, relation, index] = rec.subject.split(".");
+    const { key, params } = recommendationRuleParams(rec.id);
+    return {
+      key: `${rec.id}-${i}`,
+      id: rec.id,
+      tone: rec.tone,
+      title: t("dbm.recommendations.unused-index.title"),
+      body: t("dbm.recommendations.unused-index.body", {
         index: index ?? rec.subject,
         relation: [schema, relation].filter(Boolean).join("."),
-        size: tableSizeLabel(e.indexBytes),
-      });
-    }
-    case "long-running-query":
-      return t("dbm.recommendations.long-running-query.body", {
-        pid: e.pid ?? rec.subject,
-        duration: formatDurationMs(e.runningMs),
-      });
-    case "high-impact-blocker":
-      return t("dbm.recommendations.high-impact-blocker.body", {
-        pid: e.pid ?? rec.subject,
-        count: e.blockedCount ?? 0,
-      });
-    case "high-row-count":
-      return t("dbm.recommendations.high-row-count.body", {
-        rows: formatCount(e.rowsPerCall),
-        calls: formatCount(e.calls),
-      });
-  }
-};
-
-/** The predicate that fired, in words, from the constants it evaluates. */
-const recommendationRule = (rec: DbmRecommendation) => {
-  const { key, params } = recommendationRuleParams(rec.id);
-  return t(key as Parameters<typeof t>[0], params);
-};
+        size: tableSizeLabel(rec.evidence.indexBytes),
+      }),
+      rule: t(key as Parameters<typeof t>[0], params),
+    };
+  }),
+);
 
 // ─── Filters ─────────────────────────────────────────────────────────────────
 

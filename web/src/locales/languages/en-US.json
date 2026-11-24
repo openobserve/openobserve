@@ -27967,12 +27967,14 @@
       "checkRange": "Widen the time range — the recipe reports once every 60 seconds.",
       "columns": {
         "relation": "Table",
-        "instance": "Instance",
+        "allOnInstance": "All tables here are on {instance}.",
         "totalBytes": "Total size",
         "heapBytes": "Heap size",
         "overheadBytes": "Index + TOAST",
+        "overheadBytesHint": "Space used by the table's indexes plus TOAST, where Postgres stores large values out of line.",
         "liveTuples": "Live rows",
         "deadTuples": "Dead rows",
+        "deadTupPctHint": "Share of dead rows, estimated. Amber at 10% or more, red at 20% or more, the point where Postgres plans a vacuum.",
         "deadTupPct": "Bloat",
         "modSinceAnalyze": "Rows since analyze",
         "seqScanCount": "Seq scans",
@@ -27986,10 +27988,7 @@
       }
     },
     "recommendations": {
-      "title": "Recommendations",
-      "subtitle": "Deterministic checks over what the collector already reports. Each states the measurement and the threshold it crossed.",
       "countersCumulative": "Index scan counts are lifetime totals since the last statistics reset, not counts for the selected time range.",
-      "andMore": "and {count} more like it",
       "unused-index": {
         "title": "Index not scanned",
         "body": "{index} on {relation} has no recorded scans and occupies {size}.",

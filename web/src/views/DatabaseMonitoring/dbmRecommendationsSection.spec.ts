@@ -102,29 +102,13 @@ describe("recommendations section wiring", () => {
   });
 
   /**
-   * `buildRecommendations` emits one entry per detected item, so a database
-   * with fifteen blocked sessions would render fifteen list items and the strip
-   * becomes a wall nobody reads. The page must render the collapsed list — one
-   * row per rule — rather than iterating the raw one.
+   * The page is the table view, so the session and blocking rules (which are
+   * not table findings) must get no input.
    */
-  it("renders one row per rule, not one per detected item", () => {
+  it("keeps only table-relevant recommendations", () => {
     const src = source();
-    expect(src).toContain("collapseRecommendations");
-    // The v-for must walk the collapsed list; iterating `recommendations`
-    // directly is the uncapped rendering.
-    expect(src).toMatch(/v-for="entry in collapsedRecommendations"/);
-    expect(src).not.toMatch(/v-for="rec in recommendations"/);
-  });
-
-  /**
-   * Collapsing is only honest if the reader can SEE that entries are hidden.
-   * The row that stands for several must say how many, and must say it ONLY
-   * when something is actually hidden — a bare "and 0 more" would claim a
-   * remainder that does not exist.
-   */
-  it("discloses the entries a collapsed row stands for", () => {
-    const src = source();
-    expect(src).toContain("dbm.recommendations.andMore");
-    expect(src).toMatch(/hiddenCount\s*>\s*0/);
+    expect(src).toContain('rec.id === "unused-index"');
+    expect(src).toContain("DbmRecommendationMenu");
+    expect(src).not.toContain('dbm-recommendations"');
   });
 });

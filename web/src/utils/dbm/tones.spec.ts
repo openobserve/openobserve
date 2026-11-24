@@ -83,7 +83,7 @@ describe("DBM tone maps", () => {
   it.each([
     "../../components/dbm/DbmRowChips.vue",
     "../../components/dbm/DbmInsightStrip.vue",
-    "../../views/DatabaseMonitoring/TableHealthPage.vue",
+    "../../components/dbm/DbmRecommendationMenu.vue",
     "../../views/DatabaseMonitoring/BlockedQueriesPage.vue",
     "../../views/DatabaseMonitoring/DeadlocksPage.vue",
   ])("%s reaches its tones through this module", (path) => {
