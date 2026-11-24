@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- supported providers -->
             <div class="flex items-center gap-3">
-              <span class="text-text-disabled text-xs font-medium whitespace-nowrap">{{
+              <span class="text-text-secondary text-xs font-medium whitespace-nowrap">{{
                 t("storage_settings.supportedProviders")
               }}</span>
               <div class="flex items-center gap-2.5">
