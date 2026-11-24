@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use config::meta::{
     dashboards::{
@@ -34,7 +34,7 @@ use svix_ksuid::KsuidLike;
 
 use super::{
     distinct_values::{self, OriginType},
-    entity::{dashboards, folders, reports},
+    entity::{dashboards, folders, report_dashboards, reports},
     folders::folder_type_into_i16,
 };
 use crate::{
@@ -279,34 +279,13 @@ pub async fn put(
     .await
 }
 
-/// Deletes a dashboard with the given `folder_id` and `dashboard_id` surrogate
-/// keys.
+/// Deletes a dashboard and the reports it leaves without dashboards; returns their `(id, folder)`.
 pub async fn delete_from_folder(
     org_id: &str,
     folder_id: &str,
     dashboard_id: &str,
-) -> Result<(), errors::Error> {
-    let txn = get_orm_client_rw().await.begin().await?;
-    let maybe_dashboard_model = get_model_from_folder(&txn, org_id, folder_id, dashboard_id)
-        .await?
-        .and_then(|(_folder, maybe_dash)| maybe_dash);
-    let Some(dashboard_model) = maybe_dashboard_model else {
-        return Ok(());
-    };
-    let report_models = dashboard_model
-        .find_related(reports::Entity)
-        .all(&txn)
-        .await?;
-
-    // Delete any report that referenced the dashboard.
-    for r in report_models {
-        let rslt = r.delete(&txn).await;
-        println!("delete report result: {rslt:?}");
-    }
-
-    let _ = dashboard_model.delete(&txn).await?;
-    txn.commit().await?;
-    Ok(())
+) -> Result<Vec<(String, String)>, errors::Error> {
+    Ok(delete_from_folder_with(get_orm_client_rw().await, org_id, folder_id, dashboard_id).await?)
 }
 
 /// Deletes all dashboards.
@@ -609,6 +588,89 @@ async fn list_ids_by_org_with<C: ConnectionTrait>(
         .into_tuple::<(String, String)>()
         .all(db)
         .await
+}
+
+async fn delete_from_folder_with<C: TransactionTrait>(
+    db: &C,
+    org_id: &str,
+    folder_id: &str,
+    dashboard_id: &str,
+) -> Result<Vec<(String, String)>, sea_orm::DbErr> {
+    let txn = db.begin().await?;
+    let maybe_dashboard_model = get_model_from_folder(&txn, org_id, folder_id, dashboard_id)
+        .await?
+        .and_then(|(_folder, maybe_dash)| maybe_dash);
+    let Some(dashboard_model) = maybe_dashboard_model else {
+        return Ok(vec![]);
+    };
+    let orphaned = unlink_reports(&txn, &dashboard_model.id).await?;
+    dashboard_model.delete(&txn).await?;
+    txn.commit().await?;
+    Ok(orphaned)
+}
+
+/// Unlinks a dashboard from its reports and deletes those left without dashboards.
+async fn unlink_reports<C: ConnectionTrait>(
+    txn: &C,
+    dashboard_pk: &str,
+) -> Result<Vec<(String, String)>, sea_orm::DbErr> {
+    // A new link's foreign key waits on this lock, so no report gets linked while this runs.
+    dashboards::Entity::find_by_id(dashboard_pk)
+        .lock_exclusive()
+        .one(txn)
+        .await?;
+    // Two deletes of dashboards sharing a report would each count the other's link without it.
+    let report_ids: Vec<String> = reports::Entity::find()
+        .select_only()
+        .column(reports::Column::Id)
+        .inner_join(report_dashboards::Entity)
+        .filter(report_dashboards::Column::DashboardId.eq(dashboard_pk))
+        .order_by_asc(reports::Column::Id)
+        .lock_exclusive()
+        .into_tuple()
+        .all(txn)
+        .await?;
+    if report_ids.is_empty() {
+        return Ok(vec![]);
+    }
+    report_dashboards::Entity::delete_many()
+        .filter(report_dashboards::Column::DashboardId.eq(dashboard_pk))
+        .exec(txn)
+        .await?;
+    let still_linked: HashSet<String> = report_dashboards::Entity::find()
+        .select_only()
+        .column(report_dashboards::Column::ReportId)
+        .filter(report_dashboards::Column::ReportId.is_in(report_ids.clone()))
+        .into_tuple::<String>()
+        .all(txn)
+        .await?
+        .into_iter()
+        .collect();
+    let orphan_ids: Vec<String> = report_ids
+        .into_iter()
+        .filter(|id| !still_linked.contains(id))
+        .collect();
+    if orphan_ids.is_empty() {
+        return Ok(vec![]);
+    }
+    let orphaned: Vec<(String, String)> = reports::Entity::find()
+        .select_only()
+        .column(reports::Column::Id)
+        .column_as(
+            Expr::col((folders::Entity, folders::Column::FolderId)),
+            "folder_id",
+        )
+        .inner_join(folders::Entity)
+        .filter(reports::Column::Id.is_in(orphan_ids.clone()))
+        .order_by_asc(reports::Column::Id)
+        .into_tuple()
+        .all(txn)
+        .await?;
+    reports::Entity::delete_many()
+        .filter(reports::Column::Id.is_in(orphan_ids))
+        .exec(txn)
+        .await?;
+    Ok(orphaned)
 }
 
 fn convert_skipping_invalid(
@@ -1107,5 +1169,205 @@ mod tests {
             )]
         );
         Ok(())
+    }
+
+    /// One connection, not a pool: two connections to `sqlite::memory:` are two databases.
+    async fn report_links_db() -> DatabaseConnection {
+        let mut opts = sea_orm::ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = sea_orm::Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = sea_orm::Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(folders::Entity),
+            schema.create_table_from_entity(dashboards::Entity),
+            schema.create_table_from_entity(reports::Entity),
+            schema.create_table_from_entity(report_dashboards::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        folders::ActiveModel {
+            id: Set("f".to_string()),
+            org: Set("org".to_string()),
+            folder_id: Set("default".to_string()),
+            name: Set("default".to_string()),
+            description: Set(None),
+            icon: Set(None),
+            r#type: Set(folder_type_into_i16(FolderType::Dashboards)),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+        db
+    }
+
+    async fn seed_dashboard(db: &DatabaseConnection, id: &str) {
+        dashboards::ActiveModel {
+            id: Set(id.to_string()),
+            dashboard_id: Set(format!("dash-{id}")),
+            folder_id: Set("f".to_string()),
+            owner: Set("alice".to_string()),
+            role: Set(None),
+            title: Set(id.to_string()),
+            description: Set(None),
+            data: Set(serde_json::json!({})),
+            version: Set(8),
+            created_at: Set(0),
+            updated_at: Set(0),
+        }
+        .insert(db)
+        .await
+        .unwrap();
+    }
+
+    async fn seed_report(db: &DatabaseConnection, id: &str, dashboard_ids: &[&str]) {
+        reports::ActiveModel {
+            id: Set(id.to_string()),
+            org: Set("org".to_string()),
+            folder_id: Set("f".to_string()),
+            name: Set(id.to_string()),
+            title: Set(id.to_string()),
+            description: Set(None),
+            enabled: Set(true),
+            frequency: Set(serde_json::json!({})),
+            destinations: Set(serde_json::json!([])),
+            message: Set(None),
+            timezone: Set("UTC".to_string()),
+            tz_offset: Set(0),
+            owner: Set(None),
+            last_edited_by: Set(None),
+            created_at: Set(0),
+            updated_at: Set(None),
+            start_at: Set(0),
+            image_preview: Set(false),
+            last_run_at: Set(None),
+            last_run_status: Set(None),
+            last_run_error: Set(None),
+        }
+        .insert(db)
+        .await
+        .unwrap();
+        for dashboard_id in dashboard_ids {
+            report_dashboards::ActiveModel {
+                report_id: Set(id.to_string()),
+                dashboard_id: Set((*dashboard_id).to_owned()),
+                tab_names: Set(serde_json::json!([])),
+                variables: Set(serde_json::json!([])),
+                timerange: Set(serde_json::json!({})),
+                report_type: Set(0),
+                email_attachment_type: Set(0),
+                attachment_dimensions: Set(None),
+            }
+            .insert(db)
+            .await
+            .unwrap();
+        }
+    }
+
+    async fn links_of(db: &DatabaseConnection, report_id: &str) -> Vec<String> {
+        report_dashboards::Entity::find()
+            .filter(report_dashboards::Column::ReportId.eq(report_id))
+            .all(db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|l| l.dashboard_id)
+            .collect()
+    }
+
+    async fn report_ids(db: &DatabaseConnection) -> Vec<String> {
+        let mut ids: Vec<String> = reports::Entity::find()
+            .all(db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|r| r.id)
+            .collect();
+        ids.sort();
+        ids
+    }
+
+    #[tokio::test]
+    async fn delete_from_folder_keeps_reports_that_cover_other_dashboards() {
+        let db = report_links_db().await;
+        seed_dashboard(&db, "x").await;
+        seed_dashboard(&db, "y").await;
+        seed_report(&db, "both", &["x", "y"]).await;
+        seed_report(&db, "only-x", &["x"]).await;
+        seed_report(&db, "only-y", &["y"]).await;
+
+        let orphaned = delete_from_folder_with(&db, "org", "default", "dash-x")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            orphaned,
+            vec![("only-x".to_string(), "default".to_string())]
+        );
+        assert_eq!(report_ids(&db).await, vec!["both", "only-y"]);
+        assert_eq!(links_of(&db, "both").await, vec!["y"]);
+        assert!(links_of(&db, "only-x").await.is_empty());
+        assert_eq!(links_of(&db, "only-y").await, vec!["y"]);
+        assert!(
+            dashboards::Entity::find_by_id("x")
+                .one(&db)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn deleting_both_dashboards_of_a_shared_report_deletes_the_report() {
+        let db = report_links_db().await;
+        seed_dashboard(&db, "x").await;
+        seed_dashboard(&db, "y").await;
+        seed_report(&db, "both", &["x", "y"]).await;
+
+        let first = delete_from_folder_with(&db, "org", "default", "dash-x")
+            .await
+            .unwrap();
+        let second = delete_from_folder_with(&db, "org", "default", "dash-y")
+            .await
+            .unwrap();
+
+        assert!(first.is_empty());
+        assert_eq!(second, vec![("both".to_string(), "default".to_string())]);
+        assert!(report_ids(&db).await.is_empty());
+        assert!(links_of(&db, "both").await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn unlink_reports_reads_the_report_ids_under_row_locks_on_postgres() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results([vec![make_model(8, serde_json::json!({}))]])
+            .append_query_results([
+                Vec::<std::collections::BTreeMap<String, sea_orm::Value>>::new(),
+            ])
+            .into_connection();
+
+        assert!(unlink_reports(&db, "id-1").await.unwrap().is_empty());
+
+        let log: Vec<String> = db
+            .into_transaction_log()
+            .iter()
+            .map(|t| format!("{t:?}"))
+            .collect();
+        assert_eq!(log.len(), 2);
+        assert!(log[0].contains(r#"FROM \"dashboards\""#) && log[0].contains("FOR UPDATE"));
+        assert!(
+            log[1].contains(r#"INNER JOIN \"report_dashboards\""#) && log[1].contains("FOR UPDATE"),
+            "{}",
+            log[1]
+        );
+    }
+
+    #[tokio::test]
+    async fn delete_from_folder_of_a_missing_dashboard_orphans_nothing() {
+        let db = report_links_db().await;
+        let orphaned = delete_from_folder_with(&db, "org", "default", "dash-x")
+            .await
+            .unwrap();
+        assert!(orphaned.is_empty());
     }
 }
