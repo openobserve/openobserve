@@ -835,8 +835,8 @@ onUnmounted(() => {
   cleanupPipelinesContextProvider();
 });
 
-/** Loads the edited pipeline; resolves false when it is gone or could not be read. */
 let pipelineLoad = 0;
+/** Loads the edited pipeline; resolves false when it is gone or could not be read. */
 const getPipeline = (): Promise<boolean> => {
   const route = router.currentRoute.value;
   const recentScope = captureRecentVisitScope();
