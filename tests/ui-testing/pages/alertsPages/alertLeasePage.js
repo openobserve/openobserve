@@ -39,11 +39,6 @@ export class AlertLeasePage {
     await this.page.locator(this.searchField).fill(text);
   }
 
-  async reloadList() {
-    await this.page.reload();
-    await expect(this.page.locator(this.searchField)).toBeVisible({ timeout: 30000 });
-  }
-
   /** The exact chip text; `variant` is `created`, `on` or `off`. */
   labelPattern(variant, who) {
     const prefix = escapeRegex(LABELS[variant].replace('{who}', who));

@@ -120,7 +120,7 @@ test.describe('Alert leases — temporary alerts and timed incident creation', {
     expect((await endLease(page, id, active.id)).state).toBe('ended');
     expect((await getAlert(page, id))?.enabled).toBe(false);
 
-    await lease.reloadList();
+    await ack.openList();
     await lease.searchList(name);
     await expect(lease.listRow(name)).toBeVisible({ timeout: 30000 });
     await expect(lease.anyListChip(name)).toHaveCount(0, { timeout: 15000 });
@@ -140,7 +140,7 @@ test.describe('Alert leases — temporary alerts and timed incident creation', {
     expect((await keepLease(page, id, active.id)).state).toBe('kept');
     expect((await getAlert(page, id))?.enabled).toBe(true);
 
-    await lease.reloadList();
+    await ack.openList();
     await lease.searchList(name);
     await expect(lease.listRow(name)).toBeVisible({ timeout: 30000 });
     await expect(lease.anyListChip(name)).toHaveCount(0, { timeout: 15000 });
