@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="securityAccess.canOpen.value"
-      class="ms-3 flex shrink-0 items-center md:max-xl:min-w-0 md:max-xl:shrink"
+      class="ms-3 flex shrink-0 items-center max-xl:min-w-0 max-xl:shrink max-md:ms-1 max-md:min-w-12"
     >
       <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
     </div>

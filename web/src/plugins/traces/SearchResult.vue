@@ -934,7 +934,7 @@ export default defineComponent({
     // A blank count would be replaced by the plural number, so a space stands in and is trimmed.
     const countNoun = computed(() => countText(" ", 2).trim());
     const countParts = computed(() => {
-      const num = formatLargeNumber(shownTotal.value);
+      const num = shownTotal.value === null ? "—" : formatLargeNumber(shownTotal.value);
       const label = countLabel.value;
       const at = label.indexOf(num);
       return at < 0
