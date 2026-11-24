@@ -21,7 +21,8 @@ vi.mock("@/utils/zincutils", () => ({
   convertToUtcTimestamp: vi.fn((dateStr) => new Date(dateStr).getTime() * 1000),
 }));
 
-vi.mock("@/utils/date", () => ({
+vi.mock("@/utils/date", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/date")>()),
   generateDurationLabel: vi.fn(() => "15m"),
   formatDateWithTimezone: vi.fn(() => "2023-01-01 10:00:00"),
   subtractRelativeTime: vi.fn((endDate: Date) => {
@@ -97,21 +98,19 @@ describe("DateTime Component", () => {
       expect(wrapper.vm.relativeValue).toBe(30);
     });
 
-    it("should test onCustomPeriodSelect function", () => {
+    it("keeps a custom value over the restriction as typed", () => {
       wrapper = createWrapper({
         queryRangeRestrictionInHour: 24,
         autoApply: false,
       });
 
-      // Set up initial values
       wrapper.vm.selectedType = "relative";
       wrapper.vm.relativePeriod = "h";
-      wrapper.vm.relativeValue = 48; // Exceeds restriction
+      wrapper.vm.customDraft = 48;
 
-      wrapper.vm.onCustomPeriodSelect();
+      wrapper.vm.commitCustom(false);
 
-      // Should be limited by restriction
-      expect(wrapper.vm.relativeValue).toBeLessThanOrEqual(24);
+      expect(wrapper.vm.relativeValue).toBe(48);
     });
 
     it("should test setRelativeTime function", () => {
@@ -350,9 +349,10 @@ describe("DateTime Component", () => {
       wrapper.vm.selectedType = "relative";
       wrapper.vm.computeRelativePeriod();
 
-      expect(wrapper.vm.relativePeriodsMaxValue.s).toBe(60);
-      expect(wrapper.vm.relativePeriodsMaxValue.m).toBe(60);
+      expect(wrapper.vm.relativePeriodsMaxValue.s).toBe(48 * 3600);
+      expect(wrapper.vm.relativePeriodsMaxValue.m).toBe(48 * 60);
       expect(wrapper.vm.relativePeriodsMaxValue.h).toBe(48);
+      expect(wrapper.vm.relativePeriodsMaxValue.w).toBe(-1);
     });
 
     it("should test onTimezoneChange function", async () => {
@@ -433,7 +433,7 @@ describe("DateTime Component", () => {
       expect(wrapper.vm.relativePeriodsSelect).toBeDefined();
     });
 
-    it("should test onCustomPeriodSelect with no restriction", async () => {
+    it("should commit a custom value with no restriction", async () => {
       wrapper = createWrapper({
         queryRangeRestrictionInHour: 0,
         autoApply: true,
@@ -442,9 +442,9 @@ describe("DateTime Component", () => {
 
       wrapper.vm.selectedType = "relative";
       wrapper.vm.relativePeriod = "h";
-      wrapper.vm.relativeValue = 48;
+      wrapper.vm.customDraft = 48;
 
-      wrapper.vm.onCustomPeriodSelect();
+      wrapper.vm.commitCustom(false);
       await wrapper.vm.$nextTick();
 
       // Should not be limited when no restriction
@@ -457,9 +457,9 @@ describe("DateTime Component", () => {
       store.state.savedViewFlag = false;
       wrapper.vm.selectedType = "relative";
       wrapper.vm.relativePeriod = "m";
-      wrapper.vm.relativeValue = 40000000000000000000;
+      wrapper.vm.customDraft = 40000000000000000000;
 
-      wrapper.vm.onCustomPeriodSelect();
+      wrapper.vm.commitCustom(false);
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.relativeValue).toBe(5_256_000);
@@ -469,10 +469,10 @@ describe("DateTime Component", () => {
       wrapper = createWrapper({ queryRangeRestrictionInHour: 0, autoApply: true });
       store.state.savedViewFlag = false;
       wrapper.vm.selectedType = "relative";
-      wrapper.vm.relativeValue = 5000;
+      wrapper.vm.customDraft = 5000;
       wrapper.vm.relativePeriod = "M";
 
-      wrapper.vm.onCustomPeriodSelect();
+      wrapper.vm.commitCustom(false);
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.relativeValue).toBe(120);
@@ -485,9 +485,9 @@ describe("DateTime Component", () => {
         store.state.savedViewFlag = false;
         wrapper.vm.selectedType = "relative";
         wrapper.vm.relativePeriod = "m";
-        wrapper.vm.relativeValue = typed;
+        wrapper.vm.customDraft = typed;
 
-        wrapper.vm.onCustomPeriodSelect();
+        wrapper.vm.commitCustom(false);
         await wrapper.vm.$nextTick();
 
         expect(wrapper.vm.relativeValue).toBe(Math.max(1, Math.trunc(typed)));
@@ -501,12 +501,11 @@ describe("DateTime Component", () => {
       wrapper.vm.relativePeriod = "m";
       wrapper.vm.relativeValue = 30;
       wrapper.vm.onCustomValueFocus();
-      wrapper.vm.relativeValue = 45;
-      wrapper.vm.onCustomPeriodSelect();
+      wrapper.vm.customDraft = 45;
+      wrapper.vm.commitCustom(false);
       const emittedBefore = wrapper.emitted("on:date-change")?.length ?? 0;
 
-      wrapper.vm.relativeValue = "";
-      wrapper.vm.onCustomPeriodSelect();
+      wrapper.vm.customDraft = "";
       await wrapper.vm.$nextTick();
 
       expect(wrapper.emitted("on:date-change")?.length ?? 0).toBe(emittedBefore);
@@ -514,6 +513,7 @@ describe("DateTime Component", () => {
       expect(wrapper.vm.getDisplayValue).not.toContain("NaN");
 
       wrapper.vm.onCustomValueBlur();
+      expect(wrapper.vm.customDraft).toBe(45);
       expect(wrapper.vm.relativeValue).toBe(45);
     });
 
@@ -731,6 +731,14 @@ describe("DateTime Component", () => {
     });
   });
 
+  it("keeps its panel shown when the trigger sits inside the top collision inset", () => {
+    wrapper = createWrapper();
+    const popover = wrapper.findComponent({ name: "OPopover" });
+    expect(popover.props("collisionPadding")).toMatchObject({ top: 48 });
+    expect(popover.props("hideWhenDetached")).toBe(false);
+    expect(popover.props("closeOnScroll")).toBe(true);
+  });
+
   describe("hideSeconds", () => {
     const units = (list: Array<{ value: string }>) => list.map((period) => period.value);
 
@@ -744,6 +752,85 @@ describe("DateTime Component", () => {
       wrapper = createWrapper({ hideSeconds: true });
       expect(units(wrapper.vm.relativePeriods)).toEqual(["m", "h", "d", "w", "M"]);
       expect(units(wrapper.vm.relativePeriodsSelect)).toEqual(["m", "h", "d", "w", "M"]);
+    });
+  });
+});
+
+describe("DateTime host setter review fixes", () => {
+  let wrapper: any = null;
+  const micros = (iso: string) => Date.parse(iso) * 1000;
+
+  const create = (props: Record<string, unknown> = {}, attachTo?: HTMLElement) =>
+    mount(DateTime, {
+      props,
+      attachTo,
+      global: { plugins: [i18n, mockRouter], provide: { store } },
+    });
+
+  const shortcutTooltips = () =>
+    wrapper
+      .findAllComponents({ name: "OTooltip" })
+      .filter((c: any) => c.props("shortcutId") === "timeRangeOpen");
+
+  beforeEach(() => {
+    store.state.timezone = "UTC";
+    store.state.savedViewFlag = false;
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+  it("keeps a typed range's exact µs when the host echoes it back", async () => {
+    wrapper = create({ autoApply: true });
+    await flushPromises();
+    const start = micros("2026-01-01T01:00:00Z") + 250_000;
+    const end = start + 3_600_000_000;
+    wrapper.vm.commitTypedReading({ kind: "absolute", startUs: start, endUs: end, notes: [] });
+    await flushPromises();
+    wrapper.vm.setAbsoluteTime(start, end);
+    await flushPromises();
+
+    const range = wrapper.vm.getConsumableDateTime();
+    expect(range.startTime).toBe(start);
+    expect(range.endTime).toBe(end);
+  });
+
+  it("advertises the t shortcut only on a picker it can open", async () => {
+    wrapper = create({ hideRangeInput: true });
+    await flushPromises();
+    expect(shortcutTooltips()).toHaveLength(0);
+    wrapper.unmount();
+
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    document.body.appendChild(dialog);
+    wrapper = create({}, dialog);
+    await flushPromises();
+    expect(shortcutTooltips()).toHaveLength(0);
+    wrapper.unmount();
+
+    wrapper = create({}, document.body);
+    await flushPromises();
+    expect(shortcutTooltips()).toHaveLength(1);
+  });
+
+  it("emits a host switch to absolute even when its range fails the gate", async () => {
+    wrapper = create({ autoApply: true, queryRangeRestrictionInHour: 1 });
+    await flushPromises();
+    wrapper.vm.setAbsoluteTime(micros("2026-01-01T00:00:00Z"), micros("2026-01-01T03:00:00Z"));
+    await flushPromises();
+    wrapper.vm.setDateType("absolute");
+    await flushPromises();
+
+    const events = wrapper.emitted("on:date-change") as unknown[][];
+    expect(events.at(-1)![0]).toMatchObject({
+      valueType: "absolute",
+      startTime: micros("2026-01-01T00:00:00Z"),
+      endTime: micros("2026-01-01T03:00:00Z"),
+      userChangedValue: false,
     });
   });
 });

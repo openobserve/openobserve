@@ -395,6 +395,7 @@ import {
   registerFullConfigLoader,
 } from "@/composables/useFullConfigLoad";
 import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
+import { openPrimaryTimeRangePicker } from "@/utils/timeRangeShortcut";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 // Back from a drill-out (Analytics to Session Viewer, Traces to a trace or its logs) must land on the same results without rerunning them.
@@ -1974,6 +1975,7 @@ export default defineComponent({
     if (config.isEnterprise == "true") {
       useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
     }
+    useShortcuts([{ id: "timeRangeOpen", handler: openPrimaryTimeRangePicker }]);
 
     return {
       signOutDraftsOpen,
