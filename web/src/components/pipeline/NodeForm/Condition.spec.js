@@ -237,7 +237,9 @@ describe("Condition.vue (drawer chrome)", () => {
   it("closes an untouched saved rule even when the builder lists its keys in another order", async () => {
     const saved = savedRule();
     const { conditions, ...rest } = saved;
-    builderGroup.value = { conditions: [{ ...conditions[0] }].reverse(), ...rest };
+    const reversed = Object.fromEntries(Object.entries(conditions[0]).reverse());
+    expect(Object.keys(reversed)).not.toEqual(Object.keys(conditions[0]));
+    builderGroup.value = { conditions: [reversed], ...rest };
     const wrapper = createWrapper({
       isEditNode: true,
       currentSelectedNodeData: { data: { conditions: saved } },

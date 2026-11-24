@@ -75,21 +75,44 @@ describe("LogsNoEventsState", () => {
     expect(wrapper.text()).toContain(copy);
   });
 
-  it("shows the server's error above the no-events copy", () => {
-    const wrapper = mount(LogsNoEventsState, {
+  const mountWithError = (functionError: string | string[]) =>
+    mount(LogsNoEventsState, {
       props: {
         sqlMode: true,
         query: 'SELECT * FROM "app"',
         relativeTimePeriod: "15m",
         dateType: "relative",
         aiEnabled: false,
-        functionError: "regex parse error: unclosed group",
+        functionError,
       },
       global: { plugins: [i18n, store], stubs: { OEmptyState: OEmptyStateStub } },
     });
-    const banner = wrapper.find('[data-test="logs-no-events-query-error"]');
-    expect(banner.text()).toContain("The query returned an error");
+  const bannerOf = (wrapper: ReturnType<typeof mountWithError>) =>
+    wrapper.findComponent({ name: "OBanner" });
+
+  it("shows the server's error above the no-events copy as a warning", () => {
+    const banner = bannerOf(mountWithError("regex parse error: unclosed group"));
+    expect(banner.props("variant")).toBe("warning");
+    expect(banner.text()).toContain("Query execution warning");
     expect(banner.text()).toContain("regex parse error: unclosed group");
+  });
+
+  it.each([
+    ["a JSON array text", '["Query duration is modified", "second notice"]'],
+    ["an array", ["Query duration is modified", "second notice"]],
+  ])("lists the messages of %s one per line, without brackets", (_, functionError) => {
+    const banner = bannerOf(mountWithError(functionError));
+    const message = banner.find(".font-mono").element.textContent;
+    expect(message).toBe("Query duration is modified\nsecond notice");
+  });
+
+  it("keeps a message that only starts with a bracket", () => {
+    const banner = bannerOf(mountWithError("[E203] syntax error"));
+    expect(banner.find(".font-mono").text()).toBe("[E203] syntax error");
+  });
+
+  it("fills the pane it is placed in, as the drill-down gives it no flex class", () => {
+    expect(mountState("15m").classes()).toContain("h-full");
   });
 
   it("shows no error banner when the run had none", () => {

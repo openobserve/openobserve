@@ -526,6 +526,28 @@ describe("buildConditionPreview operator wording", () => {
     ).toBe("msg does not match regex (ignore case) '^a'");
   });
 
+  it("drops legacy ignore_case on the extended operators, as the backend does", () => {
+    expect(buildConditionPreview({ ...cond("msg", "re_match", "^a"), ignore_case: true })).toBe(
+      "msg matches regex '^a'",
+    );
+    for (const op of ["in", "NOT IN", "Starts With", "ends_with", "regex"]) {
+      const node = { ...cond("msg", op, "a"), ignore_case: true };
+      expect(buildConditionPreview(node)).not.toContain("ignore case");
+    }
+  });
+
+  it("keeps case_insensitive on the extended operators", () => {
+    expect(
+      buildConditionPreview({ ...cond("msg", "re_match", "^a"), case_insensitive: true }),
+    ).toBe("msg matches regex (ignore case) '^a'");
+  });
+
+  it("keeps legacy ignore_case on the original operators", () => {
+    expect(buildConditionPreview({ ...cond("msg", "contains", "a"), ignore_case: true })).toBe(
+      "msg contains (ignore case) 'a'",
+    );
+  });
+
   it("keeps unary operators unflagged", () => {
     const node = { ...cond("a", "is_null", ""), case_insensitive: true };
     expect(buildConditionPreview(node)).not.toContain("ignore case");

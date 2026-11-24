@@ -279,7 +279,8 @@ const NUMERIC_TYPES = new Set([
   "number",
 ]);
 
-const NUMBER_PATTERN = /^-?\d+(\.\d+)?([eE][-+]?\d+)?$/;
+/** A number the SQL writer leaves unquoted. */
+export const NUMBER_PATTERN = /^-?\d+(\.\d+)?([eE][-+]?\d+)?$/;
 
 let idCounter = 0;
 

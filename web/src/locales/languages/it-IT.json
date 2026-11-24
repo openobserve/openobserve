@@ -1311,6 +1311,7 @@
     "toggleConnector": "Alterna tra AND e OR",
     "selectedCount": "Nessun valore selezionato | {count} valore selezionato | {count} valori selezionati",
     "numberOrVariable": "Inserisci un numero o $variable",
+    "numberOnly": "Inserisci un numero",
     "query": "Query",
     "builderTooltip": "Crea filtri scegliendo campi, condizioni e valori",
     "queryTooltip": "Scrivi tu stesso la query",
@@ -21576,7 +21577,7 @@
     },
     "noEvents": {
       "title": "Nessun evento trovato",
-      "queryError": "La query ha restituito un errore",
+      "queryWarning": "Avviso di esecuzione della query",
       "descNoFilters": "Nessun evento trovato in {range}. Prova ad ampliare l'intervallo di tempo per caricare i risultati.",
       "descWithFilters": "Niente corrisponde a <strong>questa query</strong> nella finestra selezionata. Lo stream contiene dati in questo intervallo — prova ad allentare un filtro nella barra delle query.",
       "descOutOfRange": "La tua finestra temporale non contiene dati da questo stream. Vai al momento in cui i dati sono stati visti l'ultima volta.",

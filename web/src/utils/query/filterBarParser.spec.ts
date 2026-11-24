@@ -282,8 +282,13 @@ describe("parseShorthand quoted values", () => {
     expect(valueOf(String.raw`dir="C:\temp"`)).toBe(String.raw`C:\temp`);
   });
 
-  it("keeps an unterminated double-quoted value as raw text", () => {
-    expect(valueOf(String.raw`client="a\"`)).toBe(String.raw`"a\"`);
+  it("strips the outer quotes when the inner quotes are not escaped", () => {
+    expect(valueOf('title="say "hi""')).toBe('say "hi"');
+    expect(valueOf(String.raw`client="a\"`)).toBe("a\\");
+  });
+
+  it("keeps a value that only opens a double quote", () => {
+    expect(valueOf('client="abc')).toBe('"abc');
   });
 
   it("leaves single-quoted SQL values as before", () => {

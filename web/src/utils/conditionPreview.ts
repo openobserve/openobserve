@@ -25,13 +25,27 @@ const READABLE_OPERATORS: Record<string, string> = {
   re_not_match: "does not match regex",
 };
 
-// The backend folds case for any operator carrying the flag, so the card says so whatever the operator.
+// Every spelling the backend reads as an extended operator, lower-cased with `_` for spaces.
+const EXTENDED_OPERATORS = new Set([
+  "in",
+  "not_in",
+  "starts_with",
+  "ends_with",
+  "re_match",
+  "regex",
+  "re_not_match",
+  "not_regex",
+]);
+
+// The backend honours `case_insensitive` on every operator but legacy `ignore_case` only off the extended ones.
+const ignoresCase = (item: any, spelled: string): boolean =>
+  item.case_insensitive === true ||
+  (item.ignore_case === true && !EXTENDED_OPERATORS.has(spelled.toLowerCase().replace(/ /g, "_")));
+
 const operatorText = (item: any): string => {
-  const spelled = item.operator || "=";
-  const operator = READABLE_OPERATORS[String(spelled).toLowerCase()] ?? spelled;
-  return item.case_insensitive === true || item.ignore_case === true
-    ? `${operator} (ignore case)`
-    : operator;
+  const spelled = String(item.operator || "=");
+  const operator = READABLE_OPERATORS[spelled.toLowerCase()] ?? spelled;
+  return ignoresCase(item, spelled) ? `${operator} (ignore case)` : operator;
 };
 
 const leafPreview = (item: any): string => {

@@ -1311,6 +1311,7 @@
     "toggleConnector": "AND와 OR 간 전환",
     "selectedCount": "선택된 값 없음 | 값 {count}개 선택됨 | 값 {count}개 선택됨",
     "numberOrVariable": "숫자 또는 $variable 입력",
+    "numberOnly": "숫자 입력",
     "query": "쿼리",
     "builderTooltip": "필드, 조건, 값을 선택해 필터를 구성하세요",
     "queryTooltip": "쿼리를 직접 작성하세요",
@@ -21576,7 +21577,7 @@
     },
     "noEvents": {
       "title": "이벤트 없음",
-      "queryError": "쿼리에서 오류가 반환되었습니다",
+      "queryWarning": "쿼리 실행 경고",
       "descNoFilters": "{range}에서 이벤트를 찾을 수 없습니다.",
       "descWithFilters": "선택한 기간에 <strong>이 쿼리와</strong> 일치하는 항목이 없습니다. 이 스트림에는 데이터가 있습니다 — 쿼리 바에서 필터를 완화해 보세요.",
       "descOutOfRange": "선택한 시간 범위에 이 스트림의 데이터가 없습니다. 데이터가 마지막으로 확인된 시점으로 이동하세요.",

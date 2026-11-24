@@ -34,18 +34,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   The "Ask AI" ghost button is only shown when aiEnabled is true.
 -->
 <template>
-  <div class="flex flex-col">
+  <div class="flex h-full flex-col">
     <OBanner
-      v-if="functionError"
-      variant="error-soft"
-      icon="error-outline"
+      v-if="functionMessages"
+      variant="warning"
+      icon="warning"
       dense
       preserve-whitespace
       class="mx-page-edge mt-3 shrink-0"
       data-test="logs-no-events-query-error"
     >
-      <div class="font-semibold">{{ t("logs.noEvents.queryError") }}</div>
-      <div class="font-mono text-xs">{{ functionError }}</div>
+      <div class="font-semibold">{{ t("logs.noEvents.queryWarning") }}</div>
+      <div class="font-mono text-xs">{{ functionMessages }}</div>
     </OBanner>
     <OEmptyState illustration="logs" size="hero" :hide-action="true" class="min-h-0 flex-1">
       <template #title>{{ t("logs.noEvents.title") }}</template>
@@ -135,8 +135,8 @@ const props = defineProps<{
   queryWindowUs?: { start: number; end: number };
   /** User-selected timezone string, e.g. "America/New_York" or "UTC". */
   timezone?: string;
-  /** The server's function or partial-result error for this run; zero hits may be caused by it. */
-  functionError?: string;
+  /** The server's function error or notice for this run; zero hits may be caused by it. */
+  functionError?: string | string[];
 }>();
 
 const emit = defineEmits<{
@@ -147,6 +147,20 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const { aiIconSrc } = useAiIcon();
+
+// The server sends a list of messages, which can arrive as an array or as its JSON text.
+const functionMessages = computed<string>(() => {
+  const value = props.functionError;
+  if (Array.isArray(value)) return value.join("\n");
+  if (!value?.trimStart().startsWith("[")) return value ?? "";
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed.map(String).join("\n");
+  } catch {
+    // Not JSON after all: a message that merely starts with a bracket.
+  }
+  return value;
+});
 
 // --- filter detection -------------------------------------------------------
 

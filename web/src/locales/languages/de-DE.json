@@ -1311,6 +1311,7 @@
     "toggleConnector": "Zwischen AND und OR wechseln",
     "selectedCount": "Keine Werte ausgewählt | {count} Wert ausgewählt | {count} Werte ausgewählt",
     "numberOrVariable": "Zahl oder $variable eingeben",
+    "numberOnly": "Zahl eingeben",
     "query": "Abfrage",
     "builderTooltip": "Filter erstellen, indem Sie Felder, Bedingungen und Werte auswählen",
     "queryTooltip": "Abfrage selbst schreiben",
@@ -21576,7 +21577,7 @@
     },
     "noEvents": {
       "title": "Keine Ereignisse gefunden",
-      "queryError": "Die Abfrage hat einen Fehler zurückgegeben",
+      "queryWarning": "Warnung bei der Abfrageausführung",
       "descNoFilters": "In {range} wurden keine Ereignisse gefunden.",
       "descWithFilters": "Im ausgewählten Fenster stimmte nichts mit <strong>dieser Abfrage</strong> überein. Versuchen Sie, den Zeitraum zu erweitern, einen Filter zu lockern oder die Abfrage zurückzusetzen.",
       "descOutOfRange": "Ihr Zeitfenster enthält keine Daten aus diesem Stream. Springen Sie zu dem Zeitpunkt, an dem zuletzt Daten gesehen wurden.",

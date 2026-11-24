@@ -41,9 +41,11 @@ import {
   type FilterGroup,
   type FilterNode,
   type FilterOperatorId,
+  NUMBER_PATTERN,
 } from "@/utils/query/filterBar";
-import { parseShorthand } from "@/utils/query/filterBarParser";
+import { parseShorthand, type ShorthandFilter } from "@/utils/query/filterBarParser";
 import { leafConditions } from "./codecs/types";
+import { PLACEHOLDER } from "./codecs/dashboardFilterCodec";
 import { arityFor, type FilterEditorConfig } from "./filterProfiles";
 import type { FilterBarExtraSection, FilterValueLabel } from "./QueryFilterBar.types";
 
@@ -98,6 +100,17 @@ const PROMQL_LABEL_NAME = /^[A-Za-z_]\w*$/;
 // Engine pages take dotted payload paths (a workflow's `meta.severity`), so SQL names allow what the shorthand parser does.
 const SQL_FIELD_NAME = /^[A-Za-z_@][\w.@-]*$/;
 const EXACT_VALUE_OPERATORS = new Set<FilterOperatorId>(["eq", "neq", "in", "not_in"]);
+// Pattern and text operators take any text on a number column, so only these compare against a number.
+const NUMERIC_OPERATORS = new Set<FilterOperatorId>([
+  "eq",
+  "neq",
+  "gt",
+  "gte",
+  "lt",
+  "lte",
+  "in",
+  "not_in",
+]);
 
 const TYPE_ICONS: Record<FilterFieldType, IconName> = {
   string: "text-fields",
@@ -127,23 +140,27 @@ const rankByMatch = (
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-// Descriptions match on whole words, so the "in" inside "contains" does not rank Contains ahead of IN.
+// Whole-word description hits rank above substring ones, so the "in" inside "contains" stays behind IN.
+// Substring hits stay last for partial words and for CJK, which has no spaces between words.
 const operatorTier = (needle: string, names: string[], description: string): number => {
   const lower = names.map((name) => name.toLowerCase());
   if (lower.some((name) => name.startsWith(needle))) return 0;
   if (lower.some((name) => name.split(/[\s()]+/).some((word) => word.startsWith(needle)))) return 1;
+  const text = description.toLowerCase();
   const word = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(needle)}($|[^\\p{L}\\p{N}])`, "u");
-  return word.test(description.toLowerCase()) ? 2 : -1;
+  if (word.test(text)) return 2;
+  return text.includes(needle) ? 3 : -1;
 };
 
-const NUMBER_VALUE = /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i;
-const VARIABLE_VALUE = /^\$([\w-]+|\{[\w-]+(:[\w-]+)?\})$/;
-
-/** A number, or a dashboard variable (`$x`, `${x}`, `${x:csv}`, `(${x})`) the query resolves later. */
-export const isNumberOrVariable = (value: string): boolean => {
+/** A variable in any form the dashboard codec substitutes, or wrapped as `(${x})`. */
+export const isVariable = (value: string): boolean => {
   const bare = value.startsWith("(") && value.endsWith(")") ? value.slice(1, -1) : value;
-  return NUMBER_VALUE.test(value) || VARIABLE_VALUE.test(bare);
+  return PLACEHOLDER.test(bare);
 };
+
+/** A number the SQL writer leaves unquoted, or a variable where the bar has variables. */
+export const isNumberOrVariable = (value: string, variables: boolean): boolean =>
+  NUMBER_PATTERN.test(value) || (variables && isVariable(value));
 
 export function useFilterBarEditor(options: FilterBarEditorOptions) {
   const { tree, fields, config, t } = options;
@@ -175,8 +192,21 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   const fieldMap = computed(() => new Map(fields.value.map((field) => [field.name, field])));
   const typeOf = (field: string): FilterFieldType => fieldMap.value.get(field)?.type ?? "string";
   const draftType = computed<FilterFieldType>(() => typeOf(draft.value?.field ?? ""));
+  // A host that lists `$variables` substitutes them; elsewhere a `$x` reaches the query as text.
+  const variables = computed(() => Boolean(options.extraValues?.value));
+  const fitsField = (field: string, operator: FilterOperatorId | null, value: string) =>
+    typeOf(field) !== "number" ||
+    !operator ||
+    !NUMERIC_OPERATORS.has(operator) ||
+    isNumberOrVariable(value, variables.value);
   // Only typed text is checked; a value picked from the list, a saved one included, is taken as listed.
-  const acceptsTyped = (value: string) => draftType.value !== "number" || isNumberOrVariable(value);
+  const acceptsTyped = (value: string) =>
+    fitsField(draft.value?.field ?? "", draft.value?.operator ?? null, value);
+  // An operator the field does not offer is picked again, so only an allowed one checks its value.
+  const shorthandFits = ({ field, operator, value }: ShorthandFilter) =>
+    !allows(field, operator) || fitsField(field, operator, value);
+  const numberHint = () =>
+    t(variables.value ? "filterBar.numberOrVariable" : "filterBar.numberOnly");
   const arityOf = (id: FilterOperatorId) => arityFor(config.value, id);
   const multiValue = computed(() =>
     draft.value?.operator ? arityOf(draft.value.operator) === "many" : false,
@@ -277,7 +307,8 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
         label: raw(
           `${shorthand.field} ${operatorName(shorthand.operator, dialect.value, t, config.value.operatorNames)} ${shorthand.value}`,
         ),
-        detail: t("filterBar.addFilter"),
+        // Picking it is refused while the value does not fit, so the row says why.
+        detail: shorthandFits(shorthand) ? t("filterBar.addFilter") : numberHint(),
         icon: "filter-list",
       });
     }
@@ -371,7 +402,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     const matched = rankByMatch(source, needle);
     // `Error` and `error` are different values; the one typed exactly comes first and takes Enter.
     const ranked = (
-      source.includes(needle) ? [needle, ...matched.filter((v) => v !== needle)] : matched
+      needle && source.includes(needle) ? [needle, ...matched.filter((v) => v !== needle)] : matched
     ).slice(0, MAX_ROWS);
     const named = (value: string) => options.valueLabel?.value?.(draft.value?.field ?? "", value);
     const rows: ChipInputSuggestion[] = ranked.map((value) => {
@@ -405,7 +436,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   const valueHint = computed<I18nText | undefined>(() => {
     if (step.value !== "value" || editedValue.value !== null) return undefined;
     const typed = text.value.trim();
-    return typed && !acceptsTyped(typed) ? t("filterBar.numberOrVariable") : undefined;
+    return typed && !acceptsTyped(typed) ? numberHint() : undefined;
   });
 
   const extraRows = computed<ChipInputSuggestion[]>(() => {
@@ -546,8 +577,15 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   function changeField(field: string) {
     const current = draft.value!;
     if (current.operator && allows(field, current.operator)) {
-      draft.value = { ...current, field };
-      return commitDraft();
+      // Values typed for a text field may not fit a number one; those are asked for again.
+      const fits = current.values.every((value) => fitsField(field, current.operator, value));
+      draft.value = { ...current, field, values: fits ? current.values : [] };
+      if (fits) return commitDraft();
+      dropValues();
+      text.value = "";
+      editPart.value = null;
+      step.value = "value";
+      return;
     }
     editPart.value = null;
     startDraft(field);
@@ -580,7 +618,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
 
   function addShorthand() {
     const shorthand = parseShorthand(text.value.trim());
-    if (!shorthand) return;
+    if (!shorthand || !shorthandFits(shorthand)) return;
     const allowed = allows(shorthand.field, shorthand.operator);
     startDraft(shorthand.field);
     if (!allowed) return;

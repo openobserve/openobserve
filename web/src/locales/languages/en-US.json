@@ -1311,6 +1311,7 @@
     "toggleConnector": "Switch between AND and OR",
     "selectedCount": "No values selected | {count} value selected | {count} values selected",
     "numberOrVariable": "Enter a number or a $variable",
+    "numberOnly": "Enter a number",
     "query": "Query",
     "builderTooltip": "Build filters by picking fields, conditions and values",
     "queryTooltip": "Write the query yourself",
@@ -21574,7 +21575,7 @@
     },
     "noEvents": {
       "title": "No events found",
-      "queryError": "The query returned an error",
+      "queryWarning": "Query execution warning",
       "descNoFilters": "No events were found in {range}.",
       "descWithFilters": "Nothing matched <strong>this query</strong> in the selected window. The stream has data here — try relaxing a filter in the query bar.",
       "descOutOfRange": "Your time window doesn't contain any data from this stream. Jump to when data was last seen.",

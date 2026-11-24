@@ -15,9 +15,11 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, ref } from "vue";
 import QueryFilterBar from "./QueryFilterBar.vue";
-import { isNumberOrVariable } from "./useFilterBarEditor";
+import { isNumberOrVariable, useFilterBarEditor } from "./useFilterBarEditor";
+import { FILTER_PROFILES } from "./filterProfiles";
+import { raw, type TranslateFn } from "@/types/i18n";
 import {
   emptyFilterGroup,
   filterTreeToSql,
@@ -843,12 +845,20 @@ describe("QueryFilterBar typed values", () => {
   const listText = () =>
     document.body.querySelector('[data-test="query-filter-bar-suggest"]')?.textContent ?? "";
 
-  async function startValue(field: string, operator: "eq" | "in", values: string[]) {
-    const state = mountBar({ loadValues: vi.fn(async () => values) });
+  const VARIABLES = { extraValueSuggestions: () => ["$status"] };
+
+  async function startValue(
+    field: string,
+    operator: "eq" | "in" | "regex",
+    values: string[],
+    props: Record<string, unknown> = {},
+  ) {
+    const state = mountBar({ loadValues: vi.fn(async () => values), ...props });
     await openBar();
     await type(field);
     await press("Enter");
     if (operator === "in") await type("any");
+    if (operator === "regex") await type("regex");
     await press("Enter");
     if (values.length) await vi.waitFor(() => expect(rowKeys()).toContain(values[0]));
     return state;
@@ -892,14 +902,43 @@ describe("QueryFilterBar typed values", () => {
     const state = await startValue("status", "eq", []);
     await type("abc");
     expect(rowKeys()).not.toContain(CUSTOM);
-    expect(listText()).toContain("Enter a number or a $variable");
+    expect(listText()).toContain("Enter a number");
+    expect(listText()).not.toContain("$variable");
     await press("Enter");
     expect(sql(state)).toBe("");
     expect(input()!.value).toBe("abc");
   });
 
+  it("refuses a $variable where the bar has no variables", async () => {
+    const state = await startValue("status", "eq", []);
+    await type("$status");
+    expect(rowKeys()).not.toContain(CUSTOM);
+    await press("Enter");
+    expect(sql(state)).toBe("");
+  });
+
+  it("mentions variables in the hint where the bar has them", async () => {
+    await startValue("status", "eq", [], VARIABLES);
+    await type("abc");
+    expect(listText()).toContain("Enter a number or a $variable");
+  });
+
+  it("takes any text for a pattern operator on a number field", async () => {
+    const state = await startValue("status", "regex", [], { profile: "dashboard-panel" });
+    expect(state.tree.items).toHaveLength(0);
+    await type(String.raw`^5\d\d$`);
+    expect(rowKeys()).toContain(CUSTOM);
+    expect(listText()).not.toContain("Enter a number");
+    await press("Enter");
+    expect(state.tree.items[0]).toMatchObject({
+      field: "status",
+      operator: "regex",
+      values: [String.raw`^5\d\d$`],
+    });
+  });
+
   it("takes a number or a dashboard variable typed into a number field", async () => {
-    const state = await startValue("status", "in", []);
+    const state = await startValue("status", "in", [], VARIABLES);
     for (const value of ["-5", "0.25", "${status:csv}"]) {
       await type(` ${value} `);
       await press(",");
@@ -926,8 +965,38 @@ describe("QueryFilterBar operator search", () => {
   it("ranks IN first for `in` and still lists NOT IN, ahead of contains", async () => {
     const keys = await operatorsFor("IN");
     expect(keys[0]).toBe("in");
-    expect(keys).toContain("not_in");
-    expect(keys).not.toContain("contains");
+    expect(keys.indexOf("not_in")).toBeGreaterThan(0);
+    expect(keys.indexOf("contains")).toBeGreaterThan(keys.indexOf("not_in"));
+  });
+
+  it("finds an operator by part of a word in its description", async () => {
+    mountBar();
+    await openBar();
+    await type("status");
+    await press("Enter");
+    await type("great");
+    expect(rowKeys()).toEqual(["gt", "gte"]);
+    await type("les");
+    expect(rowKeys()).toEqual(["lt", "lte"]);
+  });
+
+  it("finds an operator inside a description with no spaces, as in Chinese", () => {
+    const labels: Record<string, string> = {
+      "filterBar.operators.gt": "大于",
+      "filterBar.operators.gte": "大于或等于",
+    };
+    const editor = useFilterBarEditor({
+      tree: ref(emptyFilterGroup()),
+      fields: ref(fields),
+      config: ref(FILTER_PROFILES.logs),
+      loadValues: ref(undefined),
+      t: ((key: string) => raw(labels[key] ?? key)) as TranslateFn,
+      commit: () => {},
+      submit: () => {},
+    });
+    editor.select("status", new MouseEvent("click"));
+    editor.text.value = "大于";
+    expect(editor.suggestions.value.map((row) => row.key)).toEqual(["gt", "gte"]);
   });
 
   it("finds the regex operators by their readable name and by re_match", async () => {
@@ -946,21 +1015,90 @@ describe("QueryFilterBar operator search", () => {
 });
 
 describe("isNumberOrVariable", () => {
+  it.each(["42", "-5", "0.25", "-0.5", "1e3", "2.5E-3"])("accepts the number %s", (value) => {
+    expect(isNumberOrVariable(value, false)).toBe(true);
+    expect(isNumberOrVariable(value, true)).toBe(true);
+  });
+
   it.each([
-    "42",
-    "-5",
-    "0.25",
-    "-0.5",
-    "1e3",
-    "+7",
     "$status",
     "${status}",
     "${status:csv}",
+    "${ status }",
+    "{{status}}",
+    "{{ status : csv }}",
     "(${status})",
-  ])("accepts %s", (value) => expect(isNumberOrVariable(value)).toBe(true));
+  ])("accepts the variable %s only where variables are on", (value) => {
+    expect(isNumberOrVariable(value, true)).toBe(true);
+    expect(isNumberOrVariable(value, false)).toBe(false);
+  });
 
-  it.each(["abc", "12px", "--5", ".", "NaN", "Infinity", "4 2", "1,000", "$", "($x"])(
-    "refuses %s",
-    (value) => expect(isNumberOrVariable(value)).toBe(false),
-  );
+  // The SQL writer quotes these, so taking them would compare a number column to text.
+  it.each([
+    "+7",
+    ".5",
+    "1.",
+    "abc",
+    "12px",
+    "--5",
+    ".",
+    "NaN",
+    "Infinity",
+    "4 2",
+    "1,000",
+    "$",
+    "($x",
+  ])("refuses %s", (value) => expect(isNumberOrVariable(value, true)).toBe(false));
+});
+
+describe("QueryFilterBar values reaching a number field another way", () => {
+  it("refuses a shorthand with text for a number field and keeps it typed", async () => {
+    const state = mountBar();
+    await openBar();
+    await type("status=abc");
+    expect(rowKeys()[0]).toBe("\u0000shorthand");
+    expect(rows()[0].textContent).toContain("Enter a number");
+    await press("Enter");
+    expect(sql(state)).toBe("");
+    expect(input()!.value).toBe("status=abc");
+    await type("status=500");
+    await press("Enter");
+    expect(sql(state)).toBe("status = 500");
+  });
+
+  it("asks for a new value when a chip moves to a number field its value does not fit", async () => {
+    const state = mountBar({
+      modelValue: parseSqlFilter("level = 'error'")!,
+      loadValues: vi.fn(async () => []),
+    });
+    await editPart("level", "field");
+    await type("status");
+    await press("Enter");
+    expect(sql(state)).toBe("level = 'error'");
+    expect(input()!.value).toBe("");
+    await type("500");
+    await press("Enter");
+    expect(sql(state)).toBe("status = 500");
+  });
+
+  it("keeps the value when a chip moves to a number field it fits", async () => {
+    const state = mountBar({ modelValue: parseSqlFilter("level = '42'")! });
+    await editPart("level", "field");
+    await type("status");
+    await press("Enter");
+    expect(sql(state)).toBe("status = 42");
+  });
+});
+
+describe("QueryFilterBar value edit with an empty value loaded", () => {
+  it("keeps the chip's value first, so Enter does not swap it for (empty)", async () => {
+    const state = mountBar({
+      modelValue: parseSqlFilter("level = 'error'")!,
+      loadValues: vi.fn(async () => ["", "error", "warn"]),
+    });
+    await editPart("level", "value");
+    await vi.waitFor(() => expect(rowKeys()).toEqual(["error", "", "warn"]));
+    await press("Enter");
+    expect(sql(state)).toBe("level = 'error'");
+  });
 });
