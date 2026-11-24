@@ -836,12 +836,15 @@ onUnmounted(() => {
 });
 
 /** Loads the edited pipeline; resolves false when it is gone or could not be read. */
+let pipelineLoad = 0;
 const getPipeline = (): Promise<boolean> => {
   const route = router.currentRoute.value;
   const recentScope = captureRecentVisitScope();
   const org = store.state.selectedOrganization.identifier;
-
+  // A→B→A leaves the first A request on a matching route, so only the latest load may land.
+  const load = ++pipelineLoad;
   const stale = () =>
+    load !== pipelineLoad ||
     store.state.selectedOrganization.identifier !== org ||
     router.currentRoute.value.query.id !== route.query.id ||
     router.currentRoute.value.name !== "pipelineEditor";

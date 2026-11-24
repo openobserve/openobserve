@@ -166,6 +166,19 @@ export function resourceRoute(hit: ResourceHit, org: string): RouteLocationRaw |
   }
 }
 
+let streamPick: { page: string; stream: string } | null = null;
+/** Marks a stream picked in Command K, so an open page applies it even when its URL already names it. */
+export function markStreamPick(route: RouteLocationRaw | null) {
+  streamPick = null;
+  if (!route || typeof route !== "object" || !("name" in route)) return;
+  const stream = "query" in route ? route.query?.stream : undefined;
+  if ((route.name === "logs" || route.name === "traces") && typeof stream === "string")
+    streamPick = { page: route.name, stream };
+}
+export function isStreamPick(page: string, stream: unknown): boolean {
+  return streamPick?.page === page && streamPick.stream === stream;
+}
+
 let intentSerial = 0;
 export function creationRoute(
   kind: "dashboard" | "alert" | "function" | "pipeline",

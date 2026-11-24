@@ -15,6 +15,7 @@
 
 import type { Router } from "vue-router";
 
+import { isStreamPick } from "@/components/commandPalette/resourceRoutes";
 import { changedParams, VIEW_STATE_PARAMS } from "@/composables/useLogs/useLogsUrl";
 
 /** Calls `onRestore` when Back/Forward, or a link to a stream Logs does not show, changes the search. */
@@ -32,12 +33,12 @@ export function useLogsHistoryRestore(
     popPending = false;
     if (failure || to.name !== "logs" || from.name !== "logs") return;
     if (!isPop) {
-      // A `type` flag (search history, AI chat, stream explorer) has its own handler in Logs.
-      if (to.query.type || from.query.type) return;
+      // A typed target and the stream explorer's exit have their own handlers in Logs.
+      if (to.query.type || from.query.type === "stream_explorer") return;
       const stream = to.query.stream;
-      // Logs writes its own selection to the URL, so only a stream it does not show came from a link.
-      if (typeof stream === "string" && stream !== from.query.stream && stream !== shownStreams())
-        onRestore();
+      if (typeof stream !== "string" || stream === shownStreams()) return;
+      // Logs writes its own selection to the URL, so an unchanged stream is a picked one or none.
+      if (stream !== from.query.stream || isStreamPick("logs", stream)) onRestore();
       return;
     }
     if (changedParams(from.query, to.query).some((key) => !VIEW_STATE_PARAMS.has(key))) {

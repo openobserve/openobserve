@@ -20,8 +20,8 @@ use std::{
 };
 
 use config::meta::resources::{
-    MatchTier, ResourceHit, ResourceKind, SearchQuery, SearchResponse, SourceReason, SourceResult,
-    SourceStatus,
+    MAX_SEARCH_OFFSET, MatchTier, ResourceHit, ResourceKind, SearchQuery, SearchResponse,
+    SourceReason, SourceResult, SourceStatus,
 };
 use tokio_util::sync::CancellationToken;
 
@@ -104,8 +104,8 @@ impl SearchWork {
                 selected.pop_last();
             }
         }
-        let has_more = selected.len() > keep;
-        if has_more {
+        let found_more = selected.len() > keep;
+        if found_more {
             selected.pop_last();
         }
         let partial = !complete || access.partial;
@@ -116,7 +116,7 @@ impl SearchWork {
             } else {
                 SourceStatus::Complete
             },
-            has_more: Some(has_more),
+            has_more: has_more(found_more, complete, keep),
             reason: None,
         });
         response.hits.extend(
@@ -171,5 +171,29 @@ pub(super) fn unavailable(kind: ResourceKind, reason: SourceReason) -> SourceRes
         status: SourceStatus::Unavailable,
         has_more: None,
         reason: Some(reason),
+    }
+}
+
+/// A scan cut short only knows of more rows it found, and no page starts past the offset cap.
+fn has_more(found_more: bool, complete: bool, next_offset: usize) -> Option<bool> {
+    match (found_more, complete) {
+        (true, _) => Some(next_offset <= MAX_SEARCH_OFFSET),
+        (false, true) => Some(false),
+        (false, false) => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_more_is_unknown_for_a_cut_scan_and_stops_at_the_offset_cap() {
+        assert_eq!(has_more(true, true, 40), Some(true));
+        assert_eq!(has_more(true, false, 40), Some(true));
+        assert_eq!(has_more(false, true, 40), Some(false));
+        assert_eq!(has_more(false, false, 40), None);
+        assert_eq!(has_more(true, true, MAX_SEARCH_OFFSET), Some(true));
+        assert_eq!(has_more(true, true, MAX_SEARCH_OFFSET + 1), Some(false));
     }
 }

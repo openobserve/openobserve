@@ -21,6 +21,9 @@ use utoipa::ToSchema;
 
 use crate::meta::folder::FolderType;
 
+/// The largest `offset` a search accepts, so a pager must stop before it.
+pub const MAX_SEARCH_OFFSET: usize = 10_000;
+
 #[derive(
     Debug,
     Clone,

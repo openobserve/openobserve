@@ -310,6 +310,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { isStreamPick } from "@/components/commandPalette/resourceRoutes";
 import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
@@ -2096,7 +2097,7 @@ watch(
       // The stream watcher loads a stream the URL moved to; only then does it own the reload.
       if (
         typeof stream === "string" &&
-        stream !== previousStream &&
+        (stream !== previousStream || isStreamPick("traces", stream)) &&
         stream !== searchObj.data.stream.selectedStream.value
       ) {
         searchObj.meta.searchMode = mode;
@@ -2599,7 +2600,8 @@ watch(
   async ([routeName, stream], [, previousStream]) => {
     if (routeName !== "traces" || !pageActive.value || !pageLoaded) return;
     // With auto-run off the picked stream is not in the URL yet, so an unchanged URL must not undo it.
-    if (typeof stream !== "string" || stream === previousStream) return;
+    if (typeof stream !== "string") return;
+    if (stream === previousStream && !isStreamPick("traces", stream)) return;
     if (stream === searchObj.data.stream.selectedStream.value) return;
     if (!searchObj.data.stream.streamLists.some((s: any) => s.value === stream)) return;
     const org = store.state.selectedOrganization.identifier;

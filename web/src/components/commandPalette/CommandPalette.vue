@@ -18,7 +18,7 @@ import { buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { RESOURCE_KINDS, type ResourceKind } from "@/ts/interfaces/resources";
 import { palettePages } from "./palettePages";
 import { useResourceSearch, retryable } from "./useResourceSearch";
-import { resourceRoute, creationRoute, recentVisitRoute } from "./resourceRoutes";
+import { resourceRoute, creationRoute, recentVisitRoute, markStreamPick } from "./resourceRoutes";
 import { useRecentlyViewed } from "./useRecentlyViewed";
 import { KIND_LABELS, KIND_ICONS, enabledResourceKinds } from "./presentation";
 
@@ -219,10 +219,14 @@ function hover(entry: Entry) {
 async function navigate(
   event: MouseEvent,
   action: (_event?: MouseEvent) => Promise<void | NavigationFailure>,
+  route: RouteLocationRaw | null = null,
 ) {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)
     return;
+  markStreamPick(route);
   const failure = await action(event);
+  // The page reads the pick while the navigation settles, so it ends with this task.
+  setTimeout(() => markStreamPick(null));
   if (!failure) emit("update:open", false);
 }
 function continuation(kind: ResourceKind): RouteLocationRaw {
@@ -373,7 +377,7 @@ onScopeDispose(() => {
               block
               :data-test="`command-entry-${entry.id}`"
               @pointermove="hover(entry)"
-              @click="navigate($event, go)"
+              @click="navigate($event, go, entry.route)"
               ><OTruncatedText>{{ entry.name }}</OTruncatedText
               ><OIcon v-if="entry.locked || entry.licenseLocked" name="lock" size="xs"
             /></OButton>
@@ -405,7 +409,7 @@ onScopeDispose(() => {
               block
               :data-test="`command-entry-${entry.id}`"
               @pointermove="hover(entry)"
-              @click="navigate($event, go)"
+              @click="navigate($event, go, entry.route)"
               ><OTruncatedText class="min-w-0 flex-1">{{ entry.name }}</OTruncatedText
               ><OTruncatedText
                 class="max-w-48 text-xs max-md:max-w-24"

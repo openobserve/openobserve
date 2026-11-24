@@ -185,6 +185,22 @@ describe("Command K search lifecycle", () => {
     await flushPromises();
     expect(s.search.data.value?.hits.map((hit) => hit.id)).toEqual(["new"]);
   });
+  it("keeps polling after a Retry that answers loading again", async () => {
+    vi.useFakeTimers();
+    const loading: ResourceSearchResponse = {
+      hits: [],
+      sources: [{ type: "function", status: "unavailable", has_more: null, reason: "loading" }],
+      took_ms: 0,
+    };
+    vi.mocked(resources.search).mockResolvedValue(loading);
+    const s = setup("function");
+    await typeQuery(s, "pay");
+    await s.search.refetch();
+    await flushPromises();
+    const calls = vi.mocked(resources.search).mock.calls.length;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(vi.mocked(resources.search).mock.calls.length).toBe(calls + 1);
+  });
   it("cancels a request on identity switch and never shows the old account result", async () => {
     vi.useFakeTimers();
     let resolve!: (r: ResourceSearchResponse) => void;

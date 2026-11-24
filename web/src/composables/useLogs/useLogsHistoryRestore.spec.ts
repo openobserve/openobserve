@@ -15,6 +15,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
+import { markStreamPick } from "@/components/commandPalette/resourceRoutes";
 import { useLogsHistoryRestore } from "./useLogsHistoryRestore";
 
 const Stub = { template: "<div />" };
@@ -75,6 +76,23 @@ describe("useLogsHistoryRestore", () => {
     await router.push({ name: "logs", query: { stream: "db", type: "search_history_re_apply" } });
     await settle();
     expect(onRestore).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores a Command K pick after AI chat, and a pick of the stream the URL already names", async () => {
+    const router = await makeRouter();
+    const onRestore = vi.fn();
+    stop = useLogsHistoryRestore(router, onRestore, () => "app");
+    await router.push({ name: "logs", query: { stream: "web", type: "ai_chat_query" } });
+    await settle();
+    expect(onRestore).not.toHaveBeenCalled();
+    await router.push({ name: "logs", query: { stream: "db" } });
+    await settle();
+    expect(onRestore).toHaveBeenCalledTimes(1);
+    markStreamPick({ name: "logs", query: { stream: "db" } });
+    await router.push({ name: "logs", query: { stream: "db", org_identifier: "o" } });
+    markStreamPick(null);
+    await settle();
+    expect(onRestore).toHaveBeenCalledTimes(2);
   });
 
   it("does not restore when Back leaves for another page", async () => {

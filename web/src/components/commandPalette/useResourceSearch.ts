@@ -110,7 +110,7 @@ export function useResourceSearch(input: {
       if (token === sequence) retrying.value = false;
     }
   };
-  watch(data, (result) => {
+  const schedulePoll = (result: ResourceSearchResponse | undefined) => {
     clearTimeout(pollTimer);
     if (result?.sources.some((source) => source.reason === "loading")) {
       const token = sequence;
@@ -118,7 +118,8 @@ export function useResourceSearch(input: {
         if (token === sequence && eligible.value) void retryFailed(true);
       }, 1000);
     }
-  });
+  };
+  watch(data, schedulePoll);
   onScopeDispose(cancel);
   return {
     data,
@@ -133,14 +134,18 @@ export function useResourceSearch(input: {
       eligible.value && !debouncing.value ? (retryError.value ?? query.error.value) : null,
     ),
     retryFailed,
-    refetch: () => {
+    refetch: async () => {
       // Supersedes in-flight polls and retries, whose older answers would cover the fresh one.
       sequence += 1;
+      const token = sequence;
       clearTimeout(pollTimer);
       retrying.value = false;
       retryError.value = null;
       patches.value = [];
-      return query.refetch();
+      const result = await query.refetch();
+      // An answer equal to the last one keeps its reference, so the data watcher would not re-arm.
+      if (token === sequence) schedulePoll(data.value);
+      return result;
     },
   };
 }

@@ -15,10 +15,8 @@
 
 use std::str::FromStr;
 
-use config::meta::resources::{ResourceKind, SearchQuery};
+use config::meta::resources::{MAX_SEARCH_OFFSET, ResourceKind, SearchQuery};
 use serde::Deserialize;
-
-const MAX_OFFSET: usize = 10_000;
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -58,7 +56,7 @@ impl SearchParams {
         if offset > 0 && types.len() != 1 {
             return Err("an offset requires exactly one resource type");
         }
-        if offset > MAX_OFFSET {
+        if offset > MAX_SEARCH_OFFSET {
             return Err("offset exceeds 10000");
         }
         Ok(SearchQuery {
@@ -96,7 +94,12 @@ mod tests {
             params(Some("x"), Some("dashboard,unknown"), None, None),
             params(Some("x"), None, Some(101), None),
             params(Some("x"), None, None, Some(20)),
-            params(Some("x"), Some("dashboard"), None, Some(MAX_OFFSET + 1)),
+            params(
+                Some("x"),
+                Some("dashboard"),
+                None,
+                Some(MAX_SEARCH_OFFSET + 1),
+            ),
         ] {
             assert!(invalid.into_query().is_err());
         }

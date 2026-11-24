@@ -682,7 +682,7 @@ mod tests {
         cancelled.cancelled.cancel();
         let source = &cancelled.execute().sources[0];
         assert_eq!(source.status, SourceStatus::Partial);
-        assert_eq!(source.has_more, Some(false));
+        assert_eq!(source.has_more, None);
     }
 
     #[tokio::test]
