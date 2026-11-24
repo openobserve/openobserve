@@ -27559,7 +27559,7 @@
         "occurrencesHint": "Chọn một điểm để tải cái ở trên",
         "lostLabel": "{pid} đã thua",
         "bothSidesLose": "Cả hai bên đều bị hủy gần như tương đương — {a} so với {b}. Không ứng dụng nào là vấn đề; thứ tự mới là vấn đề.",
-        "oneSideLoses": "{pid} bị hủy mỗi lần.",
+        "oneSideLoses": "{app} bị hủy mỗi lần.",
         "showAbove": "Hiển thị ở trên",
         "copy": "Sao chép SQL",
         "seeInTopQueries": "Xem trong Top queries",

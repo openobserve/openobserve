@@ -27559,7 +27559,7 @@
         "occurrencesHint": "Selecteer een punt om die hierboven te laden",
         "lostLabel": "{pid} verloor",
         "bothSidesLose": "Beide kanten worden ongeveer even vaak geannuleerd — {a} vs {b}. Geen van beide applicaties is het probleem; de volgorde wel.",
-        "oneSideLoses": "{pid} wordt elke keer geannuleerd.",
+        "oneSideLoses": "{app} wordt elke keer geannuleerd.",
         "showAbove": "Toon hierboven",
         "copy": "Kopieer SQL",
         "seeInTopQueries": "Bekijk in Top queries",

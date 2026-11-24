@@ -136,64 +136,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <!-- The ordering, in plain words. The picture shows the shape; this says
-         what actually happened and to whom. It names BOTH applications, so it
-         is suppressed when only one side reached us. -->
+    <!-- What happened and what to do, as one neutral note. Names both sides, so
+         it is suppressed when only one side reached us. -->
     <div
-      v-if="!event.partial && victim && survivor"
-      class="bg-status-info-bg text-text-body rounded-default flex items-start gap-2 px-2.5 py-2 text-xs leading-relaxed"
+      class="border-border-default bg-surface-base rounded-default flex flex-col gap-2 border px-2.5 py-2 text-xs leading-relaxed"
       :data-test="`${dataTest}-plain`"
     >
-      <OIcon name="info-outline" class="text-status-info-text mt-px size-4 shrink-0" />
-      <p>
+      <p v-if="!event.partial && victim && survivor" class="text-text-body">
         <span class="text-text-heading font-semibold">
           {{ t("dbm.deadlocks.detail.plainTitle") }}
         </span>
         {{ plainBody }}
       </p>
-    </div>
-
-    <!-- What to DO. The one band that turns a diagnosis into a change. -->
-    <div
-      class="border-border-default bg-surface-base rounded-default flex items-center gap-2 border px-2.5 py-1.5 text-xs"
-      :data-test="`${dataTest}-fix`"
-    >
-      <OIcon name="check-circle" class="text-status-success-text size-4 shrink-0" />
-      <p class="text-text-body min-w-0 flex-1">
+      <p class="text-text-body" :data-test="`${dataTest}-fix`">
         <span class="text-text-heading font-semibold">
           {{ t("dbm.deadlocks.detail.fixTitle") }}
         </span>
         {{ fixBody }}
       </p>
-      <!-- Beside the fix sentence, because that sentence is exactly what the
-           user wants elaborated: the band says WHAT to do, this asks HOW. -->
-      <DbmSuggestFixButton
-        :label="t('dbm.ai.deadlockFix')"
-        :tooltip="t('dbm.ai.deadlockFixHint')"
-        :data-test="`${dataTest}-ask-ai`"
-        @click="emit('ask-ai')"
-      />
-      <!-- The ONE labelled Copy in this view. It used to say "Copy for Slack",
-           naming a destination rather than the payload, while a per-side
-           "Copy SQL" sat inches away — two buttons competing for the same verb
-           with neither label settling which one you wanted. The per-side action
-           is icon-only now (see DbmDeadlockSide), so this button can be plain
-           "Copy" and its tooltip carries the scope: the whole incident. -->
-      <OButton
-        variant="primary"
-        size="sm"
-        icon-left="content-copy"
-        class="shrink-0"
-        :data-test="`${dataTest}-copy-slack`"
-        @click="emit('copy-summary')"
-      >
-        {{ t("dbm.deadlocks.detail.copyForSlack") }}
-        <!-- `bottom`, matching the identically-shaped Copy button on Query
-             detail and the rest of the DBM toolbar controls. Both render the
-             bare label "Copy" and explain the payload on hover, so opening on
-             opposite sides made one control read as two. -->
-        <OTooltip side="bottom" :content="t('dbm.deadlocks.detail.copyForSlackHint')" />
-      </OButton>
+      <div class="flex items-center justify-end gap-2">
+        <DbmSuggestFixButton
+          :label="t('dbm.ai.deadlockFix')"
+          :tooltip="t('dbm.ai.deadlockFixHint')"
+          :data-test="`${dataTest}-ask-ai`"
+          @click="emit('ask-ai')"
+        />
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="content-copy"
+          class="shrink-0"
+          :data-test="`${dataTest}-copy-slack`"
+          @click="emit('copy-summary')"
+        >
+          {{ t("dbm.deadlocks.detail.copyForSlack") }}
+          <OTooltip side="bottom" :content="t('dbm.deadlocks.detail.copyForSlackHint')" />
+        </OButton>
+      </div>
     </div>
   </div>
 </template>
@@ -238,14 +217,22 @@ const survivor = computed(() => survivorOf(props.event));
 /** The contested object — what the fix is actually about. */
 const objectLabel = computed(() => props.event.objects?.[0] ?? "");
 
-const sideLabel = (participant: DeadlockParticipant | null) =>
-  participant?.application?.trim() || (participant?.pid != null ? String(participant.pid) : "");
+const appOf = (p: DeadlockParticipant | null) => p?.application?.trim() ?? "";
+const pidLabel = (p: DeadlockParticipant | null) => (p?.pid != null ? `pid ${p.pid}` : "");
+
+// Same naming on both sides: app name, else pid; pid is added when the apps collide.
+const sideLabel = (p: DeadlockParticipant | null) => {
+  const app = appOf(p);
+  if (!app) return pidLabel(p);
+  const same = appOf(victim.value) === appOf(survivor.value);
+  return same && p?.pid != null ? `${app} (${pidLabel(p)})` : app;
+};
 
 const plainBody = computed<I18nText>(() =>
   t("dbm.deadlocks.detail.plainBody", {
     a: sideLabel(victim.value),
     b: sideLabel(survivor.value),
-    victim: victim.value?.pid ?? "",
+    victim: sideLabel(victim.value),
   }),
 );
 

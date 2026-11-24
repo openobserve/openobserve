@@ -27554,7 +27554,7 @@
         "occurrencesHint": "選取一個點以載入上方該項目",
         "lostLabel": "{pid} 失敗",
         "bothSidesLose": "雙方被取消的次數大致相同 — {a} 對 {b}。問題不在任一個應用程式，而是順序。",
-        "oneSideLoses": "{pid} 每次都被取消。",
+        "oneSideLoses": "{app} 每次都被取消。",
         "showAbove": "在上方顯示",
         "copy": "複製 SQL",
         "seeInTopQueries": "在熱門查詢中查看",

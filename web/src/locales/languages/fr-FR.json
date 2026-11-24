@@ -27559,7 +27559,7 @@
         "occurrencesHint": "Sélectionnez un point pour charger l'entrée ci-dessus",
         "lostLabel": "{pid} a perdu",
         "bothSidesLose": "Les deux côtés sont annulés à peu près également — {a} contre {b}. Aucune des deux applications n'est le problème ; c'est l'ordre.",
-        "oneSideLoses": "{pid} est annulé à chaque fois.",
+        "oneSideLoses": "{app} est annulé à chaque fois.",
         "showAbove": "Afficher ci-dessus",
         "copy": "Copier SQL",
         "seeInTopQueries": "Voir dans Top queries",

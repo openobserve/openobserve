@@ -27559,7 +27559,7 @@
         "occurrencesHint": "Wybierz punkt, aby załadować go powyżej",
         "lostLabel": "{pid} przegrało",
         "bothSidesLose": "Obie strony są anulowane mniej więcej równo — {a} vs {b}. Żadna aplikacja nie jest problemem; problemem jest kolejność.",
-        "oneSideLoses": "{pid} jest anulowane za każdym razem.",
+        "oneSideLoses": "{app} jest anulowane za każdym razem.",
         "showAbove": "Pokaż powyżej",
         "copy": "Kopiuj SQL",
         "seeInTopQueries": "Zobacz w Top queries",

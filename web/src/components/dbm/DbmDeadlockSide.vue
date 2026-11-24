@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="action in actions"
         :key="action.id"
         variant="outline"
-        :size="action.iconOnly ? 'icon-sm' : 'sm'"
+        :size="action.iconOnly ? 'icon-xs-sq' : 'xs'"
         :icon-left="action.icon"
         :data-test="`${dataTest}-${action.id}`"
         @click="emit('action', action.id)"

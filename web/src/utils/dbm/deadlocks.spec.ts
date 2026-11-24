@@ -320,7 +320,22 @@ describe("groupDeadlocks — rows are pairs, the badge is events", () => {
       event(3 * SECOND, 1071),
     ]);
     expect(pairs[0].victimAlternates).toBe(true);
-    expect(pairs[0].victimCounts).toEqual({ "1071": 2, "1072": 1 });
+    expect(pairs[0].victimAppCounts).toEqual({
+      "dbm-sv-deadlock-a": 2,
+      "dbm-sv-deadlock-b": 1,
+    });
+  });
+
+  it("counts victims by application, not by pid, so reconnects stay one app", () => {
+    const pairs = groupDeadlocks([
+      event(1 * SECOND, 1071),
+      event(2 * SECOND, 1071, {
+        participants: event(2 * SECOND, 1071).participants.map((p) =>
+          p.pid === 1071 ? { ...p, pid: 2001 } : p,
+        ),
+      }),
+    ]);
+    expect(pairs[0].victimAppCounts).toEqual({ "dbm-sv-deadlock-a": 2 });
   });
 
   it("does not claim alternation when one side always loses", () => {

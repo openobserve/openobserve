@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTable
         :enable-column-resize="true"
         :data="tableRows"
-        :columns="columns"
+        :columns="visibleColumns"
         row-key="rowKey"
         :loading="loading"
         :frame="false"
@@ -115,50 +115,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dbm-deadlocks-summary"
           />
 
-          <!-- ONE storm band, not two. The completion-bias caution has no
-               condition of its own beyond `storm`, so it rides inside this
-               band — as its own band it could only ever arrive stacked under
-               this one, saying something about the same situation. -->
+          <!-- ONE warning band: the storm and the capped read are two facts about
+               the same window, so they share a sentence and the long
+               explanation sits behind Details. -->
           <OBanner
-            v-if="storm"
-            variant="error"
-            dense
-            inline-actions
+            v-if="storm || (truncated && rows.length)"
+            variant="warning"
             icon="warning-amber"
-            class="border-status-error-text/25 rounded-none border-b"
-            data-test="dbm-deadlocks-storm"
+            bar
+            dense
+            class="shrink-0"
+            :data-test="storm ? 'dbm-deadlocks-storm' : 'dbm-deadlocks-coverage'"
           >
-            <span class="font-bold">{{ t("dbm.deadlocks.storm.title") }}</span>
-            {{ stormBody }}
-            <span class="block">{{ t("dbm.deadlocks.storm.biasWarning") }}</span>
+            <span data-test="dbm-deadlocks-banner-text">{{ bannerSummary }}</span>
             <template #actions>
-              <OButton
-                variant="primary"
-                size="sm"
-                icon-left="content-copy"
-                data-test="dbm-deadlocks-storm-copy"
-                @click="copyStormSummary()"
-              >
-                {{ t("dbm.deadlocks.storm.copyForSlack") }}
-                <!-- The label is the bare word "Copy", so what lands on the
-                     clipboard has to be said somewhere. Its twin inside the
-                     expansion (DbmDeadlockCycle) already explained itself; this
-                     one did not, and the two do the same job. -->
-                <OTooltip side="bottom" :content="t('dbm.deadlocks.detail.copyForSlackHint')" />
-              </OButton>
+              <OPopover side="bottom" align="end">
+                <template #trigger>
+                  <OButton variant="ghost" size="xs" data-test="dbm-deadlocks-banner-details">
+                    {{ t("dbm.coverage.details") }}
+                  </OButton>
+                </template>
+                <div
+                  class="text-text-body flex max-w-80 flex-col gap-2 p-3 text-sm"
+                  data-test="dbm-deadlocks-banner-detail-text"
+                >
+                  <p v-if="storm">{{ t("dbm.deadlocks.storm.biasWarning") }}</p>
+                  <p>
+                    {{ coverageLine }}
+                    <template v-if="readUpToLabel">{{ readUpToLabel }}</template>
+                  </p>
+                </div>
+              </OPopover>
             </template>
           </OBanner>
-
-          <!-- The database logs every deadlock it resolves, so this is not a
-               sample — unless the read hit its cap, which is what `truncated`
-               says and what turns the claim into a floor. -->
-          <DbmLockCoverageLine
-            v-if="rows.length"
-            :summary="coverageLine"
-            :variant="truncated ? 'warning' : null"
-            :trailing-label="readUpToLabel"
-            data-test="dbm-deadlocks-coverage"
-          />
         </template>
 
         <!-- The finding IS the collision, so the two statements share one cell
@@ -176,12 +165,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("dbm.deadlocks.detail.noQueryCaptured") }}
               </span>
             </div>
-            <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
-              <OTag type="dbSystem" :value="row.db_system" size="xs" />
-              <template v-if="row.db_instance">
-                <span class="opacity-45">·</span>
-                <OTruncatedText>{{ raw(row.db_instance) }}</OTruncatedText>
-              </template>
+            <div
+              v-if="(!uniformInstance && row.db_instance) || row.chips.length"
+              class="text-text-secondary flex min-h-4 min-w-0 items-center gap-1 text-xs"
+              data-test="dbm-deadlocks-meta"
+            >
+              <OTruncatedText v-if="!uniformInstance && row.db_instance">
+                {{ raw(row.db_instance) }}
+                <OTooltip :content="raw(engineName(row.db_system))" />
+              </OTruncatedText>
               <span
                 v-for="chip in row.chips"
                 :key="chip.id"
@@ -194,44 +186,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
+        <template #cell-cause="{ row }">
+          <span class="text-text-secondary text-xs">{{ row.cause || raw("—") }}</span>
+        </template>
+
         <template #cell-applications="{ row }">
-          <div class="flex flex-col items-end leading-tight">
+          <div class="flex flex-col leading-tight">
             <OTruncatedText
-              v-for="(app, index) in row.applications.slice(0, 2)"
-              :key="app"
-              class="max-w-full font-mono text-xs"
+              v-for="(app, index) in row.appDetails.slice(0, 2)"
+              :key="app.name"
+              class="max-w-full text-xs"
               :class="index === 0 ? 'text-text-body' : 'text-text-muted'"
             >
-              {{ raw(app) }}
+              {{ raw(app.name) }}
+              <OTooltip v-if="app.pid" :content="t('dbm.deadlocks.detail.pid', { pid: app.pid })" />
             </OTruncatedText>
-            <span v-if="!row.applications.length" class="text-text-muted">{{ raw("—") }}</span>
+            <span v-if="!row.appDetails.length" class="text-text-muted">{{ raw("—") }}</span>
           </div>
         </template>
 
         <template #cell-objects="{ row }">
           <div class="flex flex-col items-end leading-tight">
             <span class="text-text-heading text-compact font-mono font-medium tabular-nums">
-              {{ row.objects.length || raw("—") }}
+              {{ row.objectCount || raw("—") }}
             </span>
-            <OTruncatedText class="text-text-secondary text-3xs max-w-full">{{
-              raw(row.objects[0] ?? "")
-            }}</OTruncatedText>
+            <span v-if="row.tables.length" class="text-text-secondary text-3xs max-w-full truncate">
+              {{ raw(row.tables[0]) }}
+              <OTooltip v-if="row.objectsTip" :content="raw(row.objectsTip)" />
+            </span>
           </div>
         </template>
 
         <template #cell-lastSeen="{ row }">
-          <div class="flex flex-col items-end leading-tight">
-            <span class="text-text-body font-mono text-xs tabular-nums">
-              {{ formatClock(row.lastSeen) }}
-            </span>
-            <span class="text-text-secondary text-3xs">{{ formatAge(row.lastSeen) }}</span>
-          </div>
+          <span class="text-text-body text-xs">
+            {{ formatAge(row.lastSeen) }}
+            <OTooltip :content="raw(formatDateTime(row.lastSeen))" />
+          </span>
         </template>
 
         <!-- Count, share and trend in ONE cell: three facts about the same
              quantity, so the comparison is pre-made rather than reassembled. -->
         <template #cell-count="{ row }">
           <div class="flex items-center justify-end gap-1.5">
+            <OTooltip
+              v-if="uniformCause"
+              :content="t('dbm.deadlocks.columns.causeLine', { cause: uniformCause })"
+            />
             <div class="flex flex-col items-end leading-tight">
               <span class="text-text-heading text-compact font-mono font-semibold tabular-nums">
                 {{ row.count }}
@@ -257,40 +257,100 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-center gap-2">
                 <span class="text-text-heading text-xs font-semibold">
                   {{
-                    t("dbm.deadlocks.detail.mostRecent", {
+                    t("dbm.deadlocks.detail.eventAt", {
                       time: formatClockMs(row.selectedEvent.timestamp),
                     })
                   }}
                 </span>
-                <OTag variant="default-soft" size="xs" shape="rounded">
-                  {{
-                    t("dbm.deadlocks.detail.nthOf", {
-                      index: row.selectedEventIndex + 1,
-                      total: row.count,
-                    })
-                  }}
-                </OTag>
                 <div class="flex-1"></div>
                 <OButton
-                  variant="ghost-muted"
-                  size="sm"
+                  variant="ghost"
+                  size="icon-xs-sq"
                   icon-left="chevron-left"
+                  :aria-label="t('dbm.deadlocks.detail.earlier')"
                   :disabled="row.selectedEventIndex >= row.count - 1"
                   data-test="dbm-deadlocks-earlier"
                   @click="stepEvent(row, 1)"
                 >
-                  {{ t("dbm.deadlocks.detail.earlier") }}
+                  <OTooltip :content="t('dbm.deadlocks.detail.earlier')" />
                 </OButton>
+                <OTag variant="default-soft" size="xs" shape="rounded">
+                  {{
+                    t("dbm.deadlocks.detail.nthOf", {
+                      index: row.count - row.selectedEventIndex,
+                      total: row.count,
+                    })
+                  }}
+                </OTag>
                 <OButton
-                  variant="ghost-muted"
-                  size="sm"
+                  variant="ghost"
+                  size="icon-xs-sq"
                   icon-left="chevron-right"
+                  :aria-label="t('dbm.deadlocks.detail.later')"
                   :disabled="row.selectedEventIndex <= 0"
                   data-test="dbm-deadlocks-later"
                   @click="stepEvent(row, -1)"
                 >
-                  {{ t("dbm.deadlocks.detail.later") }}
+                  <OTooltip :content="t('dbm.deadlocks.detail.later')" />
                 </OButton>
+              </div>
+
+              <!-- Same selection as the arrows: one dot per time this pair deadlocked. -->
+              <div v-if="row.count > 1" data-test="dbm-deadlocks-occurrences">
+                <div class="flex items-start gap-3">
+                  <span
+                    class="text-text-secondary shrink-0 pt-0.5 text-xs"
+                    data-test="dbm-deadlocks-occurrences-label"
+                  >
+                    {{
+                      t("dbm.deadlocks.detail.spanLabel", {
+                        count: row.count,
+                        span: formatLagSeconds((row.lastSeen - row.firstSeen) / 1e6),
+                      })
+                    }}
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <div class="relative mx-1.5 h-5">
+                      <div class="bg-border-default absolute inset-x-0 top-1/2 h-px"></div>
+                      <!-- On phones a transparent ::before widens the 8px dot to a 24px tap target. -->
+                      <button
+                        v-for="point in row.points"
+                        :key="point.id"
+                        type="button"
+                        class="focus-visible:ring-accent absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full focus-visible:ring-2 focus-visible:outline-none max-md:before:absolute max-md:before:-inset-2"
+                        :class="
+                          point.id === row.selectedEvent?.id
+                            ? 'bg-status-error-text ring-accent ring-2'
+                            : 'bg-status-error-text/80 hover:bg-status-error-text'
+                        "
+                        :style="leftPercent(point.offset)"
+                        :aria-label="t('dbm.deadlocks.detail.eventAt', { time: point.time })"
+                        :aria-current="point.id === row.selectedEvent?.id"
+                        :data-test="`dbm-deadlocks-event-${point.id}`"
+                        @click.stop="selectEvent(row, point.id)"
+                      >
+                        <OTooltip
+                          side="top"
+                          :content="t('dbm.deadlocks.detail.eventAt', { time: point.time })"
+                        />
+                      </button>
+                    </div>
+                    <div
+                      class="text-text-secondary text-3xs mx-1.5 flex justify-between tabular-nums"
+                      data-test="dbm-deadlocks-occurrences-axis"
+                    >
+                      <span>{{ formatClock(row.firstSeen) }}</span>
+                      <span>{{ formatClock(row.lastSeen) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <p
+                  v-if="row.victimSummary"
+                  class="text-text-secondary text-3xs mt-1"
+                  data-test="dbm-deadlocks-victim-summary"
+                >
+                  {{ row.victimSummary }}
+                </p>
               </div>
 
               <DbmDeadlockCycle
@@ -301,63 +361,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @copy-summary="copySummary(row)"
                 @ask-ai="askAiForFix(row)"
               />
-
-              <!-- The repeats as a two-lane timeline rather than N rows: the
-                   lanes carry the "victim alternates" finding, which is the
-                   signature of a symmetric bug and is invisible per event. -->
-              <div
-                v-if="row.count > 1"
-                class="border-border-default bg-surface-base rounded-default border px-2.5 py-2"
-                data-test="dbm-deadlocks-occurrences"
-              >
-                <div class="mb-1.5 flex items-center gap-2">
-                  <h4 class="text-text-secondary text-2xs font-semibold">
-                    {{ t("dbm.deadlocks.detail.occurrencesTitle", { count: row.count }) }}
-                  </h4>
-                  <div class="flex-1"></div>
-                  <span class="text-text-secondary text-3xs">
-                    {{ t("dbm.deadlocks.detail.occurrencesHint") }}
-                  </span>
-                </div>
-
-                <div class="flex flex-col gap-1">
-                  <div v-for="lane in row.lanes" :key="lane.pid" class="flex items-center gap-2">
-                    <span class="text-text-secondary text-3xs w-16 shrink-0 text-right font-mono">
-                      {{ t("dbm.deadlocks.detail.lostLabel", { pid: lane.pid }) }}
-                    </span>
-                    <div
-                      class="border-border-subtle relative h-4 min-w-0 flex-1 border-b border-dashed"
-                    >
-                      <!-- On phones a transparent ::before widens the 8px dot to a 24px tap target. -->
-                      <button
-                        v-for="point in lane.points"
-                        :key="point.id"
-                        type="button"
-                        class="absolute top-1 size-2 -translate-x-1/2 rounded-full max-md:before:absolute max-md:before:-inset-2"
-                        :class="
-                          point.id === row.selectedEvent?.id
-                            ? 'bg-status-error-text ring-accent ring-2'
-                            : 'bg-status-error-text/80 hover:bg-status-error-text'
-                        "
-                        :style="leftPercent(point.offset)"
-                        :aria-label="t('dbm.deadlocks.detail.showAbove')"
-                        :data-test="`dbm-deadlocks-event-${point.id}`"
-                        @click.stop="selectEvent(row, point.id)"
-                      >
-                        <!-- The dot carried an `aria-label` and nothing else,
-                             so a screen reader knew what it did and a sighted
-                             mouse user did not: an unlabelled 8px circle with
-                             no hover text. Same string, now reaching both. -->
-                        <OTooltip side="top" :content="t('dbm.deadlocks.detail.showAbove')" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <p class="text-text-secondary text-3xs mt-1.5">
-                  {{ row.victimSummary }}
-                </p>
-              </div>
             </div>
           </div>
         </template>
@@ -402,7 +405,6 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import DbmDeadlockCycle from "@/components/dbm/DbmDeadlockCycle.vue";
-import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
 import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
@@ -421,6 +423,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, {
   type DeadlockEvent,
@@ -450,12 +453,14 @@ import {
   discriminatingPart,
   formatAge,
   formatClock,
+  formatLagSeconds,
   formatPercent,
   formatWhenWithAge,
 } from "@/utils/dbm/format";
 import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
 import { DBM_ORIGIN_QUERY_KEY } from "@/utils/dbm/queryDetailOrigin";
 import { DBM_STATUS_TONES } from "@/utils/dbm/tones";
+import { engineName, uniformValue } from "@/utils/dbm/uniformValue";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -541,7 +546,16 @@ interface DeadlockRow {
   db_system: string;
   db_instance?: string | null;
   applications: string[];
+  /** The application name with its process id, for the name's tooltip. */
+  appDetails: { name: string; pid: string }[];
   objects: string[];
+  /** Table names only, quotes stripped; transaction ids live in `objectsTip`. */
+  tables: string[];
+  objectCount: number;
+  objectsTip: string;
+  /** Neutral cause text; empty when the row has none. */
+  cause: I18nText;
+  firstSeen: number;
   lastSeen: number;
   count: number;
   share: number;
@@ -550,8 +564,8 @@ interface DeadlockRow {
   chips: { id: string; label: I18nText; tone: string }[];
   selectedEvent: DeadlockEvent | null;
   selectedEventIndex: number;
-  lanes: { pid: string; points: { id: string; offset: number }[] }[];
-  victimSummary: I18nText;
+  points: { id: string; offset: number; time: string }[];
+  victimSummary: I18nText | null;
   events: DeadlockEvent[];
 }
 
@@ -568,13 +582,6 @@ const tableRows = computed<DeadlockRow[]>(() =>
 
 const chipFor = (pair: DeadlockPair) => {
   const chips: { id: string; label: I18nText; tone: string }[] = [];
-  if (hasOppositeRowOrder(pair)) {
-    chips.push({
-      id: "opposite",
-      label: t("dbm.deadlocks.chips.oppositeOrder"),
-      tone: DBM_STATUS_TONES.error,
-    });
-  }
   const cadence = deadlockCadenceSeconds(pair);
   if (cadence != null) {
     chips.push({
@@ -602,36 +609,66 @@ const chipFor = (pair: DeadlockPair) => {
   return chips;
 };
 
-/**
- * The two lanes of the occurrence strip — one per pid that was ever cancelled.
- * Alternating dots ARE the finding, so the lanes exist even when one side
- * dominates.
- */
-const lanesFor = (pair: DeadlockPair) => {
+/** One dot per event, placed by time between the pair's first and last sighting. */
+const pointsFor = (pair: DeadlockPair) => {
   const span = Math.max(1, pair.lastSeen - pair.firstSeen);
-  const pids = Object.keys(pair.victimCounts);
-  return pids.map((pid) => ({
-    pid,
-    points: pair.events
-      .filter((e) => e.participants.some((p) => p.victim && String(p.pid) === pid))
-      .map((e) => ({ id: e.id, offset: (e.timestamp - pair.firstSeen) / span })),
+  return pair.events.map((e) => ({
+    id: e.id,
+    offset: (e.timestamp - pair.firstSeen) / span,
+    time: formatClockMs(e.timestamp),
   }));
 };
 
-const victimSummaryFor = (pair: DeadlockPair): I18nText => {
-  const counts = Object.entries(pair.victimCounts);
+/** Who loses, by application: pids change per connection, app names do not. */
+const victimSummaryFor = (pair: DeadlockPair): I18nText | null => {
+  const apps = new Set(
+    pair.events.flatMap((e) => e.participants.map((p) => p.application?.trim()).filter(Boolean)),
+  );
+  if (apps.size < 2) return null;
+  const counts = Object.entries(pair.victimAppCounts).sort((x, y) => y[1] - x[1]);
   if (counts.length > 1) {
     return t("dbm.deadlocks.detail.bothSidesLose", {
-      a: counts[0][1],
-      b: counts[1][1],
+      a: counts[0][0],
+      x: counts[0][1],
+      b: counts[1][0],
+      y: counts[1][1],
     });
   }
-  return counts.length ? t("dbm.deadlocks.detail.oneSideLoses", { pid: counts[0][0] }) : raw("");
+  return counts.length ? t("dbm.deadlocks.detail.oneSideLoses", { app: counts[0][0] }) : null;
 };
 
 const selectedEventFor = (pair: DeadlockPair): DeadlockEvent | null => {
   const chosen = selectedEventByPair.value[pair.pairKey];
   return pair.events.find((e) => e.id === chosen) ?? pair.events[0] ?? null;
+};
+
+/** `` `shop`.`accounts` `` -> `shop.accounts`. */
+const stripQuotes = (name: string) => name.replace(/[`"']/g, "");
+const isTransaction = (name: string) => /^transaction\b/i.test(name.trim());
+
+const causeFor = (oppositeRowOrder: boolean) =>
+  oppositeRowOrder ? t("dbm.deadlocks.chips.oppositeOrder") : raw("");
+
+/** The shared shape of the "Rows fought over" and "Applications" cells, for pairs and events alike. */
+const cellFacts = (objects: string[], participants: DeadlockParticipant[]) => {
+  const names = objects.map(stripQuotes);
+  const tables = names.filter((n) => !isTransaction(n));
+  const transactions = [
+    ...names.filter(isTransaction),
+    ...participants
+      .map((p) => p.transaction_id)
+      .filter(Boolean)
+      .map((id) => `transaction ${id}`),
+  ];
+  const appDetails = participants
+    .filter((p) => p.application?.trim())
+    .map((p) => ({ name: p.application!.trim(), pid: p.pid != null ? String(p.pid) : "" }));
+  return {
+    tables,
+    objectCount: tables.length,
+    objectsTip: [...tables, ...new Set(transactions)].join(", "),
+    appDetails: appDetails.filter((a, i) => appDetails.findIndex((b) => b.name === a.name) === i),
+  };
 };
 
 const pairRows = computed<DeadlockRow[]>(() =>
@@ -649,7 +686,10 @@ const pairRows = computed<DeadlockRow[]>(() =>
       db_system: pair.db_system,
       db_instance: pair.db_instance,
       applications: pair.applications,
+      ...cellFacts(pair.objects, selectedEvent?.participants ?? []),
       objects: pair.objects,
+      cause: causeFor(hasOppositeRowOrder(pair)),
+      firstSeen: pair.firstSeen,
       lastSeen: pair.lastSeen,
       count: pair.count,
       share: pair.share,
@@ -662,7 +702,7 @@ const pairRows = computed<DeadlockRow[]>(() =>
         0,
         pair.events.findIndex((e) => e.id === selectedEvent?.id),
       ),
-      lanes: lanesFor(pair),
+      points: pointsFor(pair),
       victimSummary: victimSummaryFor(pair),
       events: pair.events,
     };
@@ -685,7 +725,10 @@ const eventRows = computed<DeadlockRow[]>(() =>
         applications: event.participants
           .map((p) => p.application ?? (p.pid != null ? String(p.pid) : ""))
           .filter(Boolean),
+        ...cellFacts(event.objects ?? [], event.participants),
         objects: event.objects ?? [],
+        cause: raw(""),
+        firstSeen: event.timestamp,
         lastSeen: event.timestamp,
         count: 1,
         share: eventCount.value > 0 ? 1 / eventCount.value : 0,
@@ -694,11 +737,28 @@ const eventRows = computed<DeadlockRow[]>(() =>
         chips: [],
         selectedEvent: event,
         selectedEventIndex: 0,
-        lanes: [],
-        victimSummary: raw(""),
+        points: [],
+        victimSummary: null,
         events: [event],
       };
     }),
+);
+
+/** Rows sharing one instance say so once, in the header tooltip, not on every row. */
+const uniformInstance = computed(() => uniformValue(tableRows.value, (r) => r.db_instance));
+/** One cause on every row is a fact about the window, not a column. */
+const uniformCause = computed(() => uniformValue(tableRows.value, (r) => r.cause));
+const mixedCause = computed(() => !uniformCause.value && tableRows.value.some((r) => r.cause));
+
+const pairHeaderTip = computed(() =>
+  [
+    t("dbm.deadlocks.columns.pairHint"),
+    uniformInstance.value &&
+      t("dbm.deadlocks.columns.allOnInstance", { instance: uniformInstance.value }),
+    uniformCause.value && t("dbm.deadlocks.columns.allCause", { cause: uniformCause.value }),
+  ]
+    .filter(Boolean)
+    .join(" "),
 );
 
 const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
@@ -711,7 +771,17 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
     // table shared width evenly and the row truncated before the ⇄, hiding
     // exactly what the reader came for. Sized so the second statement's WHERE
     // clause clears the fold without starving the Applications column.
-    size: 560,
+    size: 528,
+    enableSorting: false,
+    meta: { headerTooltip: raw(pairHeaderTip.value) },
+  },
+  {
+    id: "cause",
+    hideable: true,
+    accessorKey: "cause",
+    header: t("dbm.deadlocks.columns.cause"),
+    size: 150,
+    meta: { align: "left" },
     enableSorting: false,
   },
   {
@@ -720,7 +790,7 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
     accessorKey: "applications",
     header: t("dbm.deadlocks.columns.applications"),
     size: 132,
-    meta: { align: "right" },
+    meta: { align: "left" },
     enableSorting: false,
   },
   {
@@ -728,7 +798,7 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
     hideable: true,
     accessorKey: "objects",
     header: t("dbm.deadlocks.columns.objects"),
-    size: 104,
+    size: 136,
     meta: { align: "right" },
     enableSorting: false,
   },
@@ -757,6 +827,11 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
     meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
   },
 ]);
+
+// The Cause column only earns its width when rows differ in cause.
+const visibleColumns = computed(() =>
+  columns.value.filter((c) => c.id !== "cause" || mixedCause.value),
+);
 
 /** Only what the handler implements. "Show the deadlock" was a no-op anyway —
  *  a row click already expands the cycle in place. */
@@ -830,9 +905,20 @@ const readUpToLabel = computed<I18nText | null>(() =>
     : null,
 );
 
-const stormBody = computed<I18nText>(() =>
-  t("dbm.deadlocks.storm.body", { count: eventCount.value }),
+const bannerSummary = computed<I18nText>(() =>
+  raw(
+    [
+      storm.value && t("dbm.deadlocks.storm.short", { count: eventCount.value }),
+      truncated.value && t("dbm.deadlocks.storm.truncated", { count: eventCount.value }),
+    ]
+      .filter(Boolean)
+      .join(" "),
+  ),
 );
+
+/** Date and time, for the "Last one" tooltip: the cell itself only has room for the age. */
+const formatDateTime = (micros: number) =>
+  new Date(micros / 1000).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
 
 // ── the two empty states ────────────────────────────────────────────────────
 
@@ -1091,21 +1177,6 @@ const summaryLines = (row: DeadlockRow): string[] => [
 const copySummary = (row: DeadlockRow) => {
   copyToClipboard(summaryLines(row).join("\n"), t);
   analytics.track("dbm_deadlock_summary_copied", { scope: "pair" });
-};
-
-/**
- * The STORM banner's own summary — every pair, not just the first.
- *
- * This button sits under "{count} deadlocks in this window", so a single-pair
- * summary here would put a fleet-wide headline over one pair's detail: the
- * label promising one thing while the clipboard holds another.
- */
-const copyStormSummary = () => {
-  const rows = tableRows.value;
-  if (!rows.length) return;
-  const header = `*${eventCount.value} deadlocks in this window, from ${rows.length} query pair(s)*`;
-  copyToClipboard([header, "", ...rows.flatMap((r) => [...summaryLines(r), ""])].join("\n"), t);
-  analytics.track("dbm_deadlock_summary_copied", { scope: "storm" });
 };
 
 const onEmptyAction = (id: string) => {

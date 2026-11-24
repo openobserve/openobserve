@@ -27559,7 +27559,7 @@
         "occurrencesHint": "Selecione um ponto para o carregar acima",
         "lostLabel": "{pid} perdeu",
         "bothSidesLose": "Ambos os lados são cancelados quase igualmente — {a} vs {b}. Nenhuma das aplicações é o problema; a ordem é.",
-        "oneSideLoses": "{pid} é cancelado todas as vezes.",
+        "oneSideLoses": "{app} é cancelado todas as vezes.",
         "showAbove": "Mostrar acima",
         "copy": "Copiar SQL",
         "seeInTopQueries": "Ver em Principais consultas",

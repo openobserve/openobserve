@@ -27559,7 +27559,7 @@
         "occurrencesHint": "选择一个点以加载上方相应的记录",
         "lostLabel": "{pid} 落败",
         "bothSidesLose": "双方被取消的频率大致相当 — {a} vs {b}。两个应用程序都不是问题所在；问题在于顺序。",
-        "oneSideLoses": "{pid} 每次都被取消。",
+        "oneSideLoses": "{app} 每次都被取消。",
         "showAbove": "在上方显示",
         "copy": "复制 SQL",
         "seeInTopQueries": "在热门查询中查看",

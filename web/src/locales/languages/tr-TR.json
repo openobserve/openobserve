@@ -27559,7 +27559,7 @@
         "occurrencesHint": "Yukarıdakini yüklemek için bir nokta seçin",
         "lostLabel": "{pid} kaybetti",
         "bothSidesLose": "Her iki taraf da yaklaşık eşit şekilde iptal ediliyor — {a} vs {b}. Hiçbir uygulama sorun değil; sorun sıralama.",
-        "oneSideLoses": "{pid} her seferinde iptal ediliyor.",
+        "oneSideLoses": "{app} her seferinde iptal ediliyor.",
         "showAbove": "Yukarıda göster",
         "copy": "SQL'i kopyala",
         "seeInTopQueries": "En çok sorgularda gör",

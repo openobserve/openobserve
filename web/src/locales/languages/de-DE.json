@@ -27559,7 +27559,7 @@
         "occurrencesHint": "Wählen Sie einen Punkt aus, um diesen oben zu laden.",
         "lostLabel": "{pid} verloren",
         "bothSidesLose": "Beide Seiten werden etwa gleich häufig abgebrochen — {a} vs. {b}. Keine der Anwendungen ist das Problem; die Reihenfolge ist es.",
-        "oneSideLoses": "{pid} wird jedes Mal abgebrochen.",
+        "oneSideLoses": "{app} wird jedes Mal abgebrochen.",
         "showAbove": "Oben anzeigen",
         "copy": "SQL kopieren",
         "seeInTopQueries": "In Top-Abfragen ansehen",

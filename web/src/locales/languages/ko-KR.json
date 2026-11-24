@@ -27559,7 +27559,7 @@
         "occurrencesHint": "위에서 해당 항목을 로드하려면 지점을 선택하세요.",
         "lostLabel": "{pid} 취소됨",
         "bothSidesLose": "양쪽이 거의 동일하게 취소됩니다 — {a} 대 {b}. 어느 애플리케이션도 문제가 아니며, 순서가 문제입니다.",
-        "oneSideLoses": "{pid}는 매번 취소됩니다.",
+        "oneSideLoses": "{app}는 매번 취소됩니다.",
         "showAbove": "위에 표시",
         "copy": "SQL 복사",
         "seeInTopQueries": "Top queries에서 보기",

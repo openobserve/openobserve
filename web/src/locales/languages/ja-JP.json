@@ -27559,7 +27559,7 @@
         "occurrencesHint": "ポイントを選択すると、その1件が上に読み込まれます。",
         "lostLabel": "{pid} がキャンセル",
         "bothSidesLose": "両側がほぼ均等にキャンセルされています — {a} vs {b}。問題はアプリケーションではなく、順序です。",
-        "oneSideLoses": "{pid} は毎回キャンセルされます。",
+        "oneSideLoses": "{app} は毎回キャンセルされます。",
         "showAbove": "上に表示",
         "copy": "SQL をコピー",
         "seeInTopQueries": "上位クエリで表示",

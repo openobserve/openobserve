@@ -27559,7 +27559,7 @@
         "occurrencesHint": "Seleziona un punto per caricare quello sopra",
         "lostLabel": "{pid} ha perso",
         "bothSidesLose": "Entrambe le parti vengono annullate in modo più o meno equo — {a} contro {b}. Nessuna delle due applicazioni è il problema; è l'ordine.",
-        "oneSideLoses": "{pid} viene annullato ogni volta.",
+        "oneSideLoses": "{app} viene annullato ogni volta.",
         "showAbove": "Mostra sopra",
         "copy": "Copia SQL",
         "seeInTopQueries": "Vedi nelle query principali",

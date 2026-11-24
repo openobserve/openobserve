@@ -79,8 +79,8 @@ export interface DeadlockPair {
    * of a symmetric lock-ordering bug and is invisible in any single event.
    */
   victimAlternates: boolean;
-  /** How many times each participant pid was the cancelled side. */
-  victimCounts: Record<string, number>;
+  /** How many times each application was the cancelled side; unnamed sides are skipped. */
+  victimAppCounts: Record<string, number>;
 }
 
 /**
@@ -139,15 +139,17 @@ export const groupDeadlocks = (events: DeadlockEvent[]): DeadlockPair[] => {
     const sorted = [...bucket].sort((a, b) => b.timestamp - a.timestamp);
     const newest = sorted[0];
 
-    const victimCounts: Record<string, number> = {};
+    const victimPids = new Set<string>();
+    const victimAppCounts: Record<string, number> = {};
     for (const event of sorted) {
       for (const p of event.participants) {
-        if (!p.victim || p.pid == null) continue;
-        const id = String(p.pid);
-        victimCounts[id] = (victimCounts[id] ?? 0) + 1;
+        if (!p.victim) continue;
+        if (p.pid != null) victimPids.add(String(p.pid));
+        const app = p.application?.trim();
+        if (app) victimAppCounts[app] = (victimAppCounts[app] ?? 0) + 1;
       }
     }
-    const losses = Object.values(victimCounts);
+    const losses = [...victimPids];
     // Both sides lost at least once: no single application is "the problem",
     // the ordering is.
     const victimAlternates = losses.length > 1;
@@ -169,7 +171,7 @@ export const groupDeadlocks = (events: DeadlockEvent[]): DeadlockPair[] => {
       queries: [queries[0] ?? "", queries[1] ?? ""],
       applications,
       victimAlternates,
-      victimCounts,
+      victimAppCounts,
     });
   }
 

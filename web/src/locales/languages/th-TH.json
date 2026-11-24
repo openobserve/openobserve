@@ -27553,7 +27553,7 @@
         "occurrencesHint": "Select a point to load that one above",
         "lostLabel": "{pid} lost",
         "bothSidesLose": "Both sides get cancelled about equally — {a} vs {b}. Neither application is the problem; the ordering is.",
-        "oneSideLoses": "{pid} is cancelled every time.",
+        "oneSideLoses": "{app} is cancelled every time.",
         "showAbove": "Show above",
         "copy": "Copy SQL",
         "seeInTopQueries": "See in Top queries",
