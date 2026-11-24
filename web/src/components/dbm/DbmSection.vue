@@ -34,9 +34,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <section
-    class="bg-card-glass-bg border-border-default rounded-default flex flex-col overflow-hidden border"
+    class="bg-card-glass-bg border-border-default rounded-default flex flex-col border"
+    :class="stickyHeader ? 'overflow-visible border-t-0' : 'overflow-clip'"
   >
-    <div :class="headerClass">
+    <!-- Square page-colour backing hides the section behind the rounded corners while the header is pinned. -->
+    <div v-if="stickyHeader" class="bg-surface-base sticky top-0 z-10 -mx-px">
+      <div
+        :class="[
+          headerClass,
+          'bg-surface-base border-border-default rounded-t-default border-x border-t',
+        ]"
+      >
+        <h3 class="text-compact text-text-heading font-medium">{{ title }}</h3>
+        <slot name="hint" />
+        <slot name="actions" />
+      </div>
+    </div>
+    <div v-else :class="headerClass">
       <h3 class="text-compact text-text-heading font-medium">{{ title }}</h3>
       <slot name="hint" />
       <slot name="actions" />
@@ -60,8 +74,10 @@ const props = withDefaults(
      * pushes a single trailing note to the card's far edge.
      */
     headerAlign?: "baseline" | "center" | "between";
+    /** Pin the heading row to the top of the nearest scrolling ancestor. */
+    stickyHeader?: boolean;
   }>(),
-  { headerAlign: "baseline" },
+  { headerAlign: "baseline", stickyHeader: false },
 );
 
 const headerClass = computed(

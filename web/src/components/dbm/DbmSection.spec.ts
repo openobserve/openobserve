@@ -40,7 +40,7 @@ describe("DbmSection", () => {
         "rounded-default",
         "flex",
         "flex-col",
-        "overflow-hidden",
+        "overflow-clip",
         "border",
       ]),
     );
