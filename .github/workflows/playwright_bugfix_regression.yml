@@ -182,7 +182,7 @@ jobs:
       - uses: actions/checkout@v5
       - id: gen
         run: |
-          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix_regression.json)
+          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix_regression.json --only-shards Traces-Regression,Logs-Regression)
           if [ -z "$MATRIX" ]; then echo "::error::matrix generation failed (build-ci-matrix produced no output)"; exit 1; fi
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "$MATRIX" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log('generated',m.include.length,'shards:', m.include.map(s=>s.testfolder).join(', '))"
@@ -368,6 +368,13 @@ jobs:
 
             echo "DEBUG: Final command: npx playwright test $FILE_PATHS $WORKERS_ARG"
             npx playwright test $FILE_PATHS $WORKERS_ARG
+            mv blob-report blob-report-shard
+            if [ "${{ matrix.testfolder }}" = "Logs-Regression" ]; then
+              npx playwright test RegressionSet/Logs/logs-result-display.spec.js -g "bug-13896" --repeat-each 20 --retries 0 $WORKERS_ARG
+            else
+              npx playwright test RegressionSet/Traces/traces-15130-time-window-error-state.spec.js -g "keeps the window its rows" --repeat-each 8 --retries 0 $WORKERS_ARG
+            fi
+            mv blob-report-shard/* blob-report/
           else
             echo "No files specified to run for ${{ matrix.testfolder }} folder"
           fi
