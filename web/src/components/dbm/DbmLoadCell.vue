@@ -63,7 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ formatPercent(share, 0) }}
         </span>
       </span>
-      <span v-if="showsShare || qualifier || fromApp" class="flex items-center gap-1.5">
+      <OTooltip v-if="sublabel === 'tooltip' && qualifier" :content="qualifier" />
+      <span v-if="showsShare || showsQualifierRow" class="flex items-center gap-1.5">
         <OProgressBar
           v-if="showsShare"
           :value="share"
@@ -71,9 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="xs"
           class="w-14"
         />
-        <DbmAppSourceMarker v-if="fromApp" />
+        <DbmAppSourceMarker v-if="fromApp && withMarker" />
         <span
-          v-else-if="qualifier"
+          v-else-if="qualifier && sublabel !== 'tooltip'"
           class="text-text-secondary text-3xs"
           data-test="dbm-overlap-qualifier"
         >
@@ -119,6 +120,10 @@ const props = withDefaults(
     source?: "server" | "client" | null;
     /** The engine that reported it, for the qualifier's full sentence on hover. */
     engine?: string | null;
+    /** Off where one marker per row is shown elsewhere. */
+    withMarker?: boolean;
+    /** `tooltip` moves the "wait time" line into the value's hover. */
+    sublabel?: "inline" | "tooltip";
     dataTest?: string;
   }>(),
   {
@@ -128,6 +133,8 @@ const props = withDefaults(
     qualifierKey: null,
     source: null,
     engine: null,
+    withMarker: true,
+    sublabel: "inline",
   },
 );
 
@@ -142,6 +149,10 @@ const showsShare = computed(() => props.source !== "server");
 
 // An app-sourced duration carries the marker, not a text qualifier.
 const fromApp = computed(() => props.qualifierKey === APP_SOURCE_QUALIFIER);
+
+const showsQualifierRow = computed(() =>
+  fromApp.value ? props.withMarker : !!qualifier.value && props.sublabel !== "tooltip",
+);
 
 const qualifier = computed(() =>
   props.qualifierKey === null || fromApp.value
