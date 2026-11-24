@@ -431,14 +431,16 @@ fn log_unrecognised_policies(records: &[Model]) -> usize {
 
 #[cfg(test)]
 mod tests {
+    use arrow::datatypes::Field;
+
     use super::*;
 
     fn sdr_schema() -> Schema {
         Schema::new(vec![
-            arrow::datatypes::Field::new("msg", DataType::Utf8, true),
-            arrow::datatypes::Field::new("view", DataType::Utf8View, true),
-            arrow::datatypes::Field::new("code", DataType::Int64, true),
-            arrow::datatypes::Field::new("host", DataType::Utf8, true),
+            Field::new("msg", DataType::Utf8, true),
+            Field::new("view", DataType::Utf8View, true),
+            Field::new("code", DataType::Int64, true),
+            Field::new("host", DataType::Utf8, true),
         ])
     }
 
