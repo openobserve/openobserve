@@ -1045,15 +1045,16 @@ describe("PublicLinksPanel", () => {
         start_time: Date;
         end_time: Date;
       };
-    expect(Date.now() - pickerWindow().end_time.getTime()).toBeLessThan(60_000);
+    // The pickers read these Dates as microseconds, like the dashboard's own time object.
+    expect(Date.now() * 1000 - pickerWindow().end_time.getTime()).toBeLessThan(60_000_000);
     expect(pickerWindow().end_time.getTime() - pickerWindow().start_time.getTime()).toBe(
-      86_400_000,
+      86_400_000_000,
     );
 
     await w.find('[data-test="dashboards-public-links-panel-add-range-btn"]').trigger("click");
     await flushPromises();
     expect(pickerWindow().end_time.getTime() - pickerWindow().start_time.getTime()).toBe(
-      604_800_000,
+      604_800_000_000,
     );
   });
 

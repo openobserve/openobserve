@@ -250,6 +250,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       },
       { id: "openCheatsheet", key: "shift+?", descriptionKey: "shortcuts.actions.openCheatsheet" },
       { id: "closeDialog", key: "escape", descriptionKey: "shortcuts.actions.closeDialog" },
+      { id: "openOrgSwitcher", key: "g o", descriptionKey: "shortcuts.actions.openOrgSwitcher" },
       {
         id: "aiChatToggle",
         keyForWindows: "ctrl+b",
