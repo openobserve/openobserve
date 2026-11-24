@@ -16,7 +16,10 @@
 import { escapeRegExp } from "lodash-es";
 import { CUSTOM_VALUE, SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { escapeSingleQuotes, splitQuotedString } from "@/utils/zincutils";
-import type { DashboardFilterGroup } from "@/components/filterBar/codecs/dashboardFilterCodec";
+import type {
+  DashboardFilterCondition,
+  DashboardFilterGroup,
+} from "@/components/filterBar/codecs/dashboardFilterCodec";
 import type { SqlLabel, SqlLabelGroup } from "@/utils/query/sqlUtils";
 import {
   normalizeVariableSyntax,
@@ -49,6 +52,7 @@ export interface SqlRowsOptionsResult extends QueryVariableOptionsResult {
 export const PROMQL_FILTER_OPERATORS: readonly string[] = [
   "=",
   "!=",
+  "<>",
   "re_match",
   "re_not_match",
   "IN",
@@ -85,7 +89,8 @@ interface VariableLike {
 export interface QueryVariableContextEntry {
   name: string;
   type?: string;
-  value: any;
+  query_data?: QueryVariableData | null;
+  value: unknown;
   isVariablePartialLoaded?: boolean;
   multiSelect?: boolean;
   options?: { value?: unknown }[];
@@ -94,7 +99,7 @@ export interface QueryVariableContextEntry {
 export interface QueryVariableSelectionConfig {
   type?: string;
   query_data?: QueryVariableData | null;
-  value?: any;
+  value?: unknown;
   multiSelect?: boolean;
   options?: { value?: unknown }[];
   isVariablePartialLoaded?: boolean;
@@ -169,6 +174,7 @@ const promMatcher = (filter: VariableFilterRow): string => {
   const hasVariable = /\$|\{\{/.test(value);
   switch (filter.operator) {
     case "!=":
+    case "<>":
       return hasVariable
         ? `${name}!~${promString(promRegexLiteral(value))}`
         : `${name}!=${promString(value)}`;
@@ -208,14 +214,16 @@ export const expandMultiValueFilter = <T extends { operator?: string | null; val
 };
 
 // Walks the saved JSON: the filter codecs reach the app store, which this module's many importers must not load.
-const groupLeafValues = (node: any): string[] =>
+const groupLeafValues = (node: DashboardFilterGroup | DashboardFilterCondition): string[] =>
   node?.filterType === "group"
     ? (node.conditions ?? []).flatMap(groupLeafValues)
     : [String(node?.value ?? ""), ...(node?.values ?? []).map(String)];
 
 /** Every filter value of a variable, from both saved shapes, for `$var` dependency scans. */
 export const getVariableFilterValues = (queryData?: QueryVariableData | null): string[] => [
-  ...(queryData?.filter ?? []).map((filter: any) => String(filter?.filter || filter?.value || "")),
+  ...(queryData?.filter ?? []).map((filter: VariableFilterRow & { filter?: string }) =>
+    String(filter?.filter || filter?.value || ""),
+  ),
   ...(queryData?.filter_group ? groupLeafValues(queryData.filter_group) : []),
 ];
 
@@ -303,15 +311,15 @@ export const buildFilterRowsSql = (
     .join(" AND ");
 
 // A panel-shaped leaf as the flat row it would be saved as; a list leaf keeps its values as an array.
-const leafToRow = (leaf: any): SqlLabel | null => {
+const leafToRow = (leaf: DashboardFilterCondition): SqlLabel | null => {
   const name = typeof leaf?.column === "string" ? leaf.column : (leaf?.column?.field ?? "");
   const logicalOperator = leaf?.logicalOperator;
   if (leaf?.type === "list") {
     const values = (leaf.values ?? []).map(String);
     return values.length ? { name, operator: "IN", value: values, logicalOperator } : null;
   }
-  if (leaf?.operator == null) return null;
-  return { name, operator: leaf.operator, value: leaf.value ?? "", logicalOperator };
+  if (leaf?.operator === undefined || leaf.operator === null) return null;
+  return { name, operator: leaf.operator, value: (leaf.value ?? "") as string, logicalOperator };
 };
 
 /** A `filter_group` as flat rows in their AND/OR tree; `mapRow` rewrites each row first, e.g. `= $var` to IN. */
@@ -320,7 +328,7 @@ export const toSqlLabelGroup = (
   mapRow: (row: SqlLabel) => SqlLabel = (row) => row,
 ): SqlLabelGroup => ({
   logicalOperator: group?.logicalOperator,
-  conditions: (group?.conditions ?? []).flatMap((node: any): (SqlLabel | SqlLabelGroup)[] => {
+  conditions: (group?.conditions ?? []).flatMap((node): (SqlLabel | SqlLabelGroup)[] => {
     if (node?.filterType === "group") return [toSqlLabelGroup(node, mapRow)];
     const row = leafToRow(node);
     return row ? [mapRow(row)] : [];
@@ -402,7 +410,7 @@ export const getQueryVariableAllValues = (
 };
 
 /** The value panels and child queries see: "All" becomes the listed options unless the list is capped. */
-export const resolveQueryVariableValue = (variable: QueryVariableSelectionConfig): any => {
+export const resolveQueryVariableValue = (variable: QueryVariableSelectionConfig): unknown => {
   const allValues = getQueryVariableAllValues(variable);
   if (allValues) return allValues;
   if (!isCustomQueryVariable(variable) || !hasNoListedValues(variable)) return variable?.value;
@@ -437,16 +445,16 @@ export const isQueryVariableAllCapped = (variable?: QueryVariableSelectionConfig
 export const reconcileQueryVariableValue = (
   variable: QueryVariableSelectionConfig,
   options: QueryVariableOption[],
-): any => {
+): string | string[] | null => {
   const optionValues = new Set(options.map((option) => option.value));
-  const current = Array.isArray(variable.value)
+  const current: unknown[] = Array.isArray(variable.value)
     ? variable.value
     : variable.value === null || variable.value === undefined
       ? []
       : [variable.value];
   // A capped list cannot show a pick is gone, so one it leaves out stays.
   const kept = current.filter(
-    (value: unknown) =>
+    (value: unknown): value is string =>
       value === SELECT_ALL_VALUE ||
       optionValues.has(value as string) ||
       (typeof value === "string" && (value.endsWith(CUSTOM_VALUE) || !!variable.queryCapped)),
@@ -470,13 +478,14 @@ export const getUndefinedQueryVariableNames = (
   query: string,
   definedNames: Iterable<string>,
 ): string[] => {
-  const defined = new Set(definedNames);
+  // Defined names go first, the way substitution reads them, so `$svc-1` stays `$svc` and `$my-var` stays whole.
+  const rest = replaceVariablePlaceholders(query ?? "", definedNames, () => "");
   const regex =
-    /(?:\$\{\s*([a-zA-Z0-9_]+)\s*(?::\s*[a-zA-Z]+\s*)?\})|(?:\$([a-zA-Z_][a-zA-Z0-9_]*))|(?:\{\{\s*([a-zA-Z0-9_]+)\s*(?::\s*[a-zA-Z]+\s*)?\}\})/g;
+    /(?:\$\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*[a-zA-Z]+\s*)?\})|(?:\$([a-zA-Z_][a-zA-Z0-9_-]*))|(?:\{\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*[a-zA-Z]+\s*)?\}\})/g;
   const missing = new Set<string>();
-  for (const match of (query ?? "").matchAll(regex)) {
+  for (const match of rest.matchAll(regex)) {
     const name = match[1] ?? match[2] ?? match[3];
-    if (name && !name.startsWith("__") && !defined.has(name)) missing.add(name);
+    if (name && !name.startsWith("__")) missing.add(name);
   }
   return [...missing];
 };
@@ -509,22 +518,34 @@ const formatSqlValues = (
   }
 };
 
-type PromValueContext = "regex" | "string" | "bare";
+interface PromValueContext {
+  regex: boolean;
+  /** The quote of the PromQL string around the placeholder, if any. */
+  quote: '"' | "'" | "`" | null;
+}
 
-// A placeholder inside a "…" string after =~ or !~ is a regex; inside any other "…" string, a literal.
+// A placeholder inside a string after =~ or !~ is a regex; inside any other string, a literal.
 const promContextAt = (text: string, offset: number): PromValueContext => {
+  let quote: PromValueContext["quote"] = null;
   let open = -1;
   for (let i = 0; i < offset; i++) {
-    if (text[i] === "\\" && open >= 0) i++;
-    else if (text[i] === '"') open = open >= 0 ? -1 : i;
+    const char = text[i];
+    // Backtick strings are raw, so only the other two quotes escape with a backslash.
+    if (quote && quote !== "`" && char === "\\") i++;
+    else if (quote && char === quote) quote = null;
+    else if (!quote && (char === '"' || char === "'" || char === "`")) {
+      quote = char;
+      open = i;
+    }
   }
-  if (open < 0) return "bare";
-  return /[=!]~\s*$/.test(text.slice(0, open)) ? "regex" : "string";
+  if (!quote) return { regex: false, quote: null };
+  return { regex: /[=!]~\s*$/.test(text.slice(0, open)), quote };
 };
 
-const escapePromValue = (value: string, context: PromValueContext): string => {
-  const literal = context === "regex" ? escapeRegExp(value) : value;
-  return context === "bare" ? literal : escapePromString(literal);
+const escapePromValue = (value: string, { regex, quote }: PromValueContext): string => {
+  const literal = regex ? escapeRegExp(value) : value;
+  if (quote === null || quote === "`") return literal;
+  return literal.replace(/\\/g, "\\\\").replaceAll(quote, `\\${quote}`);
 };
 
 /** Escapes a value read from data for the PromQL position of the placeholder at `offset`. */
@@ -533,14 +554,15 @@ export const promValueEscaperAt = (text: string, offset: number) => {
   return (value: string): string => escapePromValue(value, context);
 };
 
+// A null context writes the values as they are, for variables whose values may be patterns on purpose.
 const formatPromValues = (
   values: string[],
   format: VariableFormat | undefined,
-  context: PromValueContext,
+  context: PromValueContext | null,
 ): string => {
   // A regex matcher is the only place an "all" selection can be honoured in PromQL.
   const resolved = values.map((value) =>
-    value === SELECT_ALL_VALUE ? ".*" : escapePromValue(value, context),
+    value === SELECT_ALL_VALUE ? ".*" : context ? escapePromValue(value, context) : value,
   );
   switch (format) {
     case "csv":
@@ -584,8 +606,10 @@ export const substituteQueryVariables = (
       .filter((value) => value !== null && value !== undefined)
       .map(stripCustomSuffix);
     if (!values.length) return undefined;
+    // Values a query loaded are data; a typed or listed value may be a regex, as panels treat it.
+    const promContext = usesQueryVariableLoader(variable) ? promContextAt(text, offset) : null;
     return language === "promql"
-      ? formatPromValues(values, format, promContextAt(text, offset))
+      ? formatPromValues(values, format, promContext)
       : formatSqlValues(values, isArray, quoted, format);
   });
 };

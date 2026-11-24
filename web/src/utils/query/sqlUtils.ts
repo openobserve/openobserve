@@ -89,9 +89,16 @@ const importSqlParser = async () => {
 
 const LABEL_BASE_QUERY = "select * from 'default'";
 
+/** A node-sql-parser AST node; only the keys this file reads or sets are named. */
+interface SqlAstNode {
+  where?: SqlAstNode | null;
+  parentheses?: boolean;
+  [key: string]: unknown;
+}
+
 // Sets `where` on the query, ANDed after a WHERE it already has.
-const withWhereClause = (originalQuery: any, where: any) => {
-  const astOfOriginalQuery: any = parser.astify(originalQuery);
+const withWhereClause = (originalQuery: string, where: SqlAstNode) => {
+  const astOfOriginalQuery: SqlAstNode = parser.astify(originalQuery);
   const newAst = {
     ...astOfOriginalQuery,
     where: astOfOriginalQuery.where
@@ -134,7 +141,7 @@ export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {
 export interface SqlLabel {
   name?: string;
   operator?: string;
-  value?: any;
+  value?: string | string[];
   logicalOperator?: string;
 }
 
@@ -147,10 +154,10 @@ const isLabelGroup = (item: SqlLabel | SqlLabelGroup): item is SqlLabelGroup =>
   Array.isArray((item as SqlLabelGroup).conditions);
 
 // Joined left to right without parentheses, like the panel builder's joinConditions text, so AND binds tighter than OR.
-const labelGroupWhere = async (group: SqlLabelGroup): Promise<any> => {
-  let where: any = null;
+const labelGroupWhere = async (group: SqlLabelGroup): Promise<SqlAstNode | null> => {
+  let where: SqlAstNode | null = null;
   for (const item of group.conditions) {
-    const node = isLabelGroup(item)
+    const node: SqlAstNode | null = isLabelGroup(item)
       ? await labelGroupWhere(item)
       : parser.astify(
           await addLabelToSQlQuery(LABEL_BASE_QUERY, item.name, item.value, item.operator),
@@ -164,12 +171,12 @@ const labelGroupWhere = async (group: SqlLabelGroup): Promise<any> => {
 };
 
 /** As `addLabelsToSQlQuery`, for an AND/OR tree; each row renders exactly as it does there. */
-export const addLabelGroupToSQlQuery = async (originalQuery: any, group: SqlLabelGroup) => {
+export const addLabelGroupToSQlQuery = async (originalQuery: string, group: SqlLabelGroup) => {
   await importSqlParser();
   try {
     const where = await labelGroupWhere(group);
     return where ? withWhereClause(originalQuery, where) : originalQuery;
-  } catch (error: any) {
+  } catch (error) {
     console.error("There was an error generating query:", error);
   }
 };
@@ -239,7 +246,7 @@ export const addLabelToSQlQuery = async (
       case "IN":
         operator = "IN";
         // add brackets if not present in "IN" conditions
-        value = (Array.isArray(value) ? value : splitQuotedString(value)).map((it: any) => ({
+        value = (Array.isArray(value) ? value : splitQuotedString(value)).map((it: string) => ({
           type: "single_quote_string",
           value: escapeSingleQuotes(it),
         }));
@@ -247,7 +254,7 @@ export const addLabelToSQlQuery = async (
       case "NOT IN":
         operator = "NOT IN";
         // add brackets if not present in "NOT IN" conditions
-        value = (Array.isArray(value) ? value : splitQuotedString(value)).map((it: any) => ({
+        value = (Array.isArray(value) ? value : splitQuotedString(value)).map((it: string) => ({
           type: "single_quote_string",
           value: escapeSingleQuotes(it),
         }));

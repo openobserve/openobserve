@@ -292,6 +292,27 @@ describe("VariablesValueSelector — custom and PromQL query_values variables", 
     };
     const promValues = (values: string[]) => ({ data: { status: "success", data: values } });
 
+    it("aborts a PromQL load's requests when a newer load starts or the selector closes", async () => {
+      labelValues.mockReturnValue(new Promise(() => {}));
+      const { wrapper } = await mountWith([{ ...regionVariable, scope: "global" }, promNamespace]);
+      const first = labelValues.mock.calls.at(-1)[0].signal;
+      expect(first.aborted).toBe(false);
+
+      await wrapper.setProps({
+        selectedTimeDate: {
+          start_time: new Date(1_700_003_300_000),
+          end_time: new Date(1_700_003_600_000),
+        },
+      });
+      await flushPromises();
+      const second = labelValues.mock.calls.at(-1)[0].signal;
+      expect(second).not.toBe(first);
+      expect(first.aborted).toBe(true);
+
+      wrapper.unmount();
+      expect(second.aborted).toBe(true);
+    });
+
     it("reloads on a new time range and drops a value the range no longer has", async () => {
       labelValues.mockResolvedValue(promValues(["default", "monitoring"]));
       const { manager, wrapper } = await mountWith([

@@ -182,11 +182,14 @@ export const isGraphHasCycle = (graph: any) => {
 };
 
 /** The cycle `isGraphHasCycle` found, named for the user without the variables that only lead into it. */
-export const describeVariableCycle = (graph: any, path: string[]): string => {
+export const describeVariableCycle = (
+  graph: Record<string, { parentVariables?: string[] }>,
+  path: string[],
+): string => {
   // The search stops at the last variable in the path, whose dependency back into the path closes the loop.
   const last = path[path.length - 1];
   const start = graph?.[last]?.parentVariables?.find((name: string) => path.includes(name));
-  const loop = path.slice(Math.max(path.indexOf(start), 0));
+  const loop = path.slice(Math.max(path.indexOf(start as string), 0));
   if (loop.length === 1) {
     return gt("dashboard.addSettingVariable.variableDependsOnItself", { name: loop[0] });
   }

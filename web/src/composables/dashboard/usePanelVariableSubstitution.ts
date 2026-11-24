@@ -42,7 +42,7 @@ const formatPanelVariableValue = (
   promEscape?: (value: string) => string,
 ): string => {
   const escape = (value: any) => escapeSingleQuotes(String(value));
-  const literal = (value: any) => (promEscape ? promEscape(String(value)) : value);
+  const literal = (value: unknown) => (promEscape ? promEscape(String(value)) : value);
   const resolved = resolveQueryVariableValue(variable);
 
   if (!Array.isArray(resolved)) {

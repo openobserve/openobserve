@@ -154,7 +154,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { isEqual } from "lodash-es";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
 import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.vue";
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
@@ -187,6 +187,7 @@ import {
   toSqlLabelGroup,
   usesQueryVariableLoader,
   type QueryVariableOption,
+  type VariableFilterRow,
 } from "@/utils/dashboard/variables/queryVariableUtils";
 import {
   getQueryVariableErrorMessage,
@@ -201,8 +202,18 @@ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import {
   getVariableKey,
   LIVE_COMMIT_DEBOUNCE_MS,
+  type VariableRuntimeState,
 } from "@/composables/dashboard/useVariablesManager";
 import { useVariablesWatcher, variableLog } from "@/composables/dashboard/useVariableDebugger";
+
+// Loaded options carry data labels, not i18n text; the query* fields are the loader's own state.
+interface QueryVariableRuntime extends Omit<VariableRuntimeState, "options"> {
+  options?: QueryVariableOption[];
+  queryError?: string;
+  queryCapped?: boolean;
+  querySearchColumn?: string;
+  querySearch?: { text: string; options: QueryVariableOption[] };
+}
 
 export default defineComponent({
   name: "VariablesValueSelector",
@@ -834,6 +845,8 @@ export default defineComponent({
 
     // Latest load per query variable; a response that lands after a newer request is dropped.
     const queryVariableRequestIds: Record<string, number> = {};
+    // A newer load or closing the selector aborts the PromQL requests a load still has open.
+    const queryVariableAborts: Record<string, AbortController> = {};
     // Variables whose latest load is a time-range reload, which a newer range must restart.
     const timeRangeReloads = new Set<string>();
 
@@ -842,18 +855,19 @@ export default defineComponent({
         ? manager.getAllVisibleVariables(props.tabId, props.panelId) || variablesData.values
         : variablesData.values;
 
-    const runSqlForVariable = (variableObject: any) => (request: SqlVariableQueryRequest) => {
-      const { traceId } = generateTraceContext();
-      addTraceId(variableObject.name, traceId);
-      return runSqlVariableQueryOnStream(fetchQueryDataWithHttpStream, {
-        ...request,
-        orgId: store.state.selectedOrganization.identifier,
-        traceId,
-      }).finally(() => removeTraceId(variableObject.name, traceId));
-    };
+    const runSqlForVariable =
+      (variableObject: QueryVariableRuntime) => (request: SqlVariableQueryRequest) => {
+        const { traceId } = generateTraceContext();
+        addTraceId(variableObject.name, traceId);
+        return runSqlVariableQueryOnStream(fetchQueryDataWithHttpStream, {
+          ...request,
+          orgId: store.state.selectedOrganization.identifier,
+          traceId,
+        }).finally(() => removeTraceId(variableObject.name, traceId));
+      };
 
     const queryVariableLoadParams = (
-      variableObject: any,
+      variableObject: QueryVariableRuntime,
       startTime: number,
       endTime: number,
       runSql: SqlVariableQueryRunner,
@@ -878,9 +892,12 @@ export default defineComponent({
     };
 
     // The user's own pick per query variable, kept while a time range drops some of it so a later range can restore it.
-    const pinnedQuerySelections: Record<string, any> = {};
+    const pinnedQuerySelections: Record<string, unknown> = {};
 
-    const reconcileForTimeRange = (variableObject: any, options: QueryVariableOption[]) => {
+    const reconcileForTimeRange = (
+      variableObject: QueryVariableRuntime,
+      options: QueryVariableOption[],
+    ) => {
       const { name } = variableObject;
       const intended = pinnedQuerySelections[name] ?? variableObject.value;
       const reconciled = reconcileQueryVariableValue(
@@ -894,7 +911,7 @@ export default defineComponent({
     };
 
     const applyQueryVariableOptions = (
-      variableObject: any,
+      variableObject: QueryVariableRuntime,
       options: QueryVariableOption[],
       pruneStale: boolean,
     ) => {
@@ -905,8 +922,7 @@ export default defineComponent({
       const reconciles =
         isCustomQueryVariable(variableObject) &&
         (pruneStale ||
-          (!(variableObject.options?.length > 0) &&
-            isExplicitQuerySelection(variableObject.value)));
+          (!variableObject.options?.length && isExplicitQuerySelection(variableObject.value)));
       if (reconciles) {
         variableObject.options = newOptions;
         variableObject.value = reconcileForTimeRange(variableObject, newOptions);
@@ -917,7 +933,7 @@ export default defineComponent({
           : variableObject.value !== null && variableObject.value !== undefined
             ? [variableObject.value]
             : [];
-        selected.forEach((value: any) => {
+        selected.forEach((value: string) => {
           if (value === SELECT_ALL_VALUE || newOptions.some((option) => option.value === value))
             return;
           newOptions.push({ label: value, value });
@@ -960,7 +976,7 @@ export default defineComponent({
     };
 
     // A failed load keeps the last good options and still counts as finished, so panels are never held.
-    const endFailedQueryVariableLoad = (variableObject: any) => {
+    const endFailedQueryVariableLoad = (variableObject: QueryVariableRuntime) => {
       currentlyExecutingPromises[variableObject.name] = null;
       variableObject.isLoading = false;
       variableObject.isVariableLoadingPending = false;
@@ -981,7 +997,7 @@ export default defineComponent({
     };
 
     const fetchQueryVariableOptions = async (
-      variableObject: any,
+      variableObject: QueryVariableRuntime,
       { pruneStale = false, onSettled }: { pruneStale?: boolean; onSettled?: () => void } = {},
     ) => {
       const { name } = variableObject;
@@ -995,6 +1011,9 @@ export default defineComponent({
 
       const requestId = (queryVariableRequestIds[name] ?? 0) + 1;
       queryVariableRequestIds[name] = requestId;
+      queryVariableAborts[name]?.abort();
+      const controller = new AbortController();
+      queryVariableAborts[name] = controller;
       const isStale = () => isUnmounted || queryVariableRequestIds[name] !== requestId;
       if (pruneStale) timeRangeReloads.add(name);
       else timeRangeReloads.delete(name);
@@ -1002,12 +1021,15 @@ export default defineComponent({
       variableObject.isVariableLoadingPending = true;
 
       try {
-        const params = queryVariableLoadParams(
-          variableObject,
-          startTime,
-          endTime,
-          runSqlForVariable(variableObject),
-        );
+        const params = {
+          ...queryVariableLoadParams(
+            variableObject,
+            startTime,
+            endTime,
+            runSqlForVariable(variableObject),
+          ),
+          signal: controller.signal,
+        };
         const result = await loadQueryVariableValues(params);
         if (isStale()) return;
         timeRangeReloads.delete(name);
@@ -1035,8 +1057,11 @@ export default defineComponent({
     // Search streams are tracked apart from loads, so typing never cancels a reload.
     const querySearchTraces: Record<string, string> = {};
     const querySearchIds: Record<string, number> = {};
+    const querySearchAborts: Record<string, AbortController> = {};
 
     const cancelQuerySearch = (name: string) => {
+      querySearchAborts[name]?.abort();
+      delete querySearchAborts[name];
       const traceId = querySearchTraces[name];
       if (!traceId) return;
       delete querySearchTraces[name];
@@ -1058,10 +1083,18 @@ export default defineComponent({
       });
     };
 
-    onUnmounted(() => Object.keys(querySearchTraces).forEach(cancelQuerySearch));
+    onUnmounted(() => {
+      new Set([...Object.keys(querySearchTraces), ...Object.keys(querySearchAborts)]).forEach(
+        cancelQuerySearch,
+      );
+      Object.values(queryVariableAborts).forEach((controller) => controller.abort());
+    });
 
     // Typed text asks the server as a Query Values search does; the answer only feeds the open list.
-    const searchQueryVariableOptions = async (variableObject: any, text: string) => {
+    const searchQueryVariableOptions = async (
+      variableObject: QueryVariableRuntime,
+      text: string,
+    ) => {
       const { name } = variableObject;
       cancelQuerySearch(name);
       const searchId = (querySearchIds[name] ?? 0) + 1;
@@ -1072,18 +1105,21 @@ export default defineComponent({
         delete variableObject.querySearch;
         return;
       }
+      const controller = new AbortController();
+      querySearchAborts[name] = controller;
       try {
         const result = await loadQueryVariableValues({
           ...queryVariableLoadParams(variableObject, startTime, endTime, runSqlForSearch(name)),
           search: text,
           searchColumn: variableObject.querySearchColumn,
+          signal: controller.signal,
         });
         if (isUnmounted || querySearchIds[name] !== searchId) return;
         // Picked options stay in the list so their chips keep their labels while searching.
         const found = new Set(result.options.map((option) => option.value));
         const picked = new Set([variableObject.value].flat());
         const kept = (variableObject.options ?? []).filter(
-          (option: any) => picked.has(option.value) && !found.has(option.value),
+          (option) => picked.has(option.value) && !found.has(option.value),
         );
         variableObject.querySearch = { text, options: [...result.options, ...kept] };
       } catch {
@@ -1094,23 +1130,23 @@ export default defineComponent({
     // A new time range reloads custom query variables like a fresh load, parents before the children that read them.
     const reloadQueryVariablesForTimeRange = () => {
       if (!useManager || !manager || isUnmounted) return;
-      const isReloading = (v: any) => timeRangeReloads.has(v.name);
-      const inFlight = variablesData.values.filter(
-        (v: any) => isCustomQueryVariable(v) && v.isLoading && !isReloading(v),
+      const isReloading = (v: QueryVariableRuntime) => timeRangeReloads.has(v.name);
+      const inFlight: QueryVariableRuntime[] = variablesData.values.filter(
+        (v: QueryVariableRuntime) => isCustomQueryVariable(v) && v.isLoading && !isReloading(v),
       );
-      inFlight.forEach((v: any) => void fetchQueryVariableOptions(v));
+      inFlight.forEach((v) => void fetchQueryVariableOptions(v));
 
-      const targets = variablesData.values.filter(
-        (v: any) =>
+      const targets: QueryVariableRuntime[] = variablesData.values.filter(
+        (v: QueryVariableRuntime) =>
           isCustomQueryVariable(v) &&
           v.isVariablePartialLoaded &&
           (!v.isVariableLoadingPending || isReloading(v)),
       );
-      const pending = new Set<string>(targets.map((v: any) => v.name));
-      const parentsOf = (v: any): string[] =>
+      const pending = new Set<string>(targets.map((v) => v.name));
+      const parentsOf = (v: QueryVariableRuntime): string[] =>
         variablesDependencyGraph[v.name]?.parentVariables ?? [];
       const startReady = () => {
-        targets.forEach((v: any) => {
+        targets.forEach((v) => {
           if (!pending.has(v.name) || parentsOf(v).some((parent) => pending.has(parent))) return;
           pending.delete(v.name);
           // The manager already reloads a child whose parent value changed.
@@ -2315,12 +2351,13 @@ export default defineComponent({
 
       let queryContext: string;
       if (!filterGroup) {
-        const constructedFilter = (variableObject.query_data?.filter || []).map((condition: any) =>
-          expandFilter({
-            name: condition.name,
-            operator: condition.operator,
-            value: condition.value,
-          }),
+        const constructedFilter = (variableObject.query_data?.filter || []).map(
+          (condition: VariableFilterRow) =>
+            expandFilter({
+              name: condition.name,
+              operator: condition.operator,
+              value: condition.value,
+            }),
         );
         queryContext = constructedFilter.length
           ? await addLabelsToSQlQuery(dummyQuery, constructedFilter)
@@ -2345,7 +2382,7 @@ export default defineComponent({
 
           const resolved = resolveQueryVariableValue(variable);
           if (Array.isArray(resolved)) {
-            const values = resolved.map((value: any) => escapeSingleQuotes(value));
+            const values = resolved.map((value: string) => escapeSingleQuotes(value));
             // '$name' already supplies the outer quotes: '$name' -> 'a', 'b'
             return quoted
               ? values.join("', '")
@@ -2809,7 +2846,6 @@ export default defineComponent({
 
     return {
       t,
-      raw,
       props,
       textboxDebounce,
       usesQueryVariableLoader,

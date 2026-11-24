@@ -140,7 +140,10 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { isCustomQueryVariable } from "@/utils/dashboard/variables/queryVariableUtils";
+import {
+  isCustomQueryVariable,
+  type QueryVariableOption,
+} from "@/utils/dashboard/variables/queryVariableUtils";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
@@ -345,8 +348,10 @@ export default defineComponent({
     };
 
     // A query variable can show a label that differs from the value it sends to panels.
-    const optionLabel = (value: any) => {
-      const option = availableOptions.value.find((opt: any) => opt.value === value);
+    const optionLabel = (value: string) => {
+      const option: QueryVariableOption | undefined = availableOptions.value.find(
+        (opt: QueryVariableOption) => opt.value === value,
+      );
       return option?.label || value;
     };
 

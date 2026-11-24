@@ -463,3 +463,57 @@ describe("getQueryVariableErrorMessage", () => {
     expect(getQueryVariableErrorMessage(new Error("boom"))).toBe("boom");
   });
 });
+
+describe("loadQueryVariableValues — PromQL cancellation", () => {
+  beforeEach(() => {
+    labelValues.mockReset();
+    labels.mockReset();
+    metricsQuery.mockReset();
+  });
+
+  it("sends the caller's signal with every metrics request", async () => {
+    const { signal } = new AbortController();
+    labelValues.mockResolvedValue(promOk(["a"]));
+    labels.mockResolvedValue(promOk(["job"]));
+    metricsQuery.mockResolvedValue({ data: { status: "success", data: { result: [] } } });
+    await loadQueryVariableValues(baseParams({ query: "label_values(up, job)", signal }));
+    await loadQueryVariableValues(baseParams({ query: "label_names(up)", signal }));
+    await loadQueryVariableValues(baseParams({ query: "metrics(.*)", signal }));
+    await loadQueryVariableValues(baseParams({ query: "query_result(up)", signal }));
+    expect(labelValues.mock.calls.every(([args]) => args.signal === signal)).toBe(true);
+    expect(labels).toHaveBeenCalledWith(expect.objectContaining({ signal }));
+    expect(metricsQuery).toHaveBeenCalledWith(expect.objectContaining({ signal }));
+  });
+
+  it("stops the scan across metrics once the signal aborts", async () => {
+    const controller = new AbortController();
+    const names = Array.from({ length: 40 }, (_, i) => `m${i}`);
+    labelValues.mockImplementation(async ({ label, match }: any) => {
+      if (label === "__name__") return promOk(names);
+      if (!match) return { data: { status: "error", error: "match[] must specify a metric" } };
+      controller.abort();
+      return promOk([]);
+    });
+    await expect(
+      loadQueryVariableValues(
+        baseParams({ query: "label_values(job)", signal: controller.signal }),
+      ),
+    ).rejects.toBeInstanceOf(QueryVariableCancelledError);
+    // The unscoped lookup, the metric names, then one batch of eight.
+    expect(labelValues).toHaveBeenCalledTimes(10);
+  });
+
+  it("does not fall back to the scan when the first lookup was cancelled", async () => {
+    const controller = new AbortController();
+    labelValues.mockImplementation(async () => {
+      controller.abort();
+      throw new Error("canceled");
+    });
+    await expect(
+      loadQueryVariableValues(
+        baseParams({ query: "label_values(job)", signal: controller.signal }),
+      ),
+    ).rejects.toBeInstanceOf(QueryVariableCancelledError);
+    expect(labelValues).toHaveBeenCalledTimes(1);
+  });
+});

@@ -23,17 +23,52 @@ import {
   mapValuesToOptions,
   parsePromVariableQuery,
   resolveSqlOptionColumns,
+  type PromSeriesResult,
   type QueryVariableLanguage,
   type QueryVariableOption,
 } from "./queryVariableUtils";
 
+interface SqlStreamPayload {
+  queryReq: {
+    query: { sql: string | null; start_time: number; end_time: number; from: number; size: number };
+    encoding: string;
+  };
+  type: "search";
+  traceId: string;
+  org_id: string;
+  pageType: string;
+  searchType: string;
+}
+
+/** The fields of a search stream event the SQL runner reads. */
+interface SqlStreamEvent {
+  type?: string;
+  content?: { results?: { hits?: Record<string, unknown>[]; streaming_aggs?: boolean } };
+}
+
 type StreamHandlers = {
-  data: (payload: any, response: any) => void;
-  error: (payload: any, response: any) => void;
-  complete: (payload: any, response: any) => void;
+  data: (payload: unknown, response: SqlStreamEvent) => void;
+  error: (payload: unknown, response: unknown) => void;
+  complete: (payload: unknown, response: unknown) => void;
 };
 
-export type FetchQueryDataWithHttpStream = (payload: any, handlers: StreamHandlers) => unknown;
+export type FetchQueryDataWithHttpStream = (
+  payload: SqlStreamPayload,
+  handlers: StreamHandlers,
+) => unknown;
+
+interface QueryVariableErrorFields {
+  content?: { error_detail?: unknown; message?: unknown };
+  response?: { data?: { error_detail?: unknown; error?: unknown; message?: unknown } };
+  error_detail?: unknown;
+  error?: unknown;
+  message?: unknown;
+}
+
+/** A Prometheus HTTP API answer as axios returns it. */
+interface PromApiResponse {
+  data?: { status?: string; data?: unknown };
+}
 
 const METRIC_SCAN_LIMIT = 200;
 const MICROS_THRESHOLD = 1e14;
@@ -68,6 +103,8 @@ export interface QueryVariableLoadParams {
   /** Typed text the values must contain; SQL matches it in `searchColumn` on the server. */
   search?: string;
   searchColumn?: string;
+  /** Aborts the PromQL requests; SQL runs are cancelled through their trace id instead. */
+  signal?: AbortSignal;
 }
 
 export interface QueryVariableLoadResult {
@@ -86,7 +123,8 @@ export class QueryVariableCancelledError extends Error {
 }
 
 /** Pulls the readable message out of a stream error, a server error body or an axios error. */
-export const getQueryVariableErrorMessage = (error: any): string => {
+export const getQueryVariableErrorMessage = (thrown: unknown): string => {
+  const error = thrown as QueryVariableErrorFields | null | undefined;
   const candidates = [
     error?.content?.error_detail,
     error?.content?.message,
@@ -97,7 +135,9 @@ export const getQueryVariableErrorMessage = (error: any): string => {
     error?.error,
     error?.message,
   ];
-  const message = candidates.find((value) => typeof value === "string" && value.trim() !== "");
+  const message = candidates.find(
+    (value): value is string => typeof value === "string" && value.trim() !== "",
+  );
   return message ?? gt("dashboard.queryVariable.unknownError");
 };
 
@@ -135,7 +175,7 @@ export const runSqlVariableQueryOnStream = (
         searchType: "dashboards",
       },
       {
-        data: (_payload: any, response: any) => {
+        data: (_payload, response) => {
           const hits = response?.content?.results?.hits;
           switch (response?.type) {
             case "search_response_metadata":
@@ -159,14 +199,14 @@ export const runSqlVariableQueryOnStream = (
               break;
           }
         },
-        error: (_payload: any, error: any) =>
+        error: (_payload, error) =>
           settle(() => reject(new Error(getQueryVariableErrorMessage(error)))),
         complete: () => settle(() => resolve(rows)),
       },
     );
   });
 
-const promValues = (response: any): unknown[] => {
+const promValues = (response: PromApiResponse): unknown[] => {
   const body = response?.data;
   if (body?.status && body.status !== "success") {
     throw new Error(getQueryVariableErrorMessage(body));
@@ -174,7 +214,16 @@ const promValues = (response: any): unknown[] => {
   return Array.isArray(body?.data) ? body.data : [];
 };
 
-type PromRange = { org_identifier: string; start_time: number; end_time: number };
+type PromRange = {
+  org_identifier: string;
+  start_time: number;
+  end_time: number;
+  signal?: AbortSignal;
+};
+
+const throwIfAborted = (signal?: AbortSignal) => {
+  if (signal?.aborted) throw new QueryVariableCancelledError();
+};
 
 /** Prometheus HTTP API times are unix seconds; dashboards hand over microseconds, tests milliseconds. */
 export const toPromSeconds = (time: number): number => {
@@ -209,6 +258,7 @@ const labelValuesAcrossMetrics = async (
   const values = new Set<string>();
   const scanned = names.slice(0, METRIC_SCAN_LIMIT);
   for (let i = 0; i < scanned.length && values.size <= maxRecords; i += METRIC_SCAN_BATCH) {
+    throwIfAborted(range.signal);
     const batch = await Promise.allSettled(
       scanned
         .slice(i, i + METRIC_SCAN_BATCH)
@@ -226,6 +276,7 @@ const labelValuesAcrossMetrics = async (
       }
     });
   }
+  throwIfAborted(range.signal);
   return [...values].sort((a, b) => a.localeCompare(b));
 };
 
@@ -241,6 +292,7 @@ const loadLabelValues = async (
   try {
     return promValues(await metricsService.labelValues({ ...range, label }));
   } catch {
+    throwIfAborted(range.signal);
     return labelValuesAcrossMetrics(range, label, maxRecords, search);
   }
 };
@@ -252,6 +304,7 @@ const loadPromValues = async (params: QueryVariableLoadParams): Promise<unknown[
     org_identifier: params.orgId,
     start_time: toPromSeconds(params.startTime),
     end_time: toPromSeconds(params.endTime),
+    signal: params.signal,
   };
 
   switch (parsed.kind) {
@@ -276,6 +329,7 @@ const loadPromValues = async (params: QueryVariableLoadParams): Promise<unknown[
         org_identifier: params.orgId,
         query: encodeURIComponent(parsed.expr),
         end_time: range.end_time,
+        signal: params.signal,
       });
       const body = response?.data;
       if (body?.status && body.status !== "success") {
@@ -287,7 +341,7 @@ const loadPromValues = async (params: QueryVariableLoadParams): Promise<unknown[
       if (body?.data?.resultType === "scalar" || body?.data?.resultType === "string") {
         return [formatPromSeries({ value: result as [number, string] })];
       }
-      return result.map((series: any) => formatPromSeries(series));
+      return result.map((series: PromSeriesResult) => formatPromSeries(series));
     }
   }
 };
@@ -350,9 +404,12 @@ export const loadQueryVariableValues = async (
   params: QueryVariableLoadParams,
 ): Promise<QueryVariableLoadResult> => {
   if (params.language === "promql") {
-    const values = (await loadPromValues(params)).filter((value) =>
-      String(value).includes(params.search ?? ""),
-    );
+    const values = (
+      await loadPromValues(params).catch((error) => {
+        throwIfAborted(params.signal);
+        throw error;
+      })
+    ).filter((value) => String(value).includes(params.search ?? ""));
     const { options, capped } = mapValuesToOptions(values, params.maxRecords);
     return { options, capped, columns: [], rows: [] };
   }

@@ -135,6 +135,19 @@ describe("buildAutoPromqlQuery", () => {
     ).toBe('label_values(up{msg="say \\"hi\\""}, job)');
   });
 
+  it("writes the SQL not-equal <> as != instead of dropping it", () => {
+    expect(
+      buildAutoPromqlQuery({
+        stream: "up",
+        field: "pod",
+        filter: [
+          { name: "env", operator: "<>", value: "dev" },
+          { name: "ns", operator: "<>", value: "$ns" },
+        ],
+      }),
+    ).toBe('label_values(up{env!="dev",ns!~"$ns"}, pod)');
+  });
+
   it("regex-escapes literal values it turns into a regex matcher, keeping $variables", () => {
     expect(
       buildAutoPromqlQuery({
@@ -624,10 +637,12 @@ describe("substituteQueryVariables", () => {
     expect(substituteQueryVariables("'${regions:csv}'", variables, "sql")).toBe("'eu,us'");
   });
 
+  const loaded = { type: "query_values", query_data: { query_type: "promql" } };
+
   it("escapes PromQL values for the string and the regex they land in", () => {
     const vars = [
-      { name: "inst", value: ['a"b', "c.d", "e\\f"], isVariablePartialLoaded: true },
-      { name: "one", value: 'x"y.z', isVariablePartialLoaded: true },
+      { ...loaded, name: "inst", value: ['a"b', "c.d", "e\\f"], isVariablePartialLoaded: true },
+      { ...loaded, name: "one", value: 'x"y.z', isVariablePartialLoaded: true },
     ];
     expect(substituteQueryVariables('up{instance=~"$inst"}', vars, "promql")).toBe(
       'up{instance=~"a\\"b|c\\\\.d|e\\\\\\\\f"}',
@@ -641,6 +656,27 @@ describe("substituteQueryVariables", () => {
     expect(substituteQueryVariables("label_values($one, job)", vars, "promql")).toBe(
       'label_values(x"y.z, job)',
     );
+  });
+
+  it("escapes for single-quoted and backtick PromQL strings too", () => {
+    const vars = [{ ...loaded, name: "one", value: "x'y.z", isVariablePartialLoaded: true }];
+    expect(substituteQueryVariables("up{a=~'$one'}", vars, "promql")).toBe("up{a=~'x\\'y\\\\.z'}");
+    expect(substituteQueryVariables("up{a='$one'}", vars, "promql")).toBe("up{a='x\\'y.z'}");
+    expect(substituteQueryVariables("up{a=~`$one`}", vars, "promql")).toBe("up{a=~`x'y\\.z`}");
+    expect(substituteQueryVariables('up{a="it\'s", b=~"$one"}', vars, "promql")).toBe(
+      'up{a="it\'s", b=~"x\'y\\\\.z"}',
+    );
+  });
+
+  it("leaves a typed or listed value as written, like panels do", () => {
+    const vars = [
+      { name: "box", type: "textbox", value: "api-.*", isVariablePartialLoaded: true },
+      { name: "list", type: "custom", value: ["a.b", "c"], isVariablePartialLoaded: true },
+    ];
+    expect(substituteQueryVariables('label_values(up{job=~"$box"}, pod)', vars, "promql")).toBe(
+      'label_values(up{job=~"api-.*"}, pod)',
+    );
+    expect(substituteQueryVariables('up{job=~"$list"}', vars, "promql")).toBe('up{job=~"a.b|c"}');
   });
 
   it("joins a PromQL multi-select with | and turns all into .*", () => {
@@ -837,5 +873,14 @@ describe("getUndefinedQueryVariableNames", () => {
 
   it("ignores built-ins and defined variables", () => {
     expect(getUndefinedQueryVariableNames("rate(x[$__interval]) $svc", ["svc"])).toEqual([]);
+  });
+
+  it("reads a dash as part of a name, as variable names allow it", () => {
+    expect(getUndefinedQueryVariableNames('up{a="$my-var", b="${my-var}"}', ["my-var"])).toEqual(
+      [],
+    );
+    expect(getUndefinedQueryVariableNames('up{a="$my-var"}', ["svc"])).toEqual(["my-var"]);
+    // Substitution fills $svc and keeps the rest, so the text after it is no other variable.
+    expect(getUndefinedQueryVariableNames("$svc-1", ["svc"])).toEqual([]);
   });
 });
