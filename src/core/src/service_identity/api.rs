@@ -42,6 +42,7 @@ pub struct Context {
     pub user: String,
     pub summaries: Vec<WhereSummaryRecord>,
     pub readable: ReadableStreams,
+    pub evidence: crate::authz::StreamReadMemo,
     pub identity: OrgIdentity,
     pub aliases: std::sync::Arc<Vec<config::meta::service_identity::AliasRow>>,
 }
@@ -64,6 +65,7 @@ impl Context {
             user: user.to_string(),
             summaries,
             readable,
+            evidence: Default::default(),
             identity: OrgIdentity { overrides },
             aliases: db::service_identity::get_cached_aliases(org)
                 .await
@@ -1396,6 +1398,7 @@ mod tests {
                 traces: Default::default(),
                 rum: false,
             },
+            evidence: Default::default(),
             identity: OrgIdentity::default(),
             aliases: std::sync::Arc::new(Vec::new()),
         };
@@ -1461,6 +1464,7 @@ mod tests {
                 traces: Default::default(),
                 rum: false,
             },
+            evidence: Default::default(),
             identity: OrgIdentity::default(),
             aliases: std::sync::Arc::new(Vec::new()),
         };
@@ -1559,6 +1563,7 @@ mod tests {
                 traces: Default::default(),
                 rum: false,
             },
+            evidence: Default::default(),
             identity: OrgIdentity::default(),
             aliases: std::sync::Arc::new(Vec::new()),
         };
@@ -1620,6 +1625,7 @@ mod tests {
                 traces: Default::default(),
                 rum: false,
             },
+            evidence: Default::default(),
             identity: OrgIdentity::default(),
             aliases: std::sync::Arc::new(Vec::new()),
         }
@@ -1896,6 +1902,7 @@ mod tests {
                 traces: Default::default(),
                 rum: false,
             },
+            evidence: Default::default(),
             identity: OrgIdentity::default(),
             aliases: std::sync::Arc::new(Vec::new()),
         };

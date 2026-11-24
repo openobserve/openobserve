@@ -205,6 +205,11 @@ export default class DashboardPanelConfigs {
     this.funnelOrientOptions = page.locator(`[data-test="${this.funnelOrientId}-option"]`);
     this.funnelShowPercent = page.locator('[data-test="dashboard-config-funnel_show_percent"]');
 
+    //Box plot locators: Whiskers is an OSelect
+    this.boxplotWhiskerId = "dashboard-config-boxplot_whisker";
+    this.boxplotWhisker = page.locator(`[data-test="${this.boxplotWhiskerId}"]`);
+    this.boxplotWhiskerTrigger = page.locator(`[data-test="${this.boxplotWhiskerId}-trigger"]`);
+
     //Map locators
     this.mapType = page.locator('[data-test="dashboard-config-map-type"]');
 
@@ -2404,6 +2409,18 @@ export default class DashboardPanelConfigs {
   /** Labels of the funnel Stage order options, the Default entry first. */
   async getFunnelSortOptionLabels() {
     return this.getConfigSelectOptionLabels(this.funnelSortId);
+  }
+
+  /** Pick a box plot Whiskers option by its label, e.g. "1.5 × IQR" or "Default (Min to max)". */
+  async selectBoxplotWhisker(label) {
+    await this.scrollSidebarToElement(this.boxplotWhisker);
+    await this.selectConfigOption(this.boxplotWhiskerId, label);
+  }
+
+  /** Labels of the box plot Whiskers options, the Default entry first. */
+  async getBoxplotWhiskerOptionLabels() {
+    await this.scrollSidebarToElement(this.boxplotWhisker);
+    return this.getConfigSelectOptionLabels(this.boxplotWhiskerId);
   }
 
   /** Pick a funnel Orientation item by its label; `value` is what the group then reports ("__auto__" for Default). */
