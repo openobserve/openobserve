@@ -250,6 +250,15 @@ describe("ServiceAccountsList Component", () => {
     await flushPromises();
     await vi.waitFor(() => expect(wrapper.vm.showAddUserDialog).toBe(true));
     expect(wrapper.vm.selectedUser.email).toBe("delayed@example.com");
+
+    wrapper.vm.showAddUserDialog = false;
+    vi.mocked(service_accounts.list).mockResolvedValueOnce({
+      data: { data: [{ email: "delayed@example.com", first_name: "Delayed again" }] },
+    });
+    await wrapper.vm.getServiceAccountsUsers(true);
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(wrapper.vm.showAddUserDialog).toBe(false);
   });
 
   describe("Service Accounts List", () => {

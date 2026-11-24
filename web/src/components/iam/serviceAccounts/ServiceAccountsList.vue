@@ -947,8 +947,11 @@ export default defineComponent({
         showAddUserDialog.value = true;
       }, 100);
     };
+    // Closing the editor leaves `?action=update&email=` behind, so each link opens it once.
+    let openedEditLink = "";
     const addRoutePush = (row: any) => {
       if (row?.email) {
+        openedEditLink = row.email;
         router.push({
           name: "serviceAccounts",
           query: {
@@ -981,9 +984,15 @@ export default defineComponent({
           router.currentRoute.value.query.email,
         ] as const,
       ([rows, action, email]) => {
-        if (!rows || action !== "update" || typeof email !== "string") return;
+        if (action !== "update" || typeof email !== "string") {
+          openedEditLink = "";
+          return;
+        }
+        if (!rows || email === openedEditLink) return;
         const row = rows.find((user: { email: string }) => user.email === email);
-        if (row) addUser({ row }, true);
+        if (!row) return;
+        openedEditLink = email;
+        addUser({ row }, true);
       },
       { immediate: true },
     );

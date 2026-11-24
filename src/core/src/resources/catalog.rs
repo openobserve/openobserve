@@ -213,19 +213,19 @@ impl Catalog {
     }
 
     async fn build(self: Arc<Self>, key: Key) {
-        let result = tokio::time::timeout(BUILD_TIMEOUT, self.load(&key))
-            .await
-            .unwrap_or(Err(SourceReason::SourceUnavailable));
+        // The timeout covers the reads only, so a build queued behind others keeps reporting
+        // loading.
+        let result = match self.builds.acquire().await {
+            Ok(_permit) => tokio::time::timeout(BUILD_TIMEOUT, self.load(&key))
+                .await
+                .unwrap_or(Err(SourceReason::SourceUnavailable)),
+            Err(_) => Err(SourceReason::SourceUnavailable),
+        };
         self.state.lock().finish(&key, result, self.max_bytes);
         self.built.notify_waiters();
     }
 
     async fn load(&self, key: &Key) -> Result<Vec<IndexedRecord>, SourceReason> {
-        let _permit = self
-            .builds
-            .acquire()
-            .await
-            .map_err(|_| SourceReason::SourceUnavailable)?;
         let mut rows = Vec::new();
         let mut bytes = 0;
         let mut after = None;
@@ -731,6 +731,22 @@ mod tests {
             full.catalog.ensure("org", &[ResourceKind::Function]).await,
             Err(SearchError::Overloaded)
         ));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_build_waiting_for_a_slot_keeps_loading_instead_of_timing_out() {
+        let x = fixture(vec![row("f1", "Old")]);
+        let held = (
+            x.catalog.builds.acquire().await.unwrap(),
+            x.catalog.builds.acquire().await.unwrap(),
+        );
+        ensure(&x.catalog, "org").await;
+        tokio::time::sleep(BUILD_TIMEOUT * 2).await;
+        let snapshot = &x.catalog.read("org", &[ResourceKind::Function])[0].1;
+        assert!(matches!(snapshot, Err(SourceReason::Loading)));
+        drop(held);
+        x.catalog.wait_idle().await;
+        assert_eq!(x.names("org"), ["Old"]);
     }
 
     #[test]
