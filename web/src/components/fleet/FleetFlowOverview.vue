@@ -357,7 +357,7 @@ const { setViewport, zoomIn, zoomOut, fitView } = useVueFlow(flowId);
 // SVG fill on the background dots, the one place a token is read by var().
 const dotColor = "var(--color-border-strong)";
 // Layout is in screen pixels at zoom 1: readable text beats fitting everything on screen.
-const ROW = 104;
+const ROW = 128;
 const TOP = 24;
 const NODE_WIDTH = 144;
 const POPOVER_GAP = 12;
