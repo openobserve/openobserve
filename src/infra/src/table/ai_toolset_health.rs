@@ -18,8 +18,9 @@
 use std::collections::HashMap;
 
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set, TransactionTrait,
-    sea_query::{Expr, OnConflict},
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, Set, TransactionTrait,
+    UpdateMany,
+    sea_query::{Expr, Func, OnConflict, SimpleExpr},
 };
 
 pub use super::entity::ai_toolset_health::Model as ToolsetHealth;
@@ -97,7 +98,7 @@ async fn record_with<C: TransactionTrait>(
         .exec_without_returning(&txn)
         .await?;
     if inserted == 0 {
-        apply_outcome(&txn, &outcome).await?;
+        outcome_update(&outcome).exec(&txn).await?;
     }
     txn.commit().await?;
     Ok(())
@@ -105,53 +106,46 @@ async fn record_with<C: TransactionTrait>(
 
 // Calls finish out of order across batches: an outcome older than the other kind's newest is
 // ignored, and only the newest failure sets `last_error`.
-async fn apply_outcome<C: ConnectionTrait>(
-    conn: &C,
-    outcome: &CallOutcome<'_>,
-) -> Result<(), errors::Error> {
+fn outcome_update(outcome: &CallOutcome<'_>) -> UpdateMany<Entity> {
     let at = outcome.at;
     let update = Entity::update_many()
         .filter(Column::Org.eq(outcome.org))
         .filter(Column::Toolset.eq(outcome.toolset));
-    let update = match outcome.error {
+    // The column is empty or not newer than this outcome.
+    let not_newer = |column: Column| {
+        Expr::expr(Func::coalesce([Expr::col(column).into(), Expr::value(at)])).lte(at)
+    };
+    let update = update.filter(not_newer(Column::LastOkAt));
+    match outcome.error {
         None => update
             .col_expr(Column::LastOkAt, Expr::value(at))
             .col_expr(Column::FailingSince, Expr::value(Option::<i64>::None))
-            .filter(Expr::cust_with_values(
-                "COALESCE(last_error_at, ?) <= ?",
-                [at, at],
-            ))
-            .filter(Expr::cust_with_values("COALESCE(last_ok_at, ?) <= ?", [at, at])),
-        Some(error) => update
-            .col_expr(
-                Column::FailingSince,
-                Expr::cust_with_values(
-                    "CASE WHEN failing_since IS NULL OR failing_since > ? THEN ? ELSE failing_since END",
-                    [at, at],
-                ),
-            )
-            .col_expr(
-                Column::LastError,
-                Expr::cust_with_values(
-                    "CASE WHEN COALESCE(last_error_at, ?) <= ? THEN ? ELSE last_error END",
-                    [
-                        sea_orm::Value::from(at),
-                        sea_orm::Value::from(at),
-                        sea_orm::Value::from(error),
-                    ],
-                ),
-            )
-            .col_expr(
-                Column::LastErrorAt,
-                Expr::cust_with_values(
-                    "CASE WHEN COALESCE(last_error_at, ?) <= ? THEN ? ELSE last_error_at END",
-                    [at, at, at],
-                ),
-            )
-            .filter(Expr::cust_with_values("COALESCE(last_ok_at, ?) <= ?", [at, at])),
-    };
-    update.exec(conn).await?;
-    Ok(())
+            .filter(not_newer(Column::LastErrorAt)),
+        Some(error) => {
+            let unset_or_later = Condition::any()
+                .add(Column::FailingSince.is_null())
+                .add(Column::FailingSince.gt(at));
+            let newest = |value: SimpleExpr, column: Column| {
+                Expr::case(not_newer(Column::LastErrorAt), value).finally(Expr::col(column))
+            };
+            update
+                .col_expr(
+                    Column::FailingSince,
+                    Expr::case(unset_or_later, at)
+                        .finally(Expr::col(Column::FailingSince))
+                        .into(),
+                )
+                // MySQL assigns in order, so `last_error_at`, which both compare, goes last.
+                .col_expr(
+                    Column::LastError,
+                    newest(Expr::value(error), Column::LastError).into(),
+                )
+                .col_expr(
+                    Column::LastErrorAt,
+                    newest(Expr::value(at), Column::LastErrorAt).into(),
+                )
+        }
+    }
 }
 
 async fn list_with<C: ConnectionTrait>(
@@ -219,6 +213,43 @@ mod tests {
             .unwrap()
             .remove("datadog-prod")
             .unwrap()
+    }
+
+    #[test]
+    fn an_update_s_placeholders_are_each_database_s_own() {
+        use sea_orm::{DatabaseBackend, QueryTrait};
+        for error in [None, Some("HTTP 401")] {
+            let outcome = CallOutcome {
+                org: "org",
+                toolset: "dd",
+                at: 7,
+                error,
+            };
+            for backend in [
+                DatabaseBackend::Postgres,
+                DatabaseBackend::MySql,
+                DatabaseBackend::Sqlite,
+            ] {
+                let built = outcome_update(&outcome).build(backend);
+                let sql = built.sql;
+                let values = built.values.unwrap().0.len();
+                let numbered = (1..=values).all(|n| sql.contains(&format!("${n}")));
+                let (asked, quote) = match backend {
+                    DatabaseBackend::Postgres => (0, '"'),
+                    DatabaseBackend::MySql => (values, '`'),
+                    DatabaseBackend::Sqlite => (values, '"'),
+                };
+                assert_eq!(sql.matches('?').count(), asked, "{sql}");
+                assert_eq!(numbered, backend == DatabaseBackend::Postgres, "{sql}");
+                let guard = format!("COALESCE({quote}last_ok_at{quote}, ");
+                assert!(sql.contains(&guard), "{sql}");
+                assert_eq!(sql.contains("CASE WHEN"), error.is_some(), "{sql}");
+                if error.is_some() {
+                    let column = |name: &str| sql.find(&format!("{quote}{name}{quote} = "));
+                    assert!(column("last_error") < column("last_error_at"), "{sql}");
+                }
+            }
+        }
     }
 
     #[tokio::test]

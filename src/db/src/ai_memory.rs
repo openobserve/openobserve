@@ -236,8 +236,8 @@ pub async fn delete(key: &MemoryKey) -> Result<()> {
     Ok(())
 }
 
-/// Deletes a toolset together with its memory, which stays while another toolset of the org
-/// still has the same normalized name. [strong]
+/// Deletes a toolset together with an MCP one's memory, which stays while another MCP toolset of
+/// the org still has the same normalized name. [strong]
 pub async fn delete_toolset(
     org: &str,
     toolset_id: &str,

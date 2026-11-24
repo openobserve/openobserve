@@ -100,7 +100,7 @@ pub async fn published_delete(row: &OrgToolset, deleted_at: i64) -> Result<()> {
 
 /// The tombstone a delete leaves, or `None` for a row [`put_message`] never sends.
 pub fn tombstone_for(row: &OrgToolset, deleted_at: i64) -> Option<Tombstone> {
-    let replicated = !row.region_only && row.kind.parse::<ToolsetKind>().is_ok();
+    let replicated = !row.region_only && has_known_kind(row);
     replicated.then(|| Tombstone {
         org: row.org.clone(),
         key: normalize_tool_name(&row.name),
@@ -176,6 +176,17 @@ async fn apply_put(msg: AiToolsetMessage) -> Result<Applied> {
     }
     for _ in 0..UPDATE_ATTEMPTS {
         let Some(row) = local_row(&org, &key, &name).await? else {
+            // The unique name can't be taken over, and a failed insert would be redelivered.
+            if table::get_by_name(&org, &name)
+                .await?
+                .is_some_and(|held| !has_known_kind(&held))
+            {
+                log::warn!(
+                    "[SUPER_CLUSTER:sync] toolset '{name}' of org '{org}' isn't applied here: a \
+                     row of an unknown kind has its name"
+                );
+                return Ok(Applied::Ignored);
+            }
             let entry = OrgToolset {
                 id: String::new(),
                 org: org.clone(),
@@ -237,12 +248,17 @@ async fn apply_delete(tombstone: Tombstone) -> Result<Applied> {
     })
 }
 
-/// The org's row for `key`: the one named `name` when two normalize alike, else the only one.
+fn has_known_kind(row: &OrgToolset) -> bool {
+    row.kind.parse::<ToolsetKind>().is_ok()
+}
+
+/// The org's row for `key`, never one of an unknown kind: the one named `name` when two normalize
+/// alike, else the only one.
 async fn local_row(org: &str, key: &str, name: &str) -> Result<Option<OrgToolset>> {
     let mut rows: Vec<OrgToolset> = table::list(org, ListFilter::default(), None)
         .await?
         .into_iter()
-        .filter(|r| normalize_tool_name(&r.name) == key)
+        .filter(|r| has_known_kind(r) && normalize_tool_name(&r.name) == key)
         .collect();
     if let Some(i) = rows.iter().position(|r| r.name == name) {
         return Ok(Some(rows.swap_remove(i)));
@@ -514,6 +530,49 @@ mod tests {
         row.updated_at = updated_at;
         row.origin_region = None;
         assert!(table::update_if_unchanged(row, read).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn replicated_writes_never_touch_a_row_of_an_unknown_kind() {
+        if !meta_store().await {
+            return;
+        }
+        let org = format!("r1_cli_row_{}", config::utils::time::now_micros());
+        let cli = |name: &str| OrgToolset {
+            id: String::new(),
+            org: org.clone(),
+            kind: "cli".into(),
+            created_at: 0,
+            ..row(name, "{}")
+        };
+        let kinds = || async {
+            let rows = table::list(&org, ListFilter::default(), None).await;
+            let mut kinds: Vec<_> = rows
+                .unwrap()
+                .into_iter()
+                .map(|r| (r.name, r.kind))
+                .collect();
+            kinds.sort();
+            kinds
+        };
+        let pair = |name: &str, kind: &str| (name.to_string(), kind.to_string());
+        table::add(cli("dd!")).await.unwrap();
+
+        let created = put(&org, 10, json!({"url": "https://a"}));
+        assert_eq!(apply_replicated(created).await.unwrap(), Applied::Created);
+        assert_eq!(kinds().await, [pair("dd", "mcp"), pair("dd!", "cli")]);
+        let deleted = Applied::Deleted {
+            name: "dd".into(),
+            region: "zz-1".into(),
+        };
+        assert_eq!(apply_replicated(delete(&org, 20)).await.unwrap(), deleted);
+        assert_eq!(kinds().await, [pair("dd!", "cli")]);
+
+        table::add(cli("dd")).await.unwrap();
+        for message in [put(&org, 30, json!({"url": "https://a"})), delete(&org, 40)] {
+            assert_eq!(apply_replicated(message).await.unwrap(), Applied::Ignored);
+        }
+        assert_eq!(kinds().await, [pair("dd", "cli"), pair("dd!", "cli")]);
     }
 
     #[tokio::test]

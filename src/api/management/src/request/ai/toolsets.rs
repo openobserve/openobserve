@@ -529,7 +529,7 @@ pub async fn discover(
     tag = "AI",
     operation_id = "DeleteAiToolset",
     summary = "Delete an AI toolset",
-    description = "Permanently deletes an AI toolset with its AI memory, which stays while another toolset has the same normalized name. Only available in enterprise deployments.",
+    description = "Permanently deletes an AI toolset and an MCP one's AI memory, which stays while another MCP toolset has the same normalized name. Only available in enterprise deployments.",
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Toolset id (KSUID)"),
@@ -551,7 +551,7 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
         Ok(None) => return MetaHttpResponse::not_found(format!("toolset '{id}' not found")),
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
-    // Deletes the toolset with its AI memory, which stays while another toolset shares its name.
+    // Deletes an MCP toolset's AI memory too, which stays while another MCP one shares its name.
     match ::db::ai_memory::delete_toolset(&org_id, &id, normalize_tool_name).await {
         Ok(ToolsetDelete::Deleted { .. }) => {}
         Ok(ToolsetDelete::NotFound) => {

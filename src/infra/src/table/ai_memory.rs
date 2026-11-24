@@ -37,6 +37,8 @@ use crate::{db::get_orm_client_rw, errors};
 
 /// ENT's `RCA_AGENT_TYPE` (infra can't depend on ENT); an RCA chat has no person behind it.
 pub const RCA_CHAT_AGENT_TYPE: &str = "sre-rca";
+/// The one toolset kind that has a memory.
+const MCP_KIND: &str = "mcp";
 const PEOPLE_KEPT: usize = 200;
 const AGENT_KEPT: usize = 50;
 const MICROS_PER_DAY: i64 = 24 * 3600 * 1_000_000;
@@ -610,8 +612,8 @@ pub async fn delete_with<C: ConnectionTrait + TransactionTrait>(
     Ok(())
 }
 
-/// Deletes a toolset, and its memory unless another toolset still has the same normalized name.
-/// [strong]
+/// Deletes a toolset, and an MCP one's memory unless another MCP one still has the same
+/// normalized name. [strong]
 pub async fn delete_toolset_with<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org: &str,
@@ -632,6 +634,10 @@ pub async fn delete_toolset_with<C: ConnectionTrait + TransactionTrait>(
     org_ai_toolsets::Entity::delete_by_id(toolset_id)
         .exec(&txn)
         .await?;
+    if toolset.kind != MCP_KIND {
+        txn.commit().await?;
+        return Ok(ToolsetDelete::Deleted { memory: None });
+    }
     let key = MemoryKey::toolset(org, &normalize(&toolset.name));
     // Deletes of two toolsets sharing the key queue here, so the second sees the first committed.
     ai_memory::Entity::find()
@@ -641,7 +647,13 @@ pub async fn delete_toolset_with<C: ConnectionTrait + TransactionTrait>(
         .lock_exclusive()
         .one(&txn)
         .await?;
-    let still_owned = super::org_ai_toolsets::list_names_with(&txn, org)
+    let still_owned = org_ai_toolsets::Entity::find()
+        .select_only()
+        .column(org_ai_toolsets::Column::Name)
+        .filter(org_ai_toolsets::Column::Org.eq(org))
+        .filter(org_ai_toolsets::Column::Kind.eq(MCP_KIND))
+        .into_tuple::<String>()
+        .all(&txn)
         .await?
         .iter()
         .any(|name| normalize(name) == key.scope_key);
@@ -2596,6 +2608,56 @@ mod tests {
                     .unwrap(),
                 ToolsetDelete::NotFound
             );
+        }
+    }
+
+    #[tokio::test]
+    async fn only_an_mcp_toolset_s_delete_takes_its_memory() {
+        let dek = random_bytes(64);
+        for db in databases("ai_memory_cli_delete").await {
+            let key = toolset();
+            for (id, name, kind) in [
+                ("c1", "Datadog Prod", "cli"),
+                ("m1", "datadog-prod", "mcp"),
+                ("c2", "Datadog_Prod", "cli"),
+            ] {
+                org_ai_toolsets::Entity::insert(org_ai_toolsets::ActiveModel {
+                    id: Set(id.to_string()),
+                    org: Set("o1".to_string()),
+                    name: Set(name.to_string()),
+                    kind: Set(kind.to_string()),
+                    description: Set(None),
+                    data: Set(None),
+                    created_by: Set("u".to_string()),
+                    created_at: Set(1),
+                    updated_at: Set(1),
+                    region_only: Set(false),
+                    origin_region: Set(None),
+                })
+                .exec(&db)
+                .await
+                .unwrap();
+            }
+            let write = Write {
+                base_rev: 0,
+                change: content("x"),
+                settings: MemorySettings::default(),
+            };
+            apply_with(&db, &dek, &key, Some("m1"), &write, &person(1))
+                .await
+                .unwrap();
+            let normalize = |name: &str| name.to_lowercase().replace([' ', '_'], "-");
+            let delete = |id| delete_toolset_with(&db, "o1", id, normalize);
+            let kept = ToolsetDelete::Deleted { memory: None };
+            assert_eq!(delete("c1").await.unwrap(), kept);
+            assert!(get_with(&db, &dek, &key).await.unwrap().is_some());
+            let taken = ToolsetDelete::Deleted {
+                memory: Some(key.clone()),
+            };
+            assert_eq!(delete("m1").await.unwrap(), taken);
+            assert!(get_with(&db, &dek, &key).await.unwrap().is_none());
+            // The last row of the name, whose delete would otherwise publish a memory tombstone.
+            assert_eq!(delete("c2").await.unwrap(), kept);
         }
     }
 
