@@ -4444,6 +4444,7 @@ mod tests {
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     #[tokio::test]
     async fn otlp_two_resources_stamp_their_own_identity() {
+        super::service_identity::set_service_versions_for_test(true);
         let (org, stream) = ("svcid_two_res_org", "svcid_two_res");
         let request = identity_request(vec![
             (kvs(&CHECKOUT), vec![(vec![], 0), (vec![], 1)]),
@@ -4479,6 +4480,7 @@ mod tests {
     #[tokio::test]
     async fn otlp_image_digest_stamps_its_column_and_splits_the_registry_row() {
         use config::meta::service_identity::{O2_SERVICE_IMAGE, version_key, version_key_for};
+        super::service_identity::set_service_versions_for_test(true);
         let (org, stream) = ("svcid_image_org", "svcid_image");
         let build = |id: &'static str| {
             [
@@ -4543,6 +4545,7 @@ mod tests {
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     #[tokio::test]
     async fn otlp_llm_span_renamed_service_gets_its_own_identity() {
+        super::service_identity::set_service_versions_for_test(true);
         let (org, stream) = ("svcid_llm_org", "svcid_llm");
         let resource = [
             ("k8s.cluster.name", "prod-eu"),
@@ -4583,6 +4586,7 @@ mod tests {
     #[cfg(not(feature = "cloud"))]
     #[tokio::test]
     async fn otlp_span_attr_o2_service_env_is_renamed() {
+        super::service_identity::set_service_versions_for_test(true);
         let (org, stream) = ("svcid_rename_org", "svcid_rename");
         let request = identity_request(vec![(
             kvs(&CART),
@@ -4604,11 +4608,11 @@ mod tests {
         drained(org);
     }
 
-    #[cfg(not(feature = "enterprise"))]
     #[cfg(not(feature = "cloud"))]
     #[tokio::test]
-    async fn oss_build_stamps_nothing() {
-        let (org, stream) = ("svcid_oss_org", "svcid_oss");
+    async fn service_versions_off_stamps_nothing() {
+        super::service_identity::set_service_versions_for_test(false);
+        let (org, stream) = ("svcid_off_org", "svcid_off");
         let request = identity_request(vec![
             (kvs(&CHECKOUT), vec![(vec![], 0)]),
             (kvs(&CART), vec![(vec![], 1)]),
@@ -4622,9 +4626,11 @@ mod tests {
         for row in rows.values() {
             assert!(
                 !row.keys().any(|k| k.starts_with("o2_service_")),
-                "OSS writes no o2_service_* column: {row:?}"
+                "no o2_service_* column while off: {row:?}"
             );
         }
+        #[cfg(feature = "enterprise")]
+        assert!(drained(org).is_empty());
     }
 
     fn client_record() -> serde_json::Map<String, json::Value> {
@@ -4675,6 +4681,7 @@ mod tests {
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     #[tokio::test]
     async fn one_observation_per_service_where_version_per_request() {
+        super::service_identity::set_service_versions_for_test(true);
         let (org, stream) = ("svcid_one_obs_org", "svcid_one_obs");
         let mut v2 = CHECKOUT;
         v2[3] = ("service.version", "1.5.0");
@@ -4734,6 +4741,7 @@ mod tests {
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     #[tokio::test]
     async fn rejected_write_queues_nothing() {
+        super::service_identity::set_service_versions_for_test(true);
         let (org, stream) = ("svcid_rejected_org", "svcid_rejected");
         let limit = config::get_config().limit.req_cols_per_record_limit;
         let wide: SpanAttrs = (0..=limit)
@@ -4762,6 +4770,7 @@ mod tests {
             service_where_summary,
         };
 
+        super::service_identity::set_service_versions_for_test(true);
         let mut v2 = CHECKOUT;
         v2[3] = ("service.version", "1.5.0");
         let now = chrono::Utc::now().timestamp_nanos_opt().unwrap() as u64;

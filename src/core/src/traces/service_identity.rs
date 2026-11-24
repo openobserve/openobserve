@@ -373,6 +373,14 @@ impl ServiceIdentityCollector {
     }
 }
 
+/// Sets `ZO_SERVICE_VERSIONS_ENABLED` for the rest of the process; nextest gives each test its own.
+#[cfg(test)]
+pub(crate) fn set_service_versions_for_test(enabled: bool) {
+    let mut cfg = config::config::init();
+    cfg.service_versions.enabled = enabled;
+    config::CONFIG.store(Arc::new(cfg));
+}
+
 /// An attribute as resolver text: arrays and maps as JSON text, null as absent.
 #[cfg(feature = "enterprise")]
 fn attr_text(value: &json::Value) -> Option<String> {

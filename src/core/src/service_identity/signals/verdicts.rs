@@ -2435,6 +2435,7 @@ mod tests {
                 verdict::EvaluationInput,
             },
         };
+        crate::traces::service_identity::set_service_versions_for_test(true);
         let (org, stream) = ("svcver_no_unit_sep_org", "svcver_no_unit_sep");
         let spans = ingested_image_spans(org, stream).await;
         assert_eq!(spans.len(), 60);
