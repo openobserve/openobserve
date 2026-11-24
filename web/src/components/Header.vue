@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex min-w-0 flex-1 justify-center px-3 max-md:px-1">
       <OButton
         variant="outline"
-        size="sm-toolbar"
+        size="xs"
         class="w-full max-w-112 justify-start max-md:w-auto"
         data-test="header-command-palette"
         :aria-label="t('commandPalette.title')"
