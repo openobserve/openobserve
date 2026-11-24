@@ -909,7 +909,7 @@ const useRoutes = () => {
               path: "import",
               name: "importPipeline",
               component: ImportPipeline,
-              meta: { titleKey: "pipeline.importPipelineTitle" },
+              meta: { titleKey: "pipeline.pipelineLabel" },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
