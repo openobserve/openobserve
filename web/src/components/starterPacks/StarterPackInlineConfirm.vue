@@ -26,7 +26,7 @@ const props = defineProps<{ flow: StarterPackFlow; mode: "undo" | "remove" }>();
 const emit = defineEmits<{ cancel: []; done: [] }>();
 
 const { t } = useI18nTyped();
-const summary = useUndoSummary(props.flow);
+const summary = useUndoSummary(props.flow, props.mode);
 const failed = ref(false);
 const busy = computed(() => props.flow.busy.value);
 

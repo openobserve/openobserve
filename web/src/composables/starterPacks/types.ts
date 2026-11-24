@@ -186,6 +186,8 @@ export interface PackRecordItem {
   /** Library alert this Use all copy came from. */
   copyOf?: string;
   stream?: string;
+  /** Stored before the create is sent, so a resume owns what it finds only if it asked for it. */
+  attempted?: boolean;
 }
 
 export interface PackInstallRecord {

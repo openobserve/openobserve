@@ -23,9 +23,9 @@ export type EmailMeFailure = "email" | "forbidden";
 
 export type EmailMeResult = { name: string } | { failure: EmailMeFailure };
 
-// The server refuses these in a destination name (config/src/utils/str.rs RE_OFGA_UNSUPPORTED_NAME, plus "/").
+// The server refuses these in a destination or alert name (config/src/utils/str.rs RE_OFGA_UNSUPPORTED_NAME, plus "/").
 const UNSAFE_NAME = /[:#?\s'"%&/]/;
-const UNSAFE_NAME_ALL = /[:#?\s'"%&/]/g;
+export const UNSAFE_NAME_ALL = /[:#?\s'"%&/]/g;
 const MAX_ATTEMPTS = 5;
 const ALREADY_EXISTS = "Destination with the same name already exists";
 

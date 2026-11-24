@@ -20,14 +20,17 @@ import type { StarterPackFlow } from "./useStarterPackFlow";
 const HOUR_US = 60 * 60 * 1_000_000;
 
 /** The lines every undo or remove confirmation shows for a pack. */
-export function useUndoSummary(flow: StarterPackFlow) {
+export function useUndoSummary(flow: StarterPackFlow, mode: "undo" | "remove") {
   const { t } = useI18nTyped();
+  // A failed count leaves the line out rather than claiming every alert is off.
+  void flow.countAlertsOn(mode).catch(() => {});
   const left = computed(() => {
     const hours = Math.floor(flow.undoLeftUs.value / HOUR_US);
     return hours > 0 ? t("starterPacks.undo.left", { hours }) : t("starterPacks.undo.leftSoon");
   });
   const cover = computed(() => {
     const live = flow.alertsOn.value;
+    if (live === null) return "";
     return live > 0
       ? t("starterPacks.undo.loseCover", { count: live }, live)
       : t("starterPacks.undo.allOff");

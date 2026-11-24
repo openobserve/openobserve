@@ -93,6 +93,11 @@ const fake = vi.hoisted(() => {
     }
     if ((match = url.match(/\/folders\/(alerts|dashboards)(?:\/(.+))?$/))) {
       const list = state.folders[match[1]];
+      if (method === "get" && match[2]) {
+        const folder = list.find((row) => row.folderId === match![2]);
+        if (!folder) throw httpError(404);
+        return reply(folder);
+      }
       if (method === "get") return reply({ list });
       if (method === "post") {
         const folder = { ...body, folderId: nextId("f") };
@@ -152,8 +157,9 @@ const fake = vi.hoisted(() => {
     if ((match = url.match(/\/savedviews(?:\/(.+))?$/))) {
       const id = match[1];
       if (method === "post") {
-        state.views.push({ ...body, view_id: nextId("v") });
-        return reply({});
+        const view = { ...body, view_id: nextId("v") };
+        state.views.push(view);
+        return reply({ org_id: "org", view_id: view.view_id, view_name: view.view_name });
       }
       if (id) {
         const view = state.views.find((row) => row.view_id === id);
@@ -368,6 +374,20 @@ describe("useStarterPacks", () => {
       expect(alerts.map(({ itemId }) => itemId).sort()).toEqual(["k8s/one@a", "k8s/one@b"]);
     });
 
+    it("names a Use all copy so the server accepts it whatever the stream is called", async () => {
+      await packs().installPack(
+        { ...PACK, alerts: ["k8s/one"] },
+        {
+          repairs: [{ from: "s", to: "a:b c/d", also: ["e"] }],
+          copies: [{ copyOf: "k8s/one", stream: "a:b c/d" }],
+        },
+      );
+
+      const [name] = fake.state.alerts.map((alert) => alert.name);
+      expect(name).toBe("k8s/one_a_b_c_d");
+      expect(name.slice("k8s/one_".length)).toMatch(/^[^:#?\s'"%&/]+$/);
+    });
+
     it("repoints the saved view at the repaired stream", async () => {
       await packs().installPack(PACK, { repairs: [{ from: "e", to: "renamed" }] });
       expect(JSON.stringify(fake.state.views[0])).toContain("renamed");
@@ -489,6 +509,30 @@ describe("useStarterPacks", () => {
       }
     });
 
+    it("records a made folder and view by the id their create returned, with no list read", async () => {
+      await packs().installPack(PACK);
+
+      const after = (post: RegExp) => {
+        const calls = fake.state.calls;
+        return calls.slice(calls.findIndex((call) => post.test(call)) + 1);
+      };
+      const folderLists = after(/^post .*\/folders\/alerts/).filter((call) =>
+        /^get .*\/folders\/alerts$/.test(call),
+      );
+      const viewLists = after(/^post .*\/savedviews/).filter((call) =>
+        /^get .*\/savedviews$/.test(call),
+      );
+      expect(folderLists).toEqual([]);
+      const folderReads = fake.state.calls.filter((call) => /^get .*\/folders\/\w+\/./.test(call));
+      expect(folderReads).toEqual([]);
+      expect(viewLists).toEqual([]);
+      const [stored] = [...fake.state.kv.values()].map((value) => JSON.parse(value));
+      const idOf = (itemId: string) =>
+        stored.items.find((item: { itemId: string }) => item.itemId === itemId).id;
+      expect(idOf("alerts")).toBe(fake.state.folders.alerts[0].folderId);
+      expect(idOf("events")).toBe(fake.state.views[0].view_id);
+    });
+
     it("stores only ids, kinds, the content hash and status in the record", async () => {
       await packs().installPack(PACK);
 
@@ -497,7 +541,7 @@ describe("useStarterPacks", () => {
       for (const item of record.items) {
         expect(
           Object.keys(item).every((key) =>
-            ["kind", "itemId", "status", "id", "folderId", "sourceHash"].includes(key),
+            ["kind", "itemId", "status", "id", "folderId", "sourceHash", "attempted"].includes(key),
           ),
         ).toBe(true);
       }
@@ -923,6 +967,19 @@ describe("useStarterPacks", () => {
         expect(fake.state.kv.has(key)).toBe(true);
       });
 
+      it("refuses to Remove the pack while one of its setups is still running", async () => {
+        const { api, key } = await stopIt({ status: "installing", updatedAt: ago(5e6) });
+        const before = counts();
+        const stored = fake.state.kv.get(key);
+
+        const error = await api.removePack(PACK).catch((caught) => caught);
+
+        expect(error).toBeInstanceOf(StarterPackBusyError);
+        expect(error.installedBy).toBe("first@example.com");
+        expect(counts()).toEqual(before);
+        expect(fake.state.kv.get(key)).toBe(stored);
+      });
+
       it("never starts a fresh setup when the one to finish is gone", async () => {
         const { api, first, key } = await stopIt();
         fake.state.kv.set(
@@ -954,7 +1011,7 @@ describe("useStarterPacks", () => {
         let writes = 0;
         // The other continuer's claim lands right after this run's first item write.
         fake.state.onRequest = (method, url, body) => {
-          if (method !== "post" || !url.includes("/kv/") || (writes += 1) !== 2) return;
+          if (method !== "post" || !url.includes("/kv/") || (writes += 1) !== 3) return;
           const claim = { ...JSON.parse(body as string), runId: "someone-else" };
           queueMicrotask(() => fake.state.kv.set(key, JSON.stringify(claim)));
         };
@@ -962,10 +1019,83 @@ describe("useStarterPacks", () => {
         const error = await api.installPack(PACK).catch((caught) => caught);
 
         expect(error).toBeInstanceOf(StarterPackBusyError);
-        expect(fake.state.alerts.length + fake.state.views.length).toBe(2);
+        expect(fake.state.alerts.length + fake.state.views.length).toBe(1);
         const after = JSON.parse(fake.state.kv.get(key)!);
         expect(after.runId).toBe("someone-else");
         expect(after.status).toBe("installing");
+      });
+
+      it("links, never owns, a saved view of its name it never tried to make", async () => {
+        const api = packs();
+        const first = await api.installPack(PACK);
+        const key = [...fake.state.kv.keys()][0];
+        const stored = JSON.parse(fake.state.kv.get(key)!);
+        const reset = (item: { kind: string; itemId: string }) =>
+          item.kind === "savedView"
+            ? { kind: item.kind, itemId: item.itemId, status: "pending" }
+            : item;
+        const stopped = { status: "incomplete", updatedAt: ago(MINUTE_US * 10) };
+        fake.state.kv.set(
+          key,
+          JSON.stringify({ ...stored, ...stopped, items: stored.items.map(reset) }),
+        );
+
+        const record = await api.installPack(PACK);
+        await api.undoPack(PACK, first.installId);
+
+        const view = record.items.find(({ kind }) => kind === "savedView");
+        expect(view).toMatchObject({ status: "existing" });
+        expect(fake.state.views).toHaveLength(1);
+      });
+
+      it("finds a view it made by id on a resume, even renamed by hand", async () => {
+        const api = packs();
+        fake.state.faults.push({ method: "get", url: /\/savedviews\/.+/ });
+        const first = await api.installPack(PACK);
+        expect(first.status).toBe("incomplete");
+        const madeView = first.items.find(({ kind }) => kind === "savedView");
+        expect(madeView).toMatchObject({ status: "failed", id: fake.state.views[0].view_id });
+        fake.state.views[0].view_name = "Renamed";
+
+        const record = await api.installPack(PACK);
+
+        expect(record.status).toBe("complete");
+        expect(counts()).toEqual(FULL);
+        const view = record.items.find(({ kind }) => kind === "savedView");
+        expect(view).toMatchObject({ status: "created", id: fake.state.views[0].view_id });
+        await api.undoPack(PACK, first.installId);
+        expect(counts()).toEqual(EMPTY);
+      });
+
+      it("ends the run, creating nothing, when the attempt cannot be written", async () => {
+        let failed = false;
+        fake.state.onRequest = (method, url, body) => {
+          if (failed || method !== "post" || !url.includes("/kv/")) return;
+          const items: Array<{ attempted?: boolean }> = JSON.parse(body as string).items;
+          if (!items.some((item) => item.attempted)) return;
+          failed = true;
+          fake.state.faults.unshift({ method: "post", url: /\/kv\//, status: 500 });
+        };
+
+        await expect(packs().installPack(PACK)).rejects.toThrow();
+
+        const [stored] = [...fake.state.kv.values()].map((value) => JSON.parse(value));
+        expect(stored.items.some((item: { attempted?: boolean }) => item.attempted)).toBe(false);
+        expect(counts()).toEqual(EMPTY);
+      });
+
+      it("marks an item attempted in the record before creating it", async () => {
+        let marked: boolean | undefined;
+        fake.state.onRequest = (method, url) => {
+          if (method !== "post" || !url.includes("/savedviews")) return;
+          const stored = JSON.parse([...fake.state.kv.values()][0]);
+          const view = stored.items.find(({ itemId }: { itemId: string }) => itemId === "events");
+          marked = view?.attempted;
+        };
+
+        await packs().installPack(PACK);
+
+        expect(marked).toBe(true);
       });
 
       it("lets Undo remove what another user's stopped setup created, and its record", async () => {
@@ -1621,6 +1751,153 @@ describe("useStarterPacks", () => {
       });
     });
 
+    it("counts as live an alert created on and left unchanged", async () => {
+      const api = packs();
+      const pack = { ...PACK, alerts: ["k8s/one"] };
+      const record = await api.installPack(pack, { enableAlerts: true });
+      const one = record.items.find(({ itemId }) => itemId === "k8s/one")!;
+
+      expect(await api.countLiveAlerts(pack, record, new Set([one.id!]))).toBe(1);
+    });
+
+    it("leaves out of the count a live alert it could not read back, as Undo keeps it", async () => {
+      const api = packs();
+      const pack = { ...PACK, alerts: ["k8s/one"] };
+      const record = await api.installPack(pack, { enableAlerts: true });
+      const one = record.items.find(({ itemId }) => itemId === "k8s/one")!;
+      const detail = new RegExp(`/alerts/${one.id}$`);
+
+      expect(await api.countLiveAlerts(pack, record, new Set([one.id!]))).toBe(1);
+      fake.state.faults.push({ method: "get", url: detail, status: 500 });
+      expect(await api.countLiveAlerts(pack, record, new Set([one.id!]))).toBe(0);
+    });
+
+    it("does not count as live an alert turned on after setup, or one there before it", async () => {
+      fake.state.alerts.push({
+        id: "pre",
+        name: "k8s/two",
+        folder_id: "default",
+        tags: ["pack:kubernetes", "library:k8s/two"],
+        enabled: true,
+      });
+      const api = packs();
+      const record = await api.installPack(PACK);
+      const one = record.items.find(({ itemId }) => itemId === "k8s/one")!;
+      fake.state.alerts.find(({ id }) => id === one.id)!.enabled = true;
+
+      expect(record.items.find(({ itemId }) => itemId === "k8s/two")?.status).toBe("existing");
+      expect(await api.countLiveAlerts(PACK, record, new Set([one.id!, "pre"]))).toBe(0);
+    });
+
+    it("keeps a dashboard the catalog no longer lists and still finishes the Undo", async () => {
+      const api = packs();
+      const record = await api.installPack(PACK);
+      pointRecordAt("overview", { itemId: "retired" });
+
+      const result = await api.undoPack(PACK, record.installId);
+
+      expect(result.kept).toEqual([
+        { kind: "dashboard", itemId: "retired", reason: "changed" },
+        { kind: "folder", itemId: "dashboards", reason: "not_empty" },
+      ]);
+      const [stored] = await api.listInstalls(PACK.id);
+      expect(stored.status).toBe("removed");
+      expect(stored.items.map(({ itemId }) => itemId)).toEqual(["dashboards", "retired"]);
+      await expect(api.removePack(PACK)).resolves.toBeTruthy();
+    });
+
+    it("keeps the setup after a failed delete, and the next Undo sends that delete again", async () => {
+      const api = packs();
+      const record = await api.installPack(PACK);
+      fake.state.faults.push({ method: "delete", url: /\/savedviews\// });
+
+      await api.undoPack(PACK, record.installId);
+
+      const [stored] = await api.listInstalls(PACK.id);
+      expect(stored.status).toBe("complete");
+      expect(stored.items.map(({ itemId }) => itemId)).toEqual(["events"]);
+      const before = fake.state.calls.length;
+      const again = await api.undoPack(PACK, record.installId);
+      const deletes = fake.state.calls
+        .slice(before)
+        .filter((call) => call.startsWith("delete") && call.includes("/savedviews/"));
+      expect(deletes).toHaveLength(1);
+      expect(again.kept).toEqual([]);
+      expect(fake.state.kv.size).toBe(0);
+    });
+
+    it("reads a stopped setup as set up after an Undo that failed partway", async () => {
+      const api = packs();
+      fake.state.faults.push({ method: "post", url: /\/api\/v2\/org\/alerts/ });
+      const record = await api.installPack(PACK);
+      expect(record.status).toBe("incomplete");
+      fake.state.faults.push({ method: "delete", url: /\/savedviews\// });
+
+      await api.undoPack(PACK, record.installId);
+
+      const [stored] = await api.listInstalls(PACK.id);
+      expect(stored.status).toBe("complete");
+      expect(stored.items.map(({ itemId }) => itemId)).toEqual(["events"]);
+    });
+
+    it("reads a setup whose run went quiet as set up after an Undo that failed partway", async () => {
+      const api = packs();
+      const record = await api.installPack(PACK);
+      const key = [...fake.state.kv.keys()][0];
+      const stale = Date.now() * 1000 - MINUTE_US * 10;
+      const stored = JSON.parse(fake.state.kv.get(key)!);
+      fake.state.kv.set(key, JSON.stringify({ ...stored, status: "installing", updatedAt: stale }));
+      fake.state.faults.push({ method: "delete", url: /\/savedviews\// });
+
+      await api.undoPack(PACK, record.installId);
+
+      const [after] = await api.listInstalls(PACK.id);
+      expect(after.status).toBe("complete");
+      expect(after.items.map(({ itemId }) => itemId)).toEqual(["events"]);
+    });
+
+    it("keeps an undone setup removed when a later Remove fails to delete its folder", async () => {
+      const api = packs();
+      const record = await api.installPack(PACK);
+      const folderId = fake.state.folders.dashboards[0].folderId;
+      fake.state.dashboards.push({
+        dashboard_id: "mine",
+        title: "Mine",
+        folder_id: folderId,
+        body: {},
+      });
+      await api.undoPack(PACK, record.installId);
+      expect((await api.listInstalls(PACK.id))[0].status).toBe("removed");
+      fake.state.dashboards = [];
+      fake.state.faults.push({ method: "delete", url: /\/folders\/dashboards\// });
+
+      const result = await api.removePack(PACK);
+
+      expect(result.kept).toContainEqual({
+        kind: "folder",
+        itemId: "dashboards",
+        reason: "delete_failed",
+      });
+      const [stored] = await api.listInstalls(PACK.id);
+      expect(stored.status).toBe("removed");
+    });
+
+    it("leaves the setup in place when every delete is refused", async () => {
+      const api = packs();
+      const record = await api.installPack(PACK);
+      for (const url of [/\/savedviews\//, /\/api\/v2\/org\/alerts/, /\/api\/org\/dashboards/]) {
+        fake.state.faults.push({ method: "delete", url, status: 403 });
+      }
+      fake.state.faults.push({ method: "delete", url: /\/api\/v2\/org\/alerts/, status: 403 });
+
+      const result = await api.undoPack(PACK, record.installId);
+
+      expect(result.removed).toEqual([]);
+      const [stored] = await api.listInstalls(PACK.id);
+      expect(stored.status).toBe("complete");
+      expect(counts()).toEqual(FULL);
+    });
+
     it("removePack reports a tagged alert no record accounts for", async () => {
       const api = packs();
       await api.installPack(PACK);
@@ -1786,6 +2063,30 @@ describe("useStarterPacks", () => {
 
       expect(fake.state.dashboards.map(({ dashboard_id }) => dashboard_id)).toContain("theirs");
       expect(result.kept.map(({ reason }) => reason)).toEqual(["changed"]);
+    });
+
+    it("owns its own import on a resume when the record shows it tried to make it", async () => {
+      const api = packs();
+      const first = await api.installPack(HOSTS);
+      const key = [...fake.state.kv.keys()][0];
+      const stored = JSON.parse(fake.state.kv.get(key)!);
+      const { itemId } = dashboardItem(stored) as { itemId: string };
+      const items = stored.items.map((item: { kind: string }) =>
+        item.kind === "dashboard"
+          ? { kind: "dashboard", itemId, status: "pending", attempted: true }
+          : item,
+      );
+      const stopped = { status: "incomplete", updatedAt: Date.now() * 1000 - MINUTE_US * 10 };
+      fake.state.kv.set(key, JSON.stringify({ ...stored, ...stopped, items }));
+
+      const record = await api.installPack(HOSTS);
+
+      expect(dashboardItem(record)).toMatchObject({
+        status: "created",
+        id: hostDashboards()[0].dashboard_id,
+      });
+      await api.undoPack(HOSTS, first.installId);
+      expect(hostDashboards()).toHaveLength(0);
     });
 
     it("fails, not owns, an import that returns no dashboard id", async () => {

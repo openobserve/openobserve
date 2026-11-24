@@ -36,6 +36,7 @@ export const fakeFlow = (over: Record<string, unknown> = {}) =>
   ({
     alertCount: ref(2),
     alertsOn: ref(0),
+    countAlertsOn: vi.fn(async () => {}),
     alertsRoute: computed(() => ({ name: "alertList", query: { org_identifier: "org" } })),
     dashboardsRoute: computed(() => ({ name: "dashboards", query: { org_identifier: "org" } })),
     itemRoute: (item: { kind: string; id?: string }) => ({

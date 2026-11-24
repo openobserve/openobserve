@@ -27,6 +27,7 @@ export const folderKeys = {
   list: (org: string, type: string) => orgKey(org, "folders", type),
   permitted: (org: string, type: string) => orgKey(org, "folders", type, "permitted"),
   optional: (org: string, type: string) => orgKey(org, "folders", type, "optional"),
+  detail: (org: string, type: string, id: string) => orgKey(org, "folders", type, "detail", id),
 };
 
 export const nodeKeys = {

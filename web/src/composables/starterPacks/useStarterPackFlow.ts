@@ -21,6 +21,7 @@ import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
 import { readQuery } from "@/composables/query/readQuery";
 import { refreshOrgResources } from "@/composables/useOrgResources";
 import { alertsByTagsQuery } from "@/services/alerts.queries";
+import { dashboardsByFolderQuery } from "@/services/dashboards.queries";
 import { featureState } from "@/utils/featureGate";
 
 import {
@@ -90,7 +91,8 @@ const newestRecord = (rows: PackInstallRecord[], me: string): PackInstallRecord 
 export function useStarterPackFlow(org: string, pack: StarterPack) {
   const store = useStore();
   const router = useRouter();
-  const { installPack, previewPack, undoPack, removePack, listInstalls } = useStarterPacks(org);
+  const { installPack, previewPack, undoPack, removePack, countLiveAlerts, listInstalls } =
+    useStarterPacks(org);
   const { manifest: libraryManifest } = useAlertLibrary();
 
   const myEmail = (): string => store.state.userInfo?.email ?? "";
@@ -109,9 +111,14 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const previewState = ref<PackPreviewState>("idle");
   const removal = shallowRef<PackRemovalResult | null>(null);
   const removalFailed = ref(false);
-  const alertsOn = ref(0);
+  /** Live alerts the open confirmation's Undo or Remove deletes; null until counted. */
+  const alertsOn = ref<number | null>(null);
   const enabledAlertIds = shallowRef<Set<string>>(new Set());
+  const goneDashboards = shallowRef<Set<string>>(new Set());
+  const isGone = ({ kind, id }: PackRecordItem) =>
+    kind === "dashboard" && !!id && goneDashboards.value.has(id);
   let previewRun = 0;
+  let countRun = 0;
   const choices = ref<PackChoices>({ streams: {}, fields: {} });
   const nowUs = ref(Date.now() * 1000);
   const clock = setInterval(() => (nowUs.value = Date.now() * 1000), CLOCK_TICK_MS);
@@ -131,7 +138,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     const blocked =
       !running.value && all.some((item) => !countsAsItem(item) && item.status === "failed");
     return all
-      .filter(countsAsItem)
+      .filter((item) => countsAsItem(item) && !isGone(item))
       .map((item) =>
         blocked && item.status === "pending" ? { ...item, status: "failed" as const } : item,
       );
@@ -185,7 +192,50 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const readAlertsOn = async () => {
     const rows = await readQuery(alertsByTagsQuery(org, [`pack:${pack.id}`]), true);
     enabledAlertIds.value = new Set(rows.filter((row) => row.enabled).map((row) => row.alert_id));
-    alertsOn.value = enabledAlertIds.value.size;
+  };
+
+  // Each alert is read back, so only an open confirmation counts, never a load on Home.
+  const countAlertsOn = async (mode: "undo" | "remove" = "undo") => {
+    countRun += 1;
+    const run = countRun;
+    alertsOn.value = null;
+    // A confirmation can open before the load's read lands; the tag search trails this run's creates.
+    const tracked = enabledAlertIds.value;
+    await readAlertsOn();
+    const enabled = new Set([...enabledAlertIds.value, ...tracked]);
+    enabledAlertIds.value = enabled;
+    const shown = record.value ? [record.value] : [];
+    // Remove walks every install of the pack, so its count does too.
+    const rows = mode === "remove" ? await listInstalls(pack.id) : shown;
+    const counts = await Promise.all(rows.map((row) => countLiveAlerts(pack, row, enabled)));
+    // A confirmation reopened in the other mode must not show this older count.
+    if (run === countRun) alertsOn.value = counts.reduce((sum, count) => sum + count, 0);
+  };
+
+  // A dashboard deleted by hand stays in the record, so each folder is listed to drop it.
+  const readGoneDashboards = async (shown: PackInstallRecord) => {
+    const recorded = shown.items.filter(
+      ({ kind, id, folderId }) => kind === "dashboard" && !!id && !!folderId,
+    );
+    const folders = [...new Set(recorded.map(({ folderId }) => folderId!))];
+    const listed = await Promise.all(
+      folders.map(async (folderId) => {
+        // An unread folder proves nothing, so its dashboards stay shown.
+        const rows = await readQuery(dashboardsByFolderQuery(org, folderId), true).catch(
+          () => null,
+        );
+        return [folderId, rows && new Set(rows.map((row) => row.dashboard_id))] as const;
+      }),
+    );
+    const present = new Map(listed);
+    goneDashboards.value = new Set(
+      recorded
+        .filter(({ id, folderId }) => {
+          const ids = present.get(folderId!);
+          return !!ids && !ids.has(id);
+        })
+        .map(({ id }) => id!),
+    );
   };
 
   const load = async () => {
@@ -197,7 +247,10 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       if (!rows.some(({ status }) => status === "installing" || status === "incomplete")) {
         busyBy.value = null;
       }
-      if (record.value) await readAlertsOn();
+      // The old set stays until the new one is read, so a reload never flashes a deleted dashboard.
+      if (record.value) {
+        await Promise.all([readAlertsOn(), readGoneDashboards(record.value)]);
+      } else goneDashboards.value = new Set();
     } catch (error) {
       // A retry cannot get past a refusal, so it reads as ask an admin, not as a failed load.
       if (isForbidden(error)) forbidden.value = true;
@@ -319,7 +372,8 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     };
   };
 
-  const isOpenable = ({ kind, id }: PackRecordItem) => kind === "dashboard" && !!id;
+  const isOpenable = (item: PackRecordItem) =>
+    item.kind === "dashboard" && !!item.id && !isGone(item);
   // With nothing left to create there is no record, only the dashboard the preview found.
   const dashboardItem = computed(
     () => record.value?.items.find(isOpenable) ?? preview.value?.items.find(isOpenable),
@@ -339,7 +393,6 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       .filter(({ kind, status, id }) => kind === "alert" && status === "created" && id)
       .map(({ id }) => id!);
     enabledAlertIds.value = new Set([...enabledAlertIds.value, ...ids]);
-    alertsOn.value = enabledAlertIds.value.size;
   };
 
   const install = async (folderName?: string, choice: PackInstallChoice = {}): Promise<boolean> => {
@@ -384,7 +437,6 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       await readAlertsOn().catch(() => {});
       // The tag search trails a create, so keep the alerts this run just made on.
       enabledAlertIds.value = new Set([...enabledAlertIds.value, ...tracked]);
-      alertsOn.value = enabledAlertIds.value.size;
       return done.status === "complete";
     } catch (error) {
       if (error instanceof StarterPackStaleError) {
@@ -455,9 +507,11 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const undo = async () => {
     if (!(await stillAsShown())) return false;
     const installId = record.value?.installId;
-    return applyRemoval(() =>
-      installId ? undoPack(pack, installId) : Promise.resolve({ removed: [], kept: [] }),
-    );
+    if (!installId) {
+      removalFailed.value = true;
+      return false;
+    }
+    return applyRemoval(() => undoPack(pack, installId));
   };
 
   const remove = () => applyRemoval(() => removePack(pack));
@@ -473,6 +527,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     canUndo,
     chooseField,
     chooseStream,
+    countAlertsOn,
     dashboardCount,
     dashboardItem,
     dashboardsRoute,

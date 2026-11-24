@@ -29,6 +29,7 @@ import {
 import {
   createFolderMutation,
   deleteFolderMutation,
+  folderByIdQuery,
   permittedFoldersQuery,
 } from "@/services/common.queries";
 import {
@@ -90,6 +91,7 @@ import {
   readSchemaColumns,
 } from "./packMatchData";
 import { MAX_STREAM_COPIES } from "./streamCandidates";
+import { UNSAFE_NAME_ALL } from "./useEmailMeDestination";
 import { contentHash, isRunning, useInstallRecords } from "./useInstallRecords";
 import { catalogVersion } from "./usePackCatalog";
 import { StreamRewriteError } from "./streamRewriter";
@@ -146,6 +148,16 @@ const inFlight = new Map<string, Promise<PackInstallRecord>>();
 
 export const isNotFound = (error: any): boolean => error?.response?.status === 404;
 
+const foundById = async (id: string, read: () => Promise<unknown>): Promise<FoundItem | null> => {
+  try {
+    await read();
+    return { id };
+  } catch (error) {
+    if (isNotFound(error)) return null;
+    throw error;
+  }
+};
+
 // The backend stores tags lowercased, and a filter on any other case matches nothing.
 const alertTags = (packId: string, entryId: string, stream?: string): string[] => [
   `pack:${packId}`.toLowerCase(),
@@ -161,8 +173,20 @@ const NO_ADAPTATION: PackAdaptation = { repairs: [], bindings: [] };
 const flavourAlert = (pack: StarterPack, flavourId: string | undefined, alertId: string) =>
   pack.flavours?.find(({ id }) => id === flavourId)?.alerts[alertId];
 
-const isShared = (pack: StarterPack, { kind, itemId }: PackRecordItem) =>
-  kind === "dashboard" && !!pack.dashboards.find(({ id }) => id === itemId)?.shared;
+const failedItem = (item: PackRecordItem, error: unknown): PackRecordItem => ({
+  ...item,
+  status: error instanceof StreamRewriteError ? "skipped" : "failed",
+});
+
+const sharedOf = (pack: StarterPack, { kind, itemId }: PackRecordItem) =>
+  kind === "dashboard" ? pack.dashboards.find(({ id }) => id === itemId)?.shared : undefined;
+
+// A record outlives catalog changes, so its item may name a dashboard or view the pack dropped.
+const inCatalog = (pack: StarterPack, { kind, itemId }: PackRecordItem) => {
+  if (kind === "dashboard") return pack.dashboards.some(({ id }) => id === itemId);
+  if (kind === "savedView") return pack.savedViews.some(({ id }) => id === itemId);
+  return true;
+};
 
 const packItems = (pack: StarterPack, copies: PackPreview["copies"] = []): PackRecordItem[] => {
   const pending = { status: "pending" } as const;
@@ -211,20 +235,25 @@ export function useStarterPacks(org: string) {
   const createSavedView = useMutation(() => createSavedViewMutation(org));
   const deleteSavedView = useMutation(() => deleteSavedViewMutation(org));
 
-  const folderAdapter = (pack: StarterPack, type: PackFolderType): PackItemAdapter => ({
-    lookup: async () => {
-      const folders = await readQuery(permittedFoldersQuery(org, type), true);
-      const folder = folders.find((candidate) => candidate.name === pack.folder.name);
-      return folder ? { id: folder.folderId } : null;
-    },
-    create: async () => {
-      await createFolderFor[type].mutateAsync(pack.folder);
-    },
-    snapshot: async () => null,
-    remove: async ({ id }) => {
-      await deleteFolderFor[type].mutateAsync(id);
-    },
-  });
+  const folderAdapter = (pack: StarterPack, type: PackFolderType): PackItemAdapter => {
+    let made: string | undefined;
+    return {
+      lookup: async () => {
+        if (made) return { id: made };
+        const folders = await readQuery(permittedFoldersQuery(org, type), true);
+        const folder = folders.find((candidate) => candidate.name === pack.folder.name);
+        return folder ? { id: folder.folderId } : null;
+      },
+      create: async () => {
+        const created = await createFolderFor[type].mutateAsync(pack.folder);
+        made = created?.data?.folderId || undefined;
+      },
+      snapshot: async () => null,
+      remove: async ({ id }) => {
+        await deleteFolderFor[type].mutateAsync(id);
+      },
+    };
+  };
 
   const readDashboardSchemas = async (doc: Record<string, any>) => {
     const wanted = dashboardStreams(doc);
@@ -335,7 +364,7 @@ export function useStarterPacks(org: string) {
     const tags = [...((payload.tags as string[]) ?? []), ...own];
     return {
       ...doc,
-      name: stream ? `${doc.name}_${stream}` : doc.name,
+      name: stream ? `${doc.name}_${stream.replace(UNSAFE_NAME_ALL, "_")}` : doc.name,
       enabled,
       destinations: destination ? [destination] : [],
       tags: [...new Set(tags)],
@@ -397,12 +426,17 @@ export function useStarterPacks(org: string) {
 
   const savedViewAdapter = (
     pack: StarterPack,
-    itemId: string,
+    { itemId, id: recorded }: PackRecordItem,
     adaptation: PackAdaptation,
   ): PackItemAdapter => {
     const view = pack.savedViews.find((candidate) => candidate.id === itemId)!;
+    let made: string | undefined;
+    const readView = (id: string) => readQuery(savedViewDetailQuery(org, id), true);
     return {
+      // Names change by hand, so only a view the pack has no id for is found by name.
       lookup: async () => {
+        if (made) return { id: made };
+        if (recorded) return foundById(recorded, () => readView(recorded));
         const rows = await readQuery(savedViewsQuery(org), true);
         const row = rows.find(
           (candidate) => candidate.view_name === view.name && viewTypeOf(candidate) === "logs",
@@ -410,15 +444,16 @@ export function useStarterPacks(org: string) {
         return row ? { id: row.view_id } : null;
       },
       create: async () => {
-        await createSavedView.mutateAsync({
+        const created = await createSavedView.mutateAsync({
           data: buildSavedViewPayload(adaptSavedView(view.search, adaptation.repairs), {
             timezone: store.state.timezone,
           }),
           view_name: view.name,
           view_type: "logs",
         });
+        made = created?.data?.view_id || undefined;
       },
-      snapshot: ({ id }) => readQuery(savedViewDetailQuery(org, id), true),
+      snapshot: ({ id }) => readView(id),
       remove: async ({ id }) => {
         await deleteSavedView.mutateAsync(id);
       },
@@ -451,7 +486,7 @@ export function useStarterPacks(org: string) {
         destination,
       );
     }
-    return savedViewAdapter(pack, item.itemId, adaptation);
+    return savedViewAdapter(pack, item, adaptation);
   };
 
   // A Library install tags only `pack:<group>` and keeps its entry id in `library_id`.
@@ -726,7 +761,6 @@ export function useStarterPacks(org: string) {
     record: PackInstallRecord,
     enableAlerts = false,
     destination?: string,
-    fresh = false,
   ): Promise<PackRecordItem> => {
     const adaptation = { repairs: record.repairs ?? [], bindings: record.bindings ?? [] };
     const adapter = adapterFor(
@@ -739,12 +773,20 @@ export function useStarterPacks(org: string) {
       enableAlerts,
       destination,
     );
+    const index = record.items.indexOf(item);
+    let current = item;
+    let found: FoundItem | null;
     try {
-      let found = await adapter.lookup();
-      // Another surface or install made it first, so the pack links it and never deletes it.
-      // A resume cannot tell its own crashed create apart, so only a fresh pass links.
-      if (found && (fresh || isShared(pack, item)))
-        return { ...item, ...found, status: "existing" };
+      found = await adapter.lookup();
+    } catch (error) {
+      return failedItem(current, error);
+    }
+    // One this install never asked for was made elsewhere, so the pack links it and never deletes it.
+    const shared = sharedOf(pack, current);
+    if (found && (!current.attempted || (shared && found.folderId !== shared.folderId)))
+      return { ...current, ...found, status: "existing" };
+    if (!found) current = await markAttempted(record, index);
+    try {
       let made: boolean | void = true;
       if (!found) {
         // A create that errored may still have committed, so only the lookup after it decides.
@@ -753,14 +795,31 @@ export function useStarterPacks(org: string) {
         });
         found = await adapter.lookup();
       }
-      if (!found) return { ...item, status: "failed" };
-      if (made === false) return { ...item, ...found, status: "existing" };
+      if (!found) return { ...current, status: "failed" };
+      if (made === false) return { ...current, ...found, status: "existing" };
       const body = (await adapter.snapshot(found)) as Record<string, any>;
-      const settled = { ...item, ...found, status: "created" as const };
+      const settled = { ...current, ...found, status: "created" as const };
       return { ...settled, sourceHash: contentHash(body) };
     } catch (error) {
-      return { ...item, status: error instanceof StreamRewriteError ? "skipped" : "failed" };
+      // A found item keeps its id, so a resume reads it by id rather than by a name changed since.
+      return failedItem(found ? { ...current, ...found } : current, error);
     }
+  };
+
+  // Written before the create, so a resume can tell its own crashed create from another's item.
+  // A record-store failure ends the run, and the item is only marked once its write landed.
+  const markAttempted = async (record: PackInstallRecord, index: number) => {
+    const item = record.items[index];
+    const marked = { ...item, attempted: true };
+    record.items[index] = marked;
+    try {
+      await stopIfClaimLost(record);
+      await writeRun(record);
+    } catch (error) {
+      record.items[index] = item;
+      throw error;
+    }
+    return marked;
   };
 
   // Other tabs read a quiet `installing` record as stopped, so every write of a run is stamped.
@@ -873,8 +932,7 @@ export function useStarterPacks(org: string) {
     if (interrupted) await stopIfClaimLost(record);
     else await stopIfNotFirst(record);
     onProgress?.(record);
-    const fresh = !interrupted;
-    return settleRecord(pack, record, entries, onProgress, enableAlerts, destination, fresh).catch(
+    return settleRecord(pack, record, entries, onProgress, enableAlerts, destination).catch(
       async (error) => {
         // Marked stopped at once, so a Finish need not wait out the quiet window; best effort.
         const stored = await records.read(record.packId, record.installId).catch(() => null);
@@ -893,7 +951,6 @@ export function useStarterPacks(org: string) {
     onProgress?: PackInstallOptions["onProgress"],
     enableAlerts = false,
     destination?: string,
-    fresh = false,
   ): Promise<PackInstallRecord> => {
     for (let index = 0; index < record.items.length; index += 1) {
       const item = record.items[index];
@@ -906,7 +963,6 @@ export function useStarterPacks(org: string) {
         record,
         enableAlerts,
         destination,
-        fresh,
       );
       await stopIfClaimLost(record);
       await writeRun(record);
@@ -977,23 +1033,38 @@ export function useStarterPacks(org: string) {
     return rows.some((row) => row.dashboard_id === found.id);
   };
 
+  /** Why Undo keeps a recorded item, or null when Undo may delete it; a 404 throws. */
+  const keepReason = async (
+    pack: StarterPack,
+    item: PackRecordItem,
+    items: PackRecordItem[],
+    adapter: PackItemAdapter,
+    found: FoundItem,
+  ): Promise<PackKeptReason | null> => {
+    if (item.kind === "folder") {
+      const type = item.itemId as PackFolderType;
+      await readQuery(folderByIdQuery(org, type, found.id), true);
+      return (await isFolderEmpty(type, found.id)) ? null : "not_empty";
+    }
+    const body = (await adapter.snapshot(found)) as Record<string, any>;
+    if (contentHash(body) !== item.sourceHash) return "changed";
+    return (await ownsItem(pack, item, items, found, body)) ? null : "changed";
+  };
+
   /** The reason an item stays, or null once it is gone. */
   const disposeItem = async (
     pack: StarterPack,
     item: PackRecordItem,
     items: PackRecordItem[],
   ): Promise<PackKeptReason | null> => {
-    const adapter = adapterFor(pack, item, items, new Map());
+    // Without its catalog entry the pack cannot prove it made the item, so Undo keeps it.
+    if (!inCatalog(pack, item)) return item.id ? "changed" : null;
     try {
+      const adapter = adapterFor(pack, item, items, new Map());
       if (!item.id) return (await adapter.lookup()) ? "unrecorded" : null;
       const found = { id: item.id, folderId: item.folderId };
-      if (item.kind === "folder") {
-        if (!(await isFolderEmpty(item.itemId as PackFolderType, item.id))) return "not_empty";
-      } else {
-        const body = (await adapter.snapshot(found)) as Record<string, any>;
-        if (contentHash(body) !== item.sourceHash) return "changed";
-        if (!(await ownsItem(pack, item, items, found, body))) return "changed";
-      }
+      const reason = await keepReason(pack, item, items, adapter, found);
+      if (reason) return reason;
       await adapter.remove(found);
       return null;
     } catch (error) {
@@ -1022,9 +1093,44 @@ export function useStarterPacks(org: string) {
       }
     }
 
-    if (remaining.length === 0) await records.remove(record);
+    // A failed delete keeps the setup listed, so Undo is offered again and retries it.
+    // Finish would only re-settle what is left, so only a stopped setup now reads as set up.
+    const failed = kept.some(({ reason }) => reason === "delete_failed");
+    if (failed) {
+      const left = record.items.filter(
+        (item) => item.status === "existing" || remaining.includes(item),
+      );
+      const stopped =
+        record.status === "incomplete" ||
+        (record.status === "installing" && !isRunning(record, Date.now() * 1000));
+      const status = stopped ? "complete" : record.status;
+      await records.write({ ...record, status, items: left });
+    } else if (remaining.length === 0) await records.remove(record);
     else await records.write({ ...record, status: "removed", items: remaining });
     return { removed, kept };
+  };
+
+  /** Created alerts that are on now and that an Undo of this record would delete. */
+  const countLiveAlerts = async (
+    pack: StarterPack,
+    record: PackInstallRecord,
+    enabled: ReadonlySet<string>,
+  ): Promise<number> => {
+    const owner = withFolder(pack, record.folderName);
+    const live = record.items.filter(
+      ({ kind, status, id }) => kind === "alert" && status === "created" && !!id && enabled.has(id),
+    );
+    const deletable = await Promise.all(
+      live.map(async (item) => {
+        const adapter = adapterFor(owner, item, record.items, new Map());
+        const found = { id: item.id!, folderId: item.folderId };
+        const reason = await keepReason(owner, item, record.items, adapter, found).catch(
+          () => "gone",
+        );
+        return reason === null;
+      }),
+    );
+    return deletable.filter(Boolean).length;
   };
 
   /** Removes one install's unchanged items and reports the rest. */
@@ -1042,7 +1148,11 @@ export function useStarterPacks(org: string) {
   const removePack = async (pack: StarterPack): Promise<PackRemovalResult> => {
     const result: PackRemovalResult = { removed: [], kept: [] };
     await installSettled(pack);
-    for (const record of await records.list(pack.id)) {
+    const installs = await records.list(pack.id);
+    // A failed delete rewrites its record, which would overwrite a live run's record in another tab.
+    const live = installs.find((record) => isRunning(record, Date.now() * 1000));
+    if (live) throw new StarterPackBusyError(live.installedBy ?? "");
+    for (const record of installs) {
       const { removed, kept } = await removeInstall(pack, record);
       result.removed.push(...removed);
       result.kept.push(...kept);
@@ -1061,6 +1171,7 @@ export function useStarterPacks(org: string) {
     previewPack,
     undoPack,
     removePack,
+    countLiveAlerts,
     listInstalls: records.list,
   };
 }
