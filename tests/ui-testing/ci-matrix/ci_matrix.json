@@ -81,7 +81,7 @@
     "browser": "chrome",
     "run_files": [
       "dashboard-series-color-multiwindow.spec.js",
-      "crossLinking.spec.js",
+      "crossLinking-org.spec.js",
       "dashboard-variable-select-all.spec.js",
       "visualize-vrl.spec.js",
       "dashboard-sql-autocomplete-values.spec.js",
@@ -125,6 +125,7 @@
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
+      "crossLinking.spec.js",
       "dashboard-config-promql.spec.js",
       "dashboard-table-chart.spec.js",
       "dashboard-panel-unsaved-changes.spec.js",
