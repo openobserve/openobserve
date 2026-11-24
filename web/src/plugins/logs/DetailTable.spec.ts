@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach, Mock } from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach, Mock, onTestFinished } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { copyToClipboard } from "@/utils/clipboard";
 import { nextTick } from "vue";
@@ -1188,6 +1188,12 @@ describe("DetailTable Component", () => {
     });
 
     it("never emits a locked correlated tab and bounces back from one", async () => {
+      // Correlation is locked by edition, so pin the build this test is about instead of reading .env.
+      const originalIsEnterprise = config.isEnterprise;
+      (config as any).isEnterprise = "false";
+      onTestFinished(() => {
+        (config as any).isEnterprise = originalIsEnterprise;
+      });
       await mountFooter({ initialTab: "json" });
       wrapper.vm.tab = "correlated-logs";
       await flushPromises();
