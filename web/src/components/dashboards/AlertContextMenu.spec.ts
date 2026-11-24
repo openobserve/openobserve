@@ -443,4 +443,41 @@ describe("AlertContextMenu Component", () => {
       expect(wrapper.emitted("select")[0][0].threshold).toBe(123);
     });
   });
+
+  describe("merged with a chart point's rows", () => {
+    const mountWithRows = (props = {}) =>
+      mount(AlertContextMenu, {
+        props: { ...defaultProps, ...props },
+        attachTo: document.body,
+        slots: { points: "<div data-test='row'>View logs</div>" },
+        global: { stubs: { teleport: { template: "<slot />" } } },
+      });
+
+    it("lists the rows first, then a divider, then the alert items", () => {
+      wrapper = mountWithRows();
+      const html = wrapper.html();
+      expect(wrapper.find("[data-test='row']").exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OSeparator" }).exists()).toBe(true);
+      expect(html.indexOf('data-test="row"')).toBeLessThan(
+        html.indexOf("alert-context-menu-above"),
+      );
+    });
+
+    it("without alert items it shows only the rows, with no divider", () => {
+      wrapper = mountWithRows({ showAlert: false });
+      expect(wrapper.find("[data-test='row']").exists()).toBe(true);
+      expect(wrapper.find("[data-test='alert-context-menu-above']").exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OSeparator" }).exists()).toBe(false);
+    });
+
+    it("uses the O2 dropdown spacing: p-1 round the menu, px-3 py-1.5 per item", () => {
+      wrapper = createWrapper();
+      const menu = wrapper.find("[data-test='alert-context-menu']");
+      expect(menu.classes()).toEqual(expect.arrayContaining(["p-1", "min-w-40"]));
+      expect(menu.classes()).not.toContain("min-w-70");
+      expect(wrapper.find("[data-test='alert-context-menu-above']").classes()).toEqual(
+        expect.arrayContaining(["px-3", "py-1.5", "gap-2", "rounded-default"]),
+      );
+    });
+  });
 });

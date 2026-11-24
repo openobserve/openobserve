@@ -796,6 +796,70 @@ describe("TracesSearchResultList", () => {
   // The component handler is invoked by CellActions via its @add-search-term event.
   // We emit the event on the CellActions stub and assert the resulting
   // searchObj.data.stream.addToFilter string.
+  // A host such as the dashboard Trace Explorer owns the columns and the filter.
+  describe("host-owned columns", () => {
+    const hostColumns = () => [
+      { id: "service_name", size: 160, meta: {} },
+      { id: "duration", size: 120, meta: {} },
+      { id: "spans", size: 100, meta: {} },
+    ];
+    const pageColumns = [{ id: "page_only", size: 100, meta: {} }];
+
+    beforeEach(() => {
+      sharedSearchObj.data.resultGrid.columns = [...pageColumns];
+      (sharedSearchObj.data.stream as any).selectedFields = ["page_only"];
+    });
+
+    const mountHosted = () =>
+      mount_({
+        hits: [makeHit("t1")],
+        loading: false,
+        columns: hostColumns(),
+        streamFields: [{ name: "service_name", isSchemaField: true }],
+        streamName: "otel",
+      });
+
+    it("renders the host's columns, not the Traces page's", () => {
+      wrapper = mountHosted();
+      const ids = wrapper
+        .findComponent({ name: "OTable" })
+        .props("columns")
+        .map((c: any) => c.id);
+      expect(ids).toEqual(["service_name", "duration", "spans"]);
+    });
+
+    it("reorders and closes columns locally, leaving the Traces page state alone", async () => {
+      wrapper = mountHosted();
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("column-order-change", ["spans", "service_name", "duration"]);
+      await table.vm.$emit("close-column", { id: "duration" });
+
+      expect(table.props("columns").map((c: any) => c.id)).toEqual(["spans", "service_name"]);
+      expect(sharedSearchObj.data.resultGrid.columns).toEqual(pageColumns);
+      expect((sharedSearchObj.data.stream as any).selectedFields).toEqual(["page_only"]);
+    });
+
+    it("sends include and exclude to the host instead of the Traces page query", async () => {
+      wrapper = mountHosted();
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.props("selectedStreamFields")).toEqual([
+        { name: "service_name", isSchemaField: true },
+      ]);
+      await cellActions.vm.$emit("add-search-term", "service_name", "cart", "exclude");
+
+      expect(wrapper.emitted("add-filter")).toEqual([["service_name != 'cart'"]]);
+      expect(sharedSearchObj.data.stream.addToFilter).toBe("");
+    });
+
+    it("keeps its row selection out of the Traces page's navigation", () => {
+      sharedSearchObj.meta.resultGrid.navigation.lastOpenedId = "t1";
+      sharedSearchObj.meta.resultGrid.navigation.selectionActive = false;
+      wrapper = mountHosted();
+      expect(sharedSearchObj.meta.resultGrid.navigation.selectionActive).toBe(false);
+      sharedSearchObj.meta.resultGrid.navigation.lastOpenedId = null;
+    });
+  });
+
   describe("addSearchTerm — span_kind translation", () => {
     const hit = makeHit("t1");
 

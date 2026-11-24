@@ -57,12 +57,15 @@ import {
   isPathChart,
   isTimeXField,
   logsAvailability,
+  metricsAvailability,
   pointFamily,
   pointGroupFilters,
+  promqlMetricName,
+  promqlPointWindow,
   sliceBounds,
   tracesAvailability,
-  tracesPageQuery,
   treeOpensPointMenu,
+  type FieldFilter,
   type PointClick,
   type PointExplore,
   type PointExploreItem,
@@ -848,12 +851,31 @@ export function usePanelDrilldown({
     };
   };
 
-  const pointTimeRange = async (params: any, family: PointFamily, resultIndex: number) => {
+  const pointTimeRange = async (
+    params: any,
+    family: PointFamily,
+    queryIndex: number,
+    resultIndex: number,
+  ): Promise<{
+    startTime: number;
+    endTime: number;
+    lookBack?: boolean;
+  }> => {
     const { range, shiftUs } = pointQueryRange(resultIndex);
     if (family === "category") return range ?? calculateTimeRange(null, intervalMicro.value);
     // An h-bar label is the raw histogram key, which no shift has moved.
     if (isHorizontalBarChart(panelSchema.value.type)) {
       return calculateTimeRange(labelTimestamp(params?.name), intervalMicro.value);
+    }
+    // A PromQL point is computed from the samples in the look-back before it, not a bucket after it.
+    const pointUs =
+      family === "time" && panelSchema.value?.queryType === "promql"
+        ? getUTCTimestampFromZonedTimestamp(params?.value?.[0], store.state.timezone)
+        : null;
+    if (pointUs !== null) {
+      const expression = executedQuery(queryIndex, resultIndex);
+      // Each selector's own offset moves the samples it reads back (or forward, when negative).
+      return { ...promqlPointWindow(pointUs - shiftUs, expression), lookBack: true };
     }
     const clicked = await clickedTimeRange(params);
     if (family !== "time") return clicked;
@@ -863,9 +885,9 @@ export function usePanelDrilldown({
 
   const sliceText = (target: PointTarget): I18nText => {
     const bounds = sliceBounds(target.startTime, target.endTime, store.state.timezone);
-    return target.timeSlice === "bucket"
-      ? t("panel.pointExplore.slice", bounds)
-      : t("panel.pointExplore.wholeRange", bounds);
+    return target.timeSlice === "panelRange"
+      ? t("panel.pointExplore.wholeRange", bounds)
+      : t("panel.pointExplore.slice", bounds);
   };
 
   const pointDetail = (target: PointTarget): I18nText =>
@@ -898,15 +920,11 @@ export function usePanelDrilldown({
   const correlationEnabled = () =>
     !!findRelatedTelemetry && correlationConfigured(config.isEnterprise, store.state.zoConfig);
 
-  const tracesItem = (target: PointTarget): PointExploreItem => {
-    const availability = tracesAvailability({
-      queryType: panelSchema.value?.queryType,
-      streamType: target.streamType,
-      hasGroupValues: target.filters.length > 0,
-      correlationEnabled: correlationEnabled(),
-      isLocked: licenseLocks.isLocked,
-    });
-    if (availability.kind === "locked") return lockedItem(availability.feature);
+  const correlationItem = (
+    availability: { kind: string; feature?: string },
+    target: PointTarget,
+  ): PointExploreItem => {
+    if (availability.kind === "locked") return lockedItem(availability.feature ?? "");
     if (availability.kind === "blocked") return hiddenItem;
     if (availability.kind === "correlate") {
       return { state: "pending", detail: t("panel.pointExplore.findingService") };
@@ -914,64 +932,113 @@ export function usePanelDrilldown({
     return { state: "enabled", detail: pointDetail(target) };
   };
 
-  // Correlation is a server lookup, so the traces item settles after the menu has opened.
-  const correlatePointTraces = async (request: number, target: PointTarget) => {
+  const availabilityInput = (target: PointTarget) => ({
+    queryType: panelSchema.value?.queryType,
+    streamType: target.streamType,
+    hasGroupValues: target.filters.length > 0,
+    correlationEnabled: correlationEnabled(),
+    isLocked: licenseLocks.isLocked,
+  });
+
+  const tracesItem = (target: PointTarget): PointExploreItem =>
+    correlationItem(tracesAvailability(availabilityInput(target)), target);
+
+  const metricsItem = (target: PointTarget): PointExploreItem =>
+    correlationItem(metricsAvailability(availabilityInput(target)), target);
+
+  const streamFilters = (
+    stream: { filters?: Record<string, string> },
+    serviceName: string,
+  ): FieldFilter[] => {
+    const filters = Object.entries(stream.filters ?? {}).map(([field, value]) => ({
+      field,
+      value,
+    }));
+    return filters.length ? filters : [{ field: "service_name", value: serviceName }];
+  };
+
+  const correlationSource = (streamType: string): TelemetryType =>
+    streamType === "metrics" ? "metrics" : streamType === "traces" ? "traces" : "logs";
+
+  // One lookup settles both the traces and the metrics row, after the menu has opened.
+  const correlatePoint = async (request: number, target: PointTarget) => {
     const fields = Object.fromEntries(target.filters.map((f) => [f.field, f.value ?? ""]));
     let result: CorrelationResult | null = null;
     try {
       result = await findRelatedTelemetry!(
         { timestamp: target.startTime, fields },
-        target.streamType === "metrics" ? "metrics" : "logs",
+        correlationSource(target.streamType),
         5,
         target.stream,
       );
     } catch {
       result = null;
     }
-    if (request !== pointRequest || !pointExplore.value) return;
+    const explore = pointExplore.value;
+    if (request !== pointRequest || !explore) return;
     const data = result?.correlationData;
-    const traceStream = data?.related_streams?.traces?.[0];
-    if (!data || !traceStream?.stream_name) {
-      if (pointExplore.value.logs.state !== "hidden") {
-        pointExplore.value = { ...pointExplore.value, traces: hiddenItem };
-        return;
+    const next: PointExplore = { ...explore };
+    if (explore.traces.state === "pending") {
+      const traceStream = data?.related_streams?.traces?.[0];
+      next.traces = hiddenItem;
+      if (data && traceStream?.stream_name) {
+        const filters = streamFilters(traceStream, data.service_name);
+        next.tracesTarget = {
+          stream: traceStream.stream_name,
+          filter: filtersWhere("", filters),
+          filters,
+          correlated: true,
+        };
+        next.traces = {
+          state: "enabled",
+          detail: t("panel.pointExplore.tracesForService", {
+            service: data.service_name,
+            slice: sliceText(target),
+          }),
+        };
       }
-      // Nothing is left in the point section, so a menu with no drilldowns would open empty.
+    }
+    if (explore.metrics.state === "pending") {
+      const metricStreams = (data?.related_streams?.metrics ?? []).filter((s) => s.stream_name);
+      next.metrics = hiddenItem;
+      if (data && metricStreams.length) {
+        next.metricsTarget = {
+          stream: metricStreams[0].stream_name,
+          streams: metricStreams.map((s) => s.stream_name),
+          filters: streamFilters(metricStreams[0], data.service_name),
+          correlated: true,
+        };
+        next.metrics = {
+          state: "enabled",
+          detail: t("panel.pointExplore.metricsForService", {
+            service: data.service_name,
+            slice: sliceText(target),
+          }),
+        };
+      }
+    }
+    if ([next.logs, next.traces, next.metrics].every((item) => item.state === "hidden")) {
+      // Nothing is left in the point section; the right-click menu closes if it has nothing else.
       pointExplore.value = null;
-      if (!drilldownArray.value.length) hidePopupsAndOverlays();
       return;
     }
-    const streamFilters = Object.entries(traceStream.filters ?? {}).map(([field, value]) => ({
-      field,
-      value,
-    }));
-    pointExplore.value = {
-      ...pointExplore.value,
-      tracesTarget: {
-        stream: traceStream.stream_name,
-        filter: filtersWhere(
-          "",
-          streamFilters.length
-            ? streamFilters
-            : [{ field: "service_name", value: data.service_name }],
-        ),
-      },
-      traces: {
-        state: "enabled",
-        detail: t("panel.pointExplore.tracesForService", {
-          service: data.service_name,
-          slice: sliceText(target),
-        }),
-      },
-    };
+    pointExplore.value = next;
   };
+
+  // The executed query has the dashboard variables resolved; the panel query is the fallback.
+  const executedQuery = (queryIndex: number, resultIndex: number): string =>
+    String(
+      metadata?.value?.queries?.[resultIndex]?.query ??
+        panelSchema.value?.queries?.[queryIndex]?.query ??
+        "",
+    );
 
   // Fills the point section for a click on a supported chart; false where the chart has none.
   const preparePointExplore = async (params: any): Promise<boolean> => {
     pointRequest += 1;
     const request = pointRequest;
     const schema = panelSchema.value;
-    // A treemap or sunburst keeps its zoom unless the menu can open something.
+    // A treemap or sunburst tile offers the point menu only where it can open something.
     const treeBlocked =
       isPathChart(schema?.type) &&
       !treeOpensPointMenu(schema, {
@@ -994,23 +1061,22 @@ export function usePanelDrilldown({
     const resultIndex =
       schema.type === "funnel" ? queryIndex : (pointSeries(params)?._queryIndex ?? 0);
     const query = schema.queries?.[queryIndex];
+    const isPromql = schema.queryType === "promql";
     const customColumns =
-      schema.queryType !== "promql" && query?.customQuery
-        ? await customQueryColumns(queryIndex)
-        : undefined;
+      !isPromql && query?.customQuery ? await customQueryColumns(queryIndex) : undefined;
     const rows = data.value?.[resultIndex];
-    const filters =
-      schema.queryType === "promql"
-        ? []
-        : pointGroupFilters(
-            query,
-            schema,
-            family,
-            pointClick(params, family, query),
-            Array.isArray(rows) ? rows : undefined,
-            customColumns,
-          );
-    const range = await pointTimeRange(params, family, resultIndex);
+    const seriesLabels: Record<string, string> | undefined = isPromql
+      ? (pointSeries(params)?._labels ?? {})
+      : undefined;
+    const filters = pointGroupFilters(
+      query,
+      schema,
+      family,
+      isPromql ? { seriesLabels } : pointClick(params, family, query),
+      Array.isArray(rows) ? rows : undefined,
+      customColumns,
+    );
+    const range = await pointTimeRange(params, family, queryIndex, resultIndex);
     const sameAs = (other: { startTime?: number; endTime?: number } | null) =>
       !!other && range.startTime === other.startTime && range.endTime === other.endTime;
     const wholeRange =
@@ -1019,51 +1085,50 @@ export function usePanelDrilldown({
         startTime: selectedTimeObj.value?.start_time?.getTime?.(),
         endTime: selectedTimeObj.value?.end_time?.getTime?.(),
       });
+    const promql = isPromql ? executedQuery(queryIndex, resultIndex) : undefined;
     const target: PointTarget = {
       queryIndex,
-      stream: query?.fields?.stream ?? "",
-      streamType: query?.fields?.stream_type || "logs",
+      stream: isPromql
+        ? promqlMetricName(promql, seriesLabels) || (query?.fields?.stream ?? "")
+        : (query?.fields?.stream ?? ""),
+      streamType: isPromql ? "metrics" : query?.fields?.stream_type || "logs",
       startTime: range.startTime,
       endTime: range.endTime,
-      timeSlice: family === "category" || wholeRange ? "panelRange" : "bucket",
+      timeSlice: range.lookBack
+        ? "lookBack"
+        : family === "category" || wholeRange
+          ? "panelRange"
+          : "bucket",
       filters,
     };
-    const joinsStreams =
-      schema.queryType !== "promql" && (await queryJoinsStreams(queryIndex, resultIndex));
+    const joinsStreams = !isPromql && (await queryJoinsStreams(queryIndex, resultIndex));
     if (request !== pointRequest) return false;
-    const traces = tracesItem(target);
     const logs = logsItem(target, joinsStreams);
-    if (logs.state === "hidden" && traces.state === "hidden") {
+    const traces = tracesItem(target);
+    // A metrics chart whose metric cannot be named has no stream to open.
+    const metrics =
+      target.streamType === "metrics" && !target.stream ? hiddenItem : metricsItem(target);
+    if ([logs, traces, metrics].every((item) => item.state === "hidden")) {
       pointExplore.value = null;
       return false;
     }
+    const direct = { filters, correlated: false };
     pointExplore.value = {
       target,
       logs,
       traces,
+      metrics,
       tracesTarget:
         traces.state === "enabled"
-          ? { stream: target.stream, filter: filtersWhere("", filters) }
+          ? { stream: target.stream, filter: filtersWhere("", filters), ...direct }
+          : null,
+      metricsTarget:
+        metrics.state === "enabled"
+          ? { stream: target.stream, streams: [target.stream], promql, ...direct }
           : null,
     };
-    if (traces.state === "pending") correlatePointTraces(request, target);
+    if (traces.state === "pending" || metrics.state === "pending") correlatePoint(request, target);
     return true;
-  };
-
-  // Opens the clicked slice on the Traces page in a new tab.
-  const openPointTraces = () => {
-    const explore = pointExplore.value;
-    hidePopupsAndOverlays();
-    if (!explore?.tracesTarget || explore.traces.state !== "enabled") return;
-    const query = tracesPageQuery({
-      org: store.state.selectedOrganization.identifier,
-      stream: explore.tracesTarget.stream,
-      startTime: explore.target.startTime,
-      endTime: explore.target.endTime,
-      filter: explore.tracesTarget.filter,
-    });
-    const href = router.resolve({ name: "traces", query }).href;
-    window.open(href, "_blank", "noopener,noreferrer");
   };
 
   const onChartClick = async (params: any, ...args: any) => {
@@ -1113,14 +1178,7 @@ export function usePanelDrilldown({
     const crossLinkItems = getCrossLinkDrilldownItems();
     // A state timeline's drilldown reads a segment, so an annotation click only opens the annotation.
     const annotationOnly = hasAnnotation && isRowTimeline(panelSchema.value.type);
-    // Only a series item is a data point; an annotation marker keeps its own popup.
-    const isDataPoint = (params?.componentType ?? "series") === "series";
-    // A fast correlation miss can clear the section before the menu opens.
-    const hasPointExplore =
-      isDataPoint && (await preparePointExplore(params)) && !!pointExplore.value;
-    if (!isDataPoint) pointExplore.value = null;
-    const shouldShowDrilldown =
-      !annotationOnly && (hasDrilldown || crossLinkItems.length > 0 || hasPointExplore);
+    const shouldShowDrilldown = !annotationOnly && (hasDrilldown || crossLinkItems.length > 0);
 
     if (shouldShowDrilldown) {
       drilldownParams = [params, args];
@@ -1843,11 +1901,24 @@ export function usePanelDrilldown({
     { deep: true },
   );
 
+  /**
+   * Fills the point section of the right-click menu (View logs / traces / metrics) for a chart point.
+   * True when at least one row shows; a fast correlation miss can still clear it afterwards.
+   */
+  const explorePoint = async (params: any): Promise<boolean> => {
+    // Only a series item is a data point; an annotation marker or empty space has none.
+    if (!params || (params.componentType ?? "series") !== "series") {
+      pointExplore.value = null;
+      return false;
+    }
+    return (await preparePointExplore(params)) && !!pointExplore.value;
+  };
+
   return {
     drilldownArray,
     crossLinksData,
     pointExplore,
-    openPointTraces,
+    explorePoint,
     onChartClick,
     openDrilldown,
     drilldownLockedReason,

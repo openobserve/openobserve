@@ -64,8 +64,6 @@ export const convertPanelData = async (
   // Metric sparkline: per-query histogram hits (SQL metric only).
   sparklineData?: any,
   customChartContext?: CustomChartContext,
-  // A click opens the point menu, so a treemap or sunburst must not also zoom under it.
-  pointMenu = false,
 ) => {
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
@@ -196,13 +194,13 @@ export const convertPanelData = async (
     case "treemap": {
       return {
         chartType: panelSchema.type,
-        ...convertTreemapData(panelSchema, data, store, pointMenu),
+        ...convertTreemapData(panelSchema, data, store),
       };
     }
     case "sunburst": {
       return {
         chartType: panelSchema.type,
-        ...convertSunburstData(panelSchema, data, store, chartPanelRef, pointMenu),
+        ...convertSunburstData(panelSchema, data, store, chartPanelRef),
       };
     }
     case "funnel": {

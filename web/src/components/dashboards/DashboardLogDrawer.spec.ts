@@ -54,12 +54,14 @@ vi.mock("@/composables/useStreamingSearch", () => ({
   default: () => ({ fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId }),
 }));
 vi.mock("@/services/patterns", () => ({ default: {} }));
+const routerReplace = vi.hoisted(() => vi.fn());
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ query: {} }),
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useRoute: () => ({ query: { tab: "t1" } }),
+  useRouter: () => ({ replace: routerReplace, push: vi.fn() }),
 }));
 
 import DashboardLogDrawer from "@/components/dashboards/DashboardLogDrawer.vue";
+import ExplorerResultRow from "@/components/dashboards/pointExplorer/ExplorerResultRow.vue";
 
 const mountDrawer = (features: Record<string, string>, streamType?: string) =>
   shallowMount(DashboardLogDrawer, {
@@ -145,7 +147,6 @@ describe("DashboardLogDrawer filters", () => {
         { field: "code", value: 500 },
         { field: "svc", value: null },
       ],
-      timeSlice: "bucket",
     });
     await flushPromises();
     expect(firstSql()).toBe(
@@ -154,7 +155,7 @@ describe("DashboardLogDrawer filters", () => {
   });
 
   it("chart filters with no panel WHERE and no group-by values search the whole stream", async () => {
-    mountWith({ filters: [], timeSlice: "panelRange" });
+    mountWith({ filters: [] });
     await flushPromises();
     expect(firstSql()).toBe(`SELECT * FROM "app" ORDER BY _timestamp DESC`);
   });
@@ -165,23 +166,17 @@ describe("DashboardLogDrawer filters", () => {
     expect(fetchQueryDataWithHttpStream).not.toHaveBeenCalled();
   });
 
-  it("shows the Applied row with the slice, the panel filter and each group-by value", () => {
-    const t0 = Date.UTC(2026, 10, 5, 10, 5) * 1000;
+  it("a chart point shows no Applied row: the time picker and the SQL show what runs", async () => {
     const wrapper = mountWith({
-      startTime: t0,
-      endTime: t0 + 300_000_000,
       baseWhere: "level = 'error'",
       filters: [{ field: "service", value: "cart" }],
-      timeSlice: "bucket",
     });
-    const applied = wrapper.find('[data-test="log-explorer-applied"]');
-    expect(applied.exists()).toBe(true);
-    const chips = applied.findAllComponents({ name: "ODimensionChip" });
-    expect(chips.map((c) => c.props("value"))).toEqual([
-      "10:05–10:10 (clicked bucket)",
-      "level = 'error'",
-      "cart",
-    ]);
+    await flushPromises();
+    expect(wrapper.find('[data-test="log-explorer-applied"]').exists()).toBe(false);
+    // The panel filter and the clicked values are still in the query.
+    expect(firstSql()).toBe(
+      `SELECT * FROM "app" WHERE (level = 'error') AND service = 'cart' ORDER BY _timestamp DESC`,
+    );
   });
 
   it("table cell path: one field/value predicate and no Applied row, as before", async () => {
@@ -212,6 +207,8 @@ describe("DashboardLogDrawer streaming search", () => {
       props: { stream: "app", field: "level", value: "error", startTime: 1, endTime: 2, ...props },
       global: {
         renderStubDefaultSlot: true,
+        // The shared explorer pager renders for real, so its page count is the one shown.
+        stubs: { ExplorerResultsPager: false },
         plugins: [
           i18n,
           createStore({
@@ -221,6 +218,8 @@ describe("DashboardLogDrawer streaming search", () => {
       },
     });
   const state = (wrapper: ReturnType<typeof mountIt>) => (wrapper.vm as any).$.setupState;
+  const pagerPages = (wrapper: ReturnType<typeof mountIt>) =>
+    wrapper.findComponent({ name: "TablePaginationControls" }).props("pagesNumber");
   const hits = (rows: any[]) => ({
     type: "search_response_hits",
     content: { results: { hits: rows } },
@@ -285,7 +284,7 @@ describe("DashboardLogDrawer streaming search", () => {
       expect(countReq.queryReq.query).toMatchObject({ size: 0, from: 0, track_total_hits: true });
       expect(countReq.queryReq.query.sql).toBe(searchCalls()[0].queryReq.query.sql);
       expect(state(wrapper).total).toBe(214);
-      expect(state(wrapper).resultTotalPages).toBe(3);
+      expect(pagerPages(wrapper)).toBe(3);
       expect(wrapper.findComponent({ name: "TablePaginationControls" }).props("totalRows")).toBe(
         214,
       );
@@ -293,7 +292,7 @@ describe("DashboardLogDrawer streaming search", () => {
       state(wrapper).pageSize = 20;
       await flushPromises();
       expect(state(wrapper).total).toBe(214);
-      expect(state(wrapper).resultTotalPages).toBe(11);
+      expect(pagerPages(wrapper)).toBe(11);
       await state(wrapper).goToPage(10);
       expect(searchCalls().at(-1).queryReq.query.from).toBe(200);
       expect(state(wrapper).total).toBe(214);
@@ -421,7 +420,36 @@ describe("DashboardLogDrawer streaming search", () => {
     h.complete(req, {});
     await flushPromises();
     expect(state(wrapper).total).toBe(3);
-    expect(state(wrapper).resultTotalPages).toBe(1);
+    expect(pagerPages(wrapper)).toBe(1);
+  });
+
+  it("a row opens the event detail, and its chevron only toggles the inline JSON", async () => {
+    stream.reply = (req, h) => {
+      h.data(req, hits(rowsOf(2)));
+      h.complete(req, {});
+    };
+    const wrapper = mountIt();
+    await flushPromises();
+    const row = wrapper.findAllComponents(ExplorerResultRow)[1];
+    row.vm.$emit("toggle");
+    await flushPromises();
+    expect(state(wrapper).isResultExpanded(1)).toBe(true);
+    expect(state(wrapper).selectedEvent).toBeNull();
+    row.vm.$emit("open");
+    await flushPromises();
+    expect(state(wrapper).selectedEvent).toEqual({ i: 1 });
+  });
+
+  it("each result is the shared explorer row, the one the Metrics Explorer uses", async () => {
+    stream.reply = (req, h) => {
+      h.data(req, hits(rowsOf(3)));
+      h.complete(req, {});
+    };
+    const wrapper = mountIt();
+    await flushPromises();
+    const rows = wrapper.findAllComponents(ExplorerResultRow);
+    expect(rows).toHaveLength(3);
+    expect(rows[0].props("openDataTest")).toBe("log-explorer-row-open");
   });
 
   it("a count that lands after its search failed leaves the error with no pager", async () => {
@@ -461,6 +489,153 @@ describe("DashboardLogDrawer streaming search", () => {
     expect(cancelStreamQueryBasedOnRequestId).toHaveBeenCalledWith({
       trace_id: pending[0].traceId,
       org_id: "org",
+    });
+  });
+});
+
+describe("DashboardLogDrawer modes", () => {
+  const mountMode = (mode?: "logs" | "traces" | "metrics") =>
+    shallowMount(DashboardLogDrawer, {
+      props: { stream: "app", field: "", value: "", startTime: 1, endTime: 2, filters: [], mode },
+      global: {
+        plugins: [
+          i18n,
+          createStore({
+            state: {
+              selectedOrganization: { identifier: "org" },
+              timezone: "UTC",
+              zoConfig: { features: {} },
+            },
+          }),
+        ],
+      },
+    });
+
+  beforeEach(() => fetchQueryDataWithHttpStream.mockClear());
+
+  it.each(["traces", "metrics"] as const)(
+    "%s mode hands the body to its explorer and runs no logs search",
+    async (mode) => {
+      const wrapper = mountMode(mode);
+      await flushPromises();
+      expect(searchCalls()).toHaveLength(0);
+      expect(wrapper.find('[data-test="log-explorer-sql-toggle"]').exists()).toBe(false);
+    },
+  );
+
+  it("no mode is logs, as the table-cell explorer opens it", async () => {
+    const wrapper = mountMode();
+    await flushPromises();
+    expect(searchCalls()).toHaveLength(1);
+    expect(wrapper.find('[data-test="log-explorer-sql-toggle"]').exists()).toBe(true);
+  });
+});
+
+describe("DashboardLogDrawer Copy link", () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  const EVENT_TS = 1_700_000_123_456_789;
+  const mountCopy = (props: Record<string, unknown>) =>
+    shallowMount(DashboardLogDrawer, {
+      props: { stream: "app", startTime: 1, endTime: 2, ...props },
+      global: {
+        renderStubDefaultSlot: true,
+        stubs: { OButton: false },
+        plugins: [
+          i18n,
+          createStore({
+            state: {
+              selectedOrganization: { identifier: "org" },
+              timezone: "UTC",
+              zoConfig: { features: {} },
+            },
+          }),
+        ],
+      },
+    });
+  const copyLinkOf = async (wrapper: ReturnType<typeof mountCopy>) => {
+    await flushPromises();
+    (wrapper.vm as any).$.setupState.selectedEvent = { _timestamp: EVENT_TS, level: "error" };
+    await flushPromises();
+    await wrapper.find('[data-test="log-explorer-detail-copy-link"]').trigger("click");
+    return writeText.mock.calls.at(-1)?.[0] as string;
+  };
+
+  beforeEach(() => {
+    writeText.mockClear();
+    // The test setup installs navigator.clipboard as writable, not configurable.
+    (navigator as any).clipboard = { writeText };
+  });
+
+  it("a chart point's log links to that log on the Logs page, over the second holding it", async () => {
+    const wrapper = mountCopy({
+      field: "",
+      value: "",
+      filters: [{ field: "svc", value: "cart" }],
+      mode: "logs",
+    });
+    const url = new URL(await copyLinkOf(wrapper));
+    expect(url.pathname).toBe("/logs");
+    const q = Object.fromEntries(url.searchParams);
+    expect(q).toMatchObject({
+      org_identifier: "org",
+      stream: "app",
+      stream_type: "logs",
+      sql_mode: "true",
+      from: "1700000123000000",
+      to: "1700000124000000",
+    });
+    expect(Number(q.from)).toBeLessThanOrEqual(EVENT_TS);
+    expect(Number(q.to)).toBeGreaterThan(EVENT_TS);
+    expect(atob(q.query)).toBe(`SELECT * FROM "app" WHERE svc = 'cart' ORDER BY _timestamp DESC`);
+  });
+
+  it("a table cell's log keeps copying the current URL, as before", async () => {
+    const wrapper = mountCopy({ field: "level", value: "error" });
+    expect(await copyLinkOf(wrapper)).toBe(window.location.href);
+  });
+});
+
+describe("DashboardLogDrawer event URL param", () => {
+  const mountPath = (props: Record<string, unknown>) =>
+    shallowMount(DashboardLogDrawer, {
+      props: { stream: "app", startTime: 1, endTime: 2, ...props },
+      global: {
+        renderStubDefaultSlot: true,
+        plugins: [
+          i18n,
+          createStore({
+            state: {
+              selectedOrganization: { identifier: "org" },
+              timezone: "UTC",
+              zoConfig: { features: {} },
+            },
+          }),
+        ],
+      },
+    });
+  const openAndClose = async (wrapper: ReturnType<typeof mountPath>) => {
+    await flushPromises();
+    routerReplace.mockClear();
+    const state = (wrapper.vm as any).$.setupState;
+    state.openEventDetail({ _timestamp: 42 });
+    await flushPromises();
+    const opened = routerReplace.mock.calls.map(([to]) => to);
+    routerReplace.mockClear();
+    state.closeEventDetail();
+    await flushPromises();
+    return { opened, closed: routerReplace.mock.calls.map(([to]) => to) };
+  };
+
+  it("a chart point's log never writes or deletes cell_event_ts", async () => {
+    const wrapper = mountPath({ field: "", value: "", filters: [{ field: "svc", value: "cart" }] });
+    expect(await openAndClose(wrapper)).toEqual({ opened: [], closed: [] });
+  });
+
+  it("a table cell's log still writes cell_event_ts on open and deletes it on close", async () => {
+    const wrapper = mountPath({ field: "level", value: "error" });
+    expect(await openAndClose(wrapper)).toEqual({
+      opened: [{ query: { tab: "t1", cell_event_ts: "42" } }],
+      closed: [{ query: { tab: "t1" } }],
     });
   });
 });

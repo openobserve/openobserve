@@ -1139,6 +1139,19 @@ describe("DetailTable Component", () => {
         expect(wrapper.emitted("update:tab")?.at(-1)).toEqual(["table"]);
       });
 
+      it("a host can leave out a built-in tab; by default every correlated tab shows", async () => {
+        const names = () => wrapper.vm.tabOrder.map((t: any) => t.name);
+        await mountFooter({ initialTab: "json" });
+        expect(names()).toEqual(
+          expect.arrayContaining(["correlated-logs", "correlated-metrics", "correlated-traces"]),
+        );
+        await mountFooter({ initialTab: "json", hiddenTabs: ["correlated-metrics"] });
+        expect(names()).toEqual(
+          expect.arrayContaining(["json", "table", "correlated-logs", "correlated-traces"]),
+        );
+        expect(names()).not.toContain("correlated-metrics");
+      });
+
       it("lets only the visible correlated-traces tab own the trace shortcuts (AC1.8)", async () => {
         await mountFooter({ correlationProps: { serviceName: "svc" }, initialTab: "json" });
         const traces = () =>

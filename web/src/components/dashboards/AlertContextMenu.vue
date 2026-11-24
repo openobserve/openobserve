@@ -19,16 +19,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="visible"
       ref="menuRef"
-      class="bg-dropdown-bg rounded-default shadow-overlay fixed z-9999 max-w-[calc(100vw-1rem)] min-w-70 border border-transparent px-0 py-1"
+      class="bg-dropdown-bg rounded-default shadow-overlay fixed z-9999 max-w-[calc(100vw-1rem)] min-w-40 border border-transparent p-1"
       :style="menuStyle"
       @click.stop
       data-test="alert-context-menu"
     >
-      <template v-if="locked">
+      <!-- A chart point's View logs / traces / metrics rows, above the alert items. -->
+      <slot name="points" />
+      <OSeparator v-if="$slots.points && showAlert" class="my-1" />
+      <template v-if="showAlert && locked">
         <div
           v-for="item in lockedItems"
           :key="item.condition"
-          class="text-dropdown-item-disabled focus-visible:ring-focus-ring-accent flex cursor-not-allowed items-center px-4 py-2 text-sm focus-visible:ring-2 focus-visible:ring-inset"
+          class="text-dropdown-item-disabled focus-visible:ring-focus-ring-accent rounded-default flex cursor-not-allowed items-center gap-2 px-3 py-1.5 text-sm focus-visible:ring-2 focus-visible:ring-inset"
           role="menuitem"
           aria-disabled="true"
           tabindex="0"
@@ -37,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="lock"
             size="sm"
-            class="lock-chip me-2"
+            class="lock-chip"
             :data-test="`alert-context-menu-${item.condition}-lock`"
           />
           <span class="flex min-w-0 flex-col">
@@ -52,36 +55,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
       </template>
-      <template v-else>
+      <template v-else-if="showAlert">
         <div
           v-if="seriesRole === 'forecast'"
-          class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg rounded-default flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm [transition:background-color_0.2s]"
           @click="handleMenuItemClick('forecast')"
           data-test="alert-context-menu-forecast"
         >
-          <OIcon name="trending-up" size="sm" class="me-2" />
+          <OIcon name="trending-up" size="sm" />
           <span class="whitespace-nowrap select-none max-md:whitespace-normal">{{
             t("dashboard.alertContextMenu.forecastReaches", { value: forecastText })
           }}</span>
         </div>
         <div
           v-if="seriesRole !== 'forecast'"
-          class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg rounded-default flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm [transition:background-color_0.2s]"
           @click="handleMenuItemClick('above')"
           data-test="alert-context-menu-above"
         >
-          <OIcon name="arrow-upward" size="sm" class="me-2" />
+          <OIcon name="arrow-upward" size="sm" />
           <span class="whitespace-nowrap select-none max-md:whitespace-normal">{{
             t("dashboard.alertContextMenu.thresholdAbove", { value: valueText })
           }}</span>
         </div>
         <div
           v-if="seriesRole !== 'forecast'"
-          class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg rounded-default flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm [transition:background-color_0.2s]"
           @click="handleMenuItemClick('below')"
           data-test="alert-context-menu-below"
         >
-          <OIcon name="arrow-downward" size="sm" class="me-2" />
+          <OIcon name="arrow-downward" size="sm" />
           <span class="whitespace-nowrap select-none max-md:whitespace-normal">{{
             t("dashboard.alertContextMenu.thresholdBelow", { value: valueText })
           }}</span>
@@ -94,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch, onBeforeUnmount, nextTick } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { useI18nTyped } from "@/types/i18n";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { placeMenu } from "@/utils/dashboard/menuPlacement";
@@ -102,6 +106,7 @@ export default defineComponent({
   name: "AlertContextMenu",
   components: {
     OIcon,
+    OSeparator,
   },
   props: {
     visible: {
@@ -133,6 +138,10 @@ export default defineComponent({
     unitCustom: { type: String, default: null },
     locked: { type: Boolean, default: false },
     lockedReason: { type: String, default: "" },
+    /** The Create alert items; off where alerts cannot be created, leaving only the point rows. */
+    showAlert: { type: Boolean, default: true },
+    /** Changes whenever the slotted rows change, so the menu is measured and placed again. */
+    contentKey: { type: String, default: "" },
   },
   emits: ["select", "close"],
   setup(props, { emit }) {
@@ -233,7 +242,7 @@ export default defineComponent({
         height: menuRef.value?.offsetHeight ?? 0,
       };
     };
-    watch([valueText, forecastText, () => props.seriesRole], () => {
+    watch([valueText, forecastText, () => props.seriesRole, () => props.contentKey], () => {
       if (props.visible) measure();
     });
 

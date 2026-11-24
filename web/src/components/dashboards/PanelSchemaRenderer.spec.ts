@@ -19,6 +19,13 @@ import { computed, defineComponent, nextTick, ref } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
 
 // Mock all the heavy dependencies
+// These specs check which explorer the drawer opens, not the explorers themselves, which load slowly.
+vi.mock("@/components/dashboards/pointExplorer/DashboardTraceExplorer.vue", () => ({
+  default: { name: "DashboardTraceExplorer", template: "<div />" },
+}));
+vi.mock("@/components/dashboards/pointExplorer/DashboardMetricsExplorer.vue", () => ({
+  default: { name: "DashboardMetricsExplorer", template: "<div />" },
+}));
 vi.mock("@/composables/dashboard/usePanelDataLoader", () => ({
   usePanelDataLoader: vi.fn(() => ({
     data: { value: [{ data: [] }] },
@@ -258,7 +265,7 @@ describe("PanelSchemaRenderer", () => {
         stubs: {
           ChartRenderer: {
             name: "ChartRenderer",
-            props: ["findLineOnContextMenu"],
+            props: ["findLineOnContextMenu", "contextMenuAlert", "contextMenuPoints"],
             template: '<div data-test="chart-renderer"></div>',
           },
           TableRenderer: { template: '<div data-test="table-renderer"></div>' },
@@ -840,17 +847,41 @@ describe("PanelSchemaRenderer", () => {
       value: [Date.UTC(2024, 0, 1, 10, 5), 3],
       event: { offsetX: 1, offsetY: 1 },
     };
-    const clickPoint = async (props: Record<string, unknown> = {}) => {
-      wrapper = createWrapper({ panelSchema: breakdownPanel(), allowPointExplore: true, ...props });
+    // Teleports render inline so the menu's rows can be found, unless a test needs the real drawer.
+    const mountPanel = async (props: Record<string, unknown> = {}, inline = true) => {
+      wrapper = createWrapper(
+        { panelSchema: breakdownPanel(), allowPointExplore: true, ...props },
+        inline ? { stubs: { teleport: true } } : { attachTo: document.body },
+      );
       await flushPromises();
       wrapper.vm.panelData = {
         options: { series: [{ originalSeriesName: "cart" }] },
         extras: { isTimeSeries: true },
       };
-      await wrapper.vm.onPanelClick(pointClick);
-      await flushPromises();
     };
-    const item = (id: string) => wrapper.find(`[data-test="drilldown-menu-item-${id}"]`);
+    // A right-click on a point, as ChartRenderer reports it: the cursor, the value and the point.
+    const rightClickPoint = async (props: Record<string, unknown> = {}, inline = true) => {
+      await mountPanel(props, inline);
+      await wrapper.vm.onChartDomContextMenu({
+        x: 10,
+        y: 10,
+        value: 3,
+        seriesIndex: 0,
+        dataIndex: 0,
+        point: pointClick,
+      });
+      await flushPromises();
+      // The menu is a lazy component.
+      await vi.waitFor(() =>
+        expect(
+          !wrapper.vm.contextMenuVisible ||
+            !!document.querySelector('[data-test="alert-context-menu"]') ||
+            wrapper.find('[data-test="alert-context-menu"]').exists(),
+        ).toBe(true),
+      );
+    };
+    const clickPoint = rightClickPoint;
+    const item = (id: string) => wrapper.find(`[data-test="point-menu-item-${id}"]`);
 
     // Correlation needs an enterprise build, so each test pins the build instead of reading .env.
     const asBuild = (build: "oss" | "enterprise") => {
@@ -865,8 +896,9 @@ describe("PanelSchemaRenderer", () => {
       asBuild("oss");
       await clickPoint();
       expect(item("view-logs").exists()).toBe(true);
-      expect(item("view-logs").text()).toContain("View logs at this time");
-      expect(wrapper.find('[data-test="drilldown-menu-item-view-logs-detail"]').text()).toContain(
+      expect(item("view-logs").text()).toContain("View logs");
+      expect(item("view-logs").text()).not.toContain("at this time");
+      expect(wrapper.find('[data-test="point-menu-item-view-logs-detail"]').text()).toContain(
         "svc=cart",
       );
       expect(item("view-traces").exists()).toBe(false);
@@ -876,12 +908,8 @@ describe("PanelSchemaRenderer", () => {
     it("enterprise: View traces shows as pending while the service lookup runs", async () => {
       asBuild("enterprise");
       await clickPoint();
-      expect(wrapper.find('[data-test="drilldown-menu-item-view-traces-pending"]').exists()).toBe(
-        true,
-      );
-      expect(wrapper.find('[data-test="drilldown-menu-item-view-traces-lock"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="point-menu-item-view-traces-pending"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="point-menu-item-view-traces-lock"]').exists()).toBe(false);
     });
 
     it("keeps a license-locked item visible with its lock and reason", async () => {
@@ -890,12 +918,10 @@ describe("PanelSchemaRenderer", () => {
       zoConfig.features = { traces: "locked" };
       try {
         await clickPoint();
-        expect(wrapper.find('[data-test="drilldown-menu-item-view-traces-lock"]').exists()).toBe(
-          true,
+        expect(wrapper.find('[data-test="point-menu-item-view-traces-lock"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="point-menu-item-view-traces-reason"]').text()).toContain(
+          "Locked: needs",
         );
-        expect(
-          wrapper.find('[data-test="drilldown-menu-item-view-traces-reason"]').text(),
-        ).toContain("Locked: needs");
       } finally {
         zoConfig.features = previous;
       }
@@ -903,9 +929,7 @@ describe("PanelSchemaRenderer", () => {
 
     it("wraps a long detail line to at most two lines and shows the full text in a tooltip", async () => {
       await clickPoint();
-      const detail = wrapper.findComponent<any>(
-        '[data-test="drilldown-menu-item-view-logs-detail"]',
-      );
+      const detail = wrapper.findComponent<any>('[data-test="point-menu-item-view-logs-detail"]');
       expect(detail.classes()).toEqual(
         expect.arrayContaining(["line-clamp-2", "whitespace-normal", "max-w-80"]),
       );
@@ -913,22 +937,88 @@ describe("PanelSchemaRenderer", () => {
       expect(detail.findComponent({ name: "OTooltip" }).props("overflowOnly")).toBe(true);
     });
 
-    it("lists the panel's drilldowns after the point section, in their own order", async () => {
+    it("left-click opens only the panel's own drilldowns, never the View rows", async () => {
       const drilldown = [
         { name: "First", type: "byUrl", data: { url: "https://a.example" } },
         { name: "Second", type: "byUrl", data: { url: "https://b.example" } },
       ];
       asBuild("oss");
-      await clickPoint({ panelSchema: breakdownPanel({ config: { drilldown } }) });
+      await mountPanel({ panelSchema: breakdownPanel({ config: { drilldown } }) });
+      await wrapper.vm.onPanelClick(pointClick);
+      await flushPromises();
       const ids = wrapper
         .findAll('[data-test="drilldown-menu"] [data-test^="drilldown-menu-item-"]')
         .map((el) => el.attributes("data-test"))
         .filter((id) => !/-(detail|reason|lock|pending)$/.test(id!));
-      expect(ids).toEqual([
-        "drilldown-menu-item-view-logs",
-        "drilldown-menu-item-First",
-        "drilldown-menu-item-Second",
-      ]);
+      expect(ids).toEqual(["drilldown-menu-item-First", "drilldown-menu-item-Second"]);
+      expect(wrapper.vm.pointExplore).toBeNull();
+      expect(item("view-logs").exists()).toBe(false);
+    });
+
+    it("left-click with no drilldowns opens nothing", async () => {
+      asBuild("oss");
+      await mountPanel();
+      await wrapper.vm.onPanelClick(pointClick);
+      await flushPromises();
+      expect(wrapper.vm.drilldownArray).toEqual([]);
+      expect(wrapper.vm.pointExplore).toBeNull();
+      expect(wrapper.vm.contextMenuVisible).toBe(false);
+    });
+
+    it("right-click lists the View rows, a divider, then Create alert", async () => {
+      asBuild("oss");
+      await rightClickPoint({ allowAlertCreation: true });
+      const menu = wrapper.find('[data-test="alert-context-menu"]');
+      expect(menu.find('[data-test="point-menu-item-view-logs"]').exists()).toBe(true);
+      expect(menu.find('[data-test="alert-context-menu-above"]').exists()).toBe(true);
+      expect(menu.findComponent({ name: "OSeparator" }).exists()).toBe(true);
+      // The rows come first.
+      const html = menu.html();
+      expect(html.indexOf("point-menu-item-view-logs")).toBeLessThan(
+        html.indexOf("alert-context-menu-above"),
+      );
+    });
+
+    it("right-click where alerts cannot be made lists only the View rows", async () => {
+      asBuild("oss");
+      await rightClickPoint({ allowAlertCreation: false });
+      const menu = wrapper.find('[data-test="alert-context-menu"]');
+      expect(menu.find('[data-test="point-menu-item-view-logs"]').exists()).toBe(true);
+      expect(menu.find('[data-test="alert-context-menu-above"]').exists()).toBe(false);
+      expect(menu.findComponent({ name: "OSeparator" }).exists()).toBe(false);
+    });
+
+    it("right-click with no View rows shows only Create alert, as main does", async () => {
+      asBuild("oss");
+      await rightClickPoint({ allowAlertCreation: true, allowPointExplore: false });
+      expect(item("view-logs").exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-context-menu-above"]').exists()).toBe(true);
+    });
+
+    it("right-click with neither opens no menu", async () => {
+      asBuild("oss");
+      await rightClickPoint({ allowAlertCreation: false, allowPointExplore: false });
+      expect(wrapper.vm.contextMenuVisible).toBe(false);
+      expect(wrapper.find('[data-test="alert-context-menu"]').exists()).toBe(false);
+    });
+
+    it("asks the chart to keep the browser menu unless ours can open", async () => {
+      await mountPanel({ allowAlertCreation: false, allowPointExplore: false });
+      const chart = () => wrapper.findComponent({ name: "ChartRenderer" });
+      expect(chart().props("contextMenuAlert")).toBe(false);
+      expect(chart().props("contextMenuPoints")).toBe(false);
+      await wrapper.setProps({ allowAlertCreation: true, allowPointExplore: true });
+      expect(chart().props("contextMenuAlert")).toBe(true);
+      expect(chart().props("contextMenuPoints")).toBe(true);
+    });
+
+    it("View metrics uses the navbar's Metrics icon", async () => {
+      asBuild("oss");
+      const panel = breakdownPanel();
+      panel.queries[0].fields = { ...panel.queries[0].fields, stream_type: "metrics" };
+      await rightClickPoint({ panelSchema: panel });
+      const icon = item("view-metrics").findComponent({ name: "OIcon" });
+      expect(icon.props("name")).toBe("bar-chart");
     });
 
     // The mocked loader reports no histogram interval, so the slice is the panel range.
@@ -937,8 +1027,10 @@ describe("PanelSchemaRenderer", () => {
         data: { where_clause: "level = 'error'", cross_links: { stream_links: [], org_links: [] } },
       } as any);
       onTestFinished(() => resultSchema.mockRestore());
-      await clickPoint();
-      await item("view-logs").trigger("click");
+      // The real drawer teleports too, so this test keeps teleports and clicks the row in the page.
+      await rightClickPoint({}, false);
+      onTestFinished(() => wrapper.unmount());
+      document.querySelector<HTMLElement>('[data-test="point-menu-item-view-logs"]')!.click();
       await flushPromises();
 
       expect(wrapper.vm.cellDrawer).toMatchObject({
@@ -947,7 +1039,6 @@ describe("PanelSchemaRenderer", () => {
         streamType: "logs",
         baseWhere: "level = 'error'",
         filters: [{ field: "svc", value: "cart" }],
-        timeSlice: "panelRange",
       });
       const drawer = () => wrapper.findComponent({ name: "DashboardLogDrawer" });
       // The drawer is a lazy component; its first import alone can take seconds on a cold run.
@@ -955,12 +1046,93 @@ describe("PanelSchemaRenderer", () => {
       expect(drawer().props("filters")).toEqual([{ field: "svc", value: "cart" }]);
     }, 15000);
 
+    const streamTypePanel = (streamType: string) => {
+      const panel = breakdownPanel();
+      panel.queries[0].fields = { ...panel.queries[0].fields, stream_type: streamType };
+      return panel;
+    };
+    const rowIds = () =>
+      wrapper
+        .findAll('[data-test="alert-context-menu"] [data-test^="point-menu-item-view-"]')
+        .map((el) => el.attributes("data-test"))
+        .filter((id) => !/-(detail|reason|lock|pending)$/.test(id!));
+
+    it("enterprise: the rows keep the order View logs, View traces, View metrics", async () => {
+      asBuild("enterprise");
+      await clickPoint();
+      expect(rowIds()).toEqual([
+        "point-menu-item-view-logs",
+        "point-menu-item-view-traces",
+        "point-menu-item-view-metrics",
+      ]);
+    });
+
+    it("a traces chart's View traces opens the Traces Explorer drawer, not a new tab", async () => {
+      asBuild("oss");
+      const open = vi.spyOn(window, "open").mockImplementation(() => null);
+      onTestFinished(() => open.mockRestore());
+      await clickPoint({ panelSchema: streamTypePanel("traces") });
+      expect(rowIds()).toEqual(["point-menu-item-view-traces"]);
+      await item("view-traces").trigger("click");
+      await flushPromises();
+
+      expect(open).not.toHaveBeenCalled();
+      expect(wrapper.vm.cellDrawer).toMatchObject({
+        open: true,
+        mode: "traces",
+        streamType: "traces",
+        filters: [{ field: "svc", value: "cart" }],
+        correlated: false,
+      });
+      expect(wrapper.vm.cellDrawerTitle).toBe("Traces Explorer");
+    });
+
+    it("a metrics chart's View metrics opens the Metrics Explorer drawer on its stream", async () => {
+      asBuild("oss");
+      await clickPoint({ panelSchema: streamTypePanel("metrics") });
+      expect(rowIds()).toEqual(["point-menu-item-view-metrics"]);
+      await item("view-metrics").trigger("click");
+      await flushPromises();
+
+      expect(wrapper.vm.cellDrawer).toMatchObject({
+        open: true,
+        mode: "metrics",
+        streamType: "metrics",
+        streams: [wrapper.vm.cellDrawer.stream],
+        filters: [{ field: "svc", value: "cart" }],
+      });
+      expect(wrapper.vm.cellDrawerTitle).toBe("Metrics Explorer");
+    });
+
+    it("View logs keeps the Logs Explorer title", async () => {
+      asBuild("oss");
+      const resultSchema = vi.spyOn(searchService, "result_schema").mockResolvedValue({
+        data: { where_clause: "", cross_links: { stream_links: [], org_links: [] } },
+      } as any);
+      onTestFinished(() => resultSchema.mockRestore());
+      await clickPoint();
+      await item("view-logs").trigger("click");
+      await flushPromises();
+      expect(wrapper.vm.cellDrawer.mode).toBe("logs");
+      expect(wrapper.vm.cellDrawerTitle).toBe("Logs Explorer");
+    });
+
     it("kiosk mode opens no point menu", async () => {
       store.state.kioskMode = true;
       onTestFinished(() => {
         store.state.kioskMode = false;
       });
-      await clickPoint();
+      await mountPanel();
+      expect(wrapper.findComponent({ name: "ChartRenderer" }).props("contextMenuPoints")).toBe(
+        false,
+      );
+      await wrapper.findComponent({ name: "ChartRenderer" }).vm.$emit("domcontextmenu", {
+        x: 1,
+        y: 1,
+        value: 3,
+        point: pointClick,
+      });
+      await flushPromises();
       expect(wrapper.vm.pointExplore).toBeNull();
       expect(item("view-logs").exists()).toBe(false);
     });
@@ -1375,59 +1547,6 @@ describe("PanelSchemaRenderer", () => {
         expect(convertPanelData).toHaveBeenCalled();
         expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]).toBeUndefined();
       });
-
-      const field = (alias: string, functionName: string | null = null) => ({
-        alias,
-        label: alias,
-        functionName,
-        args: [{ type: "field", value: { field: "svc" } }],
-      });
-      const panelOf = (type: string, streamType: string, queries = 1) => ({
-        ...defaultProps.panelSchema,
-        type,
-        queries: Array.from({ length: queries }, () => ({
-          query: "SELECT 1",
-          fields: {
-            stream: "s",
-            stream_type: streamType,
-            x: [field("x_axis_1")],
-            y: [field("y_axis_1", "count")],
-          },
-          config: {},
-        })),
-      });
-      const treemap = (streamType: string, queries = 1) => panelOf("treemap", streamType, queries);
-      it.each([
-        ["a single-query logs treemap with the menu allowed", true, treemap("logs"), true],
-        ["the same treemap outside a dashboard panel", undefined, treemap("logs"), false],
-        ["a single-query traces treemap", true, treemap("traces"), true],
-        ["a metrics treemap with service correlation off", true, treemap("metrics"), false],
-        ["a two-query logs treemap, whose tiles name no query", true, treemap("logs", 2), false],
-        ["a line chart, which has no zoom to lose", true, panelOf("line", "logs"), false],
-      ])(
-        "%s: tells the converters whether a click opens the menu",
-        async (_name, allowPointExplore, panelSchema, expected) => {
-          const zoConfig = store.state.zoConfig as any;
-          const serviceStreams = zoConfig.service_streams_enabled;
-          zoConfig.service_streams_enabled = false;
-          onTestFinished(() => {
-            zoConfig.service_streams_enabled = serviceStreams;
-          });
-          const isFirstLoadSettled = ref(false);
-          const data = ref<any[]>([]);
-          vi.mocked(usePanelDataLoader).mockReturnValueOnce(
-            loaderWith({ isFirstLoadSettled, data }) as any,
-          );
-          wrapper = createWrapper({ allowPointExplore, panelSchema });
-          await flushPromises();
-          data.value = [[{ a: 1 }], [{ a: 1 }]];
-          isFirstLoadSettled.value = true;
-          await flushPromises();
-
-          expect(convertPanelData).toHaveBeenCalled();
-          expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[12]).toBe(expected);
-        },
-      );
 
       it("re-runs custom chart code when a variable the query does not use changes", async () => {
         const isFirstLoadSettled = ref(false);

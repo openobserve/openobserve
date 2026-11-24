@@ -36,4 +36,12 @@ describe("placeMenu", () => {
     const wide = { width: 990, height: 900 };
     expect(placeMenu({ x: 500, y: 400 }, wide, VIEWPORT)).toEqual({ left: 8, top: 8 });
   });
+
+  it("keeps a margin from the left and top edges", () => {
+    expect(placeMenu({ x: 2, y: 3 }, MENU, VIEWPORT)).toEqual({ left: 8, top: 8 });
+  });
+
+  it("flips both ways in the bottom-right corner", () => {
+    expect(placeMenu({ x: 995, y: 795 }, MENU, VIEWPORT)).toEqual({ left: 712, top: 752 });
+  });
 });

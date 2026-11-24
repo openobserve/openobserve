@@ -1021,6 +1021,73 @@ describe("ChartRenderer", () => {
       });
     });
 
+    describe("which right-clicks open our menu", () => {
+      const rightClick = async (series: string, props: Record<string, boolean>) => {
+        await wrapper.setProps(props);
+        const echarts = await import("echarts/core");
+        const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
+        vi.mocked(mockChart.getOption).mockReturnValue({ series: [{ type: series }] });
+        const handler = vi
+          .mocked(mockChart.on)
+          .mock.calls.find((call) => call[0] === "contextmenu")?.[1];
+        const preventDefault = vi.fn();
+        const params = {
+          componentType: "series",
+          seriesIndex: 0,
+          dataIndex: 1,
+          value: series === "pie" ? 5 : [1609459200000, 7],
+          event: { event: { clientX: 1, clientY: 2, preventDefault, stopPropagation: vi.fn() } },
+        };
+        handler!(params);
+        await flushPromises();
+        return { preventDefault, params };
+      };
+
+      it("with neither menu, the browser keeps its own", async () => {
+        const { preventDefault } = await rightClick("line", {
+          contextMenuAlert: false,
+          contextMenuPoints: false,
+        });
+        expect(preventDefault).not.toHaveBeenCalled();
+        expect(wrapper.emitted("domcontextmenu")).toBeUndefined();
+      });
+
+      it("a line point carries the point when the point menu is on", async () => {
+        const { preventDefault, params } = await rightClick("line", {
+          contextMenuAlert: true,
+          contextMenuPoints: true,
+        });
+        expect(preventDefault).toHaveBeenCalled();
+        expect(wrapper.emitted("domcontextmenu")?.[0][0]).toMatchObject({
+          value: 7,
+          seriesIndex: 0,
+          dataIndex: 1,
+          point: params,
+        });
+      });
+
+      it("a pie slice opens only the point menu, with no value to alert on", async () => {
+        const { preventDefault, params } = await rightClick("pie", {
+          contextMenuAlert: true,
+          contextMenuPoints: true,
+        });
+        expect(preventDefault).toHaveBeenCalled();
+        expect(wrapper.emitted("domcontextmenu")?.[0][0]).toMatchObject({
+          alertable: false,
+          point: params,
+        });
+      });
+
+      it("a pie slice without the point menu leaves the browser menu, as before", async () => {
+        const { preventDefault } = await rightClick("pie", {
+          contextMenuAlert: true,
+          contextMenuPoints: false,
+        });
+        expect(preventDefault).not.toHaveBeenCalled();
+        expect(wrapper.emitted("domcontextmenu")).toBeUndefined();
+      });
+    });
+
     describe("a line's own stroke", () => {
       const strokeEvent = (seriesIndex: number) => ({
         componentType: "series",

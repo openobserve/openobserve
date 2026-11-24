@@ -85,6 +85,8 @@ export class TimeSeriesConverter implements PromQLChartConverter {
 
         series.push({
           name: seriesData.name,
+          // The point menu scopes a click to the series by its labels.
+          _labels: seriesData.metric,
           type: this.getEChartsType(chartType),
           data,
 

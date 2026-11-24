@@ -133,14 +133,16 @@ const lineClick = {
   value: [BUCKET, 4],
 };
 
-const menuOpen = (deps: ReturnType<typeof makeDeps>) =>
-  deps.drilldownPopUpRef.value.style.display === "block";
+// The point section is what the right-click menu lists; the left-click drilldown menu never holds it.
+let lastApi: any = null;
+const menuOpen = (_deps: ReturnType<typeof makeDeps>) => !!lastApi?.pointExplore.value;
 
 describe("usePanelDrilldown point menu", () => {
   let openSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    lastApi = null;
     appConfig.isEnterprise = "false";
     openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
   });
@@ -150,8 +152,8 @@ describe("usePanelDrilldown point menu", () => {
   describe("filters and time slice per chart family", () => {
     it("time chart: the clicked histogram bucket and the series' breakdown value", async () => {
       const deps = makeDeps();
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(lineClick);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
 
       expect(menuOpen(deps)).toBe(true);
       expect(api.drilldownArray.value).toEqual([]);
@@ -173,8 +175,8 @@ describe("usePanelDrilldown point menu", () => {
     it("time h-bar: the bucket is read from the raw UTC category label", async () => {
       const deps = makeDeps({ type: "h-bar" });
       deps.panelData.value.extras = {};
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick({ ...lineClick, name: "2026-03-18T00:05:00", value: 4 });
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint({ ...lineClick, name: "2026-03-18T00:05:00", value: 4 });
 
       expect(api.pointExplore.value?.target).toMatchObject({
         startTime: BUCKET * 1000,
@@ -189,8 +191,8 @@ describe("usePanelDrilldown point menu", () => {
         fields: { x: [field("x_axis_1", "service")], breakdown: [] },
       });
       deps.panelData.value.extras = {};
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick({ componentType: "series", seriesIndex: 0, name: "cart", value: 9 });
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint({ componentType: "series", seriesIndex: 0, name: "cart", value: 9 });
 
       expect(api.pointExplore.value?.target).toMatchObject({
         startTime: START * 1000,
@@ -205,8 +207,8 @@ describe("usePanelDrilldown point menu", () => {
       const deps = makeDeps({ type: "bar", fields: { x: [field("x_axis_1", "status")] } });
       deps.panelData.value.extras = { isTimeSeries: false };
       deps.data.value = [[{ x_axis_1: 500, breakdown_1: "cart", y_axis_1: 1 }]];
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick({ ...lineClick, name: "500", value: ["500", 1] });
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint({ ...lineClick, name: "500", value: ["500", 1] });
 
       expect(api.pointExplore.value?.target).toMatchObject({
         timeSlice: "panelRange",
@@ -229,8 +231,8 @@ describe("usePanelDrilldown point menu", () => {
           heatmapTimeAxis: { columns: [{ start: BUCKET, end: BUCKET + 60_000 }] },
         },
       };
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick({ componentType: "series", seriesIndex: 0, value: [0, 0, 3] });
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint({ componentType: "series", seriesIndex: 0, value: [0, 0, 3] });
 
       expect(api.pointExplore.value?.target).toMatchObject({
         startTime: BUCKET * 1000,
@@ -245,8 +247,8 @@ describe("usePanelDrilldown point menu", () => {
     it("a host that does not allow the point menu keeps a plain click inert, as before", async () => {
       const deps = makeDeps();
       deps.allowPointExplore.value = false;
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(lineClick);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
 
       expect(menuOpen(deps)).toBe(false);
       expect(api.pointExplore.value).toBeNull();
@@ -256,8 +258,8 @@ describe("usePanelDrilldown point menu", () => {
       "%s without drilldowns opens no menu, as before",
       async (type) => {
         const deps = makeDeps({ type });
-        const api = usePanelDrilldown(deps as any);
-        await api.onChartClick({
+        const api = (lastApi = usePanelDrilldown(deps as any));
+        await api.explorePoint({
           ...lineClick,
           target: { getBoundingClientRect: () => ({ left: 0, top: 0 }) },
           offsetX: 1,
@@ -269,16 +271,17 @@ describe("usePanelDrilldown point menu", () => {
       },
     );
 
-    it("keeps the panel's drilldowns at their own indexes below the point section", async () => {
+    it("left-click opens only the panel's drilldowns, and never fills the point section", async () => {
       const deps = makeDeps();
       deps.panelSchema.value.config.drilldown = [
         { name: "First", type: "byUrl", targetBlank: true, data: { url: "https://a.example" } },
         { name: "Second", type: "byUrl", targetBlank: true, data: { url: "https://b.example" } },
       ];
-      const api = usePanelDrilldown(deps as any);
+      const api = (lastApi = usePanelDrilldown(deps as any));
       await api.onChartClick(lineClick);
 
-      expect(api.pointExplore.value).not.toBeNull();
+      expect(deps.drilldownPopUpRef.value.style.display).toBe("block");
+      expect(api.pointExplore.value).toBeNull();
       expect(api.drilldownArray.value.map((d: any) => d.name)).toEqual(["First", "Second"]);
       await api.openDrilldown(1);
       expect(openSpy).toHaveBeenCalledWith("https://b.example", "_blank", "noopener,noreferrer");
@@ -286,7 +289,7 @@ describe("usePanelDrilldown point menu", () => {
 
     it("an annotation marker keeps its own popup and gets no point section", async () => {
       const deps = makeDeps();
-      const api = usePanelDrilldown(deps as any);
+      const api = (lastApi = usePanelDrilldown(deps as any));
       await api.onChartClick({
         componentType: "markLine",
         event: { offsetX: 1, offsetY: 1 },
@@ -300,7 +303,7 @@ describe("usePanelDrilldown point menu", () => {
 
     it("a query-source band, an exemplar and a treemap breadcrumb open no menu", async () => {
       const deps = makeDeps();
-      const api = usePanelDrilldown(deps as any);
+      const api = (lastApi = usePanelDrilldown(deps as any));
       await api.onChartClick({
         componentType: "markArea",
         data: { annotationDetails: { source: { id: "s" } } },
@@ -308,6 +311,12 @@ describe("usePanelDrilldown point menu", () => {
       await api.onChartClick({ seriesId: "__exemplars__", componentType: "series" });
       deps.panelSchema.value.type = "treemap";
       await api.onChartClick({ selfType: "breadcrumb", componentType: "series" });
+      expect(deps.drilldownPopUpRef.value.style.display).not.toBe("block");
+      // Right-click on a band is not a data point either.
+      await api.explorePoint({
+        componentType: "markArea",
+        data: { annotationDetails: { source: { id: "s" } } },
+      });
 
       expect(menuOpen(deps)).toBe(false);
       expect(api.pointExplore.value).toBeNull();
@@ -315,52 +324,169 @@ describe("usePanelDrilldown point menu", () => {
   });
 
   describe("View logs and View traces availability", () => {
-    it("PromQL without correlation: neither item can open, so no point section and no menu", async () => {
+    it("PromQL without correlation: only View metrics opens, scoped to the series labels", async () => {
       const deps = makeDeps({ streamType: "metrics" });
+      const expr = "sum by (service) (rate(http_requests_total[5m]))";
       deps.panelSchema.value.queryType = "promql";
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(lineClick);
+      deps.panelSchema.value.queries[0].query = expr;
+      (deps.metadata.value.queries[0] as any).query = expr;
+      deps.panelData.value.options.series[0] = {
+        name: "checkout",
+        _labels: { service: "checkout" },
+      } as any;
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
 
-      expect(api.pointExplore.value).toBeNull();
-      expect(menuOpen(deps)).toBe(false);
+      expect(api.pointExplore.value?.logs.state).toBe("hidden");
+      expect(api.pointExplore.value?.traces.state).toBe("hidden");
+      expect(api.pointExplore.value?.metrics.state).toBe("enabled");
+      expect(api.pointExplore.value?.target.filters).toEqual([
+        { field: "service", value: "checkout" },
+      ]);
+      expect(api.pointExplore.value?.metricsTarget).toEqual({
+        stream: "http_requests_total",
+        streams: ["http_requests_total"],
+        filters: [{ field: "service", value: "checkout" }],
+        correlated: false,
+        promql: expr,
+      });
+      expect(menuOpen(deps)).toBe(true);
     });
 
-    it("a traces stream opens the Traces page in a new tab with the slice and filters", async () => {
-      const deps = makeDeps({ streamType: "traces" });
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(lineClick);
-      expect(api.pointExplore.value?.traces.state).toBe("enabled");
+    it("PromQL: a point explores the five-minute look-back behind it, not the whole range", async () => {
+      const deps = makeDeps({ streamType: "metrics" });
+      deps.panelSchema.value.queryType = "promql";
+      deps.panelSchema.value.queries[0].query = "up";
+      (deps.metadata.value.queries[0] as any).query = "up";
+      deps.resultMetaData.value = [[{ step: 60_000_000 } as any]];
+      deps.panelData.value.options.series[0] = { name: "up", _labels: { job: "api" } } as any;
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
 
-      api.openPointTraces();
-
-      const query = deps.router.resolve.mock.calls[0][0];
-      expect(query).toEqual({
-        name: "traces",
-        query: {
-          org_identifier: "org-1",
-          stream: "app",
-          from: String(BUCKET * 1000),
-          to: String(BUCKET * 1000 + 300_000_000),
-          filter: "service = 'cart'",
-        },
+      expect(api.pointExplore.value?.target).toMatchObject({
+        startTime: BUCKET * 1000 - 5 * 60_000_000,
+        endTime: BUCKET * 1000,
+        timeSlice: "lookBack",
       });
-      expect(openSpy).toHaveBeenCalledWith(
-        expect.stringContaining("/web/traces?"),
-        "_blank",
-        "noopener,noreferrer",
-      );
+      expect(api.pointExplore.value?.metrics.detail).toBe("00:00–00:05 · job=api");
+    });
+
+    it("PromQL: a wider range vector in the expression widens the look-back", async () => {
+      const deps = makeDeps({ streamType: "metrics" });
+      const expr = "sum(rate(http_requests_total[10m]))";
+      deps.panelSchema.value.queryType = "promql";
+      deps.panelSchema.value.queries[0].query = expr;
+      (deps.metadata.value.queries[0] as any).query = expr;
+      deps.panelData.value.options.series[0] = { name: "x", _labels: {} } as any;
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
+
+      expect(api.pointExplore.value?.target).toMatchObject({
+        startTime: BUCKET * 1000 - 10 * 60_000_000,
+        endTime: BUCKET * 1000,
+        timeSlice: "lookBack",
+      });
+    });
+
+    it("PromQL: an offset in the query moves the window back for every row", async () => {
+      const deps = makeDeps({ streamType: "metrics" });
+      const expr = "rate(http_requests_total[5m] offset 1h)";
+      deps.panelSchema.value.queryType = "promql";
+      deps.panelSchema.value.queries[0].query = expr;
+      (deps.metadata.value.queries[0] as any).query = expr;
+      deps.panelData.value.options.series[0] = { name: "x", _labels: {} } as any;
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
+
+      expect(api.pointExplore.value?.target).toMatchObject({
+        startTime: BUCKET * 1000 - 65 * 60_000_000,
+        endTime: BUCKET * 1000 - 60 * 60_000_000,
+        timeSlice: "lookBack",
+      });
+    });
+
+    it("PromQL: different offsets give a window covering them all", async () => {
+      const deps = makeDeps({ streamType: "metrics" });
+      const expr = "rate(a[5m]) - rate(a[5m] offset 1h)";
+      deps.panelSchema.value.queryType = "promql";
+      deps.panelSchema.value.queries[0].query = expr;
+      (deps.metadata.value.queries[0] as any).query = expr;
+      deps.panelData.value.options.series[0] = { name: "x", _labels: {} } as any;
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
+
+      expect(api.pointExplore.value?.target).toMatchObject({
+        startTime: BUCKET * 1000 - 65 * 60_000_000,
+        endTime: BUCKET * 1000,
+        timeSlice: "lookBack",
+      });
+    });
+
+    it("PromQL: a pie slice keeps the whole panel range", async () => {
+      const deps = makeDeps({ type: "pie", streamType: "metrics" });
+      deps.panelSchema.value.queryType = "promql";
+      deps.resultMetaData.value = [[{ step: 60_000_000 } as any]];
+      deps.panelData.value.options.series[0] = { name: "up", _labels: { job: "api" } } as any;
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint({ ...lineClick, name: "up", value: 4 });
+
+      expect(api.pointExplore.value?.target.timeSlice).toBe("panelRange");
+      expect(api.pointExplore.value?.target.startTime).toBe(START * 1000);
+    });
+
+    it("PromQL: the series __name__ names the metric and is no filter", async () => {
+      const deps = makeDeps({ streamType: "metrics" });
+      deps.panelSchema.value.queryType = "promql";
+      deps.panelData.value.options.series[0] = {
+        name: "up",
+        _labels: { __name__: "up", job: "api" },
+      } as any;
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
+
+      expect(api.pointExplore.value?.target.stream).toBe("up");
+      expect(api.pointExplore.value?.target.filters).toEqual([{ field: "job", value: "api" }]);
+    });
+
+    it("a SQL chart on a metrics stream opens View metrics at once on that stream", async () => {
+      const deps = makeDeps({ streamType: "metrics" });
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
+
+      expect(api.pointExplore.value?.metrics.state).toBe("enabled");
+      expect(api.pointExplore.value?.metricsTarget).toMatchObject({
+        stream: "app",
+        streams: ["app"],
+        filters: [{ field: "service", value: "cart" }],
+        correlated: false,
+      });
+      expect(deps.findRelatedTelemetry).not.toHaveBeenCalled();
+    });
+
+    it("a traces stream opens View traces at once on that stream with the slice filters", async () => {
+      const deps = makeDeps({ streamType: "traces" });
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
+
+      expect(api.pointExplore.value?.traces.state).toBe("enabled");
+      expect(api.pointExplore.value?.tracesTarget).toEqual({
+        stream: "app",
+        filter: "service = 'cart'",
+        filters: [{ field: "service", value: "cart" }],
+        correlated: false,
+      });
     });
 
     it("OSS: a logs chart hides View traces and asks no correlation", async () => {
       const deps = makeDeps();
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(lineClick);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
 
       expect(api.pointExplore.value?.logs.state).toBe("enabled");
       expect(api.pointExplore.value?.traces.state).toBe("hidden");
+      expect(api.pointExplore.value?.metrics.state).toBe("hidden");
+      expect(api.pointExplore.value?.tracesTarget).toBeNull();
       expect(deps.findRelatedTelemetry).not.toHaveBeenCalled();
-      api.openPointTraces();
-      expect(openSpy).not.toHaveBeenCalled();
     });
 
     it("enterprise: correlates the clicked filters to a service and opens its traces", async () => {
@@ -370,19 +496,23 @@ describe("usePanelDrilldown point menu", () => {
       deps.findRelatedTelemetry.mockImplementation(
         () => new Promise((resolve) => (settle = resolve)),
       );
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(lineClick);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
       expect(api.pointExplore.value?.traces).toEqual({
         state: "pending",
         detail: "Finding the service for this point…",
       });
-      api.openPointTraces();
-      expect(openSpy).not.toHaveBeenCalled();
+      expect(api.pointExplore.value?.metrics.state).toBe("pending");
+      expect(api.pointExplore.value?.tracesTarget).toBeNull();
       settle({
         correlationData: {
           service_name: "cart",
           related_streams: {
             traces: [{ stream_name: "otel_traces", filters: { service_name: "cart-svc" } }],
+            metrics: [
+              { stream_name: "k8s_pod_cpu", filters: { service_name: "cart-svc" } },
+              { stream_name: "k8s_pod_memory" },
+            ],
           },
         },
       });
@@ -398,19 +528,63 @@ describe("usePanelDrilldown point menu", () => {
         state: "enabled",
         detail: "Traces for service cart · 00:05–00:10",
       });
-      api.openPointTraces();
-      expect(deps.router.resolve.mock.calls[0][0].query).toMatchObject({
+      expect(api.pointExplore.value?.tracesTarget).toEqual({
         stream: "otel_traces",
         filter: "service_name = 'cart-svc'",
+        filters: [{ field: "service_name", value: "cart-svc" }],
+        correlated: true,
       });
+      // The one lookup also settles View metrics; it asks no second time.
+      expect(deps.findRelatedTelemetry).toHaveBeenCalledTimes(1);
+      expect(api.pointExplore.value?.metrics).toEqual({
+        state: "enabled",
+        detail: "Metrics for service cart · 00:05–00:10",
+      });
+      expect(api.pointExplore.value?.metricsTarget).toEqual({
+        stream: "k8s_pod_cpu",
+        streams: ["k8s_pod_cpu", "k8s_pod_memory"],
+        filters: [{ field: "service_name", value: "cart-svc" }],
+        correlated: true,
+      });
+    });
+
+    it("enterprise: a service with no metric streams hides View metrics and keeps View traces", async () => {
+      appConfig.isEnterprise = "true";
+      const deps = makeDeps();
+      deps.findRelatedTelemetry.mockResolvedValue({
+        correlationData: {
+          service_name: "cart",
+          related_streams: { traces: [{ stream_name: "otel_traces" }], metrics: [] },
+        },
+      });
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
+      await flushPromises();
+
+      expect(api.pointExplore.value?.traces.state).toBe("enabled");
+      expect(api.pointExplore.value?.metrics.state).toBe("hidden");
+      expect(api.pointExplore.value?.metricsTarget).toBeNull();
+    });
+
+    it("enterprise: a traces chart correlates for View metrics as a traces source", async () => {
+      appConfig.isEnterprise = "true";
+      const deps = makeDeps({ streamType: "traces" });
+      deps.findRelatedTelemetry.mockResolvedValue(null);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
+      await flushPromises();
+
+      expect(deps.findRelatedTelemetry).toHaveBeenCalledWith(expect.anything(), "traces", 5, "app");
+      expect(api.pointExplore.value?.traces.state).toBe("enabled");
+      expect(api.pointExplore.value?.metrics.state).toBe("hidden");
     });
 
     it("enterprise: no matching service hides View traces and keeps View logs", async () => {
       appConfig.isEnterprise = "true";
       const deps = makeDeps();
       deps.findRelatedTelemetry.mockResolvedValue(null);
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(lineClick);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
       await flushPromises();
 
       expect(api.pointExplore.value?.traces.state).toBe("hidden");
@@ -420,13 +594,15 @@ describe("usePanelDrilldown point menu", () => {
 
     it("enterprise: no matching service on a chart without View logs closes the empty menu", async () => {
       appConfig.isEnterprise = "true";
-      const deps = makeDeps({ streamType: "metrics" });
+      // A JOIN hides View logs, leaving only the rows correlation settles.
+      const deps = makeDeps();
+      deps.panelSchema.value.queries[0].joins = [{ stream: "other" }];
       let settle: (value: unknown) => void = () => undefined;
       deps.findRelatedTelemetry.mockImplementation(
         () => new Promise((resolve) => (settle = resolve)),
       );
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(lineClick);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
       expect(menuOpen(deps)).toBe(true);
       settle(null);
       await flushPromises();
@@ -437,10 +613,12 @@ describe("usePanelDrilldown point menu", () => {
 
     it("enterprise: a miss that lands before the menu opens leaves no empty menu", async () => {
       appConfig.isEnterprise = "true";
-      const deps = makeDeps({ streamType: "metrics" });
+      // A JOIN hides View logs, leaving only the rows correlation settles.
+      const deps = makeDeps();
+      deps.panelSchema.value.queries[0].joins = [{ stream: "other" }];
       deps.findRelatedTelemetry.mockResolvedValue(null);
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(lineClick);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
       await flushPromises();
 
       expect(api.pointExplore.value).toBeNull();
@@ -450,8 +628,8 @@ describe("usePanelDrilldown point menu", () => {
     it("enterprise: a chart with no group-by values hides View traces without correlating", async () => {
       appConfig.isEnterprise = "true";
       const deps = makeDeps({ fields: { breakdown: [] } });
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(lineClick);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
 
       expect(api.pointExplore.value?.traces.state).toBe("hidden");
       expect(deps.findRelatedTelemetry).not.toHaveBeenCalled();
@@ -464,9 +642,9 @@ describe("usePanelDrilldown point menu", () => {
       deps.findRelatedTelemetry
         .mockImplementationOnce(() => new Promise((resolve) => (settleFirst = resolve)))
         .mockResolvedValueOnce(null);
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(lineClick);
-      await api.onChartClick(lineClick);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
+      await api.explorePoint(lineClick);
       await flushPromises();
       settleFirst({
         correlationData: {
@@ -495,8 +673,8 @@ describe("usePanelDrilldown point menu", () => {
         'SELECT histogram(a._timestamp) AS x_axis_1, b.service AS breakdown_1 FROM "app" a JOIN "users" b ON a.uid = b.id GROUP BY x_axis_1, breakdown_1';
       deps.panelSchema.value.queries[0].query = sql;
       deps.metadata.value = { queries: [{ query: sql }] } as any;
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(lineClick);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
 
       expect(api.pointExplore.value?.logs.state).toBe("hidden");
       expect(api.pointExplore.value?.traces.state).toBe("pending");
@@ -505,16 +683,16 @@ describe("usePanelDrilldown point menu", () => {
     it("a builder join hides View logs", async () => {
       const deps = joinDeps();
       (deps.panelSchema.value.queries[0] as any).joins = [{ stream: "users" }];
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(lineClick);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
 
       expect(api.pointExplore.value?.logs.state).toBe("hidden");
     });
 
     it("a single-stream query keeps View logs", async () => {
       const deps = joinDeps();
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(lineClick);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
 
       expect(api.pointExplore.value?.logs.state).toBe("enabled");
     });
@@ -568,8 +746,8 @@ describe("usePanelDrilldown point menu", () => {
 
     it("a stage from the second query opens that query's stream and stage field", async () => {
       const deps = funnelDeps();
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(stageClick("Purchased"));
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(stageClick("Purchased"));
 
       expect(api.pointExplore.value?.target).toMatchObject({
         queryIndex: 1,
@@ -581,8 +759,8 @@ describe("usePanelDrilldown point menu", () => {
 
     it("a stage from the first query keeps the first query", async () => {
       const deps = funnelDeps();
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(stageClick("Visited"));
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(stageClick("Visited"));
 
       expect(api.pointExplore.value?.target).toMatchObject({
         queryIndex: 0,
@@ -594,8 +772,8 @@ describe("usePanelDrilldown point menu", () => {
     it("a stage both queries return opens no point section", async () => {
       const deps = funnelDeps();
       deps.data.value[1].push({ x_axis_1: "Visited", y_axis_1: 5 });
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(stageClick("Visited"));
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(stageClick("Visited"));
 
       expect(api.pointExplore.value).toBeNull();
       expect(menuOpen(deps)).toBe(false);
@@ -613,8 +791,8 @@ describe("usePanelDrilldown point menu", () => {
         extras: { isTimeSeries: false },
       };
       deps.data.value = [[{ x_axis_1: 404, x_axis_2: "auth", y_axis_1: 2 }]];
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick({
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint({
         componentType: "series",
         seriesIndex: 0,
         dataIndex: 1,
@@ -626,7 +804,7 @@ describe("usePanelDrilldown point menu", () => {
       ]);
 
       // Axes that disagree with the clicked label are not trusted: only the label is used.
-      await api.onChartClick({
+      await api.explorePoint({
         componentType: "series",
         seriesIndex: 0,
         dataIndex: 1,
@@ -648,14 +826,14 @@ describe("usePanelDrilldown point menu", () => {
           { query: "q", timeRangeGap: { seconds: weekMs } },
         ],
       } as any;
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick({ ...lineClick, seriesIndex: 1 });
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint({ ...lineClick, seriesIndex: 1 });
       expect(api.pointExplore.value?.target).toMatchObject({
         startTime: (BUCKET - weekMs) * 1000,
         endTime: (BUCKET - weekMs) * 1000 + 300_000_000,
         timeSlice: "bucket",
       });
-      await api.onChartClick({ ...lineClick, seriesIndex: 0 });
+      await api.explorePoint({ ...lineClick, seriesIndex: 0 });
       expect(api.pointExplore.value?.target.startTime).toBe(BUCKET * 1000);
     });
 
@@ -666,8 +844,8 @@ describe("usePanelDrilldown point menu", () => {
       });
       deps.panelData.value.extras = {};
       deps.metadata.value = { queries: [{ query: "q", startTime: 111, endTime: 999 }] } as any;
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick({ componentType: "series", seriesIndex: 0, name: "cart", value: 9 });
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint({ componentType: "series", seriesIndex: 0, name: "cart", value: 9 });
       expect(api.pointExplore.value?.target).toMatchObject({
         startTime: 111,
         endTime: 999,
@@ -701,8 +879,8 @@ describe("usePanelDrilldown point menu", () => {
 
     it("a multi-query treemap offers no point menu, since a tile names no query", async () => {
       const deps = treemapDeps([{}, {}]);
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(tileClick);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(tileClick);
       expect(api.pointExplore.value).toBeNull();
       expect(menuOpen(deps)).toBe(false);
     });
@@ -710,8 +888,8 @@ describe("usePanelDrilldown point menu", () => {
     it("a treemap with one visible query explores that query", async () => {
       const deps = treemapDeps([{ config: { hide: true } }, {}]);
       deps.panelSchema.value.queries[1].fields.stream = "second";
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(tileClick);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(tileClick);
       expect(api.pointExplore.value?.target).toMatchObject({
         queryIndex: 1,
         stream: "second",
@@ -733,9 +911,9 @@ describe("usePanelDrilldown point menu", () => {
         ],
       } as any;
       sqlUtils.extractFields.mockClear();
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(lineClick);
-      await api.onChartClick(lineClick);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
+      await api.explorePoint(lineClick);
       expect(api.pointExplore.value?.target.filters).toEqual([{ field: "service", value: "cart" }]);
       // Other tests' table panels parse their own SQL late, so count only this query's parses.
       const parsesOfThisQuery = sqlUtils.extractFields.mock.calls.filter((c: any[]) =>
@@ -744,14 +922,16 @@ describe("usePanelDrilldown point menu", () => {
       expect(parsesOfThisQuery).toHaveLength(1);
     });
 
-    it("enterprise: a traces-stream chart is enabled at once and never asks correlation", async () => {
+    it("enterprise: a traces-stream chart enables View traces at once; only View metrics correlates", async () => {
       appConfig.isEnterprise = "true";
       const deps = makeDeps({ streamType: "traces" });
-      const api = usePanelDrilldown(deps as any);
-      await api.onChartClick(lineClick);
+      deps.findRelatedTelemetry.mockResolvedValue(null);
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
       expect(api.pointExplore.value?.traces.state).toBe("enabled");
       await flushPromises();
-      expect(deps.findRelatedTelemetry).not.toHaveBeenCalled();
+      expect(deps.findRelatedTelemetry).toHaveBeenCalledTimes(1);
+      expect(api.pointExplore.value?.traces.state).toBe("enabled");
     });
   });
 });

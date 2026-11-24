@@ -24,6 +24,7 @@ import config from "@/aws-exports";
 import router from "@/test/unit/helpers/router";
 import { http, HttpResponse } from "msw";
 import tracesMockData from "@/test/unit/mockData/traces";
+import SpanBlock from "@/plugins/traces/SpanBlock.vue";
 import searchService from "@/services/search";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 
@@ -1259,6 +1260,81 @@ describe("TraceDetails", () => {
       });
     });
 
+    it("embedded with no span given, a trace opens with its span panel closed; a span click opens it", async () => {
+      // A selection left in the shared traces state (e.g. by the Traces page) must not carry over.
+      const [first] = tracesMockData.tracesDetails.traceSpans.hits as any[];
+      const mountEmbedded = () =>
+        mount(TraceDetails, {
+          attachTo: "#app",
+          props: {
+            mode: "embedded",
+            traceIdProp: first.trace_id,
+            streamNameProp: "default",
+            spanListProp: tracesMockData.tracesDetails.traceSpans.hits,
+            startTimeProp: 1752490492843,
+            endTimeProp: 1752490493164,
+          },
+          global: { plugins: [i18n, router], provide: { store }, stubs: { ODrawer: ODrawerStub } },
+        });
+      const earlier = mountEmbedded();
+      await flushPromises();
+      earlier.vm.searchObj.data.traceDetails.selectedSpanId = first.span_id;
+      earlier.vm.searchObj.data.traceDetails.showSpanDetails = true;
+      earlier.unmount();
+
+      // The explorer remounts TraceDetails for every trace it opens (keyed by trace id).
+      const local = mountEmbedded();
+      await flushPromises();
+      expect(local.vm.searchObj.data.traceDetails.showSpanDetails).toBe(false);
+      expect(local.vm.searchObj.data.traceDetails.selectedSpanId || "").toBe("");
+      expect(local.vm.isSidebarOpen).toBe(false);
+
+      local.vm.updateSelectedSpan(first.span_id);
+      await flushPromises();
+      expect(local.vm.isSidebarOpen).toBe(true);
+      expect(local.vm.searchObj.data.traceDetails.selectedSpanId).toBe(first.span_id);
+      local.unmount();
+    });
+
+    it("a single-span trace gets one full-width bar from its own trace window", async () => {
+      const [first] = tracesMockData.tracesDetails.traceSpans.hits as any[];
+      const single = { ...first, reference_parent_span_id: "", reference_parent_trace_id: "" };
+      const local = mount(TraceDetails, {
+        attachTo: "#app",
+        props: {
+          mode: "embedded",
+          traceIdProp: single.trace_id,
+          streamNameProp: "default",
+          spanListProp: [single],
+          startTimeProp: 1752490492843,
+          endTimeProp: 1752490493164,
+        },
+        global: { plugins: [i18n, router], provide: { store }, stubs: { ODrawer: ODrawerStub } },
+      });
+      await flushPromises();
+      const [span] = local.vm.spanPositionList;
+      const base = local.vm.baseTracePosition;
+      expect(base.durationUs).toBeGreaterThan(0);
+      // The waterfall rows are virtualised (none render in jsdom), so the row's own bar is
+      // mounted from the same span and window the tree hands it.
+      const block = mount(SpanBlock, {
+        props: {
+          span,
+          baseTracePosition: base,
+          depth: 0,
+          styleObj: {},
+          spanDimensions: { height: 30, barHeight: 8, textHeight: 25, gap: 15, collapseWidth: 10 },
+          spanData: single,
+        },
+        global: { plugins: [i18n, router], provide: { store } },
+      });
+      const bar = block.find('[data-test="span-marker"]');
+      expect(bar.attributes("style")).toContain("width: 100%");
+      expect(bar.attributes("style")).toContain("left: 0%");
+      block.unmount();
+      local.unmount();
+    });
+
     describe("mode prop - embedded", () => {
       let embeddedWrapper: any;
 
@@ -1350,6 +1426,17 @@ describe("TraceDetails", () => {
         if (embeddedWrapper) {
           embeddedWrapper.unmount();
         }
+      });
+
+      it("correlation keeps the URL / Traces page stream unless the host names its own", async () => {
+        const pageStream =
+          (router.currentRoute.value.query.stream as string) ||
+          embeddedWrapper.vm.searchObj.data.stream.selectedStream.value ||
+          "";
+        expect(pageStream).not.toBe("embedded-stream");
+        expect(embeddedWrapper.vm.currentTraceStreamName).toBe(pageStream);
+        await embeddedWrapper.setProps({ ownStreamName: true });
+        expect(embeddedWrapper.vm.currentTraceStreamName).toBe("embedded-stream");
       });
 
       it("should not show back button in embedded mode when showBackButton is false", () => {
@@ -3463,6 +3550,22 @@ describe("TraceDetails", () => {
       await wrapper.vm.$nextTick();
 
       expect(localStorage.getItem(ACTIVE_KEY)).toBe("waterfall");
+    });
+
+    it("a host that ignores the saved view opens on Waterfall and never overwrites it", async () => {
+      localStorage.setItem(ACTIVE_KEY, "flame-graph");
+      wrapper.unmount();
+      wrapper = mount(TraceDetails, {
+        ...mountOptions,
+        props: { ...(mountOptions as any).props, ignoreSavedTab: true },
+      });
+      await flushPromises();
+      expect(wrapper.vm.activeTab).toBe("waterfall");
+
+      wrapper.vm.updateActiveTab("map");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.activeTab).toBe("map");
+      expect(localStorage.getItem(ACTIVE_KEY)).toBe("flame-graph");
     });
 
     it("falls back to the default when the persisted tab is unavailable for this trace", async () => {

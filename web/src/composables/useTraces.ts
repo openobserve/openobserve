@@ -17,7 +17,7 @@ import { reactive, computed, nextTick, shallowRef, watch } from "vue";
 import { debounce } from "lodash-es";
 import { b64EncodeStandard, b64EncodeUnicode, useLocalTraceFilterField } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import { useRouter, type LocationQueryRaw } from "vue-router";
+import { useRouter, type LocationQueryRaw, type RouteLocationRaw } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { TranslateFn } from "@/types/i18n";
 import { getOrSetServiceColor as registryGetOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
@@ -542,10 +542,13 @@ const useTraces = () => {
   };
 
   // Function to navigate to logs with the provided query details
-  const navigateToLogs = async (queryDetails: any) => {
+  const navigateToLogs = async (
+    queryDetails: any,
+    navigate: (to: RouteLocationRaw) => unknown = (to) => router.push(to),
+  ) => {
     store.dispatch("logs/setIsInitialized", false);
     await nextTick();
-    router.push({
+    navigate({
       path: "/logs",
       query: {
         stream_type: "logs",
@@ -661,6 +664,7 @@ const useTraces = () => {
   /** Opens Logs on the correlated streams that hold this trace; "none" when no stream does, so the caller stays put. */
   const navigateToCorrelatedLogs = async (
     correlationProps: any,
+    navigate: (to: RouteLocationRaw) => unknown = (to) => router.push(to),
   ): Promise<CorrelatedLogsOutcome> => {
     const spanId = searchObj.data.traceDetails.selectedSpanId;
     const traceId = searchObj.data.traceDetails.selectedTrace?.trace_id;
@@ -757,7 +761,7 @@ const useTraces = () => {
     store.dispatch("logs/setIsInitialized", false);
     await nextTick();
 
-    router.push({
+    navigate({
       path: "/logs",
       query: {
         stream: streamNames,

@@ -21,8 +21,15 @@ import {
   funnelStageQuery,
   isTimeXField,
   logsAvailability,
+  metricsAvailability,
   pointFamily,
   pointGroupFilters,
+  promqlDurationUs,
+  promqlLookBackUs,
+  promqlMetricName,
+  promqlPointWindow,
+  promqlSelectorOffsetsUs,
+  seriesLabelFilters,
   sliceBounds,
   tracesAvailability,
   tracesPageQuery,
@@ -298,7 +305,14 @@ describe("treeOpensPointMenu", () => {
   it.each([
     ["a logs treemap", tree("logs"), ctx, true],
     ["a traces treemap", tree("traces"), ctx, true],
-    ["a metrics treemap without correlation", tree("metrics"), ctx, false],
+    // A metrics treemap opens View metrics on its own stream, correlation or not.
+    ["a metrics treemap without correlation", tree("metrics"), ctx, true],
+    [
+      "a metrics treemap with metrics locked",
+      tree("metrics"),
+      { ...ctx, isLocked: (k: string) => k === "metrics" },
+      false,
+    ],
     [
       "a metrics treemap with correlation",
       tree("metrics"),
@@ -318,7 +332,7 @@ describe("treeOpensPointMenu", () => {
       ctx,
       true,
     ],
-    ["a PromQL treemap", { ...tree("metrics"), queryType: "promql" }, ctx, false],
+    ["a PromQL treemap", { ...tree("metrics"), queryType: "promql" }, ctx, true],
     ["a pie, which never zooms", { ...tree("logs"), type: "pie" }, ctx, false],
   ])("%s: %s", (_name, schema, context, expected) => {
     expect(treeOpensPointMenu(schema, context)).toBe(expected);
@@ -403,6 +417,193 @@ describe("tracesAvailability", () => {
     expect(
       tracesAvailability({ ...base, streamType: "logs", isLocked: (k) => k === "correlation" }),
     ).toEqual({ kind: "locked", feature: "correlation" });
+  });
+});
+
+describe("metricsAvailability", () => {
+  const base = {
+    queryType: "sql",
+    hasGroupValues: true,
+    correlationEnabled: true,
+    isLocked: () => false,
+  };
+
+  it.each([
+    [{ streamType: "metrics" }, { kind: "metricsStream" }],
+    [{ streamType: "metrics", correlationEnabled: false }, { kind: "metricsStream" }],
+    [
+      { queryType: "promql", streamType: "metrics", hasGroupValues: false },
+      { kind: "metricsStream" },
+    ],
+    [{ queryType: "promql", streamType: undefined }, { kind: "metricsStream" }],
+    [{ streamType: "logs" }, { kind: "correlate" }],
+    [{ streamType: "traces" }, { kind: "correlate" }],
+    [{ streamType: undefined }, { kind: "correlate" }],
+    [{ streamType: "logs", correlationEnabled: false }, { kind: "blocked" }],
+    [{ streamType: "logs", hasGroupValues: false }, { kind: "blocked" }],
+    [{ streamType: "enrichment_tables" }, { kind: "blocked" }],
+  ])("%o gives %o", (input, expected) => {
+    expect(metricsAvailability({ ...base, ...input })).toEqual(expected);
+  });
+
+  it.each([
+    ["metrics on a metrics chart", { streamType: "metrics" }, "metrics", "metrics"],
+    ["metrics on a correlated logs chart", { streamType: "logs" }, "metrics", "metrics"],
+    [
+      "correlation on a correlated logs chart",
+      { streamType: "logs" },
+      "correlation",
+      "correlation",
+    ],
+  ])("locks %s", (_name, input, locked, feature) => {
+    expect(metricsAvailability({ ...base, ...input, isLocked: (k) => k === locked })).toEqual({
+      kind: "locked",
+      feature,
+    });
+  });
+
+  it("shows no lock where the item could not open even with the licence", () => {
+    const allLocked = () => true;
+    expect(
+      metricsAvailability({
+        ...base,
+        streamType: "logs",
+        correlationEnabled: false,
+        isLocked: allLocked,
+      }),
+    ).toEqual({ kind: "blocked" });
+    expect(
+      metricsAvailability({
+        ...base,
+        streamType: "logs",
+        hasGroupValues: false,
+        isLocked: allLocked,
+      }),
+    ).toEqual({ kind: "blocked" });
+    // Correlation is no part of a metrics chart's own path, so its lock does not apply there.
+    expect(
+      metricsAvailability({ ...base, streamType: "metrics", isLocked: (k) => k === "correlation" }),
+    ).toEqual({ kind: "metricsStream" });
+  });
+});
+
+describe("seriesLabelFilters / promqlMetricName", () => {
+  it("turns every label but __name__ into a condition", () => {
+    expect(seriesLabelFilters({ __name__: "up", job: "api", code: "" })).toEqual([
+      { field: "job", value: "api" },
+      { field: "code", value: null },
+    ]);
+    expect(seriesLabelFilters({})).toEqual([]);
+  });
+
+  it("PromQL points take the series labels instead of builder fields", () => {
+    const query = { fields: { x: [histogramX], breakdown: [builder("b", "svc")] } };
+    expect(
+      pointGroupFilters(query, { type: "line" }, "time", { seriesLabels: { pod: "p-1" } }, []),
+    ).toEqual([{ field: "pod", value: "p-1" }]);
+  });
+
+  it.each([
+    ["the series' __name__ first", "rate(x[5m])", { __name__: "up" }, "up"],
+    ["a bare selector", "http_requests_total", {}, "http_requests_total"],
+    [
+      "inside functions and ranges",
+      'sum by (service) (rate(http_requests_total{code=~"5.."}[5m]))',
+      {},
+      "http_requests_total",
+    ],
+    [
+      "a quantile over a histogram",
+      "histogram_quantile(0.99, sum by (le) (rate(req_bucket[5m])))",
+      {},
+      "req_bucket",
+    ],
+    ["a recording rule", "job:http_requests:rate5m", {}, "job:http_requests:rate5m"],
+    ["the first of a binary expression", "errors_total / requests_total", {}, "errors_total"],
+    ["no selector at all", "vector(1)", {}, ""],
+    ["no expression", undefined, undefined, ""],
+  ])("names %s", (_name, expression, labels, expected) => {
+    expect(promqlMetricName(expression, labels)).toBe(expected);
+  });
+});
+
+describe("PromQL look-back", () => {
+  const MIN = 60_000_000;
+
+  it.each([
+    ["30s", 30_000_000],
+    ["10m", 10 * MIN],
+    ["2h", 120 * MIN],
+    ["1d", 1440 * MIN],
+    ["1h30m", 90 * MIN],
+    ["500ms", 500_000],
+    ["5x", 0],
+    ["", 0],
+  ])("reads %s as %i µs", (text, expected) => {
+    expect(promqlDurationUs(text)).toBe(expected);
+  });
+
+  it.each([
+    ["no range vector: the default five minutes", "up", 5 * MIN],
+    ["a narrower range keeps the default", "rate(x[1m])", 5 * MIN],
+    ["the widest range vector", "rate(a[10m]) / rate(b[2m])", 10 * MIN],
+    ["a subquery's range, not its step", "max_over_time(rate(x[1m])[30m:15m])", 30 * MIN],
+    ["no expression", undefined, 5 * MIN],
+  ])("uses %s", (_name, expression, expected) => {
+    expect(promqlLookBackUs(expression)).toBe(expected);
+  });
+
+  it("ends the window at the point itself when nothing is offset", () => {
+    expect(promqlPointWindow(100 * MIN, "rate(x[10m])")).toEqual({
+      startTime: 90 * MIN,
+      endTime: 100 * MIN,
+    });
+  });
+
+  it.each([
+    ["no offset", 'sum(rate(x{a="b"}[5m])) by (job)', [0]],
+    ["an offset on a range selector", "rate(http_requests_total[5m] offset 1h)", [60 * MIN]],
+    ["an offset with no range (look-back)", "up offset 30m", [30 * MIN]],
+    ["an offset after a label set", 'up{job="api"} offset 1h30m', [90 * MIN]],
+    ["a negative offset reads later", "up offset -1d", [-1440 * MIN]],
+    ["each selector its own", "rate(a[5m] offset 1h) / rate(b[5m])", [60 * MIN, 0]],
+    [
+      "a subquery's offset adds to the ones inside",
+      "max_over_time(rate(x[1m] offset 5m)[30m:1m] offset 1h)",
+      [65 * MIN],
+    ],
+    [
+      "label lists and functions are not selectors",
+      "sum without (pod) (rate(x[5m])) / on (job) group_left (env) y",
+      [0, 0],
+    ],
+    ["offset text in a string is not an offset", 'up{note="x offset 1h"}', [0]],
+    ["the @ modifier is skipped", "up @ 1700000000 offset 10m", [10 * MIN]],
+  ])("selector offsets: %s", (_name, expression, expected) => {
+    expect(promqlSelectorOffsetsUs(expression)).toEqual(expected);
+  });
+
+  it("moves the window back by the offset, as the engine does", () => {
+    // Engine: [point − range − offset, point − offset].
+    expect(promqlPointWindow(600 * MIN, "rate(http_requests_total[5m] offset 1h)")).toEqual({
+      startTime: 535 * MIN,
+      endTime: 540 * MIN,
+    });
+    expect(promqlPointWindow(600 * MIN, "rate(x[10m] offset 30m)")).toMatchObject({
+      startTime: 560 * MIN,
+      endTime: 570 * MIN,
+    });
+    expect(promqlPointWindow(600 * MIN, "up offset -1h")).toMatchObject({
+      startTime: 655 * MIN,
+      endTime: 660 * MIN,
+    });
+  });
+
+  it("several offsets give the span covering them all", () => {
+    expect(promqlPointWindow(600 * MIN, "rate(a[5m] offset 1h) - rate(a[5m] offset 1d)")).toEqual({
+      startTime: 600 * MIN - 1440 * MIN - 5 * MIN,
+      endTime: 540 * MIN,
+    });
   });
 });
 

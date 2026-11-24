@@ -1163,6 +1163,7 @@ import { useAiIcon } from "@/composables/useAiIcon";
 import { buildSpanAiPayload } from "@/plugins/traces/utils/traceAiPayload";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
+import { useTraceNavigate } from "@/plugins/traces/composables/useTraceNavigation";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import JsonPreview from "@/components/JsonPreview.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
@@ -1488,6 +1489,7 @@ export default defineComponent({
     });
     const { buildQueryDetails, navigateToLogs, navigateToCorrelatedLogs, searchObj } = useTraces();
     const router = useRouter();
+    const navigate = useTraceNavigate();
 
     const highlightTextMatch = (text: string, query: string): string => {
       if (!query) return escapeHtml(text);
@@ -1587,7 +1589,7 @@ export default defineComponent({
     function openPromptAttribution() {
       const target = promptAttributionTarget.value;
       if (!target) return;
-      router.push(
+      navigate(
         aiPromptsRoute(String(store.state.selectedOrganization?.identifier ?? ""), {
           entityId: target.entityId,
           version: target.version,
@@ -2092,7 +2094,7 @@ export default defineComponent({
         return;
       }
       const outcome = correlationProps.value?.logStreams?.length
-        ? await navigateToCorrelatedLogs(correlationProps.value)
+        ? await navigateToCorrelatedLogs(correlationProps.value, navigate)
         : "none";
       if (spanKey(props.span) !== clickedSpan) return;
       if (outcome === "none") {
@@ -2111,7 +2113,7 @@ export default defineComponent({
 
     const viewSpanLogs = async () => {
       if (config.isEnterprise !== "true" || correlationLicenseLocked.value) {
-        navigateToLogs(buildQueryDetails(props.span));
+        navigateToLogs(buildQueryDetails(props.span), navigate);
         return;
       }
       logsNotice.value = null;
@@ -2374,7 +2376,7 @@ export default defineComponent({
       const req = spanProfileRequest.value;
       const match = spanProfileMatch.value;
       if (!req || !match) return;
-      router.push({
+      navigate({
         name: "profiles",
         query: {
           org_identifier: req.org,
@@ -2442,7 +2444,7 @@ export default defineComponent({
         });
         return;
       }
-      router.push(
+      navigate(
         aiPlaygroundRoute(store.state.selectedOrganization?.identifier ?? "", { fromSpan: true }),
       );
     };
@@ -2487,7 +2489,7 @@ export default defineComponent({
           return;
         }
 
-        router.push({
+        navigate({
           name: "traceDetails",
           query,
         });

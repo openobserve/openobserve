@@ -1,0 +1,111 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, expect, it } from "vitest";
+import { mount } from "@vue/test-utils";
+import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
+import ExplorerResultRow from "./ExplorerResultRow.vue";
+
+const mountRow = (expanded = false, attach = false) =>
+  mount(ExplorerResultRow, {
+    ...(attach ? { attachTo: document.body } : {}),
+    props: {
+      record: { _timestamp: 1, level: "error" },
+      time: "10:05:00",
+      expanded,
+      openLabel: "Open",
+      openDataTest: "row-open",
+    },
+    global: { plugins: [i18n, store] },
+  });
+
+describe("ExplorerResultRow", () => {
+  // jsdom computes no Tailwind, so the row's look is pinned by its classes. The chevron must carry
+  // its own: the drawer's scoped .dld-expand-btn rule does not reach this component, and without
+  // them the button falls back to the browser's 20px default and the row grows from 25px to 29px.
+  it("styles its own expand chevron, as the Logs Explorer's row did", () => {
+    const button = mountRow().find("button.dld-expand-btn");
+    expect(button.classes()).toEqual(
+      expect.arrayContaining([
+        "flex",
+        "items-center",
+        "justify-center",
+        "p-0.5",
+        "border-0",
+        "bg-transparent",
+        "cursor-pointer",
+        "text-text-secondary",
+        "hover:text-text-body",
+        "hover:bg-surface-subtle",
+      ]),
+    );
+  });
+
+  it("keeps the Logs Explorer's row spacing and hover", () => {
+    expect(mountRow().classes()).toEqual(
+      expect.arrayContaining([
+        "dld-result-row",
+        "px-2",
+        "py-1",
+        "gap-2",
+        "border-b",
+        "hover:bg-surface-subtle",
+      ]),
+    );
+  });
+
+  it("the left chevron toggles the JSON and never opens the detail", async () => {
+    const row = mountRow(true);
+    expect(row.find("button").attributes("aria-label")).toBe("Collapse");
+    await row.find("button").trigger("click");
+    expect(row.emitted("toggle")).toHaveLength(1);
+    expect(row.emitted("open")).toBeUndefined();
+  });
+
+  it("a row click and the right › both open the detail, and toggle nothing", async () => {
+    const row = mountRow();
+    await row.trigger("click");
+    await row.find("[data-test='row-open']").trigger("click");
+    expect(row.emitted("open")).toHaveLength(2);
+    expect(row.emitted("toggle")).toBeUndefined();
+  });
+
+  it("Enter on the focused row opens the detail; Enter on the chevron does not", async () => {
+    const row = mountRow();
+    expect(row.attributes("tabindex")).toBe("0");
+    await row.trigger("keydown", { key: "Enter" });
+    await row.find("button").trigger("keydown", { key: "Enter" });
+    expect(row.emitted("open")).toHaveLength(1);
+  });
+
+  it("a click that ends a text selection in the row keeps the selection, opening nothing", async () => {
+    const row = mountRow(false, true);
+    const text = row.find("[data-test='explorer-result-record']").element;
+    const range = document.createRange();
+    range.selectNodeContents(text);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    await row.trigger("click");
+    expect(row.emitted("open")).toBeUndefined();
+
+    // With the selection gone, the same click opens the detail.
+    selection.removeAllRanges();
+    await row.trigger("click");
+    expect(row.emitted("open")).toHaveLength(1);
+    row.unmount();
+  });
+});

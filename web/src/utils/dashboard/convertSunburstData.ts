@@ -77,7 +77,6 @@ export const convertSunburstData = (
   data: any,
   store: any,
   chartPanelRef?: any,
-  pointMenu = false,
 ) => {
   const config = panelSchema?.config ?? {};
   const { nodes } = buildTreemapNodes(panelSchema, Array.isArray(data) ? data : []);
@@ -86,7 +85,7 @@ export const convertSunburstData = (
   paintByPalette(nodes, config, store?.state?.theme);
   const format = (value: unknown) =>
     formatUnitValue(getUnitValue(value, config.unit, config.unit_custom, config.decimals));
-  const clickOpensMenu = pointMenu || (config.drilldown?.length ?? 0) > 0;
+  const hasDrilldown = (config.drilldown?.length ?? 0) > 0;
   const depth = treeDepth(nodes);
   const surface = chartColor("--color-surface-base");
   // Each ring is painted as its parent's colour faded onto the panel, so its label contrast can be judged.
@@ -142,8 +141,8 @@ export const convertSunburstData = (
         data: nodes,
         center: ["50%", "50%"],
         radius: [`${innerRadius * 100}%`, `${OUTER_RADIUS * 100}%`],
-        // A click opens a menu, so it must not also re-root the chart under it.
-        nodeClick: clickOpensMenu ? false : "rootToNode",
+        // A click opens the drilldown menu, so it must not also re-root the chart under it.
+        nodeClick: hasDrilldown ? false : "rootToNode",
         emphasis: { focus: "ancestor" },
         itemStyle: { borderColor: surface, borderWidth: 1 },
         label: {

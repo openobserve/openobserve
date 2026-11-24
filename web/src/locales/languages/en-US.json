@@ -10406,13 +10406,36 @@
     "dataViewEmpty": "No rows returned",
     "dataViewCapped": "Showing the first {shown} of {total} rows",
     "pointExplore": {
-      "viewLogs": "View logs at this time",
-      "viewTraces": "View traces at this time",
+      "viewLogs": "View logs",
+      "viewTraces": "View traces",
+      "viewMetrics": "View metrics",
       "slice": "{start}–{end}",
       "wholeRange": "Whole range {start}–{end}",
       "detail": "{slice} · {filters}",
       "tracesForService": "Traces for service {service} · {slice}",
+      "metricsForService": "Metrics for service {service} · {slice}",
       "findingService": "Finding the service for this point…"
+    },
+    "traceExplorer": {
+      "title": "Traces Explorer",
+      "filter": "Filter",
+      "filterPlaceholder": "e.g. service_name = 'checkout'",
+      "run": "Run",
+      "openInTraces": "Open in Traces",
+      "noTraces": "No traces in this slice",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "Previous trace",
+      "nextTrace": "Next trace"
+    },
+    "metricsExplorer": {
+      "title": "Metrics Explorer",
+      "metric": "Metric",
+      "searchMetrics": "Search metric streams",
+      "openInMetrics": "Open in Metrics",
+      "copy": "Copy",
+      "openSample": "Open sample",
+      "prevSample": "Previous sample",
+      "nextSample": "Next sample"
     },
     "logExplorer": {
       "title": "Logs Explorer",
@@ -10431,15 +10454,6 @@
       "of": "of",
       "sqlEditorLabel": "SQL Query",
       "resetSql": "Reset",
-      "applied": {
-        "label": "Applied",
-        "time": "time",
-        "clickedBucket": "clicked bucket",
-        "panelRange": "panel range",
-        "timeWithNote": "{range} ({note})",
-        "panelFilter": "panel filter",
-        "empty": "(empty)"
-      },
       "detail": {
         "drawerTitle": "Event Detail",
         "details": "Details",

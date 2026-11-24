@@ -99,6 +99,8 @@ export class BarConverter implements PromQLChartConverter {
             name: seriesData.name,
             _panelQueryIndex: queryData.queryIndex,
             _seriesRole: queryData.seriesRole,
+            // The point menu scopes a click to the series by its labels.
+            _labels: seriesData.metric,
             type: "bar",
             // A past period stacks on its own, or it would add to the current totals.
             stack: queryData.nameSuffix ? `total (${queryData.nameSuffix})` : "total",

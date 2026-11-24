@@ -536,6 +536,23 @@ describe("BarConverter", () => {
       ]);
     });
 
+    it("carries each stacked series' label set for the point menu", () => {
+      const result = converter.convert(
+        [
+          {
+            series: [{ name: "a", metric: { pod: "a" }, values: [], data: { "1": "1" } }],
+            timestamps: [[1, "2021-01-01 00:00:00"]],
+            queryIndex: 0,
+          } as any,
+        ],
+        { type: "stacked", config: {} },
+        mockStore,
+        { legends: [] },
+      );
+
+      expect(result.series[0]._labels).toEqual({ pod: "a" });
+    });
+
     it("should populate extras.legends for stacked chart", () => {
       const processedData: ProcessedPromQLData[] = [
         {

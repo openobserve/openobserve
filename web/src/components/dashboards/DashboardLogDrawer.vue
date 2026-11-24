@@ -3,14 +3,13 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <!-- Log-explorer results filtered by a clicked dashboard cell; row click opens a detail drawer. -->
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from "vue";
+import { ref, computed, onMounted, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -18,6 +17,8 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTime from "@/components/DateTime.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
+import ExplorerResultsPager from "@/components/dashboards/pointExplorer/ExplorerResultsPager.vue";
+import ExplorerResultRow from "@/components/dashboards/pointExplorer/ExplorerResultRow.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -27,25 +28,29 @@ const ChartRenderer = defineAsyncComponent(
 );
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { b64EncodeUnicode } from "@/utils/formatters";
-import useHttpStreaming from "@/composables/useStreamingSearch";
-import { generateTraceContext } from "@/utils/auth";
 import patternsService from "@/services/patterns";
-import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
-import { useLicenseLock, useLicenseLocks } from "@/composables/useFeatureLock";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { streamTypeFeature } from "@/utils/featureGate";
-import { buildChipDimensionsFromFilters } from "@/services/service_streams";
-import { correlationDisplayProps } from "@/types/serviceRef";
-import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
-import { extractSeverity } from "@/utils/sourceEventSeverity";
-import type { TelemetryContext } from "@/utils/telemetryCorrelation";
+import { useExplorerSqlSearch } from "@/composables/dashboard/useExplorerSqlSearch";
+import { useExplorerCorrelation } from "@/composables/dashboard/useExplorerCorrelation";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import {
   filtersWhere,
-  sliceBounds,
   type FieldFilter,
-  type TimeSlice,
+  type ExplorerMode,
 } from "@/utils/dashboard/chartPointExplore";
+import { eventSecondWindow } from "@/utils/dashboard/pointExplorers";
+import {
+  leaveFieldOnEscape,
+  useExplorerDetailKeys,
+} from "@/composables/dashboard/useExplorerDetailKeys";
 const DetailTable = defineAsyncComponent(() => import("@/plugins/logs/DetailTable.vue"));
+const DashboardTraceExplorer = defineAsyncComponent(
+  () => import("@/components/dashboards/pointExplorer/DashboardTraceExplorer.vue"),
+);
+const DashboardMetricsExplorer = defineAsyncComponent(
+  () => import("@/components/dashboards/pointExplorer/DashboardMetricsExplorer.vue"),
+);
 
 const props = defineProps<{
   stream: string;
@@ -57,8 +62,18 @@ const props = defineProps<{
   baseWhere?: string; // panel's own WHERE, AND-combined with the clicked cell
   // A chart point's group-by values; they replace the single field/value of a table cell.
   filters?: FieldFilter[];
-  timeSlice?: TimeSlice;
+  // Logs unless a chart point opened its traces or metrics.
+  mode?: ExplorerMode;
+  // The filters came from service correlation, not from the clicked chart.
+  correlated?: boolean;
+  // Metrics mode: the metric streams the picker offers, and the panel's PromQL.
+  streams?: string[];
+  promql?: string;
 }>();
+
+const isLogs = computed(() => (props.mode ?? "logs") === "logs");
+// Only the chart-point path passes filters; a table cell gives one field/value.
+const openedFromPoint = computed(() => props.filters !== undefined);
 
 const emit = defineEmits<{ (e: "sendToAiChat", value: unknown, append?: boolean): void }>();
 
@@ -105,8 +120,6 @@ const pageSize = ref(100);
 const loading = ref(false);
 const errorMsg = ref("");
 
-const resultTotalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
-
 // Inline per-row JSON expand (same interaction as Surrounding events), keyed by page index.
 const resultExpandedIdx = ref(new Set<number>());
 function toggleResultExpand(i: number) {
@@ -132,20 +145,6 @@ function buildDefaultSql(): string {
   return `SELECT * FROM "${props.stream}"${whereClause()} ORDER BY _timestamp DESC`;
 }
 
-// ── Applied filters (chart point) ─────────────────────────────────────────────
-const appliedTime = computed(() => {
-  const range = t(
-    "panel.pointExplore.slice",
-    sliceBounds(rangeStart.value, rangeEnd.value, store.state.timezone),
-  );
-  // The slice note only holds while the picker still shows the clicked slice.
-  if (rangeStart.value !== props.startTime || rangeEnd.value !== props.endTime) return range;
-  const note =
-    props.timeSlice === "bucket"
-      ? t("panel.logExplorer.applied.clickedBucket")
-      : t("panel.logExplorer.applied.panelRange");
-  return t("panel.logExplorer.applied.timeWithNote", { range, note });
-});
 function activeSql() {
   return customSql.value || buildDefaultSql();
 }
@@ -419,14 +418,18 @@ async function loadInsights(ev: Record<string, any>) {
   loadSurrounding(ev);
 }
 
+// Only a table cell's drawer lives in the URL (cell_*); a chart point's leaves the URL alone.
 function openEventDetail(ev: Record<string, any>) {
   selectedEvent.value = ev;
-  router.replace({ query: { ...route.query, cell_event_ts: String(ev._timestamp ?? "") } });
+  if (!openedFromPoint.value) {
+    router.replace({ query: { ...route.query, cell_event_ts: String(ev._timestamp ?? "") } });
+  }
   loadInsights(ev);
 }
 
 function closeEventDetail() {
   selectedEvent.value = null;
+  if (openedFromPoint.value) return;
   const q = { ...route.query };
   delete (q as any).cell_event_ts;
   router.replace({ query: q });
@@ -446,23 +449,12 @@ function goPrev() {
 function goNext() {
   if (hasNext.value) openEventDetail(events.value[selectedIndex.value + 1]);
 }
-function onDetailKeydown(e: KeyboardEvent) {
-  if (!selectedEvent.value) return;
-  if (e.key === "ArrowLeft") {
-    e.preventDefault();
-    goPrev();
-  } else if (e.key === "ArrowRight") {
-    e.preventDefault();
-    goNext();
-  } else if (e.key === "Escape") {
-    // Return to the results list instead of letting the drawer close.
-    e.preventDefault();
-    e.stopPropagation();
-    closeEventDetail();
-  }
-}
-onMounted(() => window.addEventListener("keydown", onDetailKeydown, true));
-onBeforeUnmount(() => window.removeEventListener("keydown", onDetailKeydown, true));
+useExplorerDetailKeys({
+  isOpen: () => !!selectedEvent.value,
+  prev: goPrev,
+  next: goNext,
+  back: closeEventDetail,
+});
 
 // ── Source Details (DetailTable) — Insights leading tab + correlation wiring ────
 const detailLeadingTabs = computed(() => [
@@ -474,17 +466,6 @@ const detailLeadingTabs = computed(() => [
   },
 ]);
 
-const correlationDashboardProps = ref<any>(null);
-const correlationLoading = ref(false);
-const correlationError = ref<string | null>(null);
-const correlationFetchInProgress = ref(false);
-const {
-  findRelatedTelemetry,
-  semanticGroups,
-  noMatch: correlationNoMatch,
-  error: serviceCorrelationError,
-} = useServiceCorrelation();
-const { locked: correlationLocked } = useLicenseLock("correlation");
 const licenseLocks = useLicenseLocks();
 const logsFeature = computed(() => streamTypeFeature(props.streamType));
 const openInLogsLocked = computed(() => licenseLocks.isLocked(logsFeature.value));
@@ -492,88 +473,18 @@ const openInLogsLockedReason = computed(() =>
   logsFeature.value ? licenseLocks.lockedReason(logsFeature.value) : raw(""),
 );
 
-// Fresh correlation per event (mirrors the Logs page reset on row change).
-watch(selectedEvent, () => {
-  correlationDashboardProps.value = null;
-  correlationLoading.value = false;
-  correlationError.value = null;
-  correlationFetchInProgress.value = false;
+const {
+  correlationDashboardProps,
+  correlationLoading,
+  correlationError,
+  openCorrelation: openCorrelationFromLog,
+} = useExplorerCorrelation({
+  sourceType: "logs",
+  stream: () => props.stream,
+  selected: selectedEvent,
+  // FTS fields drive full log-body colorization in the correlated logs table.
+  ftsFields: ["body"],
 });
-
-// Lazy correlation fetch — replicated from SearchResult.vue's openCorrelationFromLog.
-async function openCorrelationFromLog(logData: any) {
-  if (correlationFetchInProgress.value || correlationLocked.value) return;
-  try {
-    correlationFetchInProgress.value = true;
-    correlationLoading.value = true;
-    correlationError.value = null;
-    const context: TelemetryContext = {
-      timestamp: logData._timestamp || Date.now() * 1000,
-      fields: logData,
-    };
-    const timeWindowMicros = 5 * 60 * 1000000;
-    const startTimeMicros = context.timestamp - timeWindowMicros;
-    let endTimeMicros = context.timestamp + timeWindowMicros;
-    const currentTimeMicros = Date.now() * 1000;
-    if (endTimeMicros > currentTimeMicros) endTimeMicros = currentTimeMicros;
-    const result = await findRelatedTelemetry(context, "logs", 5, props.stream, {
-      start: startTimeMicros,
-      end: endTimeMicros,
-    });
-    if (!result) {
-      correlationError.value = correlationNoMatch.value
-        ? t("logs.searchResult.noMatchingService")
-        : serviceCorrelationError.value || t("logs.searchResult.unableToRetrieveCorrelation");
-      return;
-    }
-    if (!result.correlationData) {
-      correlationError.value = t("logs.searchResult.unableToRetrieveCorrelation");
-      return;
-    }
-    const logFilters = result.correlationData.related_streams.logs?.[0]?.filters || {};
-    const actualMatchedDimensions =
-      Object.keys(logFilters).length > 0 ? logFilters : result.correlationData.matched_dimensions;
-    correlationDashboardProps.value = {
-      serviceName: result.correlationData.service_name,
-      ...correlationDisplayProps(result.correlationData),
-      matchedDimensions: actualMatchedDimensions,
-      additionalDimensions: {},
-      matchedSetId: result.correlationData.matched_set_id,
-      chipDimensions: {
-        ...buildChipDimensionsFromFilters(result.correlationData, semanticGroups.value),
-        ...buildWorkloadChipDimensions(
-          result.correlationData.matched_set_id,
-          semanticGroups.value,
-          logData,
-        ),
-      },
-      sourceEvent: {
-        timestamp: logData._timestamp,
-        severity: extractSeverity(logData) ?? undefined,
-        message: logData.body || logData.message || logData.log || logData.msg,
-      },
-      metricStreams: result.correlationData.related_streams.metrics || [],
-      logStreams: result.correlationData.related_streams.logs || [],
-      traceStreams: result.correlationData.related_streams.traces || [],
-      sourceStream: props.stream,
-      sourceType: "logs",
-      availableDimensions: { ...logFilters, ...context.fields },
-      semanticGroups: semanticGroups.value,
-      // FTS fields drive full log-body colorization in the correlated logs table;
-      // "body" is the log message field for the default log stream.
-      ftsFields: ["body"],
-      timeRange: { startTime: startTimeMicros, endTime: endTimeMicros },
-    };
-  } catch (err: any) {
-    correlationError.value = t("logs.searchResult.correlationError", {
-      error: err?.message || err,
-    });
-    correlationDashboardProps.value = null;
-  } finally {
-    correlationLoading.value = false;
-    correlationFetchInProgress.value = false;
-  }
-}
 
 // JsonPreview's @copy emits an object; stringify non-strings as pretty JSON.
 function copyToClipboard(value: unknown) {
@@ -585,8 +496,16 @@ function copyToClipboard(value: unknown) {
       /* best-effort */
     });
 }
-function copyCurrentUrl() {
-  copyToClipboard(window.location.href);
+// A table cell's drawer is restored from its cell_* URL params, so its link is the current URL.
+// A chart point's drawer is not in the URL, so its link opens the event on the Logs page.
+function copyEventLink() {
+  const ts = Number(selectedEvent.value?._timestamp);
+  if (!openedFromPoint.value || !Number.isFinite(ts)) {
+    copyToClipboard(window.location.href);
+    return;
+  }
+  const { startTime, endTime } = eventSecondWindow(ts);
+  copyToClipboard(logsPageUrl(activeSql(), startTime, endTime, false));
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -628,104 +547,12 @@ function fmtRelTime(tsMicros: number, refMicros: number): string {
 }
 
 // ── Search ────────────────────────────────────────────────────────────────────
-const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
-// One stream per purpose: a new search of the same purpose cancels the one before it.
-const inFlight = new Map<string, { traceId: string; settle: () => void }>();
+const { streamSearch, countMatches: countIn } = useExplorerSqlSearch(
+  () => props.streamType ?? "logs",
+);
 
-function cancelSearch(key: string) {
-  const running = inFlight.get(key);
-  if (!running) return;
-  inFlight.delete(key);
-  cancelStreamQueryBasedOnRequestId({ trace_id: running.traceId, org_id: orgId.value });
-  running.settle();
-}
-
-/** One SQL search over _search_stream; null when a newer search of `key` or closing the drawer cancels it. */
-function streamSearch(
-  key: string,
-  query: {
-    sql: string;
-    start_time: number;
-    end_time: number;
-    from: number;
-    size: number;
-    track_total_hits?: boolean;
-  },
-): Promise<{ hits: any[] } | null> {
-  cancelSearch(key);
-  const { traceId } = generateTraceContext();
-  const useBase64 = store.state.zoConfig?.sql_base64_enabled;
-  return new Promise((resolve, reject) => {
-    inFlight.set(key, { traceId, settle: () => resolve(null) });
-    const isCurrent = () => inFlight.get(key)?.traceId === traceId;
-    let streamingAggs = false;
-    let hits: any[] = [];
-    const metadataHits: any[] = [];
-    fetchQueryDataWithHttpStream(
-      {
-        queryReq: {
-          query: { ...query, sql: useBase64 ? b64EncodeUnicode(query.sql) : query.sql },
-          ...(useBase64 ? { encoding: "base64" } : {}),
-        },
-        type: "search",
-        pageType: props.streamType ?? "logs",
-        searchType: "ui",
-        traceId,
-        org_id: orgId.value,
-      },
-      {
-        data: (_payload: unknown, response: any) => {
-          const content = response?.content ?? {};
-          const results = content.results ?? {};
-          if (response?.type === "search_response_metadata") {
-            streamingAggs ||= Boolean(results.streaming_aggs ?? content.streaming_aggs);
-            // A cached response can carry its hits on metadata alone, so keep them as a fallback.
-            if (Array.isArray(results.hits)) metadataHits.push(...results.hits);
-            return;
-          }
-          if (response?.type !== "search_response_hits") return;
-          const chunk: any[] = results.hits ?? content.hits ?? [];
-          if (!Array.isArray(chunk) || !chunk.length) return;
-          // A streaming aggregate resends its whole result with every chunk.
-          hits = streamingAggs ? [...chunk] : [...hits, ...chunk];
-        },
-        error: (_payload: unknown, response: any) => {
-          if (!isCurrent()) return;
-          inFlight.delete(key);
-          const body = response?.content ?? response ?? {};
-          const error: any = new Error(
-            String(body.error ?? body.message ?? body.error_detail ?? "Search failed"),
-          );
-          error.response = { data: body };
-          reject(error);
-        },
-        complete: () => {
-          if (!isCurrent()) return;
-          inFlight.delete(key);
-          resolve({ hits: hits.length ? hits : metadataHits });
-        },
-      },
-    );
-  });
-}
-onBeforeUnmount(() => [...inFlight.keys()].forEach(cancelSearch));
-
-// A streamed search reports only the rows it sent, so the match count is its own request, as the Logs page does it.
-async function countMatches(sql: string): Promise<number | null> {
-  try {
-    const res = await streamSearch("count", {
-      sql,
-      start_time: rangeStart.value,
-      end_time: rangeEnd.value,
-      from: 0,
-      size: 0,
-      track_total_hits: true,
-    });
-    return res ? res.hits.reduce((sum, hit) => sum + (Number(hit?.zo_sql_num) || 0), 0) : null;
-  } catch {
-    return null;
-  }
-}
+const countMatches = (sql: string) =>
+  countIn(sql, { start_time: rangeStart.value, end_time: rangeEnd.value });
 
 // A count belongs to one query run: page turns reuse it, and a newer run drops a late one.
 let queryRun = 0;
@@ -804,7 +631,7 @@ async function goToPage(p: number) {
 
 // Restore the detail drawer from URL param via a 1-row fetch by exact _timestamp.
 async function restoreEventDetail() {
-  if (selectedEvent.value || !paramsValid.value) return;
+  if (selectedEvent.value || !paramsValid.value || openedFromPoint.value) return;
   const rawTs = String(route.query.cell_event_ts ?? "");
   if (!/^\d{1,20}$/.test(rawTs)) return;
   const ts = Number(rawTs);
@@ -828,6 +655,7 @@ async function restoreEventDetail() {
 
 watch(pageSize, () => goToPage(0));
 onMounted(async () => {
+  if (!isLogs.value) return;
   dateReady = true;
   await loadEvents();
   await restoreEventDetail();
@@ -835,6 +663,7 @@ onMounted(async () => {
 watch(
   () => [props.field, props.value, props.stream, props.filters],
   () => {
+    if (!isLogs.value) return;
     selectedEvent.value = null;
     loadEvents();
   },
@@ -880,7 +709,8 @@ function openPatternInLogs(template: string) {
   window.open(url.toString(), "_blank", "noopener,noreferrer");
 }
 
-function openInLogs() {
+// The Logs page running `sql` over [from, to) µs on this drawer's stream.
+function logsPageUrl(sql: string, from: number, to: number, showHistogram: boolean): string {
   const pos = window.location.pathname.indexOf("/web/");
   const base =
     pos > -1
@@ -890,18 +720,44 @@ function openInLogs() {
   url.searchParams.set("org_identifier", orgId.value);
   url.searchParams.set("stream_type", props.streamType ?? "logs");
   url.searchParams.set("stream", props.stream);
-  url.searchParams.set("from", String(rangeStart.value));
-  url.searchParams.set("to", String(rangeEnd.value));
-  url.searchParams.set("query", b64EncodeUnicode(activeSql()) ?? "");
+  url.searchParams.set("from", String(from));
+  url.searchParams.set("to", String(to));
+  url.searchParams.set("query", b64EncodeUnicode(sql) ?? "");
   url.searchParams.set("sql_mode", "true");
   url.searchParams.set("quick_mode", "false");
-  url.searchParams.set("show_histogram", "false");
-  window.open(url.toString(), "_blank", "noopener,noreferrer");
+  url.searchParams.set("show_histogram", String(showHistogram));
+  return url.toString();
+}
+
+function openInLogs() {
+  window.open(
+    logsPageUrl(activeSql(), rangeStart.value, rangeEnd.value, false),
+    "_blank",
+    "noopener,noreferrer",
+  );
 }
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col overflow-hidden">
+  <DashboardTraceExplorer
+    v-if="mode === 'traces'"
+    :stream="stream"
+    :filters="filters ?? []"
+    :start-time="startTime"
+    :end-time="endTime"
+  />
+  <DashboardMetricsExplorer
+    v-else-if="mode === 'metrics'"
+    :stream="stream"
+    :streams="streams ?? [stream]"
+    :filters="filters ?? []"
+    :correlated="!!correlated"
+    :start-time="startTime"
+    :end-time="endTime"
+    :promql="promql"
+    @send-to-ai-chat="(v: unknown, a?: boolean) => emit('sendToAiChat', v, a)"
+  />
+  <div v-else class="flex h-full min-h-0 flex-col overflow-hidden" @keydown="leaveFieldOnEscape">
     <div v-show="!detailOpen" class="flex min-h-0 flex-1 flex-col overflow-hidden">
       <!-- ── Toolbar: datetime picker + open-in-logs + run ───── -->
       <div class="border-border-default flex min-w-0 shrink-0 flex-col border-b">
@@ -973,38 +829,6 @@ function openInLogs() {
         </div>
       </div>
 
-      <div
-        v-if="filters"
-        class="border-border-default flex shrink-0 flex-wrap items-center gap-1.5 border-b px-2 py-2"
-        data-test="log-explorer-applied"
-      >
-        <span class="text-text-secondary me-1 text-xs">{{
-          t("panel.logExplorer.applied.label")
-        }}</span>
-        <ODimensionChip
-          dim-key="time"
-          :key-label="t('panel.logExplorer.applied.time')"
-          :value="appliedTime"
-          variant="default-soft"
-          data-test="log-explorer-applied-time"
-        />
-        <ODimensionChip
-          v-if="baseWhere"
-          dim-key="panel-filter"
-          :key-label="t('panel.logExplorer.applied.panelFilter')"
-          :value="baseWhere"
-          variant="warning-soft"
-          data-test="log-explorer-applied-where"
-        />
-        <ODimensionChip
-          v-for="f in filters"
-          :key="f.field"
-          :dim-key="f.field"
-          :value="f.value ?? t('panel.logExplorer.applied.empty')"
-          :data-test="`log-explorer-applied-${f.field}`"
-        />
-      </div>
-
       <!-- ── Error ────────────────────────────────────────────────────── -->
       <div v-if="errorMsg" class="flex shrink-0 items-start gap-2 px-4 py-3">
         <OIcon name="error-outline" size="sm" class="text-error-500 mt-0.5 shrink-0" />
@@ -1037,32 +861,15 @@ function openInLogs() {
         <!-- Highlighted log rows — same LogsHighLighting + expandable JSON as Surrounding events. -->
         <div v-else class="min-h-0 flex-1 overflow-y-auto">
           <template v-for="(ev, i) in events" :key="i">
-            <div
-              class="dld-result-row border-border-default hover:bg-surface-subtle flex cursor-pointer items-center gap-2 border-b px-2 py-1"
-              @click="toggleResultExpand(i)"
-            >
-              <button
-                class="dld-expand-btn shrink-0"
-                :aria-label="isResultExpanded(i) ? t('common.collapse') : t('common.expand')"
-                @click.stop="toggleResultExpand(i)"
-              >
-                <OIcon :name="isResultExpanded(i) ? 'expand-less' : 'expand-more'" size="xs" />
-              </button>
-              <span class="text-text-secondary shrink-0 text-xs whitespace-nowrap tabular-nums">{{
-                fmtTs(ev._timestamp)
-              }}</span>
-              <OTruncatedText class="flex-1 font-mono text-xs" :tooltip="false">
-                <LogsHighLighting :data="ev" :show-braces="true" />
-              </OTruncatedText>
-              <span
-                class="text-text-secondary hover:text-accent flex w-8 shrink-0 cursor-pointer items-center justify-center"
-                data-test="log-explorer-row-open"
-                @click.stop="openEventDetail(ev)"
-              >
-                <OIcon name="chevron-right" size="sm" />
-                <OTooltip :content="t('panel.logExplorer.detail.insights')" />
-              </span>
-            </div>
+            <ExplorerResultRow
+              :record="ev"
+              :time="fmtTs(ev._timestamp)"
+              :expanded="isResultExpanded(i)"
+              :open-label="t('panel.logExplorer.detail.insights')"
+              open-data-test="log-explorer-row-open"
+              @toggle="toggleResultExpand(i)"
+              @open="openEventDetail(ev)"
+            />
             <div
               v-if="isResultExpanded(i)"
               class="dld-json-preview border-border-default bg-surface-panel border-b px-2 py-2"
@@ -1083,25 +890,12 @@ function openInLogs() {
         </div>
 
         <!-- Server pagination: the list shows one loaded page; controls fetch the next. -->
-        <div
-          v-if="total > 0"
-          class="bg-dialog-bg border-border-default sticky bottom-0 z-10 flex w-full items-center border-t px-3 py-2"
-        >
-          <div class="flex-1" />
-          <TablePaginationControls
-            :show-pagination="true"
-            :pagination="{ page: page + 1, rowsPerPage: pageSize }"
-            :total-rows="total"
-            :pages-number="resultTotalPages"
-            :is-first-page="page === 0"
-            :is-last-page="page >= resultTotalPages - 1"
-            @update:rows-per-page="(n: number) => (pageSize = n)"
-            @first-page="goToPage(0)"
-            @prev-page="goToPage(page - 1)"
-            @next-page="goToPage(page + 1)"
-            @last-page="goToPage(resultTotalPages - 1)"
-          />
-        </div>
+        <ExplorerResultsPager
+          v-model:page-size="pageSize"
+          :page="page"
+          :total="total"
+          @go-to-page="goToPage"
+        />
       </div>
     </div>
 
@@ -1153,7 +947,13 @@ function openInLogs() {
               <OTooltip :content="t('panel.logExplorer.detail.nextEvent')" />
             </OButton>
           </div>
-          <OButton size="sm-toolbar" variant="outline" icon-left="link" @click="copyCurrentUrl()">
+          <OButton
+            size="sm-toolbar"
+            variant="outline"
+            icon-left="link"
+            data-test="log-explorer-detail-copy-link"
+            @click="copyEventLink()"
+          >
             {{ t("panel.logExplorer.detail.copyLink") }}
           </OButton>
         </div>

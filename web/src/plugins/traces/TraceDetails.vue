@@ -1223,6 +1223,10 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import {
+  provideTraceLinksInNewTab,
+  traceNavigator,
+} from "@/plugins/traces/composables/useTraceNavigation";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { ancestorChain, nextVisibleSpan } from "@/utils/rowNavigation";
 import {
@@ -1452,6 +1456,21 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    // A host that must stay on its own page gets every link out of the trace in a new tab.
+    openLinksInNewTab: {
+      type: Boolean,
+      default: false,
+    },
+    // A host off the Traces page names the trace stream itself: neither the URL nor the Traces page holds it.
+    ownStreamName: {
+      type: Boolean,
+      default: false,
+    },
+    // A host off the Traces page opens on the default view and leaves the page's saved view alone.
+    ignoreSavedTab: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     ShareButton,
@@ -1497,7 +1516,13 @@ export default defineComponent({
 
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
-    const activeTab = ref<string>(loadTraceActiveTab());
+    const initialTraceTab = (llm = false): TraceTabValue =>
+      props.ignoreSavedTab
+        ? llm
+          ? DEFAULT_LLM_TRACE_TAB
+          : DEFAULT_TRACE_TAB
+        : loadTraceActiveTab(llm);
+    const activeTab = ref<string>(initialTraceTab());
     const tabOrder = ref<TraceTabValue[]>(loadTraceTabOrder());
     const showCriticalPath = ref(loadTraceCriticalPath());
     const traceGraphView = ref<TraceGraphView>(loadTraceGraphView());
@@ -1713,6 +1738,9 @@ export default defineComponent({
     const streamSearchValue = ref<string>("");
 
     const router = useRouter();
+    const openLinksInNewTab = toRef(props, "openLinksInNewTab");
+    provideTraceLinksInNewTab(openLinksInNewTab);
+    const navigate = traceNavigator(router, () => openLinksInNewTab.value);
 
     const traceDetails = ref({});
 
@@ -1770,7 +1798,7 @@ export default defineComponent({
       query.query = b64EncodeUnicode(editorValue);
       query["run-query"] = "true";
       query.tab = originSearchTab();
-      router.push({ name: "traces", query });
+      navigate({ name: "traces", query });
     };
 
     const applyAndViewTraces = () => {
@@ -1849,6 +1877,7 @@ export default defineComponent({
 
     // Current trace stream name for correlation
     const currentTraceStreamName = computed(() => {
+      if (props.mode === "embedded" && props.ownStreamName) return props.streamNameProp;
       return (
         (router.currentRoute.value.query.stream as string) ||
         searchObj.data.stream.selectedStream.value ||
@@ -2244,7 +2273,7 @@ export default defineComponent({
     watch(
       hasLLMContent,
       (llm) => {
-        activeTab.value = loadTraceActiveTab(llm);
+        activeTab.value = initialTraceTab(llm);
       },
       { immediate: true },
     );
@@ -2405,12 +2434,15 @@ export default defineComponent({
       const tab = String(value);
       activeTab.value = tab;
       // Remember the last view so reopening a trace lands where the user left
-      // off, rather than resetting to the default every time.
+      // off, rather than resetting to the default every time. A host that
+      // ignores the saved view must not overwrite it either.
       try {
-        localStorage.setItem(
-          hasLLMContent.value ? LS_LLM_TRACE_ACTIVE_TAB_KEY : LS_TRACE_ACTIVE_TAB_KEY,
-          tab,
-        );
+        if (!props.ignoreSavedTab) {
+          localStorage.setItem(
+            hasLLMContent.value ? LS_LLM_TRACE_ACTIVE_TAB_KEY : LS_TRACE_ACTIVE_TAB_KEY,
+            tab,
+          );
+        }
       } catch {
         // Storage unavailable — selection still applies for this session.
       }
@@ -3438,7 +3470,7 @@ export default defineComponent({
         `${quoteSqlIdentifierIfNeeded(String(store.state.organizationData?.organizationSettings?.trace_id_field_name))}='${escapeSingleQuotes(String(spanList.value[0]["trace_id"]))}'`,
       );
 
-      router.push({
+      navigate({
         path: "/logs",
         query: {
           stream_type: "logs",
@@ -3471,12 +3503,12 @@ export default defineComponent({
       }
 
       if (correlationLocked.value) {
-        navigateToLogs(buildQueryDetails(spanMap.value[spanId] ?? span));
+        navigateToLogs(buildQueryDetails(spanMap.value[spanId] ?? span), navigate);
         return;
       }
       const correlationData = searchObj.data.traceDetails.correlationProps;
       if (correlationData?.logStreams?.length) {
-        navigateToCorrelatedLogs(correlationData);
+        navigateToCorrelatedLogs(correlationData, navigate);
       } else {
         // The sidebar owns the correlation lookup; when it produced nothing there
         // is no log stream to open, so tell the user rather than doing nothing.
@@ -3491,7 +3523,7 @@ export default defineComponent({
       const span = replaySpan.value;
       if (!span) return;
 
-      router.push({
+      navigate({
         name: "SessionViewer",
         params: {
           id: span.rum_session_id,

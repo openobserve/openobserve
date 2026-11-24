@@ -1152,6 +1152,8 @@ export const convertPromQLData = async (
                 ...(nameSuffixes[index] ? {} : { _queryIndex: index }),
                 _panelQueryIndex: parentQueryIndex[index],
                 _seriesRole: seriesRoles[index],
+                // The point menu scopes a click to the series by its labels.
+                _labels: metric.metric,
                 // A right-click on a forecast needs the clicked point's time, which `data` holds only formatted.
                 ...(seriesRoles[index] === "forecast"
                   ? { _timestamps: xAxisData.map((value: any) => value[0]) }
@@ -1249,6 +1251,7 @@ export const convertPromQLData = async (
                 name: seriesName,
                 _panelQueryIndex: parentQueryIndex[index],
                 _seriesRole: seriesRoles[index],
+                _labels: metric.metric,
                 label: {
                   show: panelSchema.config?.label_option?.position != null,
                   position: panelSchema.config?.label_option?.position || "None",
