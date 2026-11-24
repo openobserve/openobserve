@@ -1778,6 +1778,19 @@ export class TracesPage {
     return sharedUrl;
   }
 
+  async expectShareLinkDisabled(message) {
+    await expect(
+      this.page.locator(this.shareLinkButton),
+      message,
+    ).toBeDisabled();
+  }
+
+  async expectSpansFoundCount(count, timeout = 60000) {
+    await expect(
+      this.page.locator(this.tracesCountBadge).first(),
+    ).toContainText(`${count} Spans Found`, { timeout });
+  }
+
   async clickShareLinkButton() {
     await this.page.locator(this.shareLinkButton).click();
     await this.page.waitForTimeout(1000);
@@ -3227,6 +3240,34 @@ export class TracesPage {
     };
     this.page.on('request', onRequest);
     return { requests, stop: () => this.page.off('request', onRequest) };
+  }
+
+  // Traces searches are a span-list SQL POST or a traces/latest GET whose `filter` param carries the editor text.
+  /** Live list of the filter text (latest GET) or decoded SQL (UI span-list POST, no counts) of each `stream` search sent from now on. */
+  trackTraceSearchFilters(stream) {
+    const sent = [];
+    this.page.on('request', (req) => {
+      const url = new URL(req.url());
+      if (url.pathname.endsWith(`/${stream}/traces/latest_stream`) || url.pathname.endsWith(`/${stream}/traces/latest`)) {
+        sent.push(url.searchParams.get('filter') ?? '');
+        return;
+      }
+      if (req.method() !== 'POST' || !/\/_search(_stream)?$/.test(url.pathname) || url.searchParams.get('type') !== 'traces') return;
+      if (url.searchParams.get('is_ui_histogram') === 'true') return;
+      let sql = '';
+      try {
+        const body = JSON.parse(req.postData() || '{}');
+        const q = body.query && typeof body.query === 'object' ? body.query : body;
+        const raw = String(q.sql ?? '');
+        sql = body.encoding === 'base64'
+          ? Buffer.from(raw.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '='), 'base64').toString('utf8')
+          : raw;
+      } catch {
+        /* non-JSON body */
+      }
+      if (url.searchParams.get('search_type') === 'ui' && sql.includes(stream) && !/count\s*\(/i.test(sql)) sent.push(sql);
+    });
+    return sent;
   }
 
   async applySavedView(viewName) {

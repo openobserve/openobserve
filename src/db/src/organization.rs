@@ -32,7 +32,7 @@ use config::{
     },
 };
 use infra::{
-    coordinator::org_status::{STATUS_DELETED, STATUS_DELETING, STATUS_PENDING_DELETION},
+    coordinator::org_status::{STATUS_DELETED, STATUS_DELETING, is_blocking_status},
     db::{delete_from_db_coordinator, put_into_db_coordinator},
     errors::{self, Error},
     table::organizations,
@@ -455,7 +455,7 @@ pub async fn list_with_created_at(
         .collect())
 }
 
-/// Orgs whose row and this node's status cache are both clear of pending, deleting and deleted.
+/// Orgs whose row and this node's status cache are both clear of every refused status.
 pub async fn list_unblocked() -> Result<Vec<Organization>, anyhow::Error> {
     let filter = organizations::ListFilter {
         exclude_deleted: true,
@@ -467,9 +467,7 @@ pub async fn list_unblocked() -> Result<Vec<Organization>, anyhow::Error> {
     Ok(orgs
         .into_iter()
         .filter(|org| {
-            ![STATUS_PENDING_DELETION, STATUS_DELETING, STATUS_DELETED]
-                .contains(&org.status.as_str())
-                && !crate::org_status::is_blocked(&org.identifier)
+            !is_blocking_status(&org.status) && !crate::org_status::is_blocked(&org.identifier)
         })
         .map(to_organization)
         .collect())
@@ -1099,6 +1097,7 @@ mod tests {
             ("deleting", "deleting"),
             ("deleted", "deleted"),
             ("cached", "active"),
+            ("blocked", "blocked"),
         ]
         .map(|(suffix, status)| (format!("{base}_{suffix}"), status));
         for (org, status) in &orgs {

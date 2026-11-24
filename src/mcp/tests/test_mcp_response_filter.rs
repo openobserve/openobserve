@@ -38,6 +38,7 @@ fn init_test_configs() {
                 "stream_type".into(),
                 "stats.storage_size".into(),
                 "is_internal".into(),
+                "schema".into(),
             ],
         );
         configs.insert(
@@ -188,11 +189,8 @@ fn streams_fixture() -> String {
                 "compressed_size": 10485760.0 * (i + 1) as f64,
                 "index_size": 1048576.0 * (i + 1) as f64
             },
-            "schema": (0..15).map(|j| json!({
-                "name": format!("field_{}", j),
-                "type": if j == 0 { "Int64" } else { "Utf8" },
-                "fulltext": j == 1
-            })).collect::<Vec<_>>(),
+            // StreamList leaves schema empty unless the caller sets fetchSchema=true.
+            "schema": [],
             "settings": {
                 "partition_keys": {"level": {"field_name": "level", "types": "value"}},
                 "full_text_search_keys": ["log", "message"],
@@ -535,20 +533,17 @@ fn test_streams_token_reduction() {
 
     let parsed: Value = serde_json::from_str(&summary).unwrap();
     assert_fields_present(&parsed, &["name", "stream_type", "stats.storage_size"]);
-    assert_fields_absent(
-        &parsed,
-        &["schema", "settings", "total_fields", "storage_type"],
-    );
+    assert_fields_absent(&parsed, &["settings", "total_fields", "storage_type"]);
     assert_eq!(parsed["total"], 20);
 }
 
 #[test]
-fn test_streams_summary_keeps_is_internal() {
+fn test_streams_summary_keeps_is_internal_and_fetched_fields() {
     init_test_configs();
     let full = serde_json::to_string(&json!({
         "list": [
-            {"name": "_rumdata", "stream_type": "logs", "stats": {"storage_size": 1.0}, "is_internal": true, "total_fields": 3},
-            {"name": "default", "stream_type": "logs", "stats": {"storage_size": 2.0}, "total_fields": 3}
+            {"name": "_rumdata", "stream_type": "logs", "stats": {"storage_size": 1.0}, "is_internal": true, "total_fields": 3, "schema": []},
+            {"name": "default", "stream_type": "logs", "stats": {"storage_size": 2.0}, "total_fields": 3, "schema": [{"name": "reason", "type": "Utf8"}]}
         ],
         "total": 2
     }))
@@ -558,6 +553,10 @@ fn test_streams_summary_keeps_is_internal() {
     let items = parsed["items"].as_array().unwrap();
     assert_eq!(items[0]["is_internal"], true);
     assert!(items[1].get("is_internal").is_none());
+    assert_eq!(
+        items[1]["schema"],
+        json!([{"name": "reason", "type": "Utf8"}])
+    );
     assert_fields_absent(&parsed, &["total_fields"]);
 }
 

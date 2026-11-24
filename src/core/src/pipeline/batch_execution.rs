@@ -59,7 +59,7 @@ use usage_reporting::publish_error;
 use crate::alerts::{ConditionExt, ConditionGroupExt};
 
 /// Largest destination response body echoed back into node outputs and errors.
-#[cfg(feature = "enterprise")]
+#[cfg(any(feature = "enterprise", test))]
 const DESTINATION_BODY_ECHO_LIMIT: usize = 4096;
 
 // Global batch buffer for accumulating remote stream records
@@ -76,6 +76,8 @@ struct BatchBuffer {
 pub struct WorkflowRunOptions {
     /// Destination nodes report the routing they resolved instead of dispatching.
     pub suppress_destinations: bool,
+    /// A failed HTTP step reports its status only, never the peer's body.
+    pub status_only_http_errors: bool,
     pub cancel: Option<CancellationToken>,
 }
 
@@ -624,6 +626,7 @@ impl ExecutablePipeline {
                 leaf_dest_stream: _leaf_dest_stream,
                 return_value_for_error: false, // pipelines do not support this
                 suppress_destinations: false,  // pipelines have no destination nodes
+                status_only_http_errors: false,
                 cancel: None,
                 flatten_records: true, // ingest depends on flattened records
             };
@@ -914,6 +917,7 @@ impl ExecutablePipeline {
                 leaf_dest_stream: _leaf_dest_stream,
                 return_value_for_error: true,
                 suppress_destinations: options.suppress_destinations,
+                status_only_http_errors: options.status_only_http_errors,
                 cancel: options.cancel.clone(),
                 flatten_records: false,
                 source_stream_name: "system_workflow_trigger".to_string(),
@@ -1246,6 +1250,7 @@ struct ProcessMetadata {
     leaf_dest_stream: Option<StreamParams>,
     return_value_for_error: bool,
     suppress_destinations: bool,
+    status_only_http_errors: bool,
     cancel: Option<CancellationToken>,
     /// Ingest flattens so conditions can index a flat row; a workflow's event shape is a
     /// user-facing contract, so it is preserved and columns are resolved against it.
@@ -3024,9 +3029,8 @@ async fn process_destination_node(
                     return Ok(0);
                 }
             };
-            let status = res.status();
-            let body = read_body_capped(res, DESTINATION_BODY_ECHO_LIMIT).await;
-            if !status.is_success() {
+            if !res.status().is_success() {
+                let error = http_step_error(res, metadata.status_only_http_errors).await;
                 let data_copy: Vec<_> = data.into_iter().map(|v| v.as_ref().clone()).collect();
                 let data = Value::Array(data_copy);
                 if let Err(send_err) = channels
@@ -3034,10 +3038,7 @@ async fn process_destination_node(
                     .send((
                         node.id.to_string(),
                         node.node_type(),
-                        format!(
-                            "Error status : {} ; body : {body}",
-                            status.canonical_reason().unwrap_or(status.as_str())
-                        ),
+                        error,
                         None,
                         Some(data),
                     ))
@@ -3051,6 +3052,7 @@ async fn process_destination_node(
                 }
                 return Ok(0);
             } else {
+                let body = read_body_capped(res, DESTINATION_BODY_ECHO_LIMIT).await;
                 channels
                     .send_output(&metadata, &node.id, &body.into())
                     .await;
@@ -3087,6 +3089,21 @@ fn destination_request(
         HTTPType::PUT => client.put(url),
         HTTPType::GET => client.get(url),
     }
+}
+
+/// A failed HTTP step's error; a test run gets the status only, as its response never shows the
+/// body.
+#[cfg(any(feature = "enterprise", test))]
+async fn http_step_error(res: reqwest::Response, status_only: bool) -> String {
+    let status = res.status();
+    if status_only {
+        return format!("The HTTP step answered with HTTP {}", status.as_u16());
+    }
+    let body = read_body_capped(res, DESTINATION_BODY_ECHO_LIMIT).await;
+    format!(
+        "Error status : {} ; body : {body}",
+        status.canonical_reason().unwrap_or(status.as_str())
+    )
 }
 
 /// Empty for a peer only the operator allowlist admits, since node outputs and errors reach users.
@@ -3411,6 +3428,7 @@ mod tests {
             leaf_dest_stream: None,
             return_value_for_error: false,
             suppress_destinations: false,
+            status_only_http_errors: false,
             cancel: None,
             flatten_records: true,
         };
@@ -3979,6 +3997,7 @@ mod tests {
             leaf_dest_stream: None,
             return_value_for_error: false,
             suppress_destinations: false,
+            status_only_http_errors: false,
             cancel: None,
             flatten_records: true,
         }
@@ -4292,6 +4311,7 @@ mod tests {
             leaf_dest_stream: None,
             return_value_for_error: false,
             suppress_destinations: false,
+            status_only_http_errors: false,
             cancel: None,
             flatten_records: false,
         }
@@ -5511,6 +5531,26 @@ mod tests {
         let body = read_body_capped(res, 4097).await;
         assert_eq!(body.len(), 4096);
         assert!(body.chars().all(|c| c == 'é'));
+    }
+
+    #[test]
+    fn test_http_step_error_of_a_test_run_carries_the_status_only() {
+        crate::ssrf_test_support::isolated(
+            concat!(
+                module_path!(),
+                "::test_http_step_error_of_a_test_run_carries_the_status_only"
+            ),
+            &[("ZO_SSRF_ALLOW_LOOPBACK", "true")],
+            || async {
+                let base = crate::ssrf_test_support::secret_server().await;
+                for (status_only, shown) in [(true, "500"), (false, "secret")] {
+                    let res = reqwest::get(format!("{base}/fail")).await.unwrap();
+                    let error = http_step_error(res, status_only).await;
+                    assert!(error.contains(shown), "{error}");
+                    assert_eq!(error.contains("secret"), !status_only, "{error}");
+                }
+            },
+        );
     }
 
     #[tokio::test]

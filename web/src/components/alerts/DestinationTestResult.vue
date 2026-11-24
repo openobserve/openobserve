@@ -63,15 +63,6 @@ limitations under the License. -->
             {{ result.responseTime }}{{ t("alerts.ms") }}
           </span>
         </div>
-        <div v-if="showSuccessResponseBody && result.responseBody" class="mt-2">
-          <div class="text-3xs text-text-secondary mb-1 font-semibold uppercase">
-            {{ t("alert_destinations.slackOAuth.successResponseBody") }}
-          </div>
-          <pre
-            data-test="test-success-response-body"
-            class="rounded-default text-2xs text-text-body border-border-default bg-surface-base m-0 overflow-x-auto border p-2 font-mono whitespace-pre-wrap"
-            >{{ formatResponseBody(result.responseBody) }}</pre>
-        </div>
       </div>
     </div>
 
@@ -114,50 +105,6 @@ limitations under the License. -->
           <OIcon name="lightbulb" size="sm" />
           <span>{{ getSuggestedFix(result) }}</span>
         </div>
-
-        <!-- Error Details Expansion -->
-        <OCollapsible
-          v-if="result.error || result.responseBody"
-          v-model="errorDetailsOpen"
-          data-test="test-failure-details-expansion"
-          class="mt-2 bg-transparent"
-        >
-          <template #trigger>
-            <div class="text-text-secondary text-2xs flex items-center">
-              <OIcon name="info" size="xs" class="me-1" />
-              <span class="text-xs">{{ t("alerts.viewDetails") }}</span>
-            </div>
-          </template>
-
-          <div data-test="test-failure-details" class="pt-2">
-            <div v-if="result.error" data-test="test-error-message" class="error-item mb-3">
-              <div class="text-3xs text-text-secondary mb-1 font-semibold">
-                {{ t("alerts.error") }}
-              </div>
-              <div class="text-2xs text-text-body leading-[1.5] break-words">
-                {{ result.error }}
-              </div>
-            </div>
-
-            <div v-if="result.statusCode" data-test="test-http-status" class="error-item mb-3">
-              <div class="text-3xs text-text-secondary mb-1 font-semibold">
-                {{ t("alerts.httpStatus") }}
-              </div>
-              <div class="text-2xs text-text-body leading-[1.5] break-words">
-                {{ result.statusCode }} {{ getStatusText(result.statusCode) }}
-              </div>
-            </div>
-
-            <div v-if="result.responseBody" data-test="test-response-body" class="error-item mb-3">
-              <div class="text-3xs text-text-secondary mb-1 font-semibold">
-                {{ t("alerts.responseBody") }}
-              </div>
-              <pre
-                class="rounded-default text-3xs text-text-body m-0 max-h-37.5 overflow-y-auto border border-[rgba(0,0,0,0.1)] bg-[rgba(0,0,0,0.05)] p-2 font-mono leading-[1.5] whitespace-pre dark:border-[rgba(255,255,255,0.1)] dark:bg-[rgba(255,255,255,0.05)]"
-                >{{ formatResponseBody(result.responseBody) }}</pre>
-            </div>
-          </div>
-        </OCollapsible>
 
         <!-- Retry Button -->
         <div
@@ -210,29 +157,25 @@ limitations under the License. -->
 </template>
 
 <script setup lang="ts">
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { formatDate } from "@/utils/date";
 import type { TestResult } from "@/utils/prebuilt-templates/types";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { httpStatusBucket } from "@/lib/core/Badge/badgeGroups";
-import { ref } from "vue";
 
 // Define component props
 interface Props {
   // Backend test responses also include responseTime (ms); shared TestResult omits it.
   result?: (TestResult & { responseTime?: number }) | null;
   isLoading?: boolean;
-  showSuccessResponseBody?: boolean;
 }
 
 withDefaults(defineProps<Props>(), {
   result: null,
   isLoading: false,
-  showSuccessResponseBody: false,
 });
 
 // Define component emits
@@ -245,8 +188,6 @@ defineEmits<Emits>();
 // Composables
 const { t } = useI18nTyped();
 
-const errorDetailsOpen = ref(false);
-
 // Methods
 function formatTimestamp(timestamp?: number | string): string {
   if (!timestamp) return "";
@@ -256,31 +197,14 @@ function formatTimestamp(timestamp?: number | string): string {
 }
 
 function getFailureMessage(result: TestResult): string {
-  // First, try to show the actual backend error message
-  if (result.responseBody) {
-    try {
-      const parsed = JSON.parse(result.responseBody);
-      // Common error message fields from various APIs
-      const errorMessage = parsed.error || parsed.message || parsed.errors || parsed.detail;
-      if (errorMessage) {
-        // If it's a string, return it directly
-        if (typeof errorMessage === "string") {
-          return t("alerts.testFailedWithReason", { reason: errorMessage });
-        }
-        // If it's an array, join the messages
-        if (Array.isArray(errorMessage)) {
-          return t("alerts.testFailedWithReason", { reason: errorMessage.join(", ") });
-        }
-      }
-    } catch {
-      // If parsing fails, try to use responseBody as-is if it's short enough
-      if (result.responseBody.length < 100) {
-        return t("alerts.testFailedWithReason", { reason: result.responseBody });
-      }
-    }
+  // The status-based message is translated, while the backend's error is English.
+  if (result.statusCode && result.statusCode >= 500) {
+    return t("alerts.testErrorServerError");
+  }
+  if (result.statusCode && result.statusCode >= 400) {
+    return t("alerts.testErrorClientError");
   }
 
-  // If we have an error message, show it directly
   if (result.error) {
     // Check for common error patterns that need specific guidance
     if (result.error.includes("ENOTFOUND") || result.error.includes("DNS")) {
@@ -300,50 +224,7 @@ function getFailureMessage(result: TestResult): string {
     return t("alerts.testFailedWithReason", { reason: result.error });
   }
 
-  // Fall back to generic messages based on status code
-  if (result.statusCode) {
-    if (result.statusCode >= 400 && result.statusCode < 500) {
-      return t("alerts.testErrorClientError");
-    }
-    if (result.statusCode >= 500) {
-      return t("alerts.testErrorServerError");
-    }
-  }
-
   return t("alerts.testFailedMessage");
-}
-
-function getStatusText(statusCode: number): string {
-  // HTTP reason phrases, rendered right after the numeric status code. They are
-  // protocol vocabulary (RFC 9110), quoted as-is in every locale — never translated.
-  const statusMessages: Record<number, string> = {
-    200: raw("OK"),
-    201: raw("Created"),
-    204: raw("No Content"),
-    400: raw("Bad Request"),
-    401: raw("Unauthorized"),
-    403: raw("Forbidden"),
-    404: raw("Not Found"),
-    422: raw("Unprocessable Entity"),
-    429: raw("Too Many Requests"),
-    500: raw("Internal Server Error"),
-    502: raw("Bad Gateway"),
-    503: raw("Service Unavailable"),
-    504: raw("Gateway Timeout"),
-  };
-
-  return statusMessages[statusCode] || t("alerts.unknownHttpStatus");
-}
-
-function formatResponseBody(body: string): string {
-  try {
-    // Try to parse and prettify JSON
-    const parsed = JSON.parse(body);
-    return JSON.stringify(parsed, null, 2);
-  } catch {
-    // Return as-is if not JSON
-    return body;
-  }
 }
 
 function getSuggestedFix(result: TestResult): string | null {

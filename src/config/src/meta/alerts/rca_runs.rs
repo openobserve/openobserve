@@ -135,6 +135,8 @@ string_enum! {
     RunMode {
         Fresh => "fresh",
         BuildOnPrevious => "build_on_previous",
+        /// A recurring incident checked against earlier agreeing runs instead of analysed again.
+        Recheck => "recheck",
     }
 }
 
@@ -204,8 +206,12 @@ pub struct RunStats {
     pub duration_ms: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tokens: Option<serde_json::Value>,
+    /// What the model calls cost as the agent reported them; `None` when any call was unpriced.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credits: Option<f64>,
+    /// `provider/model` of the run's last model call.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub steered: Option<u32>,
     /// Acks after the first for the same steering row.

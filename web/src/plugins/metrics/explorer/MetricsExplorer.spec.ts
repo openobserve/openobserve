@@ -364,6 +364,25 @@ describe("MetricsExplorer wiring", () => {
       expect(wrapper.find('[data-test="metrics-explorer-show-more"]').exists()).toBe(true);
     });
 
+    it("draws the still-loading slots, not no-match-yet, while the slice is being checked", () => {
+      grid.cards.value = many(3621, "m");
+      grid.pagedCards.value = [];
+      grid.hasMore.value = true;
+      const displayed = Object.getOwnPropertyDescriptor(grid, "displayed")!;
+      Object.defineProperty(grid, "displayed", {
+        configurable: true,
+        get: () => ({ value: { cards: [], placeholders: 8, emptyHeld: new Set() } }),
+      });
+      try {
+        const wrapper = mountExplorer();
+        expect(wrapper.find('[data-test="metrics-explorer-no-match-yet"]').exists()).toBe(false);
+        expect((wrapper.vm as any).gridVisible).toBe(true);
+        expect((wrapper.vm as any).rowsOfCards.flat()).toEqual(Array(8).fill(null));
+      } finally {
+        Object.defineProperty(grid, "displayed", displayed);
+      }
+    });
+
     it("shows the final no-match once nothing is left to check", () => {
       grid.cards.value = many(3621, "m");
       grid.pagedCards.value = [];

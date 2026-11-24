@@ -29,4 +29,7 @@ export const userKeys = {
   assignableRoles: (org: string) => orgKey(org, "iam", "users", "assignableRoles"),
   /** email → role list for every user in the org, in one request. */
   allUserRoles: (org: string) => orgKey(org, "iam", "users", "allRoles"),
+  /** One page of every organization's users, as the meta org lists them. */
+  allUsers: (org: string, filters: Record<string, unknown>) =>
+    orgKey(org, "iam", "users", "all", filters),
 };

@@ -37,7 +37,6 @@ const hoisted = vi.hoisted(() => ({
   mockLastTestResult: null as null | {
     success: boolean;
     statusCode: number;
-    responseBody?: string;
   },
 }));
 
@@ -135,7 +134,7 @@ function mountComp(props: Record<string, any> = {}) {
         DestinationTestResult: {
           name: "DestinationTestResult",
           template: '<div data-test="destination-test-result-stub"></div>',
-          props: ["result", "showSuccessResponseBody"],
+          props: ["result"],
         },
         AddUser: {
           name: "AddUser",
@@ -608,7 +607,7 @@ describe("AddDestination - custom Web Hook preview and test", () => {
   });
 
   it("shows the test result under the Web Hook settings", async () => {
-    hoisted.mockLastTestResult = { success: true, statusCode: 200, responseBody: "ok" };
+    hoisted.mockLastTestResult = { success: true, statusCode: 200 };
     wrapper = mountComp({ templates: [TEMPLATE] });
     await toCustomHttp(wrapper);
 
@@ -1307,23 +1306,18 @@ describe("AddDestination - Slack setup flow", () => {
     );
   });
 
-  it("opts Slack into displaying the observed HTTP 200 response body", async () => {
-    hoisted.mockLastTestResult = { success: true, statusCode: 200, responseBody: "ok" };
+  it("shows the Slack test result without workspace or channel details", async () => {
+    hoisted.mockLastTestResult = { success: true, statusCode: 200 };
     await selectSlack();
     await nextTick();
 
     const result = wrapper.findComponent({ name: "DestinationTestResult" });
-    expect(result.props("showSuccessResponseBody")).toBe(true);
-    expect(result.props("result")).toEqual({
-      success: true,
-      statusCode: 200,
-      responseBody: "ok",
-    });
+    expect(result.props("result")).toEqual({ success: true, statusCode: 200 });
     expect(JSON.stringify(result.props())).not.toMatch(/workspace|channel/i);
   });
 
   it("clears a successful test result when the webhook credentials change", async () => {
-    hoisted.mockLastTestResult = { success: true, statusCode: 200, responseBody: "ok" };
+    hoisted.mockLastTestResult = { success: true, statusCode: 200 };
     const form = await selectSlack();
     form.setFieldValue("credentials", { webhookUrl: VALID_SLACK, channel: "" });
     await nextTick();
@@ -1345,7 +1339,6 @@ describe("AddDestination - Slack setup flow", () => {
     hoisted.mockTestPrebuilt.mockResolvedValue({
       success: true,
       statusCode: 200,
-      responseBody: "ok",
     });
     const form = await selectSlack();
     form.setFieldValue("name", "slack-private");

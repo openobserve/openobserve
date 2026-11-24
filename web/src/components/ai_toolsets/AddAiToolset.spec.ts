@@ -106,7 +106,7 @@ describe("AddAiToolset", () => {
     it("shows the MCP section by default (kind = mcp)", () => {
       wrapper = createWrapper();
       expect(wrapper.find('[data-test="ai-toolset-mcp-url"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="ai-toolset-cli-command"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="ai-toolset-skill-content"]').exists()).toBe(false);
     });
 
     it("keeps the Save button enabled (R3 — never disabled to gate validity)", () => {
@@ -118,12 +118,12 @@ describe("AddAiToolset", () => {
 
     it("toggles the visible section off the form-owned kind value", async () => {
       wrapper = createWrapper();
-      getForm().setFieldValue("kind", "cli");
+      getForm().setFieldValue("kind", "skill");
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.selectedKind).toBe("cli");
-      expect(wrapper.find('[data-test="ai-toolset-cli-command"]').exists()).toBe(true);
+      expect(wrapper.vm.selectedKind).toBe("skill");
+      expect(wrapper.find('[data-test="ai-toolset-skill-content"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="ai-toolset-mcp-url"]').exists()).toBe(false);
     });
   });
@@ -205,34 +205,9 @@ describe("AddAiToolset", () => {
 
       expect(aiToolsetsService.create).not.toHaveBeenCalled();
     });
-
-    it("blocks a cli toolset with no command, then saves once command is set", async () => {
-      wrapper = createWrapper();
-      const form = getForm();
-      form.setFieldValue("kind", "cli");
-      form.setFieldValue("name", "valid");
-      await flushPromises();
-
-      await form.handleSubmit();
-      await flushPromises();
-      expect(aiToolsetsService.create).not.toHaveBeenCalled();
-
-      form.setFieldValue("cli.command", "kubectl");
-      await flushPromises();
-      await form.handleSubmit();
-      await flushPromises();
-
-      expect(aiToolsetsService.create).toHaveBeenCalledWith(
-        "test-org",
-        expect.objectContaining({
-          kind: "cli",
-          data: expect.objectContaining({ command: "kubectl" }),
-        }),
-      );
-    });
   });
 
-  describe("form-owned array-fields (headers / env / cred)", () => {
+  describe("form-owned array-fields (headers)", () => {
     it("adds a header row through the form API and mirrors it for the v-for", async () => {
       wrapper = createWrapper();
       wrapper.vm.addHeader();
@@ -294,33 +269,6 @@ describe("AddAiToolset", () => {
       await flushPromises();
       expect(getForm().state.values.mcp.headers[0].visible).toBe(true);
     });
-
-    it("saves cli env + credential files (cred value bridged from Monaco)", async () => {
-      wrapper = createWrapper();
-      const form = getForm();
-      form.setFieldValue("kind", "cli");
-      form.setFieldValue("name", "valid");
-      form.setFieldValue("cli.command", "kubectl");
-      form.setFieldValue("cli.env", [{ key: "GH_TOKEN", value: "secret", visible: false }]);
-      form.setFieldValue("cli.credFiles", [{ key: "KUBECONFIG", value: "" }]);
-      await flushPromises();
-      // The Monaco editor bridges its value into the form.
-      wrapper.vm.setCredValue(0, "apiVersion: v1");
-      await flushPromises();
-
-      await form.handleSubmit();
-      await flushPromises();
-
-      expect(aiToolsetsService.create).toHaveBeenCalledWith(
-        "test-org",
-        expect.objectContaining({
-          data: expect.objectContaining({
-            env: { GH_TOKEN: "secret" },
-            credential_files: { KUBECONFIG: "apiVersion: v1" },
-          }),
-        }),
-      );
-    });
   });
 
   // The non-negotiable field-array gate (START-HERE ① / brief §2): build >=3
@@ -362,46 +310,6 @@ describe("AddAiToolset", () => {
       // RENDERED inputs must shift, not just form.state.values.
       expect(renderedKeys("mcp.headers")).toEqual(["AAA", "CCC"]);
       expect(getForm().state.values.mcp.headers.map((h: any) => h.key)).toEqual(["AAA", "CCC"]);
-    });
-
-    it("keeps cli.env inputs in sync after deleting a NON-last row", async () => {
-      wrapper = createWrapper();
-      const form = getForm();
-      form.setFieldValue("kind", "cli");
-      form.setFieldValue("cli.env", [
-        { key: "E_AAA", value: "1", visible: false },
-        { key: "E_BBB", value: "2", visible: false },
-        { key: "E_CCC", value: "3", visible: false },
-      ]);
-      await flushPromises();
-      await wrapper.vm.$nextTick();
-      expect(renderedKeys("cli.env")).toEqual(["E_AAA", "E_BBB", "E_CCC"]);
-
-      wrapper.vm.removeEnvVar(1); // delete the MIDDLE (non-last) row
-      await flushPromises();
-      await wrapper.vm.$nextTick();
-
-      expect(renderedKeys("cli.env")).toEqual(["E_AAA", "E_CCC"]);
-    });
-
-    it("keeps cli.credFiles inputs in sync after deleting a NON-last row", async () => {
-      wrapper = createWrapper();
-      const form = getForm();
-      form.setFieldValue("kind", "cli");
-      form.setFieldValue("cli.credFiles", [
-        { key: "C_AAA", value: "" },
-        { key: "C_BBB", value: "" },
-        { key: "C_CCC", value: "" },
-      ]);
-      await flushPromises();
-      await wrapper.vm.$nextTick();
-      expect(renderedKeys("cli.credFiles")).toEqual(["C_AAA", "C_BBB", "C_CCC"]);
-
-      wrapper.vm.removeCredFile(1); // delete the MIDDLE (non-last) row
-      await flushPromises();
-      await wrapper.vm.$nextTick();
-
-      expect(renderedKeys("cli.credFiles")).toEqual(["C_AAA", "C_CCC"]);
     });
   });
 

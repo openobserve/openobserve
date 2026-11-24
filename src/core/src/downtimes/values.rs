@@ -720,6 +720,7 @@ async fn run_search(
         clear_cache: false,
         local_mode: None,
         agent_options: None,
+        raw_streams: None,
     };
     let trace_id = config::ider::generate();
     let resp = crate::search::search(&trace_id, org, query.stream_type, None, &req).await?;

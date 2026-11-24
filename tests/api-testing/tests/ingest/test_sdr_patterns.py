@@ -25,6 +25,7 @@ import time
 import uuid
 
 import pytest
+import requests
 
 ORG_ID = os.environ.get("TEST_ORG_ID", "default")
 CARD = "4111111111111111"
@@ -131,7 +132,36 @@ def _poll_search(session, base_url, sql, predicate, timeout=45, what="condition"
 
 
 @pytest.fixture(scope="module")
-def redacted_stream(request, create_session, base_url):
+def reader_session(create_session, base_url):
+    """A non-root admin without the `logs_unredacted` grant: it must see redacted values.
+
+    Root reads protected streams raw (search-time redaction phase 2), so every assertion
+    that a raw value never comes back runs as this user.
+    """
+    email = f"sdr_auto_reader_{_suffix()}@example.com"
+    password = "SdrReaderPass#12345"
+    resp = create_session.post(
+        f"{base_url}api/{ORG_ID}/users",
+        json={
+            "email": email,
+            "password": password,
+            "first_name": "sdr",
+            "last_name": "reader",
+            "role": "admin",
+        },
+    )
+    try:
+        assert resp.status_code in (200, 201), f"reader create failed: {resp.status_code} {resp.text}"
+        session = requests.Session()
+        token = base64.b64encode(f"{email}:{password}".encode()).decode()
+        session.headers.update({"Authorization": f"Basic {token}"})
+        yield session
+    finally:
+        create_session.delete(f"{base_url}api/{ORG_ID}/users/{email}")
+
+
+@pytest.fixture(scope="module")
+def redacted_stream(request, create_session, reader_session, base_url):
     """A stream with one card-number pattern associated to `body` at Both.
 
     Every resource registers its own teardown the moment it exists. Asserting before a
@@ -210,7 +240,7 @@ def redacted_stream(request, create_session, base_url):
     # The association has to reach the pattern manager before a search reflects it.
     # Not required: SDR-01 is the test that judges whether redaction happened.
     _poll_search(
-        create_session,
+        reader_session,
         base_url,
         f'SELECT body FROM "{stream}"',
         lambda hits: any("[REDACTED]" in h.get("body", "") for h in hits),
@@ -225,10 +255,10 @@ def redacted_stream(request, create_session, base_url):
 # ---------------------------------------------------------------------------
 
 
-def test_sdr_01_search_returns_redacted_values(create_session, base_url, redacted_stream):
+def test_sdr_01_search_returns_redacted_values(reader_session, base_url, redacted_stream):
     """A card number ingested into an associated field must never come back in a search."""
     hits = _poll_search(
-        create_session,
+        reader_session,
         base_url,
         f'SELECT body FROM "{redacted_stream["stream"]}"',
         lambda h: any("[REDACTED]" in r.get("body", "") for r in h),
@@ -241,7 +271,7 @@ def test_sdr_01_search_returns_redacted_values(create_session, base_url, redacte
 
 
 def test_sdr_02_redaction_applies_to_rows_ingested_after_association(
-    create_session, base_url, redacted_stream
+    create_session, reader_session, base_url, redacted_stream
 ):
     """apply_at=Both covers later writes too, not just the rows present at association."""
     resp = create_session.post(
@@ -251,7 +281,7 @@ def test_sdr_02_redaction_applies_to_rows_ingested_after_association(
     assert resp.status_code == 200
 
     hits = _poll_search(
-        create_session,
+        reader_session,
         base_url,
         f'SELECT body FROM "{redacted_stream["stream"]}"',
         lambda h: any("second charge" in r.get("body", "") for r in h),
@@ -289,8 +319,8 @@ def _leaks(payload):
 
 
 @pytest.mark.parametrize("sql", BYPASS_QUERIES)
-def test_sdr_12_no_query_shape_returns_the_raw_value(create_session, base_url, redacted_stream, sql):
-    resp = _search(create_session, base_url, sql.format(s=f'"{redacted_stream["stream"]}"'))
+def test_sdr_12_no_query_shape_returns_the_raw_value(reader_session, base_url, redacted_stream, sql):
+    resp = _search(reader_session, base_url, sql.format(s=f'"{redacted_stream["stream"]}"'))
     assert resp.status_code == 200, f"{sql}: {resp.status_code} {resp.text}"
     hits = resp.json().get("hits", [])
     assert hits, f"{sql} returned no rows; the fixture row should be searchable"
@@ -298,10 +328,10 @@ def test_sdr_12_no_query_shape_returns_the_raw_value(create_session, base_url, r
 
 
 def test_sdr_13_filters_and_encodings_see_only_redacted_values(
-    create_session, base_url, redacted_stream
+    reader_session, base_url, redacted_stream
 ):
     stream = f'"{redacted_stream["stream"]}"'
-    resp = _search(create_session, base_url, f"SELECT encode(body, 'base64') AS v FROM {stream}")
+    resp = _search(reader_session, base_url, f"SELECT encode(body, 'base64') AS v FROM {stream}")
     assert resp.status_code == 200, resp.text
     # DataFusion's base64 omits the padding
     decoded = [base64.b64decode(h["v"] + "=" * (-len(h["v"]) % 4)).decode() for h in resp.json()["hits"]]
@@ -310,7 +340,7 @@ def test_sdr_13_filters_and_encodings_see_only_redacted_values(
 
     # A predicate that is true for the redacted value must not select rows by the raw one.
     oracle = _search(
-        create_session,
+        reader_session,
         base_url,
         f"SELECT count(*) AS c FROM {stream} WHERE body LIKE '%{CARD[:6]}%'",
     )
@@ -319,7 +349,7 @@ def test_sdr_13_filters_and_encodings_see_only_redacted_values(
 
 
 def test_sdr_14_query_function_and_streaming_see_only_redacted_values(
-    create_session, base_url, redacted_stream
+    reader_session, base_url, redacted_stream
 ):
     now = int(time.time() * 1_000_000)
     query = {
@@ -331,18 +361,30 @@ def test_sdr_14_query_function_and_streaming_see_only_redacted_values(
         # A query function copying the field ran before the old response-level redaction.
         "query_fn": base64.b64encode(b".leak = .body\n.").decode(),
     }
-    resp = create_session.post(f"{base_url}api/{ORG_ID}/_search?type=logs", json={"query": query})
+    resp = reader_session.post(f"{base_url}api/{ORG_ID}/_search?type=logs", json={"query": query})
     assert resp.status_code == 200, resp.text
     hits = resp.json().get("hits", [])
     assert any("[REDACTED]" in h.get("leak", "") for h in hits), f"no copied field: {hits}"
     assert not _leaks(hits), f"the query function copy leaked the raw value: {hits}"
 
-    stream = create_session.post(
+    stream = reader_session.post(
         f"{base_url}api/{ORG_ID}/_search_stream?type=logs", json={"query": query}
     )
     assert stream.status_code == 200, stream.text
     assert "[REDACTED]" in stream.text, f"streaming returned no redacted row: {stream.text[:300]}"
     assert not _leaks(stream.text), "the streaming search leaked the raw value"
+
+
+def test_sdr_15_root_reads_the_raw_value(create_session, base_url, redacted_stream):
+    """Phase 2: root reads a protected stream raw; the fixture row predates ingest redaction."""
+    hits = _poll_search(
+        create_session,
+        base_url,
+        f'SELECT body FROM "{redacted_stream["stream"]}" WHERE body LIKE \'%{CARD[:6]}%\'',
+        lambda h: any(CARD in r.get("body", "") for r in h),
+        what="root read the raw card number",
+    )
+    assert hits, "root found no row by its raw value"
 
 
 # ---------------------------------------------------------------------------

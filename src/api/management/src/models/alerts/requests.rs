@@ -69,6 +69,11 @@ pub struct CreateAlertRequestBody {
     /// Composite-only boolean condition over stable child alert IDs.
     pub composite_condition: Option<CompositeCondition>,
 
+    /// Makes the alert temporary: disabled at `ends_at_us` (at most 7 days ahead), deleted 7 days
+    /// later unless kept. Scheduled and real-time alerts only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lease: Option<config::meta::alerts::lease::LeaseSpec>,
+
     /// The alert configuration. All fields from Alert are flattened into this request body.
     #[serde(flatten)]
     #[schema(inline)]

@@ -36,6 +36,7 @@ pub enum OrgStatus {
     PendingDeletion,
     Deleting,
     Deleted,
+    Blocked,
 }
 
 use config::meta::{cluster::Node, self_reporting::usage};

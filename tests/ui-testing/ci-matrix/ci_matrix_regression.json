@@ -22,7 +22,12 @@
       "logs-3322-field-filter-similar-names.spec.js",
       "logs-723-custom-range-sql-limit.spec.js",
       "logs-16799-value-suggest-mid-text.spec.js",
-      "logs-730-live-mode-org-switch.spec.js"
+      "logs-730-live-mode-org-switch.spec.js",
+      "logs-16949-in-subquery-total.spec.js",
+      "logs-16952-stream-type.spec.js",
+      "logs-16941-editor-field-list.spec.js",
+      "logs-16976-include-visualize.spec.js",
+      "logs-16952-drilldown.spec.js"
     ],
     "disabled": []
   },
@@ -83,7 +88,10 @@
       "dashboard-16395-go-to-logs-aggregate-where.spec.js",
       "dashboard-16808-org-switch-by-id.spec.js",
       "dashboard-16631-promql-table-drilldown-row.spec.js",
-      "dashboard-16901-multi-query-empty-first.spec.js"
+      "dashboard-16901-multi-query-empty-first.spec.js",
+      "dashboard-16935-treemap.spec.js",
+      "dashboard-2140-pin-after-move.spec.js",
+      "dashboard-2120-import-folder-lock.spec.js"
     ],
     "disabled": []
   },
@@ -144,7 +152,9 @@
       "traces-ent1272-share-link-stream.spec.js",
       "traces-ent1740-dag-label-overflow.spec.js",
       "traces-16288-rum-span-error-tab.spec.js",
-      "traces-16529-leave-mid-load.spec.js"
+      "traces-16529-leave-mid-load.spec.js",
+      "traces-16941-sidebar-filters.spec.js",
+      "traces-16961-span-links-paging.spec.js"
     ],
     "disabled": []
   },
@@ -213,7 +223,10 @@
       "logs-no-stream-prompt.spec.js",
       "logs-field-actions.spec.js",
       "logs-16782-landing-cancel.spec.js",
-      "logs-16223-recent-search-new-stream.spec.js"
+      "logs-16223-recent-search-new-stream.spec.js",
+      "logs-16952-url-nav.spec.js",
+      "logs-16987-saved-view-share.spec.js",
+      "logs-16964-page-back-large-rows.spec.js"
     ],
     "disabled": []
   },
@@ -250,7 +263,12 @@
     "actual_folder": "RegressionSet/OnlineEvals",
     "browser": "chrome",
     "run_files": [
-      "llmProviderTypes.spec.js"
+      "llmProviderTypes.spec.js",
+      "ai-obs-3133-3141-insights-scope.spec.js",
+      "ai-obs-3145-3154-insights-panels.spec.js",
+      "ai-obs-3152-insights-empty-state.spec.js",
+      "ai-obs-2642-agent-graph-stale-window.spec.js",
+      "ai-prompts-3241-append.spec.js"
     ],
     "disabled": []
   },

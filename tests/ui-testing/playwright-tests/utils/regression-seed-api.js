@@ -4,6 +4,7 @@ const { expect } = require('@playwright/test');
 const testLogger = require('./test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
 const { getHeaders, getIngestionUrl } = require('./data-ingestion.js');
+const { ingestBase } = require('./ingest-url.js');
 
 const ingestionBase = () => (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/$/, '');
 const apiBase = () => process.env.ZO_BASE_URL_SC || process.env.ZO_BASE_URL;
@@ -58,6 +59,83 @@ async function createPromqlPanelDashboard(title, metric, promql) {
           config: { promql_legend: '', query_type: 'range' },
         }],
         layout: { x: 0, y: 0, w: 96, h: 14, i: 1 },
+      }],
+    }],
+  });
+  const inner = result[`v${result.version}`] || result;
+  return inner.dashboardId || inner.dashboard_id;
+}
+
+/** POST `rows` to the logs stream through the ingest base, then poll until a last-hour count returns all of them (rows search only after the WAL flush). */
+async function ingestLogRowsAndWaitForCount(stream, rows, timeout = 60000) {
+  const res = await fetch(`${ingestBase(ingestionBase())}/api/${orgId()}/${stream}/_json`, {
+    method: 'POST',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(rows),
+  });
+  expect(res.ok, `Precondition: ingest ${stream} -> ${res.status}`).toBe(true);
+  const now = Date.now() * 1000;
+  await expect.poll(async () => {
+    const body = await apiFetch('POST', `/${orgId()}/_search?type=logs`, {
+      query: { sql: `SELECT count(*) as c FROM "${stream}"`, start_time: now - 3_600_000_000, end_time: now + 60_000_000, from: 0, size: 1 },
+    }).catch(() => null);
+    return body?.hits?.[0]?.c ?? 0;
+  }, { timeout }).toBe(rows.length);
+}
+
+const treemapField = (alias, column, functionName = null) => ({
+  label: column,
+  alias,
+  column,
+  color: null,
+  functionName,
+  args: [{ type: 'field', value: { field: column, streamAlias: null } }],
+  isDerived: false,
+  sortBy: null,
+});
+
+/** A builder-mode treemap query on `stream`: `levels` as nested groups, sized by `sum(bytes)` or, for `value` "count", `count(_timestamp)`. */
+function treemapPanelQuery(stream, levels, value) {
+  const x = levels.map((column, i) => treemapField(`x_axis_${i + 1}`, column));
+  const y = value === 'count' ? treemapField('y_axis_1', '_timestamp', 'count') : treemapField('y_axis_1', 'bytes', 'sum');
+  const select = [
+    ...x.map((f) => `${f.column} as "${f.alias}"`),
+    value === 'count' ? 'count(_timestamp) as "y_axis_1"' : 'sum(bytes) as "y_axis_1"',
+  ].join(', ');
+  return {
+    query: `SELECT ${select} FROM "${stream}" GROUP BY ${x.map((f) => f.alias).join(', ')}`,
+    customQuery: false,
+    fields: {
+      stream,
+      stream_type: 'logs',
+      x,
+      y: [y],
+      z: [],
+      breakdown: [],
+      filter: { filterType: 'group', logicalOperator: 'AND', conditions: [] },
+    },
+    config: { promql_legend: '', layer_type: 'scatter', weight_fixed: 1, limit: 0, min: 0, max: 100 },
+  };
+}
+
+/** Create a dashboard titled `title` whose one treemap panel (id `panelId`) runs `queries`; resolves to its dashboard id. */
+async function createTreemapDashboard(title, panelTitle, queries, panelId = 'p_treemap') {
+  const result = await apiFetch('POST', `/${orgId()}/dashboards?folder=default`, {
+    version: 8,
+    title,
+    description: 'treemap e2e',
+    tabs: [{
+      tabId: 'default',
+      name: 'Default',
+      panels: [{
+        id: panelId,
+        type: 'treemap',
+        title: panelTitle,
+        description: '',
+        queryType: 'sql',
+        config: { show_legends: true, unit: 'default', decimals: 0 },
+        queries,
+        layout: { x: 0, y: 0, w: 96, h: 20, i: 1 },
       }],
     }],
   });
@@ -126,6 +204,9 @@ module.exports = {
   deleteStreamQuietly,
   ensureOrg,
   ingestLogRowsFetch,
+  ingestLogRowsAndWaitForCount,
+  treemapPanelQuery,
+  createTreemapDashboard,
   ingestLogRows,
   deleteLogStreamQuietly,
   createLogsSavedView,

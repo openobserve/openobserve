@@ -70,6 +70,7 @@ export class HomePage {
         this.homePageIndicator = page.locator('[data-test="home-page"]').first();
         this.homeOverviewPanel = page.locator('[data-test="home-overview-panel"]').first();
         this.pinnedDashboardRefreshBtn = page.locator('[data-test="pinned-dashboard-refresh-btn"]');
+        this.homeRefreshButton = page.locator('[data-test="home-page"] [data-test="refresh-button"]');
 
         // ===== FAVICON SELECTOR (Bug #9217) =====
         this.faviconLink = page.locator('link#favicon');
@@ -935,5 +936,14 @@ export class HomePage {
         }
 
         return result;
+    }
+
+    async clickHomeRefresh() {
+        await this.homeRefreshButton.click();
+    }
+
+    async openPinnedDashboardTab(title) {
+        await this.homePageMenu.click();
+        await this.page.getByRole('tab', { name: title }).click();
     }
 }

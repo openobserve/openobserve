@@ -186,6 +186,12 @@ const conditionLang = computed<QueryLang | undefined>(() => {
   if (!conditionIsQuery.value || conditionText.value === EMPTY) return undefined;
   return queryCondition.value?.type === "promql" ? "promql" : "sql";
 });
+// A threshold PromQL alert's condition is only the comparison, so its expression is shown on its own.
+const promqlThresholdQuery = computed<string>(() =>
+  queryCondition.value?.type === "promql" && !queryCondition.value?.promql_rule_mode
+    ? String(queryCondition.value?.promql ?? "").trim()
+    : "",
+);
 
 // ── SLO alerts (Feature 5, Phase 3.3) ───────────────────────────────────────
 // This family has no stream, no SQL and no aggregation, so the generic source
@@ -494,6 +500,16 @@ const genericSections = computed<SummarySection[]>(() => [
             label: t("alerts.streamName"),
             value: props.alert?.stream_name || EMPTY,
           },
+          ...(promqlThresholdQuery.value
+            ? [
+                {
+                  key: "query",
+                  label: t("alerts.alertDetails.promqlQuery"),
+                  value: promqlThresholdQuery.value,
+                  code: "promql" as const,
+                },
+              ]
+            : []),
           {
             key: "condition",
             label: t("alerts.groups.criticalCondition"),

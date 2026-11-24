@@ -75,6 +75,12 @@
           :downtime="headerDowntime"
           data-test="alerts-alertdetail-muted-chip"
         />
+        <LeaseChip
+          v-for="lease in listRow?.leases ?? []"
+          :key="lease.id"
+          :lease="lease"
+          :data-test="`alerts-alertdetail-lease-${lease.kind}`"
+        />
         <ODropdown v-if="isAnomalyAlert && headerDowntime && downtimesEnabled" align="start">
           <template #trigger>
             <OButton
@@ -458,6 +464,7 @@ import AlertGroupsTable from "@/components/alerts/AlertGroupsTable.vue";
 import AlertHeaderActions from "@/components/alerts/AlertHeaderActions.vue";
 import AckChip from "@/components/alerts/AckChip.vue";
 import MutedChip from "@/components/alerts/downtimes/MutedChip.vue";
+import LeaseChip from "@/components/alerts/LeaseChip.vue";
 import RowMuteMenu from "@/components/alerts/downtimes/RowMuteMenu.vue";
 import ExtendDowntimeDialog from "@/components/alerts/downtimes/ExtendDowntimeDialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -508,6 +515,7 @@ import type {
   AckView,
   AlertGroup,
   AlertGroupsResponse,
+  AlertLeaseView,
   AlertListAck,
   AlertGroupTransition,
   CompositeAlertReference,
@@ -780,6 +788,7 @@ interface AlertListRow {
   ack?: AlertListAck | null;
   active_downtime?: (ActiveDowntime & { version?: number }) | null;
   incident?: { id: string; title?: string | null; status: string } | null;
+  leases?: AlertLeaseView[];
 }
 
 const listRow = computed<AlertListRow | null>(

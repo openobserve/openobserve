@@ -366,12 +366,29 @@ describe("Traces page load states", () => {
         expect(searchObj.meta.resultGrid.showPagination).toBe(false);
       });
 
-      it("drops the kept error count and pager when the re-run's count fails", async () => {
+      it("keeps the last count, error count and pager when the same query's re-run count fails", async () => {
         vi.spyOn(console, "warn").mockImplementation(() => {});
         await settleFirstRun();
         lastCall("main")[1].complete(null);
         lastCall("count")[1].error(null, new Error("boom"));
 
+        expect(searchObj.data.queryResults.total).toBe(42);
+        expect(searchObj.data.queryResults.errorCount).toBe(1);
+        expect(searchObj.meta.resultGrid.showPagination).toBe(true);
+      });
+
+      it("drops the kept error count and pager when another query's count fails", async () => {
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+        await mountSearching();
+        lastCall("main")[1].complete(null);
+        lastCall("count")[1].data(null, countHits(42));
+        lastCall("count")[1].complete(null);
+        searchObj.data.editorValue = "span_status = 'ERROR'";
+        await wrapper!.vm.getQueryData();
+        lastCall("main")[1].complete(null);
+        lastCall("count")[1].error(null, new Error("boom"));
+
+        expect(searchObj.data.queryResults.total).toBeNull();
         expect(searchObj.data.queryResults.errorCount).toBeUndefined();
         expect(searchObj.meta.resultGrid.showPagination).toBe(false);
       });

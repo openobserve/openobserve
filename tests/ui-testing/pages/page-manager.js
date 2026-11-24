@@ -19,6 +19,7 @@ import DashboardMaxQueryRange from "./dashboardPages/dashboard-max-query-range";
 import DashboardNotices from "./dashboardPages/dashboard-notices.js";
 import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
 import DashboardCellExplorerPage from "./dashboardPages/dashboard-cell-explorer";
+import DashboardTreemap from "./dashboardPages/dashboard-treemap.js";
 import DashboardLegendsCopy from "./dashboardPages/dashboard-legends-copy";
 import DashboardFilter from "./dashboardPages/dashboard-filter";
 import DashboardImport from "./dashboardPages/dashboard-import.js";
@@ -210,6 +211,7 @@ class PageManager {
     this.dashboardFolder = new DashboardFolder(page);
     this.dashboardFavorites = new DashboardFavorites(page);
     this.dashboardPanelActions = new DashboardactionPage(page);
+    this.dashboardTreemap = new DashboardTreemap(page);
     this.dashboardPanelConfigs = new DashboardPanelConfigs(page);
     this.dashboardPanelEdit = new DashboardPanel(page);
     this.dashboardSetting = new DashboardSetting(page);

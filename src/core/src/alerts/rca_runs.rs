@@ -128,7 +128,7 @@ pub enum StartOutcome {
 
 /// Commit the run and Begin event atomically; dispatch workflows only after commit.
 pub async fn start_run(req: StartRun) -> anyhow::Result<StartOutcome> {
-    start_run_after(req, None).await
+    start_run_after(req, None, false).await
 }
 
 /// [start_run] for a decision made on the incident's latest run: any start since then wins.
@@ -136,12 +136,18 @@ pub async fn start_run_if_latest(
     req: StartRun,
     latest_run_id: &str,
 ) -> anyhow::Result<StartOutcome> {
-    start_run_after(req, Some(latest_run_id)).await
+    start_run_after(req, Some(latest_run_id), false).await
+}
+
+/// [start_run] only while the incident has no run at all.
+pub async fn start_first_run(req: StartRun) -> anyhow::Result<StartOutcome> {
+    start_run_after(req, None, true).await
 }
 
 async fn start_run_after(
     req: StartRun,
     latest_run_id: Option<&str>,
+    first_run: bool,
 ) -> anyhow::Result<StartOutcome> {
     let StartRun {
         org_id,
@@ -205,6 +211,7 @@ async fn start_run_after(
             .then(|| minutes_to_us(cfg.incidents.reanalysis_cooldown_minutes)),
         history_limit: cfg.incidents.rca_history_limit,
         latest_run_id,
+        first_run,
     };
 
     match runs_table::start_run(new, guards, begin_event.clone(), guidance_row).await? {

@@ -93,4 +93,18 @@ test.describe('Login form validation', () => {
     await loginPage.userIdInput.fill(VALID_EMAIL);
     await expect(loginPage.userIdError).toBeHidden();
   });
+
+  test('should link the OpenObserve logo to the website in a new tab (ENT#2773)', { tag: ['@regression', '@P2'] }, async ({ page }) => {
+    await expect(loginPage.appLogo).toBeVisible();
+    const link = loginPage.appLogoLink;
+    await expect(link).toHaveAttribute('href', 'https://openobserve.ai/');
+    await expect(link).toHaveAttribute('target', '_blank');
+    await expect(link).toHaveAttribute('rel', /\bnoopener\b/);
+
+    // stubbed so the check does not depend on the public website being reachable
+    await page.context().route('https://openobserve.ai/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<html></html>' }));
+    const popup = await loginPage.clickLogoAndWaitForNewTab();
+    await expect.poll(() => popup.url(), { timeout: 15000 }).toContain('openobserve.ai');
+    await popup.close();
+  });
 });
