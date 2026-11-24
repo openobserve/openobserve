@@ -18,7 +18,7 @@ import i18nInstance from "@/locales";
 
 const t = (i18nInstance.global as any).t;
 import { nextTick } from "vue";
-import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import useDragAndDrop, { normalizeNodeIoType } from "@/plugins/pipelines/useDnD";
 
 // Mock dependencies
 vi.mock("@/utils/zincutils", () => ({
@@ -1376,6 +1376,23 @@ describe("useDragAndDrop", () => {
       ];
       expect(() => useDnD.checkIfDefaultDestinationNode("dest")).not.toThrow();
       expect(useDnD.checkIfDefaultDestinationNode("dest")).toBe(false);
+    });
+  });
+
+  // Vue Flow only renders node types it has a template for. An API-saved
+  // io_type outside input/default/output (e.g. "intermediate") made the node
+  // an empty, non-interactive box; normalizeNodeIoType maps it to "default".
+  describe("normalizeNodeIoType", () => {
+    it("maps an unknown io_type to 'default'", () => {
+      expect(normalizeNodeIoType("intermediate")).toBe("default");
+    });
+
+    it.each(["input", "default", "output"])("passes '%s' through", (io_type) => {
+      expect(normalizeNodeIoType(io_type)).toBe(io_type);
+    });
+
+    it("leaves a missing io_type undefined", () => {
+      expect(normalizeNodeIoType(undefined)).toBeUndefined();
     });
   });
 });

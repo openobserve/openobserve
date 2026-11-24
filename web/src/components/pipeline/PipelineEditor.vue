@@ -231,7 +231,7 @@ import {
   pipelineMetaDefaults,
   type PipelineMetaForm,
 } from "./pipelineMeta.schema";
-import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import useDragAndDrop, { normalizeNodeIoType } from "@/plugins/pipelines/useDnD";
 import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
 import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
 import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
@@ -829,11 +829,7 @@ const getPipeline = (): Promise<boolean> => {
       });
 
       _pipeline.nodes.forEach((node: any) => {
-        node.type = node.io_type;
-      });
-
-      _pipeline.nodes.forEach((node: any) => {
-        node.type = node.io_type;
+        node.type = normalizeNodeIoType(node.io_type);
       });
 
       pipelineObj.currentSelectedPipeline = _pipeline;

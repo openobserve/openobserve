@@ -107,7 +107,14 @@ const defaultObject = {
 
 const pipelineObj = reactive(Object.assign({}, defaultObject));
 
-export { pipelineObj };
+// Only these io_types have a Vue Flow node template; an API-saved value
+// outside the set (e.g. "intermediate") would render as an empty box.
+const NODE_IO_TYPES = new Set(["input", "default", "output"]);
+
+const normalizeNodeIoType = (io_type: unknown) =>
+  typeof io_type === "string" && !NODE_IO_TYPES.has(io_type) ? "default" : io_type;
+
+export { pipelineObj, normalizeNodeIoType };
 export default function useDragAndDrop(t: TranslateFn) {
   const { screenToFlowCoordinate, onNodesInitialized, updateNode } = useVueFlow();
 

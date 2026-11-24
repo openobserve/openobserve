@@ -37,15 +37,19 @@ let mockPipelineObj: {
   currentSelectedPipeline: { nodes: any[]; edges: any[] };
 };
 
-vi.mock("@/plugins/pipelines/useDnD", () => ({
-  default: () => {
-    mockPipelineObj = {
-      nodeTypes: [],
-      currentSelectedPipeline: { nodes: [], edges: [] },
-    };
-    return { pipelineObj: mockPipelineObj };
-  },
-}));
+vi.mock("@/plugins/pipelines/useDnD", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/plugins/pipelines/useDnD")>();
+  return {
+    ...actual,
+    default: () => {
+      mockPipelineObj = {
+        nodeTypes: [],
+        currentSelectedPipeline: { nodes: [], edges: [] },
+      };
+      return { pipelineObj: mockPipelineObj };
+    },
+  };
+});
 
 vi.mock("@vue-flow/core", () => ({
   VueFlow: {
@@ -279,6 +283,23 @@ describe("PipelineView.vue", () => {
         edges: [],
       });
       expect(wrapper.vm.lockedNodes[0].type).toBeUndefined();
+    });
+
+    it("maps an unknown io_type to the default node type", () => {
+      wrapper = createWrapper({
+        nodes: [
+          {
+            id: "n1",
+            io_type: "intermediate",
+            position: { x: 0, y: 0 },
+            data: { node_type: "condition" },
+          },
+        ],
+        edges: [],
+      });
+      const locked = wrapper.vm.lockedNodes;
+      expect(locked[0].type).toBe("default");
+      expect(locked[0].io_type).toBe("intermediate");
     });
 
     it("recomputes when pipeline prop changes", async () => {

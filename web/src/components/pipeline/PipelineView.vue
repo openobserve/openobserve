@@ -49,7 +49,7 @@ import FlowEdge from "@/components/flow/FlowEdge.vue";
 /* import the required styles */
 import "@vue-flow/core/dist/style.css";
 import "@vue-flow/controls/dist/style.css";
-import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import useDragAndDrop, { normalizeNodeIoType } from "@/plugins/pipelines/useDnD";
 const functionImage = getImageURL("images/pipeline/transform_function.png");
 const streamImage = getImageURL("images/pipeline/input_stream.png");
 const streamOutputImage = getImageURL("images/pipeline/output_stream.png");
@@ -85,7 +85,7 @@ export default defineComponent({
     const lockedNodes = computed(() => {
       return props.pipeline.nodes.map((node: PipelineNode) => ({
         ...node,
-        type: node.io_type,
+        type: normalizeNodeIoType(node.io_type),
       }));
     });
 
