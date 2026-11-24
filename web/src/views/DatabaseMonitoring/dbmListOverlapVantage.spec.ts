@@ -203,9 +203,9 @@ describe("QueriesPage sources its overlap measures from the database", () => {
       expect(source).not.toContain("dbm.list.overlap.clientObserved");
     });
 
-    it("explains the glyph with a legend in the toolbar while app-sourced rows show", () => {
-      expect(source).toContain('data-test="dbm-queries-app-source-legend"');
-      expect(source).toContain('v-if="hasAppSourcedRows && !serverListShown"');
+    // The row glyph carries its own tooltip, so the toolbar repeats nothing.
+    it("explains the glyph on the row, not with a toolbar legend", () => {
+      expect(source).not.toContain('data-test="dbm-queries-app-source-legend"');
     });
 
     // Here the glyph separates trace-only rows from server-counted ones, so it must stay on.

@@ -1506,7 +1506,9 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
-      headerTooltip: t("dbm.databases.columnHints.load"),
+      headerTooltip: raw(
+        `${t("dbm.databases.columnHints.load")} ${t("dbm.coverage.tipRowsShown")}`,
+      ),
     },
   },
   {
@@ -1518,7 +1520,9 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
-      headerTooltip: t("dbm.databases.columnHints.p95"),
+      headerTooltip: raw(
+        `${t("dbm.databases.columnHints.p95")} ${t("dbm.coverage.tipBlendedSpeeds")} ${t("dbm.coverage.tipSlowestSchema")}`,
+      ),
     },
   },
   {
@@ -1572,7 +1576,9 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
-      headerTooltip: t("dbm.databases.columnHints.p50"),
+      headerTooltip: raw(
+        `${t("dbm.databases.columnHints.p50")} ${t("dbm.coverage.tipBlendedSpeeds")} ${t("dbm.coverage.tipSlowestSchema")}`,
+      ),
     },
   },
   {
@@ -1585,7 +1591,9 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
-      headerTooltip: t("dbm.databases.columnHints.p99"),
+      headerTooltip: raw(
+        `${t("dbm.databases.columnHints.p99")} ${t("dbm.coverage.tipBlendedSpeeds")} ${t("dbm.coverage.tipSlowestSchema")}`,
+      ),
     },
   },
   {

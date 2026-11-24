@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dbm-coverage"
   />
   <OBanner
-    v-else-if="!inline && !isEmpty && entry.variant"
+    v-else-if="!inline && !isEmpty && entry.variant === 'warning'"
     :variant="entry.variant"
     :icon="entry.variant === 'warning' ? 'warning-amber' : 'info-outline'"
     bar

@@ -2377,7 +2377,9 @@ const endpointColumns = computed<OTableColumnDef<EndpointCallerRow>[]>(() => [
     meta: {
       align: "right",
       headerSubLabel: raw("p95"),
-      headerTooltip: t("dbm.queries.columnHints.p95"),
+      headerTooltip: raw(
+        `${t("dbm.queries.columnHints.p95")} ${t("dbm.coverage.tipQueryTimings")}`,
+      ),
     },
   },
   {

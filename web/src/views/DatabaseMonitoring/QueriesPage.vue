@@ -133,11 +133,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #trailing>
-          <DbmAppSourceLegend
-            v-if="hasAppSourcedRows && !serverListShown"
-            compact
-            data-test="dbm-queries-app-source-legend"
-          />
           <!-- The toolbar lives outside the table (it serves the fallback list too), so the column toggle does as well. -->
           <OTableColumnToggle
             v-if="!serverListShown"
@@ -566,7 +561,6 @@ import { computed, nextTick, onBeforeUnmount, ref, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import DbmAppSourceLegend from "@/components/dbm/DbmAppSourceLegend.vue";
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmDeltaCell from "@/components/dbm/DbmDeltaCell.vue";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
@@ -1828,13 +1822,6 @@ const tableRows = computed<QueryRow[]>(() => {
   return [...base, ...remainder];
 });
 
-/** Whether any row on screen carries the app-source marker, so the legend explains it. */
-const hasAppSourcedRows = computed(() =>
-  tableRows.value.some(
-    (row) => row.overlapCalls.source === "client" || row.overlapTime.source === "client",
-  ),
-);
-
 /**
  * Only two row tints, and neither washes the row: a left rail. Amber marks a
  * row an insight named; red marks one where every call is failing. The old
@@ -2063,7 +2050,9 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     meta: {
       align: "right",
       headerSubLabel: raw("p95"),
-      headerTooltip: t("dbm.queries.columnHints.p95"),
+      headerTooltip: raw(
+        `${t("dbm.queries.columnHints.p95")} ${t("dbm.coverage.tipBlendedSpeeds")}`,
+      ),
     },
   },
   {
@@ -2101,7 +2090,7 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     meta: {
       align: "right",
       headerSubLabel: t("dbm.queries.columnSubLabels.load"),
-      headerTooltip: t("dbm.queries.columnHints.load"),
+      headerTooltip: raw(`${t("dbm.queries.columnHints.load")} ${t("dbm.coverage.tipRowsShown")}`),
     },
   },
   {
@@ -2121,7 +2110,9 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     meta: {
       align: "right",
       headerSubLabel: raw("p99"),
-      headerTooltip: t("dbm.queries.columnHints.p99"),
+      headerTooltip: raw(
+        `${t("dbm.queries.columnHints.p99")} ${t("dbm.coverage.tipBlendedSpeeds")}`,
+      ),
     },
   },
   {

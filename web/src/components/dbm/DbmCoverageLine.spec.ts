@@ -288,9 +288,11 @@ describe("DbmCoverageLine", () => {
       expect(lineText(w)).not.toContain("missing from this window");
     });
 
-    it("warns when behind and informs on a subset", () => {
+    it("warns when behind and shows no banner for a subset", () => {
       expect(banner(mountLine({ freshness: behindBy(45) })).props("variant")).toBe("warning");
-      expect(banner(mountLine({ filterLabel: "checkout-service" })).props("variant")).toBe("info");
+      expect(
+        mountLine({ filterLabel: "checkout-service" }).find("[data-test='dbm-coverage']").exists(),
+      ).toBe(false);
     });
 
     it("keeps the long sentence behind a Details button", () => {

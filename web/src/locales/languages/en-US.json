@@ -27027,7 +27027,11 @@
       "bannerUncodedErrors": "{percent} of failures have no reason code.",
       "bannerEstimated": "Speeds are close, not exact.",
       "bannerSlowestSchema": "A database with several schemas shows its slowest one.",
-      "bannerQuery": "Timings include network time and waits for a free connection."
+      "bannerQuery": "Timings include network time and waits for a free connection.",
+      "tipBlendedSpeeds": "Over longer ranges these are blended across time windows, so they are close but not exact.",
+      "tipSlowestSchema": "A database with several schemas shows its slowest one.",
+      "tipRowsShown": "Percentages describe the rows shown.",
+      "tipQueryTimings": "Timings include network time and waits for a free connection."
     },
     "breakdown": {
       "loading": "Working out where the time went…",
