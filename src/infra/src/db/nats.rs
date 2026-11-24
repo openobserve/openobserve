@@ -1480,6 +1480,8 @@ mod tests {
         assert!(!use_kv_watcher("/super_cluster_kv_nodes/"));
         assert!(!use_kv_watcher("/super_cluster_kv_clusters/"));
         assert!(!use_kv_watcher("/other_prefix/"));
+        assert!(use_kv_watcher("/nodes/"));
+        assert!(use_kv_watcher("/user_sessions/"));
     }
 
     #[test]
