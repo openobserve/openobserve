@@ -2447,7 +2447,7 @@ export default defineComponent({
       return selected.length > 0 && selected.every((name) => targets[name]?.mode === "fts");
     });
     const loadFilterBuilderValues = (field: string, search: string) =>
-      resolveFieldValues(field, { prefix: search });
+      resolveFieldValuesDetailed(field, { prefix: search });
     const onFilterBuilderQuery = (sql: string) => {
       searchObj.data.query = sql;
       searchObj.data.editorValue = sql;
@@ -2615,6 +2615,7 @@ export default defineComponent({
       updateFunctionKeywords,
       updateStreamKeywords,
       resolveFieldValues,
+      resolveFieldValuesDetailed,
       setValuesTimeRange,
     } = useSqlSuggestions();
 

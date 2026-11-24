@@ -111,6 +111,7 @@ const {
   autoHighlight,
   searchPlaceholder,
   valuesLoading,
+  valuesCappedToHours,
   targetGroup,
   nextConnector,
   atConditionLimit,
@@ -202,7 +203,10 @@ const emptyText = computed(() => {
   }
   if (step.value === "value") {
     if (valueHint.value) return valueHint.value;
-    return valuesLoading.value ? undefined : t("filterBar.noValues");
+    if (valuesLoading.value) return undefined;
+    return valuesCappedToHours.value !== null
+      ? t("filterBar.noCappedValues", { hours: valuesCappedToHours.value })
+      : t("filterBar.noValues");
   }
   return t("filterBar.noOperators");
 });
