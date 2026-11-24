@@ -39,6 +39,30 @@
         }
       }
     },
+    // Experiments only. The policy above does not allow it, so a production run cannot select it: a dry run (REVIEW_DRY_RUN=true with
+    // REVIEW_PROVIDER_ID=openrouter-review) serves a private config that names it as the single provider. Anthropic Messages through OpenRouter.
+    "openrouter-review": {
+      "name": "OpenRouter (review experiments)",
+      "package": "@opencode/ai/providers/anthropic",
+      "env": ["OPENROUTER_REVIEW_API_KEY"],
+      "settings": { "baseURL": "https://openrouter.ai/api/v1" },
+      // Pin the upstream: OpenRouter's sticky routing keys on the first system and user message, which differ per reviewer, so unpinned sessions
+      // land on different providers and stop sharing a prompt cache.
+      "body": { "provider": { "order": ["anthropic"], "allow_fallbacks": false } },
+      "models": {
+        "anthropic/claude-sonnet-5.5": {
+          "name": "Claude Sonnet 5.5 (OpenRouter)",
+          "variants": [
+            { "id": "low", "settings": { "thinking": { "type": "adaptive" }, "effort": "low" } },
+            { "id": "medium", "settings": { "thinking": { "type": "adaptive" }, "effort": "medium" } },
+            { "id": "high", "settings": { "thinking": { "type": "adaptive" }, "effort": "high" } },
+            { "id": "xhigh", "settings": { "thinking": { "type": "adaptive" }, "effort": "xhigh" } },
+            { "id": "max", "settings": { "thinking": { "type": "adaptive" }, "effort": "max" } }
+          ],
+          "limit": { "context": 1000000, "output": 128000 }
+        }
+      }
+    },
     // Denied by the policy above; kept so switching back needs no new provider block.
     "deepseek-review": {
       "name": "DeepSeek (review)",
