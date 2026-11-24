@@ -3976,7 +3976,7 @@ pub struct Pipeline {
     #[env_config(
         name = "ZO_PIPELINE_REMOTE_REQUEST_MAX_RETRY_TIME",
         default = 86400,
-        help = "pipeline exporter client request max retry times, default 1440 minutes(24 hours)， unit is seconds"
+        help = "seconds one export keeps retrying before the file goes back to the retry queue, default 86400 (24 hours)"
     )]
     pub remote_request_max_retry_time: u64,
     #[env_config(

@@ -3124,7 +3124,7 @@ async fn read_body_capped(mut res: reqwest::Response, limit: usize) -> String {
     config::meta::db_normalizer::truncate_at_boundary(&text, limit).to_string()
 }
 
-/// Writes due buffers to the WAL and drops any whose writer is gone. [weak: its rows are lost]
+/// Writes due buffers (all when forced) to the WAL and drops any whose writer is gone. [weak: its rows are lost]
 #[cfg(feature = "enterprise")]
 pub async fn flush_all_buffers(force: bool) -> Result<(), anyhow::Error> {
     let mut buffers = BATCH_BUFFERS.lock().await;
