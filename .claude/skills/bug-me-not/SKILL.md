@@ -19,7 +19,7 @@ Run `"<this checkout>/.claude/skills/bounty-board/scripts/checkouts.sh"`. It pri
 
 | Repo | Template | Bug label | Edition |
 |---|---|---|---|
-| `openobserve/openobserve` | `.github/ISSUE_TEMPLATE/bug-report-template-latest.yaml` | `☢️ Bug` | `OSS` |
+| `openobserve/openobserve` | `.github/ISSUE_TEMPLATE/1-bug-report.yaml` | `☢️ Bug` | `OSS` |
 | `openobserve/<config repo>` | config `issue_template`, read in the private checkout | first of config `bug_labels` that exists in the repo | config `edition` |
 
 Every issue also gets `bug-me-not`, which is what sends it to autofix triage. Never copy anything from the private config into an openobserve issue.
@@ -48,7 +48,7 @@ Shell variables do not survive between Bash tool calls, so commands below use pl
 
 State in one line what you observed. Without media, say the bug was not visually verified.
 
-**2. Pick the repo.** Suggest one from the feature area, leaning toward where the code lives: the private repo when the area matches its config `file_here_when` list or the code you find in step 4 lives in the private checkout; otherwise openobserve (logs, metrics, traces, dashboards, alerts, pipelines, streams, ingestion, RUM, reports, general UI and styling). Without a private config, the answer is always openobserve.
+**2. Pick the repo.** Suggest one from the feature area, leaning toward where the code lives: the private repo when the area matches its config `file_here_when` list or the code you find in step 4 lives in the private checkout; otherwise openobserve (Logs, Metrics, Traces & Profiles · Dashboards & Reports · Alerts, Incidents & SLOs · Ingestion, Streams & Pipelines · RUM, Product Analytics & Synthetics · general UI / Styling). Without a private config, the answer is always openobserve.
 
 Never file before the repo is confirmed (step 3), unless the user named it.
 
@@ -57,14 +57,17 @@ Never file before the repo is confirmed (step 3), unless the user named it.
 2. Priority: `P0 - Critical`, `P1 - High`, `P2 - Medium`, `P3 - Low` (suggest P2 for a UI or cosmetic bug).
 3. Severity: `Blocker`, `Major`, `Minor`, `Trivial` (suggest Minor for a UI or cosmetic bug).
 4. Is this a regression?: `No` / `Yes` (default No unless the user said it used to work).
+5. Edition: `OSS` / `Enterprise` / `Cloud`, only when it cannot be inferred (see below).
 
 If everything was given, skip this step.
 
-Pick the affected-functionality checkboxes yourself, never ask: the functional area, plus `UI / Styling` when the bug is visible in the UI. Use the chosen template's exact option labels, read from the template file itself (the `affected-functionalities` checkboxes). openobserve's are: Home & Login · Logs / Metrics / Traces · Dashboards · Alerts · Streams, Pipelines & Functions · Ingestion · Real User Monitoring (RUM) · Reports · IAM & Management · UI / Styling · Unknown / Other. The private template has its own list; never mix the two.
+Pick the affected-functionality checkboxes yourself, never ask: the functional area, plus `UI / Styling` when the bug is visible in the UI; `Unknown / Other` only as a last resort. Use the exact option labels read from the chosen template's `affected-functionalities` checkboxes (both repos share one list). Cheat sheet: Logs, Metrics/PromQL, Traces, Service Graph, Profiles → `Logs, Metrics, Traces & Profiles` · Dashboards, panels, Reports, public links → `Dashboards & Reports` · Alerts, Incidents, SLOs, Downtimes, Workflows, Actions, destinations → `Alerts, Incidents & SLOs` · Ingestion, Streams/schema, Pipelines, Functions, Enrichment tables → `Ingestion, Streams & Pipelines` · RUM, session replay, Product Analytics, Synthetics, Status pages → `RUM, Product Analytics & Synthetics` · Kubernetes/Infra, DB Monitoring, SIEM → `Infra, Database & Security Monitoring` · O2 AI assistant, AutoObserve, AI Observability / LLM Evals → `AI` · Login/SSO, IAM/RBAC, SDR, Orgs, Settings, License, Usage → `Access, Settings & Admin` · speed, storage/compaction, API, Helm, install, upgrade, images → `Platform, Performance & Deployment`.
+
+Pick `Edition` yourself from the environment the user gave: a cloud URL → `Cloud`; an enterprise build or an Enterprise-only feature → `Enterprise`; any other build → `OSS`. Ask only when it cannot be inferred (no environment given and the feature exists in every edition).
 
 **4. Find the code.** For each problem, locate where it happens in the current checkout of the target repo (grep / read, read-only): the file, the function, the mechanism. This feeds the `Where:` line, and it is what autofix triage checks the item against later. If you cannot find it, write what you know and say "not located" rather than guessing a path.
 
-**5. Write the body.** Templates drift; read the chosen repo's live template and follow its labels if they changed. Headings below match the templates as of October 2026.
+**5. Write the body.** Templates drift; read the chosen repo's live template and follow its labels if they changed. Headings below match the templates as of November 2026.
 
 The Bug Description is always a checklist, even for one problem:
 - Each item's visible line is plain English: what the user sees. No code identifiers, paths, function names, or jargon there.
@@ -115,11 +118,14 @@ The Bug Description is always a checklist, even for one problem:
 
 1. <numbered, concrete steps that lead to the bug>
 
+### Edition
+
+<OSS | Enterprise | Cloud>
+
 ### Environment Details
 
 ```yaml
 Version: <from the About page if visible, else Unknown>
-Edition: <the repo's edition from the table above>
 Environment: <env or URL if visible, else omit the line>
 OS: <if known, else Unknown>
 Browser: <if known, else Unknown>
@@ -154,7 +160,7 @@ c. Run autofix triage on the new issue: follow `/bounty-board triage <REPO> <N>`
 **7. Report.**
 - The issue URL.
 - One line on what you verified from the media, or that it was text-only.
-- Repo, priority, severity, regression, affected areas.
+- Repo, edition, priority, severity, regression, affected areas.
 - The triage outcome: posted (accepted items or declined), skipped by the user, or not run and why.
 - Media: `gh` cannot upload images or videos. Give the original media path and ask the user to drag it into the issue. Offer `open <media>` and `gh issue view <N> --repo 'openobserve/<REPO>' --web` so both are ready side by side.
 

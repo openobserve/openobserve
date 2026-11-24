@@ -1,7 +1,7 @@
 name: Bug Report
 description: Report a bug in OpenObserve
 labels: ["☢️ Bug"]
- 
+
 body:
   - type: markdown
     attributes:
@@ -74,6 +74,18 @@ body:
         3. Click on login button in top-right corner
         4. Observe no response
 
+  - type: dropdown
+    id: edition
+    attributes:
+      label: Edition
+      description: Which build you saw it on
+      options:
+        - OSS
+        - Enterprise
+        - Cloud
+    validations:
+      required: true
+
   - type: textarea
     id: environment
     attributes:
@@ -94,17 +106,28 @@ body:
     id: affected-functionalities
     attributes:
       label: Which OpenObserve Functionalities Are Affected?
-      description: Select all that apply
+      description: |
+        Select all that apply. What goes where:
+        - **Logs, Metrics, Traces & Profiles**: Logs, Metrics/PromQL, Traces, Service Graph, Profiles
+        - **Dashboards & Reports**: Dashboards, panels, Reports, public links
+        - **Alerts, Incidents & SLOs**: Alerts, Incidents, SLOs, Downtimes, Workflows, Actions, destinations
+        - **Ingestion, Streams & Pipelines**: Ingestion, Streams/schema, Pipelines, Functions, Enrichment tables
+        - **RUM, Product Analytics & Synthetics**: RUM, session replay, Product Analytics, Synthetics, Status pages
+        - **Infra, Database & Security Monitoring**: Kubernetes/Infra, DB Monitoring, SIEM
+        - **AI**: O2 AI assistant, AutoObserve, AI Observability / LLM Evals
+        - **Access, Settings & Admin**: Login/SSO, IAM/RBAC, SDR, Orgs, Settings, License, Usage
+        - **Platform, Performance & Deployment**: speed, storage/compaction, API, Helm, install, upgrade, images
+        - **UI / Styling**: tick alongside an area when it looks wrong
       options:
-        - label: Home & Login
-        - label: Logs / Metrics / Traces
-        - label: Dashboards
-        - label: Alerts
-        - label: Streams, Pipelines & Functions
-        - label: Ingestion
-        - label: Real User Monitoring (RUM)
-        - label: Reports
-        - label: IAM & Management
+        - label: Logs, Metrics, Traces & Profiles
+        - label: Dashboards & Reports
+        - label: Alerts, Incidents & SLOs
+        - label: Ingestion, Streams & Pipelines
+        - label: RUM, Product Analytics & Synthetics
+        - label: Infra, Database & Security Monitoring
+        - label: AI
+        - label: Access, Settings & Admin
+        - label: Platform, Performance & Deployment
         - label: UI / Styling
         - label: Unknown / Other
     validations:
