@@ -62,7 +62,8 @@ test.describe("Logs Result Display Regression", () => {
     // second of its own stream rather than the shared fixture.
     const denseStream = 'e2e_13896_' + Math.random().toString(36).slice(2, 7);
     const orgId = getOrgIdentifier() || 'default';
-    const secondStartMs = Date.now() - 5 * 60 * 1000;
+    // The page reads from/to at whole-second precision, so rows past the next second would fall outside the range.
+    const secondStartMs = Math.floor(Date.now() / 1000) * 1000 - 5 * 60 * 1000;
 
     const rows = Array.from({ length: DENSE_ROWS }, (_, i) => ({
       _timestamp: (secondStartMs + i * 20) * 1000,
