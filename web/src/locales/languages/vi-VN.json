@@ -1445,6 +1445,7 @@
     "queryEditorLabel": "Trình soạn thảo truy vấn:",
     "addFieldToTable": "Thêm trường vào bảng",
     "removeFieldFromTable": "Xóa trường khỏi bảng",
+    "groupByThisField": "Nhóm theo trường này",
     "rows": "hàng",
     "resetFields": "Đặt lại các trường bảng đã chọn",
     "metrics": "Chỉ số",
@@ -17329,7 +17330,100 @@
     "searchTypeOthers": "Khác"
   },
   "traces": {
+    "groups": {
+      "label": "Nhóm theo",
+      "grouped": "Đã nhóm theo {field}",
+      "count": "{count} nhóm | {count} nhóm",
+      "clear": "Bỏ nhóm theo",
+      "spans": "Số span",
+      "errors": "Số lỗi",
+      "errorPct": "% lỗi",
+      "p50": "p50",
+      "p95": "p95",
+      "p95Tooltip": "Gần đúng",
+      "p99": "p99",
+      "rate": "Tốc độ",
+      "rateTooltip": "Số span trong khoảng thời gian đã chọn",
+      "noValue": "(không có giá trị)",
+      "showingOf": "Đang hiển thị {shown} trong ~{total} giá trị",
+      "openTraces": "Mở trace",
+      "empty": "Không có span nào khớp với bộ lọc này trong khoảng thời gian đã chọn",
+      "loadFailed": "Không thể tải các nhóm"
+    },
     "nlNeedsSql": "Câu hỏi này cần SQL; hãy mở trong Nhật ký",
+    "scope": {
+      "label": "Phạm vi",
+      "all": "Tất cả span",
+      "allDesc": "Mọi span khớp với bộ lọc",
+      "root": "Span gốc",
+      "rootDesc": "Các span không có span cha, nơi mỗi trace bắt đầu",
+      "entrypoint": "Span điểm vào",
+      "entrypointDesc": "Span server hoặc consumer, cùng mọi span gốc",
+      "rootUnavailable": "Stream này không có trường reference_parent_span_id",
+      "allShort": "Tất cả",
+      "rootShort": "Gốc",
+      "entrypointShort": "Điểm vào",
+      "allHint": "Mọi span trong khoảng thời gian",
+      "rootHint": "Chỉ span đầu tiên của mỗi trace",
+      "entrypointHint": "Span server và consumer, cùng span gốc",
+      "chip": "Phạm vi: {scope}"
+    },
+    "sqlMode": {
+      "actionUnavailable": "Chưa khả dụng trong chế độ SQL",
+      "drillDownDisabled": "Không thể xem chi tiết trong chế độ SQL",
+      "putConditionInWhere": "Trong chế độ SQL, hãy đặt điều kiện trong mệnh đề WHERE của bạn",
+      "rowsCount": "{count} dòng | {count} dòng",
+      "histogramLossWarning": "Dạng truy vấn này có thể làm mất span giữa các phân vùng thời gian",
+      "openInSpans": "Mở trong chế độ xem Span",
+      "runsInSpans": "SQL chạy trong chế độ xem Span",
+      "backToTraces": "Quay lại Trace",
+      "sqlKept": "SQL của bạn được giữ lại. Bật SQL để lấy lại.",
+      "statementInTraces": {
+        "title": "Chế độ xem Trace nhận bộ lọc, không nhận SELECT",
+        "subqueryTitle": "Chế độ xem Trace không thể chạy truy vấn con",
+        "description": "SQL chạy trong chế độ xem Span."
+      },
+      "noTraceIdHint": "Các dòng này không có trace_id, nên không mở được trace.",
+      "addTraceId": "Thêm trace_id",
+      "openTrace": "Mở trace",
+      "openingTrace": "Đang mở trace",
+      "firstTraces": "{count} trace đầu tiên | {count} trace đầu tiên",
+      "firstRows": "{count} hàng đầu tiên | {count} hàng đầu tiên",
+      "conditionAdded": "Đã thêm {condition} vào WHERE",
+      "conditionRemoved": "Đã xóa điều kiện {field} khỏi WHERE",
+      "editWhereToRemove": "Chỉnh sửa WHERE để xóa điều kiện {field}",
+      "undo": "Hoàn tác",
+      "inAllColumn": "trong {column}",
+      "awaitingRun": {
+        "spansTitle": "Chạy truy vấn để xem kết quả",
+        "description": "Chưa có gì được chạy. Chạy truy vấn sẽ gửi SQL trong trình soạn thảo."
+      },
+      "errors": {
+        "fieldNotFoundTitle": "Không tìm thấy trường: {field}",
+        "fieldNotFoundDesc": "Có một trường có tên tương tự trong stream này.",
+        "didYouMean": "Ý bạn là {field}?",
+        "didYouMeanDesc": "Thay thế {field} trong truy vấn, sau đó chạy truy vấn",
+        "outOfMemoryTitle": "Truy vấn này đã hết bộ nhớ",
+        "outOfMemoryDesc": "Truy vấn trên khoảng thời gian dài có thể dùng nhiều bộ nhớ hơn mức máy chủ cho phép.",
+        "useLastHour": "Dùng 1 giờ qua",
+        "useLastHourDesc": "Thu hẹp khoảng thời gian, sau đó chạy truy vấn",
+        "missingStreamTitle": "Thiếu tên stream sau FROM",
+        "missingStreamDesc": "Viết tên stream sau FROM, ví dụ FROM \"{stream}\".",
+        "noFullTextTitle": "Stream này không có trường full-text",
+        "noFullTextDesc": "match_all chỉ tìm kiếm các trường full-text. Hãy tìm kiếm một trường bằng str_match thay vào đó."
+      },
+      "matchAllEmpty": {
+        "title": "Không tìm thấy span nào",
+        "description": "Không có gì khớp với truy vấn này trong khoảng đã chọn. Stream có thể không có trường full-text nào có dữ liệu, nên match_all có thể không có gì để tìm kiếm.",
+        "searchOneField": "Thay vào đó, hãy tìm một trường",
+        "searchOneFieldDesc": "Chạy {call}"
+      },
+      "strayKeyword": "Máy chủ bỏ qua {word} giữa tên stream và WHERE. Hãy xóa nó hoặc chuyển điều kiện vào WHERE.",
+      "joinLongRange": "JOIN trên hơn 1 giờ có thể hết bộ nhớ. Hãy thu hẹp khoảng thời gian nếu truy vấn thất bại.",
+      "partialResults": "Kết quả đã bị cắt tại giới hạn hàng, nên một số hàng bị thiếu. Hãy thêm LIMIT hoặc thu hẹp truy vấn.",
+      "allFieldsNote": "Các trường ngoài lược đồ stream được lưu trong {column}. Dùng json_get_str({column}, 'field').",
+      "maybeInAll": "Trường này có thể được lưu trong {column}"
+    },
     "redActions": {
       "menuGroupDashboards": "Bảng điều khiển",
       "addRedToDashboard": "Thêm biểu đồ RED vào bảng điều khiển",
@@ -17347,6 +17441,42 @@
         "days": "Biểu đồ này giữ nguyên các cột {count} ngày như bạn thấy hiện tại."
       }
     },
+    "redCaption": {
+      "about": "Giới thiệu về biểu đồ này",
+      "matched": "Biểu đồ: tất cả span khớp",
+      "matchedCount": "Biểu đồ: {count} span khớp | Biểu đồ: tất cả {count} span khớp",
+      "noneMatched": "Biểu đồ: 0 span khớp",
+      "cte": "Biểu đồ: span từ CTE {name}",
+      "branches": "Biểu đồ: span khớp với bất kỳ nhánh nào trong {count} nhánh | Biểu đồ: span khớp với bất kỳ nhánh nào trong {count} nhánh (chồng lấp chỉ tính một lần)",
+      "joinMatched": "Biểu đồ: span bên trái trong các trace nơi phép join của bạn khớp",
+      "joinLeft": "Biểu đồ: span bên trái khớp WHERE của bạn",
+      "inner": "Biểu đồ: span từ truy vấn bên trong",
+      "stream": "Biểu đồ: tất cả span trong {stream} · bộ lọc của truy vấn chưa được áp dụng",
+      "count": "{count} span | {count} span",
+      "notApplied": "{clauses} chưa được áp dụng",
+      "scope": "Phạm vi: tất cả span (SQL của bạn quyết định)",
+      "clause": {
+        "groupBy": "GROUP BY",
+        "having": "HAVING",
+        "distinct": "DISTINCT",
+        "orderBy": "ORDER BY",
+        "limit": "LIMIT",
+        "offset": "OFFSET",
+        "window": "hàm cửa sổ",
+        "qualify": "QUALIFY",
+        "outerWhere": "WHERE bên ngoài",
+        "bothSidesWhere": "WHERE trên cả hai phía",
+        "join": "join"
+      }
+    },
+    "redCharts": {
+      "loadFailed": "Không thể tải biểu đồ này",
+      "notTraces": "Biểu đồ cần một stream trace. Truy vấn của bạn đọc {stream}.",
+      "unreadable": "Biểu đồ không thể đọc được truy vấn của bạn để biết nó chọn những span nào.",
+      "shape": "Biểu đồ không xác định được truy vấn này chọn những span nào.",
+      "noData": "Không có dữ liệu",
+      "showAllSpans": "Hiển thị tất cả span trong {stream}"
+    },
     "latencyHeatmap": {
       "title": "Thời lượng",
       "tooltipSpans": "{count} span | {count} span",
@@ -17357,7 +17487,6 @@
         "errors": "Lỗi"
       },
       "noData": "Không có dữ liệu",
-      "unavailable": "Biểu đồ nhiệt độ trễ không khả dụng cho tìm kiếm này",
       "loadFailed": "Không tải được biểu đồ nhiệt độ trễ",
       "selection": {
         "label": "Vùng chọn heatmap",

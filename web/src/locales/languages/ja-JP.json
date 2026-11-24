@@ -1445,6 +1445,7 @@
     "queryEditorLabel": "クエリエディタ:",
     "addFieldToTable": "テーブルにフィールドを追加",
     "removeFieldFromTable": "テーブルからフィールドを削除",
+    "groupByThisField": "このフィールドでグループ化",
     "rows": "行",
     "resetFields": "選択したテーブルフィールドをリセット",
     "metrics": "メトリクス",
@@ -17329,7 +17330,100 @@
     "searchTypeOthers": "その他"
   },
   "traces": {
+    "groups": {
+      "label": "グループ化",
+      "grouped": "{field} でグループ化",
+      "count": "{count} グループ | {count} グループ",
+      "clear": "グループ化を解除",
+      "spans": "スパン",
+      "errors": "エラー",
+      "errorPct": "エラー率",
+      "p50": "p50",
+      "p95": "p95",
+      "p95Tooltip": "概算値",
+      "p99": "p99",
+      "rate": "レート",
+      "rateTooltip": "選択した時間範囲のスパン",
+      "noValue": "（値なし）",
+      "showingOf": "{shown} 件の値を表示（全 ~{total} 件）",
+      "openTraces": "トレースを開く",
+      "empty": "選択した時間範囲でこのフィルターに一致するスパンはありません",
+      "loadFailed": "グループを読み込めませんでした"
+    },
     "nlNeedsSql": "この質問にはSQLが必要です。ログで開いてください",
+    "scope": {
+      "label": "スコープ",
+      "all": "すべてのスパン",
+      "allDesc": "フィルターに一致するすべてのスパン",
+      "root": "ルートスパン",
+      "rootDesc": "親を持たないスパンで、各トレースの開始点",
+      "entrypoint": "エントリポイントスパン",
+      "entrypointDesc": "サーバーまたはコンシューマーのスパンに、すべてのルートスパンを加えたもの",
+      "rootUnavailable": "このストリームには reference_parent_span_id フィールドがありません",
+      "allShort": "すべて",
+      "rootShort": "ルート",
+      "entrypointShort": "エントリ",
+      "allHint": "時間範囲内のすべてのスパン",
+      "rootHint": "各トレースの最初のスパンのみ",
+      "entrypointHint": "サーバーとコンシューマーのスパン、およびルート",
+      "chip": "スコープ: {scope}"
+    },
+    "sqlMode": {
+      "actionUnavailable": "SQL モードではまだ利用できません",
+      "drillDownDisabled": "SQL モードではドリルダウンを利用できません",
+      "putConditionInWhere": "SQL モードでは、条件を WHERE 句に記述してください",
+      "rowsCount": "{count} 行 | {count} 行",
+      "histogramLossWarning": "このクエリの形式では、時間パーティションをまたいでスパンが失われる可能性があります",
+      "openInSpans": "スパンビューで開く",
+      "runsInSpans": "SQL はスパンビューで実行されます",
+      "backToTraces": "トレースに戻る",
+      "sqlKept": "SQL は保持されています。SQL をオンにすると元に戻ります。",
+      "statementInTraces": {
+        "title": "トレースビューが受け取るのはフィルターであり、SELECT ではありません",
+        "subqueryTitle": "トレースビューではサブクエリを実行できません",
+        "description": "SQL はスパンビューで実行されます。"
+      },
+      "noTraceIdHint": "これらの行には trace_id がないため、トレースを開けません。",
+      "addTraceId": "trace_id を追加",
+      "openTrace": "トレースを開く",
+      "openingTrace": "トレースを開いています",
+      "firstTraces": "最初の {count} トレース | 最初の {count} トレース",
+      "firstRows": "最初の {count} 行 | 最初の {count} 行",
+      "conditionAdded": "WHERE 句に {condition} を追加しました",
+      "conditionRemoved": "WHERE 句から {field} 条件を削除しました",
+      "editWhereToRemove": "WHERE 句を編集して {field} 条件を削除してください",
+      "undo": "元に戻す",
+      "inAllColumn": "{column} 内",
+      "awaitingRun": {
+        "spansTitle": "結果を表示するにはクエリを実行してください",
+        "description": "まだ何も実行されていません。クエリを実行すると、エディター内の SQL が送信されます。"
+      },
+      "errors": {
+        "fieldNotFoundTitle": "フィールドが見つかりません: {field}",
+        "fieldNotFoundDesc": "このストリームには類似した名前のフィールドがあります。",
+        "didYouMean": "もしかして {field} ですか?",
+        "didYouMeanDesc": "クエリ内の {field} を置き換えてから実行します",
+        "outOfMemoryTitle": "このクエリはメモリ不足になりました",
+        "outOfMemoryDesc": "長期間のクエリは、サーバーが許容する以上のメモリを使用する可能性があります。",
+        "useLastHour": "直近 1 時間を使用",
+        "useLastHourDesc": "時間範囲を絞り込んでからクエリを実行します",
+        "missingStreamTitle": "FROM の後にストリーム名がありません",
+        "missingStreamDesc": "FROM の後にストリーム名を記述してください。例: FROM \"{stream}\".",
+        "noFullTextTitle": "このストリームには全文検索フィールドがありません",
+        "noFullTextDesc": "match_all は全文検索フィールドのみを検索します。代わりに str_match で 1 つのフィールドを検索してください。"
+      },
+      "matchAllEmpty": {
+        "title": "スパンが見つかりません",
+        "description": "選択した時間範囲では、このクエリに一致するものがありませんでした。ストリームにデータが入った全文検索フィールドがない場合、match_all が検索できるものがない可能性があります。",
+        "searchOneField": "代わりに 1 つのフィールドを検索",
+        "searchOneFieldDesc": "{call} を実行します"
+      },
+      "strayKeyword": "サーバーはストリーム名と WHERE の間の {word} を無視します。削除するか、条件を WHERE に移動してください。",
+      "joinLongRange": "1 時間を超える JOIN はメモリ不足になる可能性があります。クエリが失敗する場合は時間範囲を絞り込んでください。",
+      "partialResults": "結果は行数上限で切り捨てられたため、一部の行が欠けています。LIMIT を追加するか、クエリを絞り込んでください。",
+      "allFieldsNote": "ストリームスキーマ外のフィールドは {column} に保存されます。json_get_str({column}, 'field') を使用してください。",
+      "maybeInAll": "このフィールドは {column} に保存されている可能性があります"
+    },
     "redActions": {
       "menuGroupDashboards": "ダッシュボード",
       "addRedToDashboard": "RED チャートをダッシュボードに追加",
@@ -17347,6 +17441,42 @@
         "days": "このチャートは現在表示されている{count}日のバーを維持します。"
       }
     },
+    "redCaption": {
+      "about": "このチャートの概要",
+      "matched": "チャート: 一致したすべてのスパン",
+      "matchedCount": "チャート: 一致した {count} 件のスパン | チャート: 一致したすべての {count} 件のスパン",
+      "noneMatched": "チャート: 一致したスパンは 0 件",
+      "cte": "チャート: CTE {name} からのスパン",
+      "branches": "チャート: {count} 個の分岐のいずれかに一致するスパン | チャート: {count} 個の分岐のいずれかに一致するスパン（重複は 1 回としてカウント）",
+      "joinMatched": "チャート: 結合が一致したトレース内の左側のスパン",
+      "joinLeft": "チャート: WHERE に一致する左側のスパン",
+      "inner": "チャート: 内部クエリからのスパン",
+      "stream": "チャート: {stream} 内のすべてのスパン · クエリのフィルターは適用されていません",
+      "count": "{count} 件のスパン | {count} 件のスパン",
+      "notApplied": "{clauses} は適用されていません",
+      "scope": "スコープ: すべてのスパン（SQL によって決定）",
+      "clause": {
+        "groupBy": "GROUP BY",
+        "having": "HAVING",
+        "distinct": "DISTINCT",
+        "orderBy": "ORDER BY",
+        "limit": "LIMIT",
+        "offset": "OFFSET",
+        "window": "ウィンドウ関数",
+        "qualify": "QUALIFY",
+        "outerWhere": "外側の WHERE",
+        "bothSidesWhere": "両側にまたがる WHERE",
+        "join": "結合"
+      }
+    },
+    "redCharts": {
+      "loadFailed": "このチャートを読み込めませんでした",
+      "notTraces": "チャートにはトレースストリームが必要です。クエリは {stream} を読み取っています。",
+      "unreadable": "チャートは、クエリが選択するスパンを読み取れません。",
+      "shape": "チャートは、このクエリがどのスパンを選択するかを判別できません。",
+      "noData": "データなし",
+      "showAllSpans": "{stream} 内のすべてのスパンを表示"
+    },
     "latencyHeatmap": {
       "title": "所要時間",
       "tooltipSpans": "{count} スパン | {count} スパン",
@@ -17357,7 +17487,6 @@
         "errors": "エラー"
       },
       "noData": "データなし",
-      "unavailable": "この検索ではレイテンシヒートマップを利用できません",
       "loadFailed": "レイテンシヒートマップの読み込みに失敗しました",
       "selection": {
         "label": "ヒートマップ選択",
