@@ -10429,10 +10429,7 @@
     },
     "metricsExplorer": {
       "title": "Metrics Explorer",
-      "metric": "Metric",
-      "searchMetrics": "Search metric streams",
       "openInMetrics": "Open in Metrics",
-      "copy": "Copy",
       "openSample": "Open sample",
       "prevSample": "Previous sample",
       "nextSample": "Next sample"

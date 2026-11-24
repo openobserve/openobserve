@@ -345,10 +345,7 @@ describe("usePanelDrilldown point menu", () => {
       ]);
       expect(api.pointExplore.value?.metricsTarget).toEqual({
         stream: "http_requests_total",
-        streams: ["http_requests_total"],
         filters: [{ field: "service", value: "checkout" }],
-        correlated: false,
-        promql: expr,
       });
       expect(menuOpen(deps)).toBe(true);
     });
@@ -456,9 +453,7 @@ describe("usePanelDrilldown point menu", () => {
       expect(api.pointExplore.value?.metrics.state).toBe("enabled");
       expect(api.pointExplore.value?.metricsTarget).toMatchObject({
         stream: "app",
-        streams: ["app"],
         filters: [{ field: "service", value: "cart" }],
-        correlated: false,
       });
       expect(deps.findRelatedTelemetry).not.toHaveBeenCalled();
     });
@@ -473,7 +468,6 @@ describe("usePanelDrilldown point menu", () => {
         stream: "app",
         filter: "service = 'cart'",
         filters: [{ field: "service", value: "cart" }],
-        correlated: false,
       });
     });
 
@@ -532,7 +526,6 @@ describe("usePanelDrilldown point menu", () => {
         stream: "otel_traces",
         filter: "service_name = 'cart-svc'",
         filters: [{ field: "service_name", value: "cart-svc" }],
-        correlated: true,
       });
       // The one lookup also settles View metrics; it asks no second time.
       expect(deps.findRelatedTelemetry).toHaveBeenCalledTimes(1);
@@ -540,11 +533,10 @@ describe("usePanelDrilldown point menu", () => {
         state: "enabled",
         detail: "Metrics for service cart · 00:05–00:10",
       });
+      // The drawer opens the first related metric; it has no picker to switch to the others.
       expect(api.pointExplore.value?.metricsTarget).toEqual({
         stream: "k8s_pod_cpu",
-        streams: ["k8s_pod_cpu", "k8s_pod_memory"],
         filters: [{ field: "service_name", value: "cart-svc" }],
-        correlated: true,
       });
     });
 

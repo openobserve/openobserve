@@ -8,12 +8,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import ExplorerResultsPager from "./ExplorerResultsPager.vue";
 import ExplorerToolbar from "./ExplorerToolbar.vue";
@@ -30,15 +25,7 @@ import {
 } from "@/composables/dashboard/useExplorerDetailKeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { type FieldFilter } from "@/utils/dashboard/chartPointExplore";
-import {
-  inBucket,
-  isK8sMetricSet,
-  metricPickerGroups,
-  metricsSql,
-  sampleLabels,
-  labelsOnMetric,
-  type MetricPickerTab,
-} from "@/utils/dashboard/pointExplorers";
+import { metricsSql, sampleLabels, labelsOnMetric } from "@/utils/dashboard/pointExplorers";
 const JsonPreview = defineAsyncComponent(() => import("@/plugins/logs/JsonPreview.vue"));
 // The sample detail paints a tab-and-chart skeleton at once while its chunk loads, and the
 // chunks start loading with the list, so opening a sample rarely waits on them at all.
@@ -50,15 +37,12 @@ const DetailTable = defineAsyncComponent({
 });
 
 const props = defineProps<{
+  /** The metric the samples are read from: the chart's own, or the first one correlation found. */
   stream: string;
-  streams: string[];
   filters: FieldFilter[];
-  /** The labels came from service correlation, so the picker offers only the service's metrics. */
-  correlated: boolean;
   /** The clicked bucket (µs). */
   startTime: number;
   endTime: number;
-  promql?: string;
 }>();
 
 const emit = defineEmits<{ (e: "sendToAiChat", value: unknown, append?: boolean): void }>();
@@ -67,42 +51,13 @@ const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
-const bucket = { startTime: props.startTime, endTime: props.endTime };
 
 // ── Time: the list covers the clicked slice, as in the logs and traces modes ──
 const rangeStart = ref(props.startTime);
 const rangeEnd = ref(props.endTime);
-// ── Metric picker ────────────────────────────────────────────────────────────
-const { getStream, getStreams } = useStreams(t);
-const metric = ref(props.stream || props.streams[0] || "");
-// The panel's PromQL reads this metric; another picked metric makes it stale.
-const panelMetric = metric.value;
-const pickable = ref<string[]>([...new Set([metric.value, ...props.streams].filter(Boolean))]);
-const k8s = computed(() => isK8sMetricSet(pickable.value));
-const pickerTab = ref<MetricPickerTab>("pods");
-const pickerOptions = computed(() =>
-  metricPickerGroups(pickable.value, "", k8s.value ? pickerTab.value : null).flatMap((group) => [
-    {
-      label: t(group.labelKey),
-      header: true,
-      headerCount: raw(String(group.streams.length)),
-      keepOnSearch: false,
-    },
-    ...group.streams.map((name) => ({ label: raw(name), value: name })),
-  ]),
-);
-
-// A chart on one metric offers every metric stream; correlation offers the service's own.
-async function loadPickable() {
-  if (props.correlated) return;
-  try {
-    const res: any = await getStreams("metrics", false, false);
-    const names: string[] = (res?.list ?? []).map((s: { name: string }) => s.name);
-    pickable.value = [...new Set([metric.value, ...names].filter(Boolean))];
-  } catch {
-    /* the clicked metric stays pickable */
-  }
-}
+// ── Metric: fixed for the drawer; Open in Metrics is the way to look at another ──
+const { getStream } = useStreams(t);
+const metric = computed(() => props.stream);
 
 // ── Labels: the metric's schema decides which clicked labels apply ───────────
 const labels = ref<string[] | null>(null);
@@ -191,12 +146,6 @@ function onDateChange(range: { startTime: number; endTime: number }) {
   runQuery();
 }
 
-function pickMetric(value: unknown) {
-  if (typeof value !== "string" || !value || value === metric.value) return;
-  metric.value = value;
-  void loadMetric();
-}
-
 function toggleExpand(i: number) {
   const next = new Set(expanded.value);
   if (next.has(i)) next.delete(i);
@@ -205,7 +154,6 @@ function toggleExpand(i: number) {
 }
 
 onMounted(async () => {
-  void loadPickable();
   // Warm the detail's chunk while the list loads; a failure here just leaves it lazy.
   void loadDetailTable().catch(() => undefined);
   await loadMetric();
@@ -315,33 +263,6 @@ function fmtTs(ts: unknown): string {
         @open="openInMetrics"
         @run="runQuery"
       >
-        <template #leading>
-          <OToggleGroup
-            v-if="k8s"
-            :model-value="pickerTab"
-            data-test="metrics-explorer-picker-tab"
-            @update:model-value="(v: unknown) => (pickerTab = v === 'nodes' ? 'nodes' : 'pods')"
-          >
-            <OToggleGroupItem value="pods" size="sm">{{
-              t("metrics.groups.pods")
-            }}</OToggleGroupItem>
-            <OToggleGroupItem value="nodes" size="sm">{{
-              t("metrics.groups.nodes")
-            }}</OToggleGroupItem>
-          </OToggleGroup>
-          <div class="w-72 max-md:w-48">
-            <OSelect
-              :model-value="metric"
-              :options="pickerOptions"
-              searchable
-              size="sm"
-              :search-placeholder="t('panel.metricsExplorer.searchMetrics')"
-              :aria-label="t('panel.metricsExplorer.metric')"
-              data-test="metrics-explorer-metric-picker"
-              @update:model-value="pickMetric"
-            />
-          </div>
-        </template>
         <div v-if="showSql" class="px-2 pb-2">
           <div class="border-border-default rounded-default overflow-hidden border">
             <QueryEditor
@@ -356,26 +277,6 @@ function fmtTs(ts: unknown): string {
           </div>
         </div>
       </ExplorerToolbar>
-
-      <div
-        v-if="promql && metric === panelMetric"
-        class="border-border-default flex shrink-0 items-center gap-2 border-b px-2 py-2"
-        data-test="metrics-explorer-promql"
-      >
-        <span class="text-text-secondary text-xs">{{ raw("PromQL") }}</span>
-        <OTruncatedText as="code" class="text-text-body flex-1 font-mono text-xs">{{
-          promql
-        }}</OTruncatedText>
-        <OButton
-          size="sm-toolbar"
-          variant="outline"
-          icon-left="content-copy"
-          data-test="metrics-explorer-promql-copy"
-          @click="copyText(promql)"
-        >
-          {{ t("panel.metricsExplorer.copy") }}
-        </OButton>
-      </div>
 
       <div v-if="errorMsg" class="flex shrink-0 items-start gap-2 px-4 py-3">
         <OIcon name="error-outline" size="sm" class="text-error-500 mt-0.5 shrink-0" />
@@ -412,12 +313,7 @@ function fmtTs(ts: unknown): string {
               :expanded="expanded.has(i)"
               :open-label="t('panel.metricsExplorer.openSample')"
               open-data-test="metrics-explorer-row-open"
-              :class="inBucket(Number(ev._timestamp), bucket) ? 'bg-accent/5' : undefined"
-              :data-test="
-                inBucket(Number(ev._timestamp), bucket)
-                  ? 'metrics-explorer-row-in-bucket'
-                  : 'metrics-explorer-row'
-              "
+              data-test="metrics-explorer-row"
               @toggle="toggleExpand(i)"
               @open="openSample(ev)"
             />

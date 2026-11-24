@@ -64,11 +64,6 @@ const props = defineProps<{
   filters?: FieldFilter[];
   // Logs unless a chart point opened its traces or metrics.
   mode?: ExplorerMode;
-  // The filters came from service correlation, not from the clicked chart.
-  correlated?: boolean;
-  // Metrics mode: the metric streams the picker offers, and the panel's PromQL.
-  streams?: string[];
-  promql?: string;
 }>();
 
 const isLogs = computed(() => (props.mode ?? "logs") === "logs");
@@ -749,12 +744,9 @@ function openInLogs() {
   <DashboardMetricsExplorer
     v-else-if="mode === 'metrics'"
     :stream="stream"
-    :streams="streams ?? [stream]"
     :filters="filters ?? []"
-    :correlated="!!correlated"
     :start-time="startTime"
     :end-time="endTime"
-    :promql="promql"
     @send-to-ai-chat="(v: unknown, a?: boolean) => emit('sendToAiChat', v, a)"
   />
   <div v-else class="flex h-full min-h-0 flex-col overflow-hidden" @keydown="leaveFieldOnEscape">

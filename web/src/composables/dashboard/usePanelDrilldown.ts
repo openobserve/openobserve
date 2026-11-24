@@ -987,7 +987,6 @@ export function usePanelDrilldown({
           stream: traceStream.stream_name,
           filter: filtersWhere("", filters),
           filters,
-          correlated: true,
         };
         next.traces = {
           state: "enabled",
@@ -1003,10 +1002,9 @@ export function usePanelDrilldown({
       next.metrics = hiddenItem;
       if (data && metricStreams.length) {
         next.metricsTarget = {
+          // The drawer reads the first related metric; Open in Metrics reaches the others.
           stream: metricStreams[0].stream_name,
-          streams: metricStreams.map((s) => s.stream_name),
           filters: streamFilters(metricStreams[0], data.service_name),
-          correlated: true,
         };
         next.metrics = {
           state: "enabled",
@@ -1112,7 +1110,7 @@ export function usePanelDrilldown({
       pointExplore.value = null;
       return false;
     }
-    const direct = { filters, correlated: false };
+    const direct = { filters };
     pointExplore.value = {
       target,
       logs,
@@ -1122,10 +1120,7 @@ export function usePanelDrilldown({
         traces.state === "enabled"
           ? { stream: target.stream, filter: filtersWhere("", filters), ...direct }
           : null,
-      metricsTarget:
-        metrics.state === "enabled"
-          ? { stream: target.stream, streams: [target.stream], promql, ...direct }
-          : null,
+      metricsTarget: metrics.state === "enabled" ? { stream: target.stream, ...direct } : null,
     };
     if (traces.state === "pending" || metrics.state === "pending") correlatePoint(request, target);
     return true;

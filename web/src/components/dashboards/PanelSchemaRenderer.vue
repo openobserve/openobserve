@@ -430,9 +430,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :base-where="cellDrawer.baseWhere"
         :filters="cellDrawer.filters"
         :mode="cellDrawer.mode"
-        :correlated="cellDrawer.correlated"
-        :streams="cellDrawer.streams"
-        :promql="cellDrawer.promql"
         @send-to-ai-chat="onCellSendToAiChat"
       />
     </ODrawer>
@@ -2574,7 +2571,7 @@ export default defineComponent({
       return [
         {
           id: "view-logs",
-          icon: "description" as const,
+          icon: "search" as const,
           label: t("panel.pointExplore.viewLogs"),
           ...explore.logs,
           open: openPointLogs,
@@ -2752,9 +2749,6 @@ export default defineComponent({
       baseWhere: string;
       filters?: FieldFilter[];
       mode?: ExplorerMode;
-      correlated?: boolean;
-      streams?: string[];
-      promql?: string;
     }>({
       open: false,
       field: "",
@@ -2975,7 +2969,6 @@ export default defineComponent({
         baseWhere: "",
         filters: tracesTarget.filters,
         mode: "traces",
-        correlated: tracesTarget.correlated,
       };
     }
 
@@ -2996,9 +2989,6 @@ export default defineComponent({
         baseWhere: "",
         filters: metricsTarget.filters,
         mode: "metrics",
-        correlated: metricsTarget.correlated,
-        streams: metricsTarget.streams,
-        promql: metricsTarget.promql,
       };
     }
 

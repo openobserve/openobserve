@@ -45,17 +45,12 @@ export interface TracesTarget {
   stream: string;
   filter: string;
   filters: FieldFilter[];
-  correlated: boolean;
 }
 
-/** Where View metrics opens: the metric streams to pick from, the first one, and the label filters. */
+/** Where View metrics opens: the metric (the chart's own, or correlation's first) and its label filters. */
 export interface MetricsTarget {
   stream: string;
-  streams: string[];
   filters: FieldFilter[];
-  correlated: boolean;
-  /** The panel's executed PromQL expression, shown read-only in the drawer. */
-  promql?: string;
 }
 
 /** The point menu's section: its target, the three rows, and where traces and metrics open once known. */

@@ -17,10 +17,7 @@ import { describe, expect, it } from "vitest";
 import {
   hasFullPage,
   eventSecondWindow,
-  inBucket,
-  isK8sMetricSet,
   labelsOnMetric,
-  metricPickerGroups,
   metricsSql,
   sampleLabels,
   traceDetailWindow,
@@ -46,8 +43,6 @@ describe("Trace Explorer helpers", () => {
 });
 
 describe("Metrics Explorer helpers", () => {
-  const bucket = { startTime: 100 * MIN, endTime: 105 * MIN };
-
   it("keeps the clicked labels the metric carries and drops the others", () => {
     const filters = [
       { field: "service_name", value: "cart" },
@@ -70,33 +65,6 @@ describe("Metrics Explorer helpers", () => {
     expect(sampleLabels(row)).toEqual([
       { field: "pod", value: "a" },
       { field: "zone", value: null },
-    ]);
-  });
-
-  it("marks only samples inside the clicked bucket", () => {
-    expect(inBucket(100 * MIN, bucket)).toBe(true);
-    expect(inBucket(105 * MIN, bucket)).toBe(false);
-  });
-
-  it("splits a Kubernetes metric set into the Pods or Nodes tab, grouped by category", () => {
-    const streams = ["k8s_pod_cpu_utilization", "k8s_node_memory_usage", "http_requests_total"];
-    expect(isK8sMetricSet(streams)).toBe(true);
-    expect(isK8sMetricSet(["http_requests_total"])).toBe(false);
-    const pods = metricPickerGroups(streams, "", "pods").flatMap((g) => g.streams);
-    const nodes = metricPickerGroups(streams, "", "nodes").flatMap((g) => g.streams);
-    expect(pods).toEqual(["k8s_pod_cpu_utilization"]);
-    expect(nodes).toEqual(["k8s_node_memory_usage"]);
-  });
-
-  it("lists every stream in a flat set and filters by the search", () => {
-    const streams = ["cpu_usage", "memory_used_bytes"];
-    expect(
-      metricPickerGroups(streams, "", null)
-        .flatMap((g) => g.streams)
-        .sort(),
-    ).toEqual(streams);
-    expect(metricPickerGroups(streams, "MEM", null).flatMap((g) => g.streams)).toEqual([
-      "memory_used_bytes",
     ]);
   });
 });

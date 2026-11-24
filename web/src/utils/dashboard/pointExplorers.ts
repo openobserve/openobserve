@@ -14,15 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { fieldPredicate, type FieldFilter } from "@/utils/dashboard/chartPointExplore";
-import {
-  DEFAULT_METRIC_GROUP_DEFINITIONS,
-  K8S_METRIC_GROUP_DEFINITIONS,
-  NODE_PATTERNS,
-  POD_PATTERNS,
-  groupMetricsByCategory,
-  type MetricGroupDefinition,
-} from "@/utils/metrics/metricGrouping";
-import type { I18nKey } from "@/types/i18n";
 
 const ONE_MINUTE_US = 60_000_000;
 
@@ -73,52 +64,3 @@ export const sampleLabels = (row: Record<string, unknown>): FieldFilter[] =>
       field,
       value: value === null || value === undefined || value === "" ? null : String(value),
     }));
-
-/** Whether a µs timestamp falls inside the clicked bucket. */
-export const inBucket = (ts: number, bucket: { startTime: number; endTime: number }): boolean =>
-  ts >= bucket.startTime && ts < bucket.endTime;
-
-export type MetricPickerTab = "pods" | "nodes";
-
-const matchesAny = (name: string, patterns: RegExp[]) =>
-  patterns.some((pattern) => pattern.test(name.toLowerCase()));
-
-/** Whether the metric streams follow the Kubernetes naming that splits them into Pods and Nodes. */
-export const isK8sMetricSet = (streams: string[]): boolean =>
-  streams.some((name) => matchesAny(name, POD_PATTERNS) || matchesAny(name, NODE_PATTERNS));
-
-export interface MetricPickerGroup {
-  id: string;
-  labelKey: I18nKey;
-  streams: string[];
-}
-
-/** The picker's groups for a search; Kubernetes sets list only the active tab's pod or node metrics. */
-export const metricPickerGroups = (
-  streams: string[],
-  search: string,
-  tab: MetricPickerTab | null,
-): MetricPickerGroup[] => {
-  const needle = search.trim().toLowerCase();
-  const scoped = streams.filter((name) => {
-    if (needle && !name.toLowerCase().includes(needle)) return false;
-    if (tab === "pods") return matchesAny(name, POD_PATTERNS);
-    if (tab === "nodes") return matchesAny(name, NODE_PATTERNS);
-    return true;
-  });
-  const defs: MetricGroupDefinition[] = tab
-    ? (K8S_METRIC_GROUP_DEFINITIONS.find((g) => g.id === tab)?.children ??
-      DEFAULT_METRIC_GROUP_DEFINITIONS)
-    : DEFAULT_METRIC_GROUP_DEFINITIONS;
-  const grouped = groupMetricsByCategory(
-    scoped.map((name) => ({ stream_name: name, stream_type: "metrics" })),
-    defs,
-  );
-  return grouped.groups
-    .filter((group) => group.streams.length)
-    .map((group) => ({
-      id: group.id,
-      labelKey: group.labelKey,
-      streams: group.streams.map((s) => s.stream_name),
-    }));
-};

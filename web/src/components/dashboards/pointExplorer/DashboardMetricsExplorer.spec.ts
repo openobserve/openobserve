@@ -122,12 +122,10 @@ describe("DashboardMetricsExplorer", () => {
     wrapper = mount(DashboardMetricsExplorer, {
       props: {
         stream: "cpu",
-        streams: ["cpu"],
         filters: [
           { field: "service_name", value: "cart" },
           { field: "k8s_namespace", value: "shop" },
         ],
-        correlated: false,
         startTime: 100 * MIN,
         endTime: 105 * MIN,
         ...props,
@@ -178,11 +176,12 @@ describe("DashboardMetricsExplorer", () => {
     );
   });
 
-  it("lists raw samples with a pager total, highlighting rows inside the clicked bucket", async () => {
+  it("lists raw samples with a pager total, every row untinted like the Logs rows", async () => {
     mountExplorer();
     await flushPromises();
-    expect(wrapper.findAll("[data-test='metrics-explorer-row-in-bucket']")).toHaveLength(1);
-    expect(wrapper.findAll("[data-test='metrics-explorer-row']")).toHaveLength(1);
+    const rows = wrapper.findAll("[data-test='metrics-explorer-row']");
+    expect(rows).toHaveLength(2);
+    rows.forEach((row) => expect(row.classes()).not.toContain("bg-accent/5"));
     expect(wrapper.vm.total).toBe(2);
   });
 
@@ -254,22 +253,6 @@ describe("DashboardMetricsExplorer", () => {
     open.mockRestore();
   });
 
-  it("another metric hides the panel's PromQL line; switching back shows it again", async () => {
-    mountExplorer({ promql: "sum(rate(cpu[5m]))" });
-    await flushPromises();
-    const picker = () => wrapper.findComponent({ name: "OSelect" });
-    expect(wrapper.find("[data-test='metrics-explorer-promql']").exists()).toBe(true);
-    picker().vm.$emit("update:modelValue", "requests_total");
-    await flushPromises();
-    expect(wrapper.find("[data-test='metrics-explorer-promql']").exists()).toBe(false);
-    picker().vm.$emit("update:modelValue", "cpu");
-    await flushPromises();
-    expect(wrapper.find("[data-test='metrics-explorer-promql']").exists()).toBe(true);
-    expect(sqlOf(searches().at(-1))).toBe(
-      `SELECT * FROM "cpu" WHERE service_name = 'cart' ORDER BY _timestamp DESC`,
-    );
-  });
-
   it("a new time range reruns the list over it", async () => {
     mountExplorer();
     await flushPromises();
@@ -304,19 +287,13 @@ describe("DashboardMetricsExplorer", () => {
     );
     expect(rows[0].find(".dld-expand-btn").exists()).toBe(true);
     expect(rows[0].find("[data-test='metrics-explorer-row-open']").exists()).toBe(true);
-    // The in-bucket highlight still lands on the row.
-    expect(wrapper.find("[data-test='metrics-explorer-row-in-bucket']").classes()).toContain(
-      "bg-accent/5",
-    );
   });
 
   it("a sample opened before the detail has loaded paints its header and a tab skeleton", async () => {
     wrapper = mount(DashboardMetricsExplorer, {
       props: {
         stream: "cpu",
-        streams: ["cpu"],
         filters: [],
-        correlated: false,
         startTime: 100 * MIN,
         endTime: 105 * MIN,
       },
@@ -332,33 +309,24 @@ describe("DashboardMetricsExplorer", () => {
     expect(wrapper.findComponent(ExplorerDetailSkeleton).exists()).toBe(true);
   });
 
-  it("the metric picker switches the stream and reruns with its labels", async () => {
+  it("the header has no metric switch, dropdown or name, and no PromQL line", async () => {
     mountExplorer();
     await flushPromises();
-    expect(getStreams).toHaveBeenCalledWith("metrics", false, false);
-    wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", "requests_total");
-    await flushPromises();
-    expect(sqlOf(searches().at(-1))).toBe(
-      `SELECT * FROM "requests_total" ORDER BY _timestamp DESC`,
-    );
-    // service_name is not on requests_total, so the query above leaves it out.
-  });
-
-  it("a correlated set offers only the service's metrics and applies its labels", async () => {
-    mountExplorer({ correlated: true, streams: ["cpu", "requests_total"] });
-    await flushPromises();
+    expect(wrapper.find("[data-test='metrics-explorer-metric']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='metrics-explorer-metric-picker']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='metrics-explorer-picker-tab']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='metrics-explorer-promql']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='metrics-explorer-promql-copy']").exists()).toBe(false);
+    // Nothing to pick from, so the metric list is never fetched.
     expect(getStreams).not.toHaveBeenCalled();
-    expect(wrapper.vm.pickable).toEqual(["cpu", "requests_total"]);
-    expect(sqlOf(searches()[0])).toBe(
-      `SELECT * FROM "cpu" WHERE service_name = 'cart' ORDER BY _timestamp DESC`,
-    );
   });
 
-  it("shows the panel's PromQL read-only with Copy", async () => {
-    mountExplorer({ promql: "sum(rate(cpu[5m]))" });
+  it("a correlated open reads its first related metric, with its labels applied", async () => {
+    // The drilldown hands over the first related metric as the stream (see usePanelDrilldown).
+    mountExplorer({ stream: "requests_total", filters: [{ field: "pod", value: "a" }] });
     await flushPromises();
-    expect(wrapper.find("[data-test='metrics-explorer-promql']").text()).toContain(
-      "sum(rate(cpu[5m]))",
+    expect(sqlOf(searches()[0])).toBe(
+      `SELECT * FROM "requests_total" WHERE pod = 'a' ORDER BY _timestamp DESC`,
     );
   });
 

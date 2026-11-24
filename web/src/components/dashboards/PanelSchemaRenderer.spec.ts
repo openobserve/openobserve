@@ -1012,6 +1012,13 @@ describe("PanelSchemaRenderer", () => {
       expect(chart().props("contextMenuPoints")).toBe(true);
     });
 
+    it("View logs uses the navbar's Logs icon", async () => {
+      asBuild("oss");
+      await rightClickPoint();
+      const icon = item("view-logs").findComponent({ name: "OIcon" });
+      expect(icon.props("name")).toBe("search");
+    });
+
     it("View metrics uses the navbar's Metrics icon", async () => {
       asBuild("oss");
       const panel = breakdownPanel();
@@ -1082,7 +1089,6 @@ describe("PanelSchemaRenderer", () => {
         mode: "traces",
         streamType: "traces",
         filters: [{ field: "svc", value: "cart" }],
-        correlated: false,
       });
       expect(wrapper.vm.cellDrawerTitle).toBe("Traces Explorer");
     });
@@ -1098,9 +1104,10 @@ describe("PanelSchemaRenderer", () => {
         open: true,
         mode: "metrics",
         streamType: "metrics",
-        streams: [wrapper.vm.cellDrawer.stream],
         filters: [{ field: "svc", value: "cart" }],
       });
+      expect(wrapper.vm.cellDrawer).not.toHaveProperty("promql");
+      expect(wrapper.vm.cellDrawer).not.toHaveProperty("streams");
       expect(wrapper.vm.cellDrawerTitle).toBe("Metrics Explorer");
     });
 
