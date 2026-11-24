@@ -8,6 +8,8 @@ const logData = require('../../../fixtures/log.json');
 const STREAM = 'e2e_automate';
 const PAGE_SIZE = 100;
 const DENSE_ROWS = 12;
+const DECOY_ROWS = 4;
+const WIDE_BUCKET_MS = 10_000;
 
 test.describe("Logs Result Display Regression", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -62,13 +64,20 @@ test.describe("Logs Result Display Regression", () => {
     // second of its own stream rather than the shared fixture.
     const denseStream = 'e2e_13896_' + Math.random().toString(36).slice(2, 7);
     const orgId = getOrgIdentifier() || 'default';
-    const secondStartMs = Date.now() - 5 * 60 * 1000;
+    // The picker re-reads millisecond from/to at whole-second precision, so rows at or past the next second would fall outside.
+    const bucketStartMs = Math.floor((Date.now() - 5 * 60 * 1000) / WIDE_BUCKET_MS) * WIDE_BUCKET_MS;
+    const secondStartMs = bucketStartMs + WIDE_BUCKET_MS / 2;
 
-    const rows = Array.from({ length: DENSE_ROWS }, (_, i) => ({
-      _timestamp: (secondStartMs + i * 20) * 1000,
+    // The defect counted rows between the bucket start and the range start, so without decoys there it cannot show.
+    const offsetsMs = [
+      ...Array.from({ length: DENSE_ROWS }, (_, i) => WIDE_BUCKET_MS / 2 + i * 20),
+      ...Array.from({ length: DECOY_ROWS }, (_, i) => 500 + i * 1000),
+    ];
+    const rows = offsetsMs.map((offset, i) => ({
+      _timestamp: (bucketStartMs + offset) * 1000,
       level: 'info',
       job: 'test_13896',
-      log: `dense row ${i}`,
+      log: `row ${i}`,
     }));
     await sendRequest(page, getIngestionUrl(orgId, denseStream), rows, getHeaders());
 
@@ -79,16 +88,19 @@ test.describe("Logs Result Display Regression", () => {
     // re-running the query in the UI and hoping the index catches up first.
     await pm.logsPage.waitForSearchableRowCount(
       denseStream,
-      DENSE_ROWS,
-      secondStartMs * 1000,
+      DENSE_ROWS + DECOY_ROWS,
+      bucketStartMs * 1000,
       (secondStartMs + 1000) * 1000,
     );
 
+    await pm.logsPage.captureHistogramFrames();
     await page.goto(
       `${logData.logsUrl}?org_identifier=${orgId}&stream=${denseStream}&stream_type=logs` +
       `&from=${secondStartMs}&to=${secondStartMs + 1000}`,
     );
-    await pm.logsPage.clickRefreshButton();
+    // The banner can read the search total before the histogram replaces it, so the bucket sum is checked on its own.
+    const bucketSum = await pm.logsPage.runQueryAndSumHistogram();
+    expect(bucketSum, 'the histogram must count only the rows in the range').toBe(DENSE_ROWS);
     await pm.logsPage.expectResultsGridSettledWithRows();
 
     const title = await pm.logsPage.waitForResultTotal(DENSE_ROWS);
