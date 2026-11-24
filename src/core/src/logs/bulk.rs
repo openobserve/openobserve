@@ -925,31 +925,36 @@ mod tests {
         );
     }
 
-    // cloud builds reject the unknown test org at the trial check before the columns check
-    #[cfg(not(feature = "cloud"))]
-    #[tokio::test]
-    async fn test_ingest_fails_every_row_of_the_stream_over_the_columns_limit() {
-        let limit = get_config().limit.req_cols_per_record_limit;
-        let wide: json::Map<String, json::Value> = (0..=limit)
-            .map(|i| (format!("f_{i}"), json::json!(i)))
+    fn numbered_fields(prefix: &str, count: usize) -> json::Value {
+        json::Value::Object(
+            (0..count)
+                .map(|i| (format!("{prefix}_{i}"), json::json!(i)))
+                .collect(),
+        )
+    }
+
+    async fn ingest_bulk_rows(rows: &[(&str, &str, json::Value)]) -> BulkResponse {
+        let body: String = rows
+            .iter()
+            .map(|(index, id, record)| {
+                format!(
+                    "{}\n{record}\n",
+                    json::json!({"index": {"_index": index, "_id": id}})
+                )
+            })
             .collect();
-        let body = format!(
-            "{{\"index\": {{\"_index\": \"test_bulk_cols_ok\", \"_id\": \"1\"}}}}\n{{\"message\": \"a\"}}\n\
-             {{\"index\": {{\"_index\": \"test_bulk_cols_wide\", \"_id\": \"2\"}}}}\n{{\"message\": \"b\"}}\n\
-             {{\"index\": {{\"_index\": \"test_bulk_cols_wide\", \"_id\": \"3\"}}}}\n{}\n",
-            json::Value::Object(wide)
-        );
-        let resp = ingest(
+        ingest(
             1,
             "test_org_id",
             Bytes::from(body),
             IngestUser::from_user_email("a@a.com"),
         )
         .await
-        .unwrap();
+        .unwrap()
+    }
 
-        let rejected: Vec<&str> = resp
-            .items
+    fn schema_conformance_failures(resp: &BulkResponse) -> Vec<&str> {
+        resp.items
             .iter()
             .flat_map(|item| item.values())
             .filter(|item| {
@@ -958,13 +963,44 @@ mod tests {
                     .is_some_and(|e| e.err_type == SCHEMA_CONFORMANCE_FAILED)
             })
             .map(|item| item._id.as_str())
-            .collect();
+            .collect()
+    }
+
+    // cloud builds reject the unknown test org at the trial check before the columns check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_fails_every_row_of_the_stream_over_the_columns_limit() {
+        let half = get_config().limit.req_cols_per_record_limit / 2 + 1;
+        let resp = ingest_bulk_rows(&[
+            ("test_bulk_cols_ok", "1", json::json!({"message": "a"})),
+            ("test_bulk_cols_wide", "2", numbered_fields("a", half)),
+            ("test_bulk_cols_wide", "3", numbered_fields("b", half)),
+        ])
+        .await;
+
         assert!(resp.errors);
-        assert_eq!(rejected, ["2", "3"]);
+        assert_eq!(schema_conformance_failures(&resp), ["2", "3"]);
         assert!(infra::schema::exists("test_org_id", StreamType::Logs, "test_bulk_cols_ok").await);
         assert!(
             !infra::schema::exists("test_org_id", StreamType::Logs, "test_bulk_cols_wide").await
         );
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_drops_only_the_bulk_row_over_the_columns_limit() {
+        let limit = get_config().limit.req_cols_per_record_limit;
+        let resp = ingest_bulk_rows(&[
+            ("test_bulk_cols_row", "1", json::json!({"message": "a"})),
+            ("test_bulk_cols_row", "2", numbered_fields("f", limit + 1)),
+            ("test_bulk_cols_row", "3", json::json!({"message": "b"})),
+        ])
+        .await;
+
+        assert!(resp.errors);
+        assert_eq!(schema_conformance_failures(&resp), ["2"]);
+        assert_eq!(resp.items.len(), 3);
+        assert!(infra::schema::exists("test_org_id", StreamType::Logs, "test_bulk_cols_row").await);
     }
 
     #[test]

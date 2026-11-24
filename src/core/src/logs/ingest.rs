@@ -85,6 +85,7 @@ struct FinalizeRecordContext<'a> {
     min_ts: i64,
     max_ts: i64,
     index_all_max_value_length: usize,
+    columns_limit: usize,
     user_defined_schema_map: &'a HashMap<String, Option<HashSet<String>>>,
     streams_need_original_map: &'a HashMap<String, bool>,
     streams_need_all_values_map: &'a HashMap<String, bool>,
@@ -371,6 +372,7 @@ async fn ingest_inner(
     let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
 
     let index_all_max_value_length = cfg.limit.index_all_max_value_length;
+    let columns_limit = cfg.limit.req_cols_per_record_limit;
 
     let mut derived_streams = HashSet::new();
     if is_derived {
@@ -541,6 +543,7 @@ async fn ingest_inner(
                 min_ts,
                 max_ts,
                 index_all_max_value_length,
+                columns_limit,
                 user_defined_schema_map: &user_defined_schema_map,
                 streams_need_original_map: &streams_need_original_map,
                 streams_need_all_values_map: &streams_need_all_values_map,
@@ -704,6 +707,17 @@ async fn ingest_inner(
                                     .map(Cow::Borrowed),
                                 None,
                             );
+                            if let Err(e) = crate::ingestion::check_record_columns_limit(
+                                org_id,
+                                StreamType::Logs,
+                                &destination_stream,
+                                &local_val,
+                                columns_limit,
+                            ) {
+                                stream_status.status.failed += 1;
+                                stream_status.status.error = e.to_string();
+                                continue;
+                            }
 
                             let (ts_data, fn_num) = json_data_by_stream
                                 .entry(destination_stream.clone())
@@ -747,6 +761,7 @@ async fn ingest_inner(
                         min_ts,
                         max_ts,
                         index_all_max_value_length,
+                        columns_limit,
                         user_defined_schema_map: &user_defined_schema_map,
                         streams_need_original_map: &streams_need_original_map,
                         streams_need_all_values_map: &streams_need_all_values_map,
@@ -1122,6 +1137,25 @@ fn finalize_and_buffer_record(
         all_values_max_len: ctx.index_all_max_value_length,
     };
     let local_val = settings.apply(local_val, original_data.map(Cow::Owned), None);
+    // after UDS packing and `_original`, so it counts the columns the batch check will see
+    if let Err(e) = crate::ingestion::check_record_columns_limit(
+        ctx.org_id,
+        StreamType::Logs,
+        ctx.stream_name,
+        &local_val,
+        ctx.columns_limit,
+    ) {
+        ctx.stream_status.status.failed += 1;
+        ctx.stream_status.status.error = e.to_string();
+        reject_bulk_record(
+            ctx,
+            bulk_doc_id,
+            None,
+            crate::logs::bulk::SCHEMA_CONFORMANCE_FAILED,
+            e.to_string(),
+        );
+        return false;
+    }
     match ctx.json_data_by_stream.get_mut(ctx.stream_name) {
         Some((ts_data, fn_num)) => {
             ts_data.push((timestamp, local_val));
@@ -2065,26 +2099,37 @@ mod tests {
         assert!(parse_json_body(br#"[{"a":1}"#).is_err());
     }
 
-    // cloud builds reject the unknown test org at the trial check before the columns check
-    #[cfg(not(feature = "cloud"))]
-    #[tokio::test]
-    async fn test_ingest_json_over_the_columns_limit_fails_every_row() {
-        let limit = config::get_config().limit.req_cols_per_record_limit;
-        let wide: json::Map<String, json::Value> = (0..=limit)
-            .map(|i| (format!("f_{i}"), json::json!(i)))
-            .collect();
-        let body = json::json!([{"message": "small"}, wide]).to_string();
-        let resp = ingest(
+    fn numbered_fields(prefix: &str, count: usize) -> json::Map<String, json::Value> {
+        (0..count)
+            .map(|i| (format!("{prefix}_{i}"), json::json!(i)))
+            .collect()
+    }
+
+    async fn ingest_logs(stream_name: &str, req: IngestionRequest) -> IngestionResponse {
+        ingest(
             0,
             "test_org_id",
-            "test_json_columns_limit",
-            IngestionRequest::JSON(body.into()),
+            stream_name,
+            req,
             IngestUser::from_user_email("a@a.com"),
             None,
             false,
         )
         .await
-        .unwrap();
+        .unwrap()
+    }
+
+    // cloud builds reject the unknown test org at the trial check before the columns check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_json_rows_whose_columns_together_exceed_the_limit_fail_every_row() {
+        let half = config::get_config().limit.req_cols_per_record_limit / 2 + 1;
+        let body = json::json!([numbered_fields("a", half), numbered_fields("b", half)]);
+        let resp = ingest_logs(
+            "test_json_columns_limit",
+            IngestionRequest::JSON(body.to_string().into()),
+        )
+        .await;
 
         assert_eq!(resp.code, 200);
         let status = &resp.status[0].status;
@@ -2094,6 +2139,86 @@ mod tests {
             "{status:?}"
         );
         assert!(resp.write_failed);
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_json_drops_only_the_row_over_the_columns_limit() {
+        let limit = config::get_config().limit.req_cols_per_record_limit;
+        let body = json::json!([{"message": "small"}, numbered_fields("f", limit + 1)]);
+        let resp = ingest_logs(
+            "test_json_columns_limit_row",
+            IngestionRequest::JSON(body.to_string().into()),
+        )
+        .await;
+
+        let status = &resp.status[0].status;
+        assert_eq!((status.successful, status.failed), (1, 1));
+        assert!(
+            status.error.contains("ZO_COLS_PER_RECORD_LIMIT"),
+            "{status:?}"
+        );
+        assert!(!resp.write_failed);
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_multi_drops_only_the_row_over_the_columns_limit() {
+        let limit = config::get_config().limit.req_cols_per_record_limit;
+        let body = format!(
+            "{}\n{}\n",
+            json::json!({"message": "small"}),
+            json::Value::Object(numbered_fields("f", limit + 1))
+        );
+        let resp = ingest_logs(
+            "test_multi_columns_limit_row",
+            IngestionRequest::Multi(body.into()),
+        )
+        .await;
+
+        let status = &resp.status[0].status;
+        assert_eq!((status.successful, status.failed), (1, 1));
+        assert!(!resp.write_failed);
+    }
+
+    #[test]
+    fn test_finalize_drops_a_record_over_the_columns_limit_counting_timestamp() {
+        let limit = config::get_config().limit.req_cols_per_record_limit;
+        let mut stream_status = StreamStatus::new("s");
+        let mut buffered = LogDataByStream::new();
+        let schema_map = HashMap::new();
+        let settings = HashMap::new();
+        for (record, accepted) in [
+            (json::Value::Object(numbered_fields("f", limit - 1)), true),
+            (json::Value::Object(numbered_fields("f", limit)), false),
+        ] {
+            assert_eq!(
+                finalize_and_buffer_record(
+                    record,
+                    None,
+                    &mut FinalizeRecordContext {
+                        stream_name: "s",
+                        org_id: "o",
+                        flatten_level: 0,
+                        min_ts: 1,
+                        max_ts: i64::MAX,
+                        index_all_max_value_length: 0,
+                        columns_limit: limit,
+                        user_defined_schema_map: &schema_map,
+                        streams_need_original_map: &settings,
+                        streams_need_all_values_map: &settings,
+                        need_usage_report: false,
+                        log_ingestion_errors: false,
+                        dbm_enabled: false,
+                        stream_status: &mut stream_status,
+                        json_data_by_stream: &mut buffered,
+                        bulk_position: None,
+                    }
+                ),
+                accepted,
+            );
+        }
+        assert_eq!(stream_status.status.failed, 1);
     }
 
     fn gzip_base64(raw: &[u8]) -> String {
@@ -2313,6 +2438,7 @@ mod tests {
                         min_ts: 1,
                         max_ts: i64::MAX,
                         index_all_max_value_length: 0,
+                        columns_limit: usize::MAX,
                         user_defined_schema_map: &schema_map,
                         streams_need_original_map: &settings,
                         streams_need_all_values_map: &settings,
