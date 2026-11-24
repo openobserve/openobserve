@@ -109,6 +109,7 @@ const reports = {
     dashboard_id?: string,
     cache?: boolean,
     name_substring?: string,
+    options?: { silentForbidden?: boolean },
   ) => {
     const params: string[] = [];
     if (folder_id) params.push(`folder=${folder_id}`);
@@ -116,7 +117,7 @@ const reports = {
     if (name_substring) params.push(`report_name_substring=${encodeURIComponent(name_substring)}`);
     if (typeof cache == "boolean") params.push(`cache=${cache}`);
     const query = params.length ? `?${params.join("&")}` : "";
-    return http().get(`/api/v2/${org_identifier}/reports${query}`);
+    return http().get(`/api/v2/${org_identifier}/reports${query}`, options);
   },
   deleteReportById: (org_identifier: string, report_id: string) => {
     return http()

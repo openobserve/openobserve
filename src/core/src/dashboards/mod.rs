@@ -34,9 +34,11 @@ use db::{
 use futures::future::join_all;
 use hashbrown::HashMap;
 use infra::{
+    errors::{DbError, Error as InfraError, PutDashboardError},
     schema::get_stream_setting_fts_fields,
     table::{
         self,
+        dashboards::PutMode,
         distinct_values::{DistinctFieldRecord, OriginType},
     },
 };
@@ -140,11 +142,6 @@ pub enum DashboardError {
     /// dashboard.
     #[error("error creating default folder")]
     CreateDefaultFolder,
-
-    /// Error that occurs when updating the distinct values using the
-    /// dashboard variables
-    #[error("error in updating distinct values")]
-    DistinctValueError,
 
     /// Error that occurs when the user making the api call is not found.
     #[error("user not found")]
@@ -394,9 +391,20 @@ pub async fn create_dashboard(
     // NOTE: Overwrite whatever `dashboard_id` the client has sent us
     // If folder is default folder & doesn't exist then create it
 
-    let dashboard = if table::folders::exists(org_id, folder_id, FolderType::Dashboards).await? {
+    let folder_exists =
+        table::folders::exists_primary(org_id, folder_id, FolderType::Dashboards).await?;
+    let dashboard = if folder_exists {
         let dashboard_id = ider::generate();
-        let saved = put(org_id, &dashboard_id, folder_id, None, dashboard, None).await?;
+        let saved = put(
+            org_id,
+            &dashboard_id,
+            folder_id,
+            None,
+            dashboard,
+            None,
+            true,
+        )
+        .await?;
         set_ownership(
             org_id,
             "dashboards",
@@ -416,7 +424,16 @@ pub async fn create_dashboard(
                 DashboardError::CreateDefaultFolder
             })?;
         let dashboard_id = ider::generate();
-        let saved = put(org_id, &dashboard_id, folder_id, None, dashboard, None).await?;
+        let saved = put(
+            org_id,
+            &dashboard_id,
+            folder_id,
+            None,
+            dashboard,
+            None,
+            true,
+        )
+        .await?;
         set_ownership(
             org_id,
             "dashboards",
@@ -453,16 +470,16 @@ pub async fn update_dashboard(
     dashboard: Dashboard,
     hash: Option<&str>,
 ) -> Result<Dashboard, DashboardError> {
-    // Check if dashboard exists and belongs to the specified folder.
-    // Note: We don't need to explicitly check if the folder exists because
-    // the folder-dashboard relationship is enforced by a foreign key constraint.
-    // If the dashboard exists in the folder, the folder must exist.
-    let existing = table::dashboards::get_from_folder(org_id, folder_id, dashboard_id).await?;
-    if existing.is_none() {
-        return Err(DashboardError::DashboardNotFound);
-    }
-
-    let dashboard = put(org_id, dashboard_id, folder_id, None, dashboard, hash).await?;
+    let dashboard = put(
+        org_id,
+        dashboard_id,
+        folder_id,
+        None,
+        dashboard,
+        hash,
+        false,
+    )
+    .await?;
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
@@ -619,11 +636,16 @@ async fn reconcile_home_dashboard_on_delete(org_id: &str, dashboard_id: &str) {
 
 #[tracing::instrument]
 pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), DashboardError> {
-    let Some((folder, _dashboard)) = table::dashboards::get_by_id(org_id, dashboard_id).await?
+    let Some((folder, _dashboard)) =
+        table::dashboards::get_by_id_primary(org_id, dashboard_id).await?
     else {
         return Err(DashboardError::DashboardNotFound);
     };
-    table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
+    let orphaned_reports =
+        table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
+    for (report_id, report_folder_id) in orphaned_reports {
+        reports::forget_deleted(org_id, &report_id, &report_folder_id).await;
+    }
     // Keep the org's "pin to Home" setting from dangling on a deleted dashboard.
     reconcile_home_dashboard_on_delete(org_id, dashboard_id).await;
     // A public link must not outlive its dashboard; a failure shows it as "dashboard deleted".
@@ -687,7 +709,12 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), DashboardError> {
         &broadcast,
         |(dashboard_id, folder_id): (String, String)| async move {
             forget_dashboard(org_id, &dashboard_id, &folder_id).await?;
-            table::dashboards::delete_from_folder(org_id, &folder_id, &dashboard_id).await?;
+            let orphaned =
+                table::dashboards::delete_from_folder(org_id, &folder_id, &dashboard_id).await?;
+            // Deleted before the reports step lists rows, so their tuples go here.
+            for (report_id, report_folder_id) in orphaned {
+                reports::forget_deleted(org_id, &report_id, &report_folder_id).await;
+            }
             Ok(())
         },
     )
@@ -709,11 +736,11 @@ pub async fn move_dashboard(
     _user_id: &str,
     _check_openfga: bool,
 ) -> Result<(), DashboardError> {
-    if !table::folders::exists(org_id, to_folder, FolderType::Dashboards).await? {
+    if !table::folders::exists_primary(org_id, to_folder, FolderType::Dashboards).await? {
         return Err(DashboardError::MoveDestinationFolderNotFound);
     };
 
-    let (curr_folder, dashboard) = table::dashboards::get_by_id(org_id, dashboard_id)
+    let (curr_folder, dashboard) = table::dashboards::get_by_id_primary(org_id, dashboard_id)
         .await?
         .ok_or(DashboardError::DashboardNotFound)?;
 
@@ -755,6 +782,7 @@ pub async fn move_dashboard(
         Some(to_folder),
         dashboard,
         Some(&hash),
+        false,
     )
     .await?;
 
@@ -802,12 +830,12 @@ pub async fn move_dashboards(
     user_id: &str,
     check_openfga: bool,
 ) -> Result<(), DashboardError> {
-    if !table::folders::exists(org_id, to_folder, FolderType::Dashboards).await? {
+    if !table::folders::exists_primary(org_id, to_folder, FolderType::Dashboards).await? {
         return Err(DashboardError::MoveDestinationFolderNotFound);
     };
 
-    let futs = dashboard_ids
-        .iter()
+    let futs = distinct_ids(dashboard_ids)
+        .into_iter()
         .map(|d_id| move_dashboard(org_id, d_id, to_folder, user_id, check_openfga));
     let _ = join_all(futs)
         .await
@@ -815,6 +843,15 @@ pub async fn move_dashboards(
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(())
+}
+
+/// The ids in first-seen order, so a repeated id is moved once and can't race itself into a 409.
+fn distinct_ids(ids: &[String]) -> Vec<&str> {
+    let mut seen = std::collections::HashSet::new();
+    ids.iter()
+        .map(String::as_str)
+        .filter(|id| seen.insert(*id))
+        .collect()
 }
 
 #[tracing::instrument(skip(dashboard))]
@@ -825,19 +862,11 @@ async fn put(
     new_folder_id: Option<&str>,
     mut dashboard: Dashboard,
     hash: Option<&str>,
+    create: bool,
 ) -> Result<Dashboard, DashboardError> {
-    let old_version = table::dashboards::get_from_folder(org_id, folder_id, dashboard_id).await?;
-    if let Some(existing_dash) = &old_version {
-        check_update_hash(existing_dash, hash)?;
-    };
-
-    match update_distinct_variables(org_id, old_version, &dashboard).await {
-        Ok(_) => {}
-        Err(e) => {
-            log::error!("error in updating distinct values while updating dashboard : {e}");
-            return Err(DashboardError::DistinctValueError);
-        }
-    }
+    let old_version =
+        table::dashboards::get_from_folder_primary(org_id, folder_id, dashboard_id).await?;
+    let mode = put_mode(old_version.as_ref(), hash, create)?;
 
     let title = checked_title(&dashboard)?;
     dashboard.set_title(title);
@@ -848,7 +877,15 @@ async fn put(
     dashboard.set_dashboard_id(dashboard_id.to_owned());
     // Public links detect edits by this stamp, so every writer gets it, not only the UI.
     dashboard.set_updated_at();
-    let dash = table::dashboards::put(org_id, folder_id, new_folder_id, dashboard, false).await?;
+    let dash = table::dashboards::put(org_id, folder_id, new_folder_id, dashboard, false, mode)
+        .await
+        .map_err(|e| put_error(e, new_folder_id.is_some()))?;
+    // After the write so a losing save can't touch them; logged only, as the save has landed.
+    if let Err(e) = update_distinct_variables(org_id, old_version, &dash).await {
+        log::error!(
+            "[Dashboard] error updating distinct values for {org_id}/{dashboard_id} after save: {e}"
+        );
+    }
     if let Some(id) = dash.dashboard_id() {
         if let Err(e) = infra::coordinator::dashboards::emit_put_event(org_id, id).await {
             log::error!("[Dashboard] error emitting coordinator put event for {id}: {e}");
@@ -859,6 +896,42 @@ async fn put(
             .insert(id.to_string(), org_id.to_string());
     }
     Ok(dash)
+}
+
+/// Updates the row `existing` was read from, guarded by its hash, or creates one when asked to.
+fn put_mode(
+    existing: Option<&Dashboard>,
+    hash: Option<&str>,
+    create: bool,
+) -> Result<PutMode, DashboardError> {
+    match existing {
+        Some(existing) => {
+            check_update_hash(existing, hash)?;
+            Ok(PutMode::Update {
+                expected_updated_at: existing.updated_at,
+            })
+        }
+        None if create => Ok(PutMode::Create),
+        None => Err(DashboardError::DashboardNotFound),
+    }
+}
+
+/// Answers a lost conditional write as the stale-hash and missing-dashboard paths do.
+fn put_error(e: InfraError, moving: bool) -> DashboardError {
+    match e {
+        InfraError::DbError(DbError::PutDashboard(PutDashboardError::FolderDoesNotExist))
+            if moving =>
+        {
+            DashboardError::MoveDestinationFolderNotFound
+        }
+        InfraError::DbError(DbError::PutDashboard(PutDashboardError::NotFound)) => {
+            DashboardError::DashboardNotFound
+        }
+        InfraError::DbError(DbError::PutDashboard(PutDashboardError::Conflict)) => {
+            DashboardError::UpdateConflictingHash
+        }
+        e => e.into(),
+    }
 }
 
 /// Internal helper function find dashboard and its folder by id.
@@ -968,12 +1041,21 @@ pub async fn add_panel_to_dashboard(
     tab_id: Option<&str>,
     panel: v8::Panel,
 ) -> Result<(v8::Panel, String, String), DashboardError> {
-    let mut dashboard = table::dashboards::get_from_folder(org_id, folder_id, dashboard_id)
+    let mut dashboard = table::dashboards::get_from_folder_primary(org_id, folder_id, dashboard_id)
         .await?
         .ok_or(DashboardError::DashboardNotFound)?;
     let (panel, resolved_tab_id) = insert_panel(&mut dashboard, tab_id, panel)?;
 
-    let saved = put(org_id, dashboard_id, folder_id, None, dashboard, Some(hash)).await?;
+    let saved = put(
+        org_id,
+        dashboard_id,
+        folder_id,
+        None,
+        dashboard,
+        Some(hash),
+        false,
+    )
+    .await?;
     let new_hash = saved.hash.clone();
 
     #[cfg(feature = "enterprise")]
@@ -1072,12 +1154,21 @@ pub async fn update_panel_in_dashboard(
     tab_id: Option<&str>,
     panel: v8::Panel,
 ) -> Result<(v8::Panel, String, String), DashboardError> {
-    let mut dashboard = table::dashboards::get_from_folder(org_id, folder_id, dashboard_id)
+    let mut dashboard = table::dashboards::get_from_folder_primary(org_id, folder_id, dashboard_id)
         .await?
         .ok_or(DashboardError::DashboardNotFound)?;
     let (panel, resolved_tab_id) = replace_panel(&mut dashboard, panel_id, tab_id, panel)?;
 
-    let saved = put(org_id, dashboard_id, folder_id, None, dashboard, Some(hash)).await?;
+    let saved = put(
+        org_id,
+        dashboard_id,
+        folder_id,
+        None,
+        dashboard,
+        Some(hash),
+        false,
+    )
+    .await?;
     let new_hash = saved.hash.clone();
 
     #[cfg(feature = "enterprise")]
@@ -1375,7 +1466,7 @@ pub async fn delete_panel_from_dashboard(
     hash: &str,
     tab_id: Option<&str>,
 ) -> Result<(String, String), DashboardError> {
-    let mut dashboard = table::dashboards::get_from_folder(org_id, folder_id, dashboard_id)
+    let mut dashboard = table::dashboards::get_from_folder_primary(org_id, folder_id, dashboard_id)
         .await?
         .ok_or(DashboardError::DashboardNotFound)?;
     let v8_dash = dashboard
@@ -1411,7 +1502,16 @@ pub async fn delete_panel_from_dashboard(
         return Err(DashboardError::PanelNotFound(panel_id.to_string()));
     }
 
-    let saved = put(org_id, dashboard_id, folder_id, None, dashboard, Some(hash)).await?;
+    let saved = put(
+        org_id,
+        dashboard_id,
+        folder_id,
+        None,
+        dashboard,
+        Some(hash),
+        false,
+    )
+    .await?;
     let new_hash = saved.hash.clone();
 
     #[cfg(feature = "enterprise")]
@@ -2147,5 +2247,57 @@ mod tests {
             .as_ref()
             .unwrap();
         assert_eq!(sources[0].panels, None);
+    }
+
+    #[test]
+    fn put_mode_updates_a_read_row_guarded_by_its_stamp_and_creates_only_when_asked() {
+        let mut existing: Dashboard = v8::Dashboard::default().into();
+        existing.updated_at = 42;
+        let hash = existing.hash.clone();
+        assert_eq!(
+            put_mode(Some(&existing), Some(&hash), false).unwrap(),
+            PutMode::Update {
+                expected_updated_at: 42
+            }
+        );
+        assert!(matches!(
+            put_mode(Some(&existing), Some("1"), false),
+            Err(DashboardError::UpdateConflictingHash)
+        ));
+        assert_eq!(put_mode(None, None, true).unwrap(), PutMode::Create);
+        assert!(matches!(
+            put_mode(None, Some(&hash), false),
+            Err(DashboardError::DashboardNotFound)
+        ));
+    }
+
+    #[test]
+    fn a_lost_conditional_write_answers_409_and_a_vanished_row_404() {
+        assert!(matches!(
+            put_error(PutDashboardError::Conflict.into(), false),
+            DashboardError::UpdateConflictingHash
+        ));
+        assert!(matches!(
+            put_error(PutDashboardError::NotFound.into(), false),
+            DashboardError::DashboardNotFound
+        ));
+        assert!(matches!(
+            put_error(PutDashboardError::FolderDoesNotExist.into(), false),
+            DashboardError::InfraError(_)
+        ));
+    }
+
+    #[test]
+    fn a_move_whose_destination_folder_vanished_answers_404() {
+        assert!(matches!(
+            put_error(PutDashboardError::FolderDoesNotExist.into(), true),
+            DashboardError::MoveDestinationFolderNotFound
+        ));
+    }
+
+    #[test]
+    fn a_repeated_id_in_a_bulk_move_is_moved_once() {
+        let ids = ["d1", "d2", "d1"].map(String::from);
+        assert_eq!(distinct_ids(&ids), ["d1", "d2"]);
     }
 }

@@ -22,7 +22,7 @@ use config::{
     datafusion::request::Request,
     get_config,
     meta::{
-        search::SearchEventType,
+        search::{RawStreams, SearchEventType},
         self_reporting::protected_streams::{ProtectedReader, current_reader, refused_stream},
         sql::{OrderBy, TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
@@ -91,6 +91,8 @@ pub struct Sql {
     pub histogram_offset: Option<i64>,
     pub sorted_by_time: bool, // if a plain scan only orders by _timestamp
     pub sampling_config: Option<proto::cluster_rpc::SamplingConfig>,
+    /// Protected streams this query reads unredacted, so their index fields stay usable.
+    pub raw_streams: RawStreams,
 }
 
 impl Sql {
@@ -99,7 +101,7 @@ impl Sql {
             .search_event_type
             .as_ref()
             .and_then(|s| s.parse::<SearchEventType>().ok());
-        Self::resolve(
+        let mut sql = Self::resolve(
             query,
             &req.org_id,
             req.stream_type,
@@ -107,7 +109,9 @@ impl Sql {
             false,
             req.protected_reader,
         )
-        .await
+        .await?;
+        sql.raw_streams = req.raw_streams.clone();
+        Ok(sql)
     }
 
     pub async fn new(
@@ -358,6 +362,7 @@ impl Sql {
                 (query.start_time, query.end_time),
                 extract_patterns,
             ),
+            raw_streams: RawStreams::default(),
         })
     }
 

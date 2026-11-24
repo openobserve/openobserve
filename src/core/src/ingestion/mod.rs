@@ -429,6 +429,25 @@ pub fn inferred_column_type(key: &str, value: &Value) -> Option<DataType> {
     }
 }
 
+/// The `ZO_COLS_PER_RECORD_LIMIT` rule on one record; the caller reads `limit` once per batch.
+pub fn check_record_columns_limit(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    record: &Map<String, Value>,
+    limit: usize,
+) -> std::result::Result<(), anyhow::Error> {
+    // a column count never exceeds the entry count, so the cheap bound settles most records
+    if record.len() <= limit {
+        return Ok(());
+    }
+    let columns = record
+        .iter()
+        .filter(|(key, value)| inferred_column_type(key, value).is_some())
+        .count();
+    check_request_columns_limit(org_id, stream_type, stream_name, columns)
+}
+
 /// Whether a value of `inferred` type lands in an `existing` column without a cast or evolution.
 pub fn column_accepts(existing: &DataType, inferred: &DataType) -> bool {
     existing == inferred

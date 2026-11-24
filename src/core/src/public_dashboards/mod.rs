@@ -252,12 +252,17 @@ impl PanelSearch for SearchEngine {
         range_error: String,
         info: Option<DashboardInfo>,
     ) -> Result<search::Response, String> {
+        // Anonymous viewers run as the publisher, so they never get the publisher's raw reads.
+        let req = search::Request {
+            raw_streams: Some(search::RawStreams::default()),
+            ..req.clone()
+        };
         search_service::cache::search(
             trace_id,
             org,
             stream_type,
             Some(user.to_string()),
-            req,
+            &req,
             range_error,
             false,
             info,
@@ -2392,6 +2397,7 @@ async fn publish_estimate(
                 sampling_ratio: None,
                 search_type: Some(search::SearchEventType::PublicDashboard),
                 timezone: None,
+                raw_streams: Some(search::RawStreams::default()),
             };
             if let Ok(resp) = search_service::search_partition(
                 &ctx.family.child(),

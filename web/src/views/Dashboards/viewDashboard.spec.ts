@@ -128,7 +128,7 @@ const routeUpdateGuards: Array<(to: RouteLike, from: RouteLike) => unknown> = []
 // button prefers real history over rebuilding the folder-scoped list route.
 const mockHistoryState: { back: string | null } = { back: null };
 // Mutable so a test can open the dashboard from a folder other than the default.
-const mockRouteFolder = { value: "default" };
+const mockRouteFolder: { value: string | undefined } = { value: "default" };
 // Extra query params a test wants on the route it mounts with (cleared before every test).
 const mockExtraRouteQuery: Record<string, string> = {};
 
@@ -744,6 +744,25 @@ describe("ViewDashboard", () => {
   });
 
   describe("Navigation Functionality", () => {
+    it("sends a link without a folder to the default folder's dashboard list", async () => {
+      mockRouteFolder.value = undefined;
+      try {
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(getDashboard).not.toHaveBeenCalled();
+        expect(global.mockShowErrorNotification).toHaveBeenCalledWith(
+          "dashboard.viewDashboard.failedToLoadDashboard",
+        );
+        expect(global.mockRouterReplace).toHaveBeenCalledWith({
+          path: "/dashboards",
+          query: { folder: "default", org_identifier: "test-org" },
+        });
+      } finally {
+        mockRouteFolder.value = "default";
+      }
+    });
+
     it("should navigate back to dashboard list when goBackToDashboardList is called", async () => {
       wrapper = createWrapper();
       await flushPromises();

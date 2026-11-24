@@ -111,6 +111,8 @@ import dashboardService from "../services/dashboards";
 import commonService from "../services/common";
 import { readPanelDraft, writePanelDraft } from "@/composables/dashboard/usePanelDraft";
 import { readEditorDraft, writeEditorDraft } from "@/utils/drafts/editorDraftStore";
+import { queryClient } from "@/composables/query/queryClient";
+import { reportKeys } from "@/services/reports.querykeys";
 
 const draftInput = {
   tabId: "tab-1",
@@ -610,6 +612,16 @@ describe("Commons Utility Functions", () => {
       evictDashboardsFromCache(mockStore, new Map([["folder-a", ["nope"]]]));
 
       expect(mockStore.dispatch).not.toHaveBeenCalled();
+    });
+
+    it("drops the cached report lists, since a deleted dashboard deletes or changes the reports that include it", () => {
+      mockStore.state.organizationData.allDashboardList = {};
+      const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+
+      evictDashboardsFromCache(mockStore, new Map([["folder-a", ["d1"]]]));
+
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: reportKeys.all("test-org") });
+      invalidate.mockRestore();
     });
 
     it("should skip folders that were never fetched", () => {
@@ -1706,6 +1718,18 @@ describe("Commons Utility Functions", () => {
         [folderId]: [{ dashboardId: "dashboard-2", title: "Dashboard 2" }],
       });
       expect(mockStore.dispatch).toHaveBeenCalledWith("setDashboardData", {});
+    });
+
+    it("drops the cached report lists, since a deleted dashboard deletes or changes the reports that include it", async () => {
+      mockStore.state.organizationData.allDashboardList = {};
+      mockStore.state.organizationData.allDashboardData = {};
+      vi.mocked(dashboardService.delete).mockResolvedValue({} as AxiosResponse);
+      const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+
+      await deleteDashboardById(mockStore, "dashboard-1", "test-folder");
+
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: reportKeys.all("test-org") });
+      invalidate.mockRestore();
     });
 
     it("removes every browser draft of the deleted dashboard only", async () => {
