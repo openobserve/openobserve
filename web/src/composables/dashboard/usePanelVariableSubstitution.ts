@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { addLabelToPromQlQuery, escapeRegExp, promqlEscape } from "@/utils/query/promQLUtils";
+import {
+  addLabelToPromQlQuery,
+  escapeRegExp,
+  promqlEscape,
+  promqlStringContextAt,
+  type PromqlStringContext,
+} from "@/utils/query/promQLUtils";
 import { addLabelsToSQlQuery, getStreamFromQuery } from "@/utils/query/sqlUtils";
 import {
   formatDateVariable,
@@ -28,34 +34,10 @@ import {
 import { escapeSingleQuotes } from "@/utils/zincutils";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { MIN_PERCENTILE_SAMPLES } from "@/utils/metrics/metricDefaults";
-
-interface PromqlStringContext {
-  quote: string | null;
-  inRegexMatcher: boolean;
-}
-
-/** The PromQL string a placeholder sits in, and whether that string is a =~ or !~ matcher's pattern. */
-const promqlStringContextAt = (text: string, offset: number): PromqlStringContext => {
-  let quote: string | null = null;
-  let opening = -1;
-  for (let i = 0; i < offset; i++) {
-    const char = text[i];
-    if (quote === null) {
-      if (char === '"' || char === "'" || char === "`") {
-        [quote, opening] = [char, i];
-      } else if (char === "#") {
-        const lineEnd = text.indexOf("\n", i);
-        i = lineEnd === -1 ? offset : lineEnd;
-      }
-    } else if (char === "\\" && quote !== "`") {
-      i++;
-    } else if (char === quote) {
-      quote = null;
-    }
-  }
-  if (quote === null) return { quote, inRegexMatcher: false };
-  return { quote, inRegexMatcher: /[=!]~\s*$/.test(text.slice(0, opening)) };
-};
+import {
+  isQueryVariableAllPending,
+  resolveQueryVariableValue,
+} from "@/utils/dashboard/variables/queryVariableUtils";
 
 /** A null context formats the raw values, as the variable metadata reports them. */
 const formatPanelVariableValue = (
@@ -79,15 +61,16 @@ const formatPanelVariableValue = (
     return quote === '"' || quote === "'" ? promqlEscape(literal, quote) : literal;
   };
   const escape = (value: unknown) => (isPromql ? promqlValue(value) : sqlEscape(value));
+  const resolved = resolveQueryVariableValue(variable);
 
-  if (!Array.isArray(variable.value)) {
+  if (!Array.isArray(resolved)) {
     // a date variable prints in its effective format; a null value is the All sentinel
     const dateText = formatDateVariable(variable, format);
-    return `${escape(dateText ?? (variable.value === null ? SELECT_ALL_VALUE : variable.value))}`;
+    return escape(dateText ?? (resolved === null ? SELECT_ALL_VALUE : resolved));
   }
 
   // If no data found (empty array), use SELECT_ALL_VALUE
-  const values = variable.value.length === 0 ? [SELECT_ALL_VALUE] : variable.value;
+  const values = resolved.length === 0 ? [SELECT_ALL_VALUE] : resolved;
   const singleQuoted = values.map((value: unknown) => `'${sqlEscape(value)}'`).join(",") || "''";
   switch (format) {
     case "csv":
@@ -197,7 +180,8 @@ export const usePanelVariableSubstitution = ({
       const hasNeverBeenLoaded = !it.isVariablePartialLoaded;
 
       // Block only if: (null/empty value) AND (never been loaded)
-      const shouldBlock = (hasNullValue || hasEmptyArray) && hasNeverBeenLoaded;
+      const shouldBlock =
+        ((hasNullValue || hasEmptyArray) && hasNeverBeenLoaded) || isQueryVariableAllPending(it);
 
       log(`[areDependentVariablesStillLoading] Variable ${it.name}:`, {
         value: it.value,
@@ -248,7 +232,10 @@ export const usePanelVariableSubstitution = ({
     newDependentVariablesData.every((it: any) => {
       const oldValue = currentDependentVariablesData.find((it2: any) => it2.name == it.name);
       return it.multiSelect
-        ? areArraysEqual(asQueriedMultiValue(it.value), asQueriedMultiValue(oldValue?.value))
+        ? areArraysEqual(
+            asQueriedMultiValue(resolveQueryVariableValue(it)),
+            asQueriedMultiValue(oldValue ? resolveQueryVariableValue(oldValue) : undefined),
+          )
         : it.value == oldValue?.value && oldValue?.value != "";
     });
 

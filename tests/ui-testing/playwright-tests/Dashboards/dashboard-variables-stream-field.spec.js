@@ -333,7 +333,7 @@ test.describe(
       expect(hasCycle).toBe(true);
 
       const errorText = await scopedVars.getCycleErrorText();
-      expect(errorText).toContain("cycle");
+      expect(errorText?.trim()).toBe("A and B depend on each other.");
 
       // --- D3: Fix cycle by changing stream back to real stream ---
       await scopedVars.updateStream("e2e_automate");

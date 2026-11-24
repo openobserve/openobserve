@@ -10357,10 +10357,12 @@
       "selectTabs": "f24b786691a008a3",
       "valuePlaceholder": "ab113fb04187aa62",
       "variableCreationFailed": "85f34a968bea800d",
+      "variableDependsOnItself": "e94922ccf6e0ee33",
       "variableNameExists": "20c9644bbabd59e7",
       "variableSuffix": "9bbd380e8e2c73c3",
       "variableUpdateFailed": "1a646faad0fbbe5b",
-      "variablesHasCycle": "f584b4da6b364159"
+      "variablesDependOnEachOther": "d5e1574aab58e983",
+      "variablesHasCycle": "60f262beca1031cc"
     },
     "addTab": {
       "failedToAddTab": "891025ab945135c7",
@@ -10725,7 +10727,7 @@
       "trySearchingDifferentKeywords": "5607e0594fd9ee4a"
     },
     "customColor": "a5f69a181be08410",
-    "customValue": "494ca78f7374e46f",
+    "customValue": "c9553cfff26be01c",
     "customunitLabel": "2c7c679ff7546e59",
     "dashboardErrors": {
       "errorsCount": "ee0cd965108dfb34"
@@ -11810,6 +11812,52 @@
       "changeQueryModeConfirm": "a09ff355ffc3152f"
     },
     "queryValues": "20b17d788ab154fa",
+    "queryVariable": {
+      "aboutFunctions": "7c2ebf5acd8b1c5d",
+      "cappedAllHint": "fb58485ee2bdbc35",
+      "cappedHint": "df1de724a2429e4a",
+      "cappedPreview": "5941d156520408f5",
+      "fnLabelNames": "8e0dd00229dc82d1",
+      "fnLabelValues": "2b28dc9aaeb8306f",
+      "fnLabelValuesForSelector": "675200b25c3efa73",
+      "fnMetrics": "70b24d3c5113c057",
+      "fnQueryResult": "48996a749d29d223",
+      "functionsTitle": "636330e5d56c58c3",
+      "insertExample": "8aa318eb7eaa233a",
+      "invalidRegex": "50fd4ea4f42f90e7",
+      "label": "0e66373f45dcf3dd",
+      "labelField": "5d5623d88b1e1523",
+      "labelFieldHelp": "48ebbe975029ac60",
+      "labelSelectTooltip": "3e3832c697a09bb4",
+      "loadFailedReason": "7ef9ce39cbefb2dc",
+      "metric": "2d275a74912cca2e",
+      "metricSelectTooltip": "8fb060c14e423bfa",
+      "noValues": "09f5817431f73fdf",
+      "noValuesDescription": "265a334963612b53",
+      "previewContext": "101e6543d49270d7",
+      "previewFailed": "4bb114f80d1d1575",
+      "previewIdle": "a8abeefa5bd4c870",
+      "promqlFiltersAndOnly": "1de0aa8fb79a7557",
+      "promqlHelp": "64bcb6156f6fb3f5",
+      "promqlOperatorUnsupported": "9a1e5bcb154abd35",
+      "query": "b80a37564fbb3c07",
+      "queryLanguage": "f3494ed45ccb78d6",
+      "queryRequired": "00c5a5d547e67f20",
+      "runPreview": "10f7ab9af7acce02",
+      "runPreviewFirst": "6ecc87f02b15cd80",
+      "sqlHelp": "de7955058ff3193f",
+      "typeConstantDescription": "0d6a07235e34368b",
+      "typeCustomDescription": "a029f5dd1877b8e3",
+      "typeQueryValuesDescription": "da13a4085a7dd587",
+      "typeTextboxDescription": "675af8a901cb8ef6",
+      "undefinedVariables": "54d45a2bf543db48",
+      "unknownError": "27c2ccd962c2b8dc",
+      "unsupportedPromql": "20d59ffde150a459",
+      "valueField": "ae1e0b500c1db3eb",
+      "valueFieldHelp": "833d4db5e29ccd53",
+      "valuesCount": "ec8e5302398da5be",
+      "variableReferenceHelp": "9c4477809f95731d"
+    },
     "rawQueryBuilder": {
       "instruction": "11023f44c958dceb",
       "query": "b80a37564fbb3c07"
@@ -12533,6 +12581,7 @@
     "variableSettings": "02db55bac5e3f7ce",
     "variableSettingsPage": {
       "dashboardUpdatedSuccessfully": "042a0687fa1547fb",
+      "deleteUsedByWarning": "6103e7457124d7fa",
       "deletedPanel": "3f856e7a890f1203",
       "deletedTab": "3c6b250c6585192e",
       "dependsOn": "65c721346658538c",
