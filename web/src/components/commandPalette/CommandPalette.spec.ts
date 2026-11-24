@@ -258,6 +258,20 @@ describe("Command K palette", () => {
     await flushPromises();
     expect(document.querySelectorAll('[data-test^="command-entry-function:"]')).toHaveLength(6);
   });
+  it("lists every match of a selected type without a show more step", async () => {
+    await setup();
+    await search("payment");
+    vi.advanceTimersByTime(1);
+    document.querySelector<HTMLElement>('[data-test="command-type-function"]')!.click();
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(200);
+    await flushPromises();
+    expect(document.querySelectorAll('[data-test^="command-entry-function:"]')).toHaveLength(6);
+    const more = Array.from(document.querySelectorAll("button")).some((b) =>
+      b.textContent?.includes("Show more"),
+    );
+    expect(more).toBe(false);
+  });
   it("treats a denied source as settled, not as partial results to retry", async () => {
     vi.mocked(resources.search).mockResolvedValue({
       hits: [],

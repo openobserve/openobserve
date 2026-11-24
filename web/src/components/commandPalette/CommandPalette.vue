@@ -42,6 +42,8 @@ const peerKinds = computed(() =>
 const query = ref("");
 const type = ref<ResourceKind | "all">("all");
 const expanded = ref<ResourceKind[]>([]);
+// A single selected type is the whole list, so only the mixed view collapses its groups.
+const showsAll = (kind: ResourceKind) => type.value !== "all" || expanded.value.includes(kind);
 const activeKey = ref<string | null>(null);
 const offline = ref(!navigator.onLine);
 const openVersion = ref(0);
@@ -154,21 +156,19 @@ const groups = computed(() =>
   RESOURCE_KINDS.map((kind) => {
     const all = search.data.value?.hits.filter((hit) => hit.type === kind) ?? [];
     const source = search.data.value?.sources.find((s) => s.type === kind);
-    const entries: Entry[] = all
-      .slice(0, expanded.value.includes(kind) ? undefined : 3)
-      .flatMap((hit) => {
-        const route = resourceRoute(hit, org.value);
-        return route
-          ? [
-              {
-                id: `${kind}:${hit.id}`,
-                name: raw(hit.name),
-                route,
-                sub: hit.folder_name || hit.id,
-              },
-            ]
-          : [];
-      });
+    const entries: Entry[] = all.slice(0, showsAll(kind) ? undefined : 3).flatMap((hit) => {
+      const route = resourceRoute(hit, org.value);
+      return route
+        ? [
+            {
+              id: `${kind}:${hit.id}`,
+              name: raw(hit.name),
+              route,
+              sub: hit.folder_name || hit.id,
+            },
+          ]
+        : [];
+    });
     return { kind, entries, count: all.length, source };
   }).filter((g) => g.entries.length || (!!g.source && retryable(g.source))),
 );
@@ -413,7 +413,7 @@ onScopeDispose(() => {
             ></RouterLink
           >
           <OButton
-            v-if="group.count > 3 && !expanded.includes(group.kind)"
+            v-if="group.count > 3 && !showsAll(group.kind)"
             variant="ghost"
             size="xs"
             @click="expanded.push(group.kind)"
