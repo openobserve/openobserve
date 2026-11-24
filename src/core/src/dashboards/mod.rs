@@ -46,6 +46,7 @@ use stream::save_stream_settings;
 
 use super::{db::distinct_values, folders};
 use crate::common::meta::authz::Authz;
+pub mod prom_variables;
 pub mod reports;
 pub mod timed_annotations;
 

@@ -37,9 +37,9 @@ use {
     std::sync::Arc,
 };
 
-use crate::authz::QuerySource;
 #[cfg(feature = "enterprise")]
 use crate::authz::{StreamAccessChecker, WriteCheck};
+use crate::{authz::QuerySource, dashboards::prom_variables::PromVariableQuery};
 
 /// The stream check a save runs through its write hook, after every check of the save's own.
 #[cfg(feature = "enterprise")]
@@ -1219,71 +1219,21 @@ fn variable_query_sources(
             error: error.to_string(),
         }]
     };
-    match promql_variable_expr(query) {
-        Ok(Some(expr)) => panel_query_sources(
+    match PromVariableQuery::parse(query) {
+        PromVariableQuery::Reads(expr) => panel_query_sources(
             org_id,
             expr,
             QueryLanguage::PromQl,
             StreamType::Metrics,
             values,
         ),
-        Ok(None) => unparseable("the lookup spans every metric, so no stream can be checked"),
-        Err(error) => unparseable(error),
-    }
-}
-
-/// `parsePromVariableQuery`: the expression a variable function evaluates, `None` for an
-/// unscoped `label_values(label)`, `label_names()` or `metrics()`.
-fn promql_variable_expr(query: &str) -> Result<Option<&str>, &'static str> {
-    static FUNCTION: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-        regex::Regex::new(r"(?s)^([a-z_]+)\s*\((.*)\)$").expect("variable function regex")
-    });
-    let unsupported = "not a supported PromQL variable function";
-    let caps = FUNCTION.captures(query.trim()).ok_or(unsupported)?;
-    let args = caps.get(2).map_or("", |m| m.as_str()).trim();
-    let commas = top_level_commas(args);
-    match &caps[1] {
-        "label_values" if commas.len() > 1 => Err(unsupported),
-        "label_values" => match commas.first() {
-            Some(&comma) if args[..comma].trim().is_empty() => Err(unsupported),
-            Some(&comma) => Ok(Some(args[..comma].trim())),
-            None => Ok(None),
-        },
-        "label_names" if !commas.is_empty() => Err(unsupported),
-        "label_names" => Ok(Some(args).filter(|a| !a.is_empty())),
-        "metrics" => Ok(None),
-        "query_result" if args.is_empty() => Err(unsupported),
-        "query_result" => Ok(Some(args)),
-        _ => Err(unsupported),
-    }
-}
-
-/// Byte offsets of the commas outside brackets and quotes.
-fn top_level_commas(text: &str) -> Vec<usize> {
-    let mut commas = Vec::new();
-    let mut depth = 0i32;
-    let mut quote: Option<char> = None;
-    let mut escaped = false;
-    for (i, c) in text.char_indices() {
-        if let Some(q) = quote {
-            if escaped {
-                escaped = false;
-            } else if c == '\\' {
-                escaped = true;
-            } else if c == q {
-                quote = None;
-            }
-            continue;
+        PromVariableQuery::EveryMetric => {
+            unparseable("the lookup spans every metric, so no stream can be checked")
         }
-        match c {
-            '"' | '\'' | '`' => quote = Some(c),
-            '(' | '[' | '{' => depth += 1,
-            ')' | ']' | '}' => depth -= 1,
-            ',' if depth == 0 => commas.push(i),
-            _ => {}
+        PromVariableQuery::NotAVariableFunction | PromVariableQuery::Unsupported => {
+            unparseable("not a supported PromQL variable function")
         }
     }
-    commas
 }
 
 #[cfg(feature = "enterprise")]
@@ -1670,6 +1620,7 @@ mod tests {
             "label_names()",
             "metrics(.*)",
             "label_values(up, a, b)",
+            r#"label_values(up, "job")"#,
             "rate(up[5m])",
         ] {
             let dashboard = json!({"variables": {"list": [
@@ -1696,28 +1647,6 @@ mod tests {
         let after = variable_sources("o1", &with("SELECT a FROM secret"), &HashMap::new());
         assert_ne!(before, after);
         assert_eq!(resolved_names(&after), vec!["o1/logs/secret"]);
-    }
-
-    #[test]
-    fn promql_variable_functions_name_the_expression_they_evaluate() {
-        let cases = [
-            (
-                "label_values(up{a=\"x,y\"}, job)",
-                Ok(Some("up{a=\"x,y\"}")),
-            ),
-            (" label_values( up , job ) ", Ok(Some("up"))),
-            ("label_values(job)", Ok(None)),
-            ("label_values(, job)", Err(())),
-            ("label_names()", Ok(None)),
-            ("label_names(up{a=\"b\"})", Ok(Some("up{a=\"b\"}"))),
-            ("metrics(^http_.*)", Ok(None)),
-            ("query_result(topk(3, up))", Ok(Some("topk(3, up)"))),
-            ("query_result()", Err(())),
-            ("up", Err(())),
-        ];
-        for (query, want) in cases {
-            assert_eq!(promql_variable_expr(query).map_err(|_| ()), want, "{query}");
-        }
     }
 
     #[test]

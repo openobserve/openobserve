@@ -43,7 +43,8 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use utoipa::ToSchema;
 
 use crate::{
-    alerts::alert::is_alert_permitted, dashboards::is_dashboard_permitted,
+    alerts::alert::is_alert_permitted,
+    dashboards::{is_dashboard_permitted, prom_variables::PromVariableQuery},
     pipeline::is_user_pipeline_visible,
 };
 
@@ -852,55 +853,20 @@ fn variable_query(fields: &Value) -> Option<Query<'_>> {
     if text.is_empty() {
         Some(stream_query(fields))
     } else if fields["query_type"].as_str() == Some("promql") {
-        promql_variable_expr(text).map(Query::PromQl)
+        match PromVariableQuery::parse(text) {
+            PromVariableQuery::Reads(expr) => Some(Query::PromQl(expr)),
+            PromVariableQuery::EveryMetric => None,
+            // Unrunnable text is still scanned, so a broken variable never hides a use.
+            PromVariableQuery::NotAVariableFunction | PromVariableQuery::Unsupported => {
+                Some(Query::PromQl(text))
+            }
+        }
     } else {
         Some(Query::Sql {
             sql: text,
             default_type: fields["stream_type"].as_str().unwrap_or_default(),
         })
     }
-}
-
-/// The PromQL a Grafana-style variable query evaluates, or `None` when it reads no one metric,
-/// as `metrics(regex)` and `label_values(label)` do. Other text is scanned as written.
-fn promql_variable_expr(query: &str) -> Option<&str> {
-    let Some((name, args)) = query
-        .split_once('(')
-        .and_then(|(name, rest)| Some((name.trim(), rest.trim_end().strip_suffix(')')?.trim())))
-    else {
-        return Some(query);
-    };
-    match name {
-        "label_values" => last_top_level_comma(args).map(|at| args[..at].trim()),
-        "label_names" | "query_result" => Some(args).filter(|args| !args.is_empty()),
-        "metrics" => None,
-        _ => Some(query),
-    }
-}
-
-/// Byte offset of the last comma outside brackets and quotes.
-fn last_top_level_comma(text: &str) -> Option<usize> {
-    let (mut depth, mut quote, mut escaped, mut last) = (0i32, None, false, None);
-    for (at, ch) in text.char_indices() {
-        if let Some(open) = quote {
-            if escaped {
-                escaped = false;
-            } else if ch == '\\' {
-                escaped = true;
-            } else if ch == open {
-                quote = None;
-            }
-            continue;
-        }
-        match ch {
-            '"' | '\'' | '`' => quote = Some(ch),
-            '(' | '[' | '{' => depth += 1,
-            ')' | ']' | '}' => depth -= 1,
-            ',' if depth == 0 => last = Some(at),
-            _ => {}
-        }
-    }
-    last
 }
 
 fn dashboard_query(query: &Value, promql: bool) -> Option<Query<'_>> {
@@ -1390,6 +1356,19 @@ mod tests {
         for (query_type, query) in not_used {
             let d = with_query_variable(METRIC, query_type, query);
             assert_eq!(hits_of(&d), (None, 0), "{query}");
+        }
+    }
+
+    #[test]
+    fn a_promql_variable_the_dashboard_cannot_run_is_scanned_as_written() {
+        let d = with_query_variable("up", "promql", "rate(http_requests_total[5m])");
+        assert_eq!(hits_of(&d), (Some(None), 0));
+        for query in [
+            "label_values(http_requests_total, a, b)",
+            r#"label_values(http_requests_total, "path")"#,
+        ] {
+            let d = with_query_variable("up", "promql", query);
+            assert_eq!(hits_of(&d).0, Some(Some(MatchKind::Text)), "{query}");
         }
     }
 

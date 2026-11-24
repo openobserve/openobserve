@@ -17,7 +17,7 @@
 
 use std::{
     cmp::Ordering,
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
 };
 
 use config::{
@@ -163,7 +163,7 @@ impl<'a> Defaults<'a> {
             .any(|&idx| self.instances[idx].key == key)
     }
 
-    /// Keys of the visible variables this instance's stream, field or filters name.
+    /// Keys of the visible variables this instance's query, or else stream, field or filters name.
     fn dependencies(&self, idx: usize) -> Vec<String> {
         let Some(qd) = self.instances[idx].var.query_data.as_ref() else {
             return vec![];
@@ -173,17 +173,22 @@ impl<'a> Defaults<'a> {
         let Some(re) = name_regex(&names) else {
             return vec![];
         };
-        let texts = [qd.stream.as_str(), qd.field.as_str()]
-            .into_iter()
-            .chain(qd.query.as_deref())
-            .chain(
-                qd.filter
-                    .iter()
-                    .flatten()
-                    .flat_map(|f| [f.name.as_deref().unwrap_or_default(), f.value.as_str()]),
-            )
-            .chain(qd.filter_group.iter().flat_map(group_texts));
+        // A custom query's stream, field and filters are leftover Auto settings it never reads.
+        let texts: Vec<&str> = match custom_query(qd) {
+            Some(query) => vec![query],
+            None => [qd.stream.as_str(), qd.field.as_str()]
+                .into_iter()
+                .chain(
+                    qd.filter
+                        .iter()
+                        .flatten()
+                        .flat_map(|f| [f.name.as_deref().unwrap_or_default(), f.value.as_str()]),
+                )
+                .chain(qd.filter_group.iter().flat_map(group_texts))
+                .collect(),
+        };
         let mut keys: Vec<String> = texts
+            .into_iter()
             .flat_map(|t| re.captures_iter(t).collect::<Vec<_>>())
             .filter_map(|c| {
                 let name = c.get(1).or_else(|| c.get(2)).or_else(|| c.get(3))?;
@@ -308,6 +313,17 @@ pub struct ValuesQuery {
 }
 
 impl ValuesQuery {
+    /// `getSqlResultColumns`: all rows' keys in first-seen order; a hit omits its null columns.
+    pub fn result_columns(hits: &[Value]) -> Vec<String> {
+        let mut seen = HashSet::new();
+        hits.iter()
+            .filter_map(Value::as_object)
+            .flat_map(|row| row.keys())
+            .filter(|key| seen.insert(key.as_str()))
+            .cloned()
+            .collect()
+    }
+
     /// `mapSqlRowsToOptions`: the saved value column, else the first not starting with `_`.
     pub fn value_column<'c>(&'c self, columns: &'c [String]) -> Option<&'c str> {
         if !self.custom {
@@ -1046,6 +1062,72 @@ mod tests {
             ..q(Some("svc"))
         };
         assert_eq!(auto.value_column(&columns), Some("zo_sql_key"));
+    }
+
+    #[test]
+    fn a_custom_query_reads_columns_from_every_row_not_just_the_first() {
+        let hits = [
+            json!({ "_timestamp": 1, "zone": "a" }),
+            json!("not a row"),
+            json!({ "svc": "api", "zone": "b" }),
+            json!({ "_timestamp": 2, "svc": "web", "tier": null }),
+        ];
+        let columns = ValuesQuery::result_columns(&hits);
+        assert_eq!(columns, ["_timestamp", "zone", "svc", "tier"]);
+        assert!(ValuesQuery::result_columns(&[]).is_empty());
+        let q = |value_field: Option<&str>| ValuesQuery {
+            stream_type: StreamType::Logs,
+            stream: String::new(),
+            sql: String::new(),
+            size: 10,
+            custom: true,
+            value_field: value_field.map(str::to_string),
+        };
+        assert_eq!(q(Some("svc")).value_column(&columns), Some("svc"));
+        let null_first = [
+            json!({ "_timestamp": 1 }),
+            json!({ "_timestamp": 2, "svc": "x" }),
+        ];
+        let columns = ValuesQuery::result_columns(&null_first);
+        assert_eq!(q(None).value_column(&columns), Some("svc"));
+    }
+
+    #[test]
+    fn a_custom_query_leaves_its_auto_settings_out_of_the_dependency_graph() {
+        let leftover_group = json!({ "filterType": "group", "logicalOperator": "AND",
+            "conditions": [ { "type": "condition", "filterType": "condition",
+                "column": { "field": "k" }, "operator": "=", "value": "${ns}", "values": [],
+                "logicalOperator": "AND" } ] });
+        let dash = dashboard(json!([
+            { "type": "query_values", "name": "svc", "query_data": {
+                "stream_type": "logs", "stream": "$ns", "field": "$ns",
+                "filter": [ { "name": "k", "operator": "=", "value": "$ns" } ],
+                "filter_group": leftover_group, "query": "SELECT svc FROM logs" } },
+            { "type": "query_values", "name": "ns", "query_data": { "stream": "s", "field": "ns",
+                "filter": [ { "name": "svc", "operator": "=", "value": "$svc" } ] } }
+        ]));
+        let mut d = Defaults::new(&dash, BTreeMap::new());
+        let svc = d.next_query().expect("the custom query names no variable");
+        assert_eq!(svc.key, "svc");
+        assert!(svc.depends_on.is_empty());
+        assert_eq!(svc.query.sql, "SELECT svc FROM logs");
+        d.settle(svc, Some(vec!["api".into()]));
+        let ns = d
+            .next_query()
+            .expect("then the variable that filters on it");
+        assert_eq!(ns.depends_on, vec!["svc".to_string()]);
+        assert!(
+            ns.query.sql.contains(r#"WHERE "svc" = 'api'"#),
+            "{}",
+            ns.query.sql
+        );
+        d.settle(ns, Some(vec!["prod".into()]));
+        assert!(d.next_query().is_none());
+        let values = d.into_values();
+        assert_eq!(
+            (&values["svc"], &values["ns"]),
+            (&json!("api"), &json!("prod"))
+        );
     }
 
     #[test]
