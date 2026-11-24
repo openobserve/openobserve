@@ -106,6 +106,7 @@ impl RemoteScanNodes {
             search_infos,
             index_info,
             super_cluster_info,
+            raw_streams: self.req.raw_streams.to_vec(),
         }
     }
 }
@@ -118,6 +119,7 @@ pub struct RemoteScanNode {
     pub search_infos: SearchInfos,
     pub index_info: IndexInfo,
     pub super_cluster_info: SuperClusterInfo,
+    pub raw_streams: Vec<String>,
 }
 
 impl RemoteScanNode {
@@ -127,6 +129,7 @@ impl RemoteScanNode {
             search_info: self.search_infos.get_search_info(partition), // add is_querier
             index_info: self.index_info.clone(),
             super_cluster_info: self.super_cluster_info.clone(),
+            raw_streams: self.raw_streams.clone(),
         }
     }
 
@@ -167,6 +170,7 @@ impl RemoteScanNode {
             search_infos,
             index_info: request.index_info.clone(),
             super_cluster_info: request.super_cluster_info.clone(),
+            raw_streams: request.raw_streams.clone(),
         }
     }
 }
@@ -341,5 +345,44 @@ mod tests {
         assert_eq!(info.timeout, 30);
         assert!(info.use_cache);
         assert_eq!(info.histogram_interval, 60);
+    }
+
+    #[test]
+    fn raw_streams_reach_every_follower_request() {
+        let mut req = Request::default();
+        req.raw_streams
+            .insert(config::meta::stream::StreamType::Logs, "app");
+        let nodes = RemoteScanNodes::new(
+            req,
+            vec![],
+            HashMap::new(),
+            HashMap::new(),
+            false,
+            opentelemetry::Context::new(),
+            None,
+        );
+        let node = nodes.get_remote_node(&TableReference::from("app"));
+        assert_eq!(node.get_flight_search_request(0).raw_streams, ["logs/app"]);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_follower_region_leader_passes_raw_streams_on_unchanged() {
+        let mut node = RemoteScanNode {
+            raw_streams: vec!["logs/app".to_string()],
+            ..Default::default()
+        };
+        node.search_infos.file_id_list = vec![vec![]];
+        let request = node.get_flight_search_request(0);
+        let region = RemoteScanNode::from_flight_search_request(
+            &request,
+            SearchInfos::default(),
+            vec![],
+            opentelemetry::Context::new(),
+        );
+        assert_eq!(
+            region.get_flight_search_request(0).raw_streams,
+            ["logs/app"]
+        );
     }
 }

@@ -254,7 +254,7 @@ import {
   type PropType,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import useTraces from "../../composables/useTraces";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -517,13 +517,17 @@ export default defineComponent({
     );
 
     // Another stream or mode is another count, so its previous value is never kept.
-    const countSettled = useSettledValue<{ total: number; errorCount: number }>(() => {
+    // A failed count with nothing kept has no total; the page size is not one.
+    const countSettled = useSettledValue<{ total: number | null; errorCount: number }>(() => {
       const results = searchObj.data.queryResults;
       const busy = regionBusy.value;
       return {
         value: busy
           ? null
-          : { total: resultTotal.value, errorCount: Number(results?.errorCount ?? 0) },
+          : {
+              total: results?.countFailed ? null : resultTotal.value,
+              errorCount: Number(results?.errorCount ?? 0),
+            },
         busy,
         key: `${searchObj.data.stream.selectedStream.value}|${searchObj.meta.searchMode}`,
       };
@@ -534,7 +538,10 @@ export default defineComponent({
       () => searchObj.meta.resultGrid.showPagination || countState.value.loading,
     );
     const pagerInert = computed(() => headerDimmed.value || countState.value.loading);
-    const shownTotal = computed(() => countState.value.value?.total ?? resultTotal.value);
+    const shownTotal = computed(() => {
+      const settled = countState.value.value;
+      return settled ? settled.total : resultTotal.value;
+    });
     const shownErrorCount = computed(() => countState.value.value?.errorCount ?? 0);
 
     const countText = (count: string, plural: number) =>
@@ -542,7 +549,9 @@ export default defineComponent({
         ? `${count} ${t("traces.spansFound")}`
         : t("traces.results.tracesWithMatchingSpan", { count }, plural);
     const countLabel = computed(() =>
-      countText(formatLargeNumber(shownTotal.value), shownTotal.value),
+      shownTotal.value === null
+        ? countText(raw("—"), 2)
+        : countText(formatLargeNumber(shownTotal.value), shownTotal.value),
     );
     // A blank count would be replaced by the plural number, so a space stands in and is trimmed.
     const countNoun = computed(() => countText(" ", 2).trim());

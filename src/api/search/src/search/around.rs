@@ -148,6 +148,7 @@ pub(crate) async fn around(
         clear_cache: false,
         local_mode: None,
         agent_options: None,
+        raw_streams: None,
     };
     let resp_forward =
         SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &fw_req)
@@ -179,6 +180,7 @@ pub(crate) async fn around(
         clear_cache: false,
         local_mode: None,
         agent_options: None,
+        raw_streams: None,
     };
     let resp_backward = SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span)

@@ -2,7 +2,7 @@
 # Reports the newest real result of CHECK_NAME on HEAD_SHA, so a label-only run neither re-tests nor hides a failure.
 set -euo pipefail
 
-: "${GH_TOKEN:?}" "${REPO:?}" "${HEAD_SHA:?}" "${CHECK_NAME:?}" "${MIRROR_STEP:?}"
+: "${GH_TOKEN:?}" "${REPO:?}" "${HEAD_SHA:?}" "${CHECK_NAME:?}" "${MIRROR_STEP:?}" "${CHECKOUT_STEP:?}"
 POLL_MINUTES=${POLL_MINUTES:-90}
 SKIPPED_IS_RESULT=${SKIPPED_IS_RESULT:-false}
 CHECKS="repos/$REPO/commits/$HEAD_SHA/check-runs?check_name=$(jq -rn --arg n "$CHECK_NAME" '$n | @uri')&filter=all&per_page=100"
@@ -44,8 +44,9 @@ while :; do
     if ! JOB=$(gh api "repos/$REPO/actions/jobs/$ID"); then
       api_error; continue
     fi
-    KIND=$(jq -r --arg s "$MIRROR_STEP" \
-      'if any(.steps[]?; .name == $s and (.status == "in_progress" or (.conclusion != null and .conclusion != "skipped"))) then "mirror"
+    # A mirror that failed at checkout never reached its mirror step, so either step having run marks it.
+    KIND=$(jq -r --arg s "$MIRROR_STEP" --arg c "$CHECKOUT_STEP" \
+      'if any(.steps[]?; (.name == $s or .name == $c) and (.status == "in_progress" or (.conclusion != null and .conclusion != "skipped"))) then "mirror"
        elif .conclusion == "cancelled" and ((.steps // []) | length) == 0 then "never-started"
        else "real" end' <<<"$JOB")
     if [ "$KIND" != "real" ]; then

@@ -48,12 +48,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @pagination-change="onPageChange"
         >
           <template #toolbar>
-            <div class="w-60 shrink-0 max-md:w-40">
+            <div class="w-96 shrink-0 max-md:w-40">
               <OSelect
                 v-model="orgFilter"
                 :options="orgOptions"
                 searchable
                 clearable
+                :dropdown-style="{ minWidth: 'min(24rem, calc(100vw - 1.5rem))' }"
                 :loading="orgsLoading"
                 :placeholder="t('settings.userManagementPage.allOrganizations')"
                 :aria-label="t('settings.userManagementPage.filterByOrganization')"
@@ -238,7 +239,9 @@ const loadError = computed(() => {
 const orgsLoading = orgs.isPending;
 const orgOptions = computed(() =>
   (orgs.data.value ?? []).map((org) => ({
-    label: raw(org.name),
+    // Most orgs share the name "default", so the label carries the id for the trigger and the search.
+    label: t("settings.userManagementPage.orgOption", { name: org.name, id: org.identifier }),
+    listLabel: raw(org.name),
     value: org.identifier,
     suffix: raw(org.identifier),
   })),

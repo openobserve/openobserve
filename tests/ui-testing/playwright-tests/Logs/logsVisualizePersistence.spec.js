@@ -360,7 +360,7 @@ test.describe("Logs Visualization State Persistence testcases", () => {
 
     // 4. Gate on the URL sync — updateUrlQueryParams() runs after the chart type
     //    watcher settles, so reloading earlier would not exercise URL restoration.
-    await pm.logsPage.waitForVisualizeUrlState();
+    await pm.logsPage.waitForVisualizeUrlState({ requireQuery: true });
 
     // Capture the panel payload the app wrote for this configured state.
     const configBeforeReload = await pm.logsPage.getVisualizationDataFromUrl();

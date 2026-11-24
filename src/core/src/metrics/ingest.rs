@@ -39,16 +39,16 @@ use config::{
 use datafusion::arrow::datatypes::{DataType, Schema};
 use infra::{errors::Result, schema::SchemaCache};
 use ingestion_common::IngestUser;
-use schema::{check_for_schema, check_request_columns_limit};
+use schema::check_for_schema;
 
 use super::columnar::ColumnarStream;
 use crate::{
     alerts::alert::AlertExt,
     common::meta::stream::SchemaRecords,
     ingestion::{
-        PartitionMemo, TriggerAlertData, evaluate_trigger, get_stream_partition_keys,
-        get_thread_id, inferred_column_type, newly_enabled_uds_fields, refactor_map,
-        repack_records, schema_records_to_entries, write_entries,
+        PartitionMemo, TriggerAlertData, check_record_columns_limit, evaluate_trigger,
+        get_stream_partition_keys, get_thread_id, inferred_column_type, newly_enabled_uds_fields,
+        refactor_map, repack_records, schema_records_to_entries, write_entries,
     },
     pipeline::batch_execution::ExecutablePipeline,
 };
@@ -621,15 +621,7 @@ fn check_columns_per_record(
 ) -> Result<()> {
     let limit = get_config().limit.req_cols_per_record_limit;
     for record in records {
-        // a column count never exceeds the entry count, so the cheap bound settles most records
-        if record.len() <= limit {
-            continue;
-        }
-        let columns = record
-            .iter()
-            .filter(|(key, value)| inferred_column_type(key, value).is_some())
-            .count();
-        check_request_columns_limit(org_id, StreamType::Metrics, stream_name, columns)?;
+        check_record_columns_limit(org_id, StreamType::Metrics, stream_name, record, limit)?;
     }
     Ok(())
 }

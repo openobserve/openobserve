@@ -16,7 +16,7 @@
 import http from "./http";
 import analytics from "./product_analytics";
 
-export type ToolsetKind = "mcp" | "cli" | "skill" | "generic";
+export type ToolsetKind = "mcp" | "skill" | "generic";
 
 export interface ToolsetCreateRequest {
   name: string;

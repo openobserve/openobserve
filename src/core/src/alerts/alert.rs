@@ -3246,8 +3246,11 @@ impl AlertExt for Alert {
                     );
                     ctx.chart_png = if needs_png {
                         if chart_png.is_none() {
-                            chart_png =
-                                Some(chart::try_render_png(payload).map(std::sync::Arc::new));
+                            chart_png = Some(
+                                chart::try_render_png(payload)
+                                    .await
+                                    .map(std::sync::Arc::new),
+                            );
                         }
                         chart_png.clone().flatten()
                     } else {

@@ -224,6 +224,7 @@ async fn get_wal_batches(
         },
         index_info: IndexInfo::default(), // not needed for wal
         super_cluster_info: cluster_rpc::SuperClusterInfo::default(), // current not needed for wal
+        raw_streams: Vec::new(),
     };
 
     physical_plan = Arc::new(RemoteScanExec::new(physical_plan, remote_scan_node)?);

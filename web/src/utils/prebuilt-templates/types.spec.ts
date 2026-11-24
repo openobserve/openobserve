@@ -234,12 +234,10 @@ describe("Prebuilt Templates Types", () => {
         timestamp: Date.now(),
         error: "Connection timeout",
         statusCode: 408,
-        responseBody: '{"error": "timeout"}',
       };
 
       expect(result.success).toBe(false);
       expect(result.error).toBeTruthy();
-      expect(result.responseBody).toBeTruthy();
     });
   });
 

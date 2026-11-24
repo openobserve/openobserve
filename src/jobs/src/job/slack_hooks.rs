@@ -255,10 +255,7 @@ fn webhook_destination(d: WebhookDestination) -> Destination {
 fn render_chart_png(chart: ChartSeries) -> BoxFut<Option<Vec<u8>>> {
     Box::pin(async move {
         let payload = chart_payload(&chart)?;
-        tokio::task::spawn_blocking(move || alert_chart::try_render_png(&payload))
-            .await
-            .ok()
-            .flatten()
+        alert_chart::try_render_png(&payload).await
     })
 }
 

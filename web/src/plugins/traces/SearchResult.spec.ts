@@ -234,6 +234,15 @@ describe("SearchResult", () => {
       await flushPromises();
       expect(countText()).toContain("Spans Found");
     });
+
+    it("shows no number, not the page size, when the count failed with none kept", async () => {
+      (mockSearchObj.meta as any).searchMode = "spans";
+      mockSearchObj.data.queryResults.total = null;
+      (mockSearchObj.data.queryResults as any).countFailed = true;
+      await flushPromises();
+      expect(countText()).toBe("— Spans Found");
+      delete (mockSearchObj.data.queryResults as any).countFailed;
+    });
   });
 
   it("should mount SearchResult component", () => {

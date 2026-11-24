@@ -403,6 +403,7 @@ async fn search_index_window(
         clear_cache: false,
         local_mode: None,
         agent_options: None,
+        raw_streams: None,
     };
     let internal_trace_id = config::ider::generate_trace_id();
     let search = SearchService::cache::search(

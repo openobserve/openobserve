@@ -63,6 +63,7 @@ pub(crate) async fn run_graph_search(
         clear_cache: false,
         local_mode: Some(false),
         agent_options: None,
+        raw_streams: None,
     };
 
     let trace_id = config::ider::generate();
