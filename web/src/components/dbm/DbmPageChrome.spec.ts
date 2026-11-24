@@ -15,6 +15,7 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
+import { createStore } from "vuex";
 
 import type { DbmTabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -30,6 +31,9 @@ vi.mock("vue-router", () => ({
   useRouter: () => ({ push: vi.fn(() => Promise.resolve()) }),
 }));
 
+// The header date picker reads the user timezone from the store.
+const store = createStore({ state: { timezone: "UTC" } });
+
 const tabCounts: DbmTabCountProps = { queryCount: 12, databaseCount: 3 };
 
 const mountChrome = (props: Record<string, unknown> = {}, slots: Record<string, string> = {}) =>
@@ -44,7 +48,7 @@ const mountChrome = (props: Record<string, unknown> = {}, slots: Record<string, 
     },
     slots,
     global: {
-      plugins: [i18n],
+      plugins: [i18n, store],
       stubs: { RouterLink: true },
     },
   });
