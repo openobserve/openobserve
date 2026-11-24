@@ -17,7 +17,7 @@ import { useNavGateContext } from "@/lib/core/Navbar/useNavGateContext";
 import { buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { RESOURCE_KINDS, type ResourceKind } from "@/ts/interfaces/resources";
 import { palettePages } from "./palettePages";
-import { useResourceSearch } from "./useResourceSearch";
+import { useResourceSearch, retryable } from "./useResourceSearch";
 import { resourceRoute, creationRoute, recentVisitRoute } from "./resourceRoutes";
 import { useRecentlyViewed } from "./useRecentlyViewed";
 import { KIND_LABELS, KIND_ICONS, enabledResourceKinds } from "./presentation";
@@ -162,7 +162,7 @@ const groups = computed(() =>
           : [];
       });
     return { kind, entries, count: all.length, source };
-  }).filter((g) => g.entries.length || (g.source?.status !== "complete" && !!g.source)),
+  }).filter((g) => g.entries.length || (!!g.source && retryable(g.source))),
 );
 const entries = computed(() => [
   ...recentEntries.value,
@@ -175,7 +175,7 @@ const activeId = computed(() => {
   const entry = entries.value.find((entry) => entry.id === activeKey.value);
   return entry ? optionId(entry) : undefined;
 });
-const incomplete = computed(() => search.data.value?.sources.some((s) => s.status !== "complete"));
+const incomplete = computed(() => search.data.value?.sources.some(retryable));
 const localGroups = computed(() =>
   [
     { id: "recent", label: t("commandPalette.recent"), entries: recentEntries.value },
@@ -448,7 +448,9 @@ onScopeDispose(() => {
           <OText v-if="group.source?.status !== 'complete'" variant="meta" role="status">{{
             group.source?.reason === "loading"
               ? t("commandPalette.loading")
-              : t("commandPalette.sourceUnavailable")
+              : group.source?.status === "partial"
+                ? t("commandPalette.partial")
+                : t("commandPalette.sourceUnavailable")
           }}</OText>
         </section>
         <OEmptyState

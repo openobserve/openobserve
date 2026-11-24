@@ -252,6 +252,22 @@ describe("Command K palette", () => {
     await flushPromises();
     expect(document.querySelectorAll('[data-test^="command-entry-function:"]')).toHaveLength(6);
   });
+  it("treats a denied source as settled, not as partial results to retry", async () => {
+    vi.mocked(resources.search).mockResolvedValue({
+      hits: [],
+      sources: [
+        { type: "function", status: "complete", has_more: false },
+        { type: "user", status: "unavailable", has_more: null, reason: "permission_denied" },
+      ],
+      took_ms: 0,
+    });
+    await setup();
+    await search("nothing");
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("No matches");
+    expect(text).not.toContain("Some results are unavailable");
+    expect(text).not.toContain("This resource type is currently unavailable");
+  });
   it("keeps focus and state when a destination guard cancels navigation", async () => {
     const { wrapper, router } = await setup();
     router.beforeEach(() => false);

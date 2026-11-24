@@ -125,6 +125,37 @@ describe("Command K search lifecycle", () => {
     expect(vi.mocked(resources.search).mock.calls[2][1].types).toEqual(["dashboard"]);
     expect(s.search.data.value?.hits[0]?.id).toBe("f");
   });
+  it("drops earlier retry results when the whole search is fetched again", async () => {
+    vi.useFakeTimers();
+    vi.mocked(resources.search)
+      .mockResolvedValueOnce(partial)
+      .mockResolvedValueOnce({
+        hits: [],
+        sources: [{ type: "dashboard", status: "complete", has_more: false }],
+        took_ms: 0,
+      })
+      .mockResolvedValue({
+        hits: [
+          {
+            type: "dashboard",
+            id: "d",
+            name: "pay",
+            route_ref: { dashboard_id: "d", folder_id: "default" },
+          },
+        ],
+        sources: [
+          { type: "function", status: "complete", has_more: false },
+          { type: "dashboard", status: "complete", has_more: false },
+        ],
+        took_ms: 0,
+      });
+    const s = setup();
+    await typeQuery(s, "pay");
+    await s.search.retryFailed();
+    await s.search.refetch();
+    await flushPromises();
+    expect(s.search.data.value?.hits.map((hit) => hit.id)).toEqual(["d"]);
+  });
   it("cancels a request on identity switch and never shows the old account result", async () => {
     vi.useFakeTimers();
     let resolve!: (r: ResourceSearchResponse) => void;

@@ -149,8 +149,12 @@ watch(
       /></template>
       <template #pagination-bar
         ><div class="flex flex-wrap items-center justify-between gap-2">
-          <OText v-if="source?.status !== 'complete'" role="status" variant="meta">{{
-            source?.reason === "loading" ? t("commandPalette.loading") : t("commandPalette.partial")
+          <OText v-if="source && source.status !== 'complete'" role="status" variant="meta">{{
+            source.reason === "loading"
+              ? t("commandPalette.loading")
+              : source.status === "partial"
+                ? t("commandPalette.partial")
+                : t("commandPalette.sourceUnavailable")
           }}</OText>
           <div class="ms-auto flex items-center gap-2">
             <OButton

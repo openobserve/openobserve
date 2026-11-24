@@ -5,9 +5,18 @@ import type {
   ResourceKind,
   ResourceSearchParams,
   ResourceSearchResponse,
+  ResourceSource,
 } from "@/ts/interfaces/resources";
 
 let scopeSequence = 0;
+// A denied or disabled source stays that way, so it is neither retried nor reported as incomplete.
+export function retryable(source: ResourceSource) {
+  return (
+    source.status !== "complete" &&
+    source.reason !== "disabled" &&
+    source.reason !== "permission_denied"
+  );
+}
 export function useResourceSearch(input: {
   open: Ref<boolean>;
   org: Ref<string>;
@@ -80,13 +89,7 @@ export function useResourceSearch(input: {
     }, query.data.value);
   });
   const retryFailed = async (poll = false) => {
-    const failed =
-      data.value?.sources
-        .filter(
-          (s) =>
-            s.status !== "complete" && s.reason !== "disabled" && s.reason !== "permission_denied",
-        )
-        .map((s) => s.type) ?? [];
+    const failed = data.value?.sources.filter(retryable).map((s) => s.type) ?? [];
     if (!failed.length || retrying.value) return;
     const token = sequence;
     retrying.value = poll ? "poll" : "manual";
@@ -132,6 +135,7 @@ export function useResourceSearch(input: {
     retryFailed,
     refetch: () => {
       retryError.value = null;
+      patches.value = [];
       return query.refetch();
     },
   };
