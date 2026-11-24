@@ -82,6 +82,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dbm-databases-coverage"
           />
         </template>
+        <!-- Nothing failed means nothing to narrow to; it stays while active so it can be cleared. -->
+        <OCheckbox
+          v-if="errorCount > 0 || statFilter === 'failed'"
+          :model-value="statFilter === 'failed'"
+          size="sm"
+          :label="t('dbm.filters.failedOnly')"
+          data-test="dbm-databases-failed-only"
+          @update:model-value="(on) => (statFilter = on === true ? 'failed' : null)"
+        />
         <template #trailing>
           <div class="ms-auto flex items-center gap-1">
             <OTableColumnToggle
@@ -135,14 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
           <div data-test="dbm-databases-summary">
-            <OStatStrip
-              :items="summaryStats"
-              :loading="loading"
-              selectable
-              :selected-key="statFilter"
-              default-key="databases"
-              @select="onStatSelect"
-            />
+            <OStatStrip :items="summaryStats" :loading="loading" row />
           </div>
         </template>
 
@@ -470,6 +472,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -682,9 +685,6 @@ const errorCount = computed(() => rows.value.reduce((acc, row) => acc + (row.err
  */
 // The Failed tile narrows the table to databases with a failed call; Calls and Database time are totals, not rows.
 const statFilter = ref<"failed" | null>(null);
-const onStatSelect = (key: string) => {
-  statFilter.value = key === "failed" && statFilter.value !== "failed" ? "failed" : null;
-};
 
 const summaryStats = computed<StatItem[]>(() => {
   // Both figures are summed over the CLIENT hits, so the trace vantage is the
@@ -715,7 +715,6 @@ const summaryStats = computed<StatItem[]>(() => {
       value: calls.value ?? raw("—"),
       icon: "bar-chart",
       tone: "info",
-      selectable: false,
       dataTest: "dbm-databases-summary-calls",
     },
     {
@@ -724,7 +723,6 @@ const summaryStats = computed<StatItem[]>(() => {
       value: time.value ?? raw("—"),
       icon: "timer",
       tone: "teal",
-      selectable: false,
       dataTest: "dbm-databases-summary-time",
     },
     {
@@ -733,7 +731,6 @@ const summaryStats = computed<StatItem[]>(() => {
       value: errorCount.value ? formatCount(errorCount.value) : raw("—"),
       icon: "error-outline",
       tone: errorCount.value ? "error" : "neutral",
-      selectable: errorCount.value > 0 || statFilter.value === "failed",
       dataTest: "dbm-databases-summary-failed",
     },
   ];
