@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { Marked, type MarkedExtension } from "marked";
+import { Marked, type MarkedExtension, type Token, type Tokens } from "marked";
 import DOMPurify from "dompurify";
 import { SAFE_HTML_TAGS } from "@/utils/safeHtml";
 
@@ -30,15 +30,25 @@ function escapeAngles(text: string): string {
 function parseMarkdown(content: string): string {
   const openTags: string[] = [];
   const closingTags = new Set<string>();
+
+  function collectClosingTags(token: Token) {
+    if (token.type === "html" && token.text.startsWith("</")) {
+      closingTags.add(tagName(token.text));
+    }
+  }
+
+  function isHtmlIndentation(token: Token): token is Tokens.Code {
+    return (
+      token.type === "code" &&
+      token.codeBlockStyle === "indented" &&
+      safeHtmlTags.has(openTags.at(-1) ?? "")
+    );
+  }
   const options: MarkedExtension = {
     gfm: true,
     breaks: false,
     tokenizer: { html: () => undefined },
-    walkTokens(token) {
-      if (token.type === "html" && token.text.startsWith("</")) {
-        closingTags.add(tagName(token.text));
-      }
-    },
+    walkTokens: collectClosingTags,
     renderer: {
       html({ text }) {
         const name = tagName(text);
@@ -56,11 +66,22 @@ function parseMarkdown(content: string): string {
         return safeHtmlTags.has(name) ? text : escapeAngles(text);
       },
       code(token) {
-        if (token.codeBlockStyle === "indented" && safeHtmlTags.has(openTags.at(-1) ?? "")) {
-          // HTML indentation is formatting; unknown wrappers retain Markdown code semantics.
-          return new Marked(options).parse(token.text) as string;
+        if (!isHtmlIndentation(token)) return false;
+        const lexer = new Marked(options);
+        const pending: Token[] = [];
+        const output: string[] = [];
+        const enqueue = (text: string) => {
+          const tokens = lexer.lexer(text);
+          lexer.walkTokens(tokens, collectClosingTags);
+          for (let index = tokens.length - 1; index >= 0; index--) pending.push(tokens[index]);
+        };
+        enqueue(token.text);
+        // Expand indentation iteratively so its depth cannot consume the JavaScript call stack.
+        for (let next = pending.pop(); next; next = pending.pop()) {
+          if (isHtmlIndentation(next)) enqueue(next.text);
+          else output.push(this.parser.parse([next]));
         }
-        return false;
+        return output.join("");
       },
       text(token) {
         // Marked skips text escaping inside raw pre/code elements.

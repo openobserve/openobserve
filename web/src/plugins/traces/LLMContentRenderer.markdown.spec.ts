@@ -112,6 +112,12 @@ describe.each([
       "Alice",
     ],
     [
+      "HTML table with deep indentation",
+      `<table>\n\n${" ".repeat(16000)}<tr><td>Alice</td></tr>\n\n</table>`,
+      "table td",
+      "Alice",
+    ],
+    [
       "HTML block with blank lines and indentation",
       "<div>\n\n    <span>Alice</span>\n\n</div>",
       "div span",
