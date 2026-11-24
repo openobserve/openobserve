@@ -109,6 +109,18 @@ impl TryFrom<dashboards::Model> for Dashboard {
     }
 }
 
+/// Whether [`put`] creates the dashboard row, updates it, or does either.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PutMode {
+    Create,
+    /// Writes only while the row still has `expected_updated_at`, so a concurrent save conflicts.
+    Update {
+        expected_updated_at: i64,
+    },
+    /// Super cluster replay, which carries both creates and updates.
+    Upsert,
+}
+
 /// Gets a dashboard by it's folder ID and dashboard ID.
 ///
 /// This method differs from [get_by_id] in that it will only return the
@@ -119,17 +131,16 @@ pub async fn get_from_folder(
     folder_id: &str,
     dashboard_id: &str,
 ) -> Result<Option<Dashboard>, errors::Error> {
-    let client = get_orm_client_ro().await;
-    let model = get_model_from_folder(client, org_id, folder_id, dashboard_id)
-        .await?
-        .and_then(|(_folder, maybe_dash)| maybe_dash);
+    get_from_folder_with(get_orm_client_ro().await, org_id, folder_id, dashboard_id).await
+}
 
-    if let Some(model) = model {
-        let dash = model.try_into()?;
-        Ok(Some(dash))
-    } else {
-        Ok(None)
-    }
+/// [`get_from_folder`] from the primary, for a read that guards a write.
+pub async fn get_from_folder_primary(
+    org_id: &str,
+    folder_id: &str,
+    dashboard_id: &str,
+) -> Result<Option<Dashboard>, errors::Error> {
+    get_from_folder_with(get_orm_client_rw().await, org_id, folder_id, dashboard_id).await
 }
 
 /// Gets a dashboard by it's dashboard ID.
@@ -164,17 +175,14 @@ pub async fn get_by_id_primary(
 
 /// Lists dashboards.
 pub async fn list(params: ListDashboardsParams) -> Result<Vec<(Folder, Dashboard)>, errors::Error> {
-    let client = get_orm_client_ro().await;
-    let dashboards = list_models(client, params)
-        .await?
-        .into_iter()
-        .map(|(f, d)| {
-            let f = Folder::from(f);
-            let d = Dashboard::try_from(d)?;
-            Ok((f, d))
-        })
-        .collect::<Result<_, errors::Error>>()?;
-    Ok(dashboards)
+    list_with(get_orm_client_ro().await, params).await
+}
+
+/// [`list`] from the primary, for a read that guards a write.
+pub async fn list_primary(
+    params: ListDashboardsParams,
+) -> Result<Vec<(Folder, Dashboard)>, errors::Error> {
+    list_with(get_orm_client_rw().await, params).await
 }
 
 /// A dashboard's title and its current folder, as listed next to its public links.
@@ -254,118 +262,21 @@ pub async fn put(
     org_id: &str,
     folder_id: &str,
     new_folder_id: Option<&str>,
-    mut dashboard: Dashboard,
+    dashboard: Dashboard,
     clone: bool,
+    mode: PutMode,
 ) -> Result<Dashboard, errors::Error> {
     let client = get_orm_client_rw().await;
-
-    // Get the fields that will be inserted into or updated in the database.
-    let dashboard_id = dashboard
-        .dashboard_id()
-        .filter(|&s| !s.is_empty())
-        .ok_or(errors::PutDashboardError::MissingDashboardId)?
-        .to_owned();
-    let owner = dashboard
-        .owner()
-        .filter(|&s| !s.is_empty())
-        .ok_or(errors::PutDashboardError::MissingOwner)?
-        .to_owned();
-    let title = dashboard
-        .title()
-        .filter(|&s| !s.is_empty())
-        .ok_or(errors::PutDashboardError::MissingTitle)?
-        .to_owned();
-    let role = dashboard
-        .role()
-        .filter(|&s| !s.is_empty())
-        .map(|r| r.to_owned());
-    let description = dashboard
-        .description()
-        .filter(|&s| !s.is_empty())
-        .map(|d| d.to_owned());
-    let version = dashboard.version;
-    let created_at_depricated = dashboard.created_at_deprecated();
-    if clone {
-        dashboard.set_updated_at();
-    }
-    let updated_at = dashboard.updated_at;
-    let data = inner_data_as_json(dashboard)?;
-
-    // Try to get the new folder if the dashboard is being moved to a new folder.
-    let maybe_new_folder_model = if let Some(new_folder_id) = new_folder_id {
-        let new_folder_model = folders::Entity::find()
-            .filter(folders::Column::Org.eq(org_id))
-            .filter(folders::Column::Type.eq::<i16>(folder_type_into_i16(FolderType::Dashboards)))
-            .filter(folders::Column::FolderId.eq(new_folder_id))
-            .one(client)
-            .await?
-            .ok_or(errors::PutDashboardError::FolderDoesNotExist)?;
-        Some(new_folder_model)
-    } else {
-        None
-    };
-
-    let dashboard_model =
-        match get_model_from_folder(client, org_id, folder_id, &dashboard_id).await? {
-            None => {
-                // Destination folder does not exist so the dashboard can neither be
-                // created nor updated.
-                Err(errors::PutDashboardError::FolderDoesNotExist)
-            }
-            Some((folder_m, Some(dash_m))) => {
-                // Destination folder exists and dashboard already exists, so
-                // update the dashboard.
-
-                // If the dashboard is being to a new folder, then update the folder ID foreign key.
-                // Otherwise keep using the older folder ID foreign key.
-                let folder_id = if let Some(new_folder_model) = maybe_new_folder_model {
-                    new_folder_model.id
-                } else {
-                    folder_m.id
-                };
-
-                let mut dash_am = dash_m.into_active_model();
-                dash_am.folder_id = Set(folder_id);
-                dash_am.owner = Set(owner);
-                dash_am.role = Set(role);
-                dash_am.title = Set(title);
-                dash_am.description = Set(description);
-                dash_am.data = Set(data);
-                dash_am.version = Set(version);
-                dash_am.updated_at = Set(updated_at);
-                let model: dashboards::Model = dash_am.update(client).await?.try_into_model()?;
-                Ok(model)
-            }
-            Some((folder_m, None)) => {
-                // Destination folder exists but dashboard does not exist, so create
-                // a new dashboard.
-                // TODO: Use timestamp in microseconds like all other resources
-                let created_at_unix: i64 = if let Some(created_at_tz) = created_at_depricated {
-                    created_at_tz.timestamp()
-                } else {
-                    chrono::Utc::now().timestamp()
-                };
-
-                let dash_am = dashboards::ActiveModel {
-                    id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
-                    dashboard_id: Set(dashboard_id.to_owned()),
-                    folder_id: Set(folder_m.id),
-                    owner: Set(owner),
-                    role: Set(role),
-                    title: Set(title),
-                    description: Set(description),
-                    data: Set(data),
-                    version: Set(version),
-                    created_at: Set(created_at_unix),
-                    updated_at: Set(updated_at),
-                };
-                let model: dashboards::Model = dash_am.insert(client).await?.try_into_model()?;
-                Ok(model)
-            }
-        }?;
-
-    let dash = dashboard_model.try_into()?;
-    Ok(dash)
+    put_with(
+        client,
+        org_id,
+        folder_id,
+        new_folder_id,
+        dashboard,
+        clone,
+        mode,
+    )
+    .await
 }
 
 /// Deletes a dashboard with the given `folder_id` and `dashboard_id` surrogate
@@ -507,6 +418,179 @@ async fn list_models(
         .filter_map(|(d, maybe_f)| maybe_f.map(|f| (f, d)))
         .collect();
     Ok(folders_and_dashboards)
+}
+
+async fn get_from_folder_with<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    folder_id: &str,
+    dashboard_id: &str,
+) -> Result<Option<Dashboard>, errors::Error> {
+    get_model_from_folder(db, org_id, folder_id, dashboard_id)
+        .await?
+        .and_then(|(_folder, maybe_dash)| maybe_dash)
+        .map(Dashboard::try_from)
+        .transpose()
+}
+
+async fn list_with(
+    db: &DatabaseConnection,
+    params: ListDashboardsParams,
+) -> Result<Vec<(Folder, Dashboard)>, errors::Error> {
+    list_models(db, params)
+        .await?
+        .into_iter()
+        .map(|(f, d)| Ok((Folder::from(f), Dashboard::try_from(d)?)))
+        .collect()
+}
+
+async fn put_with<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    folder_id: &str,
+    new_folder_id: Option<&str>,
+    mut dashboard: Dashboard,
+    clone: bool,
+    mode: PutMode,
+) -> Result<Dashboard, errors::Error> {
+    let dashboard_id = dashboard
+        .dashboard_id()
+        .filter(|&s| !s.is_empty())
+        .ok_or(errors::PutDashboardError::MissingDashboardId)?
+        .to_owned();
+    let owner = dashboard
+        .owner()
+        .filter(|&s| !s.is_empty())
+        .ok_or(errors::PutDashboardError::MissingOwner)?
+        .to_owned();
+    let title = dashboard
+        .title()
+        .filter(|&s| !s.is_empty())
+        .ok_or(errors::PutDashboardError::MissingTitle)?
+        .to_owned();
+    let role = dashboard
+        .role()
+        .filter(|&s| !s.is_empty())
+        .map(|r| r.to_owned());
+    let description = dashboard
+        .description()
+        .filter(|&s| !s.is_empty())
+        .map(|d| d.to_owned());
+    let version = dashboard.version;
+    let created_at_depricated = dashboard.created_at_deprecated();
+    if clone {
+        dashboard.set_updated_at();
+    }
+    let updated_at = match mode {
+        // A same-microsecond or clock-stepped-back save must still move the stamp its check reads.
+        PutMode::Update {
+            expected_updated_at,
+        } => dashboard
+            .updated_at
+            .max(expected_updated_at.saturating_add(1)),
+        PutMode::Create | PutMode::Upsert => dashboard.updated_at,
+    };
+    let data = inner_data_as_json(dashboard)?;
+
+    let maybe_new_folder_model = if let Some(new_folder_id) = new_folder_id {
+        let new_folder_model = folders::Entity::find()
+            .filter(folders::Column::Org.eq(org_id))
+            .filter(folders::Column::Type.eq::<i16>(folder_type_into_i16(FolderType::Dashboards)))
+            .filter(folders::Column::FolderId.eq(new_folder_id))
+            .one(db)
+            .await?
+            .ok_or(errors::PutDashboardError::FolderDoesNotExist)?;
+        Some(new_folder_model)
+    } else {
+        None
+    };
+
+    let dashboard_model = match (
+        get_model_from_folder(db, org_id, folder_id, &dashboard_id).await?,
+        mode,
+    ) {
+        (None, _) => Err(errors::PutDashboardError::FolderDoesNotExist.into()),
+        (Some((_, None)), PutMode::Update { .. }) => {
+            Err(errors::PutDashboardError::NotFound.into())
+        }
+        (Some((_, Some(_))), PutMode::Create) => Err(errors::PutDashboardError::Conflict.into()),
+        (Some((folder_m, Some(dash_m))), mode) => {
+            let folder_id = if let Some(new_folder_model) = maybe_new_folder_model {
+                new_folder_model.id
+            } else {
+                folder_m.id
+            };
+
+            let pk = dash_m.id.clone();
+            let mut dash_am = dash_m.into_active_model();
+            dash_am.folder_id = Set(folder_id);
+            dash_am.owner = Set(owner);
+            dash_am.role = Set(role);
+            dash_am.title = Set(title);
+            dash_am.description = Set(description);
+            dash_am.data = Set(data);
+            dash_am.version = Set(version);
+            dash_am.updated_at = Set(updated_at);
+            update_model(db, pk, dash_am, mode).await
+        }
+        (Some((folder_m, None)), _) => {
+            // TODO: Use timestamp in microseconds like all other resources
+            let created_at_unix: i64 = if let Some(created_at_tz) = created_at_depricated {
+                created_at_tz.timestamp()
+            } else {
+                chrono::Utc::now().timestamp()
+            };
+
+            let dash_am = dashboards::ActiveModel {
+                id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
+                dashboard_id: Set(dashboard_id.to_owned()),
+                folder_id: Set(folder_m.id),
+                owner: Set(owner),
+                role: Set(role),
+                title: Set(title),
+                description: Set(description),
+                data: Set(data),
+                version: Set(version),
+                created_at: Set(created_at_unix),
+                updated_at: Set(updated_at),
+            };
+            let model: dashboards::Model = dash_am.insert(db).await?.try_into_model()?;
+            Ok(model)
+        }
+    }?;
+
+    let dash = dashboard_model.try_into()?;
+    Ok(dash)
+}
+
+/// Saves the edited row; a [`PutMode::Update`] writes only if no other save landed since its read.
+async fn update_model<C: ConnectionTrait>(
+    db: &C,
+    pk: String,
+    dash_am: dashboards::ActiveModel,
+    mode: PutMode,
+) -> Result<dashboards::Model, errors::Error> {
+    let PutMode::Update {
+        expected_updated_at,
+    } = mode
+    else {
+        return Ok(dash_am.update(db).await?.try_into_model()?);
+    };
+    match dashboards::Entity::update(dash_am)
+        .filter(dashboards::Column::UpdatedAt.eq(expected_updated_at))
+        .exec(db)
+        .await
+    {
+        Ok(model) => Ok(model),
+        Err(sea_orm::DbErr::RecordNotUpdated) => {
+            if dashboards::Entity::find_by_id(pk).one(db).await?.is_some() {
+                Err(errors::PutDashboardError::Conflict.into())
+            } else {
+                Err(errors::PutDashboardError::NotFound.into())
+            }
+        }
+        Err(e) => Err(e.into()),
+    }
 }
 
 async fn list_ids_by_org_with<C: ConnectionTrait>(
@@ -805,6 +889,163 @@ mod tests {
                 ("invalid".to_string(), "f-invalid".to_string()),
                 ("valid".to_string(), "f-valid".to_string())
             ]
+        );
+    }
+
+    async fn put_test_db() -> DatabaseConnection {
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = sea_orm::Schema::new(backend);
+        db.execute(backend.build(&schema.create_table_from_entity(folders::Entity)))
+            .await
+            .unwrap();
+        db.execute(backend.build(&schema.create_table_from_entity(dashboards::Entity)))
+            .await
+            .unwrap();
+        folders::ActiveModel {
+            id: Set("folder-pk".to_string()),
+            org: Set("org".to_string()),
+            folder_id: Set("f1".to_string()),
+            name: Set("f1".to_string()),
+            description: Set(None),
+            icon: Set(None),
+            r#type: Set(folder_type_into_i16(FolderType::Dashboards)),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+        db
+    }
+
+    fn put_test_dashboard(title: &str) -> Dashboard {
+        let inner: DashboardV8 = serde_json::from_value(serde_json::json!({
+            "version": 8,
+            "dashboardId": "dash-1",
+            "owner": "alice",
+            "title": title,
+            "description": "",
+        }))
+        .unwrap();
+        let mut dashboard: Dashboard = inner.into();
+        dashboard.set_updated_at();
+        dashboard
+    }
+
+    async fn put_test(
+        db: &DatabaseConnection,
+        dashboard: Dashboard,
+        mode: PutMode,
+    ) -> Result<Dashboard, errors::Error> {
+        put_with(db, "org", "f1", None, dashboard, false, mode).await
+    }
+
+    fn put_error(result: &Result<Dashboard, errors::Error>) -> Option<&errors::PutDashboardError> {
+        match result {
+            Err(errors::Error::DbError(errors::DbError::PutDashboard(e))) => Some(e),
+            _ => None,
+        }
+    }
+
+    #[tokio::test]
+    async fn concurrent_updates_from_one_version_let_only_one_win() {
+        let db = put_test_db().await;
+        let created = put_test(&db, put_test_dashboard("v0"), PutMode::Create)
+            .await
+            .unwrap();
+        let base = PutMode::Update {
+            expected_updated_at: created.updated_at,
+        };
+        let mut first = put_test_dashboard("first");
+        first.updated_at = created.updated_at + 1;
+        let mut second = put_test_dashboard("second");
+        second.updated_at = created.updated_at + 2;
+        let (a, b) = tokio::join!(put_test(&db, first, base), put_test(&db, second, base));
+        assert_eq!(
+            [&a, &b].iter().filter(|r| r.is_ok()).count(),
+            1,
+            "{a:?} {b:?}"
+        );
+        assert!(
+            [put_error(&a), put_error(&b)]
+                .iter()
+                .any(|e| matches!(e, Some(errors::PutDashboardError::Conflict)))
+        );
+    }
+
+    #[tokio::test]
+    async fn update_of_a_deleted_dashboard_is_not_found_and_not_reinserted() {
+        let db = put_test_db().await;
+        let created = put_test(&db, put_test_dashboard("v0"), PutMode::Create)
+            .await
+            .unwrap();
+        dashboards::Entity::delete_many().exec(&db).await.unwrap();
+        let result = put_test(
+            &db,
+            put_test_dashboard("edit"),
+            PutMode::Update {
+                expected_updated_at: created.updated_at,
+            },
+        )
+        .await;
+        assert!(
+            matches!(
+                put_error(&result),
+                Some(errors::PutDashboardError::NotFound)
+            ),
+            "{result:?}"
+        );
+        assert_eq!(dashboards::Entity::find().count(&db).await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn an_update_in_the_same_microsecond_still_moves_the_stamp() {
+        let db = put_test_db().await;
+        let created = put_test(&db, put_test_dashboard("v0"), PutMode::Create)
+            .await
+            .unwrap();
+        let mut edit = put_test_dashboard("edit");
+        edit.updated_at = created.updated_at;
+        let saved = put_test(
+            &db,
+            edit,
+            PutMode::Update {
+                expected_updated_at: created.updated_at,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(saved.updated_at, created.updated_at + 1);
+    }
+
+    #[tokio::test]
+    async fn a_row_deleted_before_the_conditional_write_is_not_found() {
+        let db = put_test_db().await;
+        put_test(&db, put_test_dashboard("v0"), PutMode::Create)
+            .await
+            .unwrap();
+        let row = dashboards::Entity::find().one(&db).await.unwrap().unwrap();
+        let expected_updated_at = row.updated_at;
+        let pk = row.id.clone();
+        dashboards::Entity::delete_many().exec(&db).await.unwrap();
+        let mut dash_am = row.into_active_model();
+        dash_am.title = Set("edit".to_string());
+        let result = update_model(
+            &db,
+            pk,
+            dash_am,
+            PutMode::Update {
+                expected_updated_at,
+            },
+        )
+        .await;
+        assert!(
+            matches!(
+                result,
+                Err(errors::Error::DbError(errors::DbError::PutDashboard(
+                    errors::PutDashboardError::NotFound
+                )))
+            ),
+            "{result:?}"
         );
     }
 
