@@ -59,6 +59,8 @@ pub(crate) async fn read_databases_body(
             Ok(b) => {
                 stamp_baseline_sections(&mut body, vec![("baseline_hits", json!(b.hits))], false)
             }
+            #[cfg(feature = "enterprise")]
+            Err(resp) if is_authz_unavailable(&resp) => return Err(resp),
             Err(_) => stamp_baseline_sections(&mut body, vec![("baseline_hits", json!([]))], true),
         }
     }
@@ -158,7 +160,7 @@ async fn read_databases_window(
         q.stream.as_ref(),
         &[&totals_rows[..], &qs_rows[..]],
     )
-    .await
+    .await?
     else {
         return Err(unauthorized_response());
     };

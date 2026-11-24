@@ -45,8 +45,10 @@ use openobserve_core::{
         accounting::{CallCounts, REQUEST_CALLS},
         active_checker,
         list::{
-            Bypass, Identity, ObjectRef, ObjectsQuery, Readable, StreamSet, authorize_objects,
-            probe_covers, stream_answers, stream_read_query,
+            Bypass, Identity, ObjectRef, ObjectsQuery, OrgWideCheck, Readable,
+            SITE_AUTOOBSERVE_STREAMS, SITE_DB_MONITORING, SITE_GEN_AI, SITE_SECURITY_SOURCES,
+            SITE_SERVICE_GRAPH, StreamSet, authorize_objects, probe_covers, stream_answers,
+            stream_read_query,
         },
     },
 };
@@ -222,6 +224,24 @@ fn meta_role_override_uses_the_identity_sent_to_openfga() {
         },
         "meta_mixed_readers",
     ));
+}
+
+#[test]
+#[ignore = "needs OpenFGA v1.22.1 at O2_OPENFGA_IT_URL"]
+fn s5_site_answers_equal_per_object_checks_end_to_end() {
+    RUNTIME.block_on(async {
+        let _serial = SERIAL.lock().await;
+        connect().await;
+        seed().await;
+        for deadline in ["5000", "0"] {
+            declare_deadline(deadline);
+            for member in &MEMBERS {
+                for query in s5_queries(member.id) {
+                    assert_s5_matches(&query, deadline).await;
+                }
+            }
+        }
+    });
 }
 
 #[test]
@@ -708,4 +728,116 @@ async fn legacy_given_id_check(query: &ObjectsQuery<'_>, object: &ObjectRef<'_>)
         user.is_external,
     )
     .await
+}
+
+fn s5_queries(user_id: &str) -> Vec<ObjectsQuery<'_>> {
+    let stored = ObjectsQuery {
+        bypass: Bypass::RbacOffOrRoot,
+        identity: Identity::StoredEmail,
+        ..stream_read_query(
+            SITE_GEN_AI,
+            ORG,
+            user_id,
+            &[StreamType::Logs, StreamType::Metrics],
+        )
+    };
+    let mut queries = vec![
+        stream_read_query(SITE_SECURITY_SOURCES, ORG, user_id, &[StreamType::Logs]),
+        ObjectsQuery {
+            prelude: Some(s5_prelude("db_monitoring")),
+            ..stream_read_query(SITE_DB_MONITORING, ORG, user_id, &[StreamType::Traces])
+        },
+        ObjectsQuery {
+            site: SITE_SERVICE_GRAPH,
+            stream_types: &[StreamType::Traces],
+            prelude: Some(s5_prelude("traces")),
+            ..stored
+        },
+        stored,
+    ];
+    for stream_types in [
+        &[StreamType::Logs],
+        &[StreamType::Metrics],
+        &[StreamType::Traces],
+    ] {
+        queries.push(stream_read_query(
+            SITE_AUTOOBSERVE_STREAMS,
+            ORG,
+            user_id,
+            stream_types,
+        ));
+    }
+    queries
+}
+
+fn s5_prelude(resource: &str) -> OrgWideCheck<'_> {
+    OrgWideCheck {
+        resource,
+        permission: "GET",
+        use_all_org: true,
+        use_self_context: false,
+        use_self_parent: false,
+    }
+}
+
+async fn assert_s5_matches(query: &ObjectsQuery<'_>, deadline: &str) {
+    let checker = active_checker();
+    let objects: Vec<ObjectRef<'_>> = STREAMS
+        .iter()
+        .filter(|(stream_type, _)| query.stream_types.contains(stream_type))
+        .map(|(stream_type, name)| {
+            if query.site == SITE_GEN_AI {
+                ObjectRef {
+                    id: name,
+                    stream_type: *stream_type,
+                    ofga_id: Cow::Borrowed(name),
+                }
+            } else {
+                ObjectRef::stream(*stream_type, name)
+            }
+        })
+        .collect();
+    let label = format!(
+        "{} {} {:?} deadline {deadline}",
+        query.site, query.user_id, query.stream_types
+    );
+    let oracle = s5_per_object_answer(checker.as_ref(), query, &objects, &label).await;
+    let readable = authorize_objects(checker.as_ref(), query, &objects)
+        .await
+        .expect(&label);
+    assert_eq!(readable, oracle, "{label}");
+}
+
+async fn s5_per_object_answer(
+    checker: &dyn StreamAccessChecker,
+    query: &ObjectsQuery<'_>,
+    objects: &[ObjectRef<'_>],
+    label: &str,
+) -> Readable {
+    if !checker.enforces_rbac().await
+        || checker.is_root(query.user_id).await
+        || (query.bypass == Bypass::RbacOffRootOrOrgAdmin
+            && checker.is_root_or_admin(query.org_id, query.user_id).await)
+    {
+        return Readable::All;
+    }
+    if let Some(prelude) = &query.prelude
+        && checker
+            .org_wide_check(query.user_id, query.org_id, prelude)
+            .await
+            .expect(label)
+    {
+        return Readable::All;
+    }
+    let mut oracle = HashSet::new();
+    for object in objects {
+        if checker
+            .check_object(query.user_id, query.org_id, query, object)
+            .await
+            .expect(label)
+        {
+            oracle.insert((object.stream_type, object.id.to_string()));
+        }
+    }
+    Readable::Only(oracle)
 }

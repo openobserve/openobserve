@@ -17,9 +17,24 @@
 //!
 //! HTTP handlers for the service graph, read from the v4 metrics.
 
+#[cfg(any(feature = "enterprise", test))]
+use std::future::Future;
+
 use axum::response::Response as HttpResponse;
 use common::meta::http::HttpResponse as MetaHttpResponse;
+#[cfg(any(feature = "enterprise", test))]
+use config::meta::stream::StreamType;
 use serde::Deserialize;
+
+#[cfg(any(feature = "enterprise", test))]
+use crate::authz::{
+    StreamAccessChecker, check_each,
+    list::{
+        AuthzUnavailable, Bypass, Identity, LegacyChecks, ListMode, ObjectRef, ObjectsQuery,
+        OrgWideCheck, SITE_SERVICE_GRAPH, ShadowComparison, StreamAnswer, StreamSet,
+        answer_in_mode_with, type_answers,
+    },
+};
 
 #[cfg(feature = "enterprise")]
 const EDGE_HISTORY_WINDOW_MICROS: i64 = 24 * 60 * 60 * 1_000_000;
@@ -31,6 +46,14 @@ const MAX_FUTURE_MICROS: i64 = 24 * 60 * 60 * 1_000_000;
 const MIN_MAX_WINDOW_DAYS: i64 = 3650;
 #[cfg(any(feature = "enterprise", test))]
 const DAY_MICROS: i64 = 24 * 60 * 60 * 1_000_000;
+#[cfg(any(feature = "enterprise", test))]
+const TRACE_STREAM_PRELUDE: OrgWideCheck<'static> = OrgWideCheck {
+    resource: "traces",
+    permission: "GET",
+    use_all_org: true,
+    use_self_context: false,
+    use_self_parent: false,
+};
 
 /// Query parameters for service graph API
 #[derive(Debug, Deserialize)]
@@ -99,7 +122,10 @@ pub async fn get_current_topology(
         Err(e) => return MetaHttpResponse::bad_request(e),
     };
 
-    let readable = readable_trace_streams(org_id, user_id).await;
+    let readable = match readable_trace_streams(org_id, user_id).await {
+        Ok(readable) => readable,
+        Err(err) => return crate::authz::list::authz_unavailable_response(err),
+    };
     let Some(scope) = scope_streams(trace_stream_filter(query.stream_name.clone()), readable)
     else {
         return MetaHttpResponse::forbidden("Unauthorized Access");
@@ -211,7 +237,10 @@ pub async fn get_edge_history(
         Ok(window) => window,
         Err(e) => return MetaHttpResponse::bad_request(e),
     };
-    let readable = readable_trace_streams(org_id, user_id).await;
+    let readable = match readable_trace_streams(org_id, user_id).await {
+        Ok(readable) => readable,
+        Err(err) => return crate::authz::list::authz_unavailable_response(err),
+    };
     let Some(scope) = scope_streams(trace_stream_filter(query.stream_name), readable) else {
         return MetaHttpResponse::forbidden("Unauthorized Access");
     };
@@ -279,50 +308,159 @@ pub async fn get_current_topology(
 
 /// The trace streams `user_id` may read in `org_id`, sorted; `None` when it may read all of them.
 #[cfg(feature = "enterprise")]
-async fn readable_trace_streams(org_id: &str, user_id: &str) -> Option<Vec<String>> {
-    use config::meta::stream::StreamType;
-
-    use crate::auth::check_permissions;
-
-    // an org-wide reader keeps the unscoped graph, collector series included
-    if check_permissions(
-        org_id, org_id, user_id, "traces", "GET", None, true, false, false,
+async fn readable_trace_streams(
+    org_id: &str,
+    user_id: &str,
+) -> Result<Option<Vec<String>>, AuthzUnavailable> {
+    let checker = crate::authz::active_checker();
+    let placeholder = &config::get_config().common.dashboard_placeholder;
+    readable_among(
+        checker.as_ref(),
+        &crate::authz::list::TodayChecks,
+        org_id,
+        user_id,
+        || crate::db::schema::list_streams_from_cache(org_id, StreamType::Traces),
+        placeholder,
     )
     .await
+}
+
+#[cfg(any(feature = "enterprise", test))]
+async fn readable_among<F: Future<Output = Vec<String>>>(
+    checker: &dyn StreamAccessChecker,
+    checks: &dyn LegacyChecks,
+    org_id: &str,
+    user_id: &str,
+    list: impl Fn() -> F,
+    placeholder: &str,
+) -> Result<Option<Vec<String>>, AuthzUnavailable> {
+    let query = trace_stream_query(org_id, user_id);
+    let streams = tokio::sync::OnceCell::<Vec<String>>::new();
+    // Legacy owns the snapshot whenever its prelude requires stream checks.
+    let legacy_list_ready = tokio::sync::Notify::new();
+    let (readable, _) = answer_in_mode_with(
+        checker,
+        SITE_SERVICE_GRAPH,
+        user_id,
+        || {
+            streams
+                .get()
+                .into_iter()
+                .flatten()
+                .filter(|stream| stream.as_str() != placeholder)
+                .map(|stream| (StreamType::Traces, stream.clone()))
+                .collect()
+        },
+        ShadowComparison::PreserveUnscoped(StreamType::Traces),
+        || async {
+            let readable = legacy_trace_stream_set(
+                checker,
+                checks,
+                org_id,
+                user_id,
+                async {
+                    streams
+                        .get_or_init(|| {
+                            legacy_list_ready.notify_one();
+                            list()
+                        })
+                        .await
+                        .as_slice()
+                },
+                placeholder,
+            )
+            .await;
+            legacy_list_ready.notify_one();
+            readable
+        },
+        |mode| {
+            let streams = &streams;
+            let list = &list;
+            let legacy_list_ready = &legacy_list_ready;
+            trace_stream_answers(
+                checker,
+                &query,
+                async move {
+                    if mode == ListMode::Shadow {
+                        legacy_list_ready.notified().await;
+                    }
+                    streams.get_or_init(list).await.as_slice()
+                },
+                placeholder,
+            )
+        },
+    )
+    .await?;
+    Ok(readable.map(|streams| {
+        let mut names: Vec<_> = streams.into_iter().map(|(_, name)| name).collect();
+        names.sort();
+        names
+    }))
+}
+
+#[cfg(any(feature = "enterprise", test))]
+async fn trace_stream_answers<'s>(
+    checker: &dyn StreamAccessChecker,
+    query: &ObjectsQuery<'_>,
+    streams: impl Future<Output = &'s [String]>,
+    placeholder: &str,
+) -> StreamAnswer {
+    let answers = type_answers(checker, query, &[StreamType::Traces]).await?;
+    if answers.reads_every() {
+        return Ok((None, answers));
+    }
+    let streams = streams.await;
+    let objects: Vec<_> = streams
+        .iter()
+        .filter(|stream| stream.as_str() != placeholder)
+        .map(|stream| ObjectRef::stream(StreamType::Traces, stream))
+        .collect();
+    let readable = answers.decide(checker, query.site, &objects).await?;
+    Ok((readable.into_streams(), answers))
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn trace_stream_query<'a>(org_id: &'a str, user_id: &'a str) -> ObjectsQuery<'a> {
+    ObjectsQuery {
+        site: SITE_SERVICE_GRAPH,
+        org_id,
+        user_id,
+        stream_types: &[StreamType::Traces],
+        permission: "GET",
+        use_all_org: false,
+        use_self_parent: true,
+        use_self_context: false,
+        parent_id: "",
+        bypass: Bypass::RbacOffOrRoot,
+        identity: Identity::StoredEmail,
+        prelude: Some(TRACE_STREAM_PRELUDE),
+    }
+}
+
+#[cfg(any(feature = "enterprise", test))]
+async fn legacy_trace_stream_set<'s>(
+    checker: &dyn StreamAccessChecker,
+    checks: &dyn LegacyChecks,
+    org_id: &str,
+    user_id: &str,
+    streams: impl Future<Output = &'s [String]>,
+    placeholder: &str,
+) -> Option<StreamSet> {
+    // an org-wide reader keeps the unscoped graph, collector series included
+    if checks
+        .org_wide(org_id, user_id, &TRACE_STREAM_PRELUDE)
+        .await
     {
         return None;
     }
-    let streams = crate::db::schema::list_streams_from_cache(org_id, StreamType::Traces).await;
-    let placeholder = &config::get_config().common.dashboard_placeholder;
-    let checker = crate::authz::active_checker();
-    Some(readable_among(checker.as_ref(), org_id, user_id, streams, placeholder).await)
-}
-
-/// The `streams` the user may read, sorted; one named as the dashboard placeholder never is.
-#[cfg(feature = "enterprise")]
-async fn readable_among(
-    checker: &dyn crate::authz::StreamAccessChecker,
-    org_id: &str,
-    user_id: &str,
-    streams: Vec<String>,
-    placeholder: &str,
-) -> Vec<String> {
-    use config::meta::stream::StreamType;
-
     // the engine drops a matcher whose value is the placeholder, which would unscope the read
-    let wanted: Vec<(StreamType, String)> = streams
-        .into_iter()
-        .filter(|stream| stream != placeholder)
-        .map(|stream| (StreamType::Traces, stream))
-        .collect();
-    // the caller's traces:_all_ check came first, so the org-wide question would repeat it
-    let mut readable: Vec<String> = crate::authz::check_each(checker, user_id, org_id, wanted)
+    let wanted = streams
         .await
-        .into_iter()
-        .map(|(_, name)| name)
+        .iter()
+        .filter(|stream| stream.as_str() != placeholder)
+        .map(|stream| (StreamType::Traces, stream.clone()))
         .collect();
-    readable.sort();
-    readable
+    Some(check_each(checker, user_id, org_id, wanted).await)
 }
 
 /// `None` when the user may read no requested stream, which the handlers answer with 403.
@@ -380,11 +518,64 @@ fn resolve_window(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{
+        Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    };
+
+    use config::{meta::stream::StreamType, metrics::authz as metrics};
+
     use super::*;
+    use crate::authz::{
+        FakeStreamChecker, TypedStream,
+        list::{CheckerChecks, ListMode, ListPolicy, SHADOW_TESTS, UnavailableReason},
+        within_budget,
+    };
 
     const NOW: i64 = 1_800_000_000_000_000;
     const SPAN: i64 = 3_600_000_000;
     const MAX_DAYS: i64 = 3650;
+    const ORG: &str = "service-graph";
+    const PLACEHOLDER: &str = "_o2_all_";
+
+    #[derive(Default)]
+    struct DelayedLegacyPrelude {
+        finished: AtomicBool,
+    }
+
+    #[async_trait::async_trait]
+    impl LegacyChecks for DelayedLegacyPrelude {
+        async fn org_wide(&self, _org_id: &str, _user_id: &str, _check: &OrgWideCheck<'_>) -> bool {
+            tokio::task::yield_now().await;
+            self.finished.store(true, Ordering::Relaxed);
+            false
+        }
+
+        async fn object(
+            &self,
+            _org_id: &str,
+            _user_id: &str,
+            _query: &ObjectsQuery<'_>,
+            _object: &ObjectRef<'_>,
+        ) -> bool {
+            unreachable!("service graph uses the stream checker for per-stream checks")
+        }
+    }
+
+    fn trace_streams() -> Vec<String> {
+        ["c", "a", "b", PLACEHOLDER].map(str::to_string).to_vec()
+    }
+
+    fn grant_trace_read(checker: &FakeStreamChecker, user: &str, name: &str) {
+        checker.grant_read(
+            user,
+            &TypedStream {
+                org_id: ORG.to_string(),
+                stream_type: StreamType::Traces,
+                name: name.to_string(),
+            },
+        );
+    }
 
     #[test]
     fn test_resolve_window_uses_an_explicit_window() {
@@ -496,44 +687,511 @@ mod tests {
         assert_eq!(scope(None, Some(&[])), None);
     }
 
-    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_trace_query_matches_the_live_stream_check() {
+        let query = trace_stream_query(ORG, "user");
+        assert_eq!(query.permission, "GET");
+        assert_eq!(query.identity, Identity::StoredEmail);
+        assert!(query.use_self_parent);
+        assert!(!query.use_self_context);
+        assert!(!query.use_all_org);
+        assert!(query.parent_id.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_off_sends_the_prelude_before_listing_streams() {
+        let checker = FakeStreamChecker::default();
+        let scoped = "off-scoped@example.com";
+        let wide = "off-wide@example.com";
+        checker.grant_org_wide_check(wide, ORG, "traces");
+        for user in [scoped, wide] {
+            checker.set_list_mode(user, ListMode::Off);
+            let snapshots = Mutex::new(Vec::new());
+            let readable = readable_among(
+                &checker,
+                &CheckerChecks(&checker),
+                ORG,
+                user,
+                || {
+                    let calls = checker.calls(user);
+                    snapshots
+                        .lock()
+                        .unwrap()
+                        .push((calls.org_wide_checks, calls.streams));
+                    std::future::ready(trace_streams())
+                },
+                PLACEHOLDER,
+            )
+            .await
+            .unwrap();
+            if user == scoped {
+                assert_eq!(*snapshots.lock().unwrap(), vec![(1, 0)]);
+                assert_eq!(readable, Some(vec![]));
+            } else {
+                assert!(snapshots.lock().unwrap().is_empty());
+                assert_eq!(readable, None);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_on_lists_streams_only_after_a_scoped_type_answer() {
+        let checker = FakeStreamChecker::default();
+        let root = "on-root@example.com";
+        let wide = "on-wide@example.com";
+        let scoped = "on-scoped@example.com";
+        checker.grant_root(root);
+        checker.grant_org_wide_check(wide, ORG, "traces");
+        checker.set_role(ORG, scoped, "custom");
+        grant_trace_read(&checker, scoped, "a");
+        for user in [root, wide, scoped] {
+            checker.set_list_mode(user, ListMode::On);
+            let snapshots = Mutex::new(Vec::new());
+            let readable = readable_among(
+                &checker,
+                &CheckerChecks(&checker),
+                ORG,
+                user,
+                || {
+                    let calls = checker.calls(user);
+                    snapshots
+                        .lock()
+                        .unwrap()
+                        .push((calls.org_wide_checks, calls.types_access));
+                    std::future::ready(trace_streams())
+                },
+                PLACEHOLDER,
+            )
+            .await
+            .unwrap();
+            if user == scoped {
+                assert_eq!(*snapshots.lock().unwrap(), vec![(1, 1)]);
+                assert_eq!(readable, Some(vec!["a".to_string()]));
+            } else {
+                assert!(snapshots.lock().unwrap().is_empty());
+                assert_eq!(readable, None);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_shadow_lists_streams_at_most_once() {
+        let _serial = SHADOW_TESTS.lock().await;
+        let checker = FakeStreamChecker::default();
+        let user = "shadow-lazy@example.com";
+        checker.set_list_mode(user, ListMode::Shadow);
+        checker.set_shadow_sample(user, 1.0);
+        grant_trace_read(&checker, user, "a");
+        let listings = AtomicUsize::new(0);
+        let readable = readable_among(
+            &checker,
+            &CheckerChecks(&checker),
+            ORG,
+            user,
+            || {
+                listings.fetch_add(1, Ordering::Relaxed);
+                std::future::ready(trace_streams())
+            },
+            PLACEHOLDER,
+        )
+        .await
+        .unwrap();
+        assert_eq!(readable, Some(vec!["a".to_string()]));
+        assert_eq!(listings.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn test_shadow_snapshots_streams_after_the_legacy_prelude() {
+        let _serial = SHADOW_TESTS.lock().await;
+        let checker = FakeStreamChecker::default();
+        let user = "shadow-legacy-snapshot@example.com";
+        checker.set_list_mode(user, ListMode::Shadow);
+        checker.set_shadow_sample(user, 1.0);
+        for name in ["early", "late"] {
+            grant_trace_read(&checker, user, name);
+        }
+        let checks = DelayedLegacyPrelude::default();
+        let listings = AtomicUsize::new(0);
+        let readable = readable_among(
+            &checker,
+            &checks,
+            ORG,
+            user,
+            || {
+                assert_eq!(checker.calls(user).types_access, 1);
+                listings.fetch_add(1, Ordering::Relaxed);
+                let mut snapshot = vec!["early".to_string()];
+                if checks.finished.load(Ordering::Relaxed) {
+                    snapshot.push("late".to_string());
+                }
+                std::future::ready(snapshot)
+            },
+            PLACEHOLDER,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            readable,
+            Some(vec!["early".to_string(), "late".to_string()])
+        );
+        assert_eq!(listings.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn test_shadow_reports_unscoped_legacy_and_all_cached_streams_as_different() {
+        let _serial = SHADOW_TESTS.lock().await;
+        let checker = FakeStreamChecker::default();
+        let legacy_checker = FakeStreamChecker::default();
+        let user = "shadow-scope-mismatch@example.com";
+        checker.set_list_mode(user, ListMode::Shadow);
+        checker.set_shadow_sample(user, 1.0);
+        checker.grant_read_every_stream(user, ORG);
+        legacy_checker.grant_org_wide_check(user, ORG, TRACE_STREAM_PRELUDE.resource);
+        let mismatch = metrics::AUTHZ_LIST_SHADOW_MISMATCH_TOTAL.with_label_values(&[
+            SITE_SERVICE_GRAPH,
+            StreamType::Traces.as_str(),
+            "new_allows_less",
+        ]);
+        let before = mismatch.get();
+
+        let readable = readable_among(
+            &checker,
+            &CheckerChecks(&legacy_checker),
+            ORG,
+            user,
+            || std::future::ready(trace_streams()),
+            PLACEHOLDER,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(readable, None);
+        assert_eq!(mismatch.get(), before + 1);
+    }
+
     #[tokio::test]
     async fn test_readable_among_checks_each_stream_and_skips_the_placeholder() {
-        use config::meta::stream::StreamType;
-
-        use crate::authz::{FakeStreamChecker, TypedStream};
-
         let checker = FakeStreamChecker::default();
-        for name in ["a", "c", "_o2_all_"] {
-            checker.grant_read(
-                "u1",
-                &TypedStream {
-                    org_id: "o1".to_string(),
-                    stream_type: StreamType::Traces,
-                    name: name.to_string(),
-                },
+        let user = "placeholder@example.com";
+        for name in ["a", "c", PLACEHOLDER] {
+            grant_trace_read(&checker, user, name);
+        }
+        let checks = CheckerChecks(&checker);
+        assert_eq!(
+            readable_among(
+                &checker,
+                &checks,
+                ORG,
+                user,
+                || std::future::ready(trace_streams()),
+                PLACEHOLDER
+            )
+            .await
+            .unwrap(),
+            Some(vec!["a".to_string(), "c".to_string()])
+        );
+        assert_eq!(checker.calls(user).streams, 3);
+        assert!(checker.calls(user).org_wide.is_empty());
+        assert_eq!(
+            readable_among(
+                &checker,
+                &checks,
+                ORG,
+                user,
+                || std::future::ready(Vec::new()),
+                PLACEHOLDER
+            )
+            .await
+            .unwrap(),
+            Some(vec![])
+        );
+    }
+
+    #[tokio::test]
+    async fn test_readable_among_on_matches_legacy_for_each_role() {
+        let cases: [(&str, &str, bool, &[&str]); 5] = [
+            ("user@example.com", "user", true, &["a", "c"]),
+            ("custom@example.com", "custom", true, &["a", "c"]),
+            ("editor@example.com", "editor", false, &["a", "b", "c"]),
+            (ORG, "admin", false, &[]),
+            (ORG, "admin", true, &["a", "c"]),
+        ];
+        for (user, role, granted, expected) in cases {
+            let checker = FakeStreamChecker::default();
+            checker.set_role(ORG, user, role);
+            if role == "admin" {
+                checker.grant_admin(ORG, user);
+            }
+            if granted {
+                for name in ["a", "c", PLACEHOLDER] {
+                    grant_trace_read(&checker, user, name);
+                }
+            }
+            let checks = CheckerChecks(&checker);
+            let legacy = readable_among(
+                &checker,
+                &checks,
+                ORG,
+                user,
+                || std::future::ready(trace_streams()),
+                PLACEHOLDER,
+            )
+            .await
+            .unwrap();
+            checker.set_list_mode(user, ListMode::On);
+            let actual = readable_among(
+                &checker,
+                &checks,
+                ORG,
+                user,
+                || std::future::ready(trace_streams()),
+                PLACEHOLDER,
+            )
+            .await
+            .unwrap();
+            assert_eq!(actual, legacy, "{user}: {role}");
+            assert_eq!(
+                actual,
+                Some(expected.iter().map(|name| name.to_string()).collect()),
+                "{user}: {role}"
             );
         }
-        let streams = ["c", "a", "b", "_o2_all_"].map(str::to_string).to_vec();
-        assert_eq!(
-            readable_among(&checker, "o1", "u1", streams.clone(), "_o2_all_").await,
-            vec!["a".to_string(), "c".to_string()]
-        );
-        assert!(
-            readable_among(&checker, "o1", "u1", vec![], "_o2_all_")
+    }
+
+    #[tokio::test]
+    async fn test_readable_among_off_and_shadow_match_legacy() {
+        let _serial = SHADOW_TESTS.lock().await;
+        let checker = FakeStreamChecker::default();
+        let user = "legacy@example.com";
+        grant_trace_read(&checker, user, "a");
+        let checks = CheckerChecks(&checker);
+        let resolve = || {
+            readable_among(
+                &checker,
+                &checks,
+                ORG,
+                user,
+                || std::future::ready(trace_streams()),
+                PLACEHOLDER,
+            )
+        };
+        let legacy = resolve().await.unwrap();
+        assert_eq!(legacy, Some(vec!["a".to_string()]));
+        assert_eq!(checker.calls(user).types_access, 0);
+
+        checker.set_list_mode(user, ListMode::Shadow);
+        checker.set_shadow_sample(user, 1.0);
+        checker.fail_types_access_once(user, UnavailableReason::Timeout);
+        assert_eq!(resolve().await.unwrap(), legacy);
+        assert_eq!(checker.calls(user).types_access, 1);
+    }
+
+    #[tokio::test]
+    async fn test_readable_among_root_and_prelude_keep_an_unscoped_graph() {
+        let checker = FakeStreamChecker::default();
+        let root = "root@example.com";
+        let reader = "wide@example.com";
+        checker.grant_root(root);
+        checker.grant_org_wide_check(reader, ORG, "traces");
+        for user in [root, reader] {
+            checker.set_list_mode(user, ListMode::On);
+            assert_eq!(
+                within_budget(
+                    1,
+                    readable_among(
+                        &checker,
+                        &CheckerChecks(&checker),
+                        ORG,
+                        user,
+                        || std::future::ready(trace_streams()),
+                        PLACEHOLDER,
+                    ),
+                )
                 .await
-                .is_empty()
-        );
-        // o2-enterprise#3642: the per-stream Check honors a per-type grant; no org-wide repeat
-        checker.grant_read_all("u2", "o1", StreamType::Traces);
+                .unwrap(),
+                None
+            );
+            assert_eq!(checker.calls(user).types_access, 0);
+            assert_eq!(checker.calls(user).object_checks, 0);
+        }
+        assert_eq!(checker.calls(root).org_wide_checks, 0);
+        assert_eq!(checker.calls(reader).org_wide_checks, 1);
+    }
+
+    #[tokio::test]
+    async fn test_readable_among_probe_all_keeps_a_scoped_graph() {
+        let checker = FakeStreamChecker::default();
+        let user = "all-streams@example.com";
+        checker.set_list_mode(user, ListMode::On);
+        checker.grant_read_every_stream(user, ORG);
         assert_eq!(
-            readable_among(&checker, "o1", "u2", streams, "_o2_all_").await,
-            vec!["a".to_string(), "b".to_string(), "c".to_string()]
+            within_budget(
+                5,
+                readable_among(
+                    &checker,
+                    &CheckerChecks(&checker),
+                    ORG,
+                    user,
+                    || std::future::ready(trace_streams()),
+                    PLACEHOLDER,
+                ),
+            )
+            .await
+            .unwrap(),
+            Some(["a", "b", "c"].map(str::to_string).to_vec())
         );
-        assert!(
-            checker.calls("u2").org_wide.is_empty(),
-            "the traces:_all_ pre-check already asked"
+        assert_eq!(checker.calls(user).lists, 0);
+        assert_eq!(checker.calls(user).object_checks, 0);
+    }
+
+    #[tokio::test]
+    async fn test_readable_among_stays_within_five_calls() {
+        let checker = FakeStreamChecker::default();
+        let user = "budget@example.com";
+        checker.set_role(ORG, user, "custom");
+        checker.set_list_mode(user, ListMode::On);
+        let mut streams: Vec<String> = (0..2000).rev().map(|i| format!("stream_{i:04}")).collect();
+        let mut expected: Vec<String> = streams.iter().step_by(2).cloned().collect();
+        for name in &expected {
+            grant_trace_read(&checker, user, name);
+        }
+        expected.sort();
+        streams.push(PLACEHOLDER.to_string());
+        let readable = within_budget(
+            5,
+            readable_among(
+                &checker,
+                &CheckerChecks(&checker),
+                ORG,
+                user,
+                || std::future::ready(streams.clone()),
+                PLACEHOLDER,
+            ),
+        )
+        .await
+        .unwrap();
+        assert_eq!(readable, Some(expected));
+        let calls = checker.calls(user);
+        assert!(calls.total() <= 5, "{calls:?}");
+        assert_eq!(calls.lists, 1);
+        assert_eq!(calls.object_checks, 0);
+        assert_eq!(calls.stored_email_types, 1);
+    }
+
+    #[tokio::test]
+    async fn test_readable_among_on_propagates_authz_failures() {
+        let failures: [fn(&FakeStreamChecker, &str, UnavailableReason); 3] = [
+            FakeStreamChecker::fail_org_wide_check_once,
+            FakeStreamChecker::fail_types_access_once,
+            FakeStreamChecker::fail_list_once,
+        ];
+        for fail in failures {
+            let checker = FakeStreamChecker::default();
+            let user = "failure@example.com";
+            checker.set_list_mode(user, ListMode::On);
+            fail(&checker, user, UnavailableReason::Timeout);
+            let err = within_budget(
+                5,
+                readable_among(
+                    &checker,
+                    &CheckerChecks(&checker),
+                    ORG,
+                    user,
+                    || std::future::ready(trace_streams()),
+                    PLACEHOLDER,
+                ),
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(err.reason, UnavailableReason::Timeout);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_readable_among_on_propagates_fallback_failure() {
+        let checker = FakeStreamChecker::default();
+        let user = "fallback-failure@example.com";
+        checker.set_list_mode(user, ListMode::On);
+        checker.set_list_policy(user, ListPolicy::Disabled);
+        checker.fail_object_check_once(user, UnavailableReason::Timeout);
+        let result = readable_among(
+            &checker,
+            &CheckerChecks(&checker),
+            ORG,
+            user,
+            || std::future::ready(trace_streams()),
+            PLACEHOLDER,
+        )
+        .await;
+        assert_eq!(result.unwrap_err().reason, UnavailableReason::Timeout);
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    async fn assert_authz_unavailable_response(response: HttpResponse) {
+        assert_eq!(
+            response.status(),
+            axum::http::StatusCode::SERVICE_UNAVAILABLE
         );
+        assert_eq!(response.headers()["retry-after"], "3");
+        assert_eq!(response.headers()["x-o2-authz"], "unavailable");
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+            serde_json::json!({
+                "code": 503,
+                "error_code": "authz_unavailable",
+                "message": "Permission service unavailable, try again",
+            })
+        );
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn test_handlers_return_authz_unavailable_with_503() {
+        let checker = crate::authz::fake_checker();
+        let user = "service-graph-handler-failure@example.com";
+        checker.set_list_mode(user, ListMode::On);
+        checker.fail_org_wide_check_once(user, UnavailableReason::Timeout);
+        let topology = within_budget(
+            5,
+            get_current_topology(
+                ORG,
+                user,
+                ServiceGraphQuery {
+                    start_time: None,
+                    end_time: None,
+                    filter: None,
+                    stream_name: None,
+                    agent_id: None,
+                    agent_name: None,
+                    agent_env: None,
+                },
+            ),
+        )
+        .await;
+        assert_authz_unavailable_response(topology).await;
+
+        checker.fail_org_wide_check_once(user, UnavailableReason::Timeout);
+        let history = within_budget(
+            5,
+            get_edge_history(
+                ORG,
+                user,
+                EdgeHistoryQuery {
+                    client_service: None,
+                    server_service: None,
+                    start_time: None,
+                    end_time: None,
+                    stream_name: None,
+                },
+            ),
+        )
+        .await;
+        assert_authz_unavailable_response(history).await;
     }
 
     #[cfg(feature = "enterprise")]

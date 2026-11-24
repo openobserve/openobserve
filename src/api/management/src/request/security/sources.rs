@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
+    future::Future,
     sync::{Arc, LazyLock, Mutex},
 };
 
@@ -59,6 +60,13 @@ use o2_enterprise::enterprise::security::{
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::{UserEmail, check_permissions},
+    authz::{
+        StreamAccessChecker,
+        list::{
+            AuthzUnavailable, SITE_SECURITY_SOURCES, StreamSet, answer_in_mode,
+            authz_unavailable_response, stream_answers,
+        },
+    },
     background_access::StreamReadCheck,
     pipeline as pipeline_service,
     pipeline::db::PipelineError,
@@ -697,13 +705,6 @@ async fn readable_streams(
         openobserve_api_common::auth::validator::list_objects_for_user(org_id, user_id, "GET", key)
             .await
             .map_err(|e| MetaHttpResponse::forbidden(e.to_string()))?;
-    // With list_only_permitted off the list above is every stream, so ask what the caller holds.
-    let readable = match &permitted {
-        Some(names) => any_stream_readable(Some(names)),
-        None => db::authz::list_permitted_objects(org_id, user_id, "GET", key)
-            .await
-            .map_or(true, |held| any_stream_readable(held.as_deref())),
-    };
     let mut streams: Vec<common::meta::stream::Stream> =
         stream::get_streams(org_id, Some(StreamType::Logs), false, None)
             .await
@@ -712,6 +713,14 @@ async fn readable_streams(
                 !config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(&s.name)
             })
             .collect();
+    // With list_only_permitted off the list above is every stream, so ask what the caller holds.
+    let readable = if needs_stream_grant_lookup(permitted.as_deref(), streams.len()) {
+        db::authz::list_permitted_objects(org_id, user_id, "GET", key)
+            .await
+            .map_or(true, |held| any_stream_readable(held.as_deref()))
+    } else {
+        any_stream_readable(permitted.as_deref())
+    };
     // Security read covers the sources themselves, so a source-only analyst still sees them.
     if let Some(names) = &permitted {
         let all = format!("{key}:_all_{org_id}");
@@ -727,13 +736,101 @@ async fn readable_streams(
         let readable = readable || !streams.is_empty();
         return Ok((streams, readable));
     }
+    if streams.is_empty() {
+        return Ok((streams, still_readable(readable, 0, 0)));
+    }
     // An unfiltered list would hand out doc counts and verdicts of streams a search refuses.
-    let denied =
-        super::unreadable_streams(org_id, user_id, streams.iter().map(|s| s.name.as_str())).await;
+    let names: Vec<_> = streams.iter().map(|s| s.name.clone()).collect();
+    let requested = names
+        .iter()
+        .map(|name| (StreamType::Logs, name.clone()))
+        .collect();
+    let checker = openobserve_core::authz::active_checker();
+    let allowed = readable_sources_in_mode(
+        checker.as_ref(),
+        org_id,
+        user_id,
+        &requested,
+        || async {
+            let denied =
+                super::unreadable_streams(org_id, user_id, names.iter().map(String::as_str)).await;
+            Some(
+                requested
+                    .iter()
+                    .filter(|(_, name)| !denied.contains(name))
+                    .cloned()
+                    .collect(),
+            )
+        },
+        |denied| {
+            openobserve_core::security::admit_security_sources_once(
+                checker.as_ref(),
+                org_id,
+                user_id,
+                denied,
+            )
+        },
+    )
+    .await
+    .map_err(authz_unavailable_response)?;
     let before = streams.len();
-    streams.retain(|s| !denied.contains(&s.name));
+    streams.retain(|s| {
+        allowed
+            .as_ref()
+            .is_none_or(|readable| readable.contains(&(StreamType::Logs, s.name.clone())))
+    });
     let readable = still_readable(readable, before, streams.len());
     Ok((streams, readable))
+}
+
+async fn readable_sources_in_mode<
+    LF: Future<Output = Option<StreamSet>>,
+    SF: Future<Output = Result<HashSet<String>, AuthzUnavailable>>,
+>(
+    checker: &dyn StreamAccessChecker,
+    org_id: &str,
+    user_id: &str,
+    requested: &StreamSet,
+    legacy: impl FnOnce() -> LF,
+    admit: impl FnOnce(Vec<String>) -> SF,
+) -> Result<Option<StreamSet>, AuthzUnavailable> {
+    let (readable, _) = answer_in_mode(
+        checker,
+        SITE_SECURITY_SOURCES,
+        user_id,
+        requested,
+        legacy,
+        || async {
+            let (mut readable, answers) = stream_answers(
+                checker,
+                SITE_SECURITY_SOURCES,
+                user_id,
+                org_id,
+                requested,
+                &[StreamType::Logs],
+            )
+            .await?;
+            if let Some(readable) = &mut readable {
+                let denied = requested
+                    .difference(readable)
+                    .map(|(_, name)| name.clone())
+                    .collect();
+                readable.extend(
+                    admit(denied)
+                        .await?
+                        .into_iter()
+                        .map(|name| (StreamType::Logs, name)),
+                );
+            }
+            Ok((readable, answers))
+        },
+    )
+    .await?;
+    Ok(readable)
+}
+
+fn needs_stream_grant_lookup(permitted: Option<&[String]>, non_protected_logs: usize) -> bool {
+    permitted.is_none() && non_protected_logs == 0
 }
 
 /// Whether any stream survived the read check; an org without streams keeps the grant's answer.
@@ -1380,7 +1477,243 @@ async fn detach(
 
 #[cfg(test)]
 mod tests {
+    use openobserve_core::authz::{
+        FakeStreamChecker, TypedStream, fake_checker,
+        list::{ListMode, OrgWideCheck, UnavailableReason},
+        within_budget,
+    };
+
     use super::*;
+
+    fn source_names() -> Vec<String> {
+        ["granted", "private", "security_source"]
+            .map(String::from)
+            .to_vec()
+    }
+
+    fn security_get() -> OrgWideCheck<'static> {
+        OrgWideCheck {
+            resource: "security",
+            permission: "GET",
+            use_all_org: true,
+            use_self_context: false,
+            use_self_parent: false,
+        }
+    }
+
+    async fn legacy_sources(org_id: &str, user_id: &str, names: &[String]) -> Option<StreamSet> {
+        let denied =
+            super::super::unreadable_streams(org_id, user_id, names.iter().map(String::as_str))
+                .await;
+        Some(
+            names
+                .iter()
+                .filter(|name| !denied.contains(name.as_str()))
+                .map(|name| (StreamType::Logs, name.clone()))
+                .collect(),
+        )
+    }
+
+    async fn admit_fake_sources(
+        checker: &FakeStreamChecker,
+        org_id: &str,
+        user_id: &str,
+        denied: Vec<String>,
+    ) -> Result<HashSet<String>, AuthzUnavailable> {
+        let mut admitted: HashSet<_> = denied
+            .into_iter()
+            .filter(|name| name == "security_source")
+            .collect();
+        if !admitted.is_empty()
+            && !checker
+                .org_wide_check(user_id, org_id, &security_get())
+                .await?
+        {
+            admitted.clear();
+        }
+        Ok(admitted)
+    }
+
+    async fn fake_sources_in_mode(
+        checker: &FakeStreamChecker,
+        org_id: &str,
+        user_id: &str,
+        names: &[String],
+    ) -> Result<Option<StreamSet>, AuthzUnavailable> {
+        let requested = names
+            .iter()
+            .map(|name| (StreamType::Logs, name.clone()))
+            .collect();
+        readable_sources_in_mode(
+            checker,
+            org_id,
+            user_id,
+            &requested,
+            || legacy_sources(org_id, user_id, names),
+            |denied| admit_fake_sources(checker, org_id, user_id, denied),
+        )
+        .await
+    }
+
+    #[test]
+    fn test_list_objects_gate_requires_no_non_protected_logs() {
+        assert!(needs_stream_grant_lookup(None, 0));
+        assert!(!needs_stream_grant_lookup(None, 1));
+        assert!(!needs_stream_grant_lookup(Some(&[]), 0));
+        assert!(!needs_stream_grant_lookup(
+            Some(&["logs:granted".to_string()]),
+            0,
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_source_modes_match_legacy_roles() {
+        let checker = fake_checker();
+        let names = source_names();
+        for role in ["user", "custom", "editor", "admin"] {
+            for mode in [ListMode::Off, ListMode::On] {
+                let org_id = format!("security_sources_modes_{role}_{mode:?}");
+                let user_id = if role == "admin" {
+                    org_id.clone()
+                } else {
+                    format!("{org_id}_reader")
+                };
+                checker.set_role(&org_id, &user_id, role);
+                checker.set_list_mode(&user_id, mode);
+                if role == "admin" {
+                    checker.grant_admin(&org_id, &user_id);
+                }
+                checker.grant_read(
+                    &user_id,
+                    &TypedStream {
+                        org_id: org_id.clone(),
+                        stream_type: StreamType::Logs,
+                        name: "granted".to_string(),
+                    },
+                );
+                let legacy = legacy_sources(&org_id, &user_id, &names).await.unwrap();
+                let expected_len = if matches!(role, "editor" | "admin") {
+                    names.len()
+                } else {
+                    1
+                };
+                assert_eq!(legacy.len(), expected_len);
+                let readable = fake_sources_in_mode(&checker, &org_id, &user_id, &names)
+                    .await
+                    .unwrap();
+                let expected = if role == "admin" && mode == ListMode::On {
+                    None
+                } else {
+                    Some(legacy)
+                };
+                assert_eq!(readable, expected, "role {role}, mode {mode:?}");
+                assert_eq!(checker.calls(&user_id).object_checks, 0);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_source_new_path_within_five_calls() {
+        let checker = fake_checker();
+        let user_id = "security_sources_budget_analyst";
+        checker.set_list_mode(user_id, ListMode::On);
+        checker.grant_org_wide_check(user_id, "org", "security");
+        let names = source_names();
+        let readable = within_budget(5, fake_sources_in_mode(&checker, "org", user_id, &names))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            readable,
+            StreamSet::from([(StreamType::Logs, "security_source".to_string())])
+        );
+        assert_eq!(checker.calls(user_id).total(), 5);
+        assert_eq!(checker.calls(user_id).org_wide_checks, 1);
+        assert_eq!(checker.calls(user_id).object_checks, 0);
+        assert_eq!(checker.calls(user_id).streams, 0);
+    }
+
+    #[tokio::test]
+    async fn test_source_failures_return_authz_unavailable_response() {
+        let checker = fake_checker();
+        for security_failure in [false, true] {
+            let user_id = format!("security_sources_failure_{security_failure}");
+            checker.set_list_mode(&user_id, ListMode::On);
+            if security_failure {
+                checker.fail_org_wide_check_once(&user_id, UnavailableReason::Transport);
+            } else {
+                checker.fail_types_access_once(&user_id, UnavailableReason::Transport);
+            }
+            let response = fake_sources_in_mode(&checker, "org", &user_id, &source_names())
+                .await
+                .map_err(authz_unavailable_response)
+                .unwrap_err();
+            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+            assert_eq!(response.headers()["x-o2-authz"], "unavailable");
+            assert_eq!(response.headers()["retry-after"], "3");
+            assert_eq!(
+                checker.calls(&user_id).org_wide_checks,
+                usize::from(security_failure)
+            );
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert_eq!(
+                serde_json::from_slice::<Value>(&body).unwrap(),
+                serde_json::json!({
+                    "code": 503,
+                    "error_code": "authz_unavailable",
+                    "message": "Permission service unavailable, try again",
+                })
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_shadow_sources_keep_the_legacy_answer() {
+        let checker = fake_checker();
+        let user_id = "security_sources_shadow_reader";
+        checker.set_list_mode(user_id, ListMode::Shadow);
+        checker.set_shadow_sample(user_id, 1.0);
+        checker.list_extra_once(user_id, StreamType::Logs, "private");
+        let names = source_names();
+        let legacy = legacy_sources("org", user_id, &names).await;
+        let readable = fake_sources_in_mode(&checker, "org", user_id, &names)
+            .await
+            .unwrap();
+        assert_eq!(readable, legacy);
+        assert_eq!(checker.calls(user_id).streams, names.len() * 2);
+        assert_eq!(checker.calls(user_id).object_checks, 0);
+    }
+
+    #[tokio::test]
+    async fn test_off_and_shadow_sources_keep_legacy_check_denials() {
+        let checker = fake_checker();
+        for mode in [ListMode::Off, ListMode::Shadow] {
+            let user_id = format!("security_sources_legacy_denials_{mode:?}");
+            checker.set_list_mode(&user_id, mode);
+            checker.set_shadow_sample(&user_id, 1.0);
+            checker.grant_read(
+                &user_id,
+                &TypedStream {
+                    org_id: "org".to_string(),
+                    stream_type: StreamType::Logs,
+                    name: "granted".to_string(),
+                },
+            );
+            checker.fail_stream_read_once(&user_id, "granted");
+            let names = source_names();
+            let readable = fake_sources_in_mode(&checker, "org", &user_id, &names)
+                .await
+                .unwrap();
+            assert_eq!(readable, Some(StreamSet::new()));
+            assert_eq!(checker.calls(&user_id).streams, names.len());
+            assert_eq!(checker.calls(&user_id).object_checks, 0);
+            if mode == ListMode::Off {
+                assert_eq!(checker.calls(&user_id).types_access, 0);
+            }
+        }
+    }
 
     #[test]
     fn test_an_admitted_source_indexes_every_value_for_match_all() {

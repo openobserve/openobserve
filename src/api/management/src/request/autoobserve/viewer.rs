@@ -32,7 +32,7 @@ use openobserve_core::{
     service_identity::access,
 };
 
-use super::{PERMISSION_CHECK_CONCURRENCY, readable_streams, readable_subjects};
+use super::{PERMISSION_CHECK_CONCURRENCY, raw_readable_streams, readable_subjects};
 use crate::request::{organization::require_credential_access, security::security_allowed};
 
 /// The read check each subject kind's own GET route makes.
@@ -79,7 +79,7 @@ struct LiveRights<'a> {
 #[async_trait]
 impl ReadRights for LiveRights<'_> {
     async fn streams(&self, ids: Vec<(String, String)>) -> Vec<bool> {
-        readable_streams(self.org_id, self.user_id, ids).await
+        raw_readable_streams(self.org_id, self.user_id, ids).await
     }
 
     async fn alerts(&self, subjects: Vec<EntityRef>) -> Vec<bool> {

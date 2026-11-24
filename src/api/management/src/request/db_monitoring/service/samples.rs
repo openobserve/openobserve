@@ -174,7 +174,7 @@ pub(crate) async fn read_samples_body(
             }
         };
     let Some(streams) =
-        involved_streams(org_id, user_id, q.stream.as_ref(), &[&totals_rows[..]]).await
+        involved_streams(org_id, user_id, q.stream.as_ref(), &[&totals_rows[..]]).await?
     else {
         return Err(unauthorized_response());
     };
