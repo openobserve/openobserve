@@ -14609,6 +14609,7 @@
         "noSyntheticsFolderAccess": "Non hai accesso alle cartelle di Synthetics.",
         "tags": "Tag",
         "tagPlaceholder": "chiave:valore",
+        "alertTagsHint": "Ogni tag deve essere presente sull'avviso.",
         "tagsHint": "Ogni tag deve essere presente sul controllo.",
         "removeBlock": "Rimuovi questo blocco",
         "specificItems": "Elementi specifici",

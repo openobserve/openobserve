@@ -14609,6 +14609,7 @@
         "noSyntheticsFolderAccess": "Sentetik klasörlerine erişiminiz yok.",
         "tags": "Etiketler",
         "tagPlaceholder": "key:value",
+        "alertTagsHint": "Her etiket uyarıda bulunmalıdır.",
         "tagsHint": "Her etiket kontrolde bulunmalıdır.",
         "removeBlock": "Bu bloğu kaldır",
         "specificItems": "Belirli öğeler",

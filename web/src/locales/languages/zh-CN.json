@@ -14609,6 +14609,7 @@
         "noSyntheticsFolderAccess": "您无权访问合成监控文件夹。",
         "tags": "标签",
         "tagPlaceholder": "key:value",
+        "alertTagsHint": "每个标签都必须在该告警上。",
         "tagsHint": "每个标签都必须在该检查上。",
         "removeBlock": "移除此区块",
         "specificItems": "指定项目",

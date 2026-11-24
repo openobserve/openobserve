@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <div
-      v-if="module === 'synthetics' && tagsOpen"
+      v-if="taggable && tagsOpen"
       class="flex flex-col gap-1"
       :data-test="`downtime-target-${module}-tags-block`"
     >
@@ -83,7 +83,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="closeBlock('tags')"
         />
       </div>
-      <span class="text-text-secondary text-xs">{{ t("alerts.downtimes.form.tagsHint") }}</span>
+      <span class="text-text-secondary text-xs">{{
+        module === "alerts"
+          ? t("alerts.downtimes.form.alertTagsHint")
+          : t("alerts.downtimes.form.tagsHint")
+      }}</span>
     </div>
 
     <div
@@ -116,11 +120,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
-      v-if="!noAccess && !locked && (!idsOpen || (module === 'synthetics' && !tagsOpen))"
+      v-if="!noAccess && !locked && (!idsOpen || (taggable && !tagsOpen))"
       class="flex flex-wrap gap-1"
     >
       <OButton
-        v-if="module === 'synthetics' && !tagsOpen"
+        v-if="taggable && !tagsOpen"
         variant="ghost"
         size="sm"
         icon-left="add"
@@ -223,6 +227,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   ALL_FOLDERS,
   exclusiveAllFolders,
+  hasTags,
   type DowntimeFormValues,
 } from "@/utils/downtimes/downtimeForm";
 import { MODULE_ICONS, MODULE_LABEL_KEYS } from "@/utils/downtimes/targetSummary";
@@ -274,6 +279,7 @@ const values = form.useStore((s: { values: DowntimeFormValues }) => s.values.tar
 const tagsOpen = computed(() => !!values.value?.tags_open);
 const idsOpen = computed(() => !!values.value?.ids_open);
 const sloMode = computed(() => values.value?.slo_mode);
+const taggable = computed(() => hasTags(props.module));
 
 const moduleLocks = useTargetModuleLocks();
 const locked = computed(() => moduleLocks[props.module].locked.value);
@@ -302,7 +308,7 @@ const folderName = (id: string) => folders.value.find((f) => f.folderId === id)?
 
 const { items, query: itemsQuery } = useDowntimeItems(
   () => props.module,
-  () => !noAccess.value && (idsOpen.value || (props.module === "synthetics" && tagsOpen.value)),
+  () => !noAccess.value && (idsOpen.value || (taggable.value && tagsOpen.value)),
 );
 
 const chosenFolders = computed(() => values.value?.folders ?? []);

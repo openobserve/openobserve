@@ -1834,6 +1834,7 @@ pub async fn list_alert_groups(
                         &alert_id,
                         &folder_id,
                         &StdHashMap::new(),
+                        &_alert.tags,
                         &g.group_key,
                         now,
                     )

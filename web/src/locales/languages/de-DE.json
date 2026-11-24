@@ -14609,6 +14609,7 @@
         "noSyntheticsFolderAccess": "Sie haben keinen Zugriff auf Synthetics-Ordner.",
         "tags": "Tags",
         "tagPlaceholder": "key:value",
+        "alertTagsHint": "Jedes Tag muss am Alarm vorhanden sein.",
         "tagsHint": "Jedes Tag muss an der Prüfung vorhanden sein.",
         "removeBlock": "Diesen Block entfernen",
         "specificItems": "Bestimmte Elemente",

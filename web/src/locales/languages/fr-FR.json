@@ -14609,6 +14609,7 @@
         "noSyntheticsFolderAccess": "Vous n'avez pas accès aux dossiers de Synthétiques.",
         "tags": "Étiquettes",
         "tagPlaceholder": "clé:valeur",
+        "alertTagsHint": "Chaque étiquette doit être présente sur l'alerte.",
         "tagsHint": "Chaque étiquette doit être présente sur le contrôle.",
         "removeBlock": "Supprimer ce bloc",
         "specificItems": "Éléments spécifiques",

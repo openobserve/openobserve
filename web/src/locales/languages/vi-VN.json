@@ -14609,6 +14609,7 @@
         "noSyntheticsFolderAccess": "Bạn không có quyền truy cập thư mục Synthetics.",
         "tags": "Thẻ",
         "tagPlaceholder": "key:value",
+        "alertTagsHint": "Mỗi thẻ phải tồn tại trên cảnh báo.",
         "tagsHint": "Mỗi thẻ phải tồn tại trên bài kiểm tra.",
         "removeBlock": "Xóa khối này",
         "specificItems": "Mục cụ thể",

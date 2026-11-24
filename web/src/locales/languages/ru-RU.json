@@ -14609,6 +14609,7 @@
         "noSyntheticsFolderAccess": "У вас нет доступа к папкам синтетики.",
         "tags": "Теги",
         "tagPlaceholder": "key:value",
+        "alertTagsHint": "Каждый тег должен присутствовать в оповещении.",
         "tagsHint": "Каждый тег должен присутствовать в проверке.",
         "removeBlock": "Удалить этот блок",
         "specificItems": "Конкретные элементы",

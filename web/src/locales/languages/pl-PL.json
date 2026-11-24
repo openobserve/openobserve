@@ -14609,6 +14609,7 @@
         "noSyntheticsFolderAccess": "Nie masz dostępu do folderów syntetyków.",
         "tags": "Tagi",
         "tagPlaceholder": "klucz:wartość",
+        "alertTagsHint": "Każdy tag musi występować w alercie.",
         "tagsHint": "Każdy tag musi występować w kontroli.",
         "removeBlock": "Usuń ten blok",
         "specificItems": "Konkretne elementy",

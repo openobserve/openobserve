@@ -14609,6 +14609,7 @@
         "noSyntheticsFolderAccess": "Je hebt geen toegang tot Synthetics-mappen.",
         "tags": "Tags",
         "tagPlaceholder": "key:value",
+        "alertTagsHint": "Elke tag moet op de melding aanwezig zijn.",
         "tagsHint": "Elke tag moet op de check aanwezig zijn.",
         "removeBlock": "Dit blok verwijderen",
         "specificItems": "Specifieke items",

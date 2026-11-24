@@ -14607,6 +14607,7 @@
         "noSyntheticsFolderAccess": "You don't have access to synthetics folders.",
         "tags": "Tags",
         "tagPlaceholder": "key:value",
+        "alertTagsHint": "Every tag must be on the alert.",
         "tagsHint": "Every tag must be on the check.",
         "removeBlock": "Remove this block",
         "specificItems": "Specific items",

@@ -12,6 +12,8 @@ import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.v
 import DowntimeConditionSection from "./DowntimeConditionSection.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import stage8 from "@/test/unit/fixtures/serviceVersions/stage8.json";
+import alertsService from "@/services/alerts";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 
 // The route guard opens this page only with downtimes on.
 vi.mock("@/composables/downtimes/useDowntimesEnabled", async () => {
@@ -244,6 +246,46 @@ describe("AddDowntime", () => {
     const [, body] = vi.mocked(downtimes.create).mock.calls[0];
     expect(body.targets).toEqual([{ module: "alerts", folders: { kind: "all" } }]);
     expect(body.schedule.repeat).toBe("none");
+    wrapper.unmount();
+  });
+
+  it("targets alerts by tag, offering the alerts' own tags, without asking to mute all", async () => {
+    const listed = vi.spyOn(alertsService, "listByFolderId").mockResolvedValue({
+      data: {
+        list: [
+          {
+            alert_id: "a1",
+            name: "payments-latency",
+            folder_id: "default",
+            tags: ["component:payments"],
+          },
+          { alert_id: "a2", name: "ops-disk", folder_id: "default", tags: [] },
+        ],
+      },
+    } as any);
+    const { wrapper } = await mountPage();
+    await wrapper.get('[data-test="downtime-target-alerts-add-tags"]').trigger("click");
+    await flushPromises();
+    const picker = () =>
+      wrapper
+        .findAllComponents(OFormSelect)
+        .find((select) => select.props("name") === "targets.alerts.tags")!;
+    await vi.waitFor(() =>
+      expect(picker().props("options")).toEqual([
+        { label: "component:payments", value: "component:payments" },
+      ]),
+    );
+    picker().vm.$emit("create", "component:payments");
+    await flushPromises();
+    await seeSchedule(wrapper);
+    await save(wrapper);
+    expect(dialog()).toBeNull();
+    expect(downtimes.create).toHaveBeenCalledTimes(1);
+    const [, body] = vi.mocked(downtimes.create).mock.calls[0];
+    expect(body.targets).toEqual([
+      { module: "alerts", folders: { kind: "all" }, tags: ["component:payments"] },
+    ]);
+    listed.mockRestore();
     wrapper.unmount();
   });
 
