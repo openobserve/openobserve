@@ -96,6 +96,7 @@ describe("AddSettingVariable schema — query_values modes", () => {
       });
     expect(promql("=")).toEqual([]);
     expect(promql("re_match")).toEqual([]);
+    expect(promql("<>")).toEqual([]);
     expect(promql(">")).toEqual(["query_data.filter.0.operator"]);
     expect(promql("str_match")).toEqual(["query_data.filter.0.operator"]);
     expect(

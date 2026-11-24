@@ -76,9 +76,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="showLabelOnTop"
                 :options="variableTypes"
                 :label="t('dashboard.typeOfVariable')"
-                :help-text="selectedTypeDescription"
                 data-test="dashboard-variable-type-select"
-              />
+              >
+                <template v-if="selectedTypeDescription" #tooltip
+                  ><OTooltip :content="selectedTypeDescription"
+                /></template>
+              </OFormSelect>
             </div>
             <div class="mt-4 text-base font-bold">
               {{ t("dashboard.addGeneralSettings") }}
@@ -106,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <span class="text-base font-bold">{{ t("dashboard.extraOptions") }}</span>
               <OToggleGroup
-                v-if="variableData.type == 'query_values'"
+                v-if="variableData.type === 'query_values'"
                 :model-value="isCustomQuery ? 'custom' : 'auto'"
                 data-test="dashboard-variable-query-mode"
                 @update:model-value="onQueryModeChange($event as string)"
@@ -130,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroup>
               <div v-if="variableData.type == 'custom' && variableData.multiSelect"></div>
             </div>
-            <div v-if="variableData.type == 'query_values'" class="mt-3">
+            <div v-if="variableData.type === 'query_values'" class="mt-3">
               <OFormSelect
                 name="query_data.stream_type"
                 :label="t('dashboard.selectStreamType')"
@@ -963,7 +966,9 @@ export default defineComponent({
     const lastPrefills: Partial<Record<QueryVariableLanguage, string>> = {};
 
     const isMultiSelectVariable = (name: string): boolean =>
-      (props.dashboardVariablesList ?? []).some((v: any) => v.name === name && v.multiSelect);
+      (props.dashboardVariablesList ?? []).some(
+        (v: { name: string; multiSelect?: boolean }) => v.name === name && v.multiSelect,
+      );
 
     // Without its OR filters a PromQL prefill would list values the Builder settings exclude, so none is written.
     const autoQueryFor = (language: QueryVariableLanguage): string => {
@@ -1335,7 +1340,9 @@ export default defineComponent({
     };
 
     // An auto SQL variable keeps the legacy shape; query keys are only saved for PromQL or a custom query.
-    const buildQueryDataPayload = (queryData: any) => {
+    const buildQueryDataPayload = (
+      queryData: NonNullable<AddSettingVariableForm["query_data"]>,
+    ) => {
       const {
         query_type,
         custom_query,
@@ -1351,7 +1358,8 @@ export default defineComponent({
       const rest = { ...base, ...(filter_group ? { filter_group } : { filter: filter ?? [] }) };
       const typed = language === "promql" ? { ...rest, query_type: language } : rest;
       if (!custom_query) return typed;
-      const payload: any = { ...typed, query };
+      const payload: typeof typed & { query: string; value_field?: string; label_field?: string } =
+        { ...typed, query };
       if (language === "sql" && value_field) payload.value_field = value_field;
       if (language === "sql" && label_field) payload.label_field = label_field;
       return payload;
@@ -1443,35 +1451,22 @@ export default defineComponent({
     const findVariableCycle = async (value: AddSettingVariableForm): Promise<string> => {
       // The form keeps a custom text typed before switching back to Builder; only what Save sends can loop.
       const current = buildVariablePayload(value);
-      // need all variables to check for cycle
-      // get all variables data.
-      let variablesData: any = JSON.parse(
+      const variablesData: { name: string; type: string; query_data: unknown }[] = JSON.parse(
         JSON.stringify(await getDashboard(store, route.query.dashboard, route.query.folder)),
       )?.variables?.list;
 
-      // current updated variable data need to merge/update in above variablesData.
-      // temporary update variable list
-      // if edit mode, then update the variable data
+      // The edited variable replaces its saved copy, or joins the list when it is new.
       if (editMode.value) {
-        //if name already exists
         const variableIndex = variablesData.findIndex(
-          (variable: any) => variable.name == props.variableName,
+          (variable) => variable.name === props.variableName,
         );
-
         variablesData[variableIndex] = current;
-      }
-      // else, it's a new variable.
-      else {
+      } else {
         variablesData.push(current);
       }
 
-      // now, need to check whether filter has cycle or not
-      // key: variable name
-      // value: { parentVariables: list of parent variable names, childVariables: list of child variable names }
-      let variablesDependencyGraph: any = buildVariablesDependencyGraph(variablesData);
-
-      // if graph has cycle, it will return the cycle path
-      // else it will return null
+      const variablesDependencyGraph = buildVariablesDependencyGraph(variablesData);
+      // The path of the first loop found, or null when the variables form none.
       const hasCycle = isGraphHasCycle(variablesDependencyGraph);
       return hasCycle ? describeVariableCycle(variablesDependencyGraph, hasCycle) : "";
     };
@@ -1574,18 +1569,13 @@ export default defineComponent({
       useSelectAutoComplete(toRef(data, "currentFieldsList"), "name");
 
     const streamTypeUpdated = async (newStreamType?: string) => {
-      // Prefer the value the select just emitted ($event) over reading it back
-      // off the reactive form projection: at the moment this handler fires the
-      // projection can still hold the PREVIOUS stream type, which would fetch the
-      // wrong type's stream list. Programmatic callers (tests) pass no arg and
-      // keep reading from the form.
+      // The form projection can still hold the previous type while the select's event fires.
       const streamType = newStreamType ?? variableData.query_data.stream_type;
-      // PromQL only reads metrics, so any other stream type goes back to SQL.
-      if (streamType !== "metrics") onQueryLanguageChange("sql");
-
-      // reset the stream and field (cross-field setFieldValue)
+      // Cleared first: a SQL prefill built from the old metric and label would query a stream that isn't there.
       setFormField("query_data.stream", "");
       setFormField("query_data.field", "");
+      // PromQL only reads metrics, so any other stream type goes back to SQL.
+      if (streamType !== "metrics") onQueryLanguageChange("sql");
 
       // if stream type is exists
       if (streamType) {
@@ -1730,7 +1720,8 @@ export default defineComponent({
     const streamFields = computed(() =>
       queryLanguage.value === "promql"
         ? (data.currentFieldsList ?? []).filter(
-            (field: any) => !INTERNAL_FIELDS.has(field?.name) && !field?.name?.startsWith("__"),
+            (field: { name: string }) =>
+              !INTERNAL_FIELDS.has(field?.name) && !field?.name?.startsWith("__"),
           )
         : (data.currentFieldsList ?? []),
     );

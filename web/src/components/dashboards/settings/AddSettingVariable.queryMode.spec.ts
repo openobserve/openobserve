@@ -366,3 +366,22 @@ describe("AddSettingVariable OR filters and blocked saves", () => {
     wrapper.unmount();
   });
 });
+
+describe("AddSettingVariable stream type change", () => {
+  it("does not write SQL from a PromQL variable's leftover metric and label", async () => {
+    const wrapper = await mountForm({
+      ...autoPromqlVariable,
+      query_data: { ...autoPromqlVariable.query_data, query: "label_values(up, job)" },
+    });
+    const vm = wrapper.vm as any;
+    expect(vm.isCustomQuery).toBe(true);
+
+    await vm.streamTypeUpdated("logs");
+    await flushPromises();
+
+    expect(vm.variableData.query_data.query_type).toBe("sql");
+    expect(vm.variableData.query_data.query).toBe("");
+    expect(editorText(wrapper)).toBe("");
+    wrapper.unmount();
+  });
+});

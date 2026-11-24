@@ -19,7 +19,11 @@
 // non-`custom`/non-`query_values` type's default rows never block submit.
 
 import { z } from "zod";
-import { dashboardFilterCodec, isFlatAnd } from "@/components/filterBar/codecs";
+import {
+  dashboardFilterCodec,
+  isFlatAnd,
+  type DashboardFilterGroup,
+} from "@/components/filterBar/codecs";
 import { leafConditions } from "@/components/filterBar/codecs/types";
 import { isConditionComplete } from "@/utils/query/filterBar";
 import { PROMQL_FILTER_OPERATORS } from "@/utils/dashboard/variables/queryVariableUtils";
@@ -30,7 +34,8 @@ export const VARIABLE_NAME_REGEX = /^[a-zA-Z0-9_-]*$/;
 // Operators that do NOT need a value (the filter value field is hidden for them).
 export const FILTER_OPERATORS_WITHOUT_VALUE = ["Is Null", "Is Not Null"];
 
-const parseGroup = (group: unknown) => dashboardFilterCodec().parse(group as any, { fields: [] });
+const parseGroup = (group: unknown) =>
+  dashboardFilterCodec().parse(group as DashboardFilterGroup | null, { fields: [] });
 
 const hasIncompleteCondition = (group: unknown): boolean =>
   leafConditions(parseGroup(group)).some((condition) => !isConditionComplete(condition));

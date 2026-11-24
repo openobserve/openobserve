@@ -103,6 +103,12 @@ const mountEditor = (queryData: Record<string, unknown>, variablesList: any[] = 
 
 const formOf = (wrapper: any) => (wrapper.findComponent(OForm).vm as any).form;
 
+// An idle preview shows no result of any kind, only the Run preview button.
+const showsPreviewResult = (wrapper: any) =>
+  ["count", "empty", "error"].some((part) =>
+    wrapper.find(`[data-test="dashboard-variable-query-preview-${part}"]`).exists(),
+  );
+
 const runPreview = async (wrapper: any) => {
   await wrapper.find('[data-test="dashboard-variable-query-run-preview"]').trigger("click");
   await flushPromises();
@@ -141,6 +147,69 @@ describe("QueryVariableEditor", () => {
       expect.objectContaining({ label: "job", match: "up" }),
     );
     expect(formOf(wrapper).state.values.query_data.query).toBe("label_values(up, job)");
+    expect(wrapper.find('[data-test="dashboard-variable-query-preview-count"]').exists()).toBe(
+      true,
+    );
+    wrapper.unmount();
+  });
+
+  it("drops the preview and its columns once the query or stream type changes", async () => {
+    streamRespondsWith([{ service: "checkout", errors: 4 }]);
+    const wrapper = mountEditor({ query: "SELECT service, count(*) errors FROM logs GROUP BY 1" });
+    await flushPromises();
+    await runPreview(wrapper);
+    const valueOptions = () =>
+      wrapper
+        .findAllComponents({ name: "OFormSelect" })
+        .find((select: any) => select.props("name") === "query_data.value_field")
+        ?.props("options")
+        .map((option: any) => option.value);
+    expect(valueOptions()).toEqual(["service", "errors"]);
+
+    const editor = wrapper.findComponent({ name: "UnifiedQueryEditor" });
+    editor.vm.$emit("user-edit");
+    editor.vm.$emit("update:query", "SELECT host FROM logs");
+    await flushPromises();
+    expect(showsPreviewResult(wrapper)).toBe(false);
+    expect(valueOptions()).toEqual(["service"]);
+
+    await runPreview(wrapper);
+    formOf(wrapper).setFieldValue("query_data.stream_type", "traces");
+    await flushPromises();
+    expect(showsPreviewResult(wrapper)).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("cancels a running PromQL preview when the editor closes", async () => {
+    labelValues.mockReturnValue(new Promise(() => {}));
+    const wrapper = mountEditor({
+      stream_type: "metrics",
+      query_type: "promql",
+      query: "label_values(up, job)",
+    });
+    await flushPromises();
+    await runPreview(wrapper);
+    const { signal } = labelValues.mock.calls[0][0];
+    expect(signal.aborted).toBe(false);
+    wrapper.unmount();
+    expect(signal.aborted).toBe(true);
+  });
+
+  it("escapes only parent values a query loaded, as panels do", async () => {
+    routeQuery.value = { period: "1h", "var-box": "api-.*", "var-svc": "a.b" };
+    labelValues.mockResolvedValue({ data: { status: "success", data: [] } });
+    const wrapper = mountEditor(
+      { query_type: "promql", query: 'label_values(up{job=~"$box", svc=~"$svc"}, pod)' },
+      [
+        { name: "box", type: "textbox" },
+        { name: "svc", type: "query_values", query_data: { query: "SELECT svc FROM t" } },
+      ],
+    );
+    await flushPromises();
+    await runPreview(wrapper);
+    expect(labelValues).toHaveBeenCalledWith(
+      expect.objectContaining({ match: 'up{job=~"api-.*", svc=~"a\\\\.b"}' }),
+    );
     wrapper.unmount();
   });
 
@@ -305,7 +374,7 @@ describe("QueryVariableEditor", () => {
     );
     formOf(wrapper).setFieldValue("query_data.query_type", "promql");
     await flushPromises();
-    expect(wrapper.find('[data-test="dashboard-variable-query-preview-idle"]').exists()).toBe(true);
+    expect(showsPreviewResult(wrapper)).toBe(false);
     expect(wrapper.find('[data-test="dashboard-variable-query-functions-trigger"]').exists()).toBe(
       true,
     );

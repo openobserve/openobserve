@@ -18,7 +18,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col gap-4" data-test="dashboard-variable-query-editor">
     <div class="flex flex-col gap-1">
       <div class="flex items-center justify-between gap-2">
-        <OText variant="label">{{ t("dashboard.queryVariable.query") }}</OText>
+        <div class="flex items-center gap-1">
+          <OText variant="label">{{ t("dashboard.queryVariable.query") }}</OText>
+          <span
+            tabindex="0"
+            role="img"
+            class="text-text-muted rounded-default focus-visible:ring-focus-ring-accent inline-flex shrink-0 cursor-help focus-visible:ring-2 focus-visible:outline-none"
+            :aria-label="queryHelp"
+            data-test="dashboard-variable-query-help"
+            ><OIcon name="info-outline" size="sm" /><OTooltip :content="queryHelp"
+          /></span>
+        </div>
         <OPopover
           v-if="language === 'promql'"
           v-model:open="functionsOpen"
@@ -72,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <UnifiedQueryEditor
-              :ref="(el: any) => (queryEditorRef = el)"
+              :ref="(el) => (queryEditorRef = el as QueryEditorHandle | null)"
               :key="`${language}-${editorKey}`"
               :languages="[language]"
               :default-language="language"
@@ -106,11 +116,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ queryIssue }}
       </div>
-      <OText variant="meta">{{
-        language === "sql"
-          ? t("dashboard.queryVariable.sqlHelp")
-          : t("dashboard.queryVariable.promqlHelp")
-      }}</OText>
     </div>
 
     <div class="flex flex-col gap-2" data-test="dashboard-variable-query-preview">
@@ -124,7 +129,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="runPreview"
           >{{ t("dashboard.queryVariable.runPreview") }}</OButton
         >
-        <OText variant="meta">{{ t("dashboard.queryVariable.previewContext") }}</OText>
+        <span
+          tabindex="0"
+          role="img"
+          class="text-text-muted rounded-default focus-visible:ring-focus-ring-accent inline-flex shrink-0 cursor-help focus-visible:ring-2 focus-visible:outline-none"
+          :aria-label="previewHelp"
+          data-test="dashboard-variable-query-preview-help"
+          ><OIcon name="info-outline" size="sm" /><OTooltip
+            ><template #content
+              >{{ t("dashboard.queryVariable.previewIdle") }}
+              {{ t("dashboard.queryVariable.previewContext") }}</template
+            ></OTooltip
+          ></span
+        >
         <OTag
           v-for="parent in referencedParents"
           :key="parent.name"
@@ -146,14 +163,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           })
         }}</OBanner
       >
-      <OText
-        v-if="preview.state === 'idle'"
-        variant="meta"
-        data-test="dashboard-variable-query-preview-idle"
-        >{{ t("dashboard.queryVariable.previewIdle") }}</OText
-      >
       <OBanner
-        v-else-if="preview.state === 'error'"
+        v-if="preview.state === 'error'"
         variant="error-soft"
         icon="error-outline"
         dense
@@ -218,24 +229,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OFormSelect
           name="query_data.value_field"
           :label="t('dashboard.queryVariable.valueField')"
-          :help-text="t('dashboard.queryVariable.valueFieldHelp')"
-          :options="valueColumnOptions"
+          :options="columnOptions"
           :placeholder="columns.length ? undefined : t('dashboard.queryVariable.runPreviewFirst')"
           :searchable="false"
           class="flex-1"
           data-test="dashboard-variable-query-value-field"
-        />
+        >
+          <template #tooltip
+            ><OTooltip :content="t('dashboard.queryVariable.valueFieldHelp')"
+          /></template>
+        </OFormSelect>
         <OFormSelect
           name="query_data.label_field"
           :label="t('dashboard.queryVariable.labelField')"
-          :help-text="t('dashboard.queryVariable.labelFieldHelp')"
-          :options="labelColumnOptions"
+          :options="columnOptions"
           :placeholder="columns.length ? undefined : t('dashboard.queryVariable.runPreviewFirst')"
           :searchable="false"
           clearable
           class="flex-1"
           data-test="dashboard-variable-query-label-field"
-        />
+        >
+          <template #tooltip
+            ><OTooltip :content="t('dashboard.queryVariable.labelFieldHelp')"
+          /></template>
+        </OFormSelect>
       </template>
       <OFormInput
         name="query_data.max_record_size"
@@ -251,7 +268,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
+import {
+  computed,
+  inject,
+  onUnmounted,
+  reactive,
+  ref,
+  shallowRef,
+  watch,
+  type Component,
+  type Ref,
+} from "vue";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -262,12 +289,15 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+import type { AddSettingVariableForm } from "./AddSettingVariable.schema";
+import type { VariableConfig } from "@/composables/dashboard/useVariablesManager";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { generateTraceContext } from "@/utils/zincutils";
@@ -301,8 +331,18 @@ interface PreviewState {
   error: string;
 }
 
+interface QueryEditorHandle {
+  getValue?: () => string | undefined;
+}
+
+interface QueryVariableFormContext {
+  Field: Component;
+  useStore: <T>(selector: (state: { values: AddSettingVariableForm }) => T) => Readonly<Ref<T>>;
+  setFieldValue: (name: string, value: unknown) => void;
+}
+
 const props = defineProps<{
-  dashboardVariablesList?: any[];
+  dashboardVariablesList?: VariableConfig[];
   /** A problem found on Save that only the query text can fix, such as a variable loop. */
   queryIssue?: string;
 }>();
@@ -310,15 +350,25 @@ const props = defineProps<{
 const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
-const form: any = inject(FORM_CONTEXT_KEY);
+const form: QueryVariableFormContext = inject(FORM_CONTEXT_KEY);
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
-const queryData = form.useStore((s: any) => s.values?.query_data ?? {});
-const variableName = form.useStore((s: any) => s.values?.name ?? "");
+const queryData = form.useStore((s) => s.values?.query_data ?? {});
+const variableName = form.useStore((s) => s.values?.name ?? "");
 const language = computed<QueryVariableLanguage>(() =>
   queryData.value?.query_type === "promql" ? "promql" : "sql",
 );
 const queryText = computed<string>(() => queryData.value?.query ?? "");
+const streamType = computed<string>(() => queryData.value?.stream_type || "logs");
+const queryHelp = computed(() =>
+  language.value === "sql"
+    ? t("dashboard.queryVariable.sqlHelp")
+    : t("dashboard.queryVariable.promqlHelp"),
+);
+const previewHelp = computed(
+  () =>
+    `${t("dashboard.queryVariable.previewIdle")} ${t("dashboard.queryVariable.previewContext")}`,
+);
 
 const functionsOpen = ref(false);
 const editorKey = ref(0);
@@ -332,7 +382,10 @@ const preview = reactive<PreviewState>({
   error: "",
 });
 let previewRun = 0;
-const queryEditorRef = shallowRef<{ getValue?: () => string | undefined } | null>(null);
+// The query and stream type the shown preview ran with; any other text makes its columns stale.
+let previewedFor = "";
+let previewAbort: AbortController | null = null;
+const queryEditorRef = shallowRef<QueryEditorHandle | null>(null);
 // A freshly mounted editor can echo an empty model before the user types; that echo must not wipe a prefilled query.
 let userEdited = false;
 let activeTraceId: string | null = null;
@@ -379,18 +432,24 @@ const routeValue = (name: string) => {
 // Current value of each other variable: the URL selection first, then its saved default.
 const parentContext = computed<QueryVariableContextEntry[]>(() =>
   (props.dashboardVariablesList ?? [])
-    .filter((v: any) => v?.name && v.name !== variableName.value)
-    .map((v: any) => {
-      let value: any = routeValue(v.name);
+    .filter((v) => v?.name && v.name !== variableName.value)
+    .map((v) => {
+      let value: unknown = routeValue(v.name);
       if (value === undefined && v.type === "custom") {
-        const selected = (v.options ?? []).filter((o: any) => o.selected).map((o: any) => o.value);
+        const selected = (v.options ?? []).filter((o) => o.selected).map((o) => o.value);
         value = v.multiSelect ? selected : (selected[0] ?? v.options?.[0]?.value);
       }
       if (value === undefined && v.selectAllValueForMultiSelect === "custom") {
         value = v.multiSelect ? v.customMultiSelectValue : v.customMultiSelectValue?.[0];
       }
       if (value === undefined) value = v.value;
-      return { name: v.name, type: v.type, value, isVariablePartialLoaded: true };
+      return {
+        name: v.name,
+        type: v.type,
+        query_data: v.query_data,
+        value,
+        isVariablePartialLoaded: true,
+      };
     }),
 );
 
@@ -413,7 +472,7 @@ const referencedParents = computed(() => {
 const undefinedNames = computed(() =>
   getUndefinedQueryVariableNames(queryText.value, [
     variableName.value,
-    ...(props.dashboardVariablesList ?? []).map((v: any) => v?.name).filter(Boolean),
+    ...(props.dashboardVariablesList ?? []).map((v) => v?.name).filter(Boolean),
   ]),
 );
 
@@ -469,10 +528,20 @@ const syncTypedQuery = () => {
   if (text !== queryText.value) setField("query_data.query", text);
 };
 
+const previewKey = () => `${streamType.value}\u0000${queryText.value}`;
+
+const abortPreview = () => {
+  previewAbort?.abort();
+  previewAbort = null;
+};
+
 const runPreview = async () => {
   syncTypedQuery();
   if (!queryText.value.trim()) return;
   const run = ++previewRun;
+  previewedFor = previewKey();
+  abortPreview();
+  const { signal } = (previewAbort = new AbortController());
   const maxRecords = getQueryVariableMaxRecords({ query_data: queryData.value });
   preview.state = "loading";
   preview.error = "";
@@ -481,7 +550,7 @@ const runPreview = async () => {
     const result = await loadQueryVariableValues({
       query: substituteQueryVariables(queryText.value, parentContext.value, language.value),
       language: language.value,
-      streamType: queryData.value?.stream_type || "logs",
+      streamType: streamType.value,
       valueField: queryData.value?.value_field,
       labelField: queryData.value?.label_field,
       maxRecords,
@@ -489,6 +558,7 @@ const runPreview = async () => {
       endTime,
       orgId: store.state.selectedOrganization.identifier,
       runSql,
+      signal,
     });
     if (run !== previewRun) return;
     preview.options = result.options;
@@ -511,6 +581,7 @@ const runPreview = async () => {
 const resetPreview = () => {
   previewRun++;
   cancelActiveStream();
+  abortPreview();
   preview.state = "idle";
   preview.options = [];
   preview.rows = [];
@@ -523,11 +594,18 @@ watch(language, () => {
   resetPreview();
 });
 
+watch([queryText, streamType], () => {
+  if (preview.state !== "idle" && previewKey() !== previewedFor) resetPreview();
+});
+
 const onUserEdit = () => {
   userEdited = true;
 };
 
-const onQueryUpdate = (field: any, value: string) => {
+const onQueryUpdate = (
+  field: { state: { value?: string }; handleChange: (value: string) => void },
+  value: string,
+) => {
   const current = field.state.value ?? "";
   if (value === current) return;
   if (!userEdited && !(value ?? "").trim() && current.trim()) return;
@@ -549,10 +627,9 @@ const columns = computed<string[]>(() => {
   );
 });
 
-const valueColumnOptions = computed(() =>
+const columnOptions = computed(() =>
   columns.value.map((column) => ({ label: raw(column), value: column })),
 );
-const labelColumnOptions = valueColumnOptions;
 
 const previewColumns = computed<OTableColumnDef[]>(() =>
   preview.columns.map((column, index) => ({
@@ -572,6 +649,7 @@ const previewRows = computed(() =>
 onUnmounted(() => {
   previewRun++;
   cancelActiveStream();
+  abortPreview();
 });
 
 defineExpose({ runPreview, preview, syncTypedQuery });
