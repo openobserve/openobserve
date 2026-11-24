@@ -27,7 +27,10 @@ use ::search::{
 use config::{
     TIMESTAMP_COL_NAME, ider,
     meta::{
-        search::{CardinalityLevel, SearchPartitionRequest, generate_aggregation_search_interval},
+        search::{
+            CardinalityLevel, RawStreams, SearchPartitionRequest,
+            generate_aggregation_search_interval,
+        },
         sql::resolve_stream_names,
     },
     utils::sql::is_simple_aggregate_query,
@@ -71,6 +74,56 @@ pub fn is_ranked_histogram(sql: &Sql, ts_column: Option<&str>) -> bool {
     sql.histogram_interval.is_some() && is_ranked_by_non_ts_column(sql, ts_column)
 }
 
+/// A streaming id reads and writes the cache its partition registered without checking the SQL,
+/// so only the user who registered it may search with it.
+pub fn check_streaming_owner(
+    streaming_id: Option<&str>,
+    user_id: Option<&str>,
+) -> Result<(), Error> {
+    let Some(Some(owner)) = streaming_id.and_then(registry::get_owner) else {
+        return Ok(());
+    };
+    if user_id == Some(owner.as_str()) {
+        return Ok(());
+    }
+    Err(Error::Message(
+        "the streaming id belongs to another user".to_string(),
+    ))
+}
+
+/// Fails a streaming search whose redaction differs from the one its streaming id was cached
+/// with, since its results would land under the other class's key; a retry re-partitions.
+#[cfg(feature = "vectorscan")]
+pub fn check_streaming_redaction(
+    org_id: &str,
+    stream_type: config::meta::stream::StreamType,
+    streaming_id: Option<&str>,
+    streams: &[datafusion::common::TableReference],
+    raw_streams: &RawStreams,
+) -> Result<(), Error> {
+    let Some(recorded) = streaming_id.and_then(registry::get_redaction_digest) else {
+        return Ok(());
+    };
+    let current = redaction_digest(org_id, stream_type, streams, Some(raw_streams));
+    if recorded != current {
+        return Err(Error::Message(
+            "search-time redaction changed while the query ran; run it again".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(not(feature = "vectorscan"))]
+pub fn check_streaming_redaction(
+    _org_id: &str,
+    _stream_type: config::meta::stream::StreamType,
+    _streaming_id: Option<&str>,
+    _streams: &[datafusion::common::TableReference],
+    _raw_streams: &RawStreams,
+) -> Result<(), Error> {
+    Ok(())
+}
+
 /// Prepare streaming aggregate execution: discover cache, generate partition strategy,
 /// and initialize cache for the streaming aggregation pipeline.
 ///
@@ -79,6 +132,7 @@ pub async fn prepare_streaming_aggregate(
     trace_id: &str,
     req: &SearchPartitionRequest,
     ctx: &PartitionSqlContext,
+    #[cfg_attr(not(feature = "vectorscan"), allow(unused_variables))] raw_streams: &RawStreams,
     use_cache: bool,
 ) -> Result<(bool, Option<String>, Option<StreamingAggsPartitionStrategy>), Error> {
     if ctx.sql.histogram_offset != Some(0) {
@@ -120,7 +174,12 @@ pub async fn prepare_streaming_aggregate(
         if cache_interval_mins > 0 {
             let streaming_id = ider::uuid();
             #[cfg(feature = "vectorscan")]
-            let digest = redaction_digest(org_id, stream_type, &ctx.sql.stream_names);
+            let digest = redaction_digest(
+                org_id,
+                stream_type,
+                &ctx.sql.stream_names,
+                Some(raw_streams),
+            );
             #[cfg(not(feature = "vectorscan"))]
             let digest: Option<String> = None;
             let hashed_query = get_aggregation_cache_key_from_request(
@@ -190,6 +249,7 @@ pub async fn prepare_streaming_aggregate(
 
             // Store partition strategy for use in do_partitioned_search
             registry::set_partition_strategy(&streaming_id, partition_strategy);
+            registry::set_redaction_digest(&streaming_id, digest);
 
             log::info!(
                 "[trace_id {trace_id}] [streaming_id: {streaming_id}] init streaming_agg cache: cache_file_path: {cache_file_path}"
@@ -237,4 +297,57 @@ pub(crate) async fn cardinality_fields(sql: &Sql) -> Result<Vec<String>, Error> 
         fields.retain(|field| field != TIMESTAMP_COL_NAME);
     }
     Ok(fields)
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::StreamType;
+    use datafusion::common::TableReference;
+
+    use super::*;
+
+    #[cfg(feature = "vectorscan")]
+    #[test]
+    fn a_streaming_search_must_match_its_partition_redaction() {
+        let streams = [TableReference::from("app")];
+        let raw = RawStreams::default();
+        let check = |id| check_streaming_redaction("org", StreamType::Logs, id, &streams, &raw);
+        assert!(check(None).is_ok());
+        assert!(check(Some("never-registered")).is_ok());
+
+        registry::init_cache("sdr-class-check", 0, 1, "sdr-class-check", 60);
+        let current = crate::datafusion::physical_optimizer::sdr_redact::redaction_digest(
+            "org",
+            StreamType::Logs,
+            &streams,
+            Some(&raw),
+        );
+        registry::set_redaction_digest("sdr-class-check", current);
+        assert!(check(Some("sdr-class-check")).is_ok());
+
+        registry::set_redaction_digest("sdr-class-check", Some("sdr=logs/app=stale".to_string()));
+        assert!(check(Some("sdr-class-check")).is_err());
+        registry::remove_cache("sdr-class-check");
+    }
+
+    #[test]
+    fn only_the_registering_user_may_search_with_a_streaming_id() {
+        assert!(check_streaming_owner(None, Some("bob@x")).is_ok());
+        assert!(check_streaming_owner(Some("sdr-owner-unknown"), Some("bob@x")).is_ok());
+
+        registry::init_cache("sdr-owner-check", 0, 1, "sdr-owner-check", 60);
+        registry::set_owner("sdr-owner-check", Some("alice@x".to_string()));
+        assert!(check_streaming_owner(Some("sdr-owner-check"), Some("alice@x")).is_ok());
+        assert!(check_streaming_owner(Some("sdr-owner-check"), Some("bob@x")).is_err());
+        assert!(check_streaming_owner(Some("sdr-owner-check"), None).is_err());
+        registry::remove_cache("sdr-owner-check");
+    }
+
+    #[test]
+    fn an_unregistered_streaming_id_is_never_refused() {
+        let streams = [TableReference::from("app")];
+        let raw = RawStreams::default();
+        let ok = check_streaming_redaction("org", StreamType::Logs, None, &streams, &raw);
+        assert!(ok.is_ok());
+    }
 }

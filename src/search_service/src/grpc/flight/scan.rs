@@ -22,7 +22,7 @@ use config::{
     datafusion::request::FlightSearchRequest,
     meta::{
         inverted_index::IndexOptimizeMode,
-        search::ScanStats,
+        search::{RawStreams, ScanStats},
         sql::TableReferenceExt,
         stream::{FileKey, StreamSettings, StreamType},
     },
@@ -74,8 +74,17 @@ impl StreamSearchSettings {
     ) -> Result<Self, Error> {
         let org_id = &req.query_identifier.org_id;
         let stream_name = source.stream.stream_name();
-        let redaction =
-            ScanRedaction::load(org_id, source.stream_type, &stream_name, &source.schema).await?;
+        // A missing list, e.g. from an older leader, leaves the stream redacted.
+        let raw =
+            RawStreams::from(req.raw_streams.clone()).contains(source.stream_type, &stream_name);
+        let redaction = ScanRedaction::load(
+            org_id,
+            source.stream_type,
+            &stream_name,
+            &source.schema,
+            raw,
+        )
+        .await?;
         let redacted: HashSet<String> = redaction.redacted_columns().into_iter().collect();
         let schema_fields: HashMap<_, _> = source
             .schema

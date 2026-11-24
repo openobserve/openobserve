@@ -331,11 +331,13 @@ fn stream_index_fields(sql: &Sql) -> HashMap<TableReference, HashSet<String>> {
         // Keeps leader planning in line with the scan: the follower never indexes a redacted field.
         #[cfg(feature = "vectorscan")]
         let idx_fields = {
-            let protected = protected_columns(
-                &sql.org_id,
-                stream_name.get_stream_type(sql.stream_type),
-                &stream_name.stream_name(),
-            );
+            let stream_type = stream_name.get_stream_type(sql.stream_type);
+            let name = stream_name.stream_name();
+            let protected = if sql.raw_streams.contains(stream_type, &name) {
+                Default::default()
+            } else {
+                protected_columns(&sql.org_id, stream_type, &name)
+            };
             idx_fields
                 .into_iter()
                 .filter(|field| !protected.contains(field))
@@ -439,6 +441,7 @@ mod tests {
             histogram_offset: Some(0),
             sorted_by_time: false,
             sampling_config: None,
+            raw_streams: Default::default(),
         }
     }
 

@@ -24,7 +24,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
-const { ingestTestData, waitForStreamData } = require('../utils/data-ingestion.js');
+const { ingestTestData, waitForStreamData, ingestCustomData } = require('../utils/data-ingestion.js');
 const MonacoEditorHelper = require('../utils/MonacoEditorHelper.js');
 
 // ============================================================================
@@ -2362,5 +2362,79 @@ test.describe("Autocomplete zero-setup row — never pressing Tab gives today's 
                 expect(typing[sequence.name], `typing vs off: ${sequence.name}`).toEqual(off[sequence.name]);
             }
         }
+    });
+});
+
+test.describe("Value suggestions follow the selected time range", () => {
+    test.describe.configure({ mode: 'serial' });
+    const stream = `e2e_values_window_${Date.now()}`;
+    const field = 'vwin_tag';
+    const oldValue = `old_${Date.now().toString(36)}`;
+    const SIX_HOURS_US = 6 * 3600 * 1e6;
+    let pm;
+
+    test.beforeAll(async ({ browser }) => {
+        const page = await browser.newPage();
+        try {
+            const twoHoursAgoUs = (Date.now() - 2 * 3600 * 1000) * 1000;
+            const res = await ingestCustomData(page, stream, [
+                { [field]: oldValue, _timestamp: twoHoursAgoUs },
+                { [field]: 'recent_value' },
+            ]);
+            expect(res.status, 'Precondition: rows must ingest').toBe(200);
+            // The 2h-old row is outside the 1h window waitForStreamData checks, so poll the values API over 6h.
+            await new PageManager(page).logsPage.waitForFieldValueViaApi(stream, field, oldValue, SIX_HOURS_US);
+        } finally {
+            await page.close();
+        }
+    });
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+        await pm.logsPage.selectStream(stream);
+        await pm.logsPage.waitForStreamFieldsLoaded(field);
+        await pm.logsPage.clickDateTimeButton();
+        await pm.logsPage.selectRelative6Hours();
+        await page.keyboard.press('Escape');
+    });
+
+    test.afterAll(async ({ browser }) => {
+        const page = await browser.newPage();
+        try {
+            await new PageManager(page).streamsPage.deleteStreamViaAPI(stream);
+        } catch (e) {
+            testLogger.warn(`Cleanup of ${stream} failed: ${e.message}`);
+        } finally {
+            await page.close();
+        }
+    });
+
+    test("values are looked up over the picker's range, not the last 15 minutes", {
+        tag: ['@all', '@autosuggestions', '@logs', '@values', '@bug-16941', '@P2']
+    }, async ({ page }) => {
+        const valueRequests = [];
+        page.on('request', (req) => {
+            const url = req.url();
+            if (/\/_values\?/.test(url) && url.includes(`fields=${field}`)) valueRequests.push(new URL(url));
+        });
+
+        await seedEditor(page, `${field} =`);
+        const typedAt = Date.now() * 1000;
+        await page.keyboard.type(' ');
+
+        await expect.poll(() => valueRequests.length, { message: 'a values request for the field', timeout: 15000 })
+            .toBeGreaterThan(0);
+        const sent = valueRequests[valueRequests.length - 1];
+        const start = Number(sent.searchParams.get('start_time'));
+        const end = Number(sent.searchParams.get('end_time'));
+        testLogger.info(`values window: ${start}..${end} (${((end - start) / 3.6e9).toFixed(2)}h)`);
+
+        expect(Math.abs((end - start) - SIX_HOURS_US)).toBeLessThanOrEqual(2 * 60 * 1e6);
+        expect(Math.abs(end - typedAt)).toBeLessThanOrEqual(2 * 60 * 1e6);
+
+        await expect.poll(async () => (await menuState(page)).rows.join(' | '), { timeout: 10000 })
+            .toContain(oldValue);
     });
 });

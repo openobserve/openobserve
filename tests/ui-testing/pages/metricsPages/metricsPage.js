@@ -1602,6 +1602,13 @@ export class MetricsPage {
         return false;
     }
 
+    /** The picker trigger toggles, so clicking it while the panel is already open would close it. */
+    async openDateTimePicker() {
+        const panel = this.page.locator('#date-time-menu');
+        if (!(await panel.isVisible())) await this.dateTimePicker.click();
+        await expect(panel).toBeVisible({ timeout: 10000 });
+    }
+
     async getCustomRangeOption() {
         // The DateTime popover opens onto the Relative tab by default; click it
         // to expose the relative-period preset buttons.

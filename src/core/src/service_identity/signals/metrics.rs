@@ -332,9 +332,22 @@ where
     F: FnOnce() -> Fut,
     Fut: std::future::Future<Output = Result<Value, anyhow::Error>>,
 {
+    settled_read_in(&SETTLED, key, now, read).await
+}
+
+async fn settled_read_in<F, Fut>(
+    held: &Mutex<Settled>,
+    key: SettledKey,
+    now: i64,
+    read: F,
+) -> Result<Value, anyhow::Error>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Result<Value, anyhow::Error>>,
+{
     let settled = key.2.end <= settled_before(now);
     if settled {
-        let held = SETTLED.lock().expect("settled reads").get(&key, now);
+        let held = held.lock().expect("settled reads").get(&key, now);
         if let Some(value) = held {
             return Ok(value);
         }
@@ -344,8 +357,7 @@ where
         return Ok(value);
     }
     let value = compact(value, key.2.start, key.2.step);
-    SETTLED
-        .lock()
+    held.lock()
         .expect("settled reads")
         .put(key, now, value.clone());
     Ok(value)
@@ -752,10 +764,12 @@ pub(crate) mod engine_tests {
             };
             (org.to_string(), "m{}[1h]".to_string(), grid, false)
         };
+        // A put sweeps reads older than its clock, so a cache shared with other tests races.
+        let cache = Mutex::new(Settled::default());
         for end in [settled, settled + 1] {
             reads.store(0, std::sync::atomic::Ordering::SeqCst);
             for _ in 0..3 {
-                let value = settled_read(key("settled-org", end), now, || read(3))
+                let value = settled_read_in(&cache, key("settled-org", end), now, || read(3))
                     .await
                     .unwrap();
                 assert_eq!(matrix(&value).len(), 1);
@@ -765,7 +779,7 @@ pub(crate) mod engine_tests {
         }
         reads.store(0, std::sync::atomic::Ordering::SeqCst);
         let later = now + SETTLED_TTL_MICROS;
-        settled_read(key("settled-org", settled), later, || read(3))
+        settled_read_in(&cache, key("settled-org", settled), later, || read(3))
             .await
             .unwrap();
         assert_eq!(
@@ -791,11 +805,6 @@ pub(crate) mod engine_tests {
             held.get(&key("bounded-org", settled - 5), now + 5)
                 .is_none()
         );
-        SETTLED
-            .lock()
-            .unwrap()
-            .reads
-            .retain(|k, _| k.0 != "settled-org");
     }
 
     #[tokio::test]
@@ -828,12 +837,13 @@ pub(crate) mod engine_tests {
                 .map(|s| s.total)
                 .collect()
         };
-        let cached = settled_read(key(), now, read).await.unwrap();
+        let cache = Mutex::new(Settled::default());
+        let cached = settled_read_in(&cache, key(), now, read).await.unwrap();
         storage.lock().unwrap().push(Sample::new(end, 7.0));
-        let stale = settled_read(key(), now + SETTLED_TTL_MICROS - 1, read)
+        let stale = settled_read_in(&cache, key(), now + SETTLED_TTL_MICROS - 1, read)
             .await
             .unwrap();
-        let healed = settled_read(key(), now + SETTLED_TTL_MICROS, read)
+        let healed = settled_read_in(&cache, key(), now + SETTLED_TTL_MICROS, read)
             .await
             .unwrap();
         assert_eq!(total(&cached), vec![0.0]);
@@ -849,11 +859,6 @@ pub(crate) mod engine_tests {
         );
         const { assert!(SETTLED_TTL_MICROS <= SETTLE_MARGIN_MICROS) };
         assert!(SETTLE_MARGIN_MICROS <= writable_after(now) - settled_before(now));
-        SETTLED
-            .lock()
-            .unwrap()
-            .reads
-            .retain(|k, _| k.0 != "delayed-write-org");
     }
 
     #[test]

@@ -1115,6 +1115,8 @@ pub struct SearchRequest {
     pub user_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(bytes = "vec", tag = "5")]
     pub request: ::prost::alloc::vec::Vec<u8>,
+    #[prost(string, repeated, tag = "6")]
+    pub raw_streams: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
@@ -1136,6 +1138,8 @@ pub struct SearchPartitionRequest {
     pub request: ::prost::alloc::vec::Vec<u8>,
     #[prost(bool, tag = "6")]
     pub skip_max_query_range: bool,
+    #[prost(string, repeated, tag = "7")]
+    pub raw_streams: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SearchPartitionResponse {
@@ -3581,6 +3585,9 @@ pub struct FlightSearchRequest {
     pub index_info: ::core::option::Option<IndexInfo>,
     #[prost(message, optional, tag = "4")]
     pub super_cluster_info: ::core::option::Option<SuperClusterInfo>,
+    /// `{stream_type}/{stream}` the user may read unredacted; a node that drops it redacts all.
+    #[prost(string, repeated, tag = "5")]
+    pub raw_streams: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct QueryIdentifier {

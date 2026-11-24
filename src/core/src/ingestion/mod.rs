@@ -429,6 +429,25 @@ pub fn inferred_column_type(key: &str, value: &Value) -> Option<DataType> {
     }
 }
 
+/// The `ZO_COLS_PER_RECORD_LIMIT` rule on one record; the caller reads `limit` once per batch.
+pub fn check_record_columns_limit(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    record: &Map<String, Value>,
+    limit: usize,
+) -> std::result::Result<(), anyhow::Error> {
+    // a column count never exceeds the entry count, so the cheap bound settles most records
+    if record.len() <= limit {
+        return Ok(());
+    }
+    let columns = record
+        .iter()
+        .filter(|(key, value)| inferred_column_type(key, value).is_some())
+        .count();
+    check_request_columns_limit(org_id, stream_type, stream_name, columns)
+}
+
 /// Whether a value of `inferred` type lands in an `existing` column without a cast or evolution.
 pub fn column_accepts(existing: &DataType, inferred: &DataType) -> bool {
     existing == inferred
@@ -833,7 +852,12 @@ pub async fn check_ingestion_allowed(
     stream_name: Option<&str>,
 ) -> Result<()> {
     if db::org_status::is_blocked(org_id) {
-        return Err(infra::errors::IngestionError::OrgBlocked(org_id.to_string()).into());
+        let kind = if db::org_status::is_blocked_status(org_id) {
+            infra::errors::OrgBlockKind::Blocked
+        } else {
+            infra::errors::OrgBlockKind::Deleted
+        };
+        return Err(infra::errors::IngestionError::OrgBlocked(org_id.to_string(), kind).into());
     }
 
     if !LOCAL_NODE.is_ingester() {
@@ -2161,6 +2185,19 @@ mod tests {
         use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
 
         let org = "ingest-blocked-org";
+        ORG_STATUS_CACHE.insert(org.to_string(), OrgStatus::Blocked);
+        let res = check_ingestion_allowed(org, StreamType::Logs, Some("default")).await;
+        ORG_STATUS_CACHE.remove(org);
+        assert!(
+            matches!(
+                res,
+                Err(Error::Ingestion(infra::errors::IngestionError::OrgBlocked(
+                    ref o,
+                    infra::errors::OrgBlockKind::Blocked
+                ))) if o == org
+            ),
+            "Blocked: {res:?}"
+        );
         for status in [
             OrgStatus::PendingDeletion,
             OrgStatus::Deleting,
@@ -2172,7 +2209,10 @@ mod tests {
             assert!(
                 matches!(
                     res,
-                    Err(Error::Ingestion(infra::errors::IngestionError::OrgBlocked(ref o))) if o == org
+                    Err(Error::Ingestion(infra::errors::IngestionError::OrgBlocked(
+                        ref o,
+                        infra::errors::OrgBlockKind::Deleted
+                    ))) if o == org
                 ),
                 "{status:?}: {res:?}"
             );

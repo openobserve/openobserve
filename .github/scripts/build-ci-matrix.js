@@ -410,6 +410,11 @@ const matrix = emitted.map((s) => ({
   // Same rule: ZO_SYNTHETICS_ENABLED registers the /synthetics routes once at start.
   synthetics_enabled:
     s.synthetics_enabled === true || s.synthetics_enabled === "true" ? "true" : "false",
+  // Same rule: ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA is read once at start.
+  restricted_routes_on_empty_data:
+    s.restricted_routes_on_empty_data === true || s.restricted_routes_on_empty_data === "true"
+      ? "true"
+      : "false",
   ingest_allowed_upto:
     s.ingest_allowed_upto === undefined || s.ingest_allowed_upto === null
       ? ""
