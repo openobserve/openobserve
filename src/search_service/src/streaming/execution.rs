@@ -535,7 +535,6 @@ fn trim_slices_to_budget(responses: &mut [Response], budget: usize) {
     }
 }
 
-/// Flags the sample partial when some time slices failed, so the caller can warn.
 fn mark_partial_slices(responses: &mut [Response], failed: usize, total: usize) {
     if failed == 0 {
         return;
@@ -551,7 +550,6 @@ fn mark_partial_slices(responses: &mut [Response], failed: usize, total: usize) 
     }
 }
 
-/// Copies the partial flag and reasons of the sampled slices onto the patterns JSON.
 #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
 pub(super) fn tag_partial_extraction(
     patterns: &mut config::utils::json::Value,

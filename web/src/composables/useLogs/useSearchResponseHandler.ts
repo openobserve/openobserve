@@ -473,7 +473,12 @@ export const useSearchResponseHandler = () => {
       regeratePaginationFlag = true;
     }
 
-    const rowOffset = Number(payload.meta?.rowOffset ?? 0);
+    const isReplace =
+      response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs;
+    const rowOffset =
+      isReplace || !searchObj.data.queryResults.aggs?.length
+        ? Number(payload.meta?.rowOffset ?? 0)
+        : 0;
     const countHits =
       rowOffset > 0
         ? response.content.results.hits.map((hit: any) =>
@@ -483,7 +488,7 @@ export const useSearchResponseHandler = () => {
           )
         : response.content.results.hits;
 
-    if (response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs) {
+    if (isReplace) {
       searchObj.data.queryResults.aggs = countHits;
     } else {
       searchObj.data.queryResults.aggs.push(...countHits);

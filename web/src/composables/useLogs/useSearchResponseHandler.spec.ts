@@ -831,6 +831,28 @@ describe("useSearchResponseHandler", () => {
       expect(mockState.searchObj.data.queryResults.aggs).toEqual([{ zo_sql_num: 0 }]);
     });
 
+    it("takes the OFFSET off once when several partitions add up, not once per partition", () => {
+      mockState.searchObj.data.queryResults.aggs = [];
+      for (const rows of [600, 400]) {
+        responseHandler.handleSearchResponse(
+          {
+            type: "pageCount",
+            traceId: "c",
+            queryReq: { query: {} },
+            meta: { rowOffset: 5 },
+          } as any,
+          {
+            type: "search_response_hits",
+            content: { results: { hits: [{ zo_sql_num: rows }] } },
+          } as any,
+        );
+      }
+      expect(mockState.searchObj.data.queryResults.aggs).toEqual([
+        { zo_sql_num: 595 },
+        { zo_sql_num: 400 },
+      ]);
+    });
+
     it("keeps the count as is without an OFFSET", () => {
       expect(countHits()).toEqual([{ zo_sql_num: 600 }]);
     });
