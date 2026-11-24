@@ -106,6 +106,18 @@ describe.each([
     ["mixed-case tags", "<DiV>first<BR/>x<SUP>2</sUp></dIv>", "div sup", "2"],
     ["Markdown table break", "| Name |\n| --- |\n| first<br>second |", "td br", ""],
     [
+      "HTML table with blank lines and indentation",
+      "<table>\n\n    <tr><td>Alice</td></tr>\n\n</table>",
+      "table td",
+      "Alice",
+    ],
+    [
+      "HTML block with blank lines and indentation",
+      "<div>\n\n    <span>Alice</span>\n\n</div>",
+      "div span",
+      "Alice",
+    ],
+    [
       "HTML table",
       "<table>\n<thead><tr><th>Name</th></tr></thead>\n<tbody><tr><td>Alice</td></tr></tbody>\n</table>",
       "table tbody td",
@@ -129,6 +141,25 @@ describe.each([
     ).toBeNull();
   });
 
+  it.each(["<br>", "<img src='https://example.com/image.png'>"])(
+    "keeps %s inside unknown-tag attributes literal",
+    (attribute) => {
+      const content = `<instructions title="${attribute}">unknown</instructions>`;
+      for (const source of [content, `<div>${content}</div>`]) {
+        const message = renderMessage(source);
+        expect(message.textContent?.trim()).toBe(content);
+        expect(message.querySelector("br, img, instructions")).toBeNull();
+      }
+    },
+  );
+
+  it("keeps indented HTML examples as code outside HTML blocks", () => {
+    const content = "<table><tr><td>Alice</td></tr></table>";
+    const message = renderMessage(`<div>before</div>\n\n    ${content}`);
+    expect(message.querySelector("pre code")?.textContent?.trim()).toBe(content);
+    expect(message.querySelector("table")).toBeNull();
+  });
+
   it.each(["div", "pre", "code"])("preserves placeholders and entities inside %s", (tag) => {
     const message = renderMessage(
       `<${tag}>\n<EMAIL_ADDRESS> <span>${token}</span> <PERSON_1> &amp;\n</${tag}>`,
@@ -148,6 +179,14 @@ describe.each([
     expect(message.querySelector("div")?.textContent).toContain("<instructions>");
     expect(message.querySelector("div")?.textContent).toContain("</instructions>");
     expect(message.querySelector("instructions")).toBeNull();
+  });
+
+  it("keeps indented Markdown code inside unknown wrappers in safe HTML", () => {
+    const message = renderMessage(
+      "<div>\n<instructions>\n\n    <b>example</b>\n\n</instructions>\n</div>",
+    );
+    expect(message.querySelector("div pre code")?.textContent?.trim()).toBe("<b>example</b>");
+    expect(message.querySelector("b")).toBeNull();
   });
 
   it("renders HTML and Markdown images with dangerous attributes removed", () => {
