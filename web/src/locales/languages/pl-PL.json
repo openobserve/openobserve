@@ -9790,6 +9790,7 @@
       "seriesCapChipFallback": "Serie ograniczone",
       "seriesCapTitle": "Osiągnięto limit serii",
       "seriesCapBody": "Wyświetlane serie: {shown} z {total}. Maksymalna liczba serii na wykresie: {cap}.",
+      "seriesCapBodyPerQuery": "Wyświetlane serie: {shown} z {total}. Maksymalna liczba serii na zapytanie: {cap}.",
       "seriesCapBodyCapped": "Wyświetlane serie: {shown} z co najmniej {total}. Wyniki zostały ograniczone do limitu wierszy.",
       "seriesCapBodyPartial": "Wyświetlane serie: {shown} z co najmniej {total}. Serwer zwrócił częściowe wyniki.",
       "unmatchedRegionsChip": "{count} poza mapą | {count} poza mapą",

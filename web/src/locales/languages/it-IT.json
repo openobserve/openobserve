@@ -9790,6 +9790,7 @@
       "seriesCapChipFallback": "Serie limitate",
       "seriesCapTitle": "Limite di serie raggiunto",
       "seriesCapBody": "Visualizzazione di {shown} serie su {total}. Un grafico disegna al massimo {cap} serie.",
+      "seriesCapBodyPerQuery": "Visualizzazione di {shown} serie su {total}. Ogni query disegna al massimo {cap} serie.",
       "seriesCapBodyCapped": "Visualizzazione di {shown} serie su almeno {total}. I risultati sono stati limitati al limite di righe.",
       "seriesCapBodyPartial": "Visualizzazione di {shown} serie su almeno {total}. Il server ha restituito risultati parziali.",
       "unmatchedRegionsChip": "{count} non sulla mappa | {count} non sulla mappa",

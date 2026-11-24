@@ -9790,6 +9790,7 @@
       "seriesCapChipFallback": "Séries limitées",
       "seriesCapTitle": "Limite de séries atteinte",
       "seriesCapBody": "Affichage de {shown} sur {total} séries. Un graphique affiche au maximum {cap} séries.",
+      "seriesCapBodyPerQuery": "Affichage de {shown} sur {total} séries. Chaque requête affiche au maximum {cap} séries.",
       "seriesCapBodyCapped": "Affichage de {shown} sur au moins {total} séries. Les résultats ont été plafonnés à la limite de lignes.",
       "seriesCapBodyPartial": "Affichage de {shown} sur au moins {total} séries. Le serveur a renvoyé des résultats partiels.",
       "unmatchedRegionsChip": "{count} absent de la carte | {count} absents de la carte",

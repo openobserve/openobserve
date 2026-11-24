@@ -9790,6 +9790,7 @@
       "seriesCapChipFallback": "Reeksen beperkt",
       "seriesCapTitle": "Reekslimiet bereikt",
       "seriesCapBody": "Toont {shown} van {total} reeksen. Een grafiek tekent maximaal {cap} reeksen.",
+      "seriesCapBodyPerQuery": "Toont {shown} van {total} reeksen. Elke query tekent maximaal {cap} reeksen.",
       "seriesCapBodyCapped": "Toont {shown} van ten minste {total} reeksen. Resultaten zijn afgekapt op de rijlimiet.",
       "seriesCapBodyPartial": "Toont {shown} van ten minste {total} reeksen. De server retourneerde gedeeltelijke resultaten.",
       "unmatchedRegionsChip": "{count} niet op de kaart | {count} niet op de kaart",
