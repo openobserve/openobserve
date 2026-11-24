@@ -25,7 +25,11 @@ import type {
 import { reportKeys } from "./reports.querykeys";
 import { LIVE_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
-export const reportsQuery = (org: string, filters: ReportListFilters) =>
+export const reportsQuery = (
+  org: string,
+  filters: ReportListFilters,
+  options?: { silentForbidden?: boolean },
+) =>
   queryOptions({
     queryKey: reportKeys.list(org, filters),
     queryFn: async (): Promise<any[]> =>
@@ -36,6 +40,7 @@ export const reportsQuery = (org: string, filters: ReportListFilters) =>
           undefined,
           filters.isCache,
           filters.nameQuery || undefined,
+          options,
         )
       ).data ?? [],
     staleTime: NORMAL_STALE_TIME,
