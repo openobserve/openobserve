@@ -72,6 +72,9 @@ describe("useLogsHistoryRestore", () => {
     await router.push({ name: "logs", query: { stream: "api" } });
     await settle();
     expect(onRestore).toHaveBeenCalledTimes(1);
+    await router.push({ name: "logs", query: { stream: "db", type: "search_history_re_apply" } });
+    await settle();
+    expect(onRestore).toHaveBeenCalledTimes(1);
   });
 
   it("does not restore when Back leaves for another page", async () => {

@@ -32,6 +32,8 @@ export function useLogsHistoryRestore(
     popPending = false;
     if (failure || to.name !== "logs" || from.name !== "logs") return;
     if (!isPop) {
+      // A `type` flag (search history, AI chat, stream explorer) has its own handler in Logs.
+      if (to.query.type || from.query.type) return;
       const stream = to.query.stream;
       // Logs writes its own selection to the URL, so only a stream it does not show came from a link.
       if (typeof stream === "string" && stream !== from.query.stream && stream !== shownStreams())
