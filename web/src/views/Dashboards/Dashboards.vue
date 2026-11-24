@@ -336,6 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="max-md:hidden"
                     data-test="dashboard-delete"
                     data-row-action="delete"
+                    :loading="deleteLoadingId === row.id"
                     @click.stop="showDeleteDialogFn({ row })"
                   >
                     <OTooltip side="bottom" :content="t('dashboard.delete')" />
@@ -542,6 +543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'dashboard.deleteDashboardConfirmMsg'
       "
       :message-name="selectedDelete?.name"
+      :warning-message="singleDeleteReportsWarning"
       ok-variant="destructive"
       @update:ok="deleteDashboard"
       @update:cancel="confirmDeleteDialog = false"
@@ -571,6 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           selectedIds.length,
         )
       "
+      :warning-message="bulkDeleteReportsWarning"
       ok-variant="destructive"
       @update:ok="bulkDeleteDashboards"
       @update:cancel="confirmBulkDelete = false"
@@ -637,6 +640,7 @@ import {
   getFoldersList,
 } from "../../utils/commons";
 import { dashboardsByFolderQuery } from "@/services/dashboards.queries";
+import { reportsQuery } from "@/services/reports.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import TemplateSuggestionCards from "@/components/dashboards/TemplateSuggestionCards.vue";
@@ -757,6 +761,7 @@ export default defineComponent({
     const route = useRoute();
     const orgData: any = ref(store.state.selectedOrganization);
     const confirmDeleteDialog = ref<boolean>(false);
+    const deleteLoadingId = ref<string | null>(null);
     const selectedDelete = ref<DashboardRow | null>(null);
     const activeFolderId = ref<string | null>(null);
     // Set once the onMounted landing decision has run; folder-selection events
@@ -1592,8 +1597,12 @@ export default defineComponent({
       }
     };
 
-    const showDeleteDialogFn = (props: any) => {
+    const showDeleteDialogFn = async (props: any) => {
+      if (deleteLoadingId.value !== null) return;
       selectedDelete.value = props.row;
+      deleteLoadingId.value = props.row.id;
+      await loadReportsForDelete();
+      deleteLoadingId.value = null;
       confirmDeleteDialog.value = true;
     };
 
@@ -1786,6 +1795,77 @@ export default defineComponent({
     const confirmBulkDelete = ref<boolean>(false);
     const bulkDeleteLoading = ref(false);
 
+    type ReportForDelete = {
+      report_id: string;
+      name: string;
+      dashboards?: { dashboard: string }[];
+    };
+    const reportsForDelete = ref<ReportForDelete[]>([]);
+    const REPORTS_FOR_DELETE_TIMEOUT_MS = 5000;
+
+    // Fetched fresh before the dialog opens, so a report created elsewhere is never missed or shown late.
+    const loadReportsForDelete = async () => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      // A hung request must not block the delete, so the dialog opens without the warning.
+      const timedOut = new Promise<ReportForDelete[]>((resolve) => {
+        timer = setTimeout(() => resolve([]), REPORTS_FOR_DELETE_TIMEOUT_MS);
+      });
+      try {
+        reportsForDelete.value = await Promise.race([
+          queryClient.fetchQuery({
+            ...reportsQuery(
+              store.state.selectedOrganization.identifier,
+              { folder: undefined, isCache: undefined },
+              { silentForbidden: true },
+            ),
+            staleTime: 0,
+          }),
+          timedOut,
+        ]);
+      } catch {
+        reportsForDelete.value = [];
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
+    // A dashboard can feed dozens of reports; naming them all would push the dialog buttons off screen.
+    const REPORT_NAMES_SHOWN = 5;
+
+    const deleteReportsWarning = (dashboardIds: string[]): I18nText | undefined => {
+      const reports = new Map<string, { name: string; dashboards: string[] }>();
+      for (const report of reportsForDelete.value) {
+        const entry = reports.get(report.report_id) ?? { name: report.name, dashboards: [] };
+        entry.dashboards.push(...(report.dashboards ?? []).map((d) => d.dashboard));
+        reports.set(report.report_id, entry);
+      }
+      // The server deletes a report only when every dashboard it covers is deleted; others just lose the link.
+      const names = [...reports.values()]
+        .filter((r) => r.dashboards.length && r.dashboards.every((d) => dashboardIds.includes(d)))
+        .map((r) => r.name)
+        .sort((a, b) => a.localeCompare(b));
+      if (!names.length) return undefined;
+      const shown = names.slice(0, REPORT_NAMES_SHOWN).join(", ");
+      const more = names.length - REPORT_NAMES_SHOWN;
+      if (more > 0) {
+        return t("dashboard.deleteDashboardReportsWarningMore", {
+          count: names.length,
+          names: shown,
+          more,
+        });
+      }
+      return t(
+        "dashboard.deleteDashboardReportsWarning",
+        { count: names.length, names: shown },
+        names.length,
+      );
+    };
+
+    const singleDeleteReportsWarning = computed(() =>
+      selectedDelete.value ? deleteReportsWarning([selectedDelete.value.id]) : undefined,
+    );
+    const bulkDeleteReportsWarning = computed(() => deleteReportsWarning(selectedIds.value));
+
     const showPlaylistDialog = ref(false);
     const playlistEntries = ref<PlaylistDialogEntry[]>([]);
 
@@ -1831,7 +1911,11 @@ export default defineComponent({
       window.open(href, "_blank", "noopener");
     };
 
-    const openBulkDeleteDialog = () => {
+    const openBulkDeleteDialog = async () => {
+      if (bulkDeleteLoading.value) return;
+      bulkDeleteLoading.value = true;
+      await loadReportsForDelete();
+      bulkDeleteLoading.value = false;
       confirmBulkDelete.value = true;
     };
 
@@ -2048,9 +2132,12 @@ export default defineComponent({
       routeToViewD,
       showDeleteDialogFn,
       confirmDeleteDialog,
+      deleteLoadingId,
       filterQuery,
 
       deleteDashboard,
+      singleDeleteReportsWarning,
+      bulkDeleteReportsWarning,
       duplicateDashboard,
       getDashboards,
       refreshDashboards,
