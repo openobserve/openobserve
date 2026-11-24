@@ -5235,7 +5235,18 @@
     "block": "封禁组织",
     "unblock": "解除封禁组织",
     "blockConfirmMessage": "封禁 {name}？在解除封禁之前，该组织将不再接受数据摄取、查询和登录。",
-    "blockConfirmLabel": "封禁"
+    "blockConfirmLabel": "封禁",
+    "favorites": "收藏",
+    "recent": "最近",
+    "allOrganizations": "所有组织",
+    "addToFavorites": "添加到收藏",
+    "removeFromFavorites": "从收藏中移除",
+    "addNamedToFavorites": "将 {name} 添加到收藏",
+    "removeNamedFromFavorites": "将 {name} 从收藏中移除",
+    "favoritesLimitReached": "最多 {max} 个收藏",
+    "manageOrganizations": "管理组织",
+    "switchToIt": "切换到该组织",
+    "switchToNewFailed": "新组织尚未出现在列表中。请刷新列表，然后从其所在行切换。"
   },
   "template": {
     "search": "搜索模板"
@@ -23876,6 +23887,7 @@
     },
     "actions": {
       "openCheatsheet": "打开键盘快捷键备忘单",
+      "openOrgSwitcher": "打开组织切换器",
       "closeDialog": "关闭任何对话框、抽屉或模态",
       "focusSearch": "聚焦搜索栏",
       "focusQuery": "聚焦查询编辑器",

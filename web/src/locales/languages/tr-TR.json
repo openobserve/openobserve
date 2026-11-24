@@ -5235,7 +5235,18 @@
     "block": "Kuruluşu engelle",
     "unblock": "Kuruluşun engelini kaldır",
     "blockConfirmMessage": "{name} engellensin mi? Engeli kaldırılana kadar veri alımı, sorgu ve oturum açma kabul edilmez.",
-    "blockConfirmLabel": "Engelle"
+    "blockConfirmLabel": "Engelle",
+    "favorites": "Sık Kullanılanlar",
+    "recent": "Son Kullanılanlar",
+    "allOrganizations": "Tüm kuruluşlar",
+    "addToFavorites": "Sık kullanılanlara ekle",
+    "removeFromFavorites": "Sık kullanılanlardan kaldır",
+    "addNamedToFavorites": "{name} öğesini sık kullanılanlara ekle",
+    "removeNamedFromFavorites": "{name} öğesini sık kullanılanlardan kaldır",
+    "favoritesLimitReached": "En fazla {max} sık kullanılan",
+    "manageOrganizations": "Kuruluşları yönet",
+    "switchToIt": "Ona geç",
+    "switchToNewFailed": "Yeni kuruluş henüz listede değil. Listeyi yenileyin ve kendi satırından geçiş yapın."
   },
   "template": {
     "search": "Şablon ara"
@@ -23876,6 +23887,7 @@
     },
     "actions": {
       "openCheatsheet": "Klavye kısayolları özet sayfasını aç",
+      "openOrgSwitcher": "Kuruluş değiştiriciyi aç",
       "closeDialog": "Açık iletişim kutusunu, çekmeceyi veya kalıcı pencereyi kapat",
       "focusSearch": "Arama çubuğuna odaklan",
       "focusQuery": "Sorgu düzenleyicisine odaklan",

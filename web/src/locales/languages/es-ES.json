@@ -5235,7 +5235,18 @@
     "block": "Bloquear organización",
     "unblock": "Desbloquear organización",
     "blockConfirmMessage": "¿Bloquear {name}? Dejará de aceptar ingesta, consultas e inicios de sesión hasta que se desbloquee.",
-    "blockConfirmLabel": "Bloquear"
+    "blockConfirmLabel": "Bloquear",
+    "favorites": "Favoritos",
+    "recent": "Recientes",
+    "allOrganizations": "Todas las organizaciones",
+    "addToFavorites": "Añadir a favoritos",
+    "removeFromFavorites": "Quitar de favoritos",
+    "addNamedToFavorites": "Añadir {name} a favoritos",
+    "removeNamedFromFavorites": "Quitar {name} de favoritos",
+    "favoritesLimitReached": "Hasta {max} favoritos",
+    "manageOrganizations": "Gestionar organizaciones",
+    "switchToIt": "Cambiar a ella",
+    "switchToNewFailed": "La nueva organización aún no está en la lista. Actualiza la lista y cambia desde su fila."
   },
   "template": {
     "search": "Buscar plantilla"
@@ -23876,6 +23887,7 @@
     },
     "actions": {
       "openCheatsheet": "Abrir hoja de referencia de atajos de teclado",
+      "openOrgSwitcher": "Abrir el selector de organizaciones",
       "closeDialog": "Cierre cualquier cuadro de diálogo, cajón o modal",
       "focusSearch": "Barra de búsqueda de enfoque",
       "focusQuery": "Editor de consultas de enfoque",

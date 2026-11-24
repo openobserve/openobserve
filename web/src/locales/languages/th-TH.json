@@ -5235,7 +5235,18 @@
     "block": "บล็อกองค์กร",
     "unblock": "เลิกบล็อกองค์กร",
     "blockConfirmMessage": "บล็อก {name} หรือไม่? องค์กรจะไม่รับการนำเข้าข้อมูล การค้นหา และการลงชื่อเข้าใช้จนกว่าจะเลิกบล็อก",
-    "blockConfirmLabel": "บล็อก"
+    "blockConfirmLabel": "บล็อก",
+    "favorites": "รายการโปรด",
+    "recent": "ล่าสุด",
+    "allOrganizations": "องค์กรทั้งหมด",
+    "addToFavorites": "เพิ่มในรายการโปรด",
+    "removeFromFavorites": "นำออกจากรายการโปรด",
+    "addNamedToFavorites": "เพิ่ม {name} ในรายการโปรด",
+    "removeNamedFromFavorites": "นำ {name} ออกจากรายการโปรด",
+    "favoritesLimitReached": "สูงสุด {max} รายการโปรด",
+    "manageOrganizations": "จัดการองค์กร",
+    "switchToIt": "สลับไปที่องค์กรนี้",
+    "switchToNewFailed": "องค์กรใหม่ยังไม่อยู่ในรายการ โปรดรีเฟรชรายการแล้วสลับจากแถวขององค์กรนั้น"
   },
   "template": {
     "search": "Search Template"
@@ -23874,6 +23885,7 @@
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
+      "openOrgSwitcher": "เปิดตัวสลับองค์กร",
       "closeDialog": "Close any dialog, drawer, or modal",
       "focusSearch": "Focus search bar",
       "focusQuery": "Focus query editor",

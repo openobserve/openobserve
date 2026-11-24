@@ -5235,7 +5235,18 @@
     "block": "Bloquear organização",
     "unblock": "Desbloquear organização",
     "blockConfirmMessage": "Bloquear {name}? Deixará de aceitar ingestão, consultas e inícios de sessão até ser desbloqueada.",
-    "blockConfirmLabel": "Bloquear"
+    "blockConfirmLabel": "Bloquear",
+    "favorites": "Favoritos",
+    "recent": "Recentes",
+    "allOrganizations": "Todas as organizações",
+    "addToFavorites": "Adicionar aos favoritos",
+    "removeFromFavorites": "Remover dos favoritos",
+    "addNamedToFavorites": "Adicionar {name} aos favoritos",
+    "removeNamedFromFavorites": "Remover {name} dos favoritos",
+    "favoritesLimitReached": "Até {max} favoritos",
+    "manageOrganizations": "Gerir organizações",
+    "switchToIt": "Mudar para essa",
+    "switchToNewFailed": "A nova organização ainda não está na lista. Atualize a lista e mude a partir da respetiva linha."
   },
   "template": {
     "search": "Pesquisar modelos"
@@ -23876,6 +23887,7 @@
     },
     "actions": {
       "openCheatsheet": "Abrir o guia rápido de atalhos de teclado",
+      "openOrgSwitcher": "Abrir o seletor de organizações",
       "closeDialog": "Fechar qualquer caixa de diálogo, gaveta ou modal",
       "focusSearch": "Focar a barra de pesquisa",
       "focusQuery": "Focar o editor de consultas",

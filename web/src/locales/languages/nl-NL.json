@@ -5235,7 +5235,18 @@
     "block": "Organisatie blokkeren",
     "unblock": "Organisatie deblokkeren",
     "blockConfirmMessage": "{name} blokkeren? Tot de deblokkering accepteert de organisatie geen ingestie, query's of aanmeldingen meer.",
-    "blockConfirmLabel": "Blokkeren"
+    "blockConfirmLabel": "Blokkeren",
+    "favorites": "Favorieten",
+    "recent": "Recent",
+    "allOrganizations": "Alle organisaties",
+    "addToFavorites": "Toevoegen aan favorieten",
+    "removeFromFavorites": "Verwijderen uit favorieten",
+    "addNamedToFavorites": "{name} toevoegen aan favorieten",
+    "removeNamedFromFavorites": "{name} verwijderen uit favorieten",
+    "favoritesLimitReached": "Maximaal {max} favorieten",
+    "manageOrganizations": "Organisaties beheren",
+    "switchToIt": "Ernaar overschakelen",
+    "switchToNewFailed": "De nieuwe organisatie staat nog niet in de lijst. Vernieuw de lijst en schakel over via de rij ervan."
   },
   "template": {
     "search": "Sjabloon zoeken"
@@ -23876,6 +23887,7 @@
     },
     "actions": {
       "openCheatsheet": "Cheatsheet voor sneltoetsen openen",
+      "openOrgSwitcher": "Open de organisatiewisselaar",
       "closeDialog": "Elke dialoog, lade of modaal sluiten",
       "focusSearch": "Focuszoekbalk",
       "focusQuery": "Editor voor focusquery's",

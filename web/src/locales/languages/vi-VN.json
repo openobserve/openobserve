@@ -5235,7 +5235,18 @@
     "block": "Chặn tổ chức",
     "unblock": "Bỏ chặn tổ chức",
     "blockConfirmMessage": "Chặn {name}? Tổ chức sẽ không nhận dữ liệu nhập, truy vấn và đăng nhập cho đến khi được bỏ chặn.",
-    "blockConfirmLabel": "Chặn"
+    "blockConfirmLabel": "Chặn",
+    "favorites": "Yêu thích",
+    "recent": "Gần đây",
+    "allOrganizations": "Tất cả tổ chức",
+    "addToFavorites": "Thêm vào yêu thích",
+    "removeFromFavorites": "Xóa khỏi yêu thích",
+    "addNamedToFavorites": "Thêm {name} vào yêu thích",
+    "removeNamedFromFavorites": "Xóa {name} khỏi yêu thích",
+    "favoritesLimitReached": "Tối đa {max} mục yêu thích",
+    "manageOrganizations": "Quản lý tổ chức",
+    "switchToIt": "Chuyển sang",
+    "switchToNewFailed": "Tổ chức mới chưa có trong danh sách. Hãy làm mới danh sách và chuyển từ hàng của tổ chức đó."
   },
   "template": {
     "search": "Tìm kiếm mẫu"
@@ -23876,6 +23887,7 @@
     },
     "actions": {
       "openCheatsheet": "Mở bảng phím tắt",
+      "openOrgSwitcher": "Mở trình chuyển đổi tổ chức",
       "closeDialog": "Đóng bất kỳ hộp thoại, ngăn kéo hoặc cửa sổ phương thức",
       "focusSearch": "Tập trung thanh tìm kiếm",
       "focusQuery": "Tập trung trình soạn thảo truy vấn",
