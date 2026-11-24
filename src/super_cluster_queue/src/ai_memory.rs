@@ -37,6 +37,10 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         );
         return Err(Error::Message("Invalid message type".to_string()));
     }
+    // Before decoding: an error would redeliver a message this region is only meant to drop.
+    if !db::ai_memory_replication::MEMORY_REPLICATION_ENABLED {
+        return Ok(());
+    }
     let msg = AiMemoryMessage::try_from(msg)?;
     let (org, scope, scope_key) = match &msg {
         AiMemoryMessage::Put(r) => (r.org.clone(), r.scope, r.scope_key.clone()),
@@ -114,6 +118,48 @@ mod tests {
             MessageType::SystemSettingsTable,
         );
         assert!(process(msg).await.is_err());
+    }
+
+    fn incoming(body: Vec<u8>) -> Message {
+        Message::new(
+            "/ai_memory/acme/org/".to_string(),
+            Some(bytes::Bytes::from(body)),
+            None,
+            false,
+            MessageType::AiMemoryTable,
+        )
+    }
+
+    #[tokio::test]
+    async fn while_replication_is_off_a_message_is_acked_and_dropped() {
+        assert!(process(incoming(b"not a memory".to_vec())).await.is_ok());
+        if config::get_config().common.meta_store != "sqlite" {
+            eprintln!("skipped: writes only to a SQLite meta store");
+            return;
+        }
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let org = format!("memory_off_{}", now_micros());
+        let put = AiMemoryMessage::Put(Box::new(config::meta::ai::memory::MemoryReplica {
+            org: org.clone(),
+            scope: MemoryScope::Org,
+            scope_key: String::new(),
+            content: "from eu".into(),
+            op_id: Some("op-1".into()),
+            updated_by: "user:u1".into(),
+            updated_at: 2,
+            region: "eu-1".into(),
+            settings: Default::default(),
+            revisions: vec![],
+        }));
+        assert!(
+            process(incoming(serde_json::to_vec(&put).unwrap()))
+                .await
+                .is_ok()
+        );
+        let conn = infra::db::get_orm_client_rw().await;
+        let keys = infra::table::ai_memory::list_keys_with(conn, &org).await;
+        assert!(keys.unwrap().is_empty());
     }
 
     #[test]

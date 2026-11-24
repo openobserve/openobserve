@@ -558,7 +558,7 @@ fn replace_once(content: &str, old: &str, new: &str, index: usize) -> Result<Str
     ))
 }
 
-/// One memory as another region gets it (super-cluster message 103): the applied head, its
+/// One memory as another region gets it (super-cluster message 108): the applied head, its
 /// settings and the revisions that travel with it, in plaintext. Its `Debug` leaves out the text
 /// and the user id a user memory is keyed by.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]

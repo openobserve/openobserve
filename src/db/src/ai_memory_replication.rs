@@ -13,9 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Super-cluster replication of AI memory (message 103): every write sends the memory as it now
-//! is, the newest head by `(time, region)` wins in every region, and deletes leave 30-day
-//! tombstones. Logs name the org and scope only, never a user id or memory text.
+//! Super-cluster replication of AI memory (message 108), off by [`MEMORY_REPLICATION_ENABLED`].
+//! The newest head by `(time, region)` wins. Logs never name a user id or memory text.
 
 use config::{meta::ai::memory::MemoryTombstone, utils::time::now_micros};
 use infra::{
@@ -29,6 +28,10 @@ use infra::{
 use o2_enterprise::enterprise::{
     common::config::get_config as get_o2_config, super_cluster::queue::AiMemoryMessage,
 };
+
+/// Off until its known cross-region problems are fixed: each region keeps its own AI memory.
+/// While off, nothing is sent or kept for sending, and other regions' messages are dropped.
+pub const MEMORY_REPLICATION_ENABLED: bool = false;
 
 /// Sends `key`'s memory as it now is; `also` is the id of a revision just discarded.
 pub async fn publish_put(key: &MemoryKey, also: Option<&str>) {
@@ -117,7 +120,9 @@ fn local_region() -> String {
 }
 
 fn replicating() -> bool {
-    get_o2_config().super_cluster.enabled && !config::get_config().common.local_mode
+    MEMORY_REPLICATION_ENABLED
+        && get_o2_config().super_cluster.enabled
+        && !config::get_config().common.local_mode
 }
 
 async fn send(msg: &AiMemoryMessage) {

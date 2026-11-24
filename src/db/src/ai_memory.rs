@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! AI memory reads and writes; every write ends in [`publish`] so other regions can follow it.
+//! AI memory reads and writes; every write ends in [`publish`], a no-op while replication is off.
 
 use config::{
     meta::ai::memory::{
@@ -251,7 +251,7 @@ pub async fn delete_toolset(
     Ok(deleted)
 }
 
-/// Sends `key`'s memory to the other regions of a super cluster.
+/// Sends `key`'s memory to the other regions of a super cluster while replication is on.
 async fn publish(key: &MemoryKey) {
     publish_with(key, None).await;
 }
