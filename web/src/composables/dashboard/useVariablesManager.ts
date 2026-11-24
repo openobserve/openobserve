@@ -108,7 +108,7 @@ const needsQueryOptions = (variable: VariableRuntimeState): boolean =>
   isCustomQueryVariable(variable) &&
   !variable.isLoading &&
   !variable.isVariableLoadingPending &&
-  !((variable as any).options?.length > 0);
+  !variable.options?.length;
 
 const holdsSelectAll = (variable: VariableRuntimeState): boolean =>
   Array.isArray(variable.value)

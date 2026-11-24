@@ -1434,4 +1434,70 @@ describe("useVariablesManager — query variables", () => {
     expect(env.isVariableLoadingPending).toBe(true);
     expect(zone.isVariableLoadingPending).toBe(false);
   });
+
+  // A value that arrived without a fetch (URL, adopted state) leaves the options its labels come from unloaded.
+  const settledWithoutOptions = (v: any, value: unknown) =>
+    Object.assign(v, {
+      value,
+      options: [],
+      isVariablePartialLoaded: true,
+      isVariableLoadingPending: false,
+      isLoading: false,
+    });
+
+  it("fetches a custom query variable's options when its tab shows, but not an auto one's", async () => {
+    const manager = useVariablesManager(gt);
+    await manager.initialize(
+      [
+        queryVar({ scope: "tabs", tabs: ["t1"], multiSelect: false }),
+        {
+          name: "zone",
+          type: "query_values",
+          scope: "tabs",
+          tabs: ["t1"],
+          query_data: { stream: "s", field: "zone" },
+        } as any,
+      ],
+      { tabs: [] },
+    );
+    const svc = settledWithoutOptions(manager.getVariable("svc", "tabs", "t1"), "checkout");
+    const zone = settledWithoutOptions(manager.getVariable("zone", "tabs", "t1"), "z1");
+
+    manager.setTabVisibility("t1", true);
+
+    expect(svc.isVariableLoadingPending).toBe(true);
+    expect(zone.isVariableLoadingPending).toBe(false);
+  });
+
+  it("fetches a kept custom query child's options when its parent settles on the same value", async () => {
+    const manager = useVariablesManager(gt);
+    await manager.initialize(
+      [
+        {
+          name: "region",
+          type: "custom",
+          scope: "global",
+          options: [{ label: "EU", value: "eu", selected: true }],
+        } as any,
+        queryVar({
+          multiSelect: false,
+          query_data: { query: "SELECT svc FROM logs WHERE region = '$region'" },
+        }),
+      ],
+      { tabs: [] },
+    );
+    const region = manager.getVariable("region", "global") as any;
+    region.value = "eu";
+    manager.onVariablePartiallyLoaded("region@global");
+    const svc = settledWithoutOptions(manager.getVariable("svc", "global"), "checkout");
+
+    manager.onVariablePartiallyLoaded("region@global");
+    expect(svc.value).toBe("checkout");
+    expect(svc.isVariableLoadingPending).toBe(true);
+
+    Object.assign(svc, { options: [{ label: "checkout", value: "checkout" }] });
+    svc.isVariableLoadingPending = false;
+    manager.onVariablePartiallyLoaded("region@global");
+    expect(svc.isVariableLoadingPending).toBe(false);
+  });
 });
