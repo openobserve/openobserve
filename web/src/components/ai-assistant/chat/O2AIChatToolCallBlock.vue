@@ -65,7 +65,7 @@ const memoryText = computed(() =>
 <template>
   <div
     v-if="memory"
-    class="tool-call-item text-text-secondary text-compact mb-2 flex items-center gap-2 px-3 py-1"
+    class="tool-call-item text-text-secondary rounded-default text-compact mb-2 flex max-w-full min-w-0 items-center gap-2 px-3 py-2"
     data-test="o2-ai-chat-memory-line"
   >
     <OIcon
@@ -74,17 +74,17 @@ const memoryText = computed(() =>
       :class="memory.kind === 'refused' ? 'text-status-negative' : 'text-status-positive'"
     />
     <span class="flex-1">{{ memoryText }}</span>
-    <router-link
-      v-if="!readonly && hasMemoryPage"
-      :to="{
-        name: 'aiMemory',
-        query: { org_identifier: store?.state.selectedOrganization?.identifier },
-      }"
-      class="text-primary text-xs"
-      data-test="o2-ai-chat-memory-link"
-    >
-      {{ t("aiMemory.open") }}
-    </router-link>
+    <OButton v-if="!readonly && hasMemoryPage" as-child variant="link" size="xs">
+      <router-link
+        data-test="o2-ai-chat-memory-link"
+        :to="{
+          name: 'aiMemory',
+          query: { org_identifier: store?.state.selectedOrganization?.identifier },
+        }"
+      >
+        {{ t("aiMemory.openPage") }}
+      </router-link>
+    </OButton>
   </div>
   <div
     v-else

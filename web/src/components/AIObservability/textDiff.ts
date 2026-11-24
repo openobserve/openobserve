@@ -55,8 +55,11 @@ function wordSegments(before: string, after: string): [DiffSegment[], DiffSegmen
 }
 
 /** Line diff of two texts, with word-level highlights on lines that were edited in place. */
+// Empty text has no lines, so a first version shows only additions.
+const toLines = (text: string): string[] => (text === "" ? [] : text.split("\n"));
+
 export function diffLines(before: string, after: string): DiffRow[] {
-  const ops = lcs(before.split("\n"), after.split("\n"));
+  const ops = lcs(toLines(before), toLines(after));
   const rows: DiffRow[] = [];
   let leftLine = 0;
   let rightLine = 0;
