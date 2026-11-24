@@ -62,6 +62,7 @@ use crate::{
         (status = 200, description = "Ingested; empty body"),
         (status = 400, description = "Not a protobuf body, the payload cannot be ingested, or part of it was not written", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+        (status = 503, description = "Ingester overloaded; retry", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -81,7 +82,10 @@ pub async fn remote_write(
     if content_type == "application/x-protobuf" {
         match metrics::prom::remote_write(&org_id, body, user).await {
             Ok(outcome) => remote_write_response(outcome),
-            Err(e) => MetaHttpResponse::bad_request(e),
+            Err(e) => match e.downcast_ref::<errors::Error>() {
+                Some(errors::Error::ResourceError(_)) => MetaHttpResponse::service_unavailable(e),
+                _ => MetaHttpResponse::bad_request(e),
+            },
         }
     } else {
         MetaHttpResponse::bad_request("Bad Request")
@@ -2008,6 +2012,43 @@ mod tests {
             .unwrap();
         let body = String::from_utf8_lossy(&body);
         assert!(body.contains("samples: 1"), "{body}");
+    }
+
+    // cloud builds check the org's trial before the memtable, which needs a live org
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn a_full_memtable_refuses_remote_write_with_503_and_a_bad_body_with_400() {
+        let full = config::get_config().limit.mem_table_max_size as i64;
+        let memtable = config::metrics::INGEST_MEMTABLE_ARROW_BYTES.with_label_values::<&str>(&[]);
+        for (fill, status, message) in [
+            (0, StatusCode::BAD_REQUEST, "Invalid snappy compressed data"),
+            (
+                full,
+                StatusCode::SERVICE_UNAVAILABLE,
+                "MemoryTableOverflowError",
+            ),
+        ] {
+            let mut headers = HeaderMap::new();
+            headers.insert("Content-Type", "application/x-protobuf".parse().unwrap());
+            memtable.add(fill);
+            let resp = remote_write(
+                Path("default".to_string()),
+                Headers(UserEmail {
+                    user_id: "a@a.com".to_string(),
+                }),
+                headers,
+                Bytes::from_static(b"\xff"),
+            )
+            .await;
+            memtable.sub(fill);
+            let got = resp.status();
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let body = String::from_utf8_lossy(&body);
+            assert_eq!(got, status, "{body}");
+            assert!(body.contains(message), "{body}");
+        }
     }
 
     #[test]
