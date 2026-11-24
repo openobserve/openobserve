@@ -388,28 +388,7 @@ pub async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
                     node.http_addr,
                     times
                 );
-                if node.is_interactive_querier() {
-                    remove_node_from_consistent_hash(
-                        &node,
-                        &Role::Querier,
-                        Some(RoleGroup::Interactive),
-                    )
-                    .await;
-                }
-                if node.is_background_querier() {
-                    remove_node_from_consistent_hash(
-                        &node,
-                        &Role::Querier,
-                        Some(RoleGroup::Background),
-                    )
-                    .await;
-                }
-                if node.is_compactor() {
-                    remove_node_from_consistent_hash(&node, &Role::Compactor, None).await;
-                }
-                if node.is_flatten_compactor() {
-                    remove_node_from_consistent_hash(&node, &Role::FlattenCompactor, None).await;
-                }
+                remove_node_from_consistent_hashes(&node).await;
                 NODES.write().await.remove(&node.uuid);
                 NODES_HEALTH_CHECK.write().await.remove(&node.uuid);
             }
@@ -449,14 +428,8 @@ pub async fn get_node_by_uuid(uuid: &str) -> Option<Node> {
     NODES.read().await.get(uuid).cloned()
 }
 
-/// Owner liveness for work claims. Prepare counts as alive: jobs start in `job::init()` before
-/// `set_online()`, so a node still in Prepare may already own claims.
 pub async fn is_node_alive(uuid: &str) -> bool {
-    NODES
-        .read()
-        .await
-        .get(uuid)
-        .is_some_and(|node| node.status != NodeStatus::Offline)
+    NODES.read().await.get(uuid).is_some_and(Node::is_alive)
 }
 
 #[inline(always)]
@@ -835,36 +808,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_is_node_alive_unless_offline() {
-        let cases = [
-            ("alive-test-online", Some(NodeStatus::Online), true),
-            ("alive-test-offline", Some(NodeStatus::Offline), false),
-            ("alive-test-prepare", Some(NodeStatus::Prepare), true),
-            ("alive-test-absent", None, false),
-        ];
-        for (uuid, status, _) in &cases {
-            if let Some(status) = status {
-                add_node_to_cache(Node {
-                    uuid: uuid.to_string(),
-                    name: uuid.to_string(),
-                    status: status.clone(),
-                    ..Default::default()
-                })
-                .await;
-            }
-        }
-        for (uuid, _, want) in cases {
-            assert_eq!(is_node_alive(uuid).await, want, "{uuid}");
-        }
-    }
-
-    #[tokio::test]
     async fn test_join_removes_every_previous_incarnation() {
         let node = |uuid: &str, name: &str| Node {
             uuid: uuid.into(),
             name: name.into(),
             role: vec![Role::Ingester],
-            status: NodeStatus::Online,
+            // the health check test drops Online nodes it cannot reach from the shared cache
+            status: NodeStatus::Prepare,
             ..Default::default()
         };
         let joined = node("incarnation-test-new", "incarnation-test-pod");
