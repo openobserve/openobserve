@@ -72,6 +72,14 @@ export const optionalFoldersQuery = (org: string, type: string) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
+/** One folder read by its id; a 404 means it is gone. */
+export const folderByIdQuery = (org: string, type: string, folderId: string) =>
+  queryOptions({
+    queryKey: folderKeys.detail(org, type, folderId),
+    queryFn: async (): Promise<Folder> => (await common.get_Folder(org, type, folderId)).data,
+    staleTime: NORMAL_STALE_TIME,
+  });
+
 export const nodesQuery = (org: string) =>
   queryOptions({
     queryKey: nodeKeys.list(org),

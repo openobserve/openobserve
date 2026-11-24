@@ -20,6 +20,15 @@ const fake = vi.hoisted(() => ({
   markRemoved: vi.fn(),
   push: vi.fn(async () => undefined),
   alerts: [] as Array<{ enabled: boolean }>,
+  holdAlerts: null as Promise<void> | null,
+  holdDashboards: null as Promise<void> | null,
+  deletedDashboards: [] as string[],
+  countLiveAlerts: vi.fn(
+    async (_pack: unknown, shown: PackInstallRecord, enabled: ReadonlySet<string>) =>
+      shown.items.filter(
+        ({ kind, status, id }) => kind === "alert" && status === "created" && enabled.has(id ?? ""),
+      ).length,
+  ),
 }));
 
 vi.mock("./useStarterPacks", () => ({
@@ -28,6 +37,7 @@ vi.mock("./useStarterPacks", () => ({
     previewPack: fake.previewPack,
     undoPack: fake.undoPack,
     removePack: fake.removePack,
+    countLiveAlerts: fake.countLiveAlerts,
     listInstalls: async () => {
       if (fake.listError) throw fake.listError;
       fake.onList?.();
@@ -36,7 +46,21 @@ vi.mock("./useStarterPacks", () => ({
   }),
 }));
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: fake.push }) }));
-vi.mock("@/composables/query/readQuery", () => ({ readQuery: async () => fake.alerts }));
+vi.mock("@/composables/query/readQuery", () => ({
+  readQuery: async ({ queryKey }: { queryKey: unknown[] }) => {
+    if (!queryKey.includes("dashboards")) {
+      if (fake.holdAlerts) await fake.holdAlerts;
+      return fake.alerts;
+    }
+    if (fake.holdDashboards) await fake.holdDashboards;
+    const folder = queryKey[queryKey.length - 1];
+    return fake.installs
+      .flatMap(({ items }) => items)
+      .filter(({ kind, id, folderId }) => kind === "dashboard" && id && folderId === folder)
+      .filter(({ id }) => !fake.deletedDashboards.includes(id!))
+      .map(({ id }) => ({ dashboard_id: id }));
+  },
+}));
 vi.mock("@/composables/useOrgResources", () => ({ refreshOrgResources: fake.refreshResources }));
 vi.mock("./useBrowserMatches", () => ({
   useBrowserMatches: () => ({ markRemoved: fake.markRemoved }),
@@ -141,7 +165,118 @@ describe("useStarterPackFlow", () => {
     fake.installs = [];
     fake.listError = null;
     fake.alerts = [];
+    fake.holdAlerts = null;
+    fake.holdDashboards = null;
+    fake.deletedDashboards = [];
     fake.previewPack.mockResolvedValue({ items: [], names: {}, notIncluded: [] });
+  });
+
+  it("counts as live only the alerts the record says an Undo would delete", async () => {
+    fake.installs = [record()];
+    fake.alerts = [
+      { alert_id: "al1", enabled: true },
+      { alert_id: "pre", enabled: true },
+    ] as any;
+    fake.countLiveAlerts.mockResolvedValueOnce(0);
+    const flow = setup();
+    await flow.load();
+    expect(fake.countLiveAlerts).not.toHaveBeenCalled();
+    expect(flow.alertsOn.value).toBeNull();
+    await flow.countAlertsOn();
+    expect(fake.countLiveAlerts).toHaveBeenCalledWith(
+      PACK,
+      fake.installs[0],
+      new Set(["al1", "pre"]),
+    );
+    expect(flow.alertsOn.value).toBe(0);
+    expect(flow.enabledAlertIds.value.has("pre")).toBe(true);
+  });
+
+  it("shows the count of the latest confirmation when an older count lands last", async () => {
+    fake.installs = [record(), record({ installId: "i2" })];
+    fake.alerts = [{ alert_id: "al1", enabled: true }] as any;
+    const flow = setup();
+    await flow.load();
+    let finishUndo!: (count: number) => void;
+    fake.countLiveAlerts.mockImplementationOnce(
+      () => new Promise<number>((done) => (finishUndo = done)),
+    );
+    const undoCount = flow.countAlertsOn("undo");
+    await flow.countAlertsOn("remove");
+    expect(flow.alertsOn.value).toBe(2);
+    finishUndo(1);
+    await undoCount;
+    expect(flow.alertsOn.value).toBe(2);
+  });
+
+  it("counts the enabled alerts when the confirmation opens before the load read them", async () => {
+    fake.installs = [record()];
+    fake.alerts = [{ alert_id: "al1", enabled: true }] as any;
+    let release!: () => void;
+    fake.holdAlerts = new Promise<void>((done) => (release = done));
+    const flow = setup();
+    const loading = flow.load();
+    await flushPromises();
+    expect(flow.record.value).not.toBeNull();
+    fake.holdAlerts = null;
+    await flow.countAlertsOn();
+    expect(flow.alertsOn.value).toBe(1);
+    release();
+    await loading;
+  });
+
+  it("counts Remove's live alerts across every install of the pack", async () => {
+    const second = record({ installId: "i2" });
+    fake.installs = [record(), second];
+    fake.alerts = [{ alert_id: "al1", enabled: true }] as any;
+    const flow = setup();
+    await flow.load();
+    await flow.countAlertsOn("undo");
+    expect(flow.alertsOn.value).toBe(1);
+    await flow.countAlertsOn("remove");
+    expect(flow.alertsOn.value).toBe(2);
+    expect(fake.countLiveAlerts).toHaveBeenLastCalledWith(PACK, second, new Set(["al1"]));
+  });
+
+  it("hides a dashboard deleted by hand from the pack's items and its Open link", async () => {
+    fake.installs = [record()];
+    fake.deletedDashboards = ["d1"];
+    const flow = setup();
+    await flow.load();
+    expect(flow.items.value.map(({ itemId }) => itemId)).toEqual(["a1"]);
+    expect(flow.made.value.map(({ itemId }) => itemId)).toEqual(["a1"]);
+    expect(flow.dashboardItem.value).toBeUndefined();
+  });
+
+  it("keeps a deleted dashboard hidden while a reload reads the folders again", async () => {
+    fake.installs = [record()];
+    fake.deletedDashboards = ["d1"];
+    const flow = setup();
+    await flow.load();
+    let release!: () => void;
+    fake.holdDashboards = new Promise<void>((done) => (release = done));
+    const reloading = flow.load();
+    await flushPromises();
+    expect(flow.items.value.map(({ itemId }) => itemId)).toEqual(["a1"]);
+    release();
+    await reloading;
+    expect(flow.items.value.map(({ itemId }) => itemId)).toEqual(["a1"]);
+  });
+
+  it("keeps a dashboard that is still there", async () => {
+    fake.installs = [record()];
+    const flow = setup();
+    await flow.load();
+    expect(flow.items.value.map(({ itemId }) => itemId)).toEqual(["overview", "a1"]);
+    expect(flow.dashboardItem.value?.id).toBe("d1");
+  });
+
+  it("calls an Undo with no setup to undo a failure", async () => {
+    const flow = setup();
+    await flow.load();
+    expect(await flow.undo()).toBe(false);
+    expect(flow.removalFailed.value).toBe(true);
+    expect(fake.undoPack).not.toHaveBeenCalled();
   });
 
   it("has no counts before the preview, then counts what the popup would create", async () => {
@@ -276,6 +411,7 @@ describe("useStarterPackFlow", () => {
     const flow = setup();
     await flow.install(undefined, { enableAlerts: true });
     expect(fake.installPack.mock.calls[0][1].enableAlerts).toBe(true);
+    await flow.countAlertsOn();
     expect(flow.alertsOn.value).toBe(1);
     expect(flow.enabledAlertIds.value.has("al1")).toBe(true);
   });
@@ -361,6 +497,7 @@ describe("useStarterPackFlow", () => {
     const flow = setup();
     await flow.install();
     expect(fake.installPack.mock.calls[0][1].enableAlerts).toBe(false);
+    await flow.countAlertsOn();
     expect(flow.alertsOn.value).toBe(0);
   });
 
