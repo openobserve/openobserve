@@ -20,34 +20,30 @@
            ring is a passive visual cue only — never steals keyboard focus,
            since a sample can land while the user is mid-typing somewhere
            else. -->
-      <div
-        class="rounded-default ring-2 transition-colors duration-300 motion-reduce:transition-none"
+      <OButton
+        variant="outline"
+        size="xs"
+        icon-left="data-array"
+        class="ring-2"
         :class="flashing ? 'ring-accent' : 'ring-transparent'"
         :data-flashing="flashing || undefined"
-        data-test="ai-playground-variables-trigger"
+        data-test="ai-playground-variables-btn"
       >
-        <OButton
-          variant="outline"
+        {{
+          varNames.length
+            ? t("aiObservability.playground.variablesCount", { count: varNames.length })
+            : t("aiObservability.playground.variables")
+        }}
+        <OTag
+          v-if="unseenVarNames.length"
+          variant="primary-soft"
           size="xs"
-          icon-left="data-array"
-          data-test="ai-playground-variables-btn"
+          class="ms-1"
+          data-test="ai-playground-variables-new-tag"
         >
-          {{
-            varNames.length
-              ? t("aiObservability.playground.variablesCount", { count: varNames.length })
-              : t("aiObservability.playground.variables")
-          }}
-          <OTag
-            v-if="unseenVarNames.length"
-            variant="primary-soft"
-            size="xs"
-            class="ms-1"
-            data-test="ai-playground-variables-new-tag"
-          >
-            {{ t("aiObservability.playground.newValueTag") }}
-          </OTag>
-        </OButton>
-      </div>
+          {{ t("aiObservability.playground.newValueTag") }}
+        </OTag>
+      </OButton>
     </template>
 
     <div class="flex w-96 flex-col gap-2 p-2">

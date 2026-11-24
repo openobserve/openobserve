@@ -91,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   appearance="inline"
                   :searchable="false"
                   class="shrink-0"
+                  :aria-label="t('panel.breakdown')"
                   data-test="dbm-metrics-load-breakdown"
                 />
                 <!-- How to read the chart is reference, so it opens on demand instead of truncating beside the title. -->

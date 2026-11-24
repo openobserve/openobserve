@@ -91,6 +91,7 @@ import {
   parsedQueryToPanelFields,
 } from "@/utils/query/sqlQueryParser";
 import { decodeBuildConfig } from "@/composables/useLogs/logsVisualization";
+import { dropFunnelConfig } from "@/utils/dashboard/convertFunnelData";
 import { extractWhereClause, parseWhereClauseToFilterChecked } from "@/utils/query/sqlUtils";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -328,6 +329,8 @@ const initializeFromQuery = async () => {
     dashboardPanelData.data.type = urlConfig.type;
     shouldAutoSelectChartType = false;
   }
+  // A re-derived type is never a funnel, so funnel settings from the URL apply only to a restored funnel.
+  dropFunnelConfig(dashboardPanelData.data);
 
   // Restore saved fields directly instead of parsing searchQuery, preserving the
   // exact builder/custom state.

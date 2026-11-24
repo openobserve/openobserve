@@ -1699,7 +1699,10 @@ describe("validatePanel on logs", () => {
   });
 });
 
-describe("validatePanel on a treemap with more than one query", () => {
+describe.each([
+  ["treemap", "dashboard.utils.treemapOneQuery"],
+  ["funnel", "dashboard.utils.funnelOneQuery"],
+] as const)("validatePanel on a %s with more than one query", (type, messageKey) => {
   const field = (alias: string) => ({
     alias,
     column: alias,
@@ -1717,7 +1720,7 @@ describe("validatePanel on a treemap with more than one query", () => {
     const errors: string[] = [];
     validatePanel(
       gt,
-      { data: { type: "treemap", queryType: "sql", config: {}, queries }, layout: {} },
+      { data: { type, queryType: "sql", config: {}, queries }, layout: {} },
       errors,
       true,
       [],
@@ -1727,7 +1730,7 @@ describe("validatePanel on a treemap with more than one query", () => {
     );
     return errors;
   };
-  const oneQuery = gt("dashboard.utils.treemapOneQuery");
+  const oneQuery = gt(messageKey);
 
   it("rejects two visible queries and accepts one visible beside a hidden one", () => {
     expect(run([query(), query()])).toContain(oneQuery);
@@ -1735,7 +1738,7 @@ describe("validatePanel on a treemap with more than one query", () => {
     expect(run([query()])).toEqual([]);
   });
 
-  it("still imports a saved multi-query treemap, which draws its first visible query", () => {
+  it("still imports a saved multi-query panel, which draws its first visible query", () => {
     const errors = validateDashboardJson(gt, {
       dashboardId: "d",
       title: "t",
@@ -1746,7 +1749,7 @@ describe("validatePanel on a treemap with more than one query", () => {
           name: "Default",
           panels: [
             {
-              type: "treemap",
+              type,
               id: "p-tree",
               title: "t",
               layout: { x: 0, y: 0, w: 1, h: 1, i: "tree" },
@@ -1756,6 +1759,6 @@ describe("validatePanel on a treemap with more than one query", () => {
         },
       ],
     });
-    expect(errors.some((error) => error.includes(oneQuery))).toBe(false);
+    expect(errors).toEqual([]);
   });
 });

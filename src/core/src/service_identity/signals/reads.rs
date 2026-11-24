@@ -427,6 +427,7 @@ async fn summarize(
                 &streams,
                 evidence.source_streams_overflow,
                 admin,
+                &ctx.evidence,
             )
             .await
         {
@@ -565,6 +566,7 @@ async fn deploy_readable(ctx: &Context, row: &deploys::Model) -> bool {
             &streams,
             row.source_streams_overflow,
             admin,
+            &ctx.evidence,
         )
         .await
 }

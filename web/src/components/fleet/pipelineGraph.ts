@@ -15,9 +15,9 @@
 
 import type { FleetPipeline } from "@/services/fleet";
 import { ratio } from "./flowIssues";
-import type { Telemetry } from "./flowTypes";
+import type { FlowSignal } from "./flowTypes";
 
-export type MapColumn = "fleet" | "receiver" | "destination" | "sink";
+export type MapColumn = "fleet" | "destination" | "sink";
 
 export interface MapNode {
   id: string;
@@ -28,7 +28,6 @@ export interface MapNode {
   rate: number | null;
   failed: number;
   dropped: number;
-  refused: number;
   queue: number | null;
   failedRatio: number;
   droppedRatio: number;
@@ -41,7 +40,8 @@ export interface MapEdge {
   id: string;
   source: string;
   target: string;
-  signal: Telemetry;
+  /** Names the unit only; a route carrying several signals counts items. */
+  signal: FlowSignal;
   rate: number | null;
   pipelines: string[];
   branch?: { kind: "failed" | "dropped"; ratio: number };
@@ -59,7 +59,7 @@ export interface PipelineMap {
   edges: MapEdge[];
 }
 
-const COLUMNS: MapColumn[] = ["fleet", "receiver", "destination"];
+const COLUMNS: MapColumn[] = ["fleet", "destination"];
 const MIN_COLUMN_GAP = 168;
 const PAD = 16;
 // The last column has no neighbour, so its failure branch and the label after it need their own room.
@@ -81,15 +81,9 @@ export function strokeWidth(rate: number | null, max: number): number {
   return MIN_WIDTH + ((MAX_WIDTH - MIN_WIDTH) * Math.log1p(rate)) / Math.log1p(max);
 }
 
-function receiverShare(p: FleetPipeline, rate: number | null): number {
-  const total = p.receivers.reduce((sum, r) => sum + (r.rate ?? 0), 0);
-  return total > 0 && rate !== null ? rate / total : 1 / Math.max(p.receivers.length, 1);
-}
-
 class MapBuilder {
   nodes = new Map<string, MapNode>();
   edges = new Map<string, MapEdge>();
-  receiverRates = new Map<string, Map<Telemetry, number | null>>();
 
   node(id: string, column: MapColumn, fleet: string, name: string): MapNode {
     const known = this.nodes.get(id);
@@ -102,7 +96,6 @@ class MapBuilder {
       rate: null,
       failed: 0,
       dropped: 0,
-      refused: 0,
       queue: null,
       failedRatio: 0,
       droppedRatio: 0,
@@ -120,6 +113,7 @@ class MapBuilder {
       e = { id, source, target, signal: p.signal, rate: null, pipelines: [] };
       this.edges.set(id, e);
     }
+    if (e.signal !== p.signal) e.signal = "all";
     if (!e.pipelines.includes(p.id)) e.pipelines.push(p.id);
     return e;
   }
@@ -142,24 +136,12 @@ class MapBuilder {
     }
   }
 
-  // A receiver feeding several pipelines of one signal copies its full rate to each, so those count once.
-  addReceivers(p: FleetPipeline, fleetNode: MapNode) {
-    for (const r of p.receivers) {
-      const rn = this.node(`r:${p.fleet}|${r.name}`, "receiver", p.fleet, r.name);
-      this.touch(rn, p);
-      const bySignal = this.receiverRates.get(rn.id) ?? new Map<Telemetry, number | null>();
-      bySignal.set(p.signal, maxRate(bySignal.get(p.signal) ?? null, r.rate));
-      this.receiverRates.set(rn.id, bySignal);
-      rn.rate = [...bySignal.values()].reduce<number | null>((sum, v) => addRate(sum, v), null);
-      rn.refused = Math.max(rn.refused, r.refused);
-      const fr = this.edge(`fr:${p.fleet}|${r.name}|${p.signal}`, fleetNode.id, rn.id, p);
-      fr.rate = maxRate(fr.rate, r.rate);
-      const share = receiverShare(p, r.rate);
-      for (const ex of p.exporters) {
-        const id = `rd:${p.fleet}|${r.name}|${ex.destination}|${p.signal}`;
-        const rd = this.edge(id, rn.id, `d:${ex.destination}`, p);
-        rd.rate = addRate(rd.rate, ex.rate === null ? null : ex.rate * share);
-      }
+  // One line per fleet and destination, whatever signals and pipelines share it.
+  addRoutes(p: FleetPipeline) {
+    for (const ex of p.exporters) {
+      const id = `fd:${p.fleet}|${ex.destination}`;
+      const e = this.edge(id, `f:${p.fleet}`, `d:${ex.destination}`, p);
+      e.rate = addRate(e.rate, ex.rate);
     }
   }
 
@@ -170,7 +152,10 @@ class MapBuilder {
       const sink = this.node(`x:${dn.id}`, "sink", dn.fleet, dn.name);
       sink.pipelines = [...dn.pipelines];
       sink.rate = failed ? dn.failed : dn.dropped;
-      const signal = [...this.edges.values()].find((e) => e.target === dn.id)?.signal ?? "logs";
+      const signals = [...this.edges.values()]
+        .filter((e) => e.target === dn.id)
+        .map((e) => e.signal);
+      const signal = new Set(signals).size === 1 ? signals[0] : "all";
       this.edges.set(`br:${dn.id}`, {
         id: `br:${dn.id}`,
         source: dn.id,
@@ -212,7 +197,7 @@ function place(nodes: MapNode[], layout: MapLayout) {
   }
 }
 
-/** Fleet → receiver → destination; nodes keep the order of the pipelines they first appear in. */
+/** Fleet → destination; nodes keep the order of the pipelines they first appear in. */
 export function buildPipelineMap(pipelines: FleetPipeline[], layout: MapLayout): PipelineMap {
   const b = new MapBuilder();
   for (const p of pipelines) {
@@ -220,8 +205,8 @@ export function buildPipelineMap(pipelines: FleetPipeline[], layout: MapLayout):
     b.touch(fleetNode, p);
     fleetNode.rate = addRate(fleetNode.rate, p.out_rate);
     b.addDestinations(p);
+    b.addRoutes(p);
   }
-  for (const p of pipelines) b.addReceivers(p, b.node(`f:${p.fleet}`, "fleet", p.fleet, p.fleet));
   b.addBranches();
   const nodes = [...b.nodes.values()];
   const order = (n: MapNode) => COLUMNS.indexOf(n.column);
