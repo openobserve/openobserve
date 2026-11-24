@@ -208,7 +208,7 @@ pub async fn data(
         // the SDKs read only the status, and the shared ingestion response would show every
         // browser the internal stream names and counts.
         Ok(_) => StatusCode::ACCEPTED.into_response(),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(e) => ingest_error_response(e),
     }
 }
 
@@ -272,7 +272,7 @@ pub async fn log(
         // the SDKs read only the status, and the shared ingestion response would show every
         // browser the internal stream names and counts.
         Ok(_) => StatusCode::ACCEPTED.into_response(),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(e) => ingest_error_response(e),
     }
 }
 
@@ -510,6 +510,15 @@ fn resource_write_status(result: &Result<(), ResourceWriteError>) -> StatusCode 
     }
 }
 
+/// The browser SDK retries a 5xx but drops a 400, so an overload refusal must answer 503.
+fn ingest_error_response(e: Error) -> Response {
+    if matches!(e, Error::ResourceError(_)) {
+        MetaHttpResponse::service_unavailable(e)
+    } else {
+        MetaHttpResponse::bad_request(e)
+    }
+}
+
 fn encoded_row_size(data: &Bytes) -> usize {
     data.len().div_ceil(3) * 4 + RESOURCE_ROW_OVERHEAD_BYTES
 }
@@ -742,7 +751,7 @@ pub async fn sessionreplay(
         // the SDKs read only the status, and the shared ingestion response would show every
         // browser the internal stream names and counts.
         Ok(_) => StatusCode::ACCEPTED.into_response(),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(e) => ingest_error_response(e),
     }
 }
 
@@ -1318,6 +1327,16 @@ mod tests {
         ] {
             assert_eq!(status(e.into()), StatusCode::INTERNAL_SERVER_ERROR);
         }
+    }
+
+    #[test]
+    fn an_overload_refusal_answers_503_and_any_other_ingest_error_400() {
+        let overload = Error::ResourceError("DiskCircuitBreakerError".to_string());
+        let status = ingest_error_response(overload).status();
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+        let refused = Error::IngestionError("not an ingester".to_string());
+        let status = ingest_error_response(refused).status();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
