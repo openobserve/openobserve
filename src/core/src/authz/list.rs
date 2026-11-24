@@ -28,7 +28,10 @@ use axum::{
     http::{HeaderName, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
-use config::{meta::stream::StreamType, metrics::authz as metrics};
+use config::{
+    meta::stream::{ALL_STREAM_TYPES, StreamType},
+    metrics::authz as metrics,
+};
 use futures::stream::StreamExt;
 
 use super::{
@@ -39,6 +42,11 @@ pub const SITE_SERVICE_STREAMS: Site = "service_streams";
 pub const SITE_SERVICE_STREAMS_CORRELATE: Site = "service_streams_correlate";
 pub const SITE_SERVICE_IDENTITY: Site = "service_identity";
 pub const SITE_SERVICE_EVIDENCE: Site = "service_evidence";
+pub const SITE_SECURITY_SOURCES: Site = "security_sources";
+pub const SITE_DB_MONITORING: Site = "db_monitoring";
+pub const SITE_AUTOOBSERVE_STREAMS: Site = "autoobserve_streams";
+pub const SITE_SERVICE_GRAPH: Site = "service_graph";
+pub const SITE_GEN_AI: Site = "gen_ai";
 
 /// OpenFGA accepts every id of this length in the covered alphabet, so a type answer decides it.
 pub(super) const MAX_COVERED_ID_LEN: usize = 200;
@@ -78,6 +86,12 @@ pub enum ModeAnswers {
     Legacy,
     Serve(TypeAnswers),
     Shadow(TypeAnswers),
+}
+
+pub enum ShadowComparison<'a> {
+    Requested,
+    Objects(&'a [ObjectRef<'a>]),
+    PreserveUnscoped(StreamType),
 }
 
 /// Which path answers a converted site (`O2_OPENFGA_LIST_AUTHZ_MODE`).
@@ -184,6 +198,92 @@ impl<'a> ObjectRef<'a> {
     }
 }
 
+/// The two Checks a converted site's `origin/main` loop sends, so its legacy copy also runs on a
+/// fake.
+#[async_trait::async_trait]
+pub trait LegacyChecks: Send + Sync {
+    async fn org_wide(&self, org_id: &str, user_id: &str, check: &OrgWideCheck<'_>) -> bool;
+
+    async fn object(
+        &self,
+        org_id: &str,
+        user_id: &str,
+        query: &ObjectsQuery<'_>,
+        object: &ObjectRef<'_>,
+    ) -> bool;
+}
+
+/// Sends each Check through `check_permissions` with the sites' own arguments.
+#[cfg(feature = "enterprise")]
+pub struct TodayChecks;
+
+#[cfg(feature = "enterprise")]
+#[async_trait::async_trait]
+impl LegacyChecks for TodayChecks {
+    async fn org_wide(&self, org_id: &str, user_id: &str, check: &OrgWideCheck<'_>) -> bool {
+        crate::auth::check_permissions(
+            org_id,
+            org_id,
+            user_id,
+            check.resource,
+            check.permission,
+            None,
+            check.use_all_org,
+            check.use_self_context,
+            check.use_self_parent,
+        )
+        .await
+    }
+
+    async fn object(
+        &self,
+        org_id: &str,
+        user_id: &str,
+        query: &ObjectsQuery<'_>,
+        object: &ObjectRef<'_>,
+    ) -> bool {
+        crate::auth::check_permissions(
+            &object.ofga_id,
+            org_id,
+            user_id,
+            object.stream_type.as_str(),
+            query.permission,
+            None,
+            false,
+            query.use_self_context,
+            query.use_self_parent,
+        )
+        .await
+    }
+}
+
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
+pub struct CheckerChecks<'a>(pub &'a dyn StreamAccessChecker);
+
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
+#[async_trait::async_trait]
+impl LegacyChecks for CheckerChecks<'_> {
+    async fn org_wide(&self, org_id: &str, user_id: &str, check: &OrgWideCheck<'_>) -> bool {
+        self.0
+            .org_wide_check(user_id, org_id, check)
+            .await
+            .unwrap_or(false)
+    }
+
+    async fn object(
+        &self,
+        org_id: &str,
+        user_id: &str,
+        query: &ObjectsQuery<'_>,
+        object: &ObjectRef<'_>,
+    ) -> bool {
+        self.0
+            .check_object(user_id, org_id, query, object)
+            .await
+            .unwrap_or(false)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Readable {
     /// Only from the bypass or a `true` prelude.
@@ -264,6 +364,20 @@ impl std::fmt::Display for AuthzUnavailable {
 
 impl std::error::Error for AuthzUnavailable {}
 
+/// First failure of an infallible callback chain; only the AutoObserve streams site uses it.
+#[derive(Default)]
+pub struct AuthzLatch(std::sync::OnceLock<AuthzUnavailable>);
+
+impl AuthzLatch {
+    pub fn record(&self, err: AuthzUnavailable) {
+        self.0.get_or_init(|| err);
+    }
+
+    pub fn failure(&self) -> Option<AuthzUnavailable> {
+        self.0.get().copied()
+    }
+}
+
 /// OSS form of the effective shape, so the trait needs no enterprise type.
 #[derive(Clone, Copy, Debug)]
 pub struct StreamShape<'a> {
@@ -338,6 +452,10 @@ pub struct TypeAnswers {
 }
 
 impl TypeAnswers {
+    pub fn reads_every(&self) -> bool {
+        matches!(self.answer, Answer::Every(_))
+    }
+
     /// Covered ids from the type answers, every other id by `check_object`.
     pub async fn decide(
         &self,
@@ -516,6 +634,49 @@ pub async fn authorize_objects(
     answers.decide(checker, query.site, objects).await
 }
 
+/// A converted object loop in the configured mode; `None` reads every requested object.
+pub async fn objects_in_mode<LF: Future<Output = Option<StreamSet>>>(
+    checker: &dyn StreamAccessChecker,
+    query: &ObjectsQuery<'_>,
+    objects: &[ObjectRef<'_>],
+    legacy: impl FnOnce() -> LF,
+) -> Result<Option<StreamSet>, AuthzUnavailable> {
+    let mut types = Vec::new();
+    for object in objects {
+        if !types.contains(&object.stream_type) {
+            types.push(object.stream_type);
+        }
+    }
+    let (readable, _) = answer_in_mode_with(
+        checker,
+        query.site,
+        query.user_id,
+        || {
+            objects
+                .iter()
+                .map(|object| (object.stream_type, object.id.to_string()))
+                .collect()
+        },
+        ShadowComparison::Objects(objects),
+        legacy,
+        |_| object_answers(checker, query, &types, objects),
+    )
+    .await?;
+    Ok(readable)
+}
+
+/// Type answers for `types`, then the objects they allow; `None` reads every object.
+pub async fn object_answers(
+    checker: &dyn StreamAccessChecker,
+    query: &ObjectsQuery<'_>,
+    types: &[StreamType],
+    objects: &[ObjectRef<'_>],
+) -> StreamAnswer {
+    let answers = type_answers(checker, query, types).await?;
+    let readable = answers.decide(checker, query.site, objects).await?;
+    Ok((readable.into_streams(), answers))
+}
+
 pub async fn type_answers(
     checker: &dyn StreamAccessChecker,
     query: &ObjectsQuery<'_>,
@@ -625,6 +786,24 @@ pub fn stream_read_query<'a>(
     }
 }
 
+/// The stream type spelled exactly `s` whose type-level answer is proved; never lowercased.
+pub fn listable_stream_type(s: &str) -> Option<StreamType> {
+    let stream_type = ALL_STREAM_TYPES.into_iter().find(|t| t.as_str() == s)?;
+    #[cfg(feature = "enterprise")]
+    let listable = o2_openfga::authorizer::list::is_listable(super::stream_model(stream_type));
+    #[cfg(not(feature = "enterprise"))]
+    let listable = matches!(
+        stream_type,
+        StreamType::Logs
+            | StreamType::Metrics
+            | StreamType::Traces
+            | StreamType::Profiles
+            | StreamType::Index
+            | StreamType::Metadata
+    );
+    listable.then_some(stream_type)
+}
+
 /// Runs the path the mode names; `shadow` returns the legacy answer and compares the new one.
 pub async fn answer_in_mode<
     LF: Future<Output = Option<StreamSet>>,
@@ -637,10 +816,35 @@ pub async fn answer_in_mode<
     legacy: impl FnOnce() -> LF,
     new: impl FnOnce() -> NF,
 ) -> Result<(Option<StreamSet>, ModeAnswers), AuthzUnavailable> {
+    answer_in_mode_with(
+        checker,
+        site,
+        user_id,
+        || requested.clone(),
+        ShadowComparison::Requested,
+        legacy,
+        |_| new(),
+    )
+    .await
+}
+
+/// As [`answer_in_mode`] for a site that lists its objects only once a path needs them.
+pub async fn answer_in_mode_with<
+    LF: Future<Output = Option<StreamSet>>,
+    NF: Future<Output = StreamAnswer>,
+>(
+    checker: &dyn StreamAccessChecker,
+    site: Site,
+    user_id: &str,
+    requested: impl FnOnce() -> StreamSet,
+    comparison: ShadowComparison<'_>,
+    legacy: impl FnOnce() -> LF,
+    new: impl FnOnce(ListMode) -> NF,
+) -> Result<(Option<StreamSet>, ModeAnswers), AuthzUnavailable> {
     let settings = checker.list_settings(user_id);
     match settings.mode {
         ListMode::Off => Ok((legacy().await, ModeAnswers::Legacy)),
-        ListMode::On => match new().await {
+        ListMode::On => match new(ListMode::On).await {
             Ok((readable, answers)) => Ok((readable, ModeAnswers::Serve(answers))),
             Err(err) => Err(unavailable(site, err)),
         },
@@ -654,13 +858,20 @@ pub async fn answer_in_mode<
             };
             let ((legacy_answer, legacy_errors), new_answer) = futures::join!(
                 counted(legacy()),
-                tokio::time::timeout(SHADOW_NEW_PATH_BUDGET, counted(new())),
+                tokio::time::timeout(SHADOW_NEW_PATH_BUDGET, counted(new(ListMode::Shadow))),
             );
             let Ok((new_answer, _)) = new_answer else {
                 shadow_skipped(site, "new_timeout");
                 return Ok((legacy_answer, ModeAnswers::Legacy));
             };
-            compare_shadow(site, requested, &legacy_answer, legacy_errors, &new_answer);
+            compare_shadow(
+                site,
+                &requested(),
+                comparison,
+                &legacy_answer,
+                legacy_errors,
+                &new_answer,
+            );
             let answers = match new_answer {
                 Ok((_, answers)) => ModeAnswers::Shadow(answers),
                 Err(_) => ModeAnswers::Legacy,
@@ -830,6 +1041,7 @@ async fn counted<F: Future>(fut: F) -> (F::Output, u32) {
 fn compare_shadow(
     site: Site,
     requested: &StreamSet,
+    comparison: ShadowComparison<'_>,
     legacy: &Option<StreamSet>,
     legacy_errors: u32,
     new: &StreamAnswer,
@@ -842,11 +1054,31 @@ fn compare_shadow(
         shadow_skipped(site, "new_error");
         return;
     };
-    let objects: Vec<_> = requested
-        .iter()
-        .map(|(stream_type, name)| ObjectRef::stream(*stream_type, name))
-        .collect();
-    for strategy in answers.decided_strategies(&objects) {
+    if let ShadowComparison::PreserveUnscoped(stream_type) = comparison
+        && legacy.is_none() != new.is_none()
+    {
+        let direction = if new.is_none() {
+            "new_allows_more"
+        } else {
+            "new_allows_less"
+        };
+        log::warn!("[authz] {site}: shadow scope mismatch on {stream_type} ({direction})");
+        metrics::AUTHZ_LIST_SHADOW_MISMATCH_TOTAL
+            .with_label_values(&[site, stream_type.as_str(), direction])
+            .inc();
+        return;
+    }
+    let strategies = match comparison {
+        ShadowComparison::Objects(objects) => answers.decided_strategies(objects),
+        ShadowComparison::Requested | ShadowComparison::PreserveUnscoped(_) => {
+            let objects: Vec<_> = requested
+                .iter()
+                .map(|(stream_type, name)| ObjectRef::stream(*stream_type, name))
+                .collect();
+            answers.decided_strategies(&objects)
+        }
+    };
+    for strategy in strategies {
         metrics::AUTHZ_LIST_SHADOW_COMPARED_TOTAL
             .with_label_values(&[site, strategy])
             .inc();
@@ -1726,6 +1958,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn objects_in_shadow_does_not_credit_lists_for_raw_ids() {
+        let _serial = SHADOW_TESTS.lock().await;
+        let fake = FakeStreamChecker::default();
+        let user = "shadow-raw-id@example.com";
+        let site = "shadow_raw_id";
+        fake.set_list_mode(user, ListMode::Shadow);
+        fake.set_shadow_sample(user, 1.0);
+        fake.set_list_policy(user, ListPolicy::Enabled);
+        grant(&fake, user, StreamType::Logs, "foo:bar");
+        let compared = metrics::AUTHZ_LIST_SHADOW_COMPARED_TOTAL.with_label_values(&[site, "list"]);
+        let before = compared.get();
+        let query = stream_read_query(site, ORG, user, &[StreamType::Logs]);
+        let objects = [ObjectRef {
+            id: "foo:bar",
+            stream_type: StreamType::Logs,
+            ofga_id: Cow::Borrowed("foo:bar"),
+        }];
+
+        let kept = objects_in_mode(&fake, &query, &objects, || async { Some(StreamSet::new()) })
+            .await
+            .unwrap();
+
+        assert_eq!(kept, Some(StreamSet::new()));
+        let calls = fake.calls(user);
+        assert_eq!((calls.lists, calls.object_checks), (1, 1));
+        assert_eq!(compared.get(), before);
+    }
+
+    #[tokio::test]
     async fn shadow_mode_answers_with_legacy_and_records_comparisons_and_mismatches() {
         let _serial = SHADOW_TESTS.lock().await;
         let fake = FakeStreamChecker::default();
@@ -2119,5 +2380,177 @@ mod tests {
                 "message": "Permission service unavailable, try again",
             })
         );
+    }
+
+    #[test]
+    fn authz_latch_keeps_the_first_failure() {
+        let latch = AuthzLatch::default();
+        let first = AuthzUnavailable::from(UnavailableReason::Timeout);
+        assert_eq!(latch.failure(), None);
+        latch.record(first);
+        latch.record(UnavailableReason::Transport.into());
+        assert_eq!(latch.failure(), Some(first));
+    }
+
+    #[test]
+    fn listable_stream_types_require_canonical_names_and_listable_models() {
+        for stream_type in [
+            StreamType::Logs,
+            StreamType::Metrics,
+            StreamType::Traces,
+            StreamType::Profiles,
+            StreamType::Index,
+            StreamType::Metadata,
+        ] {
+            assert_eq!(
+                listable_stream_type(stream_type.as_str()),
+                Some(stream_type)
+            );
+        }
+        for name in [
+            "Logs",
+            "foo",
+            "enrichment_tables",
+            "service_graph",
+            "file_list",
+            " logs",
+            "",
+        ] {
+            assert_eq!(listable_stream_type(name), None, "{name}");
+        }
+    }
+
+    #[tokio::test]
+    async fn checker_checks_preserve_grants_and_deny_check_errors() {
+        let fake = FakeStreamChecker::default();
+        let user = "s5-legacy-checks@example.com";
+        let checks = CheckerChecks(&fake);
+        let query = stream_read_query(SITE_DB_MONITORING, ORG, user, &[]);
+        let object = ObjectRef::stream(StreamType::Logs, "app");
+        let prelude = OrgWideCheck {
+            resource: "db_monitoring",
+            permission: "GET",
+            use_all_org: true,
+            use_self_context: true,
+            use_self_parent: false,
+        };
+        assert!(!checks.org_wide(ORG, user, &prelude).await);
+        assert!(!checks.object(ORG, user, &query, &object).await);
+        fake.grant_org_wide_check(user, ORG, prelude.resource);
+        grant(&fake, user, StreamType::Logs, "app");
+        assert!(checks.org_wide(ORG, user, &prelude).await);
+        assert!(checks.object(ORG, user, &query, &object).await);
+        fake.fail_org_wide_check_once(user, UnavailableReason::Timeout);
+        fake.fail_object_check_once(user, UnavailableReason::Transport);
+        assert!(!checks.org_wide(ORG, user, &prelude).await);
+        assert!(!checks.object(ORG, user, &query, &object).await);
+    }
+
+    #[tokio::test]
+    async fn objects_in_off_mode_returns_the_legacy_answer_unchanged() {
+        let fake = FakeStreamChecker::default();
+        let user = "s5-objects-off@example.com";
+        let query = stream_read_query(SITE_GEN_AI, ORG, user, &[]);
+        let objects = [ObjectRef::stream(StreamType::Logs, "app")];
+        let streams = typed(StreamType::Logs, &["app".to_string()]);
+        for legacy in [None, Some(StreamSet::new()), Some(streams)] {
+            let result = objects_in_mode(&fake, &query, &objects, || async { legacy.clone() })
+                .await
+                .unwrap();
+            assert_eq!(result, legacy);
+        }
+        assert_eq!(fake.calls(user).total(), 0);
+    }
+
+    #[tokio::test]
+    async fn objects_in_on_mode_returns_none_for_a_prelude_grant() {
+        let fake = FakeStreamChecker::default();
+        let user = "s5-objects-prelude@example.com";
+        on(&fake, user);
+        fake.grant_org_wide_check(user, ORG, "db_monitoring");
+        let mut query = stream_read_query(SITE_DB_MONITORING, ORG, user, &[]);
+        query.prelude = Some(OrgWideCheck {
+            resource: "db_monitoring",
+            permission: "GET",
+            use_all_org: true,
+            use_self_context: true,
+            use_self_parent: false,
+        });
+        let objects = [ObjectRef::stream(StreamType::Logs, "app")];
+        let result = within_budget(
+            1,
+            objects_in_mode(&fake, &query, &objects, || async {
+                panic!("on mode must not call legacy")
+            }),
+        )
+        .await
+        .unwrap();
+        assert_eq!(result, None);
+        let calls = fake.calls(user);
+        assert_eq!(calls.org_wide_checks, 1);
+        assert_eq!((calls.types_access, calls.object_checks), (0, 0));
+    }
+
+    #[tokio::test]
+    async fn objects_in_on_mode_decides_each_requested_type_once() {
+        let fake = FakeStreamChecker::default();
+        let user = "s5-objects-types@example.com";
+        on(&fake, user);
+        grant(&fake, user, StreamType::Metrics, "shared");
+        let mut query = stream_read_query(SITE_GEN_AI, ORG, user, &[StreamType::Profiles]);
+        query.use_self_parent = false;
+        let objects = [
+            ObjectRef::stream(StreamType::Metrics, "shared"),
+            ObjectRef::stream(StreamType::Logs, "shared"),
+            ObjectRef::stream(StreamType::Metrics, "shared"),
+            ObjectRef::stream(StreamType::Traces, "denied"),
+        ];
+        let result = within_budget(
+            4,
+            objects_in_mode(&fake, &query, &objects, || async {
+                panic!("on mode must not call legacy")
+            }),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            result,
+            Some(typed(StreamType::Metrics, &["shared".to_string()]))
+        );
+        let calls = fake.calls(user);
+        assert_eq!(
+            (calls.types_access, calls.lists, calls.object_checks),
+            (1, 3, 0)
+        );
+    }
+
+    #[tokio::test]
+    async fn objects_in_mode_propagates_new_path_errors_only_in_on_mode() {
+        let _serial = SHADOW_TESTS.lock().await;
+        for mode in [ListMode::Off, ListMode::Shadow, ListMode::On] {
+            let fake = FakeStreamChecker::default();
+            let user = "s5-objects-error@example.com";
+            fake.set_list_mode(user, mode);
+            fake.set_shadow_sample(user, 1.0);
+            fake.fail_types_access_once(user, UnavailableReason::Timeout);
+            let query = stream_read_query(SITE_AUTOOBSERVE_STREAMS, ORG, user, &[]);
+            let objects = [ObjectRef::stream(StreamType::Logs, "app")];
+            let legacy = typed(StreamType::Logs, &["app".to_string()]);
+            let legacy_called = AtomicBool::new(false);
+            let result = objects_in_mode(&fake, &query, &objects, || async {
+                legacy_called.store(true, Ordering::Relaxed);
+                Some(legacy.clone())
+            })
+            .await;
+            match mode {
+                ListMode::On => assert_eq!(result, Err(UnavailableReason::Timeout.into())),
+                ListMode::Off | ListMode::Shadow => assert_eq!(result, Ok(Some(legacy))),
+            }
+            assert_eq!(legacy_called.load(Ordering::Relaxed), mode != ListMode::On);
+            assert_eq!(
+                fake.calls(user).types_access,
+                usize::from(mode != ListMode::Off)
+            );
+        }
     }
 }

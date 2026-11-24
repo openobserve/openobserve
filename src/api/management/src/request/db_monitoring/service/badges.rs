@@ -82,6 +82,44 @@ impl BadgeSliceResults {
         }
         body
     }
+
+    /// A list-authz outage in any slice answers the typed 503, as the Databases and Queries tabs
+    /// do.
+    pub(crate) fn into_response(self) -> HttpResponse {
+        #[cfg(feature = "enterprise")]
+        let mut slices = self;
+        #[cfg(not(feature = "enterprise"))]
+        let slices = self;
+
+        #[cfg(feature = "enterprise")]
+        if let Some(response) = slices.take_authz_unavailable() {
+            return response;
+        }
+        if slices.all_forbidden() {
+            return unauthorized_response();
+        }
+        MetaHttpResponse::json(slices.into_envelope())
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn take_authz_unavailable(&mut self) -> Option<HttpResponse> {
+        let members = [
+            Some(&mut self.databases),
+            Some(&mut self.queries),
+            Some(&mut self.activity),
+            Some(&mut self.deadlocks),
+            Some(&mut self.blocking),
+            Some(&mut self.table_health),
+            self.server_queries.as_mut(),
+            self.server_samples.as_mut(),
+        ];
+        for member in members.into_iter().flatten() {
+            if member.as_ref().is_err_and(is_authz_unavailable) {
+                return std::mem::replace(member, Ok(Value::Null)).err();
+            }
+        }
+        None
+    }
 }
 
 /// Whether the client-vantage databases slice summed EXACTLY zero finished
@@ -311,10 +349,7 @@ pub(crate) async fn read_badges_response(
         server_queries,
         server_samples,
     };
-    if slices.all_forbidden() {
-        return unauthorized_response();
-    }
-    MetaHttpResponse::json(slices.into_envelope())
+    slices.into_response()
 }
 
 // ─── FR-1 instance health · the receiver-vantage metric sweep ────────────────
@@ -338,6 +373,8 @@ pub(crate) async fn read_badges_response(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "enterprise")]
+    use openobserve_core::authz::list::{UnavailableReason, authz_unavailable_response};
     use serde_json::json;
 
     use super::{super::testutil::*, *};
@@ -354,6 +391,70 @@ mod tests {
             server_queries: None,
             server_samples: None,
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_badges_authz_unavailable_slice_answers_the_typed_503() {
+        for fallback in [false, true] {
+            let mut slices = all_ok_slices();
+            let unavailable = Err(authz_unavailable_response(
+                UnavailableReason::Timeout.into(),
+            ));
+            if fallback {
+                slices.server_samples = Some(unavailable);
+            } else {
+                slices.queries = unavailable;
+            }
+            let resp = slices.into_response();
+            assert_eq!(resp.status(), axum::http::StatusCode::SERVICE_UNAVAILABLE);
+            assert_eq!(resp.headers()["retry-after"], "3");
+            assert_eq!(resp.headers()["x-o2-authz"], "unavailable");
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert_eq!(
+                serde_json::from_slice::<Value>(&body).unwrap(),
+                json!({
+                    "code": 503,
+                    "error_code": "authz_unavailable",
+                    "message": "Permission service unavailable, try again",
+                })
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_badges_into_response_keeps_today_answers() {
+        let resp = all_ok_slices().into_response();
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(
+            serde_json::from_slice::<Value>(&body).unwrap(),
+            all_ok_slices().into_envelope()
+        );
+
+        let mut slices = all_ok_slices();
+        slices.queries = Err(MetaHttpResponse::internal_error("search failed"));
+        assert_eq!(slices.into_response().status(), axum::http::StatusCode::OK);
+
+        let denied = || -> Result<Value, HttpResponse> { Err(unauthorized_response()) };
+        let slices = BadgeSliceResults {
+            databases: denied(),
+            queries: denied(),
+            activity: denied(),
+            deadlocks: denied(),
+            blocking: denied(),
+            table_health: denied(),
+            server_queries: None,
+            server_samples: None,
+        };
+        assert_eq!(
+            slices.into_response().status(),
+            axum::http::StatusCode::FORBIDDEN
+        );
     }
 
     /// The envelope carries each endpoint's body UNDER ITS OWN KEY, unchanged

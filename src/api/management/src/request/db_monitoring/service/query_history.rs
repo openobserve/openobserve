@@ -353,28 +353,13 @@ pub(crate) async fn read_query_history_response(
     let below = below_top_n_windows(&windows_with_data, &fp_windows);
     let (to_backfill, flag_only) = split_backfill_windows(below, HISTORY_BACKFILL_MAX_WINDOWS);
 
-    // Backfill needs ONE raw trace stream: the explicit param, else the unique
-    // trace_stream_name of the window rows. Ambiguous multi-stream scopes skip
-    // backfill (flag-only) rather than guess.
-    //
-    // Resolved BEFORE the backfill runs and intersected with what the caller may
-    // read (see `resolve_backfill_stream`): the inferred name comes from
-    // org-scoped rollup rows, so without this the backfill could aggregate raw
-    // spans from a stream this caller has no access to.
-    let readable_streams: BTreeSet<String> = involved_streams(
-        org_id,
-        user_id,
-        // The explicit param is deliberately NOT passed: it is already gated at
-        // the top of this handler, and `involved_streams` would return `None`
-        // for an unreadable one — collapsing the readable set that the INFERRED
-        // branch needs. Here we only ever want "what may this caller read".
-        None,
-        &[&totals_rows[..]],
-    )
-    .await
-    .unwrap_or_default()
-    .into_iter()
-    .collect();
+    // Org-scoped rollups can name streams the caller cannot read, so filter
+    // inferred candidates before backfill reads raw spans.
+    let readable_streams =
+        match history_readable_streams(org_id, user_id, q.stream.as_ref(), &totals_rows).await {
+            Ok(streams) => streams,
+            Err(resp) => return resp,
+        };
     let backfill_stream: Option<String> =
         resolve_backfill_stream(q.stream.as_ref(), &totals_rows, &readable_streams);
 
@@ -438,12 +423,12 @@ pub(crate) async fn read_query_history_response(
         // through `involved_streams`, which returns `None` for an unreadable
         // name so the handler can still 403 on it.
         let streams: Vec<String> = match q.stream.as_ref() {
-            Some(_) => {
-                involved_streams(org_id, user_id, q.stream.as_ref(), &[&totals_rows[..]]).await?
-            }
+            Some(_) => involved_streams(org_id, user_id, q.stream.as_ref(), &[&totals_rows[..]])
+                .await?
+                .ok_or_else(unauthorized_response)?,
             None => readable_streams.iter().cloned().collect(),
         };
-        Some(collect_tails(org_id, &streams, start_time, end_time).await)
+        Ok::<_, HttpResponse>(collect_tails(org_id, &streams, start_time, end_time).await)
     };
     // FR-5 calling endpoints, folded into this response when asked for.
     //
@@ -488,8 +473,9 @@ pub(crate) async fn read_query_history_response(
     }
     series.sort_by_key(|p| get_i64(p, "timestamp"));
 
-    let Some(collected) = collected else {
-        return unauthorized_response();
+    let collected = match collected {
+        Ok(collected) => collected,
+        Err(resp) => return resp,
     };
     let tail_rows: Vec<Value> = collected
         .tails
@@ -567,8 +553,30 @@ pub(crate) async fn read_query_history_response(
     MetaHttpResponse::json(body)
 }
 
+async fn history_readable_streams(
+    org_id: &str,
+    user_id: &str,
+    stream_param: Option<&String>,
+    totals_rows: &[Value],
+) -> Result<BTreeSet<String>, HttpResponse> {
+    if stream_param.is_some() {
+        return Ok(BTreeSet::new());
+    }
+    Ok(involved_streams(org_id, user_id, None, &[totals_rows])
+        .await?
+        .unwrap_or_default()
+        .into_iter()
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "enterprise")]
+    use openobserve_core::authz::{
+        fake_checker,
+        list::{ListMode, UnavailableReason},
+        within_budget,
+    };
     use serde_json::json;
 
     use super::{super::testutil::*, *};
@@ -668,6 +676,48 @@ mod tests {
             "the explicit param has its own gate; re-filtering here would 200 \
              where the handler must 403"
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn history_readable_streams_skips_authz_for_explicit_stream() {
+        let fake = fake_checker();
+        let user = format!("dbm_history_explicit_{}", config::ider::uuid());
+        fake.set_list_mode(&user, ListMode::On);
+        fake.fail_every_call(&user, UnavailableReason::Timeout);
+        let stream = "explicit".to_string();
+        let rows = [json!({ "trace_stream_name": "explicit" })];
+
+        let readable = within_budget(
+            0,
+            history_readable_streams("dbm-history", &user, Some(&stream), &rows),
+        )
+        .await
+        .unwrap();
+        assert!(readable.is_empty());
+        assert_eq!(fake.calls(&user).total(), 0);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn history_readable_streams_propagates_authz_timeout_without_stream() {
+        let fake = fake_checker();
+        let user = format!("dbm_history_inferred_{}", config::ider::uuid());
+        fake.set_list_mode(&user, ListMode::On);
+        fake.fail_every_call(&user, UnavailableReason::Timeout);
+        let rows = [json!({ "trace_stream_name": "inferred" })];
+
+        let response = within_budget(
+            1,
+            history_readable_streams("dbm-history", &user, None, &rows),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            response.status(),
+            axum::http::StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert_eq!(response.headers()["x-o2-authz"], "unavailable");
     }
 
     /// Asserted on SOURCE ORDER because it cannot be asserted on behaviour here:

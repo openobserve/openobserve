@@ -105,6 +105,8 @@ pub(super) async fn read_queries_body(
                 ],
                 false,
             ),
+            #[cfg(feature = "enterprise")]
+            Err(resp) if is_authz_unavailable(&resp) => return Err(resp),
             Err(_) => stamp_baseline_sections(
                 &mut body,
                 vec![("baseline_hits", json!([])), ("baseline_other", json!([]))],
@@ -170,7 +172,8 @@ async fn read_queries_window(
     // `bypass: false`), which `can_read_stream` treats as authorizing every
     // stream's DB rows -- see its doc comment. Filtering the pool by `streams`
     // would be a no-op that reads as a boundary this endpoint does not have.
-    let Some(streams) = involved_streams(org_id, user_id, q.stream.as_ref(), &[&qs_rows[..]]).await
+    let Some(streams) =
+        involved_streams(org_id, user_id, q.stream.as_ref(), &[&qs_rows[..]]).await?
     else {
         return Err(unauthorized_response());
     };
