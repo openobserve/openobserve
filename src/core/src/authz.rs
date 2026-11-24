@@ -405,8 +405,9 @@ impl StreamAccessChecker for OpenFgaStreamChecker {
         let model = OFGA_MODELS
             .get(type_str)
             .map_or(type_str, |model| model.key);
+        // the stored email, as `auth::check_permissions` uses, in case the header differs in case
         check_permissions(
-            user_id,
+            &user.email,
             AuthExtractor {
                 auth: "".to_string(),
                 method: "GET".to_string(),
@@ -453,9 +454,13 @@ impl StreamAccessChecker for OpenFgaStreamChecker {
                     .map_or(type_str, |model| model.key)
             })
             .collect();
-        let readable =
-            o2_openfga::authorizer::authz::org_wide_readable_types(org_id, user_id, &role, &models)
-                .await;
+        let readable = o2_openfga::authorizer::authz::org_wide_readable_types(
+            org_id,
+            &user.email,
+            &role,
+            &models,
+        )
+        .await;
         wanted
             .iter()
             .zip(models)
@@ -528,9 +533,12 @@ impl StreamReadMemo {
         if unrestricted {
             return true;
         }
+        let shortcut = org_wide_shortcut_covers(stream_type, name);
         let (cell, first_of_type) = {
             let mut cells = self.streams.lock().unwrap_or_else(|e| e.into_inner());
-            let first = !cells.keys().any(|(t, _)| *t == stream_type);
+            let first = !cells
+                .keys()
+                .any(|(t, n)| *t == stream_type && org_wide_shortcut_covers(*t, n));
             let cell = cells.entry((stream_type, name.to_string())).or_default();
             (cell.clone(), first)
         };
@@ -538,7 +546,7 @@ impl StreamReadMemo {
         *cell
             .get_or_init(|| async {
                 (!first_of_type
-                    && org_wide_grant_covers(name)
+                    && shortcut
                     && self.org_wide(checker, user_id, org_id, stream_type).await)
                     || checker
                         .can_read_stream(
@@ -1136,13 +1144,17 @@ pub(crate) async fn readable_streams(
         return None;
     }
     let mut per_type: std::collections::HashMap<StreamType, usize> = Default::default();
-    for (stream_type, _) in &streams {
-        *per_type.entry(*stream_type).or_default() += 1;
+    for (stream_type, name) in &streams {
+        if org_wide_shortcut_covers(*stream_type, name) {
+            *per_type.entry(*stream_type).or_default() += 1;
+        }
     }
     // A lone stream's own Check already counts the org-wide grants, so asking first costs more.
-    let (covered, mut to_check): (Vec<_>, Vec<_>) = streams
-        .into_iter()
-        .partition(|(stream_type, name)| per_type[stream_type] > 1 && org_wide_grant_covers(name));
+    let (covered, mut to_check): (Vec<_>, Vec<_>) =
+        streams.into_iter().partition(|(stream_type, name)| {
+            org_wide_shortcut_covers(*stream_type, name)
+                && per_type.get(stream_type).is_some_and(|n| *n > 1)
+        });
     let mut readable = HashSet::new();
     if !covered.is_empty() {
         let mut types: Vec<StreamType> = Vec::new();
@@ -1255,6 +1267,20 @@ fn org_wide_grant_covers(stream_name: &str) -> bool {
         && id
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'=' | b'-'))
+}
+
+/// True when an org-wide grant decides the stream; `stream:_all_` never reaches enrichment tables.
+#[cfg(any(feature = "enterprise", test))]
+fn org_wide_shortcut_covers(stream_type: StreamType, name: &str) -> bool {
+    matches!(
+        stream_type,
+        StreamType::Logs
+            | StreamType::Metrics
+            | StreamType::Traces
+            | StreamType::Profiles
+            | StreamType::Index
+            | StreamType::Metadata
+    ) && org_wide_grant_covers(name)
 }
 
 #[cfg(any(feature = "enterprise", test))]
@@ -1792,8 +1818,7 @@ mod tests {
         }
     }
 
-    // o2-enterprise#3642: a `{type}:_all_` grant reaches a lone stream only through selfParent,
-    // and DB monitoring's `?stream=` relies on it.
+    // o2-enterprise#3642: DB monitoring's `?stream=` reads `{type}:_all_` through selfParent.
     #[test]
     fn the_live_stream_check_counts_per_type_all_grants() {
         let source = include_str!("authz.rs");
@@ -1808,6 +1833,10 @@ mod tests {
         let check = &check[..check.find("async fn org_wide_readable(").unwrap()];
         assert!(check.contains("use_self_parent: true"));
         assert!(check.contains("use_self_context: false"));
+        assert!(
+            check.contains("&user.email,"),
+            "OpenFGA must get the stored email"
+        );
     }
 
     fn related(logs: &[&str], traces: &[&str], metrics: &[&str]) -> RelatedStreams {
@@ -1952,8 +1981,7 @@ mod tests {
             .collect()
     }
 
-    // o2-enterprise#3642: a stream named on many rows costs one Check, an org-wide type one
-    // question.
+    // o2-enterprise#3642: a stream on many rows costs one Check, a wide type one question.
     #[cfg(all(feature = "enterprise", feature = "test-utils"))]
     #[tokio::test]
     async fn stream_read_memo_checks_each_stream_and_type_once() {
@@ -2024,6 +2052,65 @@ mod tests {
         let calls = checker.calls("u1");
         assert_eq!(calls.streams, 4);
         assert_eq!(calls.org_wide.len(), 1);
+    }
+
+    // A `stream:_all_` grant does not reach enrichment tables, so their own Check always decides.
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn enrichment_tables_never_take_the_org_wide_shortcut() {
+        let checker = FakeStreamChecker::default();
+        let wanted: HashSet<(StreamType, String)> = ["t1", "t2", "t3"]
+            .into_iter()
+            .map(|name| (StreamType::EnrichmentTables, name.to_string()))
+            .chain([
+                (StreamType::Logs, "app".to_string()),
+                (StreamType::Logs, "a b/c".repeat(200)),
+            ])
+            .collect();
+        let kept = readable_streams(&checker, "u1", "o1", wanted).await;
+        assert_eq!(kept, Some(HashSet::new()));
+        let calls = checker.calls("u1");
+        assert!(calls.org_wide.is_empty(), "{:?}", calls.org_wide);
+        assert_eq!(calls.streams, 5);
+
+        let memo = StreamReadMemo::default();
+        for name in ["t1", "t2"] {
+            assert!(
+                !memo
+                    .can_read(&checker, "u2", "o1", StreamType::EnrichmentTables, name)
+                    .await
+            );
+        }
+        assert!(checker.calls("u2").org_wide.is_empty());
+    }
+
+    // The shortcut's types are OpenFGA's stream resources, whose GET reads its parent.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn org_wide_shortcut_types_are_the_openfga_stream_resources() {
+        use o2_openfga::meta::mapping::{OFGA_MODELS, is_stream_resource};
+
+        for stream_type in [
+            StreamType::Logs,
+            StreamType::Metrics,
+            StreamType::Traces,
+            StreamType::Profiles,
+            StreamType::ServiceGraph,
+            StreamType::EnrichmentTables,
+            StreamType::Filelist,
+            StreamType::Metadata,
+            StreamType::Index,
+        ] {
+            let type_str = stream_type.as_str();
+            let model = OFGA_MODELS
+                .get(type_str)
+                .map_or(type_str, |model| model.key);
+            assert_eq!(
+                org_wide_shortcut_covers(stream_type, "s"),
+                is_stream_resource(model),
+                "{type_str}"
+            );
+        }
     }
 
     #[tokio::test]
@@ -2223,11 +2310,12 @@ mod tests {
         let longest = "a".repeat(MAX_SHORTCUT_ID_LEN);
         let too_long = "a".repeat(MAX_SHORTCUT_ID_LEN + 1);
         let refused = [too_long.as_str(), "", "*", "a\u{1}b", "caf\u{e9}"];
-        let mut all = wanted(&[(Logs, longest.as_str())]);
+        let shortcut = wanted(&[(Logs, longest.as_str()), (Logs, "app")]);
+        let mut all = shortcut.clone();
         all.extend(wanted(&refused.map(|name| (Logs, name))));
         let checker = FakeChecker::default().reads_all("u1", "o1", Logs);
         let kept = readable_streams(&checker, "u1", "o1", all).await;
-        assert_eq!(kept, Some(wanted(&[(Logs, longest.as_str())])));
+        assert_eq!(kept, Some(shortcut));
         assert_eq!(checker.stream_checks(), refused.len());
 
         let only_refused = FakeChecker::default().reads_all("u1", "o1", Logs);

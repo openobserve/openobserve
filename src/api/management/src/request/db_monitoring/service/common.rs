@@ -1088,8 +1088,7 @@ pub(super) async fn involved_streams(
     )
 }
 
-/// [`can_read_stream`] over many streams: the module grant is asked once, then the
-/// streams it does not cover go through one org-wide question and bounded Checks.
+/// [`can_read_stream`] over many streams, with the module grant asked once.
 async fn readable_among(
     org_id: &str,
     user_id: &str,

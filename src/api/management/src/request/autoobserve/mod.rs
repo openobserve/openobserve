@@ -881,8 +881,7 @@ async fn readable_subjects(org_id: &str, user_id: &str, subjects: Vec<EntityRef>
     readable_mask(&LiveAuthority { org_id, user_id }, &subjects).await
 }
 
-/// Each stream needs the read right a search of it needs; one org-wide check per type comes first,
-/// then the streams left are checked 16 at a time.
+/// Each stream needs the read right a search of it needs, decided by `readable_org_streams`.
 async fn readable_streams(org_id: &str, user_id: &str, ids: Vec<(String, String)>) -> Vec<bool> {
     use config::meta::stream::StreamType;
 

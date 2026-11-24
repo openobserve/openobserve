@@ -1067,8 +1067,7 @@ pub(crate) mod tests {
             );
         }
 
-        // o2-enterprise#3642: a read-all grant on logs costs one org-wide question, no stream
-        // Check.
+        // o2-enterprise#3642: a logs read-all grant costs one org-wide question, no Check.
         #[tokio::test]
         async fn test_unreadable_streams_asks_once_with_an_org_wide_grant() {
             use config::meta::stream::StreamType;
