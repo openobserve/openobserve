@@ -12458,7 +12458,7 @@
     "suggestCheckPermissions": "Sprawdź, czy Twoje dane uwierzytelniające mają niezbędne uprawnienia.",
     "suggestCheckEndpoint": "Sprawdź, czy URL punktu końcowego jest poprawny.",
     "suggestRateLimit": "Przekroczyłeś limit żądań. Poczekaj przed ponowieniem próby.",
-    "suggestServerIssue": "Usługa miejsca docelowego napotyka problemy. Spróbuj ponownie później.",
+    "suggestServerIssue": "Spróbuj ponownie za kilka minut. Jeśli błąd będzie się powtarzać, sprawdź usługę docelową.",
     "description": "Opis",
     "stream_name": "Nazwa strumienia",
     "cloneTitle": "Klonuj alert",
@@ -20229,7 +20229,7 @@
         "latency": "Opóźnienie",
         "output": "Wyodrębnione dane wyjściowe",
         "rawRequest": "Wysłane żądanie",
-        "idle": "Żądanie i odpowiedź pojawią się tutaj po uruchomieniu testu.",
+        "idle": "Wysłane żądanie i wyodrębniony wynik pojawią się tutaj po uruchomieniu testu.",
         "disabledHint": "Najpierw podaj nazwę i punkt końcowy.",
         "failure": {
           "transport": "Nie udało się dotrzeć do punktu końcowego.",

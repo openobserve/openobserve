@@ -12458,7 +12458,7 @@
     "suggestCheckPermissions": "Verifique se as suas credenciais têm as permissões necessárias.",
     "suggestCheckEndpoint": "Verifique se o URL do endpoint está correto.",
     "suggestRateLimit": "Excedeu o limite da taxa. Aguarde antes de tentar novamente.",
-    "suggestServerIssue": "O serviço de destino está a enfrentar problemas. Tente novamente mais tarde.",
+    "suggestServerIssue": "Tente novamente dentro de alguns minutos. Se continuar a falhar, verifique o serviço de destino.",
     "description": "Descrição",
     "stream_name": "Nome do stream",
     "cloneTitle": "Clonar alerta",
@@ -20229,7 +20229,7 @@
         "latency": "Latência",
         "output": "Saída extraída",
         "rawRequest": "Pedido enviado",
-        "idle": "O pedido e a resposta aparecem aqui quando executa um teste.",
+        "idle": "O pedido enviado e a saída extraída aparecem aqui assim que executar um teste.",
         "disabledHint": "Preencha o nome e o endpoint primeiro.",
         "failure": {
           "transport": "Não foi possível contactar o endpoint.",
