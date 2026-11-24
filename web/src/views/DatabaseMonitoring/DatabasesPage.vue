@@ -82,8 +82,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dbm-databases-coverage"
           />
         </template>
+        <template #trailing>
+          <div class="ms-auto flex items-center gap-1">
+            <OTableColumnToggle
+              :columns="columns"
+              :column-visibility="columnVisibility"
+              :default-column-visibility="defaultColumnVisibility"
+              :has-resized-columns="tableRef?.hasResizedColumns ?? false"
+              @update:column-visibility="setColumnVisibility"
+              @reset:column-sizes="tableRef?.resetColumnSizes?.()"
+            />
+          </div>
+        </template>
       </DbmFilterBar>
       <OTable
+        ref="tableRef"
         :data="treeRows"
         :columns="columns"
         row-key="rowKey"
@@ -95,12 +108,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :sort-by="sortBy"
         :sort-order="sortOrder"
         :show-global-filter="false"
-        :column-visibility="defaultColumnVisibility"
+        :column-visibility="columnVisibility"
         :persist-columns="true"
         table-id="dbm-databases"
         :enable-column-resize="true"
         :toolbar-bordered="false"
         :get-row-style="rowStyle"
+        :row-actions="rowActions"
+        row-actions-more-data-test="dbm-databases-row-more-actions"
         tree
         :get-row-warning="hasShortfall"
         v-model:expanded-ids="expandedIds"
@@ -145,6 +160,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ statusLine(row) }}
             </OTruncatedText>
             <template v-else>
+              <OTag
+                variant="default-soft"
+                size="xs"
+                shape="rounded"
+                class="shrink-0"
+                :label="
+                  t(row.kind === 'service' ? 'dbm.breakdown.kindApp' : 'dbm.breakdown.kindSchema')
+                "
+                data-test="dbm-databases-row-kind"
+              />
               <DbmServiceList
                 v-if="row.kind === 'service' && row.name"
                 :services="[row.name]"
@@ -155,7 +180,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("dbm.breakdown.noService") }}
               </span>
               <template v-else>
-                <OIcon name="database" size="xs" class="text-text-secondary shrink-0" />
                 <OTruncatedText class="text-text-heading text-2xs font-semibold">
                   {{ row.name ? raw(row.name) : t("dbm.breakdown.noSchema") }}
                 </OTruncatedText>
@@ -312,18 +336,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-else class="text-text-muted">{{ raw("—") }}</span>
         </template>
 
-        <!-- What the server says about itself. A breakdown child is a slice of
-             one instance, not an instance, so it states nothing here. -->
-        <template #cell-instanceHealth="{ row }">
-          <DbmInstanceHealthCell
-            v-if="!isBreakdownRow(row) && row.metrics"
-            :metrics="row.metrics"
-            :engine="row.db_system"
-            data-test="dbm-databases-instance-health"
-          />
-          <span v-else class="text-text-muted block text-right">{{ raw("—") }}</span>
-        </template>
-
         <!-- The health scalar: how close this instance is to a ceiling it
              published, and WHICH ceiling. Deliberately not a composite score —
              a weighted number nobody can decompose is one a reader will not
@@ -336,22 +348,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              invented denominator would rank a saturated MySQL host as the
              calmest thing on the page. -->
         <template #cell-attention="{ row }">
-          <span v-if="isBreakdownRow(row)" class="text-text-muted block text-right">{{
+          <div v-if="!isBreakdownRow(row) && row.metrics" data-test="dbm-databases-health">
+            <DbmInstanceHealthCell
+              :metrics="row.metrics"
+              :engine="row.db_system"
+              data-test="dbm-databases-instance-health"
+            />
+          </div>
+          <span v-else class="text-text-muted block" data-test="dbm-databases-health">{{
             raw("—")
           }}</span>
-          <div v-else class="flex flex-col items-end gap-px" data-test="dbm-databases-attention">
-            <span
-              class="font-mono text-xs font-medium tabular-nums"
-              :class="attentionToneClass(row)"
-            >
-              {{
-                attentionOf(row).ratio === null
-                  ? raw("—")
-                  : formatPercent(attentionOf(row).ratio, 0)
-              }}
-            </span>
-            <span class="text-text-secondary text-3xs">{{ attentionLabel(row) }}</span>
-          </div>
         </template>
 
         <!-- A child's share is of its own parent level, which is exactly the
@@ -377,23 +383,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <span class="text-text-secondary text-3xs font-mono tabular-nums">
                 {{ formatPercent(row.share, 0) }}
+                <OTooltip
+                  v-if="isBreakdownRow(row) && shareParent[row.rowKey]"
+                  side="bottom"
+                  :content="t('dbm.breakdown.shareOf', { parent: shareParent[row.rowKey] })"
+                />
               </span>
             </span>
           </span>
           <span v-else class="text-text-muted block text-right">{{ raw("—") }}</span>
-        </template>
-
-        <!-- Actions are per-row: the query-shaped ones (open, alert) need
-             traffic to point at, so a trafficless row offers only the Metrics
-             hop — its identity came from the metric streams, so that one
-             always lands on content. -->
-        <template #cell-actions="{ row }">
-          <DbmRowActions
-            v-if="!isBreakdownRow(row)"
-            :actions="rowActionsFor(row)"
-            data-test="dbm-databases-row-actions"
-            @action="(id) => onRowAction(id, row)"
-          />
         </template>
 
         <!-- The honesty line, attached to the database it describes: the split's
@@ -441,7 +439,6 @@ import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptySt
 import DbmInstanceHealthCell from "@/components/dbm/DbmInstanceHealthCell.vue";
 import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
 import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
@@ -449,9 +446,10 @@ import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -497,7 +495,7 @@ import useStreams from "@/composables/useStreams";
 import { foldServerInstanceMetrics } from "@/utils/dbm/instanceMetricsRead";
 import type { DbmInstanceMetricSet, DbmRowMetrics } from "@/utils/dbm/instanceMetrics";
 import { unionFleetRows, type DbmServerInstanceRef } from "@/utils/dbm/fleetRows";
-import { healthScalar, healthSortValue } from "@/utils/dbm/healthScalar";
+import { healthSortValue } from "@/utils/dbm/healthScalar";
 import { APP_SOURCE_QUALIFIER } from "@/utils/dbm/overlapMetrics";
 import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
 import { hasDbmTraceVantage } from "@/composables/dbm/useDbmTraceVantage";
@@ -861,6 +859,21 @@ const treeRows = computed<TableRow[]>(() =>
   }),
 );
 
+// Child rowKey -> name of the level its share is of (instance, or schema for an app row).
+const shareParent = computed(() => {
+  const map: Record<string, string> = {};
+  const walk = (children: DbmBreakdownRow[], parent: string) => {
+    for (const c of children) {
+      map[c.rowKey] = parent;
+      walk(c.children, c.name ?? t("dbm.breakdown.noSchema"));
+    }
+  };
+  for (const r of treeRows.value) {
+    if (!isBreakdownRow(r)) walk(r.children, r.db_instance || t("dbm.databases.unnamedInstance"));
+  }
+  return map;
+});
+
 /**
  * Sorting is owned here rather than by the table, and that is what tree mode
  * requires: OTable sorts the FLATTENED list, which would tear children away
@@ -881,43 +894,9 @@ const treeRows = computed<TableRow[]>(() =>
 const sortBy = ref("attention");
 const sortOrder = ref<"asc" | "desc">("desc");
 
-/**
- * The attention column's three renderings, each a different fact.
- *
- * A percentage is only ever shown against a limit the ENGINE published. The
- * other two states are both dashes, but they carry different sentences: a
- * reading with no ceiling to divide by, and no reading at all.
- */
-const attentionOf = (row: TableRow) => healthScalar(isBreakdownRow(row) ? undefined : row.metrics);
-
 /** The engine that reported a row; a breakdown row has none and must not borrow its parent's. */
 const engineOf = (row: TableRow): string | undefined =>
   isBreakdownRow(row) ? undefined : row.db_system;
-
-const attentionLabel = (row: TableRow): I18nText => {
-  const scalar = attentionOf(row);
-  if (scalar.state === "measured") return t("dbm.databases.attention.connections");
-  // A count arrived; there is simply no published ceiling to express it
-  // against. Every MySQL instance is permanently in this state.
-  if (scalar.state === "no-limit") return t("dbm.databases.attention.noLimit");
-  return t("dbm.databases.attention.unknown");
-};
-
-/**
- * Amber before the cliff, not at it: Postgres reserves its last connections
- * for superusers, so an instance refuses application traffic before the ratio
- * reaches 1. The threshold matches DbmInstanceHealthCell's, because two
- * numbers on one row disagreeing about when to worry is worse than either.
- */
-const ATTENTION_DANGER = 0.9;
-
-const attentionToneClass = (row: TableRow): string => {
-  const scalar = attentionOf(row);
-  if (scalar.ratio !== null && scalar.ratio >= ATTENTION_DANGER) return "text-status-error-text";
-  // Unknown is not calm — it sorts to the top of this column — but it is not
-  // an alarm either, so it reads as the muted dash every unmeasured cell uses.
-  return scalar.state === "measured" ? "text-text-heading" : "text-text-muted";
-};
 
 /** The value a column sorts on, so the comparator does not switch on strings twice. */
 const sortValue = (row: DatabaseRow, column: string): string | number | null => {
@@ -1423,33 +1402,30 @@ const rowStyle = (row: TableRow) => {
   return color ? { boxShadow: `var(--shadow-rail-thin-geom) ${color}` } : {};
 };
 
-/**
- * Per-row: the query-shaped actions need traffic to point at, but a
- * TRAFFICLESS row's identity came from the metric streams — the Metrics hop is
- * exactly the one guaranteed to land on content there.
- */
-const rowActionsFor = (row: DatabaseRow): DbmRowAction[] => {
-  const metrics: DbmRowAction = {
-    id: "metrics",
-    icon: "show-chart",
-    label: t("dbm.databases.viewMetrics"),
-  };
-  if (row.trafficless) return [metrics];
-  return [
-    { id: "open", icon: "chevron-right", label: t("dbm.databases.openQueries") },
-    metrics,
-    { id: "alert", icon: "shield", label: t("dbm.databases.alertMe") },
-  ];
-};
+// Query-shaped actions need traffic to point at; the row click already opens Metrics.
+const rowActions: OTableRowAction[] = [
+  {
+    id: "queries",
+    icon: "search",
+    label: t("dbm.databases.openTopQueries"),
+    visible: (row) => !isBreakdownRow(row) && !row.trafficless,
+    onSelect: (row) => onRowAction("queries", row),
+    dataTest: () => "dbm-databases-row-actions-queries",
+  },
+  {
+    id: "alert",
+    icon: "notifications-active",
+    label: t("dbm.common.createAlert"),
+    visible: (row) => !isBreakdownRow(row) && !row.trafficless,
+    onSelect: (row) => onRowAction("alert", row),
+    dataTest: () => "dbm-databases-row-actions-alert",
+  },
+];
 
 const onRowAction = (id: string, row: DatabaseRow) => {
   analytics.track("dbm_row_action_clicked", { page: "databases", action: id });
-  if (id === "open") {
+  if (id === "queries") {
     openQueries(row);
-    return;
-  }
-  if (id === "metrics") {
-    openMetrics(row);
     return;
   }
   // Database scope, not query scope: this row IS the whole instance, so the
@@ -1473,7 +1449,62 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     accessorKey: "db_instance",
     size: 300,
     sortable: true,
-    meta: { isName: true },
+    meta: {
+      isName: true,
+      autoWidth: true,
+      fillRemaining: true,
+      headerTooltip: t("dbm.databases.columnHints.instance"),
+    },
+  },
+  // Two adjacent columns of DIFFERENT provenance, which is the one thing this
+  // pair must not hide. `load` is client-observed span time — what the
+  // applications waited — and `attention` is the server's own saturation
+  // against its own published limit. They are not two views of one measurement
+  // and must never be read as comparable, so each carries a sub-label naming
+  // the vantage it came from.
+  {
+    id: "attention",
+    hideable: true,
+    header: t("dbm.databases.columns.attention"),
+    size: 300,
+    sortable: true,
+    meta: {
+      align: "left" as const,
+      headerTooltip: t("dbm.databases.columnHints.attention"),
+    },
+  },
+  {
+    id: "load",
+    hideable: true,
+    header: t("dbm.databases.columns.load"),
+    accessorKey: "total_time_ns",
+    size: 190,
+    sortable: true,
+    meta: {
+      align: "right",
+      headerTooltip: t("dbm.databases.columnHints.load"),
+    },
+  },
+  {
+    id: "p95",
+    hideable: true,
+    header: t("dbm.databases.columns.p95"),
+    accessorKey: "p95_ns",
+    size: 96,
+    sortable: true,
+    meta: {
+      align: "right",
+      headerTooltip: t("dbm.databases.columnHints.p95"),
+    },
+  },
+  {
+    id: "errorRate",
+    hideable: true,
+    header: t("dbm.databases.columns.errorRate"),
+    accessorKey: "errorRate",
+    size: 84,
+    sortable: true,
+    meta: { align: "right" },
   },
   // An OVERLAP measure: both vantages count calls, so the column may not stay
   // silent about which one it is quoting (D2). The header states the
@@ -1485,12 +1516,11 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     hideable: true,
     header: t("dbm.databases.columns.calls"),
     accessorKey: "calls",
-    // At 96 the "from your apps" sub-label ellipsised beside the sort chevron.
     size: 124,
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: t("dbm.databases.columnSubLabels.calls"),
+      headerTooltip: t("dbm.databases.columnSubLabels.calls"),
     },
   },
   {
@@ -1507,15 +1537,6 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     },
   },
   {
-    id: "errorRate",
-    hideable: true,
-    header: t("dbm.databases.columns.errorRate"),
-    accessorKey: "errorRate",
-    size: 84,
-    sortable: true,
-    meta: { align: "right" },
-  },
-  {
     id: "p50",
     hideable: true,
     header: t("dbm.databases.columns.p50"),
@@ -1527,21 +1548,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("p50"),
       headerTooltip: t("dbm.databases.columnHints.p50"),
-    },
-  },
-  {
-    id: "p95",
-    hideable: true,
-    header: t("dbm.databases.columns.p95"),
-    accessorKey: "p95_ns",
-    size: 96,
-    sortable: true,
-    meta: {
-      align: "right",
-      headerSubLabel: raw("p95"),
-      headerTooltip: t("dbm.databases.columnHints.p95"),
     },
   },
   {
@@ -1554,7 +1561,6 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("p99"),
       headerTooltip: t("dbm.databases.columnHints.p99"),
     },
   },
@@ -1565,67 +1571,13 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     accessorKey: "calling_services",
     size: 200,
   },
-  // What the SERVER says about itself, beside what the applications
-  // experienced.
-  //
-  // Rendered ALWAYS, including when the join is switched off. Dropping the
-  // column in that case sounds right — a permanently empty column is worse
-  // than no column — but a feature the user paid for and cannot see reads as
-  // a feature nobody built, and the knob is off by DEFAULT, so on a fresh
-  // install that is every user. The cell states the reason and names the
-  // setting, which is the same discipline the four unmatched causes follow.
-  {
-    id: "instanceHealth",
-    hideable: true,
-    header: t("dbm.instanceMetrics.columnHeader"),
-    // Width 200: the cell carries a sparkline, the ratio, the "N of M
-    // connections" line AND the secondary chips (cache hit, lag, deadlocks);
-    // at 150 the chips wrap into a third line.
-    size: 200,
-    sortable: true,
-    meta: {
-      align: "right" as const,
-      headerTooltip: t("dbm.instanceMetrics.columnHint"),
-    },
-  },
-  // Two adjacent columns of DIFFERENT provenance, which is the one thing this
-  // pair must not hide. `load` is client-observed span time — what the
-  // applications waited — and `attention` is the server's own saturation
-  // against its own published limit. They are not two views of one measurement
-  // and must never be read as comparable, so each carries a sub-label naming
-  // the vantage it came from.
-  {
-    id: "attention",
-    hideable: true,
-    header: t("dbm.databases.columns.attention"),
-    size: 130,
-    sortable: true,
-    meta: {
-      align: "right" as const,
-      headerSubLabel: t("dbm.databases.columnSubLabels.attention"),
-      headerTooltip: t("dbm.databases.columnHints.attention"),
-    },
-  },
-  {
-    id: "load",
-    hideable: true,
-    header: t("dbm.databases.columns.load"),
-    accessorKey: "total_time_ns",
-    size: 190,
-    sortable: true,
-    meta: {
-      align: "right",
-      headerSubLabel: t("dbm.databases.columnSubLabels.load"),
-      headerTooltip: t("dbm.databases.columnHints.load"),
-    },
-  },
   {
     id: "actions",
     header: t("dbm.common.actions"),
     isAction: true,
     size: 92,
     sortable: false,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
   },
 ]);
 
@@ -1655,8 +1607,20 @@ const columns = computed<OTableColumnDef<TableRow>[]>(() =>
     : allColumns.value.filter((column) => !TRACE_ONLY_COLUMNS.has(column.id)),
 );
 
-/** Every column in the mockup's set is on: at two rows there is room for all. */
-const defaultColumnVisibility = {};
+// Off by default to keep the table scannable; a saved user choice still wins.
+const defaultColumnVisibility = {
+  calls: false,
+  qps: false,
+  p50: false,
+  p99: false,
+  services: false,
+};
+
+const tableRef = ref<{ hasResizedColumns?: boolean; resetColumnSizes?: () => void } | null>(null);
+const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("dbm-databases");
+// Seed once so the five columns start hidden; a saved user choice still wins.
+if (!Object.keys(columnVisibility.value).length)
+  columnVisibility.value = { ...defaultColumnVisibility };
 
 const clearScope = () => {
   systemFilter.value = null;

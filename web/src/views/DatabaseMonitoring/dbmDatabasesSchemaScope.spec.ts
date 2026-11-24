@@ -20,7 +20,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DatabasesResponse, QueryStatsRow } from "@/services/db_monitoring";
 import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
-import type { DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 
 vi.mock("vuex", () => ({
   useStore: () => ({
@@ -171,6 +170,7 @@ const OTableStub = defineComponent({
     data: { type: Array as PropType<TreeRow[]>, default: () => [] },
     getRowWarning: { type: Function as PropType<(row: TreeRow) => boolean>, default: null },
     expandedIds: { type: Array as PropType<string[]>, default: () => [] },
+    rowActions: { type: Array as PropType<any[]>, default: () => [] },
   },
   emits: ["row-click", "update:expandedIds", "sort-change"],
   setup(props, { slots }) {
@@ -185,7 +185,14 @@ const OTableStub = defineComponent({
         ...walk(props.data).map((row) =>
           h("div", { key: row.rowKey }, [
             props.getRowWarning?.(row) ? slots["tree-warning"]?.({ row }) : null,
-            slots["cell-actions"]?.({ row }),
+            ...props.rowActions
+              .filter((a) => a.visible?.(row) ?? true)
+              .map((a) =>
+                h("button", {
+                  "data-action": a.id,
+                  onClick: () => a.onSelect(row),
+                }),
+              ),
           ]),
         ),
       ]);
@@ -215,19 +222,11 @@ const DbmFilterBarStub = defineComponent({
   setup: () => () => h("div"),
 });
 
-const DbmRowActionsStub = defineComponent({
-  name: "DbmRowActions",
-  props: { actions: { type: Array as PropType<DbmRowAction[]>, default: () => [] } },
-  emits: ["action"],
-  setup: () => () => h("div"),
-});
-
 const stubs = {
   OTable: OTableStub,
   DbmPageChrome: DbmPageChromeStub,
   DbmTableToolbar: DbmTableToolbarStub,
   DbmFilterBar: DbmFilterBarStub,
-  DbmRowActions: DbmRowActionsStub,
   DbmCoverageLine: true,
   DbmEmptyState: true,
   DbmInstanceHealthCell: true,
@@ -376,7 +375,7 @@ describe("a hand-off from the overview scopes the target, not the overview", () 
   it("opens Top queries for a single-schema server without naming its schema", async () => {
     const { router } = await mountOverview();
     const index = topRows().findIndex((row) => row.db_instance === "pg-orders");
-    wrapper!.findAllComponents(DbmRowActionsStub)[index].vm.$emit("action", "open");
+    await wrapper!.findAll('[data-action="queries"]')[index].trigger("click");
     await settle();
     expect(pushed(router).name).toBe("dbmQueries");
     expect(pushed(router).query.instance).toBe("pg-orders");

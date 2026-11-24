@@ -354,9 +354,9 @@ describe("DatabasesPage qualifies its overlap measures", () => {
    * hide: `attention` is the server's own saturation and `load` is
    * client-observed span time. Extending the page must not cost these.
    */
-  it("keeps the attention/load provenance sub-labels", () => {
-    expect(source).toContain("dbm.databases.columnSubLabels.attention");
-    expect(source).toContain("dbm.databases.columnSubLabels.load");
+  it("keeps the attention/load provenance in the header tooltips", () => {
+    expect(source).toContain("dbm.databases.columnHints.attention");
+    expect(source).toContain("dbm.databases.columnHints.load");
   });
 
   describe("the two vantage states", () => {
