@@ -23,6 +23,8 @@ use common::meta::{
     http::HttpResponse as MetaHttpResponse,
     stream::{FieldUpdate, Stream, StreamCreate},
 };
+#[cfg(feature = "vectorscan")]
+use config::meta::stream::{PatternAssociation, UpdateSettingsWrapper};
 use config::{
     META_ORG_ID, SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
@@ -48,6 +50,8 @@ use config::{
 use db::re_pattern::process_association_changes;
 use db::{self, distinct_values, enrichment_table};
 use hashbrown::HashMap;
+#[cfg(feature = "vectorscan")]
+use infra::table::re_pattern_stream_map::search_association_changes_conflict;
 use infra::{
     cache::stats,
     schema::{
@@ -58,7 +62,7 @@ use infra::{
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
 #[cfg(feature = "vectorscan")]
-use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
+use o2_enterprise::enterprise::re_patterns::{PATTERN_MANAGER, get_pattern_manager};
 
 const LOCAL: &str = "disk";
 const S3: &str = "s3";
@@ -816,7 +820,7 @@ async fn search_pattern_conflict(
     stream_type: StreamType,
     settings: &StreamSettings,
     added_partition_keys: &[String],
-    update: &config::meta::stream::UpdateSettingsWrapper<config::meta::stream::PatternAssociation>,
+    update: &UpdateSettingsWrapper<PatternAssociation>,
 ) -> Option<String> {
     if added_partition_keys.is_empty() && update.add.is_empty() {
         return None;
@@ -824,7 +828,7 @@ async fn search_pattern_conflict(
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
         .unwrap_or_else(|_| Schema::empty());
-    let existing = o2_enterprise::enterprise::re_patterns::get_pattern_manager()
+    let existing = get_pattern_manager()
         .await
         .map(|mgr| mgr.get_associations(org_id, stream_type, stream_name))
         .unwrap_or_default();
@@ -845,7 +849,7 @@ async fn search_pattern_conflict(
         .map(|p| p.field.as_str())
         .collect();
     let added: Vec<&str> = added_partition_keys.iter().map(String::as_str).collect();
-    infra::table::re_pattern_stream_map::search_association_changes_conflict(
+    search_association_changes_conflict(
         &schema,
         &partition_keys,
         &added,
