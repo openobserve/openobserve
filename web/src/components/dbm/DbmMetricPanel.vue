@@ -41,60 +41,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ title }}
       </h4>
-      <OSelect
-        v-if="byOptions?.length"
-        :model-value="by"
-        :options="byOptions"
-        size="sm"
-        appearance="inline"
-        :searchable="false"
-        class="shrink-0"
-        :aria-label="t('panel.breakdown')"
-        :data-test="`dbm-metric-panel-by-${panelKey}`"
-        @update:model-value="emit('update:by', $event as string)"
-      />
-      <OButton
-        v-if="helpText"
-        variant="ghost"
-        size="icon-sm"
-        icon-left="info-outline"
-        class="ms-auto shrink-0"
-        :aria-label="t('dbm.metrics.load.about')"
-        :data-test="`dbm-metric-panel-info-${panelKey}`"
-      >
-        <OTooltip side="bottom" :content="helpText" />
-      </OButton>
-      <OTooltip
-        v-if="exploreUrl && metricsLock.locked.value"
-        side="bottom"
-        :content="metricsLock.lockedReason.value"
-      >
-        <span
-          class="inline-flex shrink-0"
-          role="link"
-          aria-disabled="true"
-          :aria-label="t('dbm.metrics.explore')"
+      <!-- OSelect fills its box, so the wrapper sets the width. -->
+      <div class="w-40 shrink-0">
+        <OSelect
+          v-if="byOptions?.length"
+          :model-value="by"
+          :options="byOptions"
+          size="sm"
+          :searchable="false"
+          class="w-full"
+          :aria-label="t('panel.breakdown')"
+          :data-test="`dbm-metric-panel-by-${panelKey}`"
+          @update:model-value="emit('update:by', $event as string)"
+        />
+      </div>
+      <!-- Link first, info last: the same order as the Database load card. -->
+      <div class="ms-auto flex shrink-0 items-center gap-1.5">
+        <OTooltip
+          v-if="exploreUrl && metricsLock.locked.value"
+          side="bottom"
+          :content="metricsLock.lockedReason.value"
+        >
+          <span
+            class="inline-flex shrink-0"
+            role="link"
+            aria-disabled="true"
+            :aria-label="t('dbm.metrics.explore')"
+            :data-test="`dbm-metric-panel-explore-${panelKey}`"
+          >
+            <OIcon
+              name="lock"
+              size="xs"
+              class="text-icon-locked"
+              :data-test="`dbm-metric-panel-explore-lock-${panelKey}`"
+            />
+          </span>
+        </OTooltip>
+        <a
+          v-else-if="exploreUrl"
+          :href="exploreUrl"
+          target="_blank"
+          rel="noopener"
+          class="text-text-label hover:text-accent relative shrink-0"
           :data-test="`dbm-metric-panel-explore-${panelKey}`"
         >
-          <OIcon
-            name="lock"
-            size="xs"
-            class="text-icon-locked"
-            :data-test="`dbm-metric-panel-explore-lock-${panelKey}`"
-          />
-        </span>
-      </OTooltip>
-      <a
-        v-else-if="exploreUrl"
-        :href="exploreUrl"
-        target="_blank"
-        rel="noopener"
-        class="text-text-label hover:text-accent relative shrink-0"
-        :data-test="`dbm-metric-panel-explore-${panelKey}`"
-      >
-        <OIcon name="open-in-new" size="xs" />
-        <OTooltip side="bottom" :content="t('dbm.metrics.explore')" />
-      </a>
+          <OIcon name="open-in-new" size="xs" />
+          <OTooltip side="bottom" :content="t('dbm.metrics.explore')" />
+        </a>
+        <OButton
+          v-if="helpText"
+          variant="ghost"
+          size="icon-sm"
+          icon-left="info-outline"
+          class="shrink-0"
+          :aria-label="t('dbm.metrics.load.about')"
+          :data-test="`dbm-metric-panel-info-${panelKey}`"
+        >
+          <OTooltip side="bottom" :content="helpText" />
+        </OButton>
+      </div>
     </div>
     <div class="relative h-55 w-full px-2 pb-2">
       <PanelSchemaRenderer
