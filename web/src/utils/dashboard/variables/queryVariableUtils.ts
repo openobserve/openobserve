@@ -16,6 +16,11 @@
 import { escapeRegExp } from "lodash-es";
 import { CUSTOM_VALUE, SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { escapeSingleQuotes, splitQuotedString } from "@/utils/zincutils";
+import {
+  promqlEscape,
+  promqlStringContextAt,
+  type PromqlStringContext,
+} from "@/utils/query/promQLUtils";
 import type {
   DashboardFilterCondition,
   DashboardFilterGroup,
@@ -94,6 +99,7 @@ export interface QueryVariableContextEntry {
   isVariablePartialLoaded?: boolean;
   multiSelect?: boolean;
   options?: { value?: unknown }[];
+  customMultiSelectValue?: string[];
 }
 
 export interface QueryVariableSelectionConfig {
@@ -148,10 +154,7 @@ export const getQueryVariableMaxRecords = (variable?: {
   return Number.isFinite(size) && size > 0 ? Math.floor(size) : DEFAULT_QUERY_VARIABLE_MAX_RECORDS;
 };
 
-const escapePromString = (value: string): string =>
-  value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-
-const promString = (value: string): string => `"${escapePromString(value)}"`;
+const promString = (value: string): string => `"${promqlEscape(value)}"`;
 
 const PROM_PLACEHOLDER = /(\$\{[^}]*\}|\{\{[^}]*\}\}|\$[a-zA-Z0-9_-]+)/;
 
@@ -518,52 +521,23 @@ const formatSqlValues = (
   }
 };
 
-interface PromValueContext {
-  regex: boolean;
-  /** The quote of the PromQL string around the placeholder, if any. */
-  quote: '"' | "'" | "`" | null;
-}
-
-// A placeholder inside a string after =~ or !~ is a regex; inside any other string, a literal.
-const promContextAt = (text: string, offset: number): PromValueContext => {
-  let quote: PromValueContext["quote"] = null;
-  let open = -1;
-  for (let i = 0; i < offset; i++) {
-    const char = text[i];
-    // Backtick strings are raw, so only the other two quotes escape with a backslash.
-    if (quote && quote !== "`" && char === "\\") i++;
-    else if (quote && char === quote) quote = null;
-    else if (!quote && (char === '"' || char === "'" || char === "`")) {
-      quote = char;
-      open = i;
-    }
-  }
-  if (!quote) return { regex: false, quote: null };
-  return { regex: /[=!]~\s*$/.test(text.slice(0, open)), quote };
-};
-
-const escapePromValue = (value: string, { regex, quote }: PromValueContext): string => {
-  const literal = regex ? escapeRegExp(value) : value;
-  if (quote === null || quote === "`") return literal;
-  return literal.replace(/\\/g, "\\\\").replaceAll(quote, `\\${quote}`);
-};
-
-/** Escapes a value read from data for the PromQL position of the placeholder at `offset`. */
-export const promValueEscaperAt = (text: string, offset: number) => {
-  const context = promContextAt(text, offset);
-  return (value: string): string => escapePromValue(value, context);
-};
-
-// A null context writes the values as they are, for variables whose values may be patterns on purpose.
+// Matches panels: quotes are escaped for every value; only values a Query Values variable picked from data
+// lose their regex meaning, while typed, listed and the author's custom defaults may be a regex on purpose.
 const formatPromValues = (
   values: string[],
   format: VariableFormat | undefined,
-  context: PromValueContext | null,
+  variable: QueryVariableContextEntry,
+  context: PromqlStringContext,
 ): string => {
+  const regexLiteral = variable.type === "query_values" && context.inRegexMatcher;
+  const keptRegex = new Set<string>(variable.customMultiSelectValue ?? []);
+  const { quote } = context;
   // A regex matcher is the only place an "all" selection can be honoured in PromQL.
-  const resolved = values.map((value) =>
-    value === SELECT_ALL_VALUE ? ".*" : context ? escapePromValue(value, context) : value,
-  );
+  const resolved = values.map((value) => {
+    if (value === SELECT_ALL_VALUE) return ".*";
+    const literal = regexLiteral && !keptRegex.has(value) ? escapeRegExp(value) : value;
+    return quote === '"' || quote === "'" ? promqlEscape(literal, quote) : literal;
+  });
   switch (format) {
     case "csv":
       return resolved.join(",");
@@ -606,10 +580,8 @@ export const substituteQueryVariables = (
       .filter((value) => value !== null && value !== undefined)
       .map(stripCustomSuffix);
     if (!values.length) return undefined;
-    // Values a query loaded are data; a typed or listed value may be a regex, as panels treat it.
-    const promContext = usesQueryVariableLoader(variable) ? promContextAt(text, offset) : null;
     return language === "promql"
-      ? formatPromValues(values, format, promContext)
+      ? formatPromValues(values, format, variable, promqlStringContextAt(text, offset))
       : formatSqlValues(values, isArray, quoted, format);
   });
 };

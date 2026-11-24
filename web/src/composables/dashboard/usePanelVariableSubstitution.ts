@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
+import {
+  addLabelToPromQlQuery,
+  escapeRegExp,
+  promqlEscape,
+  promqlStringContextAt,
+  type PromqlStringContext,
+} from "@/utils/query/promQLUtils";
 import { addLabelsToSQlQuery, getStreamFromQuery } from "@/utils/query/sqlUtils";
 import {
   formatDateVariable,
@@ -30,42 +36,60 @@ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { MIN_PERCENTILE_SAMPLES } from "@/utils/metrics/metricDefaults";
 import {
   isQueryVariableAllPending,
-  promValueEscaperAt,
   resolveQueryVariableValue,
-  usesQueryVariableLoader,
 } from "@/utils/dashboard/variables/queryVariableUtils";
 
+/** A null context formats the raw values, as the variable metadata reports them. */
 const formatPanelVariableValue = (
   variable: any,
   format: VariableFormat | undefined,
   queryType: any,
-  promEscape?: (value: string) => string,
+  context: PromqlStringContext | null,
 ): string => {
-  const escape = (value: any) => escapeSingleQuotes(String(value));
-  const literal = (value: unknown) => (promEscape ? promEscape(String(value)) : value);
+  const isPromql = queryType === "promql";
+  // values picked from data are literals; custom and textbox values may be regex on purpose
+  const regexLiteral = variable.type === "query_values" && context?.inRegexMatcher === true;
+  const sqlEscape = (value: unknown) => escapeSingleQuotes(String(value));
+  // the author's custom defaults copied into the value may be regex on purpose
+  const keptRegex = new Set<unknown>(variable.customMultiSelectValue ?? []);
+  const promqlValue = (value: unknown) => {
+    // a null list entry joins as "", the way Array.join writes it
+    const text = value === null || value === undefined ? "" : String(value);
+    const literal =
+      regexLiteral && text !== SELECT_ALL_VALUE && !keptRegex.has(text) ? escapeRegExp(text) : text;
+    const quote = context?.quote;
+    return quote === '"' || quote === "'" ? promqlEscape(literal, quote) : literal;
+  };
+  const escape = (value: unknown) => (isPromql ? promqlValue(value) : sqlEscape(value));
   const resolved = resolveQueryVariableValue(variable);
 
   if (!Array.isArray(resolved)) {
     // a date variable prints in its effective format; a null value is the All sentinel
     const dateText = formatDateVariable(variable, format);
-    const value = dateText ?? (resolved === null ? SELECT_ALL_VALUE : resolved);
-    return promEscape ? String(literal(value)) : escape(value);
+    return escape(dateText ?? (resolved === null ? SELECT_ALL_VALUE : resolved));
   }
 
   // If no data found (empty array), use SELECT_ALL_VALUE
-  const values = (resolved.length === 0 ? [SELECT_ALL_VALUE] : resolved).map(literal);
-  const singleQuoted = values.map((value: any) => `'${escape(value)}'`).join(",") || "''";
+  const values = resolved.length === 0 ? [SELECT_ALL_VALUE] : resolved;
+  const singleQuoted = values.map((value: unknown) => `'${sqlEscape(value)}'`).join(",") || "''";
   switch (format) {
     case "csv":
       return values.join(",");
     case "pipe":
       return values.join("|");
     case "doublequote":
-      return values.map((value: any) => `"${value}"`).join(",") || '""';
+      return (
+        values
+          .map((value: unknown) =>
+            isPromql && context ? `"${promqlEscape(String(value))}"` : `"${String(value)}"`,
+          )
+          .join(",") || '""'
+      );
     case "singlequote":
       return singleQuoted;
     default:
-      return queryType === "sql" ? singleQuoted : values.join("|");
+      if (queryType === "sql") return singleQuoted;
+      return isPromql ? values.map(promqlValue).join("|") : values.join("|");
   }
 };
 
@@ -507,8 +531,9 @@ export const usePanelVariableSubstitution = ({
       metadata.push({ type, name, value });
     };
 
+    const text = query;
     query = replaceVariablePlaceholders(
-      query,
+      text,
       [...fixedValues.keys(), ...dependentVariables.keys()],
       ({ name, format, offset }) => {
         // fixed variables shadow a dashboard variable of the same name
@@ -519,15 +544,16 @@ export const usePanelVariableSubstitution = ({
         }
 
         const variable = dependentVariables.get(name);
-        // Values a query variable loaded are data, never patterns; other types may hold a regex on purpose.
-        const promEscape =
-          queryType === "promql" && usesQueryVariableLoader(variable)
-            ? promValueEscaperAt(query, offset)
-            : undefined;
-        const value = formatPanelVariableValue(variable, format, queryType, promEscape);
+        const context = queryType === "promql" ? promqlStringContextAt(text, offset) : null;
         const isScalar = !Array.isArray(variable.value);
-        report("variable", name, isScalar ? (variable.value ?? SELECT_ALL_VALUE) : value);
-        return value;
+        report(
+          "variable",
+          name,
+          isScalar
+            ? (variable.value ?? SELECT_ALL_VALUE)
+            : formatPanelVariableValue(variable, format, queryType, null),
+        );
+        return formatPanelVariableValue(variable, format, queryType, context);
       },
     );
 

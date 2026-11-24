@@ -447,6 +447,7 @@ const parentContext = computed<QueryVariableContextEntry[]>(() =>
         name: v.name,
         type: v.type,
         query_data: v.query_data,
+        customMultiSelectValue: v.customMultiSelectValue,
         value,
         isVariablePartialLoaded: true,
       };

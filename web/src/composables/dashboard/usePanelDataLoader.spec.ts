@@ -70,7 +70,8 @@ vi.mock("vuex", () => ({
   }),
 }));
 
-vi.mock("@/utils/query/promQLUtils", () => ({
+vi.mock("@/utils/query/promQLUtils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/query/promQLUtils")>()),
   addLabelToPromQlQuery: vi.fn((query) => query),
 }));
 

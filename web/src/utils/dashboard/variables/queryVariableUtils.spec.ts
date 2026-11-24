@@ -668,15 +668,32 @@ describe("substituteQueryVariables", () => {
     );
   });
 
-  it("leaves a typed or listed value as written, like panels do", () => {
+  it("keeps a typed or listed value a regex but escapes its quotes, like panels do", () => {
     const vars = [
-      { name: "box", type: "textbox", value: "api-.*", isVariablePartialLoaded: true },
+      { name: "box", type: "textbox", value: 'api-.*"x', isVariablePartialLoaded: true },
       { name: "list", type: "custom", value: ["a.b", "c"], isVariablePartialLoaded: true },
     ];
     expect(substituteQueryVariables('label_values(up{job=~"$box"}, pod)', vars, "promql")).toBe(
-      'label_values(up{job=~"api-.*"}, pod)',
+      'label_values(up{job=~"api-.*\\"x"}, pod)',
     );
     expect(substituteQueryVariables('up{job=~"$list"}', vars, "promql")).toBe('up{job=~"a.b|c"}');
+  });
+
+  it("regex-escapes every Query Values parent picked from data, but not the author's custom defaults", () => {
+    const auto = {
+      name: "host",
+      type: "query_values",
+      query_data: { stream: "s", field: "host" },
+      value: ["a.b", "c+d"],
+      customMultiSelectValue: ["c+d"],
+      isVariablePartialLoaded: true,
+    };
+    expect(substituteQueryVariables('up{host=~"$host"}', [auto], "promql")).toBe(
+      'up{host=~"a\\\\.b|c+d"}',
+    );
+    expect(substituteQueryVariables('up{host="$host"}', [auto], "promql")).toBe(
+      'up{host="a.b|c+d"}',
+    );
   });
 
   it("joins a PromQL multi-select with | and turns all into .*", () => {

@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Stream selector sits on the same page-edge rail inset as the field list below it. -->
     <div class="px-page-edge">
       <OSelect
+        :aria-label="t('search.selectStream')"
         data-test="log-search-index-list-select-stream"
         :model-value="searchObj.data.stream.selectedStream?.value ?? null"
         :label="
