@@ -301,27 +301,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="payments" size="xs" />
                   {{ formatCost(getCost(turn.span)) }}
                 </span>
-                <span
+                <LLMCacheChip
                   v-if="cacheByTurn.get(String(turn.span.span_id))"
                   data-test="thread-turn-cache"
-                  class="thread-metric rounded-default text-2xs inline-flex shrink-0 items-center gap-1 border px-2 py-[0.18rem] leading-none whitespace-nowrap"
-                  :class="
-                    cacheByTurn.get(String(turn.span.span_id))!.misses
-                      ? 'text-status-warning-text bg-status-warning-bg border-status-warning-text/30 font-medium'
-                      : 'bg-surface-subtle border-border-default text-text-secondary'
-                  "
-                  :title="cacheTitle(cacheByTurn.get(String(turn.span.span_id))!)"
-                >
-                  <OIcon
-                    :name="
-                      cacheByTurn.get(String(turn.span.span_id))!.misses
-                        ? 'warning-amber'
-                        : 'cached'
-                    "
-                    size="xs"
-                  />
-                  {{ cacheLabel(cacheByTurn.get(String(turn.span.span_id))!) }}
-                </span>
+                  class="thread-metric"
+                  :cache="cacheByTurn.get(String(turn.span.span_id))!"
+                />
                 <span
                   v-if="turn.span.span_status === 'ERROR'"
                   class="thread-metric thread-metric--error rounded-default text-error-600 dark:text-error-400 text-2xs border-error-600/25 bg-error-600/8 dark:border-error-400/30 dark:bg-error-400/12 inline-flex shrink-0 items-center gap-1 border px-2 py-[0.18rem] leading-none font-medium whitespace-nowrap"
@@ -382,16 +367,19 @@ import {
   getModel,
   getCost,
   getTokens,
+  addCacheUse,
   classifyCacheUse,
   buildTraceGroup,
   spanTimeBounds,
   type Message,
   type Turn,
   type TraceGroup,
+  type TurnCacheUse,
 } from "./threadView.utils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ThreadToolCalls from "./ThreadToolCalls.vue";
+import LLMCacheChip from "./LLMCacheChip.vue";
 import BehindThisStep from "./BehindThisStep.vue";
 import { REQUEST_TIMELINE_KEY, stepToExplain } from "./timeAttribution";
 import { renderMarkdown } from "./markdown";
@@ -474,19 +462,13 @@ const displayGroups = computed<TraceGroup[]>(() => {
   });
 });
 
-interface TurnCache {
-  misses: number;
-  readTokens: number;
-  writeTokens: number;
-}
-
 // Keyed by the rendered turn's span id; a condensed turn sums the calls it merged.
-const cacheByTurn = computed<Map<string, TurnCache>>(() => {
+const cacheByTurn = computed<Map<string, TurnCacheUse>>(() => {
   const byCall = classifyCacheUse(
     traceGroups.value.flatMap((g) => g.turns.map((t) => t.span)),
     props.warmCacheModels,
   );
-  const out = new Map<string, TurnCache>();
+  const out = new Map<string, TurnCacheUse>();
   for (const g of traceGroups.value) {
     const merged = props.condenseTurns && g.turns.length > 1;
     const lastId = String(g.turns[g.turns.length - 1].span.span_id);
@@ -494,31 +476,11 @@ const cacheByTurn = computed<Map<string, TurnCache>>(() => {
       const use = byCall.get(String(turn.span.span_id));
       if (!use) continue;
       const key = merged ? lastId : String(turn.span.span_id);
-      const sum = out.get(key) ?? { misses: 0, readTokens: 0, writeTokens: 0 };
-      if (use.state === "miss") sum.misses++;
-      sum.readTokens += use.readTokens;
-      sum.writeTokens += use.writeTokens;
-      out.set(key, sum);
+      out.set(key, addCacheUse(out.get(key), use));
     }
   }
   return out;
 });
-
-function cacheLabel(c: TurnCache): string {
-  if (c.misses > 1) return t("traces.threadView.cacheMissCount", { n: c.misses });
-  if (c.misses) return t("traces.threadView.cacheMiss");
-  if (c.readTokens) {
-    return t("traces.threadView.cacheHit", { tokens: formatNumber(c.readTokens) });
-  }
-  return t("traces.threadView.cacheWrite", { tokens: formatNumber(c.writeTokens) });
-}
-
-function cacheTitle(c: TurnCache): string {
-  return t("traces.threadView.cacheDetail", {
-    read: formatNumber(c.readTokens),
-    written: formatNumber(c.writeTokens),
-  });
-}
 
 /** Single-trace shortcuts for the existing template (back-compat). */
 const turns = computed<Turn[]>(() => (traceGroups.value.length ? traceGroups.value[0].turns : []));

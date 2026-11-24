@@ -107,6 +107,21 @@ export function classifyCacheUse(
   return out;
 }
 
+/** Cache outcome of one rendered turn: the LLM calls it merges, summed. */
+export interface TurnCacheUse {
+  misses: number;
+  readTokens: number;
+  writeTokens: number;
+}
+
+export function addCacheUse(sum: TurnCacheUse | undefined, use: CacheUse): TurnCacheUse {
+  return {
+    misses: (sum?.misses ?? 0) + (use.state === "miss" ? 1 : 0),
+    readTokens: (sum?.readTokens ?? 0) + use.readTokens,
+    writeTokens: (sum?.writeTokens ?? 0) + use.writeTokens,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Span classification
 // ---------------------------------------------------------------------------
