@@ -163,27 +163,91 @@ jobs:
       contents: read
     outputs:
       reuse: ${{ steps.resolve.outputs.reuse }}
-      run_id: ${{ steps.resolve.outputs.run_id }}
+      binary_reuse: ${{ steps.resolve.outputs.binary_reuse }}
+      frontend_reuse: ${{ steps.resolve.outputs.frontend_reuse }}
+      binary_run_id: ${{ steps.resolve.outputs.binary_run_id }}
+      frontend_run_id: ${{ steps.resolve.outputs.frontend_run_id }}
       binary_artifact_name: ${{ steps.resolve.outputs.binary_artifact_name }}
       frontend_artifact_name: ${{ steps.resolve.outputs.frontend_artifact_name }}
+      binary_via_key: ${{ steps.resolve.outputs.binary_via_key }}
+      frontend_via_key: ${{ steps.resolve.outputs.frontend_via_key }}
+      rust_key: ${{ steps.resolve.outputs.rust_key }}
+      web_key: ${{ steps.resolve.outputs.web_key }}
+      ds_content_sha: ${{ steps.resolve.outputs.ds_content_sha }}
     steps:
-      - name: Find exact-SHA Playwright runtime
+      # The keys are git tree/blob ids, so a blobless, sparse clone is enough.
+      - uses: actions/checkout@v5
+        with:
+          filter: blob:none
+          sparse-checkout: |
+            src/web
+            .github/actions
+      - uses: ./.github/actions/github-auth
+
+      - name: Find a reusable Playwright runtime
         id: resolve
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           ARTIFACT_SHA: ${{ github.sha }}
           CURRENT_RUN_ID: ${{ github.run_id }}
+          REPO_ID: ${{ github.repository_id }}
+          # Same defaults as web/scripts/fetch-datasource-content.mjs, which the web build runs.
+          DS_CONTENT_REPO: https://github.com/openobserve/o2-datasource.git
+          DS_CONTENT_REF: main
         run: |
           set -euo pipefail
-          binary_artifact="release-ci-binary-${ARTIFACT_SHA}"
-          frontend_artifact="frontend-dist-${ARTIFACT_SHA}"
-          selected_run_id="$CURRENT_RUN_ID"
-          reuse=false
+          sha_binary="release-ci-binary-${ARTIFACT_SHA}"
+          sha_frontend="frontend-dist-${ARTIFACT_SHA}"
 
-          # Scope candidates to this workflow and source head. ARTIFACT_SHA is
+          # Any unresolved path fails the key (empty), so a lookup never matches a constant hash.
+          key_of() {
+            local p id out=""
+            for p in "$@"; do
+              id="$(git rev-parse --verify --quiet "HEAD:$p")" || return 1
+              out+="$p $id"$'\n'
+            done
+            printf '%s' "$out" | sha256sum | cut -c1-40
+          }
+          # Every input of `cargo build --profile release-ci` below; this file carries the toolchain pin, flags and steps.
+          # config/prebuilt-destinations.json is compiled in by src/config/src/prebuilt_loader.rs (include_str!).
+          rust_inputs=(src Cargo.toml Cargo.lock build.rs rust-toolchain.toml .cargo config/prebuilt-destinations.json .github/protoc.sh .github/actions/github-auth .github/workflows/playwright.yml)
+          # The web build pulls data-source content from another repo, so its resolved commit is a frontend input too.
+          ds_content_sha="$(git ls-remote "$DS_CONTENT_REPO" "refs/heads/${DS_CONTENT_REF}" 2>/dev/null | cut -f1)" || ds_content_sha=""
+          [[ "$ds_content_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::warning::Could not resolve ${DS_CONTENT_REPO}@${DS_CONTENT_REF}"; ds_content_sha=""; }
+          web_key=""
+          if [ -n "$ds_content_sha" ]; then
+            web_key="$(key_of web .github/workflows/playwright.yml)" && web_key="$(printf '%s %s' "$web_key" "$ds_content_sha" | sha256sum | cut -c1-40)" || web_key=""
+          fi
+          embed=false
+          # release-ci reads /tmp/dist at run time only while its proc macros keep debug assertions; otherwise web/dist is compiled in.
+          if awk '/^\[profile\.release-ci\]/{f=1;next} /^\[/{f=0} f' Cargo.toml | grep -Eq '^debug-assertions *= *true' &&
+             ! grep -q 'build-override' Cargo.toml && ! grep -q 'always-embed' Cargo.toml src/web/Cargo.toml; then
+            rust_key="$(key_of "${rust_inputs[@]}")" || rust_key=""
+          else
+            embed=true
+            echo "::notice::release-ci may embed web/dist, so the binary key also covers web/"
+            rust_key=""
+            if [ -n "$web_key" ]; then
+              rust_key="$(key_of "${rust_inputs[@]}")" && rust_key="$(printf '%s %s' "$rust_key" "$web_key" | sha256sum | cut -c1-40)" || rust_key=""
+            fi
+          fi
+          echo "rust-key=$rust_key web-key=$web_key"
+
+          binary_reuse=false; binary_run_id="$CURRENT_RUN_ID"; binary_artifact="$sha_binary"
+          frontend_reuse=false; frontend_run_id="$CURRENT_RUN_ID"; frontend_artifact="$sha_frontend"
+          binary_via_key=false; frontend_via_key=false
+
+          # Exact-SHA pair first (re-runs of this commit). ARTIFACT_SHA is
           # the exact tested merge/commit SHA, so a base-branch update cannot
           # reuse a binary built from an older synthetic merge commit.
+          # Exact-name filter, so a run with more than one page of artifacts is still matched.
+          run_has() {
+            local n
+            n="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/runs/$1/artifacts?name=$2" \
+              --jq '[.artifacts[] | select(.expired == false)] | length' 2>/dev/null)" || n=0
+            [ "${n:-0}" -gt 0 ] && echo yes || echo no
+          }
           run_ids="$(
             gh api --method GET \
               "repos/${GITHUB_REPOSITORY}/actions/workflows/playwright.yml/runs?head_sha=${SOURCE_HEAD_SHA}&per_page=100" \
@@ -192,31 +256,135 @@ jobs:
           )"
           while IFS= read -r run_id; do
             [ -n "$run_id" ] || continue
-            artifact_names="$(
-              gh api --method GET \
-                "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" \
-                --jq '.artifacts[] | select(.expired == false) | .name' \
-                2>/dev/null || true
-            )"
-            if grep -Fxq "$binary_artifact" <<< "$artifact_names" &&
-               grep -Fxq "$frontend_artifact" <<< "$artifact_names"; then
-              selected_run_id="$run_id"
-              reuse=true
+            if [ "$(run_has "$run_id" "$sha_binary")" = yes ] && [ "$(run_has "$run_id" "$sha_frontend")" = yes ]; then
+              binary_reuse=true; binary_run_id="$run_id"
+              frontend_reuse=true; frontend_run_id="$run_id"
+              echo "Reusing exact-SHA binary and frontend from run $run_id"
               break
             fi
           done <<< "$run_ids"
 
+          # Newest same-repo run (never a fork) that published this key, with an artifact left alive long enough for the shards.
+          find_by_key() {
+            local fresh='.expired == false and ((.expires_at | fromdateiso8601) > (now + 7200))'
+            gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=$1&per_page=100" \
+              --jq "[.artifacts[] | select(${fresh} and .workflow_run.head_repository_id == ${REPO_ID})] | sort_by(.created_at) | reverse | .[].workflow_run.id" \
+              2>/dev/null |
+            while IFS= read -r run_id; do
+              name="$( { gh api --method GET --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" \
+                --jq ".artifacts[] | select(${fresh} and (.name | startswith(\"$2\"))) | .name" 2>/dev/null || true; } | head -n1)"
+              if [ -n "$name" ]; then echo "$run_id $name"; break; fi
+            done || true
+          }
+          if [ "$binary_reuse" != true ] && [ -z "$rust_key" ]; then
+            echo "Could not compute rust-key; building"
+          elif [ "$binary_reuse" != true ]; then
+            found="$(find_by_key "pw-rust-key-${rust_key}" release-ci-binary-)"
+            if [ -n "$found" ]; then
+              read -r binary_run_id binary_artifact <<< "$found"; binary_reuse=true; binary_via_key=true
+              echo "Reusing binary for rust-key $rust_key from run $binary_run_id ($binary_artifact)"
+            else
+              echo "No binary for rust-key $rust_key; building"
+            fi
+          fi
+          if [ "$frontend_reuse" != true ] && [ -z "$web_key" ]; then
+            echo "Could not compute web-key; building"
+          elif [ "$frontend_reuse" != true ]; then
+            found="$(find_by_key "pw-web-key-${web_key}" frontend-dist-)"
+            if [ -n "$found" ]; then
+              read -r frontend_run_id frontend_artifact <<< "$found"; frontend_reuse=true; frontend_via_key=true
+              echo "Reusing frontend for web-key $web_key from run $frontend_run_id ($frontend_artifact)"
+            else
+              echo "No frontend for web-key $web_key; building"
+            fi
+          fi
+
+          # An embedding build compiles /tmp/dist in, so it needs the frontend built in the same job.
+          if [ "$embed" = true ] && [ "$binary_reuse" != true ] && [ "$frontend_reuse" = true ]; then
+            echo "Binary embeds web/dist and must be built; building the frontend with it"
+            frontend_reuse=false; frontend_run_id="$CURRENT_RUN_ID"; frontend_artifact="$sha_frontend"
+          fi
+
+          reuse=false
+          [ "$binary_reuse" = true ] && [ "$frontend_reuse" = true ] && reuse=true
           {
             echo "reuse=$reuse"
-            echo "run_id=$selected_run_id"
+            echo "binary_reuse=$binary_reuse"
+            echo "frontend_reuse=$frontend_reuse"
+            echo "binary_run_id=$binary_run_id"
+            echo "frontend_run_id=$frontend_run_id"
             echo "binary_artifact_name=$binary_artifact"
             echo "frontend_artifact_name=$frontend_artifact"
+            echo "binary_via_key=$binary_via_key"
+            echo "frontend_via_key=$frontend_via_key"
+            echo "rust_key=$rust_key"
+            echo "web_key=$web_key"
+            echo "ds_content_sha=$ds_content_sha"
           } >> "$GITHUB_OUTPUT"
-          if [ "$reuse" = "true" ]; then
-            echo "Reusing exact-SHA Playwright runtime from run $selected_run_id"
-          else
-            echo "No reusable exact-SHA Playwright runtime found; build_binary will run"
-          fi
+
+  # Copies a runtime reused from another run into this run under this commit's names: mobile-sdk-e2e.yml needs both in one run.
+  republish_runtime:
+    timeout-minutes: 10
+    name: republish_runtime
+    needs: [resolve_binary]
+    if: >-
+      needs.resolve_binary.result == 'success' &&
+      (needs.resolve_binary.outputs.binary_run_id != format('{0}', github.run_id) ||
+       needs.resolve_binary.outputs.frontend_run_id != format('{0}', github.run_id))
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    env:
+      COPY_BINARY: ${{ needs.resolve_binary.outputs.binary_run_id != format('{0}', github.run_id) }}
+      COPY_FRONTEND: ${{ needs.resolve_binary.outputs.frontend_run_id != format('{0}', github.run_id) }}
+    steps:
+      - if: env.COPY_BINARY == 'true'
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.resolve_binary.outputs.binary_artifact_name }}
+          path: release-ci-binary
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.resolve_binary.outputs.binary_run_id }}
+      - if: env.COPY_BINARY == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-ci-binary-${{ github.sha }}
+          path: release-ci-binary/openobserve
+          retention-days: 1
+          overwrite: true
+      - if: env.COPY_FRONTEND == 'true'
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.resolve_binary.outputs.frontend_artifact_name }}
+          path: dist
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.resolve_binary.outputs.frontend_run_id }}
+      - if: env.COPY_FRONTEND == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist-${{ github.sha }}
+          path: dist
+          retention-days: 1
+          if-no-files-found: error
+          overwrite: true
+      # Re-mark only artifacts found by this key: an exact-SHA reuse may hold content built for another key.
+      - run: mkdir -p marker && echo "${{ github.sha }}" > marker/sha
+      - if: env.COPY_BINARY == 'true' && needs.resolve_binary.outputs.binary_via_key == 'true' && needs.resolve_binary.outputs.rust_key != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pw-rust-key-${{ needs.resolve_binary.outputs.rust_key }}
+          path: marker/sha
+          retention-days: 1
+          overwrite: true
+      - if: env.COPY_FRONTEND == 'true' && needs.resolve_binary.outputs.frontend_via_key == 'true' && needs.resolve_binary.outputs.web_key != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pw-web-key-${{ needs.resolve_binary.outputs.web_key }}
+          path: marker/sha
+          retention-days: 1
+          overwrite: true
 
   build_binary:
     timeout-minutes: 45
@@ -232,9 +400,13 @@ jobs:
       labels: ubicloud-standard-16
     permissions:
       contents: read
+    env:
+      BUILD_BINARY: ${{ needs.resolve_binary.outputs.binary_reuse != 'true' }}
+      BUILD_FRONTEND: ${{ needs.resolve_binary.outputs.frontend_reuse != 'true' }}
 
     steps:
       - name: Remove unused tools
+        if: env.BUILD_BINARY == 'true'
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
@@ -246,11 +418,17 @@ jobs:
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
+        if: env.BUILD_BINARY == 'true'
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: nightly-2026-10-24
           targets: x86_64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        id: rust_cache
+        if: env.BUILD_BINARY == 'true'
+        # PR runs (never save) cap a 2-3 MB/s restore at 3 min; save-eligible runs wait so a killed restore is never saved.
+        timeout-minutes: ${{ (github.event_name == 'merge_group' || github.ref == 'refs/heads/main') && 45 || 3 }}
+        continue-on-error: ${{ !(github.event_name == 'merge_group' || github.ref == 'refs/heads/main') }}
         with:
           cache-on-failure: true
           shared-key: playwright-release-ci
@@ -258,47 +436,92 @@ jobs:
           # push:main is gone); keep the main-ref check for any non-PR fallback.
           save-if: ${{ github.event_name == 'merge_group' || github.ref == 'refs/heads/main' }}
 
+      # A killed restore can leave truncated files that cargo would trust and the post step could save.
+      - name: Drop a partly restored Rust cache
+        if: env.BUILD_BINARY == 'true' && steps.rust_cache.outcome == 'failure'
+        run: |
+          echo "::warning::Rust cache restore did not finish in 3 min; building without it"
+          pkill -x tar || true
+          pkill -x zstd || true
+          rm -rf target ~/.cargo/registry ~/.cargo/git
+
       - name: Install Protoc
+        if: env.BUILD_BINARY == 'true'
         run: |
           bash ./.github/protoc.sh
 
       - uses: actions/setup-node@v7
+        if: env.BUILD_FRONTEND == 'true'
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
 
       - name: Install frontend dependencies
+        if: env.BUILD_FRONTEND == 'true'
         run: cd web && npm ci
 
       - name: Build binary and frontend
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
           GIT_HASH_OVERRIDE: ${{ github.sha }}
+          # Builds the exact content commit the web key was computed from (the script accepts a SHA as ref).
+          DS_CONTENT_REF: ${{ needs.resolve_binary.outputs.ds_content_sha || 'main' }}
         run: |
           mkdir -p /tmp/dist
-          bash -c "cd web && npm run build && cp -r ./dist/. /tmp/dist/" &
-          NPM_PID=$!
-          sed -i 's|folder = "../../web/dist/"|folder = "/tmp/dist/"|' src/web/src/lib.rs && grep -q 'folder = "/tmp/dist/"' src/web/src/lib.rs
-          cargo build --profile release-ci --target x86_64-unknown-linux-gnu
-          wait $NPM_PID
-          test -f /tmp/dist/index.html
-          (cd web && npm run check:bundle-budget)
+          NPM_PID=
+          if [ "$BUILD_FRONTEND" = true ]; then
+            bash -c "cd web && npm run build && cp -r ./dist/. /tmp/dist/" &
+            NPM_PID=$!
+          fi
+          if [ "$BUILD_BINARY" = true ]; then
+            echo "Building binary for rust-key ${{ needs.resolve_binary.outputs.rust_key }}"
+            sed -i 's|folder = "../../web/dist/"|folder = "/tmp/dist/"|' src/web/src/lib.rs && grep -q 'folder = "/tmp/dist/"' src/web/src/lib.rs
+            cargo build --profile release-ci --target x86_64-unknown-linux-gnu
+          fi
+          if [ -n "$NPM_PID" ]; then
+            echo "Building frontend for web-key ${{ needs.resolve_binary.outputs.web_key }}"
+            wait "$NPM_PID"
+            test -f /tmp/dist/index.html
+            (cd web && npm run check:bundle-budget)
+          fi
+          mkdir -p marker && echo "${{ github.sha }}" > marker/sha
 
       - name: Upload binary artifact
+        if: env.BUILD_BINARY == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: release-ci-binary-${{ github.sha }}
           path: target/x86_64-unknown-linux-gnu/release-ci/openobserve
           retention-days: 1
 
+      # Uploaded after the payload, so a key marker never points at a run without it.
+      - name: Upload binary key marker
+        if: env.BUILD_BINARY == 'true' && needs.resolve_binary.outputs.rust_key != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pw-rust-key-${{ needs.resolve_binary.outputs.rust_key }}
+          path: marker/sha
+          retention-days: 1
+          overwrite: true
+
       - name: Upload frontend artifact
+        if: env.BUILD_FRONTEND == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist-${{ github.sha }}
           path: /tmp/dist
           retention-days: 1
           if-no-files-found: error
+
+      - name: Upload frontend key marker
+        if: env.BUILD_FRONTEND == 'true' && needs.resolve_binary.outputs.web_key != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pw-web-key-${{ needs.resolve_binary.outputs.web_key }}
+          path: marker/sha
+          retention-days: 1
+          overwrite: true
 
   # Build the shard matrix from tests/ui-testing/ci-matrix/ci_matrix.json (single source of truth,
   # shared with ENT via build-ci-matrix.js). Runs under the same gate as build_binary so
@@ -509,7 +732,7 @@ jobs:
           path: release-ci-binary
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
-          run-id: ${{ needs.resolve_binary.outputs.run_id }}
+          run-id: ${{ needs.resolve_binary.outputs.binary_run_id }}
 
       - name: Download frontend artifact
         uses: actions/download-artifact@v5
@@ -518,7 +741,7 @@ jobs:
           path: /tmp/dist
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
-          run-id: ${{ needs.resolve_binary.outputs.run_id }}
+          run-id: ${{ needs.resolve_binary.outputs.frontend_run_id }}
 
       - name: Start mail sink (Mailpit)
         # A local SMTP server the tests can also READ. Runs as a static binary
