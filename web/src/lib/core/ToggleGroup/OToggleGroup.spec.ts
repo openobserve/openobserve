@@ -308,6 +308,35 @@ describe("OToggleGroup", () => {
       wrapper.unmount();
     });
 
+    it("stays on the active item when the track is scrolled", async () => {
+      const selected = ref("a");
+      const wrapper = mount(
+        {
+          components: { OToggleGroup, OToggleGroupItem },
+          setup: () => ({ selected }),
+          template: `
+            <OToggleGroup :model-value="selected">
+              <OToggleGroupItem v-for="value in ['a', 'b', 'c']" :key="value" :value="value">
+                {{ value }}
+              </OToggleGroupItem>
+            </OToggleGroup>`,
+        },
+        { attachTo: document.body },
+      );
+      const track = wrapper.get("[data-variant]").element as HTMLElement;
+      stubGeometry(track);
+      const onScreen = track.querySelector<HTMLElement>('[data-otoggle-value="c"]')!;
+      onScreen.getBoundingClientRect = () =>
+        ({ left: ITEM_WIDTH, top: 0, width: ITEM_WIDTH, height: 20 }) as DOMRect;
+      Object.defineProperty(track, "scrollLeft", { value: ITEM_WIDTH, configurable: true });
+      selected.value = "c";
+      await settle();
+      expect((track.firstElementChild as HTMLElement).style.transform).toBe(
+        `translate(${ITEM_WIDTH * 2}px, 0px)`,
+      );
+      wrapper.unmount();
+    });
+
     it("hides the indicator when the value matches no item", async () => {
       const selected = ref("b");
       const wrapper = mount(
