@@ -64,7 +64,7 @@ impl SourceRead {
             sql: format!(
                 "SELECT {} FROM ({}) AS r WHERE id > $2 ORDER BY id LIMIT $3",
                 summary_columns(),
-                selection(kind)
+                selection(kind)?
             ),
             values: vec![
                 org.into(),
@@ -142,6 +142,19 @@ struct SummaryRow {
 }
 
 impl SummaryRow {
+    fn stream(id: &str) -> Self {
+        Self {
+            id: id.to_owned(),
+            name: id.to_owned(),
+            folder_id: None,
+            folder_name: None,
+            enabled: None,
+            attributes: None,
+            alert_type: None,
+            oversized: false,
+        }
+    }
+
     /// A row that cannot be parsed is skipped with a warning so it never hides the rest of its
     /// kind.
     fn into_summary(self, org: &str, kind: ResourceKind) -> Option<ResourceSummary> {
@@ -267,6 +280,10 @@ pub async fn load_page(
     after: Option<&str>,
     limit: usize,
 ) -> Result<SummaryPage> {
+    if kind == ResourceKind::Stream {
+        let schemas = infra::schema::STREAM_SCHEMAS_LATEST.read().await;
+        return stream_page(org, schemas.keys(), after, limit);
+    }
     require_sql_store()?;
     load_page_with(get_orm_client_rw().await, org, kind, after, limit).await
 }
@@ -300,6 +317,36 @@ async fn load_page_with<C: ConnectionTrait>(
     Ok(SummaryPage { items, next })
 }
 
+/// Pages one org's logs, metrics and traces streams out of `org/type/name` schema cache keys.
+fn stream_page<'a>(
+    org: &str,
+    keys: impl Iterator<Item = &'a String>,
+    after: Option<&str>,
+    limit: usize,
+) -> Result<SummaryPage> {
+    ensure!(
+        (1..=MAX_PAGE_SIZE).contains(&limit),
+        "invalid source page size"
+    );
+    let prefix = format!("{org}/");
+    let mut ids = keys
+        .filter_map(|key| key.strip_prefix(&prefix))
+        .filter(|id| {
+            id.split_once('/')
+                .is_some_and(|(signal, _)| matches!(signal, "logs" | "metrics" | "traces"))
+                && after.is_none_or(|after| *id > after)
+        })
+        .collect::<Vec<_>>();
+    ids.sort_unstable();
+    ids.truncate(limit);
+    let next = (ids.len() == limit).then(|| ids[limit - 1].to_owned());
+    let items = ids
+        .into_iter()
+        .filter_map(|id| SummaryRow::stream(id).into_summary(org, ResourceKind::Stream))
+        .collect();
+    Ok(SummaryPage { items, next })
+}
+
 fn summary_columns() -> String {
     format!(
         "id,name,folder_id,folder_name,enabled,\
@@ -308,17 +355,15 @@ fn summary_columns() -> String {
     )
 }
 
-fn selection(kind: ResourceKind) -> &'static str {
-    match kind {
+fn selection(kind: ResourceKind) -> Result<&'static str> {
+    Ok(match kind {
         ResourceKind::Dashboard => {
             "SELECT d.dashboard_id AS id,d.title AS name,f.folder_id,f.name AS folder_name,NULL AS enabled,NULL AS attributes,NULL AS alert_type FROM dashboards d JOIN folders f ON f.id=d.folder_id WHERE f.org=$1 AND f.type=0"
         }
         ResourceKind::Alert => {
             "SELECT a.id,a.name,f.folder_id,f.name AS folder_name,a.enabled,CAST(a.context_attributes AS TEXT) AS attributes,CASE WHEN a.is_real_time THEN 'realtime' ELSE 'scheduled' END AS alert_type FROM alerts a JOIN folders f ON f.id=a.folder_id WHERE a.org=$1 AND f.org=$1 AND f.type=1 UNION ALL SELECT a.id,a.name,f.folder_id,f.name AS folder_name,a.enabled,CAST(a.context_attributes AS TEXT) AS attributes,'composite' AS alert_type FROM alert_composites a JOIN folders f ON f.folder_id=a.folder_id AND f.org=a.org AND f.type=1 WHERE a.org=$1 UNION ALL SELECT a.anomaly_id AS id,a.name,f.folder_id,f.name AS folder_name,a.enabled,NULL AS attributes,'anomaly_detection' AS alert_type FROM anomaly_detection_config a JOIN folders f ON f.id=a.folder_id WHERE a.org_id=$1 AND f.org=$1 AND f.type=1"
         }
-        ResourceKind::Stream => {
-            "SELECT DISTINCT key2 AS id,key2 AS name,NULL AS folder_id,NULL AS folder_name,NULL AS enabled,NULL AS attributes,NULL AS alert_type FROM meta WHERE module='schema' AND key1=$1 AND (key2 LIKE 'logs/%' OR key2 LIKE 'metrics/%' OR key2 LIKE 'traces/%')"
-        }
+        ResourceKind::Stream => bail!("streams are read from the schema cache"),
         ResourceKind::Function => {
             "SELECT DISTINCT key2 AS id,key2 AS name,NULL AS folder_id,NULL AS folder_name,NULL AS enabled,NULL AS attributes,NULL AS alert_type FROM meta WHERE module='function' AND key1=$1"
         }
@@ -334,7 +379,7 @@ fn selection(kind: ResourceKind) -> &'static str {
         ResourceKind::ServiceAccount => {
             "SELECT u.email AS id,trim(u.first_name || ' ' || u.last_name) AS name,NULL AS folder_id,NULL AS folder_name,NULL AS enabled,NULL AS attributes,NULL AS alert_type FROM org_users o JOIN users u ON u.email=o.email WHERE o.org_id=$1 AND o.role IN (5,6)"
         }
-    }
+    })
 }
 
 fn stream_route(key: &str) -> Result<Option<(String, String, ResourceRoute)>> {
@@ -539,29 +584,40 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn metadata_pages_use_exact_org_boundaries_and_stream_identity() {
+    async fn function_pages_use_exact_org_boundaries() {
         let conn = fixture().await;
-        for sql in [
+        conn.execute_unprepared(
             "INSERT INTO meta VALUES ('function','org','Alpha',0,'not VRL'),('function','org2','Leaked',0,'body')",
-            "INSERT INTO meta VALUES ('schema','org','logs/payment',0,''),('schema','org','logs/payment',1,''),('schema','org','traces/payment/123',0,''),('schema','org','logs/_o2_ai_chat_events',0,'')",
-        ] {
-            conn.execute_unprepared(sql).await.unwrap();
-        }
+        )
+        .await
+        .unwrap();
         let functions = load_page_with(&conn, "org", ResourceKind::Function, None, 20)
             .await
             .unwrap();
         assert_eq!(functions.items.len(), 1);
-        let streams = load_page_with(&conn, "org", ResourceKind::Stream, None, 20)
-            .await
-            .unwrap();
-        assert_eq!(
-            streams
-                .items
-                .iter()
-                .map(|r| r.id.as_str())
-                .collect::<Vec<_>>(),
-            vec!["logs/payment", "traces/payment"]
-        );
+    }
+
+    #[test]
+    fn stream_pages_come_from_cache_keys_of_one_org() {
+        let keys = [
+            "org/traces/payment",
+            "org/logs/payment",
+            "org/logs/_o2_ai_chat_events",
+            "org/enrichment_tables/lookup",
+            "org/metrics/cpu",
+            "org2/logs/leaked",
+            "orgx/logs/leaked",
+        ]
+        .map(String::from);
+        let ids = |page: &SummaryPage| page.items.iter().map(|r| r.id.clone()).collect::<Vec<_>>();
+        let first = stream_page("org", keys.iter(), None, 2).unwrap();
+        assert_eq!(ids(&first), ["logs/payment"]);
+        assert_eq!(first.next.as_deref(), Some("logs/payment"));
+        let rest = stream_page("org", keys.iter(), first.next.as_deref(), 2).unwrap();
+        assert_eq!(ids(&rest), ["metrics/cpu", "traces/payment"]);
+        assert_eq!(rest.items[1].name, "payment");
+        let end = stream_page("org", keys.iter(), rest.next.as_deref(), 2).unwrap();
+        assert!(end.items.is_empty() && end.next.is_none());
     }
 
     #[tokio::test]
