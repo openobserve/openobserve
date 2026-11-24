@@ -60,6 +60,26 @@ export class EditionFeaturesPage {
     this.learnMoreButton = this.dialog.locator('[data-test="enterprise-upgrade-learn-more-btn"]');
     this.featuresTitle = this.dialog.locator('[data-test="enterprise-upgrade-features-title"]');
     this.featureItems = this.dialog.locator('[data-test="enterprise-upgrade-feature-item"]');
+
+    this.aiButton = page.locator('[data-test="menu-link-ai-item"]');
+    this.tooltip = page.locator('[role="tooltip"]');
+  }
+
+  /** The header AI button names its lock in both its accessible name and its hover tooltip. */
+  async expectAiButtonExplains(text) {
+    await expect(this.aiButton).toHaveAttribute('aria-label', text, { timeout: 15000 });
+    await this.aiButton.hover();
+    await expect(this.tooltip.filter({ hasText: text })).toBeVisible({ timeout: 10000 });
+  }
+
+  /** An edition-locked left-nav row carries its lock reason for screen readers and on hover. */
+  async expectLockedNavRowExplains(group, item, text) {
+    await this.page.locator(`[data-test="nav-group-${group}"]`).hover();
+    const row = this.page.locator(`[data-test="nav-group-item-${item}-locked"]`).first();
+    await expect(row).toBeVisible({ timeout: 10000 });
+    await expect(row).toHaveAccessibleName(new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    await row.hover();
+    await expect(this.tooltip.filter({ hasText: text })).toBeVisible({ timeout: 10000 });
   }
 
   getFeatureItem(name) {

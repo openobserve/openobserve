@@ -17,7 +17,7 @@
 //! (`agent_options.output_format`). Runs at the serialization edge only:
 //! result cache and the engine always see the original JSON hits.
 
-use config::{
+use crate::{
     TIMESTAMP_COL_NAME,
     meta::search::{OutputFormat, Response},
     utils::json,
@@ -201,9 +201,8 @@ fn render_md_table(columns: &[String], hits: &[json::Value]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use config::utils::json::json;
-
     use super::*;
+    use crate::utils::json::json;
 
     fn response_with_hits(hits: Vec<json::Value>) -> Response {
         Response {

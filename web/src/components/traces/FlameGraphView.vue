@@ -161,7 +161,6 @@
         @evaluate="$emit('evaluate', $event)"
         @close="closeSidebar"
         @select-span="handleSelectSpan"
-        @open-trace="$emit('open-trace')"
         @add-filter="(payload: any) => $emit('add-filter', payload)"
         @apply-filter-immediately="(payload: any) => $emit('apply-filter-immediately', payload)"
         @update:active-tab="sidebarActiveTab = $event as string"
@@ -237,7 +236,6 @@ const emit = defineEmits<{
   "select-span": [spanId: string];
   "add-filter": [payload: { field: string; value: string; operator: "=" | "!=" }];
   "apply-filter-immediately": [payload: { field: string; value: string; operator: "=" | "!=" }];
-  "open-trace": [];
 }>();
 
 // Composables

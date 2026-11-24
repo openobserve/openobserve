@@ -466,6 +466,8 @@ class WorkflowFoldersPage {
   // test. This select is `searchable`, so filter by name first: that collapses the list to
   // one row regardless of how many folders there are.
   async selectFolderInEditor(folderName) {
+    // The picker fetches folders in onMounted, so it shows before the store holds them.
+    await this.waitForFolderIdResolved(folderName);
     const folderId = await this.resolveFolderIdByName(folderName);
     if (!folderId) {
       throw new Error(`selectFolderInEditor: could not resolve folderId for "${folderName}"`);

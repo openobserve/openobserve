@@ -49,14 +49,15 @@ export interface SparklineProps {
   /** `area` fills under the line; `bar` draws one column per point. */
   shape?: "area" | "bar";
   tone?: SparklineTone;
+  /** Dashboard series slot, 1 to 12, for a shape that is one entity among several; wins over `tone`. */
+  series?: number;
   /**
    * Fixes the vertical scale's ceiling. Omit to scale to the series' own max —
    * pass a shared value when several sparklines must be comparable to each
    * other, since independently-scaled shapes cannot be compared by eye.
    */
   max?: number;
-  /** Height step. Cells use `xs`; a card's `#chart` slot uses `sm`. */
-  size?: "xs" | "sm";
+  size?: "xs" | "sm" | "md";
   /** Accessible description of the trend, e.g. "calls over the last 6 windows". */
   ariaLabel?: I18nText;
   dataTest?: string;

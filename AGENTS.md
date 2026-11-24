@@ -7,6 +7,20 @@
   Read it before any change bigger than a one-cause patch; reviewers apply its §2 tests. On
   anything mechanical (ordering, comments, lint thresholds, schema, PR rules) this file wins.
 
+## Deployment facts
+
+- In a super cluster, one region is elected to run the scheduler. Every scheduler node in that
+  region runs, and the nodes share jobs through row locks (`FOR UPDATE SKIP LOCKED`). Every new
+  spec, design and code change must honor this until schedulers are supported in more than one
+  region:
+  - Do not design for scheduled jobs that run in two regions at the same time.
+  - Do not assume that only one scheduler node runs.
+  - A scheduler node in any other region runs only the region-local AutoObserve lane.
+  - The election runs only at node startup (`src/jobs/src/job/scheduler.rs`) and is advisory. Two
+    regions that start together can both claim it, so do not use it as a lock.
+  - A job gated only on `LOCAL_NODE.is_scheduler()` runs in every region. If it must run in one
+    region, it must read the election claim.
+
 ## Build & workflow
 
 - Build with `cargo build` (debug). Never use `--release` unless explicitly asked.

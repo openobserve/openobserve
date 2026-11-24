@@ -76,9 +76,8 @@ test.describe('Logs Explain query: Plan and Analyze', () => {
     await pm.logsPage.openExplainForQuery(STREAM, `SELECT CAST(log AS INT) x FROM "${STREAM}" LIMIT 5`, { expectRows: false });
     await pm.logsPage.switchQueryPlanToAnalyze();
     const { state } = await pm.logsPage.runQueryPlanAnalyze();
-    // Marked only after setup has settled, so a broken setup fails red instead of passing as the known bug.
-    test.fail(true, '#16511 item 2: a failed EXPLAIN ANALYZE run is shown as a success');
-    expect(state).not.toBe('done');
-    await pm.logsPage.expectAnalyzeNotShownAsSuccess();
+    // #16511 item 2: a partial run keeps the done state, so the warning bar and banner are what tell it apart from a success.
+    expect(state).toBe('done');
+    await pm.logsPage.expectAnalyzeShownAsPartial();
   });
 });

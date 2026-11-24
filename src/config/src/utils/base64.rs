@@ -42,7 +42,11 @@ pub fn basic_password(auth: &str) -> Option<String> {
 }
 
 pub fn encode(s: &str) -> String {
-    base64::engine::general_purpose::STANDARD.encode(s.as_bytes())
+    encode_raw(s.as_bytes())
+}
+
+pub fn encode_raw(b: &[u8]) -> String {
+    base64::engine::general_purpose::STANDARD.encode(b)
 }
 
 pub fn encode_url(s: &str) -> String {

@@ -1,8 +1,9 @@
 //! SeaORM entity for composite alert definitions.
 
 use sea_orm::entity::prelude::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Default, PartialEq, DeriveEntityModel, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
 #[sea_orm(table_name = "alert_composites")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]

@@ -293,12 +293,15 @@ describe("toCoverageSource", () => {
     });
     const source = toCoverageSource(
       gt,
-      coverage({ rows: [row("api", "covered"), row("web", "none")] as never }),
+      coverage({
+        rows: [{ ...row("api", "covered"), traffic_per_hour: 1500 }, row("web", "none")] as never,
+      }),
       { status: "ready", retry },
       "en-US",
     );
     const [api, web] = source.rows;
     expect(api.status).toMatchObject({ state: "watched", label: "Watched" });
+    expect(api.identity?.trafficPerHour).toBe(1500);
     expect(web.status).toEqual({ state: "gap", label: "Coverage gap" });
     expect(source.totals).toMatchObject({ total: 2, gaps: 1, fullyWatched: 1, learning: 0 });
   });
@@ -340,33 +343,47 @@ describe("toCoverageSource", () => {
     });
   });
 
-  it("a service with no watched check whose streams are still learning reads learning, not a gap", () => {
+  it("an unwatched learning service is a coverage gap that keeps its learning line; watched ones keep their state", () => {
     const now = Date.UTC(2026, 10, 12, 12);
     const cell = (state: string) => ({ state, evidence: [], counts: {} });
-    const row = (name: string, errors: string, learning_until: number | null) => ({
+    const row = (name: string, states: string[], learning_until: number | null) => ({
       service_name: name,
       cluster: "prod-eu",
       namespace: "billing",
-      streams: [{ type: "logs", name, learning_until, history_days_found: 3, reason: "young" }],
-      cells: { errors: cell(errors), latency: cell("none"), absence: cell("none") },
+      streams: [{ type: "logs", name, learning_until, reason: "young" }],
+      cells: { errors: cell(states[0]), latency: cell(states[1]), absence: cell(states[2]) },
     });
     const later = now * 1000 + 5 * DAY_US;
     const source = toCoverageSource(
       gt,
       coverage({
         rows: [
-          row("young", "none", later),
-          row("young-partial", "covered", later),
-          row("ready", "none", null),
+          row("young", ["none", "none", "none"], later),
+          row("young-partial", ["covered", "none", "none"], later),
+          row("young-watched", ["covered", "covered", "covered"], later),
+          row("ready", ["none", "none", "none"], null),
         ] as never,
       }),
       { status: "ready", retry },
       "en-US",
       now,
     );
-    expect(source.rows.map((r) => r.status?.state)).toEqual(["learning", "partial", "gap"]);
-    expect(source.rows[0].status?.label).toBe("Learning");
-    expect(source.totals).toMatchObject({ total: 3, learning: 1, partial: 1, gaps: 1 });
+    expect(source.rows.map((r) => r.status)).toEqual([
+      { state: "gap", label: "Coverage gap" },
+      { state: "partial", label: "Partly watched" },
+      { state: "watched", label: "Watched" },
+      { state: "gap", label: "Coverage gap" },
+    ]);
+    expect(source.rows[0].identity?.streams).toEqual([
+      expect.objectContaining({ name: "young", learning_until: later }),
+    ]);
+    expect(source.totals).toMatchObject({
+      total: 4,
+      gaps: 2,
+      partial: 1,
+      fullyWatched: 1,
+      learning: 0,
+    });
   });
 
   it("gives each service the engine's three checks, and its state agrees with them", () => {

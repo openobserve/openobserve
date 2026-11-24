@@ -1,7 +1,14 @@
 // Copyright 2026 OpenObserve Inc.
-
-// The happy-path test leaves an `ai-toolset-fv-*` toolset behind; delete it by hand when
-// cleanup.spec.js doesn't.
+// AI Toolsets — form validation E2E tests
+//
+// Covers: AddAiToolset (name required, MCP URL required, happy path)
+//         CrossLinkDialog (name required, URL required, invalid URL, happy path)
+//
+// Cleanup notes:
+//   - AI Toolsets created in the happy-path test use the prefix ai-toolset-fv-.
+//     Delete manually via Management > AI Toolsets if cleanup.spec.js does not yet
+//     support AI Toolset deletion via API.
+//   - Cross-link items created in the happy-path test are deleted within the test.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');

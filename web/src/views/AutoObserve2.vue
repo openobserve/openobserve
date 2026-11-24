@@ -117,23 +117,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="flex flex-col gap-4 @min-[60rem]:flex-row @min-[60rem]:items-end @min-[60rem]:justify-between @min-[60rem]:gap-8"
           >
-            <div class="flex min-w-0 flex-col gap-1.5">
-              <p
-                class="text-text-body min-h-11.5 max-w-[70ch] text-sm leading-relaxed text-pretty"
+            <div class="flex min-w-0 flex-col gap-1.5 @min-[60rem]:flex-1">
+              <div
+                class="min-h-22.75 w-full max-w-[70ch] text-sm"
                 data-test="autoobserve2-coverage-sentence"
               >
                 <template v-if="liveData.coverageSkeleton.value">
                   <OSkeleton
-                    v-for="w in ['w-full', 'w-3/5']"
-                    :key="w"
+                    v-for="(w, i) in SENTENCE_BARS"
+                    :key="i"
                     animation="none"
-                    class="my-1 h-4 max-w-full"
+                    class="my-1 h-3.5 max-w-full"
                     :class="w"
                     data-test="autoobserve2-coverage-sentence-skeleton"
                   />
                 </template>
-                <template v-else>{{ coverageSentence }}</template>
-              </p>
+                <OTruncatedText
+                  v-else
+                  as="p"
+                  :lines="SENTENCE_BARS.length"
+                  class="text-text-body text-sm leading-relaxed text-pretty"
+                >
+                  <template v-if="verdict">
+                    <span class="text-text-heading block text-base leading-snug font-semibold">{{
+                      verdict.text
+                    }}</span>
+                    <span class="text-text-secondary">{{ verdictSub }}</span>
+                  </template>
+                  <template v-else>{{ coverageSentence }}</template>
+                </OTruncatedText>
+              </div>
+              <div class="flex h-8 items-center gap-3">
+                <OSkeleton
+                  v-if="liveData.coverageSkeleton.value"
+                  animation="none"
+                  class="h-8 w-24"
+                  aria-hidden="true"
+                />
+                <template v-else>
+                  <OButton
+                    v-if="addAlert"
+                    variant="primary"
+                    size="sm"
+                    class="shrink-0"
+                    data-test="autoobserve2-coverage-add-alert"
+                    @click="runCta('coverage-add-alert', addAlert)"
+                    >{{ addAlert.label }}</OButton
+                  >
+                  <OTruncatedText
+                    v-if="ctaNote"
+                    :lines="2"
+                    class="text-text-secondary text-xs"
+                    data-test="autoobserve2-coverage-cta-note"
+                    >{{ ctaNote }}</OTruncatedText
+                  >
+                </template>
+              </div>
             </div>
             <div class="flex min-h-10 w-full shrink-0 items-end @min-[60rem]:max-w-[26rem]">
               <div
@@ -222,11 +261,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import type { AutoObserveIncidentItem } from "@/services/autoobserve";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -240,7 +281,13 @@ import SettingsDrawer from "@/components/autoobserve/v2/SettingsDrawer.vue";
 import HowItWorksDrawer from "@/components/autoobserve/v2/HowItWorksDrawer.vue";
 import AutoObserveCoverageTab from "@/components/autoobserve/AutoObserveCoverageTab.vue";
 import { useLiveAutoObserve } from "@/components/autoobserve/live/liveModel";
-import { coverageStateSentence } from "@/components/autoobserve/live/LiveCoverageSentence";
+import {
+  GAP_BATCH,
+  coverageStateSentence,
+  coverageVerdict,
+} from "@/components/autoobserve/live/LiveCoverageSentence";
+import { gapNoDataReview } from "@/components/autoobserve/insight/kindCopy";
+import { useInsightActions } from "@/components/autoobserve/insight/useInsightActions";
 import LivePaged from "@/components/autoobserve/live/LivePaged.vue";
 import LiveIssues from "@/components/autoobserve/live/LiveIssues.vue";
 import { MAIN_PAGED_CAP } from "@/components/autoobserve/live/incidentsCopy";
@@ -270,6 +317,7 @@ const ISSUES_RANGE_WITHIN: Record<IssuesRange, I18nKey> = {
 const HISTORY_FILTERS: HistoryFilter[] = ["all", "incident", "change", "decision"];
 
 const { t, locale } = useI18nTyped();
+const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const liveData = useLiveAutoObserve({ active: () => route.query.page !== "activity" });
@@ -303,6 +351,28 @@ const setHistoryFilter = (value: HistoryFilter) =>
   void router.replace({ query: { ...route.query, history: value === "all" ? undefined : value } });
 
 const coverageTotals = computed(() => liveData.source.value.totals);
+
+// The verdict, its sub-line and the learning text land after first paint; four lines hold
+// them, cut with a tooltip past that, so the box the skeleton drew never grows.
+const SENTENCE_BARS = ["w-11/12", "w-full", "w-full", "w-3/5"] as const;
+const verdict = computed(() => coverageVerdict(t, locale.value, liveData.source.value.rows));
+const verdictSub = computed(() =>
+  raw([verdict.value?.sub, liveData.learning.value].filter(Boolean).join(" ")),
+);
+const { run: runCta } = useInsightActions();
+const engineRows = computed(() => liveData.source.value.rows.flatMap((r) => r.engine ?? []));
+// Ten at a time keeps each review list short enough to read before adding.
+const addAlert = computed(() => {
+  const gaps = verdict.value?.gaps.flatMap((r) => r.engine ?? []) ?? [];
+  const org = String(store.state.selectedOrganization?.identifier ?? "");
+  return gaps.length ? gapNoDataReview(t, org, engineRows.value, gaps, GAP_BATCH) : null;
+});
+const ctaNote = computed(() => {
+  if (addAlert.value) return addAlert.value.note;
+  return verdict.value && !verdict.value.gaps.length
+    ? t("autoobserve.coverageLive.verdict.nothingToAdd")
+    : null;
+});
 
 const coverageSentence = computed(() => {
   const parts = [
@@ -349,7 +419,8 @@ const setAllOpen = (open: boolean) => {
 };
 
 const openSuggestions = () => setAllOpen(true);
-const coverageKey = computed(() => `${queryString("focus") ?? ""}:${queryString("filter") ?? ""}`);
+// The coverage tab follows every setting a link or Back changes, so only a new focus remounts it.
+const coverageKey = computed(() => queryString("focus") ?? "");
 
 const DRAWER_QUERY = { drawer: undefined, history: undefined };
 

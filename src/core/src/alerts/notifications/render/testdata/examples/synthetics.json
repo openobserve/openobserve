@@ -1,133 +1,153 @@
 {
   "slack_firing": {
-    "blocks": [
+    "attachments": [
       {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "*<https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme|🔴 checkout API failing>*"
-        }
-      },
-      {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "checkout API is failing\nconnection timed out after 10s"
-        }
-      },
-      {
-        "type": "section",
-        "fields": [
+        "color": "#E01E5A",
+        "blocks": [
           {
-            "type": "mrkdwn",
-            "text": "*Event*\nFiring"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme|🔴 checkout API failing>*"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Check*\ncheckout API (http)"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "checkout API is failing\nconnection timed out after 10s"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Target*\nhttps://shop.acme.com/api/health"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Status*\nFailing"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Locations*\n1 of 2 failed: us-east-1"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Environments*\nproduction"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Error*\nconnection timed out after 10s"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Time*\n2026-11-02 10:05:00 UTC"
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Event*\nFiring"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Check*\ncheckout API (http)"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Target*\nhttps://shop.acme.com/api/health"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Status*\nFailing"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Locations*\n1 of 2 failed: us-east-1"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Environments*\nproduction"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Error*\nconnection timed out after 10s"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Time*\n2026-11-02 10:05:00 UTC"
+              }
+            ]
           }
         ]
       },
       {
-        "type": "actions",
-        "elements": [
+        "color": "#E01E5A",
+        "blocks": [
           {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "Open check"
-            },
-            "url": "https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme",
-            "style": "primary"
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open check"
+                },
+                "url": "https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme",
+                "style": "primary"
+              }
+            ]
           }
         ]
       }
     ]
   },
   "slack_resolved": {
-    "blocks": [
+    "attachments": [
       {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "*<https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme|🟢 checkout API recovered>*"
-        }
-      },
-      {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "checkout API has recovered"
-        }
-      },
-      {
-        "type": "section",
-        "fields": [
+        "color": "#2EB67D",
+        "blocks": [
           {
-            "type": "mrkdwn",
-            "text": "*Event*\nResolved"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme|🟢 checkout API recovered>*"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Check*\ncheckout API (http)"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "checkout API has recovered"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Target*\nhttps://shop.acme.com/api/health"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Status*\nRecovered"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Locations*\nus-east-1, eu-west-1 recovered"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Environments*\nproduction"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Time*\n2026-11-02 10:40:00 UTC"
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Event*\nResolved"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Check*\ncheckout API (http)"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Target*\nhttps://shop.acme.com/api/health"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Status*\nRecovered"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Locations*\nus-east-1, eu-west-1 recovered"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Environments*\nproduction"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Time*\n2026-11-02 10:40:00 UTC"
+              }
+            ]
           }
         ]
       },
       {
-        "type": "actions",
-        "elements": [
+        "color": "#2EB67D",
+        "blocks": [
           {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "Open check"
-            },
-            "url": "https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme",
-            "style": "primary"
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open check"
+                },
+                "url": "https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme",
+                "style": "primary"
+              }
+            ]
           }
         ]
       }

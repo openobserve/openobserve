@@ -15,6 +15,4 @@
 
 pub mod deduplication;
 pub mod projections;
-#[cfg(feature = "vectorscan")]
-pub mod regex_projections;
 pub mod shared_subplan;

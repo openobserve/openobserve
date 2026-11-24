@@ -18,7 +18,10 @@ import { defineComponent } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
-import useSearchBar, { streamSwitchPending } from "./useSearchBar";
+import useSearchBar, { CATALOG_RETRY_INTERVAL, streamSwitchPending } from "./useSearchBar";
+import { queryClient } from "@/composables/query/queryClient";
+import { queryFunctionsQuery } from "@/services/query_functions.queries";
+import queryFunctions from "@/services/query_functions";
 import searchState from "./searchState";
 import { resetLogsAutoRunForTests, useLogsAutoRun } from "./logsAutoRun";
 import { REFRESH_QUERY_ORIGIN } from "./logsRowNav";
@@ -382,6 +385,136 @@ describe("useSearchBar Composable", () => {
       releaseGroups([]);
       await run;
       expect(mockGetDataThroughStream).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getQueryData — function catalog SQL mode needs", () => {
+    let releaseCatalog: (list: unknown[]) => void;
+    let fetchSpy: ReturnType<typeof vi.spyOn>;
+    const catalogKey = () =>
+      queryFunctionsQuery(store.state.selectedOrganization.identifier).queryKey;
+
+    const prime = (sqlMode: boolean) => {
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamLists = [{ label: "app", value: "app" }];
+      searchObj.data.stream.selectedStream = ["app"];
+      searchObj.meta.sqlMode = sqlMode;
+    };
+
+    beforeEach(() => {
+      queryClient.removeQueries({ queryKey: catalogKey() });
+      fetchSpy = vi.spyOn(queryClient, "fetchQuery").mockReturnValue(
+        new Promise((resolve) => {
+          releaseCatalog = resolve as (list: unknown[]) => void;
+        }) as any,
+      );
+    });
+
+    afterEach(() => {
+      fetchSpy.mockRestore();
+      queryClient.removeQueries({ queryKey: catalogKey() });
+      searchState().searchObj.meta.sqlMode = false;
+    });
+
+    it("waits for an uncached catalog before building a SQL search", async () => {
+      prime(true);
+      const run = (wrapper.vm as any).getQueryData(false);
+      await flushPromises();
+      expect(mockGetDataThroughStream).not.toHaveBeenCalled();
+
+      releaseCatalog([]);
+      await run;
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ["a cached catalog", true, true],
+      ["non-SQL mode", false, false],
+    ])("dispatches in the same tick with %s", (_case, sqlMode, cached) => {
+      if (cached) queryClient.setQueryData(catalogKey(), []);
+      prime(sqlMode as boolean);
+      void (wrapper.vm as any).getQueryData(false);
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getQueryData — function catalog that fails to load", () => {
+    let listSpy: ReturnType<typeof vi.spyOn>;
+    const catalogKey = () =>
+      queryFunctionsQuery(store.state.selectedOrganization.identifier).queryKey;
+
+    beforeEach(() => {
+      queryClient.removeQueries({ queryKey: catalogKey() });
+      listSpy = vi.spyOn(queryFunctions, "list").mockRejectedValue({ response: { status: 500 } });
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamLists = [{ label: "app", value: "app" }];
+      searchObj.data.stream.selectedStream = ["app"];
+      searchObj.meta.sqlMode = true;
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      queryClient.removeQueries({ queryKey: catalogKey() });
+      searchState().searchObj.meta.sqlMode = false;
+    });
+
+    // setupTests turns retry off globally, so assert the opt-out the app's retry policy needs.
+    it("asks once without retrying, then runs the search", async () => {
+      const fetchSpy = vi.spyOn(queryClient, "fetchQuery");
+      await (wrapper.vm as any).getQueryData(false);
+      expect(fetchSpy).toHaveBeenCalledWith(expect.objectContaining({ retry: false }));
+      expect(listSpy).toHaveBeenCalledTimes(1);
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not wait again after a recent failure", async () => {
+      await (wrapper.vm as any).getQueryData(false);
+      mockGetDataThroughStream.mockClear();
+
+      void (wrapper.vm as any).getQueryData(false);
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
+      expect(listSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("refetches in the background a minute after a failure, without waiting", async () => {
+      await (wrapper.vm as any).getQueryData(false);
+      vi.spyOn(Date, "now").mockReturnValue(Date.now() + CATALOG_RETRY_INTERVAL + 1);
+      mockGetDataThroughStream.mockClear();
+
+      void (wrapper.vm as any).getQueryData(false);
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
+      await flushPromises();
+      expect(listSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not wait for a background refetch that is still in flight", async () => {
+      await (wrapper.vm as any).getQueryData(false);
+      listSpy.mockReturnValue(new Promise(() => {}));
+      vi.spyOn(Date, "now").mockReturnValue(Date.now() + CATALOG_RETRY_INTERVAL + 1);
+      void (wrapper.vm as any).getQueryData(false);
+      await flushPromises();
+      expect(listSpy).toHaveBeenCalledTimes(2);
+      mockGetDataThroughStream.mockClear();
+
+      void (wrapper.vm as any).getQueryData(false);
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
+      expect(listSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it("uses the catalog from the next search once a background refetch succeeds", async () => {
+      await (wrapper.vm as any).getQueryData(false);
+      const catalog = [{ name: "approx_distinct", kind: "aggregate" }];
+      listSpy.mockResolvedValue({ data: { list: catalog } });
+      vi.spyOn(Date, "now").mockReturnValue(Date.now() + CATALOG_RETRY_INTERVAL + 1);
+      void (wrapper.vm as any).getQueryData(false);
+      await flushPromises();
+      expect(queryClient.getQueryData(catalogKey())).toEqual(catalog);
+
+      mockGetDataThroughStream.mockClear();
+      void (wrapper.vm as any).getQueryData(false);
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
+      expect(listSpy).toHaveBeenCalledTimes(2);
     });
   });
 

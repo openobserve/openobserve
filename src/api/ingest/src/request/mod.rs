@@ -21,7 +21,6 @@ pub mod profiles;
 pub mod rum;
 
 /// An expired trial is the only quota answer; no other refusal should read as a quota problem.
-#[cfg(feature = "cloud")]
 pub(crate) fn ingestion_not_allowed_response(e: infra::errors::Error) -> axum::response::Response {
     use axum::{http::StatusCode, response::IntoResponse};
 

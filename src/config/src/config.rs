@@ -155,12 +155,15 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 //      status_page_notices.false_alarm_recovered_at.
 // 155: create the service version, identity, alias, deploy and verdict tables.
 // 156: add alert_incidents.last_detection_at, when a new detection joined a worked case.
-// 157: create ai_toolset_health.
-// 158: add org_ai_toolsets.region_only/origin_region and ai_toolset_tombstones.
-// 159: create ai_memory and ai_memory_revisions.
-// 160: add ai_memory_revisions.flags, why a pending edit needs a closer look.
-// 161: add ai_memory.settings_at/settings_region and ai_memory_tombstones for replication.
-pub const DB_SCHEMA_VERSION: u64 = 161;
+// 157: add alert_incident_alerts.labels and severity, create alert_pair_verdicts, and delete
+//      service_streams rows named by the metric-name label that list no trace stream.
+// 159: delete org_ai_toolsets rows of the removed cli kind.
+// 160: create ai_toolset_health.
+// 161: add org_ai_toolsets.region_only/origin_region and ai_toolset_tombstones.
+// 162: create ai_memory and ai_memory_revisions.
+// 163: add ai_memory_revisions.flags, why a pending edit needs a closer look.
+// 164: add ai_memory.settings_at/settings_region and ai_memory_tombstones for replication.
+pub const DB_SCHEMA_VERSION: u64 = 164;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -194,6 +197,8 @@ pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 128 * 1024;
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 pub const SOURCEMAP_MEM_CACHE_SIZE: usize = 10000;
+/// Enterprise usage calculations need data at most this old, so publishing never waits longer.
+const ENTERPRISE_USAGE_PUBLISH_CAP_SECS: i64 = 10 * 60;
 
 #[inline]
 pub fn get_batch_size() -> usize {
@@ -843,8 +848,11 @@ async fn init_sns_client() -> aws_sdk_sns::Client {
     let cfg = get_config();
     let shared_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
 
-    let sns_config = aws_sdk_sns::config::Builder::from(&shared_config)
-        .endpoint_url(cfg.sns.endpoint.clone())
+    let mut builder = aws_sdk_sns::config::Builder::from(&shared_config);
+    if !cfg.sns.endpoint.is_empty() {
+        builder = builder.endpoint_url(cfg.sns.endpoint.clone());
+    }
+    let sns_config = builder
         .timeout_config(
             aws_config::timeout::TimeoutConfig::builder()
                 .connect_timeout(std::time::Duration::from_secs(cfg.sns.connect_timeout))
@@ -1261,7 +1269,7 @@ pub struct DatabaseMonitoring {
 pub struct ServiceVersions {
     #[env_config(
         name = "ZO_SERVICE_VERSIONS_ENABLED",
-        default = true,
+        default = false,
         help = "Enable Service Versions: span stamping at ingest, the version registry flush and the service signals processor. false pauses all three and keeps every stored row and cursor; true resumes from the saved cursors."
     )]
     pub enabled: bool,
@@ -2630,7 +2638,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_SDR_FAIL_CLOSED",
         default = false,
-        help = "Refuse rather than keep unredacted data when sensitive-data redaction cannot run. Logs and traces ingestion is rejected with 503 while the pattern manager is unavailable or a stream's ingestion pattern failed to build, and a search on a stream with search-time patterns errors when its redaction step cannot run. Off by default: data is stored and returned unredacted and the evidence row records a fail-open."
+        help = "Refuse rather than keep unredacted data when ingestion-time redaction cannot run. Logs and traces ingestion is rejected with 503 while the pattern manager is unavailable or a stream's ingestion pattern failed to build. Off by default: data is stored unredacted and the evidence row records a fail-open. Search-time redaction ignores this setting and always fails closed."
     )]
     pub sdr_fail_closed: bool,
     #[env_config(
@@ -2910,8 +2918,6 @@ pub struct Limit {
     pub query_partition_by_secs: usize,
     #[env_config(name = "ZO_QUERY_PARTITION_MAX_NUM", default = 100)] // max number of partitions
     pub query_partition_max_num: usize,
-    #[env_config(name = "ZO_DISABLE_PARTITIONS_FOR_NON_TS_ORDER_BY", default = false)]
-    pub disable_partitions_for_non_ts_order_by: bool,
     // Default Config: Run Query Recommendation Analysis for last one hour for every hour
     #[env_config(name = "ZO_QUERY_RECOMMENDATION_DURATION", default = 3600000000)] // microseconds
     pub query_recommendation_duration: i64,
@@ -3076,6 +3082,12 @@ pub struct Limit {
         help = "Per-user cap on alert-destination test-sends per minute. A test-send posts a real [TEST]-marked message to a real destination, so this bounds accidental or scripted spam of someone's channel/inbox. The cap is enforced PER PROCESS (in-memory, not cluster-shared) — a multi-node deployment's effective cap is N times this value, where N is the node count. 0 = unlimited."
     )]
     pub alert_test_send_per_minute: u32,
+    #[env_config(
+        name = "ZO_INCIDENTS_JOIN_WINDOW_MINUTES",
+        default = 240,
+        help = "How long after an incident's first alert another alert may still join it by matching dimensions, in minutes. Alerts already in the incident always rejoin it, and an incident without dimensions takes only its own alerts. 0 removes the time limit."
+    )]
+    pub incidents_join_window_minutes: i64,
     #[env_config(
         name = "ZO_ALERT_CHART_ENABLED",
         default = true,
@@ -5430,6 +5442,12 @@ fn check_health_check_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// `ZO_USAGE_PUBLISH_INTERVAL` as an enterprise build applies it.
+#[inline]
+pub fn enterprise_usage_publish_interval(cfg: &Config) -> i64 {
+    ENTERPRISE_USAGE_PUBLISH_CAP_SECS.min(cfg.common.usage_publish_interval)
+}
+
 #[inline]
 pub fn is_local_disk_storage() -> bool {
     get_config().common.is_local_storage
@@ -6145,6 +6163,58 @@ mod tests {
     #[test]
     fn test_ensure_not_empty_with_whitespace() {
         assert!(ensure_not_empty("  value  ", "TEST").is_ok());
+    }
+
+    #[test]
+    fn test_sns_endpoint_builder_and_resolution() {
+        use aws_sdk_sns::config::endpoint::ResolveEndpoint;
+
+        let shared_config = aws_config::SdkConfig::builder()
+            .region(aws_config::Region::new("eu-central-1"))
+            .build();
+
+        let empty_endpoint = "";
+        let mut builder_default = aws_sdk_sns::config::Builder::from(&shared_config);
+        if !empty_endpoint.is_empty() {
+            builder_default = builder_default.endpoint_url(empty_endpoint);
+        }
+        let _client = aws_sdk_sns::Client::from_conf(builder_default.build());
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let resolver = aws_sdk_sns::config::endpoint::DefaultResolver::new();
+        let params_default = aws_sdk_sns::config::endpoint::Params::builder()
+            .region("eu-central-1".to_string())
+            .build()
+            .unwrap();
+        let endpoint = rt
+            .block_on(resolver.resolve_endpoint(&params_default))
+            .unwrap();
+        assert_eq!(endpoint.url(), "https://sns.eu-central-1.amazonaws.com");
+
+        let params_empty = aws_sdk_sns::config::endpoint::Params::builder()
+            .region("eu-central-1".to_string())
+            .endpoint("".to_string())
+            .build()
+            .unwrap();
+        assert!(
+            std::panic::catch_unwind(|| {
+                let _ = rt.block_on(resolver.resolve_endpoint(&params_empty));
+            })
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn test_init_sns_client_succeeds_with_default_config() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let _client = rt.block_on(init_sns_client());
     }
 
     #[test]

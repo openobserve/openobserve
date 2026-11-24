@@ -257,6 +257,8 @@ export interface LiveIdentity {
   cluster: string | null;
   namespace: string | null;
   streams: { type: string; name: string; learning_until?: number | null }[];
+  /** Events an hour over the service's own streams; null or absent when unknown. */
+  trafficPerHour?: number | null;
 }
 
 export interface StreamScan {

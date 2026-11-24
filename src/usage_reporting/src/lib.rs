@@ -444,7 +444,7 @@ pub async fn enqueue_error_with_timeout(
 fn initialize_reporting_queue() -> ReportingQueue {
     let cfg = get_config();
     #[cfg(feature = "enterprise")]
-    let publish_interval = (10 * 60).min(cfg.common.usage_publish_interval);
+    let publish_interval = config::enterprise_usage_publish_interval(&cfg);
     #[cfg(not(feature = "enterprise"))]
     let publish_interval = cfg.common.usage_publish_interval;
     let timeout = time::Duration::from_secs(

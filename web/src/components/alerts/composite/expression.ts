@@ -18,6 +18,27 @@ export interface CompositeChildOption extends CompositeChildDisplay {
   stale?: boolean;
 }
 
+/** Alert-list rows a composite may reference: composites and anomaly configs are never children. */
+export const childOptionsFrom = (rows: readonly any[]): CompositeChildOption[] =>
+  rows
+    .filter(
+      (row) =>
+        (row.alert_id ?? row.id) &&
+        row.alert_type !== "composite" &&
+        row.alert_type !== "anomaly_detection",
+    )
+    .map((row) => ({
+      alert_id: row.alert_id ?? row.id,
+      name: row.name,
+      alert_type: row.alert_type,
+      folder_id: row.folder_id,
+      folder_name: row.folder_name,
+      enabled: row.enabled,
+      level: row.level,
+      stale: row.stale,
+      accessible: true,
+    }));
+
 export const expressionChildIds = (expression: string): string[] => {
   const ids: string[] = [];
   for (const match of expression.matchAll(/\{([^{}]+)\}/g)) {

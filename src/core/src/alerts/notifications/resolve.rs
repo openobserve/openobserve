@@ -137,11 +137,15 @@ pub fn resolve_content(
     };
     unknown_variables.append(&mut unk);
 
+    let (spec_fields, default_fields) = super::default_template::fields_for(&spec.fields, ctx.kind);
     let mut fields = Vec::new();
-    for field in &spec.fields {
+    for field in spec_fields.iter() {
         if let Some(filter) = &field.show_when
             && !filter.matches(ctx.level)
         {
+            continue;
+        }
+        if default_fields && !super::default_template::default_field_applies(field, ctx.kind) {
             continue;
         }
         let (label, mut unk) = substitute_raw(&field.label, ctx);
@@ -225,9 +229,13 @@ pub fn resolve_content(
     }
 }
 
-/// Appends Primary, then Detail unless it is blank or repeats `alert_url`.
-/// An authored link to the Detail URL stands in for it, so the object link shows once.
+/// Appends Primary, then Detail unless it is blank or repeats `alert_url`. On an anomaly an
+/// authored link to `alert_url` drops; one to the Detail URL stands in for it.
 pub(crate) fn append_system_links(links: &mut Vec<Link>, ctx: &NotificationContext) {
+    let primary_url = ctx.alert_url.trim();
+    if ctx.kind == NotificationKind::Anomaly && !primary_url.is_empty() {
+        links.retain(|l| l.role != LinkRole::Authored || l.url.trim() != primary_url);
+    }
     links.push(Link {
         label: ctx.alert_url_label.clone(),
         url: ctx.alert_url.clone(),
@@ -647,7 +655,26 @@ pub(crate) fn status_dot(ctx: &NotificationContext) -> &'static str {
         (NotificationEvent::Informational, _) => "🔵",
         // A maintenance window opening is a notice, not a failure.
         _ if ctx.kind == NotificationKind::Downtime => "🔵",
+        // A P4 incident and a P3 page carry no level on purpose: they are informational.
+        (_, None)
+            if matches!(
+                ctx.kind,
+                NotificationKind::Incident | NotificationKind::OnCall
+            ) =>
+        {
+            "🔵"
+        }
         _ => "🔴",
+    }
+}
+
+/// The Slack webhook bar color, read from `status_dot` so the dot and the bar never differ.
+pub(crate) fn status_color(ctx: &NotificationContext) -> &'static str {
+    match status_dot(ctx) {
+        "🟢" => "#2EB67D",
+        "🟠" => "#F2952F",
+        "🔵" => "#4A90D9",
+        _ => "#E01E5A",
     }
 }
 
@@ -1253,15 +1280,28 @@ mod tests {
     #[test]
     fn status_dot_colors_by_event_and_level() {
         use NotificationEvent::{Firing, Informational, Resolved};
-        use NotificationKind::{Alert, Downtime, Synthetics};
-        for (kind, event, level, expected) in [
-            (Alert, Resolved, Some(AlertLevel::Critical), "🟢"),
-            (Alert, Firing, Some(AlertLevel::Ok), "🟢"),
-            (Synthetics, Informational, Some(AlertLevel::Warning), "🟠"),
-            (Alert, Informational, None, "🔵"),
-            (Downtime, Firing, None, "🔵"),
-            (Alert, Firing, Some(AlertLevel::Critical), "🔴"),
-            (Alert, Firing, None, "🔴"),
+        use NotificationKind::{Alert, Downtime, Incident, OnCall, Synthetics};
+        for (kind, event, level, expected, bar) in [
+            (Alert, Resolved, Some(AlertLevel::Critical), "🟢", "#2EB67D"),
+            // A P4 incident and a P3 page carry no level: informational, not urgent.
+            (Incident, Firing, None, "🔵", "#4A90D9"),
+            (OnCall, Firing, None, "🔵", "#4A90D9"),
+            (Incident, Firing, Some(AlertLevel::Warning), "🟠", "#F2952F"),
+            (Alert, Firing, Some(AlertLevel::NoData), "🟠", "#F2952F"),
+            (OnCall, Firing, Some(AlertLevel::Critical), "🔴", "#E01E5A"),
+            (Incident, Resolved, None, "🟢", "#2EB67D"),
+            (Alert, Firing, Some(AlertLevel::Ok), "🟢", "#2EB67D"),
+            (
+                Synthetics,
+                Informational,
+                Some(AlertLevel::Warning),
+                "🟠",
+                "#F2952F",
+            ),
+            (Alert, Informational, None, "🔵", "#4A90D9"),
+            (Downtime, Firing, None, "🔵", "#4A90D9"),
+            (Alert, Firing, Some(AlertLevel::Critical), "🔴", "#E01E5A"),
+            (Alert, Firing, None, "🔴", "#E01E5A"),
         ] {
             let ctx = NotificationContext {
                 kind,
@@ -1270,6 +1310,7 @@ mod tests {
                 ..Default::default()
             };
             assert_eq!(status_dot(&ctx), expected, "{kind:?} {event:?} {level:?}");
+            assert_eq!(status_color(&ctx), bar, "bar {kind:?} {event:?} {level:?}");
         }
     }
 
@@ -1408,6 +1449,62 @@ mod tests {
         );
         assert!(!r.links[1].reserved);
         assert_eq!(r.links[2].role, LinkRole::Primary);
+    }
+
+    #[test]
+    fn an_authored_link_to_the_data_url_drops_and_the_others_stay() {
+        let mut ctx = with_detail("https://o2.example/web/alerts/detail/a1");
+        ctx.kind = NotificationKind::Anomaly;
+        let data_url = format!(" {} ", ctx.alert_url);
+        let r = resolve_content(
+            &authored(&[
+                ("View data around the window", data_url.as_str()),
+                ("Runbook", "https://rb"),
+            ]),
+            &ctx,
+            "slack",
+        );
+        let links: Vec<(&str, LinkRole)> =
+            r.links.iter().map(|l| (l.label.as_str(), l.role)).collect();
+        assert_eq!(
+            links,
+            [
+                ("Runbook", LinkRole::Authored),
+                ("View logs", LinkRole::Primary),
+                ("Open alert", LinkRole::Detail),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_scheduled_alert_keeps_its_authored_link_to_the_data_url() {
+        let ctx = with_detail("https://o2.example/web/alerts/detail/a1");
+        assert_eq!(ctx.kind, NotificationKind::Alert);
+        let r = resolve_content(
+            &authored(&[("See the data", ctx.alert_url.as_str())]),
+            &ctx,
+            "slack",
+        );
+        let links: Vec<(&str, LinkRole)> =
+            r.links.iter().map(|l| (l.label.as_str(), l.role)).collect();
+        assert_eq!(
+            links,
+            [
+                ("See the data", LinkRole::Authored),
+                ("View logs", LinkRole::Primary),
+                ("Open alert", LinkRole::Detail),
+            ],
+            "as on main"
+        );
+    }
+
+    #[test]
+    fn a_blank_data_url_drops_no_authored_link() {
+        let mut ctx = with_detail("https://o2.example/web/alerts/detail/a1");
+        ctx.alert_url.clear();
+        let mut links = vec![Link::authored("Mine", "")];
+        append_system_links(&mut links, &ctx);
+        assert_eq!(links[0], Link::authored("Mine", ""));
     }
 
     #[test]

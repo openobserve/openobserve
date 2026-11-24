@@ -38,6 +38,16 @@ vi.mock("@/services/search", () => ({
   default: { search: vi.fn() },
 }));
 
+vi.mock("@/services/anomaly_detection", () => ({
+  default: { explore: vi.fn() },
+}));
+
+// The page navigates through the router; the link it would open is what these tests check.
+vi.mock("@/utils/alerts/anomalyExploreView", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/alerts/anomalyExploreView")>()),
+  openAppUrl: vi.fn(),
+}));
+
 // `__esModule` is load-bearing: the component reaches this through defineAsyncComponent.
 vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
   __esModule: true,
@@ -48,9 +58,37 @@ vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
   },
 }));
 
+import { queryClient } from "@/composables/query/queryClient";
 import AnomalyDetectionChart from "@/components/alerts/AnomalyDetectionChart.vue";
+import anomalyDetection from "@/services/anomaly_detection";
+import { openAppUrl } from "@/utils/alerts/anomalyExploreView";
 
 const search = vi.mocked(searchService.search);
+const explore = vi.mocked(anomalyDetection.explore);
+const openUrl = vi.mocked(openAppUrl);
+
+const EXPLORE = {
+  url: "https://o2.example/web/logs?stream=logs",
+  label: "View logs",
+  target: "logs",
+  filter_applied: true,
+  name: "checkout-requests",
+  measure: "count(*) per 5 min",
+  stream: "logs",
+  filter: null,
+  state: "none",
+  state_source: "buckets",
+  summary: null,
+  model_version: 0,
+  last_detection_run: null,
+  cursor_us: null,
+  no_new_data_since_us: null,
+  window: null,
+  explore_start_us: 0,
+};
+
+const exploreReturns = (over: Record<string, unknown> = {}) =>
+  explore.mockResolvedValue({ data: { ...EXPLORE, ...over } } as any);
 
 const stubs = {
   // The renderer runs a real query pipeline; the panel CONFIG handed to it is
@@ -125,6 +163,9 @@ beforeEach(() => {
   anomaliesSchema.fail = false;
   search.mockReset();
   respond([HIT]);
+  explore.mockReset();
+  exploreReturns();
+  openUrl.mockReset();
 });
 
 afterEach(() => {
@@ -513,6 +554,220 @@ describe("AnomalyDetectionChart", () => {
         );
         expect(time).toBe(times[0]);
       }
+    });
+  });
+
+  describe("summary strip", () => {
+    it("loads the endpoint without a window on mount and shows its state", async () => {
+      exploreReturns({ state: "none" });
+      wrapper = await mountChart({ ...ANOMALY, is_trained: true, current_model_version: 0 });
+      expect(explore).toHaveBeenCalledTimes(1);
+      expect(explore.mock.calls[0][2]).toEqual({});
+      expect(wrapper.find('[data-test="alerts-anomalysummarystrip-state-none"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="alerts-anomalysummarystrip-message"]').text()).toBe(
+        "No anomalies in the last 7 days",
+      );
+    });
+
+    it("keeps the chart when the endpoint fails, and Retry reads it again", async () => {
+      explore.mockRejectedValue({ response: { status: 500 } });
+      wrapper = await mountChart();
+      // A 5xx is retried twice with backoff before the strip shows the error.
+      await vi.waitFor(
+        () =>
+          expect(wrapper!.find('[data-test="alerts-anomalysummarystrip-error"]').exists()).toBe(
+            true,
+          ),
+        { timeout: 8000, interval: 100 },
+      );
+      expect(wrapper.find('[data-test="alerts-anomalydetectionchart-metric-chart"]').exists()).toBe(
+        true,
+      );
+      const before = explore.mock.calls.length;
+      exploreReturns();
+      await wrapper.find('[data-test="alerts-anomalysummarystrip-retry"]').trigger("click");
+      await settle();
+      expect(explore).toHaveBeenCalledTimes(before + 1);
+      expect(wrapper.find('[data-test="alerts-anomalysummarystrip-error"]').exists()).toBe(false);
+    }, 15000);
+
+    it("re-reads the strip when the chart range changes", async () => {
+      wrapper = await mountChart();
+      await wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "6h");
+      await settle();
+      expect(explore).toHaveBeenCalledTimes(2);
+    });
+
+    it("reports each forced read, not the mount read, so the page re-reads the notice", async () => {
+      wrapper = await mountChart();
+      expect(wrapper.emitted("refreshed")).toBeUndefined();
+      await wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "6h");
+      await settle();
+      expect(wrapper.emitted("refreshed")).toHaveLength(1);
+    });
+
+    it("opens the endpoint's link from the primary button", async () => {
+      wrapper = await mountChart();
+      await wrapper.find('[data-test="alerts-anomalysummarystrip-open"]').trigger("click");
+      expect(openUrl.mock.calls[0][1]).toBe(EXPLORE.url);
+    });
+  });
+
+  describe("reload on a new model", () => {
+    const TRAINED = { ...ANOMALY, is_trained: true, current_model_version: 7 };
+
+    it("asks for one reload when the summary reports another model", async () => {
+      exploreReturns({ model_version: 9 });
+      wrapper = await mountChart(TRAINED);
+      expect(wrapper.emitted("reload")).toHaveLength(1);
+    });
+
+    it("does not loop for an edited detector still training", async () => {
+      // Loaded model 7, the server says 0 (retraining), and the reload brings an untrained config.
+      exploreReturns({ model_version: 0 });
+      wrapper = await mountChart(TRAINED);
+      expect(wrapper.emitted("reload")).toHaveLength(1);
+      await wrapper.setProps({ alert: { ...TRAINED, is_trained: false } });
+      await settle();
+      expect(explore.mock.calls.length).toBeGreaterThan(1);
+      expect(wrapper.emitted("reload")).toHaveLength(1);
+    });
+
+    it("reloads again for a second retrain after the first one finished", async () => {
+      exploreReturns({ model_version: 0 });
+      wrapper = await mountChart(TRAINED);
+      await wrapper.setProps({ alert: { ...TRAINED, is_trained: false } });
+      await settle();
+      exploreReturns({ model_version: 8 });
+      await wrapper.setProps({ alert: { ...TRAINED, is_trained: false, name: "x" } });
+      await settle();
+      expect(wrapper.emitted("reload")).toHaveLength(2);
+      exploreReturns({ model_version: 0 });
+      await wrapper.setProps({ alert: { ...TRAINED, current_model_version: 8 } });
+      await settle();
+      expect(wrapper.emitted("reload")).toHaveLength(3);
+    });
+
+    it("does not reload again when the reloaded config still lags the server", async () => {
+      exploreReturns({ model_version: 9 });
+      wrapper = await mountChart(TRAINED);
+      await wrapper.setProps({ alert: { ...TRAINED } });
+      await settle();
+      expect(wrapper.emitted("reload")).toHaveLength(1);
+    });
+
+    it("redraws the chart for the reloaded config", async () => {
+      wrapper = await mountChart();
+      const before = search.mock.calls.length;
+      await wrapper.setProps({ alert: { ...ANOMALY } });
+      await settle();
+      expect(search.mock.calls.length).toBeGreaterThan(before);
+    });
+  });
+
+  describe("point popover", () => {
+    const TRAINED = { ...ANOMALY, is_trained: true, current_model_version: 7 };
+    const TS = Date.parse("2026-10-01T00:05:00Z");
+    const click = async (over: Record<string, unknown> = {}) => {
+      await wrapper.findComponent({ name: "ChartRenderer" }).vm.$emit("click", {
+        seriesName: "Anomaly",
+        value: [TS, 12],
+        event: { offsetX: 40, offsetY: 80 },
+        ...over,
+      });
+      await settle();
+    };
+    const popover = () => wrapper.findComponent({ name: "AnomalyPointPopover" });
+
+    beforeEach(() => {
+      exploreReturns({ model_version: 7 });
+    });
+
+    it("opens for a red point of the current model, found by its timestamp", async () => {
+      respond([{ ...HIT, model_version: 7 }]);
+      wrapper = await mountChart(TRAINED);
+      await click({ dataIndex: 99 });
+      expect(popover().props("open")).toBe(true);
+      expect(popover().props("row").tsMs).toBe(TS);
+      expect(popover().props("current")).toBe(true);
+    });
+
+    it("ignores a click on any other series", async () => {
+      respond([{ ...HIT, model_version: 7 }]);
+      wrapper = await mountChart(TRAINED);
+      await click({ seriesName: "Value" });
+      expect(popover().props("open")).toBe(false);
+    });
+
+    it("opens the bucket only, with pad 0 and the point's model", async () => {
+      respond([{ ...HIT, model_version: 7 }]);
+      wrapper = await mountChart(TRAINED);
+      await click();
+      exploreReturns({ model_version: 7, url: "https://o2.example/web/logs?bucket=1" });
+      await popover().vm.$emit("open-bucket");
+      await settle();
+      const query = explore.mock.calls[explore.mock.calls.length - 1][2];
+      expect(query).toEqual({
+        start: TS * 1000,
+        end: (TS + 5 * 60_000) * 1000,
+        pad: 0,
+        model_version: 7,
+      });
+      expect(openUrl.mock.calls[0][1]).toBe("https://o2.example/web/logs?bucket=1");
+    });
+
+    it("asks the server again on a second open, so a retrain since gets its 409", async () => {
+      respond([{ ...HIT, model_version: 7 }]);
+      wrapper = await mountChart(TRAINED);
+      await click();
+      await popover().vm.$emit("open-bucket");
+      await settle();
+      explore.mockRejectedValue({ response: { status: 409 } });
+      await click();
+      await popover().vm.$emit("open-bucket");
+      await settle();
+      expect(wrapper.emitted("reload")).toHaveLength(1);
+    });
+
+    it("forces the point request by invalidating its exact key, not with staleTime 0", async () => {
+      respond([{ ...HIT, model_version: 7 }]);
+      wrapper = await mountChart(TRAINED);
+      const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+      const fetch = vi.spyOn(queryClient, "fetchQuery");
+      await click();
+      await popover().vm.$emit("open-bucket");
+      await settle();
+      expect(invalidate).toHaveBeenCalledWith(
+        expect.objectContaining({ exact: true, refetchType: "none" }),
+      );
+      expect(fetch.mock.calls[0][0]).not.toHaveProperty("staleTime", 0);
+      invalidate.mockRestore();
+      fetch.mockRestore();
+    });
+
+    it("marks a point of an older model, which has no data button", async () => {
+      respond([{ ...HIT, model_version: 3 }]);
+      wrapper = await mountChart(TRAINED);
+      await click();
+      expect(popover().props("open")).toBe(true);
+      expect(popover().props("current")).toBe(false);
+    });
+
+    it("reloads the page once on a 409 and closes the popover", async () => {
+      respond([{ ...HIT, model_version: 7 }]);
+      wrapper = await mountChart(TRAINED);
+      await click();
+      explore.mockRejectedValue({ response: { status: 409 } });
+      await popover().vm.$emit("open-bucket");
+      await settle();
+      expect(wrapper.emitted("reload")).toHaveLength(1);
+      expect(popover().props("open")).toBe(false);
+      await click();
+      await popover().vm.$emit("open-bucket");
+      await settle();
+      expect(wrapper.emitted("reload")).toHaveLength(1);
     });
   });
 });

@@ -288,6 +288,45 @@ impl ScheduledTriggerData {
     }
 }
 
+/// Super-cluster payload for an alert run that moved only the per-run fields of its job row.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TriggerRunStamp {
+    pub org: String,
+    pub module_key: String,
+    pub status: TriggerStatus,
+    pub retries: i32,
+    /// When the run claimed the job; a replica applies a stamp only to a row claimed earlier.
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    pub next_run_at: i64,
+    pub period_end_time: Option<i64>,
+    pub tolerance: i64,
+    pub last_satisfied_at: Option<i64>,
+}
+
+impl TriggerRunStamp {
+    /// `data` with this run's three fields set; unreadable `data` starts empty, as the scheduler
+    /// starts from the default.
+    pub fn patch_data(&self, data: &str) -> String {
+        // Edited as JSON, not through the struct, so a field a newer region wrote survives.
+        let readable = ScheduledTriggerData::from_json_string(data).is_ok();
+        let mut fields = match json::from_str(data) {
+            Ok(json::Value::Object(fields)) if readable => fields,
+            _ => json::Map::new(),
+        };
+        fields.insert("tolerance".to_string(), self.tolerance.into());
+        fields.insert(
+            "last_satisfied_at".to_string(),
+            self.last_satisfied_at.into(),
+        );
+        match self.period_end_time {
+            Some(at) => fields.insert("period_end_time".to_string(), at.into()),
+            None => fields.remove("period_end_time"),
+        };
+        json::Value::Object(fields).to_string()
+    }
+}
+
 /// The `data` of an `OncallSlackSync` row: the retry state of its passes (SY-6).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OncallSlackSyncData {
@@ -774,5 +813,112 @@ mod tests {
         assert_eq!(bj.current_position, 42);
         assert_eq!(bj.deletion_status, DeletionStatus::Pending);
         assert_eq!(bj.deletion_job_ids.len(), 1);
+    }
+
+    fn a_run_stamp() -> TriggerRunStamp {
+        TriggerRunStamp {
+            org: "org-1".to_string(),
+            module_key: "alert-1".to_string(),
+            status: TriggerStatus::Waiting,
+            retries: 0,
+            start_time: 2_000,
+            end_time: Some(2_500),
+            next_run_at: 3_000,
+            period_end_time: Some(1_900),
+            tolerance: 7,
+            last_satisfied_at: Some(2_000),
+        }
+    }
+
+    #[test]
+    fn a_run_stamp_patches_only_the_three_per_run_fields_of_the_job_data() {
+        let before = ScheduledTriggerData {
+            period_end_time: Some(900),
+            tolerance: 3,
+            last_satisfied_at: Some(1_000),
+            delivery_silenced_until: Some(9_999),
+            last_notified_level: Some(2),
+            notified_destinations: vec!["slack".to_string()],
+            ..Default::default()
+        };
+
+        let after = ScheduledTriggerData::from_json_string(
+            &a_run_stamp().patch_data(&before.to_json_string()),
+        )
+        .unwrap();
+
+        assert_eq!(after.period_end_time, Some(1_900));
+        assert_eq!(after.tolerance, 7);
+        assert_eq!(after.last_satisfied_at, Some(2_000));
+        assert_eq!(after.delivery_silenced_until, Some(9_999));
+        assert_eq!(after.last_notified_level, Some(2));
+        assert_eq!(after.notified_destinations, vec!["slack".to_string()]);
+    }
+
+    fn as_json(text: &str) -> json::Value {
+        json::from_str(text).unwrap()
+    }
+
+    /// The replica must end with the same job data the evaluating region stored.
+    #[test]
+    fn a_run_stamp_clears_a_field_the_run_cleared() {
+        let before = ScheduledTriggerData {
+            period_end_time: Some(900),
+            last_satisfied_at: Some(1_000),
+            ..Default::default()
+        };
+        let stamp = TriggerRunStamp {
+            period_end_time: None,
+            last_satisfied_at: None,
+            ..a_run_stamp()
+        };
+        let expected = ScheduledTriggerData {
+            tolerance: 7,
+            ..Default::default()
+        };
+
+        assert_eq!(
+            as_json(&stamp.patch_data(&before.to_json_string())),
+            as_json(&expected.to_json_string())
+        );
+    }
+
+    #[test]
+    fn a_run_stamp_keeps_job_data_fields_this_build_does_not_know() {
+        let after: json::Value =
+            json::from_str(&a_run_stamp().patch_data(r#"{"tolerance":3,"from_a_newer_region":1}"#))
+                .unwrap();
+
+        assert_eq!(after["from_a_newer_region"], 1);
+        assert_eq!(after["tolerance"], 7);
+    }
+
+    #[test]
+    fn a_run_stamp_on_unreadable_job_data_starts_from_the_default() {
+        let expected = ScheduledTriggerData {
+            period_end_time: Some(1_900),
+            tolerance: 7,
+            last_satisfied_at: Some(2_000),
+            ..Default::default()
+        };
+
+        for unreadable in ["", "not json", r#"{"notified_destinations":"not a list"}"#] {
+            assert_eq!(
+                as_json(&a_run_stamp().patch_data(unreadable)),
+                as_json(&expected.to_json_string())
+            );
+        }
+    }
+
+    /// The payload is a wire format other regions decode, so its field names are pinned.
+    #[test]
+    fn a_run_stamp_decodes_from_its_wire_form() {
+        let wire = r#"{"org":"org-1","module_key":"alert-1","status":"Waiting","retries":0,
+            "start_time":2000,"end_time":2500,"next_run_at":3000,"period_end_time":1900,
+            "tolerance":7,"last_satisfied_at":2000}"#;
+
+        let decoded: TriggerRunStamp = json::from_str(wire).unwrap();
+
+        assert_eq!(decoded, a_run_stamp());
     }
 }

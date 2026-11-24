@@ -157,7 +157,7 @@ test.describe("Service Graph Side Panel (non-modal drawer) testcases", () => {
     const terminalState = await pm.serviceGraphPage.getMetricsTerminalState();
     const buildType = await pm.routeGuardPage.getBuildType();
     testLogger.info(`Metrics tab terminal state: ${terminalState} (build_type=${buildType})`);
-    expect(['correlation', 'empty', 'error']).toContain(terminalState);
+    expect(['correlation', 'empty', 'no-streams', 'error']).toContain(terminalState);
     if (buildType === 'opensource') {
       // OSS registers no correlation route, so the tab can only end in its error state.
       expect(terminalState).toBe('error');

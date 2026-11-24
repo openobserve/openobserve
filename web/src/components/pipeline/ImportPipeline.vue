@@ -1675,7 +1675,11 @@ export default defineComponent({
         baseImportRef.value.jsonArrayOfObj[index].org = orgId;
         baseImportRef.value.jsonArrayOfObj[index].source.org_id = orgId;
         baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
-          if (node.data.node_type == "stream" || node.data.node_type == "query") {
+          if (
+            node.data.node_type == "stream" ||
+            node.data.node_type == "query" ||
+            node.data.node_type == "remote_stream"
+          ) {
             node.data.org_id = orgId;
           }
         });

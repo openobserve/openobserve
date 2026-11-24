@@ -8,6 +8,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# The repository default token is read and write. This job only reads the config file and sets or
+# removes the "Invalid PR Title" label, so give it nothing more.
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   check:
     # Nothing runs on a PR without the 'ready-for-ci' label, or on a draft; ci-gate alone reports the state.

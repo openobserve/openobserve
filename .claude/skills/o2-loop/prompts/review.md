@@ -21,6 +21,12 @@ Look for, in priority order:
 
 Do not report: formatting, naming taste, anything `cargo fmt` or `cargo clippy` already enforces, or speculative issues you cannot point to a concrete line for.
 
+## Deployment facts
+- In a super cluster, one region is elected to run the scheduler, and every scheduler node in that region runs. Do not report a finding that needs scheduled jobs to run in two regions at the same time, for example the same scheduled job triggered from two regions. This holds until schedulers are supported in more than one region.
+- These findings are still valid: a race between two scheduler nodes in the same region, a problem in the region-local AutoObserve lane that runs in every other region, and a job gated only on `LOCAL_NODE.is_scheduler()` that runs in every region but must run in one.
+- The election runs only at node startup and is advisory. Report code that uses it as a lock.
+- Report a spec or design in the change set that assumes schedulers in more than one region, or that assumes exactly one scheduler node.
+
 ## Output rules
 - Every finding names its `repo` (the repository name given in the change-set or paired-repository section) and cites a real `file` and `line` in that checkout, with a `detail` that states the failing input or state and the wrong outcome. `line` may be null only for a file-level finding such as a missing test file, and never for a finding above low severity.
 - Give each finding a stable id `F<n>` starting at F1. Later rounds refer to these ids.

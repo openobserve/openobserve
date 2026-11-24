@@ -916,6 +916,15 @@ describe("User Component", () => {
       expect(pushSpy).not.toHaveBeenCalled();
     });
 
+    it("opens neither Add-user nor Invite for a Cloud non-admin", async () => {
+      await mountAs("viewer");
+      const pushSpy = vi.spyOn(router, "push").mockImplementation(() => Promise.resolve());
+      wrapper.vm.openAddFlow();
+      expect(wrapper.vm.showInviteDialog).toBe(false);
+      expect(wrapper.vm.showAddUserDialog).toBe(false);
+      expect(pushSpy).not.toHaveBeenCalled();
+    });
+
     it("keeps addRoutePush for the add flow outside Cloud", async () => {
       await mountAs("admin", "false");
       const pushSpy = vi.spyOn(router, "push").mockImplementation(() => Promise.resolve());

@@ -35,6 +35,7 @@ mod agent_signals;
 mod ai_chat_retention;
 mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
+mod alert_lease_sweep;
 #[cfg(feature = "enterprise")]
 mod alert_transitions_reaper;
 #[cfg(feature = "cloud")]
@@ -587,6 +588,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::org_status::set_org_gone_hook(openobserve_core::org_cleanup::forget_gone_org);
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::common::org_status::set_blocked_cache(db::org_status::is_blocked);
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::alerts::incident_membership::set_provider(std::sync::Arc::new(
+        openobserve_core::alerts::membership_provider::ServerProvider,
+    ));
     tokio::task::spawn(db::org_status::watch());
     // KV reads are served from a per-node cache, so every node, routers included, must hear writes.
     tokio::task::spawn(db::kv::watch());
@@ -1592,6 +1597,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // can never retire on its own, because a vanished group produces no
     // observation to act on.
     alert_group_reaper::run();
+    alert_lease_sweep::run();
     // Retention for the alert availability ledger (S-16). Not job-cluster
     // gated: retention deletes do not replicate, so every region reaps its own
     // copy or it grows without bound.
@@ -1685,6 +1691,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(async move {
             o2_enterprise::enterprise::re_patterns::get_pattern_manager().await
         });
+        tokio::task::spawn(db::re_pattern::warn_unenforceable_search_associations());
     }
 
     // Initialize the remaining cloud tasks. AI quota state and synchronization

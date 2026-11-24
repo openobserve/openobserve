@@ -267,6 +267,11 @@ export function urlWriteMode(
     : "push";
 }
 
+/** A history step re-applies a search the URL already holds, so the run's first URL write must not push and wipe Forward. */
+export function replaceNextLogsWrite(): void {
+  arrivalPending = true;
+}
+
 /** Called when the Logs landing runs no search, so the user's first deliberate search keeps its own history entry. */
 export function endLogsArrival(): void {
   arrivalPending = false;

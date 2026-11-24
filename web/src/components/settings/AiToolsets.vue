@@ -194,11 +194,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 :data-test="`ai-toolsets-${row.name}-badge-${badge}`"
               >
-                {{ t(BADGE_LABELS[badge]) }}
+                {{ t(BADGE_LABELS[badge as ToolsetBadge]) }}
                 <button
                   v-if="badge === 'allTools'"
                   type="button"
-                  class="text-primary-600 ms-1 underline"
+                  class="text-text-link ms-1 underline"
                   :data-test="`ai-toolsets-${row.name}-choose-tools`"
                   @click.stop="chooseTools(row)"
                 >

@@ -481,7 +481,15 @@ pub async fn mark_notice_false_alarm(
     before: &status_page_notices::Model,
     after: &status_page_notices::Model,
 ) -> Result<bool, errors::Error> {
-    let conn = get_orm_client_rw().await;
+    mark_notice_false_alarm_on(get_orm_client_rw().await, before, after).await
+}
+
+/// [`mark_notice_false_alarm`] on a given connection.
+pub async fn mark_notice_false_alarm_on<C: ConnectionTrait>(
+    conn: &C,
+    before: &status_page_notices::Model,
+    after: &status_page_notices::Model,
+) -> Result<bool, errors::Error> {
     let resolved_was = match before.resolved_at {
         Some(at) => status_page_notices::Column::ResolvedAt.eq(at),
         None => status_page_notices::Column::ResolvedAt.is_null(),
@@ -1390,5 +1398,168 @@ mod tests {
             .unwrap();
 
         assert!(get_snapshot(&db, "gone").await.unwrap().is_none());
+    }
+
+    async fn notices_db() -> DatabaseConnection {
+        let db = db().await;
+        let backend = db.get_database_backend();
+        db.execute(
+            backend
+                .build(&Schema::new(backend).create_table_from_entity(status_page_notices::Entity)),
+        )
+        .await
+        .unwrap();
+        db
+    }
+
+    fn open_notice() -> status_page_notices::Model {
+        status_page_notices::Model {
+            id: "n1".into(),
+            org_id: "org1".into(),
+            kind: 0,
+            impact: 0,
+            source: 0,
+            title: String::new(),
+            body: String::new(),
+            state: 1,
+            starts_at: 0,
+            resolved_at: None,
+            segments: "[]".into(),
+            excluded_from_uptime: false,
+            deleted_at: None,
+            auto_check_id: Some("mon-1".into()),
+            auto_recovery_streak: 0,
+            owner: None,
+            false_alarm_by: None,
+            false_alarm_at: None,
+            false_alarm_reason: None,
+            false_alarm_recovered_at: None,
+            created_at: 0,
+            updated_at: 0,
+        }
+    }
+
+    fn marked(
+        before: &status_page_notices::Model,
+        by: &str,
+        at: i64,
+        stamp: i64,
+    ) -> status_page_notices::Model {
+        status_page_notices::Model {
+            state: 2,
+            resolved_at: Some(at),
+            excluded_from_uptime: true,
+            false_alarm_by: Some(by.into()),
+            false_alarm_at: Some(at),
+            false_alarm_reason: Some("probe".into()),
+            false_alarm_recovered_at: Some(stamp),
+            updated_at: at,
+            ..before.clone()
+        }
+    }
+
+    #[tokio::test]
+    async fn of_two_marks_from_the_same_read_only_the_first_writes() {
+        let db = notices_db().await;
+        let before = open_notice();
+        let am: status_page_notices::ActiveModel = before.clone().into();
+        am.reset_all().insert(&db).await.unwrap();
+
+        // Two users read the open notice, then both mark it.
+        let first = marked(&before, "a@b.c", 100, 7);
+        let second = marked(&before, "x@y.z", 101, 9);
+        assert!(
+            mark_notice_false_alarm_on(&db, &before, &first)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !mark_notice_false_alarm_on(&db, &before, &second)
+                .await
+                .unwrap(),
+            "the second mark must read again, not overwrite the first"
+        );
+
+        let n = status_page_notices::Entity::find_by_id("n1")
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(n.false_alarm_by.as_deref(), Some("a@b.c"));
+        assert_eq!(
+            n.false_alarm_recovered_at,
+            Some(7),
+            "one stamp, from the first mark"
+        );
+        assert_eq!((n.state, n.resolved_at), (2, Some(100)));
+    }
+
+    #[tokio::test]
+    async fn of_two_marks_on_a_resolved_notice_only_the_first_writes() {
+        let db = notices_db().await;
+        // Resolved already, so a mark keeps state and resolved_at and only the empty-mark
+        // guard stops the second one.
+        let before = status_page_notices::Model {
+            state: 2,
+            resolved_at: Some(50),
+            ..open_notice()
+        };
+        let am: status_page_notices::ActiveModel = before.clone().into();
+        am.reset_all().insert(&db).await.unwrap();
+
+        let keep = |m: status_page_notices::Model| status_page_notices::Model {
+            resolved_at: Some(50),
+            ..m
+        };
+        let first = keep(marked(&before, "a@b.c", 100, 7));
+        let second = keep(marked(&before, "x@y.z", 101, 9));
+        assert!(
+            mark_notice_false_alarm_on(&db, &before, &first)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !mark_notice_false_alarm_on(&db, &before, &second)
+                .await
+                .unwrap(),
+            "the second mark must not overwrite the first"
+        );
+        let n = status_page_notices::Entity::find_by_id("n1")
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(n.false_alarm_by.as_deref(), Some("a@b.c"));
+        assert_eq!(n.false_alarm_at, Some(100));
+        assert_eq!(n.false_alarm_recovered_at, Some(7));
+        assert_eq!((n.state, n.resolved_at), (2, Some(50)));
+    }
+
+    #[tokio::test]
+    async fn a_mark_from_a_read_before_a_tick_resolved_the_notice_does_not_write() {
+        let db = notices_db().await;
+        let before = open_notice();
+        let am: status_page_notices::ActiveModel = before.clone().into();
+        am.reset_all().insert(&db).await.unwrap();
+
+        // The rebuilder resolves the notice after the user read it.
+        update_notice_runtime(&db, "n1", 2, Some(90), "[]", 0, 90)
+            .await
+            .unwrap();
+        assert!(
+            !mark_notice_false_alarm_on(&db, &before, &marked(&before, "a@b.c", 100, 7))
+                .await
+                .unwrap()
+        );
+        let n = status_page_notices::Entity::find_by_id("n1")
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(n.false_alarm_at, None);
+        assert_eq!(
+            n.false_alarm_recovered_at, None,
+            "no hold armed from a stale read"
+        );
     }
 }

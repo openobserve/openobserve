@@ -41,8 +41,6 @@ use hashbrown::HashMap;
 use log;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
-#[cfg(feature = "enterprise")]
-use openobserve_core::auth::check_permissions;
 use search::utils::is_permissable_function_error;
 use search_service::streaming::process_search_stream_request;
 use tokio::sync::mpsc;
@@ -64,8 +62,9 @@ use crate::{
         },
     },
     search::{
-        build_search_request_per_field, error_utils::map_error_to_http_response,
-        utils::SearchStreamGuard,
+        build_search_request_per_field,
+        error_utils::map_error_to_http_response,
+        utils::{SearchStreamGuard, enrich_field_error},
     },
 };
 
@@ -368,55 +367,28 @@ pub async fn search_http2_stream(
 
     req.clear_cache = get_clear_cache_from_request(&query);
 
-    // Check if user has edit permissions when clear_cache is requested
     #[cfg(feature = "enterprise")]
-    if req.clear_cache {
-        use o2_openfga::meta::mapping::{RESULT_LOGS_CACHE_KEY, is_cache_rbac_enabled};
-
-        // We only check DELETE cache rbac for logs stream type
-        let (permission_type, method) =
-            if stream_type.eq(&StreamType::Logs) && is_cache_rbac_enabled() {
-                // check if cache rbac is enabled
-                (RESULT_LOGS_CACHE_KEY, "DELETE")
-            } else {
-                (stream_type.as_str(), "PUT")
-            };
-        for stream_name in stream_names.iter() {
-            if !check_permissions(
-                stream_name,
-                &org_id,
-                &user_id,
-                permission_type,
-                method,
-                None,
-                false,
-                false,
-                true,
-            )
-            .await
-            {
-                // Add audit before closing
-                report_to_audit(
-                    user_id,
-                    org_id.clone(),
-                    trace_id,
-                    403,
-                    Some(
-                        "Unauthorized to clear cache - requires stream edit permission".to_string(),
-                    ),
-                    "POST".to_string(),
-                    format!("/api/{}/_search_stream", org_id),
-                    query
-                        .iter()
-                        .map(|(k, v)| format!("{}={}", k, v))
-                        .collect::<Vec<_>>()
-                        .join("&"),
-                    body_bytes,
-                )
-                .await;
-                return MetaHttpResponse::forbidden("Unauthorized Access");
-            }
-        }
+    if req.clear_cache
+        && !super::can_clear_cache(&org_id, &user_id, stream_type, &stream_names).await
+    {
+        // Add audit before closing
+        report_to_audit(
+            user_id,
+            org_id.clone(),
+            trace_id,
+            403,
+            Some("Unauthorized to clear cache - requires stream edit permission".to_string()),
+            "POST".to_string(),
+            format!("/api/{}/_search_stream", org_id),
+            query
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&"),
+            body_bytes,
+        )
+        .await;
+        return MetaHttpResponse::forbidden("Unauthorized Access");
     }
 
     // Set use_cache from query params
@@ -554,6 +526,8 @@ pub async fn search_http2_stream(
 
     // Create a channel for streaming results
     let (tx, rx) = mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(100);
+    let schema_streams = std::sync::Arc::new(stream_names.clone());
+    let schema_org: std::sync::Arc<str> = org_id.as_str().into();
 
     #[cfg(feature = "enterprise")]
     let audit_ctx = Some(AuditContext {
@@ -592,7 +566,15 @@ pub async fn search_http2_stream(
     let mut guard = SearchStreamGuard::new(org_id.clone(), trace_id.clone());
 
     // Return streaming response
-    let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
+    let events = tokio_stream::wrappers::ReceiverStream::new(rx).then(move |result| {
+        with_suggestion_source(
+            result,
+            schema_org.clone(),
+            stream_type,
+            schema_streams.clone(),
+        )
+    });
+    let stream = events.flat_map(move |result| {
         let chunks_iter = match result {
             Ok(mut v) => {
                 if matches!(v, StreamResponses::Done) {
@@ -619,7 +601,7 @@ pub async fn search_http2_stream(
                 }
                 v.to_chunks()
             }
-            Err(err) => {
+            Err((err, suggest_from)) => {
                 guard.mark_finished();
                 log::error!("[HTTP2_STREAM trace_id {trace_id}] Error in search stream: {err}");
                 let err_res = match err {
@@ -629,30 +611,19 @@ pub async fn search_http2_stream(
                             infra::errors::ErrorCodes::SearchCancelQuery(_) => {
                                 StreamResponses::Cancelled
                             }
-                            _ => {
-                                let message = code.get_message();
-                                let error_detail = code.get_error_detail();
-                                let http_response = map_error_to_http_response(&err, None);
-
-                                StreamResponses::Error {
-                                    code: http_response.status().into(),
-                                    message,
-                                    error_detail: Some(error_detail),
-                                }
-                            }
+                            _ => openobserve_core::http::error_code_event(
+                                code,
+                                suggest_from.as_ref().unwrap_or(code),
+                                err.http_status(),
+                                &trace_id,
+                            ),
                         }
                     }
                     // A server-side refusal (e.g. ZO_SDR_FAIL_CLOSED) keeps its 503.
-                    infra::errors::Error::ResourceError(_) => StreamResponses::Error {
-                        code: err.http_status(),
-                        message: err.to_string(),
-                        error_detail: None,
-                    },
-                    _ => StreamResponses::Error {
-                        code: 500,
-                        message: err.to_string(),
-                        error_detail: None,
-                    },
+                    infra::errors::Error::ResourceError(_) => {
+                        StreamResponses::error(err.http_status(), err.to_string(), None)
+                    }
+                    _ => StreamResponses::error(500, err.to_string(), None),
                 };
                 err_res.to_chunks()
             }
@@ -1014,24 +985,20 @@ pub async fn values_http2_stream(
                         let error_detail = code.get_error_detail();
                         let http_response = map_error_to_http_response(&err, None);
 
-                        config::meta::search::StreamResponses::Error {
-                            code: http_response.status().into(),
+                        config::meta::search::StreamResponses::error(
+                            http_response.status().into(),
                             message,
-                            error_detail: Some(error_detail),
-                        }
+                            Some(error_detail),
+                        )
                     }
                     infra::errors::Error::ResourceError(_) => {
-                        config::meta::search::StreamResponses::Error {
-                            code: err.http_status(),
-                            message: err.to_string(),
-                            error_detail: None,
-                        }
+                        config::meta::search::StreamResponses::error(
+                            err.http_status(),
+                            err.to_string(),
+                            None,
+                        )
                     }
-                    _ => config::meta::search::StreamResponses::Error {
-                        code: 500,
-                        message: err.to_string(),
-                        error_detail: None,
-                    },
+                    _ => config::meta::search::StreamResponses::error(500, err.to_string(), None),
                 };
                 err_res.to_chunks()
             }
@@ -1055,6 +1022,31 @@ async fn get_sql(
     search_type: Option<SearchEventType>,
 ) -> Result<search::sql::Sql, infra::errors::Error> {
     search::sql::Sql::new(&query.clone().try_into()?, org_id, stream_type, search_type).await
+}
+
+/// A failed search paired with the error code to suggest fields from: the engine saw only the
+/// pruned scan schema, so suggestions use the streams' real fields, as `_search` does.
+async fn with_suggestion_source(
+    result: Result<StreamResponses, infra::errors::Error>,
+    org_id: std::sync::Arc<str>,
+    stream_type: StreamType,
+    stream_names: std::sync::Arc<Vec<String>>,
+) -> Result<StreamResponses, (infra::errors::Error, Option<infra::errors::ErrorCodes>)> {
+    let err = match result {
+        Ok(v) => return Ok(v),
+        Err(err) => err,
+    };
+    let suggest_from = match &err {
+        infra::errors::Error::ErrorCode(code) => {
+            let full = infra::errors::Error::ErrorCode(code.clone());
+            match enrich_field_error(full, &org_id, stream_type, &stream_names).await {
+                infra::errors::Error::ErrorCode(code) => Some(code),
+                _ => None,
+            }
+        }
+        _ => None,
+    };
+    Err((err, suggest_from))
 }
 
 #[cfg(test)]

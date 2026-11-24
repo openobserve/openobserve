@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    meta::slack::{SlackThread, SlackThreadKey},
+    meta::slack::{SlackThread, SlackThreadKey, ThreadKind},
     utils::json,
 };
 use sea_orm::{
@@ -301,12 +301,20 @@ fn to_active(row: &SlackThread) -> Result<ActiveModel, Error> {
 }
 
 fn from_model(model: Model) -> Result<SlackThread, Error> {
+    // A kind from a newer release reads as an alert thread, where the bot answers mentions only.
+    let kind = parse_enum("kind", &model.kind).unwrap_or_else(|e| {
+        log::warn!(
+            "[slack_threads] {}: {e}, read as an alert thread",
+            model.thread_ts
+        );
+        ThreadKind::Alert
+    });
     Ok(SlackThread {
         installation_id: model.installation_id,
         channel_id: model.channel_id,
         thread_ts: model.thread_ts,
         org_id: model.org_id,
-        kind: parse_enum("kind", &model.kind)?,
+        kind,
         assistant_session_id: model.assistant_session_id,
         started_by_link_id: model.started_by_link_id,
         shared_urls: parse_json("shared_urls", model.shared_urls.as_deref())?,
@@ -323,7 +331,7 @@ fn from_model(model: Model) -> Result<SlackThread, Error> {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::slack::{BotAnswer, SharedUrl, ThreadKind};
+    use config::meta::slack::{BotAnswer, SharedUrl};
     use sea_orm::{Database, DatabaseConnection};
 
     use super::*;
@@ -407,6 +415,19 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_kind_from_a_newer_release_reads_as_an_alert_thread() {
+        let db = db().await;
+        put_with(&db, &thread("1.1", "acme", 1_000)).await.unwrap();
+        Entity::update_many()
+            .col_expr(Column::Kind, Expr::value("digest"))
+            .exec(&db)
+            .await
+            .unwrap();
+        let read = get_with(&db, "i1", "C1", "1.1").await.unwrap().unwrap();
+        assert_eq!(read.kind, ThreadKind::Alert);
+    }
+
+    #[tokio::test]
     async fn touch_moves_activity_and_expiry() {
         let db = db().await;
         let row = thread("1.1", "acme", 1_000);
@@ -485,7 +506,7 @@ mod tests {
         };
         put_with(&db, &other_channel).await.unwrap();
         db.execute_unprepared(
-            "UPDATE slack_threads SET kind = 'from_a_newer_release' \
+            "UPDATE slack_threads SET shared_urls = 'not json' \
              WHERE thread_ts IN ('1.1', '1.2')",
         )
         .await

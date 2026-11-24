@@ -150,6 +150,15 @@ export interface DecisionRequest {
   request_id?: string;
 }
 
+/** Marks an issue's shown next step not helpful; `id` is the issue's decision id. */
+export interface StepJudgementRequest {
+  family: "issue";
+  id: string;
+  action: "not_helpful";
+  step_id: string;
+  request_id?: string;
+}
+
 export interface UndoRequest {
   expected_revision: number;
   request_id?: string;
@@ -242,7 +251,7 @@ const base = (org: string) => `/api/v2/${encodeURIComponent(org)}/autoobserve/de
 const autoobserveDecisions = {
   preview: (org: string, params: PreviewParams, signal?: AbortSignal) =>
     http().get<Preview>(`${base(org)}/preview`, { params, signal, silentForbidden: true }),
-  decide: (org: string, body: DecisionRequest) =>
+  decide: (org: string, body: DecisionRequest | StepJudgementRequest) =>
     http().post<DecisionResult>(base(org), body, { silentForbidden: true }),
   decideBatch: (org: string, items: DecisionRequest[]) =>
     http().post<BatchResult>(base(org), { items }, { silentForbidden: true }),

@@ -48,6 +48,11 @@ pub struct StreamInfo {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub filter_spellings: HashMap<String, Vec<String>>,
 
+    /// Other fields of a filter's group this stream holds, keyed by the `filters` field; each
+    /// matches the same value and spellings, so a query ORs them with it.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub filter_aliases: HashMap<String, Vec<String>>,
+
     /// Identity dimensions that could not be resolved to a queryable field on
     /// this stream's schema and were therefore omitted from `filters`.
     /// Consumers should warn: queries on this stream are wider than the chips imply.
@@ -78,6 +83,7 @@ impl StreamInfo {
             filters: HashMap::new(),
             dropped_dimensions: Vec::new(),
             filter_spellings: HashMap::new(),
+            filter_aliases: HashMap::new(),
         }
     }
 
@@ -89,6 +95,7 @@ impl StreamInfo {
             filters: HashMap::new(),
             dropped_dimensions: Vec::new(),
             filter_spellings: HashMap::new(),
+            filter_aliases: HashMap::new(),
         }
     }
 
@@ -100,6 +107,7 @@ impl StreamInfo {
             filters,
             dropped_dimensions: Vec::new(),
             filter_spellings: HashMap::new(),
+            filter_aliases: HashMap::new(),
         }
     }
 
@@ -115,6 +123,7 @@ impl StreamInfo {
             filters,
             dropped_dimensions: Vec::new(),
             filter_spellings: HashMap::new(),
+            filter_aliases: HashMap::new(),
         }
     }
 }

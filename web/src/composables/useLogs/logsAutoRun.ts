@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { getCurrentInstance, ref } from "vue";
+import { getCurrentInstance, ref, shallowReactive } from "vue";
 import { useStore, type Store } from "vuex";
+import { isEqual } from "lodash-es";
 import config from "@/aws-exports";
 import { gt, type I18nKey, type I18nText } from "@/types/i18n";
 import { searchState, type SearchObject } from "@/composables/useLogs/searchState";
@@ -26,6 +27,7 @@ import {
   sameSignature,
   type AutoRunConfig,
   type AutoRunEngine,
+  type AutoRunMeta,
   type AutoRunStore,
   type LogsSignature,
   type PersistAction,
@@ -272,6 +274,7 @@ function createLogsAutoRun() {
     executors: {
       logs: (ctx) => {
         if (ctx.op === "full") {
+          leaveSearchAround();
           runReasons.clear();
           runReasons.set(ctx.generation.id, [...ctx.reasons]);
         }
@@ -327,6 +330,7 @@ function createLogsAutoRun() {
       };
     },
     rearmRefresh: () => rearm?.(),
+    onResetScope: () => clearPanelScopes(),
     getFreeTextFlags: () => freeTextGateFlags(searchObj(), (key) => gt(key as I18nKey)),
     readPanelConfigSignature: (surface) => {
       if (!panelConfigReader) return null;
@@ -354,15 +358,30 @@ function createLogsAutoRun() {
     engine.settleGeneration(generationId);
   }
 
+  function leaveSearchAround(): void {
+    engine.clearSearchAroundInvalidation();
+    searchAroundShown.value = false;
+    const around = searchObj().data.searchAround;
+    if (!around) return;
+    around.indexTimestamp = -1;
+    if (around.histogramHide) {
+      searchObj().meta.showHistogram = true;
+      around.histogramHide = false;
+    }
+  }
+
   function bindPayload(payload: TransportPayload): boolean {
     const generationId = payload.generationId;
-    if (generationId === null || generationId === undefined) return true;
+    if (generationId === null || generationId === undefined) {
+      if (payload.type === "search") leaveSearchAround();
+      return true;
+    }
     const role = ROLE_BY_TYPE[payload.type] ?? "other";
     if (!engine.registerTrace(generationId, payload.traceId, role)) return false;
+    if (payload.type === "search") leaveSearchAround();
     traceGeneration.set(payload.traceId, generationId);
     if (!generationEpoch.has(generationId)) generationEpoch.set(generationId, freeTextScanEpoch);
     if (payload.type === "search") {
-      searchAroundShown.value = false;
       engine.recordDispatch(generationId, {
         req: payload.queryReq,
         traceId: payload.traceId,
@@ -542,12 +561,15 @@ function createLogsAutoRun() {
     return decision.ok ? null : decision.reason;
   }
 
+  type PanelScope = { surface: "visualize" | "build"; signature: LogsSignature };
   let panelRun: {
     generationId: number;
     started: boolean;
     failed: boolean;
     dispatched: string | null;
+    scope: PanelScope | null;
   } | null = null;
+  let outsideRunLoad: PanelScope | null = null;
 
   function currentPanelSignature(): string | null {
     if (!panelConfigReader) return null;
@@ -556,14 +578,73 @@ function createLogsAutoRun() {
     return panelConfigSignature(panelConfigReader(surface), readLogsSignature(searchObj()));
   }
 
+  // Charts also reload outside an engine run (tab switch, config re-render), so the scope is noted on every load.
+  const panelScopes = shallowReactive<Partial<Record<"visualize" | "build", LogsSignature>>>({});
+  // A chart fetches with the window and query it was last handed, never the picker's live ones.
+  const appliedScopes: Partial<Record<"visualize" | "build", LogsSignature>> = {};
+
+  function panelSurface(): "visualize" | "build" | null {
+    const mode = searchModeOf(searchObj().meta.logsVisualizeToggle);
+    return mode === "visualize" || mode === "build" ? mode : null;
+  }
+
+  function isPanelScopeStale(): boolean {
+    const surface = panelSurface();
+    const loaded = surface ? panelScopes[surface] : undefined;
+    if (!loaded) return false;
+    const live = readLogsSignature(searchObj());
+    if (surface !== "build") return !sameSignature(live, loaded);
+    // Build's chart runs its own generated SQL, so only the search bar's wording and SQL mode differ there.
+    const { query, sqlMode, quickMode, quickModeFields } = loaded;
+    return !sameSignature({ ...live, query, sqlMode, quickMode, quickModeFields }, loaded);
+  }
+
+  function currentPanelScope(): PanelScope | null {
+    const surface = panelSurface();
+    return surface ? { surface, signature: readLogsSignature(searchObj()) } : null;
+  }
+
+  function notePanelScopeApplied(): PanelScope | null {
+    const scope = currentPanelScope();
+    if (scope) appliedScopes[scope.surface] = scope.signature;
+    return scope;
+  }
+
+  function appliedPanelScope(): PanelScope | null {
+    const surface = panelSurface();
+    const signature = surface ? appliedScopes[surface] : undefined;
+    return surface && signature ? { surface, signature } : null;
+  }
+
+  // A cancelled or failed load never showed the new scope, so only a load that ends cleanly counts.
+  function commitPanelScope(scope: PanelScope | null): void {
+    if (scope) panelScopes[scope.surface] = scope.signature;
+  }
+
+  function clearPanelScopes(): void {
+    delete panelScopes.visualize;
+    delete panelScopes.build;
+    delete appliedScopes.visualize;
+    delete appliedScopes.build;
+    outsideRunLoad = null;
+  }
+
+  // Logs results reused by Visualize carry the time window they ran with, not the picker's.
+  function executedTimeMatches(): boolean {
+    const executed = searchObj().meta.executed as AutoRunMeta["executed"];
+    // A Search run in flight has cleared the record but may already show its new window's rows.
+    return !!executed && isEqual(executed.signature.time, readLogsSignature(searchObj()).time);
+  }
+
   function beginPanelRun(generationId: number, abort?: () => void): void {
     engine.recordPanelDispatch(generationId);
     if (abort) engine.registerAbort(generationId, abort);
-    panelRun = { generationId, started: false, failed: false, dispatched: null };
+    panelRun = { generationId, started: false, failed: false, dispatched: null, scope: null };
   }
 
   function markPanelDispatched(generationId: number): void {
     if (panelRun?.generationId !== generationId || panelRun.dispatched !== null) return;
+    panelRun.scope = notePanelScopeApplied();
     panelRun.dispatched = currentPanelSignature();
   }
 
@@ -588,13 +669,19 @@ function createLogsAutoRun() {
     panelRun = null;
     if (!run) return;
     const signature = run.dispatched;
-    if (ok && signature) engine.recordPanelComplete(run.generationId, signature);
-    else engine.recordPanelFailure(run.generationId);
+    if (ok && signature) {
+      if (engine.recordPanelComplete(run.generationId, signature)) commitPanelScope(run.scope);
+    } else engine.recordPanelFailure(run.generationId);
     engine.settleGeneration(run.generationId);
   }
 
   function panelLoadingChanged(loading: boolean, hasErrors: boolean): void {
-    if (!panelRun) return;
+    if (!panelRun) {
+      if (loading) outsideRunLoad = appliedPanelScope();
+      else if (!hasErrors) commitPanelScope(outsideRunLoad);
+      if (!loading) outsideRunLoad = null;
+      return;
+    }
     if (loading) {
       panelRun.started = true;
       markPanelDispatched(panelRun.generationId);
@@ -602,6 +689,11 @@ function createLogsAutoRun() {
     }
     if (!panelRun.started) return;
     endPanelRun(!panelRun.failed && !hasErrors);
+  }
+
+  function cancelPanelLoad(): void {
+    outsideRunLoad = null;
+    if (panelRun) panelRun.scope = null;
   }
 
   function hasPanelRun(generationId: number): boolean {
@@ -645,6 +737,10 @@ function createLogsAutoRun() {
     markPanelFailed,
     endPanelRun,
     panelLoadingChanged,
+    cancelPanelLoad,
+    notePanelScopeApplied,
+    isPanelScopeStale,
+    executedTimeMatches,
     hasPanelRun,
     panelSignature: (surface: "visualize" | "build") =>
       panelConfigReader

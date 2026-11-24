@@ -444,7 +444,10 @@ export const usePanelAggregation = ({
               itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
             }
           });
-          query.fields.x = query.fields.x.slice(0, TREEMAP_MAX_LEVELS);
+          // A time bucket is not a useful tile label, so only plain fields stay as levels.
+          query.fields.x = query.fields.x
+            .filter((itemX: { functionName?: string | null }) => itemX.functionName !== "histogram")
+            .slice(0, TREEMAP_MAX_LEVELS);
           query.fields.y = query.fields.y.slice(0, 1);
           query.fields.z = [];
           query.fields.breakdown = query.fields.breakdown.slice(
@@ -473,8 +476,10 @@ export const usePanelAggregation = ({
               itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
             }
           });
-          // Each x field is a ring, so keep them up to the cap, leaving room for one breakdown ring.
-          query.fields.x = query.fields.x.slice(0, SUNBURST_MAX_LEVELS);
+          // Each plain x field is a ring, kept up to the cap with room for one breakdown ring; a time bucket makes no useful ring.
+          query.fields.x = query.fields.x
+            .filter((itemX: { functionName?: string | null }) => itemX.functionName !== "histogram")
+            .slice(0, SUNBURST_MAX_LEVELS);
           query.fields.y = query.fields.y.slice(0, 1);
           query.fields.z = [];
           query.fields.breakdown = query.fields.breakdown.slice(

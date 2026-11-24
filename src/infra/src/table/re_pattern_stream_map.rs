@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::stream::StreamType;
+use arrow::datatypes::{DataType, Schema};
+use config::meta::stream::{PatternAssociation, StreamType};
 use sea_orm::{ColumnTrait, DbErr, EntityTrait, QueryFilter, Set, SqlErr, TransactionTrait};
 use serde::{Deserialize, Serialize};
 
@@ -194,6 +195,68 @@ impl From<Model> for PatternAssociationEntry {
     }
 }
 
+/// True when the association rewrites what a search returns; `Detect` only observes.
+pub fn is_search_rewrite(apply_at: ApplyPolicy, policy: PatternPolicy) -> bool {
+    matches!(apply_at, ApplyPolicy::AtSearch | ApplyPolicy::Both) && policy != PatternPolicy::Detect
+}
+
+/// Why a search-time association on `field` cannot take effect: the scan only redacts strings,
+/// and a partition key would carry the raw value in the file path.
+pub fn search_association_conflict(
+    schema: &Schema,
+    partition_keys: &[&str],
+    field: &str,
+) -> Option<String> {
+    if partition_keys.contains(&field) {
+        return Some(format!(
+            "field [{field}] is a partition key, so it cannot have a search-time pattern: the file path would carry its raw value"
+        ));
+    }
+    let data_type = schema.field_with_name(field).ok()?.data_type();
+    if matches!(
+        data_type,
+        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View
+    ) {
+        return None;
+    }
+    Some(format!(
+        "field [{field}] is {data_type}, and search-time patterns apply to string fields only; use an ingestion-time pattern instead"
+    ))
+}
+
+/// The first change that would leave a search-time association unable to take effect.
+pub fn search_association_changes_conflict(
+    schema: &Schema,
+    partition_keys: &[&str],
+    added_partition_keys: &[&str],
+    associations: &[PatternAssociation],
+    added: &[PatternAssociation],
+) -> Option<String> {
+    let rewrites = |a: &&PatternAssociation| {
+        is_search_rewrite(
+            ApplyPolicy::from(&a.apply_at),
+            PatternPolicy::from(&a.policy),
+        )
+    };
+    if let Some(conflict) = added
+        .iter()
+        .filter(rewrites)
+        .find_map(|a| search_association_conflict(schema, partition_keys, &a.field))
+    {
+        return Some(conflict);
+    }
+    associations
+        .iter()
+        .filter(rewrites)
+        .find(|a| added_partition_keys.contains(&a.field.as_str()))
+        .map(|a| {
+            format!(
+                "field [{}] has a search-time pattern, so it cannot be a partition key: the file path would carry its raw value",
+                a.field
+            )
+        })
+}
+
 pub async fn add(entry: PatternAssociationEntry) -> Result<(), errors::Error> {
     let stored_policy = entry.stored_policy();
     let record = ActiveModel {
@@ -369,6 +432,112 @@ fn log_unrecognised_policies(records: &[Model]) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn sdr_schema() -> Schema {
+        Schema::new(vec![
+            arrow::datatypes::Field::new("msg", DataType::Utf8, true),
+            arrow::datatypes::Field::new("view", DataType::Utf8View, true),
+            arrow::datatypes::Field::new("code", DataType::Int64, true),
+            arrow::datatypes::Field::new("host", DataType::Utf8, true),
+        ])
+    }
+
+    fn sdr_association(field: &str, apply_at: &str, policy: &str) -> PatternAssociation {
+        PatternAssociation {
+            field: field.to_string(),
+            pattern_id: "p1".to_string(),
+            policy: policy.to_string(),
+            apply_at: apply_at.to_string(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_search_rewrite_excludes_ingestion_and_detect() {
+        assert!(is_search_rewrite(
+            ApplyPolicy::AtSearch,
+            PatternPolicy::Redact
+        ));
+        assert!(is_search_rewrite(
+            ApplyPolicy::Both,
+            PatternPolicy::DropField
+        ));
+        assert!(!is_search_rewrite(
+            ApplyPolicy::AtIngestion,
+            PatternPolicy::Redact
+        ));
+        assert!(!is_search_rewrite(
+            ApplyPolicy::AtSearch,
+            PatternPolicy::Detect
+        ));
+    }
+
+    #[test]
+    fn test_search_association_conflict_allows_string_fields_only() {
+        let schema = sdr_schema();
+        assert_eq!(search_association_conflict(&schema, &[], "msg"), None);
+        assert_eq!(search_association_conflict(&schema, &[], "view"), None);
+        assert_eq!(
+            search_association_conflict(&schema, &[], "not_yet_ingested"),
+            None
+        );
+        let err = search_association_conflict(&schema, &[], "code").unwrap();
+        assert!(
+            err.contains("[code]") && err.contains("string fields only"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn test_search_association_conflict_refuses_a_partition_key() {
+        let err = search_association_conflict(&sdr_schema(), &["host"], "host").unwrap();
+        assert!(err.contains("partition key"), "{err}");
+    }
+
+    #[test]
+    fn test_search_association_changes_refuse_both_directions() {
+        let schema = sdr_schema();
+        let on_host = sdr_association("host", "AtSearch", "Redact");
+        // a search-time pattern added to an existing partition key
+        let err = search_association_changes_conflict(
+            &schema,
+            &["host"],
+            &[],
+            std::slice::from_ref(&on_host),
+            std::slice::from_ref(&on_host),
+        )
+        .unwrap();
+        assert!(err.contains("is a partition key"), "{err}");
+        // a protected field made a partition key
+        let err = search_association_changes_conflict(
+            &schema,
+            &["host"],
+            &["host"],
+            std::slice::from_ref(&on_host),
+            &[],
+        )
+        .unwrap();
+        assert!(err.contains("cannot be a partition key"), "{err}");
+    }
+
+    #[test]
+    fn test_search_association_changes_ignore_non_search_and_untouched() {
+        let schema = sdr_schema();
+        let ingest = sdr_association("code", "AtIngestion", "Redact");
+        let detect = sdr_association("host", "AtSearch", "Detect");
+        let legacy = sdr_association("code", "AtSearch", "Redact");
+        assert_eq!(
+            search_association_changes_conflict(
+                &schema,
+                &["host"],
+                &["host"],
+                &[ingest.clone(), detect.clone(), legacy],
+                &[ingest, detect],
+            ),
+            None,
+            "an existing conflict must not block an unrelated settings update"
+        );
+    }
 
     #[test]
     fn test_pattern_policy_from_str_all_variants() {

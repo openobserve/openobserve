@@ -23,6 +23,7 @@ export class ServiceGraphPage {
     this.dateTimePicker = '[data-test="service-graph-date-time-picker"]';
     this.refreshButton = '[data-test="service-graph-refresh-btn"]';
     this.chartContainer = '[data-test="service-graph-chart"]';
+    this.streamSelector = '[data-test="service-graph-stream-selector"]';
 
     // ===== VIEW TOGGLE BUTTONS (page header #subnav — button with .selected class) =====
     this.graphViewTab = '[data-test="service-graph-graph-view-btn"]';
@@ -92,6 +93,7 @@ export class ServiceGraphPage {
     this.metricsStreamItem = '[data-test="telemetry-correlation-metric-stream-item"]';
     this.metricsError = '[data-test="service-graph-side-panel-metrics-error"]';
     this.metricsEmpty = '[data-test="service-graph-side-panel-metrics-empty"]';
+    this.metricsNoStreams = '[data-test="correlation-no-metric-streams"]';
 
     // ===== TELEMETRY CORRELATION DIALOG =====
     this.correlationDashboardClose = '[data-test="correlation-dashboard-close"]';
@@ -516,6 +518,26 @@ export class ServiceGraphPage {
     return await table.locator('tbody tr').count();
   }
 
+  /** Waits for the side panel's first operation row to show `count`, then clicks it to hand off to Traces. */
+  async openFirstOperationTraces(nodeName, count) {
+    const row = this.page.locator(`${this.operationsTable} tbody tr`).first();
+    await expect(
+      row,
+      `${nodeName} must list its operations from the stream`,
+    ).toBeVisible({ timeout: 30000 });
+    await expect(row).toContainText(String(count));
+    // A row click hands off with no column filter; the per-column hover buttons add errors or latency bounds.
+    await row.locator("td").first().click();
+    await this.page.waitForURL(/\/traces\?/, { timeout: 15000 });
+  }
+
+  /** Opens `nodeName`'s side panel and hands its first operation (expected to count `count`) off to Traces. */
+  async viewTracesFromFirstOperation(nodeName, count) {
+    await this.clickNodeByName(nodeName);
+    await this.expectSidePanelServiceName(nodeName);
+    await this.openFirstOperationTraces(nodeName, count);
+  }
+
   async closeSidePanel() {
     await this.page.locator(this.sidePanelCloseBtn).click();
     await this.page.locator(this.sidePanel)
@@ -530,19 +552,21 @@ export class ServiceGraphPage {
    * loading spinner) — NOT on the dashboard's data-test, which the fragment-root component drops
    * (see this.metricsStreamItem). Throws if the panel never renders (a genuinely broken tab).
    * @returns {Promise<boolean>} true if real metric-stream rows rendered (data present); false for
-   *   a resolved-but-streamless view (zero-stream dashboard / empty / error) — all acceptable.
+   *   a resolved-but-streamless view (zero-stream dashboard / no-streams / empty / error) — all
+   *   acceptable.
    */
   async clickMetricsTabAndWait() {
     await this.page.locator(this.metricsTab).click();
 
     // Wait until the metrics tab RESOLVES into a rendered content state — the correlation view
-    // (header) OR a terminal empty/error state. We race real content elements (never the swallowed
-    // panel wrapper); if none appears within the window the race rejects and the caller fails,
+    // (header) OR a terminal empty/error/no-streams state. We race real content elements (never the
+    // swallowed panel wrapper); if none appears within the window the race rejects and the caller fails,
     // which is the correct outcome for a genuinely broken/hung tab.
     await Promise.race([
       this.page.locator(this.metricsCorrelationHeader).first().waitFor({ state: 'visible', timeout: 30000 }),
       this.page.locator(this.metricsError).first().waitFor({ state: 'visible', timeout: 30000 }),
       this.page.locator(this.metricsEmpty).first().waitFor({ state: 'visible', timeout: 30000 }),
+      this.page.locator(this.metricsNoStreams).first().waitFor({ state: 'visible', timeout: 30000 }),
     ]);
 
     // Report whether real metric-stream rows rendered (.first() — the selector matches every row,
@@ -565,7 +589,7 @@ export class ServiceGraphPage {
       .isVisible({ timeout: 3000 }).catch(() => false);
   }
 
-  /** Terminal state of the Metrics tab: 'correlation', 'error', 'empty', or 'unknown' when none rendered. */
+  /** Terminal state of the Metrics tab: 'correlation', 'error', 'empty', 'no-streams', or 'unknown'. */
   async getMetricsTerminalState() {
     if (await this.page.locator(this.metricsCorrelationHeader).first().isVisible().catch(() => false)) {
       return 'correlation';
@@ -575,6 +599,9 @@ export class ServiceGraphPage {
     }
     if (await this.page.locator(this.metricsEmpty).first().isVisible().catch(() => false)) {
       return 'empty';
+    }
+    if (await this.page.locator(this.metricsNoStreams).first().isVisible().catch(() => false)) {
+      return 'no-streams';
     }
     return 'unknown';
   }
@@ -708,4 +735,25 @@ export class ServiceGraphPage {
       path: `test-results/screenshots/${name}-${Date.now()}.png`,
     });
   }
+  async expectStreamSelectorVisible(timeout = 30000) {
+    await expect(this.page.locator(this.streamSelector)).toBeVisible({ timeout });
+  }
+
+  /** Returns a live list of the stream_name of every topology response from now on. */
+  trackTopologyStreams() {
+    const streams = [];
+    // Responses, not requests: a load still in flight makes the component skip the next one.
+    this.page.on('response', (res) => {
+      if (res.url().includes('/traces/service_graph/topology/current')) {
+        streams.push(new URL(res.url()).searchParams.get('stream_name'));
+      }
+    });
+    return streams;
+  }
+
+  async selectStreamFromDropdown(streamName) {
+    await this.page.locator(this.streamSelector).click();
+    await this.page.getByRole('option', { name: streamName, exact: true }).click();
+  }
+
 }

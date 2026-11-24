@@ -15,13 +15,13 @@
 
 import { ref, watch } from "vue";
 
-/** Whether a page shows the filter builder (the default) instead of the query editor, remembered per browser. */
+/** Whether a page shows the filter builder instead of the query editor (the default), remembered per browser. */
 export function useFilterBuilderPreference(storageKey: string) {
   const read = (): boolean => {
     try {
-      return localStorage.getItem(storageKey) !== "query";
+      return localStorage.getItem(storageKey) === "builder";
     } catch {
-      return true;
+      return false;
     }
   };
 

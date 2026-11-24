@@ -98,7 +98,6 @@ import { incidentEventsQuery } from "@/services/incidents.queries";
 import { useOrgId } from "@/composables/query";
 import { useNowMicros } from "@/composables/downtimes/useNowMicros";
 import { getIntlLocale } from "@/locales";
-import { timezoneAbbr } from "@/utils/formatters";
 import {
   COLUMN_MINUTES,
   incidentUnfold,
@@ -193,12 +192,7 @@ const summaryKey = computed(() =>
 
 const root = ref<HTMLElement | null>(null);
 
-// Every time on the cards carries its own day when it is not today, so the hint names the zone only.
-const hint = computed(() =>
-  t("alerts.incidents.unfold.hintZone", {
-    zone: timezoneAbbr(zone.value, new Date(nowMicros.value / 1000)),
-  }),
-);
+const hint = computed(() => t("alerts.incidents.unfold.hint"));
 
 const stepped = computed(() => !!panelSummary.value && unfold.value.alertCount > STEP_ABOVE);
 

@@ -1,144 +1,164 @@
 {
   "slack_firing": {
-    "blocks": [
+    "attachments": [
       {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "*<https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme|🔴 High error rate firing>*"
-        }
-      },
-      {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "Error rate above 5% for 5 minutes"
-        }
-      },
-      {
-        "type": "section",
-        "fields": [
+        "color": "#E01E5A",
+        "blocks": [
           {
-            "type": "mrkdwn",
-            "text": "*Level*\nP2"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme|🔴 High error rate firing>*"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Event*\nFiring"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "Error rate above 5% for 5 minutes"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Stream*\nweb-logs"
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Level*\nP2"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Event*\nFiring"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Stream*\nweb-logs"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Threshold*\n &gt; 5"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Value*\n12.4"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Time*\n2026-11-02 10:05:00 UTC"
+              }
+            ]
           },
           {
-            "type": "mrkdwn",
-            "text": "*Threshold*\n &gt; 5"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Value*\n12.4"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Time*\n2026-11-02 10:05:00 UTC"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "`host` web-1 · `errors` 9\n`host` web-2 · `errors` 3"
+            }
           }
         ]
       },
       {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "`host` web-1 · `errors` 9\n`host` web-2 · `errors` 3"
-        }
-      },
-      {
-        "type": "actions",
-        "elements": [
+        "color": "#E01E5A",
+        "blocks": [
           {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "Open incident"
-            },
-            "url": "https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme",
-            "style": "primary"
-          },
-          {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "Open alert"
-            },
-            "url": "https://o2.acme.com/web/alerts/detail/7Kx2?org_identifier=acme"
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open incident"
+                },
+                "url": "https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme",
+                "style": "primary"
+              },
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open alert"
+                },
+                "url": "https://o2.acme.com/web/alerts/detail/7Kx2?org_identifier=acme"
+              }
+            ]
           }
         ]
       }
     ]
   },
   "slack_resolved": {
-    "blocks": [
+    "attachments": [
       {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "*<https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme|🟢 High error rate resolved>*"
-        }
-      },
-      {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "All linked alerts recovered"
-        }
-      },
-      {
-        "type": "section",
-        "fields": [
+        "color": "#2EB67D",
+        "blocks": [
           {
-            "type": "mrkdwn",
-            "text": "*Level*\nP2"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme|🟢 High error rate resolved>*"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Event*\nResolved"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "All linked alerts recovered"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Stream*\nweb-logs"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Threshold*\n &gt; 5"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Value*\n12.4"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Time*\n2026-11-02 10:40:00 UTC"
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Level*\nP2"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Event*\nResolved"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Stream*\nweb-logs"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Threshold*\n &gt; 5"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Value*\n12.4"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Time*\n2026-11-02 10:40:00 UTC"
+              }
+            ]
           }
         ]
       },
       {
-        "type": "actions",
-        "elements": [
+        "color": "#2EB67D",
+        "blocks": [
           {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "Open incident"
-            },
-            "url": "https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme",
-            "style": "primary"
-          },
-          {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "Open alert"
-            },
-            "url": "https://o2.acme.com/web/alerts/detail/7Kx2?org_identifier=acme"
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open incident"
+                },
+                "url": "https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme",
+                "style": "primary"
+              },
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open alert"
+                },
+                "url": "https://o2.acme.com/web/alerts/detail/7Kx2?org_identifier=acme"
+              }
+            ]
           }
         ]
       }

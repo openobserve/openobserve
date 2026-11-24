@@ -64,10 +64,6 @@ const uniqueStreams = (streams: readonly LearningStream[]) => [
   ...new Map(streams.map((s) => [`${s.type}/${s.name}`, s])).values(),
 ];
 
-/** A service is learning while any stream still gathers history or cannot, and it is no gap. */
-export const serviceLearning = (streams: readonly LearningStream[], nowMs: number): boolean =>
-  streams.some((s) => isLearning(s, nowMs) || STUCK.has(s.reason ?? ""));
-
 export const hasReasons = (
   learning: LearningView | null | undefined,
   streams: readonly LearningStream[],

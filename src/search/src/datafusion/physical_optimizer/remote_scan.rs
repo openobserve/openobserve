@@ -316,7 +316,10 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
             }
-        } else if node.name() == "HashJoinExec" {
+        } else if matches!(
+            node.name(),
+            "HashJoinExec" | "NestedLoopJoinExec" | "CrossJoinExec"
+        ) {
             let mut new_children: Vec<Arc<dyn ExecutionPlan>> = vec![];
             for child in node.children() {
                 let mut visitor = TableNameVisitor::new();
@@ -528,6 +531,7 @@ impl<'n> TreeNodeVisitor<'n> for NewEmptyExecCountVisitor {
 mod tests {
     use datafusion::{
         arrow::datatypes::{DataType, Field, Schema},
+        common::JoinType,
         execution::{SessionStateBuilder, runtime_env::RuntimeEnvBuilder},
         physical_optimizer::PhysicalOptimizerRule,
         physical_plan::{empty::EmptyExec, expressions::col},
@@ -976,6 +980,13 @@ mod tests {
     }
 
     async fn cluster_plan(sql: &str) -> (SessionContext, Arc<dyn ExecutionPlan>) {
+        cluster_plan_with(sql, SessionConfig::new().with_target_partitions(4)).await
+    }
+
+    async fn cluster_plan_with(
+        sql: &str,
+        session_config: SessionConfig,
+    ) -> (SessionContext, Arc<dyn ExecutionPlan>) {
         use tracing_opentelemetry::OpenTelemetrySpanExt;
         let schema = Arc::new(Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
@@ -1004,14 +1015,15 @@ mod tests {
             single_node_optimizer_enable: false,
         };
         let state = SessionStateBuilder::new()
-            .with_config(SessionConfig::new().with_target_partitions(4))
+            .with_config(session_config)
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_physical_optimizer_rule(Arc::new(rule))
             .with_default_features()
             .build();
         let ctx = SessionContext::new_with_state(state);
+        let partitions = ctx.state().config().target_partitions();
         let table = NewEmptyTable::new("t", schema)
-            .with_partitions(4)
+            .with_partitions(partitions)
             .with_sort_order(sort_order_for(sql));
         ctx.register_table("t", Arc::new(table)).unwrap();
         let logical = ctx.state().create_logical_plan(sql).await.unwrap();
@@ -1134,6 +1146,138 @@ mod tests {
             })
             .unwrap();
             assert!(sorted_below_merge, "{sql}");
+        }
+    }
+
+    fn count_bare_new_empty_execs(plan: &Arc<dyn ExecutionPlan>) -> usize {
+        if plan.is::<RemoteScanExec>() {
+            return 0;
+        }
+        let own = usize::from(plan.is::<NewEmptyExec>());
+        own + plan
+            .children()
+            .into_iter()
+            .map(count_bare_new_empty_execs)
+            .sum::<usize>()
+    }
+
+    // RightSemi/RightAnti/RightMark only come from swapping the left-side join, so they share its
+    // SQL.
+    fn join_type_queries(join_type: JoinType) -> Vec<String> {
+        const CONDITIONS: [&str; 4] = [
+            "a.event_name = b.event_name",
+            "a.value < b.value",
+            "a.event_name = b.event_name AND a.value < b.value",
+            "1 = 1",
+        ];
+        let join = |kind: &str| -> Vec<String> {
+            CONDITIONS
+                .iter()
+                .map(|on| format!("SELECT a.event_name, b.value FROM t a {kind} JOIN t b ON {on}"))
+                .collect()
+        };
+        let exists = |negate: &str, or: &str| -> Vec<String> {
+            CONDITIONS
+                .iter()
+                .map(|on| {
+                    format!(
+                        "SELECT a.event_name FROM t a \
+                        WHERE {negate}EXISTS (SELECT 1 FROM t b WHERE {on}){or}"
+                    )
+                })
+                .collect()
+        };
+        let mut queries = match join_type {
+            JoinType::Inner => join("INNER"),
+            JoinType::Left => join("LEFT"),
+            JoinType::Right => join("RIGHT"),
+            JoinType::Full => join("FULL"),
+            JoinType::LeftSemi | JoinType::RightSemi => exists("", ""),
+            JoinType::LeftAnti | JoinType::RightAnti => exists("NOT ", ""),
+            JoinType::LeftMark | JoinType::RightMark => exists("", " OR a.value > 1"),
+        };
+        match join_type {
+            JoinType::Inner => queries.extend([
+                "SELECT a.event_name, b.value FROM t a CROSS JOIN t b".to_string(),
+                "SELECT a.event_name, b.value FROM t a, t b".to_string(),
+                "SELECT a.event_name, c.value FROM t a JOIN t b ON a.value < b.value \
+                    JOIN t c ON b.event_name = c.event_name"
+                    .to_string(),
+            ]),
+            JoinType::LeftSemi => queries.push(
+                "SELECT a.event_name FROM t a WHERE a.event_name IN \
+                    (SELECT b.event_name FROM t b WHERE b.value > 1)"
+                    .to_string(),
+            ),
+            JoinType::LeftAnti => queries.push(
+                "SELECT a.event_name FROM t a WHERE a.event_name NOT IN \
+                    (SELECT b.event_name FROM t b WHERE b.value > 1)"
+                    .to_string(),
+            ),
+            _ => {}
+        }
+        let counts: Vec<String> = queries
+            .iter()
+            .map(|sql| format!("SELECT count(*) AS c FROM ({sql})"))
+            .collect();
+        queries.extend(counts);
+        queries
+    }
+
+    async fn assert_every_join_side_is_scanned(sql: &str, target_partitions: usize) {
+        const HANDLED_JOINS: [&str; 3] = ["HashJoinExec", "NestedLoopJoinExec", "CrossJoinExec"];
+        let session_config = crate::datafusion::exec::create_session_config(
+            crate::datafusion::sort_order::FileSortOrder::None,
+            target_partitions,
+        )
+        .unwrap();
+        let (ctx, plan) = cluster_plan_with(sql, session_config).await;
+        let display = datafusion::physical_plan::displayable(plan.as_ref()).indent(false);
+        let context = format!("{sql} (target_partitions={target_partitions})\n{display}");
+        let mut joins = vec![];
+        plan.apply(|node| {
+            if node.name().ends_with("JoinExec") {
+                joins.push(node.name().to_string());
+            }
+            Ok(TreeNodeRecursion::Continue)
+        })
+        .unwrap();
+        assert!(!joins.is_empty(), "no join planned: {context}");
+        // A new join operator must get a RemoteScanRewriter arm before it joins this list.
+        for join in &joins {
+            assert!(
+                HANDLED_JOINS.contains(&join.as_str()),
+                "unhandled {join}: {context}"
+            );
+        }
+        assert_eq!(count_bare_new_empty_execs(&plan), 0, "{context}");
+        assert!(decode_every_remote_scan(&ctx, &plan) >= 2, "{context}");
+        let check = datafusion::physical_optimizer::sanity_checker::SanityCheckPlan::new();
+        if let Err(e) = check.optimize(Arc::clone(&plan), ctx.state().config_options()) {
+            panic!("{e}: {context}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cluster_join_matrix_scans_every_side() {
+        let join_types = [
+            JoinType::Inner,
+            JoinType::Left,
+            JoinType::Right,
+            JoinType::Full,
+            JoinType::LeftSemi,
+            JoinType::RightSemi,
+            JoinType::LeftAnti,
+            JoinType::RightAnti,
+            JoinType::LeftMark,
+            JoinType::RightMark,
+        ];
+        for join_type in join_types {
+            for sql in join_type_queries(join_type) {
+                for target_partitions in [2, 8] {
+                    assert_every_join_side_is_scanned(&sql, target_partitions).await;
+                }
+            }
         }
     }
 }

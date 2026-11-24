@@ -127,6 +127,14 @@ impl UserRole {
         matches!(self, UserRole::ServiceAccount | UserRole::SreAgent)
     }
 
+    /// The roles a person may be given by an invitation or a role change.
+    pub fn is_member_role(&self) -> bool {
+        match self {
+            UserRole::Admin | UserRole::Editor | UserRole::Viewer | UserRole::User => true,
+            UserRole::Root | UserRole::ServiceAccount | UserRole::SreAgent => false,
+        }
+    }
+
     pub fn get_label(&self) -> String {
         match self {
             UserRole::Admin => "Admin".to_string(),
@@ -438,6 +446,21 @@ mod tests {
         assert!(!UserRole::Admin.is_service_account());
         assert!(!UserRole::Viewer.is_service_account());
         assert!(!UserRole::Root.is_service_account());
+    }
+
+    #[test]
+    fn test_user_role_is_member_role() {
+        for (role, member) in [
+            (UserRole::Admin, true),
+            (UserRole::Editor, true),
+            (UserRole::Viewer, true),
+            (UserRole::User, true),
+            (UserRole::Root, false),
+            (UserRole::ServiceAccount, false),
+            (UserRole::SreAgent, false),
+        ] {
+            assert_eq!(role.is_member_role(), member, "{role:?}");
+        }
     }
 
     #[test]

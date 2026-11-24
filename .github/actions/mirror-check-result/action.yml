@@ -1,0 +1,36 @@
+name: Mirror check result
+description: On a label-only PR event, report this check's newest real result on the PR head instead of re-running it
+inputs:
+  check-name:
+    description: Name of the check run to mirror; the calling job must report under the same name
+    required: true
+  step-name:
+    description: Name of the calling step, which tells earlier mirrors apart from real results
+    default: Mirror the last real result
+  checkout-step:
+    description: Name of the calling job's step that checks out this action
+    default: Check out the mirror action
+  skipped-is-result:
+    description: "'true' when a skipped job is a real verdict (no relevant changes), not a run that never tested"
+    default: "false"
+  poll-minutes:
+    description: How long to wait for an unfinished real result before failing
+    default: "90"
+  token:
+    description: Token with checks:read and actions:read
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        REPO: ${{ github.repository }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        RUN_ID: ${{ github.run_id }}
+        CHECK_NAME: ${{ inputs.check-name }}
+        MIRROR_STEP: ${{ inputs.step-name }}
+        CHECKOUT_STEP: ${{ inputs.checkout-step }}
+        SKIPPED_IS_RESULT: ${{ inputs.skipped-is-result }}
+        POLL_MINUTES: ${{ inputs.poll-minutes }}
+      run: '"$GITHUB_ACTION_PATH/mirror.sh"'

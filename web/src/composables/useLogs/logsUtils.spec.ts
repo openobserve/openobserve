@@ -137,6 +137,8 @@ vi.mock("@openobserve/node-sql-parser/build/datafusionsql", () => ({
 
 // Import the module under test (after mocks are set up)
 import { logsUtils } from "./logsUtils";
+import { queryClient } from "@/composables/query/queryClient";
+import { queryFunctionsQuery } from "@/services/query_functions.queries";
 
 describe("logsUtils", () => {
   let utils: ReturnType<typeof logsUtils>;
@@ -363,6 +365,43 @@ describe("logsUtils", () => {
       expect(utils.hasAggregation(null as any)).toBe(false);
       expect(utils.hasAggregation(undefined as any)).toBe(false);
     });
+
+    describe("with the server function catalog", () => {
+      const catalogKey = queryFunctionsQuery("test-org").queryKey;
+      const functionColumn = (name: string) => [
+        { expr: { type: "function", name: { name: [{ type: "default", value: name }] } } },
+      ];
+
+      beforeEach(() => {
+        mockSearchObj.data.query = "";
+        queryClient.setQueryData(catalogKey, [
+          { name: "approx_distinct", kind: "aggregate" },
+          { name: "approx_topk", kind: "aggregate" },
+          { name: "lower", kind: "scalar" },
+          { name: "row_number", kind: "window" },
+        ]);
+      });
+
+      afterEach(() => {
+        queryClient.removeQueries({ queryKey: catalogKey });
+      });
+
+      it("should treat catalog aggregates the parser reads as plain functions as aggregation", () => {
+        expect(utils.hasAggregation(functionColumn("approx_distinct") as any)).toBe(true);
+        expect(utils.hasAggregation(functionColumn("APPROX_TOPK") as any)).toBe(true);
+      });
+
+      it("should not treat scalar or window functions as aggregation", () => {
+        expect(utils.hasAggregation(functionColumn("lower") as any)).toBe(false);
+        expect(utils.hasAggregation(functionColumn("row_number") as any)).toBe(false);
+      });
+
+      it("should fall back to aggr_func only when the catalog is not loaded", () => {
+        queryClient.removeQueries({ queryKey: catalogKey });
+        expect(utils.hasAggregation(functionColumn("approx_distinct") as any)).toBe(false);
+        expect(utils.hasAggregation([{ expr: { type: "aggr_func", name: "COUNT" } }])).toBe(true);
+      });
+    });
   });
 
   describe("isLimitQuery", () => {
@@ -391,6 +430,23 @@ describe("logsUtils", () => {
 
     it("should return false for undefined input", () => {
       expect(utils.isLimitQuery(undefined as any)).toBe(false);
+    });
+
+    it("should read the trailing LIMIT of a UNION from its last branch", () => {
+      const parsedSQL = {
+        limit: { seperator: "", value: [] },
+        _next: { limit: { seperator: "", value: [{ type: "number", value: 100 }] } },
+      };
+      expect(utils.isLimitQuery(parsedSQL as any)).toBe(true);
+      expect(utils.getOuterLimit(parsedSQL as any)?.value[0].value).toBe(100);
+    });
+
+    it("should not treat a LIMIT on the first UNION branch as the query's LIMIT", () => {
+      const parsedSQL = {
+        limit: { seperator: "", value: [{ type: "number", value: 5 }] },
+        _next: { limit: { seperator: "", value: [] } },
+      };
+      expect(utils.isLimitQuery(parsedSQL as any)).toBe(false);
     });
   });
 
@@ -681,6 +737,25 @@ describe("logsUtils", () => {
       mockSearchObj.meta.showHistogram = true;
       mockSearchObj.meta.refreshInterval = 0;
       mockSearchObj.meta.logsVisualizeToggle = "logs";
+    });
+
+    it("keeps the anomaly banner parameters, so a search or a refresh does not drop the banner", () => {
+      mockCurrentRoute.value = {
+        query: {
+          from_anomaly: "a1",
+          anomaly_filter_applied: "0",
+          anomaly_actual: "208",
+          type: "search_scheduler",
+        },
+      } as any;
+      try {
+        const query = utils.generateURLQuery();
+        expect(query.from_anomaly).toBe("a1");
+        expect(query.anomaly_filter_applied).toBe("0");
+        expect(query.anomaly_actual).toBe("208");
+      } finally {
+        mockCurrentRoute.value = { query: {} };
+      }
     });
 
     it("should generate query params with stream info", () => {

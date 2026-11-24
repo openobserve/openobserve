@@ -1206,6 +1206,13 @@ fn secret_refusal(matches: Option<bool>) -> Option<Response> {
 
 /// The reply for an agent's write; the turn, chat, setting and cap are checked in its transaction.
 async fn write_for_turn(request: InternalWriteRequest) -> (StatusCode, Value) {
+    // The org is in the body, so the routes' blocked-org gate never sees it.
+    if ::db::org_status::is_blocked(&request.org_id) {
+        return (
+            StatusCode::FORBIDDEN,
+            json!({"code": "org_blocked", "message": "the organization is blocked"}),
+        );
+    }
     let toolset = match (request.scope, request.toolset.as_deref()) {
         (MemoryScope::Toolset, name) => {
             let name = name.unwrap_or_default();
@@ -1911,6 +1918,24 @@ pub(crate) mod tests {
     async fn without_a_secret_on_openobserve_the_internal_route_is_closed() {
         let resp = internal_write(axum::http::HeaderMap::new(), axum::body::Bytes::new()).await;
         assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn a_running_turn_of_a_blocked_org_writes_no_memory() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        if !meta_store().await {
+            return;
+        }
+        let (org, session, turn, _) = running_turn("o2-ai").await;
+        let ids = (org.as_str(), session.as_str(), turn.as_str());
+        let write = || write_for_turn(agent_write(ids, MemoryScope::Org, None, 0, add("- a")));
+        for status in [OrgStatus::Blocked, OrgStatus::PendingDeletion] {
+            ORG_STATUS_CACHE.insert(org.clone(), status);
+            let (status, reply) = write().await;
+            ORG_STATUS_CACHE.remove(&org);
+            assert_eq!(status, StatusCode::FORBIDDEN, "{reply}");
+        }
+        assert_eq!(write().await.0, StatusCode::OK);
     }
 
     #[tokio::test]

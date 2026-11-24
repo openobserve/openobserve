@@ -100,6 +100,8 @@ async function seedDetailMetrics(request) {
 }
 
 module.exports = {
+  postRows,
+  waitForInstantQuery,
   TIME_SHIFT_METRIC,
   DETAIL_METRIC,
   RELATED_METRIC,

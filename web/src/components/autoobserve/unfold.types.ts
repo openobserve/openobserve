@@ -58,6 +58,8 @@ export interface UnfoldCard {
   at: string;
   /** Where a range of firings ends, read after `at`. */
   until?: string;
+  /** How long ago `at` (and `until`) was; the card has no room for it, so it is the time's tooltip. */
+  ago?: I18nText;
   minute: number | null;
   title: I18nText;
   detail?: I18nText;

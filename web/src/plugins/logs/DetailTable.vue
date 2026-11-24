@@ -223,6 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :scope="correlationScope"
         :instance-version="correlationVersion"
         :time-range="correlationProps.timeRange"
+        :trace-stream="correlationTraceInfo?.stream_name"
         @close="closeTable"
       />
       <OTabPanels
@@ -1551,6 +1552,7 @@ export default defineComponent({
       showCorrelationHeader,
       correlationScope,
       correlationVersion,
+      correlationTraceInfo,
       severity,
       severityTagLabel,
       severityFieldValue,

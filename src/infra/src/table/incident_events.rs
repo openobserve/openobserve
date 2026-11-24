@@ -114,22 +114,61 @@ fn decode_events(org_id: &str, incident_id: &str, raw: &serde_json::Value) -> Ve
 
 /// Initialize events row for a new incident with a Created event
 pub async fn init(org_id: &str, incident_id: &str) -> Result<(), sea_orm::DbErr> {
-    let db = get_orm_client_rw().await;
-    let event = IncidentEvent::created();
-    let events_json = encode_events(&[event])?;
+    use config::meta::alerts::incidents::IncidentEventType;
 
-    let model = incident_events::ActiveModel {
-        org_id: Set(org_id.to_string()),
-        incident_id: Set(incident_id.to_string()),
-        events: Set(events_json),
-    };
-    model.insert(db).await?;
-    Ok(())
+    let txn = get_orm_client_rw().await.begin().await?;
+    let mut created = IncidentEvent::created();
+    // A moved alert's incident is visible before its setup, so its SplitFrom may already be there.
+    match locked_row(&txn, org_id, incident_id).one(&txn).await? {
+        Some(model) => {
+            let mut events = decode_events(org_id, incident_id, &model.events);
+            if !events
+                .iter()
+                .any(|e| matches!(e.event_type, IncidentEventType::Created))
+            {
+                let earliest = events.iter().map(|e| e.timestamp).min();
+                created.timestamp =
+                    earliest.map_or(created.timestamp, |t| t.min(created.timestamp));
+                // Why the incident opened stays its first entry.
+                let at = events
+                    .iter()
+                    .take_while(|e| matches!(e.event_type, IncidentEventType::SplitFrom { .. }))
+                    .count();
+                events.insert(at, created);
+                let mut active: incident_events::ActiveModel = model.into();
+                active.events = Set(encode_events(&events)?);
+                active.update(&txn).await?;
+            }
+        }
+        None => {
+            let model = incident_events::ActiveModel {
+                org_id: Set(org_id.to_string()),
+                incident_id: Set(incident_id.to_string()),
+                events: Set(encode_events(&[created])?),
+            };
+            model.insert(&txn).await?;
+        }
+    }
+    txn.commit().await
 }
 
 /// Get all events for an incident
 pub async fn get(org_id: &str, incident_id: &str) -> Result<Vec<IncidentEvent>, sea_orm::DbErr> {
-    let db = get_orm_client_ro().await;
+    get_with(get_orm_client_ro().await, org_id, incident_id).await
+}
+
+/// [get] on the primary, for a decision an event written in the same transaction as a change
+/// drives.
+pub async fn get_rw(org_id: &str, incident_id: &str) -> Result<Vec<IncidentEvent>, sea_orm::DbErr> {
+    get_with(get_orm_client_rw().await, org_id, incident_id).await
+}
+
+/// [get] on a given connection, such as a transaction holding the incident row.
+pub async fn get_with<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    incident_id: &str,
+) -> Result<Vec<IncidentEvent>, sea_orm::DbErr> {
     let row = incident_events::Entity::find()
         .filter(incident_events::Column::OrgId.eq(org_id))
         .filter(incident_events::Column::IncidentId.eq(incident_id))
@@ -339,6 +378,47 @@ pub async fn append_in(
     append_once_in(txn, org_id, incident_id, event, false).await
 }
 
+/// Drops one alert's firing entries and the wording of its severity raises, in the caller's
+/// transaction; the raises' levels and alert id stay so a put-back can replay them.
+pub async fn forget_alert_in(
+    txn: &DatabaseTransaction,
+    org_id: &str,
+    incident_id: &str,
+    alert_id: &str,
+) -> Result<(), sea_orm::DbErr> {
+    use config::meta::alerts::incidents::IncidentEventType;
+
+    let Some(model) = locked_row(txn, org_id, incident_id).one(txn).await? else {
+        return Ok(());
+    };
+    let mut events = decode_events(org_id, incident_id, &model.events);
+    let before = events.len();
+    events.retain(
+        |e| !matches!(&e.event_type, IncidentEventType::Alert { alert_id: a, .. } if a == alert_id),
+    );
+    let mut changed = events.len() != before;
+    for event in &mut events {
+        if let IncidentEventType::SeverityUpgrade {
+            reason,
+            alert_id: Some(by),
+            ..
+        } = &mut event.event_type
+            && by == alert_id
+            && !reason.is_empty()
+        {
+            reason.clear();
+            changed = true;
+        }
+    }
+    if !changed {
+        return Ok(());
+    }
+    let mut active: incident_events::ActiveModel = model.into();
+    active.events = Set(encode_events(&events)?);
+    active.update(txn).await?;
+    Ok(())
+}
+
 async fn append_once_in(
     txn: &DatabaseTransaction,
     org_id: &str,
@@ -401,23 +481,23 @@ fn locked_row(
     }
 }
 
-/// Record an alert event with compaction.
-/// Scans backwards through the trailing block of consecutive Alert events; if a matching
-/// alert_id is found within that block, its count is incremented. If a non-Alert event is
-/// encountered first (or the list is empty), a new Alert event is appended.
-/// Returns whether a manual reopen waited for this firing, decided under the row lock.
 pub async fn record_alert(
     org_id: &str,
     incident_id: &str,
     alert_id: &str,
     alert_name: &str,
     triggered_at: i64,
-) -> Result<bool, sea_orm::DbErr> {
+) -> Result<Option<bool>, sea_orm::DbErr> {
     let db = get_orm_client_rw().await;
 
     let txn = db.begin().await?;
 
     let row = locked_row(&txn, org_id, incident_id).one(&txn).await?;
+    // A move out drops the alert's entries under this lock; a firing it already moved records none.
+    if !super::alert_incidents::has_member_in(&txn, incident_id, alert_id).await? {
+        txn.rollback().await?;
+        return Ok(None);
+    }
 
     let waited = match row {
         Some(model) => {
@@ -450,7 +530,7 @@ pub async fn record_alert(
     };
 
     txn.commit().await?;
-    Ok(waited)
+    Ok(Some(waited))
 }
 
 /// Deletes all incident event entries belonging to the given org.

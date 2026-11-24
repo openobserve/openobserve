@@ -45,13 +45,20 @@ const LABEL_KEYS = {
 export const kindLabelKey = (kind: NotificationKind) => LABEL_KEYS[kind];
 
 // Variables only one kind fills; a body that uses one is meant for that kind.
+// Anomaly and synthetics list the exact names the server sends (ANOMALY_VARIABLES and
+// SYNTHETICS_VARIABLES in src/core/src/alerts/notifications/examples.rs). The server's
+// bare `score`, `threshold`, `window_start` and `window_end` are left out: they are common
+// stream field names, and a normal alert template that uses one must still apply to alerts.
 const KIND_VARIABLES: [NotificationKind, RegExp][] = [
   [
     "anomaly",
-    /^(anomaly_.*|max_deviation_percent|deviation_.*|worst_.*|window_start|window_end|score|threshold)$/,
+    /^(anomaly_.*|max_deviation_percent|deviation_kind|worst_actual_value|worst_expected)$/,
   ],
   ["incident", /^incident_.*/],
-  ["synthetics", /^check_.*/],
+  [
+    "synthetics",
+    /^check_(id|name|type|target|status|status_label|status_reason|locations_line|location_count|consecutive_failures|flaky|degraded|run_id|url|error|environments|checked_at|title)$/,
+  ],
   ["downtime", /^downtime_.*/],
   ["on_call", /^(oncall_.*|runbook_url)$/],
 ];

@@ -18,6 +18,7 @@ pub mod deleting_streams;
 pub mod file_data;
 pub mod file_downloader;
 pub mod meta;
+pub mod recency;
 pub mod stats;
 pub mod storage;
 

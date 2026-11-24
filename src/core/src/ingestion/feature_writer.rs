@@ -20,8 +20,10 @@ use common::infra::config::ORG_INGESTION_TOKENS;
 use config::{
     META_ORG_ID, get_config,
     meta::{
-        alerts::alert_calibration::DIGEST_STREAM, autoobserve::AUTOOBSERVE_STREAM_PREFIX,
-        service_identity::SERVICE_SIGNALS_STREAM_PREFIX, stream::StreamType,
+        alerts::alert_calibration::DIGEST_STREAM,
+        autoobserve::AUTOOBSERVE_STREAM_PREFIX,
+        service_identity::SERVICE_SIGNALS_STREAM_PREFIX,
+        stream::{SESSION_REPLAY_RESOURCES_STREAM, StreamType},
     },
     utils::base64,
 };
@@ -64,13 +66,15 @@ pub enum FeatureWriter {
     AlertCalibration,
     AutoObserve,
     ServiceSignals,
+    SessionReplay,
 }
 
 impl FeatureWriter {
-    pub const ALL: [Self; 3] = [
+    pub const ALL: [Self; 4] = [
         Self::AlertCalibration,
         Self::AutoObserve,
         Self::ServiceSignals,
+        Self::SessionReplay,
     ];
 
     pub fn from_token_name(name: &str) -> Option<Self> {
@@ -82,13 +86,14 @@ impl FeatureWriter {
             Self::AlertCalibration => "_o2_alert_calibration",
             Self::AutoObserve => "_o2_autoobserve",
             Self::ServiceSignals => "_o2_service_signals",
+            Self::SessionReplay => "_o2_sessionreplay_resources",
         }
     }
 
     /// AutoObserve rows land in `_meta` whatever org they describe, so its token lives there.
     pub fn token_org(self, org: &str) -> &str {
         match self {
-            Self::AlertCalibration | Self::ServiceSignals => org,
+            Self::AlertCalibration | Self::ServiceSignals | Self::SessionReplay => org,
             Self::AutoObserve => META_ORG_ID,
         }
     }
@@ -98,22 +103,24 @@ impl FeatureWriter {
             Self::AlertCalibration => stream == DIGEST_STREAM,
             Self::AutoObserve => stream.starts_with(AUTOOBSERVE_STREAM_PREFIX),
             Self::ServiceSignals => stream.starts_with(SERVICE_SIGNALS_STREAM_PREFIX),
+            Self::SessionReplay => stream == SESSION_REPLAY_RESOURCES_STREAM,
         }
     }
 
     /// Service signals write verdict events as logs and their rollups as metrics.
     pub fn stream_types(self) -> &'static [StreamType] {
         match self {
-            Self::AlertCalibration | Self::AutoObserve => &[StreamType::Logs],
+            Self::AlertCalibration | Self::AutoObserve | Self::SessionReplay => &[StreamType::Logs],
             Self::ServiceSignals => &[StreamType::Logs, StreamType::Metrics],
         }
     }
 
-    /// What each writer sent before it had a token: AutoObserve's `Usage` keeps `_meta` unbilled.
+    /// What each writer sent before it had a token: `Usage` keeps AutoObserve's and replay rows
+    /// unbilled.
     pub fn ingestion_type(self) -> cluster_rpc::IngestionType {
         match self {
             Self::AlertCalibration | Self::ServiceSignals => cluster_rpc::IngestionType::Json,
-            Self::AutoObserve => cluster_rpc::IngestionType::Usage,
+            Self::AutoObserve | Self::SessionReplay => cluster_rpc::IngestionType::Usage,
         }
     }
 
@@ -122,6 +129,7 @@ impl FeatureWriter {
             Self::AlertCalibration => SystemJobType::AlertCalibration,
             Self::AutoObserve => SystemJobType::AutoObserve,
             Self::ServiceSignals => SystemJobType::ServiceSignals,
+            Self::SessionReplay => SystemJobType::SessionReplay,
         }
     }
 
@@ -148,6 +156,7 @@ impl FeatureWriter {
             Self::AlertCalibration => "Alert Calibration",
             Self::AutoObserve => "AutoObserve",
             Self::ServiceSignals => "Service Versions",
+            Self::SessionReplay => "Session Replay",
         }
     }
 
@@ -498,6 +507,16 @@ pub(crate) mod tests {
         assert!(ServiceSignals.allows("_o2_service_requests_total"));
         assert!(!ServiceSignals.allows(DIGEST_STREAM));
         assert!(!ServiceSignals.allows(""));
+        assert!(SessionReplay.allows(SESSION_REPLAY_RESOURCES_STREAM));
+        assert!(!SessionReplay.allows("_rumdata"));
+        assert!(!SessionReplay.allows("_o2_sessionreplay_resources_x"));
+        assert!(!SessionReplay.allows(DIGEST_STREAM));
+        assert_eq!(SessionReplay.token_org("demo-org"), "demo-org");
+        assert_eq!(SessionReplay.stream_types(), &[StreamType::Logs]);
+        assert_eq!(
+            SessionReplay.ingestion_type(),
+            cluster_rpc::IngestionType::Usage
+        );
         assert_eq!(ServiceSignals.token_org("demo-org"), "demo-org");
         assert_eq!(AlertCalibration.token_org("demo-org"), "demo-org");
         assert_eq!(AutoObserve.token_org("demo-org"), META_ORG_ID);
@@ -629,6 +648,34 @@ pub(crate) mod tests {
         assert_eq!(
             body.ingestion_type,
             Some(cluster_rpc::IngestionType::Json as i32)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_session_replay_write_sends_usage_rows_to_its_stream_with_its_credential() {
+        let transport = RecordingTransport::answering(200);
+        let token = WriterToken::for_tests(FeatureWriter::SessionReplay, "demo-org", "o2oi_r");
+        write(
+            &transport,
+            &token,
+            SESSION_REPLAY_RESOURCES_STREAM,
+            b"[]".to_vec(),
+        )
+        .await
+        .unwrap();
+        let err = write(&transport, &token, "_rumdata", b"[]".to_vec())
+            .await
+            .unwrap_err();
+        assert!(matches!(err, WriteError::OutOfScope(_)), "{err:?}");
+        let sent = transport.credentials();
+        assert_eq!(sent.len(), 1);
+        let (credentials, org, body) = &sent[0];
+        assert_eq!(credentials, "session_replay@system.local:o2oi_r");
+        assert_eq!(org, "demo-org");
+        assert_eq!(body.stream_name, SESSION_REPLAY_RESOURCES_STREAM);
+        assert_eq!(
+            body.ingestion_type,
+            Some(cluster_rpc::IngestionType::Usage as i32)
         );
     }
 

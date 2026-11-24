@@ -30,7 +30,7 @@ use super::{
         ClosedEpisode, ClosedGroupEpisode, EpisodeInput, RecoveryReason, apply_episode,
         hold_firing_cycle,
     },
-    state::{AlertState, ROLLUP_GROUP_KEY, StateTransition, StateUpdate, apply_outcome},
+    state::{AlertState, ROLLUP_GROUP_KEY, RunStamps, StateTransition, StateUpdate, apply_outcome},
 };
 use crate::meta::self_reporting::usage::RunOutcome;
 
@@ -972,6 +972,32 @@ pub struct GroupPlan {
 pub struct ReapedGroup {
     pub group_key: String,
     pub prev_level_at: Option<i64>,
+}
+
+/// Super-cluster payload for a grouped evaluation: the rows that changed, plus the run time for
+/// the rest.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TouchedGroupPlan {
+    pub alert_id: String,
+    /// Only the rows whose columns other than the run stamps changed.
+    pub plan: GroupPlan,
+    pub touch: GroupTouch,
+}
+
+/// Run stamps for the group rows a [`TouchedGroupPlan`] leaves out of its plan.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GroupTouch {
+    /// The evaluation time.
+    pub at: i64,
+    /// Start of the window since the last full plan: rows last seen in it were observed at `at`
+    /// unless named in `unobserved`; an older row is one the evaluating region no longer tracks.
+    pub seen_since: i64,
+    /// Rows seen since `seen_since` that this evaluation did not see.
+    #[serde(default)]
+    pub unobserved: Vec<String>,
+    /// The rollup row's stamps when the rollup is not among the plan's updates.
+    #[serde(default)]
+    pub rollup: Option<RunStamps>,
 }
 
 /// One sweep's writes: each M-7 resolve in its own plan, everything else in `rest`.
@@ -4946,5 +4972,30 @@ mod tests {
             assert_eq!(plan.evicted, vec![key("a")]);
             assert!(plan.closed_episodes.is_empty());
         }
+    }
+
+    /// The payload is a wire format other regions decode, so its field names are pinned.
+    #[test]
+    fn a_touched_group_plan_decodes_from_its_wire_form() {
+        use super::{GroupPlan, GroupTouch, TouchedGroupPlan};
+
+        let wire = r#"{"alert_id":"alert-1","plan":{"updates":[],"evicted":[]},
+            "touch":{"at":2000,"seen_since":1000,"unobserved":["gone"]}}"#;
+
+        let decoded: TouchedGroupPlan = crate::utils::json::from_str(wire).unwrap();
+
+        assert_eq!(
+            decoded,
+            TouchedGroupPlan {
+                alert_id: "alert-1".to_string(),
+                plan: GroupPlan::default(),
+                touch: GroupTouch {
+                    at: 2_000,
+                    seen_since: 1_000,
+                    unobserved: vec!["gone".to_string()],
+                    rollup: None,
+                },
+            }
+        );
     }
 }

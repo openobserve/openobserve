@@ -194,6 +194,21 @@ export interface AlertGroup {
 
 export type AckSource = "ui" | "api" | "slack" | "oncall" | "incident";
 
+/** An active alert lease (`LeaseView`): a temporary alert, or incident creation held for a window. */
+export interface AlertLeaseView {
+  id: string;
+  alert_id: string;
+  kind: "created" | "creates_incident";
+  set_value: boolean;
+  starts_at_us: number;
+  ends_at_us: number;
+  set_by: string;
+  set_by_name: string;
+  reason: string;
+  state: "active" | "pending" | "ended" | "kept" | "superseded" | "removed";
+  version: number;
+}
+
 /** One group's ack in force (`AckView` of `POST /alerts/{id}/ack`). */
 export interface AckView {
   /** `""` for a single-row or composite alert. */

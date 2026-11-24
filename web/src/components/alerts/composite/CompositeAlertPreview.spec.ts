@@ -57,7 +57,7 @@ describe("CompositeAlertPreview", () => {
         result: null,
         result_level: null,
         warnings: [{ code: "child_disabled", child_alert_id: "id-a" }],
-        errors: [{ code: "composite_too_deep", message: "Maximum depth is two" }],
+        errors: [{ code: "child_is_composite", message: "Child alert c1 is a composite alert" }],
       }),
     );
 
@@ -65,8 +65,8 @@ describe("CompositeAlertPreview", () => {
       wrapper.find('[data-test="alerts-composite-preview-warning-child_disabled"]').exists(),
     ).toBe(true);
     expect(
-      wrapper.find('[data-test="alerts-composite-preview-error-composite_too_deep"]').text(),
-    ).toContain("Maximum depth is two");
+      wrapper.find('[data-test="alerts-composite-preview-error-child_is_composite"]').text(),
+    ).toContain("Child alert c1 is a composite alert");
     expect(
       wrapper.find('[data-test="alerts-composite-preview-result"]').attributes("aria-live"),
     ).toBe("polite");

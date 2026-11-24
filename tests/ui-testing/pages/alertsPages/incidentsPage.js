@@ -139,4 +139,41 @@ export class IncidentsPage {
     await this.confirmDialog().locator(this.confirmDialogPrimary).click();
     await expect(this.confirmDialog()).toBeHidden({ timeout: 10000 });
   }
+
+  unfoldCard(cardId) {
+    return this.page.locator(`[data-test="autoobserve-unfold-card-${cardId}"]`).first();
+  }
+
+  async openAlertGraph() {
+    await this.page.locator('[data-test="incident-alert-graph-tab"]').click();
+    await expect(this.page.locator('[data-test="incident-unfold-graph"]')).toBeVisible({ timeout: 30000 });
+  }
+
+  async expectUnfoldCardTitle(cardId, title) {
+    await expect(this.page.locator(`[data-test="autoobserve-unfold-title-${cardId}"]`).first()).toContainText(title, { timeout: 30000 });
+  }
+
+  async expectUnfoldCardTag(cardId, text) {
+    const tag = this.page.locator(`[data-test="autoobserve-unfold-tag-${cardId}"]`);
+    if (text === null) await expect(tag).toHaveCount(0);
+    else await expect(tag.first()).toContainText(text);
+  }
+
+  /** True when the first card starts left of the second, as the unfold lays cards out in firing order. */
+  async unfoldCardIsLeftOf(firstId, secondId) {
+    const a = await this.unfoldCard(firstId).boundingBox();
+    const b = await this.unfoldCard(secondId).boundingBox();
+    expect(a && b, 'both cards must be laid out').toBeTruthy();
+    return a.x < b.x;
+  }
+
+  async openUnfoldCard(cardId) {
+    await this.unfoldCard(cardId).click();
+    await expect(this.page.locator('[data-test="incident-alert-panel"]')).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectAlertPanel(name, countText) {
+    await expect(this.page.locator('[data-test="incident-alert-panel-name"]')).toContainText(name, { timeout: 15000 });
+    await expect(this.page.locator('[data-test="incident-alert-panel-count"]')).toContainText(countText);
+  }
 }

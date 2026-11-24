@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :scope="versionScope"
         :instance-version="versionInstance"
         :time-range="timeRange"
+        :trace-stream="sortedTraceStreams[0]?.stream_name"
         @close="onClose"
       />
     </template>
@@ -386,6 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-else-if="hasNoMetricStreams"
+                    data-test="correlation-no-metric-streams"
                     class="flex h-[calc(100vh-7.5rem)] flex-col items-center justify-center py-20"
                   >
                     <div class="mb-2 text-base font-medium opacity-90">
@@ -840,6 +842,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-else-if="hasNoMetricStreams"
+                  data-test="correlation-no-metric-streams"
                   class="flex h-full flex-col items-center justify-center py-20"
                 >
                   <div class="mb-2 text-base font-medium opacity-90">
@@ -1089,7 +1092,7 @@ import type { StreamInfo } from "@/services/service_streams";
 import { enrichStreamsWithOverlap } from "@/utils/streamTimeOverlap";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import {
-  buildSqlCondition,
+  buildStreamFilterCondition,
   buildFieldToGroupIdMap,
   applyDimensionEditsToFilters,
   quoteSqlLiteral,
@@ -2907,9 +2910,7 @@ const fetchTracesByDimensions = (): Promise<any[]> => {
   const filterParts: string[] = [];
   if (traceStreamInfo.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
-      filterParts.push(
-        buildSqlCondition(fieldName, value, traceStreamInfo.filter_spellings?.[fieldName]),
-      );
+      filterParts.push(buildStreamFilterCondition(traceStreamInfo, fieldName, value));
     }
   }
   const filter = withVersionFilter(filterParts);
@@ -3035,9 +3036,7 @@ const openTracesPage = () => {
 
   if (traceStreamInfo?.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
-      filterParts.push(
-        buildSqlCondition(fieldName, value, traceStreamInfo.filter_spellings?.[fieldName]),
-      );
+      filterParts.push(buildStreamFilterCondition(traceStreamInfo, fieldName, value));
     }
   }
 

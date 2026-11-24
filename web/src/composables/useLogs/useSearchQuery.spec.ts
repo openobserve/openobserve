@@ -137,6 +137,7 @@ vi.mock("./logsUtils", () => ({
     isDistinctQuery: vi.fn(() => false),
     isWithQuery: vi.fn(() => false),
     isLimitQuery: vi.fn(() => false),
+    getOuterLimit: vi.fn(() => null),
     extractTimestamps: vi.fn(),
     addTransformToQuery: vi.fn(),
     updateUrlQueryParams: vi.fn(),

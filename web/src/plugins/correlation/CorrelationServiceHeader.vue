@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :service="displayServiceName || serviceName"
       :instance-version="instanceVersion"
       :candidates="candidates"
+      :trace-stream="traceStream"
       @close="emit('close')"
     />
   </div>
@@ -62,6 +63,7 @@ const props = defineProps<{
   scope: Scope | null;
   instanceVersion: string | null | undefined;
   timeRange?: CorrelationTimeRange;
+  traceStream?: string;
 }>();
 const emit = defineEmits<{ close: [] }>();
 const { t } = useI18nTyped();

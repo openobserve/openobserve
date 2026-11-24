@@ -61,20 +61,18 @@ export const annotationService = {
     org_id: string,
     dashboard_id: string,
     params: {
-      panels: string[];
+      panels?: string[];
       start_time: number;
       end_time: number;
     },
   ) => {
-    // Format the panels parameter as comma-separated string if it's an array
-    const formattedPanels = Array.isArray(params.panels) ? params.panels.join(",") : params.panels;
-
-    // Construct query parameters
-    const queryParams = {
-      panels: formattedPanels,
+    // No `panels` asks for every annotation on the dashboard. An empty list
+    // would ask for the dashboard-wide ones only, so it is never sent.
+    const queryParams: Record<string, string | number> = {
       start_time: params.start_time,
       end_time: params.end_time,
     };
+    if (params.panels?.length) queryParams.panels = params.panels.join(",");
 
     // Make the API call
     return http().get(`/api/${org_id}/dashboards/${dashboard_id}/annotations`, {

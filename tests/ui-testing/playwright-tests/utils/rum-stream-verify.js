@@ -19,8 +19,9 @@ const authHeader = basicAuthHeader;
  * @param {number} [p.size=50]
  * @returns {Promise<Array<object>>}
  */
-async function searchStream(page, { sql, lookbackMinutes = 30, size = 50 }) {
-  const { orgId, baseUrl, email, password } = ctx();
+async function searchStream(page, { sql, lookbackMinutes = 30, size = 50, org = null }) {
+  const { orgId: envOrg, baseUrl, email, password } = ctx();
+  const orgId = org || envOrg;
   const endMicros = Date.now() * 1000;
   const startMicros = endMicros - lookbackMinutes * 60 * 1000 * 1000;
 
@@ -52,13 +53,13 @@ async function searchStream(page, { sql, lookbackMinutes = 30, size = 50 }) {
  */
 async function waitForStreamRows(
   page,
-  { sql, minRows = 1, timeoutMs = 40000, intervalMs = 2500, lookbackMinutes = 30, size = 50 },
+  { sql, minRows = 1, timeoutMs = 40000, intervalMs = 2500, lookbackMinutes = 30, size = 50, org = null },
 ) {
   const deadline = Date.now() + timeoutMs;
   let hits = [];
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    hits = await searchStream(page, { sql, lookbackMinutes, size });
+    hits = await searchStream(page, { sql, lookbackMinutes, size, org });
     if (hits.length >= minRows) return hits;
     if (Date.now() > deadline) return hits; // let caller assert & report
     await page.waitForTimeout(intervalMs);

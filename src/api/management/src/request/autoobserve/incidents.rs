@@ -20,12 +20,13 @@ use axum::{
     response::Response,
 };
 use o2_enterprise::enterprise::autoobserve::api::MAX_LIMIT;
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::autoobserve::incidents;
 use serde::Deserialize;
 use utoipa::IntoParams;
 
-use super::{deployment_disabled, page, parse_query};
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use super::{deployment_disabled, page, parse_query, viewer::WebViewer};
+use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::auth::UserEmail};
 
 #[derive(Debug, Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
@@ -33,6 +34,8 @@ pub struct IncidentsQuery {
     /// 1 to 500; 100 by default.
     pub limit: Option<usize>,
     pub offset: Option<usize>,
+    /// Only this incident: an empty list when AutoObserve did not open it in this org.
+    pub incident_id: Option<String>,
 }
 
 #[utoipa::path(
@@ -42,7 +45,7 @@ pub struct IncidentsQuery {
     tag = "AutoObserve",
     operation_id = "AutoObserveListIncidents",
     summary = "List incidents AutoObserve opened",
-    description = "Incidents AutoObserve opened for a stream that stopped, dropped or rose, newest first, each with its finding, the incident and the incident's analysis. `paging` says whether AutoObserve pages for this org; `has_more` says another page follows.",
+    description = "Incidents AutoObserve opened for a stream that stopped, dropped or rose, newest first, each with its finding, the incident and the incident's analysis. `paging` says whether AutoObserve pages for this org; `has_more` says another page follows. Where issue context is on, an item also carries `context`: what changed just before the finding and what it affects, limited to what the caller may read.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), IncidentsQuery),
     responses(
@@ -59,6 +62,7 @@ pub struct IncidentsQuery {
 )]
 pub async fn list_incidents(
     Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
     query: Result<Query<IncidentsQuery>, QueryRejection>,
 ) -> Response {
     if let Some(disabled) = deployment_disabled() {
@@ -73,8 +77,17 @@ pub async fn list_incidents(
     if page.limit == 0 || page.limit > MAX_LIMIT {
         return MetaHttpResponse::bad_request(format!("limit must be 1 to {MAX_LIMIT}"));
     }
-    match incidents::list(&org_id, page).await {
-        Ok(body) => MetaHttpResponse::json(body),
+    match incidents::list(&org_id, page, query.incident_id.as_deref()).await {
+        Ok(mut body) => {
+            let viewer = WebViewer {
+                user_id: user.user_id,
+            };
+            // Context is an addition to the list, so a failed read serves the list without it.
+            if let Err(e) = incidents::attach_context(&org_id, &mut body.items, &viewer).await {
+                log::warn!("[autoobserve] reading the incident context of {org_id} failed: {e}");
+            }
+            MetaHttpResponse::json(body)
+        }
         Err(e) => {
             log::error!("[autoobserve] listing the incidents of {org_id} failed: {e}");
             MetaHttpResponse::internal_error("listing AutoObserve incidents failed")
@@ -104,7 +117,11 @@ mod tests {
             "/v2/{org_id}/autoobserve/incidents",
             routing::get(list_incidents),
         );
-        let request = Request::builder().uri(uri).body(Body::empty()).unwrap();
+        let request = Request::builder()
+            .uri(uri)
+            .header("user_id", "root@example.com")
+            .body(Body::empty())
+            .unwrap();
         let response = app.oneshot(request).await.unwrap();
         let status = response.status();
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)

@@ -15,6 +15,7 @@
 
 import { toRaw } from "vue";
 import {
+  groupAndRuns,
   newFilterId,
   type FilterCondition,
   type FilterConnector,
@@ -55,6 +56,10 @@ export function stampTree<T extends FilterNode>(node: T, raw: unknown): T {
   if (node.kind === "group") node.items.forEach((item) => item.meta || stampTree(item, null));
   return stamp(node, raw);
 }
+
+/** A parsed level as `groupAndRuns` draws it; the new groups are stamped, so an untouched filter saves as loaded. */
+export const withAndRunGroups = (items: FilterNode[]): FilterNode[] =>
+  groupAndRuns(items).map((item) => (item.meta ? item : stamp(item, null)));
 
 export const isPristine = (node: FilterNode): boolean =>
   Boolean(node.meta) && node.meta!.sig === nodeSig(node);

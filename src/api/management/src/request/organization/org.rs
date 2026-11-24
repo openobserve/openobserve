@@ -691,6 +691,12 @@ pub async fn create_org(
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<OrgCreateRequest>,
 ) -> Response {
+    // Anyone can create an org on cloud, so the field must not place an account in a new org.
+    if cfg!(feature = "cloud") && req.service_account.is_some() {
+        return MetaHttpResponse::bad_request(
+            "Creating an organization with a service account is not available on OpenObserve Cloud",
+        );
+    }
     let mut org = Organization {
         identifier: req.identifier,
         name: req.name,
@@ -1818,6 +1824,138 @@ pub async fn resurrect_org_deletion(
     MetaHttpResponse::forbidden(NOT_SUPPORTED_HERE)
 }
 
+/// BlockOrg — _meta admin action that stops an org's ingestion, queries and logins.
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/organizations/{target_org_id}/block",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "BlockOrg",
+    summary = "Block an organization",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("target_org_id" = String, Path, description = "Target org id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = MetaHttpResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn block_org(
+    Headers(user_email): Headers<UserEmail>,
+    Path((meta_org, target_org_id)): Path<(String, String)>,
+) -> Response {
+    // The route permission already requires `organizations:CREATE` in `_meta`; this is defense.
+    if meta_org != config::META_ORG_ID {
+        return MetaHttpResponse::forbidden("Not allowed");
+    }
+    match openobserve_core::org_cleanup::block_org(&target_org_id, &user_email.user_id).await {
+        Ok(()) => MetaHttpResponse::ok("Organization blocked"),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+#[cfg(not(feature = "cloud"))]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/organizations/{target_org_id}/block",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "BlockOrg",
+    summary = "Block an organization",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("target_org_id" = String, Path, description = "Target org id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = MetaHttpResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn block_org(Path((_meta_org, _target_org_id)): Path<(String, String)>) -> Response {
+    MetaHttpResponse::forbidden(NOT_SUPPORTED_HERE)
+}
+
+/// UnblockOrg — _meta admin action that lifts a block and makes the org active again.
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/organizations/{target_org_id}/unblock",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "UnblockOrg",
+    summary = "Unblock an organization",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("target_org_id" = String, Path, description = "Target org id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = MetaHttpResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn unblock_org(
+    Headers(user_email): Headers<UserEmail>,
+    Path((meta_org, target_org_id)): Path<(String, String)>,
+) -> Response {
+    // The route permission already requires `organizations:CREATE` in `_meta`; this is defense.
+    if meta_org != config::META_ORG_ID {
+        return MetaHttpResponse::forbidden("Not allowed");
+    }
+    use openobserve_core::org_cleanup::UnblockError;
+    match openobserve_core::org_cleanup::unblock_org(&target_org_id, &user_email.user_id).await {
+        Ok(()) => MetaHttpResponse::ok("Organization unblocked"),
+        Err(e @ (UnblockError::StillBlocked(_) | UnblockError::PartlyUnblocked(_))) => {
+            MetaHttpResponse::service_unavailable(e)
+        }
+        Err(e @ (UnblockError::NotBlocked | UnblockError::Other(_))) => {
+            MetaHttpResponse::bad_request(e)
+        }
+    }
+}
+
+#[cfg(not(feature = "cloud"))]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/organizations/{target_org_id}/unblock",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "UnblockOrg",
+    summary = "Unblock an organization",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("target_org_id" = String, Path, description = "Target org id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = MetaHttpResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn unblock_org(Path((_meta_org, _target_org_id)): Path<(String, String)>) -> Response {
+    MetaHttpResponse::forbidden(NOT_SUPPORTED_HERE)
+}
+
 /// ListOrgCleanupTasks - admin endpoint to inspect cleanup task state for an org
 #[utoipa::path(
     get,
@@ -2107,6 +2245,21 @@ mod tests {
 
     fn q(key: &str, value: &str) -> HashMap<String, String> {
         HashMap::from([(key.to_string(), value.to_string())])
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn cloud_refuses_creating_an_org_for_a_service_account() {
+        let req: OrgCreateRequest = serde_json::from_value(serde_json::json!({
+            "name": "acme",
+            "service_account": "jane@company.com",
+        }))
+        .unwrap();
+        let caller = Headers(UserEmail {
+            user_id: "eve@company.com".to_string(),
+        });
+        let resp = create_org(caller, Json(req)).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 
     #[test]

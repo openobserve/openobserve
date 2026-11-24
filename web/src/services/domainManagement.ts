@@ -15,18 +15,14 @@
 
 import http from "./http";
 import analytics from "./product_analytics";
-
-interface DomainRestriction {
-  name: string;
-  allowAllUsers: boolean;
-  allowedEmails: string[];
-}
+import type { DomainRestrictionsBody } from "@/utils/domainRestrictions";
+import type { DomainManagementResponse } from "@/ts/interfaces";
 
 const domainManagement = {
   getDomainRestrictions: (metaOrg: string) => {
-    return http().get(`/api/${metaOrg}/domain_management`);
+    return http().get<DomainManagementResponse>(`/api/${metaOrg}/domain_management`);
   },
-  updateDomainRestrictions: (metaOrg: string, domain: DomainRestriction) => {
+  updateDomainRestrictions: (metaOrg: string, domain: DomainRestrictionsBody) => {
     return http()
       .put(`/api/${metaOrg}/domain_management`, domain)
       .then((res) => {

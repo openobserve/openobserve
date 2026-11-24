@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ countText }}<OTooltip :content="countTooltip"
             /></span>
             <span> · {{ rangeText }}</span>
+            <span data-test="incident-alert-panel-age"> · {{ ageText }}</span>
             <span v-if="everyText"> · {{ everyText }}</span>
           </p>
           <OSkeleton
@@ -440,7 +441,7 @@ import { incidentsQuery } from "@/services/incidents.queries";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatTimestampInTimezone } from "@/utils/date";
-import { identifierBreaks, timezoneAbbr } from "@/utils/formatters";
+import { identifierBreaks } from "@/utils/formatters";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import {
   alertNeedsWords,
@@ -461,6 +462,7 @@ import {
 import {
   alertLiveState,
   alertLiveWords,
+  incidentAge,
   incidentTime,
   unfoldDuration,
   type IncidentAlertSummary,
@@ -564,8 +566,7 @@ const info = computed(() => {
   };
 });
 
-const zoneName = computed(() => timezoneAbbr(props.zone, new Date(props.now / 1000)));
-const when = (us: number) => incidentTime(props.zone, us, props.now);
+const when = (us: number) => incidentTime(props.zone, us);
 
 const place = computed<I18nText | null>(() => {
   const i = info.value;
@@ -585,8 +586,13 @@ const countText = computed(() => {
 const rangeText = computed(() => {
   const s = props.summary;
   if (!s) return "";
-  return s.count === 1 ? when(s.first) : firingRange(props.zone, s.first, s.last, props.now);
+  return s.count === 1 ? when(s.first) : firingRange(props.zone, s.first, s.last);
 });
+const ageText = computed(() =>
+  props.summary
+    ? t("alerts.incidents.unfold.lastFired", { age: incidentAge(props.summary.last, props.now) })
+    : "",
+);
 const everyText = computed(() => {
   const median = props.summary?.medianInterval;
   return median ? t("alerts.incidents.panel.every", { interval: unfoldDuration(t, median) }) : null;
@@ -612,7 +618,6 @@ const countTooltip = computed(() => {
   if (s.longestGap) {
     parts.push(t("alerts.incidents.panel.tipGap", { gap: unfoldDuration(t, s.longestGap) }));
   }
-  parts.push(t("alerts.incidents.panel.timesIn", { zone: zoneName.value }));
   return raw(parts.join(" · "));
 });
 
@@ -709,7 +714,7 @@ const valueLine = computed(() => {
   return {
     ...words,
     raw: n(firingValueOf(hit) ?? 0),
-    at: formatTimestampInTimezone(hit.timestamp, "HH:mm", props.zone),
+    at: incidentTime(props.zone, hit.timestamp),
   };
 });
 const needs = computed(() => {
@@ -899,18 +904,18 @@ const weekTooltip = computed(() => {
       ),
     );
   }
-  parts.push(t("alerts.incidents.panel.weekDays", { zone: zoneName.value }));
+  parts.push(t("alerts.incidents.panel.weekDays"));
   return raw(parts.join(" "));
 });
 const dayLabel = (us: number) => formatTimestampInTimezone(us, "MMM D", props.zone);
 const dayTooltip = (day: WeekDay) =>
   !day.known
     ? t("alerts.incidents.panel.weekDayUnknown", {
-        day: formatTimestampInTimezone(day.at, "EEE, MMM D", props.zone),
+        day: formatTimestampInTimezone(day.at, "YYYY-MM-DD", props.zone),
       })
     : t(
         "alerts.incidents.panel.weekDay",
-        { day: formatTimestampInTimezone(day.at, "EEE, MMM D", props.zone), count: n(day.n) },
+        { day: formatTimestampInTimezone(day.at, "YYYY-MM-DD", props.zone), count: n(day.n) },
         day.n,
       );
 // A busy search answers 429 or 503, or names its circuit breaker; anything else is a plain failure.
@@ -1000,7 +1005,6 @@ const logsTooltip = computed(() =>
   t("alerts.incidents.panel.logsRange", {
     from: when(logsWindow.value.from),
     to: when(logsWindow.value.to),
-    zone: zoneName.value,
   }),
 );
 

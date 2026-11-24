@@ -1654,6 +1654,168 @@ mod tests {
         assert_eq!((n.state, n.resolved_at), (2, Some(50)));
     }
 
+    async fn with_notices(db: &DatabaseConnection) {
+        use crate::table::entity::status_page_notices as notices;
+        let backend = db.get_database_backend();
+        db.execute(backend.build(&Schema::new(backend).create_table_from_entity(notices::Entity)))
+            .await
+            .unwrap();
+    }
+
+    fn failing(recovered_at: i64) -> StatusStreaks {
+        StatusStreaks {
+            last_check_status: 2,
+            down_runs: 3,
+            run_ts: 100,
+            run_class: 2,
+            recovered_at,
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn a_reset_signs_a_failing_row_again_for_its_new_stamp() {
+        let db = db().await;
+        with_notices(&db).await;
+        let (cur, _) = check_row(&db).await;
+        assert!(
+            synthetics_checks::swap_status_streaks(&db, "mon-1", &cur, &failing(50))
+                .await
+                .unwrap()
+        );
+        assert!(check_row(&db).await.0.signed);
+
+        synthetics_checks::reset_false_alarm_holds(&db, 1_000)
+            .await
+            .unwrap();
+        let (row, updated_at) = check_row(&db).await;
+        assert_eq!(row.recovered_at, 1_001);
+        assert!(
+            row.signed,
+            "a mark right after the reset must be able to hold"
+        );
+        assert!(updated_at > 1_000, "the rebuilder must read the signed row");
+
+        // A clock behind the stamp: the stamp still moves, and the row stays signed.
+        synthetics_checks::reset_false_alarm_holds(&db, 900)
+            .await
+            .unwrap();
+        let (row, _) = check_row(&db).await;
+        assert_eq!(row.recovered_at, 1_002);
+        assert!(row.signed);
+    }
+
+    #[tokio::test]
+    async fn a_reset_that_read_the_row_before_another_reset_moves_and_signs_it_again() {
+        let db = db().await;
+        with_notices(&db).await;
+        let (cur, _) = check_row(&db).await;
+        assert!(
+            synthetics_checks::swap_status_streaks(&db, "mon-1", &cur, &failing(50))
+                .await
+                .unwrap()
+        );
+        // Reset B reads the row, then reset A runs to the end before B writes.
+        let read_b = synthetics_checks::read_stamp_row(&db, "mon-1")
+            .await
+            .unwrap();
+        synthetics_checks::reset_false_alarm_holds(&db, 1_000)
+            .await
+            .unwrap();
+        assert_eq!(check_row(&db).await.0.recovered_at, 1_001);
+        synthetics_checks::move_failing_row(&db, read_b, 1_100)
+            .await
+            .unwrap();
+        let (row, _) = check_row(&db).await;
+        assert_eq!(row.recovered_at, 1_101);
+        assert!(row.signed, "the later reset signs the final stamp");
+    }
+
+    #[tokio::test]
+    async fn two_resets_with_clocks_behind_the_stamp_both_move_it_and_keep_it_signed() {
+        let db = db().await;
+        with_notices(&db).await;
+        let (cur, _) = check_row(&db).await;
+        assert!(
+            synthetics_checks::swap_status_streaks(&db, "mon-1", &cur, &failing(1_001))
+                .await
+                .unwrap()
+        );
+        let read_b = synthetics_checks::read_stamp_row(&db, "mon-1")
+            .await
+            .unwrap();
+        synthetics_checks::reset_false_alarm_holds(&db, 900)
+            .await
+            .unwrap();
+        assert_eq!(check_row(&db).await.0.recovered_at, 1_002);
+        synthetics_checks::move_failing_row(&db, read_b, 950)
+            .await
+            .unwrap();
+        let (row, _) = check_row(&db).await;
+        assert_eq!(row.recovered_at, 1_003);
+        assert!(row.signed);
+    }
+
+    #[tokio::test]
+    async fn a_reset_keeps_an_unsigned_failing_row_unsigned() {
+        let db = db().await;
+        with_notices(&db).await;
+        let (cur, _) = check_row(&db).await;
+        assert!(
+            synthetics_checks::swap_status_streaks(&db, "mon-1", &cur, &failing(50))
+                .await
+                .unwrap()
+        );
+        // A badge-only message from an older producer voids the stamp.
+        let badge = StatusStreaks {
+            last_check_status: 2,
+            signed: false,
+            ..Default::default()
+        };
+        synthetics_checks::apply_replicated_streaks(&db, "mon-1", &badge)
+            .await
+            .unwrap();
+        let (voided, voided_at) = check_row(&db).await;
+        assert!(!voided.signed);
+        assert!(
+            voided_at >= voided.recovered_at - 1,
+            "a void moves updated_at, so the rebuilder drops the hold"
+        );
+
+        synthetics_checks::reset_false_alarm_holds(&db, voided.recovered_at + 10)
+            .await
+            .unwrap();
+        assert!(
+            !check_row(&db).await.0.signed,
+            "a reset must not sign a row an older producer wrote"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_void_moves_updated_at_even_when_the_badge_does_not_change() {
+        let db = db().await;
+        let (cur, _) = check_row(&db).await;
+        assert!(
+            synthetics_checks::swap_status_streaks(&db, "mon-1", &cur, &failing(50))
+                .await
+                .unwrap()
+        );
+        let (_, before) = check_row(&db).await;
+        // The same badge, so only the void can move `updated_at`.
+        let badge = StatusStreaks {
+            last_check_status: 2,
+            signed: false,
+            ..Default::default()
+        };
+        tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+        synthetics_checks::apply_replicated_streaks(&db, "mon-1", &badge)
+            .await
+            .unwrap();
+        let (row, after) = check_row(&db).await;
+        assert!(!row.signed);
+        assert!(after > before);
+    }
+
     #[tokio::test]
     async fn late_up_between_two_downs_rebuilds_the_streak() {
         let db = db().await;

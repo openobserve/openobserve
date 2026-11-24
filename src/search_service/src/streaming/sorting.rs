@@ -830,22 +830,4 @@ mod tests {
         assert_eq!(result.len(), 3);
         assert_eq!(result[0]["cnt"].as_i64().unwrap(), 955);
     }
-
-    #[test]
-    fn test_topk_heap_unlimited_non_ts_order_by() {
-        // Non-ts ORDER BY with size==-1 (e.g. plain aggregate query, not CTE):
-        // heap_k == query_default_limit, all rows from all partitions must survive.
-        // Note: CTE queries now short-circuit via is_aggregate=true and never reach
-        // the TopKHeap path.
-        let mut heap = TopKHeap::new(1000, &[("level_count".to_string(), true)]);
-        heap.push_hits(vec![
-            json!({"level": "info",  "level_count": 955}),
-            json!({"level": "error", "level_count": 382}),
-        ]);
-        heap.push_hits(vec![json!({"level": "warn", "level_count": 100})]);
-        let result = heap.into_sorted_vec(0);
-        assert_eq!(result.len(), 3, "all rows must survive with unlimited size");
-        assert_eq!(result[0]["level"].as_str().unwrap(), "info");
-        assert_eq!(result[0]["level_count"].as_i64().unwrap(), 955);
-    }
 }

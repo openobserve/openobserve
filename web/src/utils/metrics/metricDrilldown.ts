@@ -15,7 +15,7 @@
 
 import type { FieldAlias, ServiceIdentityConfig } from "@/services/service_streams";
 import {
-  buildSqlCondition,
+  buildStreamFilterCondition,
   extractSemanticDimensions,
   filterDimensionsForCorrelation,
 } from "@/utils/telemetryCorrelation";
@@ -112,22 +112,29 @@ export const droppedLabelNames = (
 export const usableFilters = (filters: Record<string, string> = {}) =>
   Object.entries(filters).filter(([, value]) => value && value !== SELECT_ALL_VALUE);
 
-const whereOf = (filters: Record<string, string>) =>
+const whereOf = (filters: Record<string, string>, aliases?: RouteScope["aliases"]) =>
   b64EncodeUnicode(
     usableFilters(filters)
-      .map(([field, value]) => buildSqlCondition(field, value))
+      .map(([field, value]) =>
+        buildStreamFilterCondition({ filter_aliases: aliases }, field, value),
+      )
       .join(" AND "),
   );
 
-interface RouteArgs {
-  stream: string;
+/** The filters a page opens on, with the other fields of each filter's group the stream holds. */
+export interface RouteScope {
   filters: Record<string, string>;
+  aliases?: Readonly<Record<string, readonly string[]>>;
+}
+
+interface RouteArgs extends RouteScope {
+  stream: string;
   timeRange: TimeWindow;
   org: string;
 }
 
 /** Restoring the URL pushes a second entry, so one Back lands on logs again, unless `defined_schemas` is present and `refresh` absent. */
-export const buildLogsRoute = ({ stream, filters, timeRange, org }: RouteArgs) => ({
+export const buildLogsRoute = ({ stream, filters, aliases, timeRange, org }: RouteArgs) => ({
   path: "/logs",
   query: {
     stream_type: "logs",
@@ -135,7 +142,7 @@ export const buildLogsRoute = ({ stream, filters, timeRange, org }: RouteArgs) =
     from: String(timeRange.start_time),
     to: String(timeRange.end_time),
     sql_mode: "false",
-    query: whereOf(filters),
+    query: whereOf(filters, aliases),
     quick_mode: "false",
     show_histogram: "true",
     defined_schemas: "user_defined_schema",
@@ -143,13 +150,13 @@ export const buildLogsRoute = ({ stream, filters, timeRange, org }: RouteArgs) =
   },
 });
 
-export const buildTracesRoute = ({ stream, filters, timeRange, org }: RouteArgs) => ({
+export const buildTracesRoute = ({ stream, filters, aliases, timeRange, org }: RouteArgs) => ({
   name: "traces",
   query: {
     stream,
     from: String(timeRange.start_time),
     to: String(timeRange.end_time),
-    query: whereOf(filters),
+    query: whereOf(filters, aliases),
     // Same key order as the traces page's own URL: vue-router compares query strings by order.
     org_identifier: org,
     tab: "traces",

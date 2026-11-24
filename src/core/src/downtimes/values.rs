@@ -720,6 +720,7 @@ async fn run_search(
         clear_cache: false,
         local_mode: None,
         agent_options: None,
+        raw_streams: None,
     };
     let trace_id = config::ider::generate();
     let resp = crate::search::search(&trace_id, org, query.stream_type, None, &req).await?;
@@ -850,6 +851,7 @@ mod tests {
                     filters: HashMap::new(),
                     dropped_dimensions: vec![],
                     filter_spellings: HashMap::new(),
+                    filter_aliases: HashMap::new(),
                 }]),
                 ..Default::default()
             },

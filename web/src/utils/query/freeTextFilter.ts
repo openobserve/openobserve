@@ -266,6 +266,8 @@ interface AstNode {
 type WhereShape = "predicate" | "column" | null;
 
 let sharedParser: SqlParser | null = null;
+const bareColumnWords = new Map<string, boolean>();
+const WORD_AT = /[A-Za-z0-9_]+/y;
 
 export function planFilter(
   raw: string,
@@ -310,6 +312,28 @@ export function renderPlan(
   if (plan.kind !== "freeText") return renderSqlFilter(plan.filter, knownFields);
   if (target.mode === "blocked" || target.fields.length === 0) return null;
   return renderNode(plan.root);
+}
+
+// The browser parser reserves words the server reads as columns (order, group); quoting them keeps the filter parsable.
+export function quoteReservedFieldNames(filter: string, fieldNames: ReadonlySet<string>): string {
+  let out = "";
+  let i = 0;
+  while (i < filter.length) {
+    const end = maskedSpanEnd(filter, i);
+    WORD_AT.lastIndex = i;
+    const word = end === null ? WORD_AT.exec(filter)?.[0] : undefined;
+    if (end !== null) {
+      out += filter.slice(i, end);
+      i = end;
+    } else if (word) {
+      out += isReservedFieldWord(filter, i, word, fieldNames) ? `"${word}"` : word;
+      i += word.length;
+    } else {
+      out += filter[i];
+      i++;
+    }
+  }
+  return out;
 }
 
 // A held filter must reach no consumer: its raw text reads the -term as subtraction.
@@ -1358,6 +1382,23 @@ function exprShape(node: AstNode | undefined): WhereShape {
     return exprShape(node.left) !== null && exprShape(node.right) !== null ? "predicate" : null;
   }
   return PREDICATE_OPERATORS.has(operator) ? "predicate" : null;
+}
+
+// Filter syntax words and function names stay bare even when a field shares the name.
+function isReservedFieldWord(
+  filter: string,
+  start: number,
+  word: string,
+  fieldNames: ReadonlySet<string>,
+): boolean {
+  if (!fieldNames.has(word) || KEYWORDS.has(word.toUpperCase())) return false;
+  if (filter[start - 1] === "." || /^\s*\(/.test(filter.slice(start + word.length))) return false;
+  let bare = bareColumnWords.get(word);
+  if (bare === undefined) {
+    bare = astifySelect(`select * from s where ${word} = 1`) !== null;
+    bareColumnWords.set(word, bare);
+  }
+  return !bare;
 }
 
 function astifySelect(sql: string): AstNode | null {

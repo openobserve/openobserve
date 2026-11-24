@@ -156,6 +156,29 @@ pub async fn history<C: ConnectionTrait>(
     Ok(rows)
 }
 
+/// Transitions of every service in `[from, to)`, newest first; `pre_existing` is not a change.
+pub async fn in_window<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    (from, to): (i64, i64),
+    limit: u64,
+) -> Result<Vec<Model>, errors::Error> {
+    let rows = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::At.gte(from))
+        .filter(Column::At.lt(to))
+        .filter(Column::Kind.ne("pre_existing"))
+        .order_by_desc(Column::At)
+        .order_by_asc(Column::DeployKey)
+        .limit(limit)
+        .all(conn)
+        .await?;
+    for row in &rows {
+        validate(row)?;
+    }
+    Ok(rows)
+}
+
 pub async fn pending_verdicts<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -675,6 +698,63 @@ mod tests {
                     .unwrap()
                     .unwrap()
                     .source_streams_overflow
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn in_window_lists_changes_of_one_org_inside_the_window_newest_first() {
+        use super::{Model, in_window, put};
+        use crate::table::migration::{
+            create_service_identity_tables_for_test, sqlite_and_postgres_for_test,
+        };
+
+        let row = |org: &str, version: &str, kind: &str, at: i64| {
+            let key = serde_json::json!([org, "svc", "where", "region", version, at]);
+            Model {
+                deploy_key: sha256::digest(key.to_string()),
+                org_id: org.into(),
+                service_name: "svc".into(),
+                where_key: "where".into(),
+                scope_key: "scope".into(),
+                cluster: "region".into(),
+                to_version: version.into(),
+                to_version_key: version.into(),
+                kind: kind.into(),
+                entry_source: "traffic".into(),
+                at,
+                updated_at: at,
+                source_streams: "[]".into(),
+                serving_versions: "[]".into(),
+                full_serving: "[]".into(),
+                ..Default::default()
+            }
+        };
+        for conn in sqlite_and_postgres_for_test("deploy_in_window").await {
+            create_service_identity_tables_for_test(&conn)
+                .await
+                .unwrap();
+            for r in [
+                row("org", "before", "deploy", 99),
+                row("org", "first", "deploy", 100),
+                row("org", "old", "pre_existing", 150),
+                row("org", "back", "rollback", 160),
+                row("org", "again", "redeploy", 170),
+                row("other", "elsewhere", "deploy", 150),
+                row("org", "after", "deploy", 200),
+            ] {
+                assert!(put(&conn, r).await.unwrap());
+            }
+            let versions = |rows: Vec<Model>| -> Vec<String> {
+                rows.into_iter().map(|r| r.to_version).collect()
+            };
+            assert_eq!(
+                versions(in_window(&conn, "org", (100, 200), 50).await.unwrap()),
+                ["again", "back", "first"]
+            );
+            assert_eq!(
+                versions(in_window(&conn, "org", (100, 200), 2).await.unwrap()),
+                ["again", "back"]
             );
         }
     }

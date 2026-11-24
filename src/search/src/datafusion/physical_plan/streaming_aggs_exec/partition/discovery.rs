@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{cmp::Reverse, collections::BTreeMap};
+
 use config::meta::search::Interval;
 
 use crate::datafusion::physical_plan::streaming_aggs_exec::files::STREAMING_AGGS_CACHE_DIR;
@@ -31,9 +33,10 @@ pub struct CacheEntry {
 }
 
 impl CacheEntry {
-    /// Checks if this cache entry overlaps with the given time range
-    pub fn overlaps_with(&self, start: i64, end: i64, interval: Interval) -> bool {
-        self.start_time < end && self.end_time > start && self.interval <= interval
+    /// Whether this entry can serve the given range: its whole state merges into the result,
+    /// so a file that extends past either edge would add rows outside the window.
+    pub fn is_within(&self, start: i64, end: i64, interval: Interval) -> bool {
+        self.start_time >= start && self.end_time <= end && self.interval <= interval
     }
 }
 
@@ -91,6 +94,20 @@ impl CacheDiscoveryResult {
     /// Returns true if no cache is available
     pub fn has_no_cache(&self) -> bool {
         self.cache_coverage_ratio == 0.0
+    }
+
+    fn from_entries(cache_entries: Vec<CacheEntry>, query_start: i64, query_end: i64) -> Self {
+        let cache_entries = select_disjoint_cache_entries(cache_entries);
+        let uncached_ranges = calculate_uncached_ranges(&cache_entries, query_start, query_end);
+        let total_duration = query_end - query_start;
+        let cached_duration = calculate_cached_duration(&cache_entries, query_start, query_end);
+        let cache_coverage_ratio = if total_duration > 0 {
+            cached_duration as f64 / total_duration as f64
+        } else {
+            0.0
+        };
+
+        Self::new(cache_entries, uncached_ranges, cache_coverage_ratio)
     }
 }
 
@@ -152,34 +169,41 @@ pub async fn discover_cache_for_query(
         }
 
         // Parse the cache entry
-        if let Some(entry) = parse_cache_file_name(cache_file_path, file_name_str) {
-            // Only include entries that overlap with the query range
-            if entry.overlaps_with(query_start, query_end, query_interval) {
-                cache_entries.push(entry);
-            }
+        if let Some(entry) = parse_cache_file_name(cache_file_path, file_name_str)
+            && entry.is_within(query_start, query_end, query_interval)
+        {
+            cache_entries.push(entry);
         }
     }
 
-    // Sort cache entries by start time
-    cache_entries.sort_by_key(|e| e.start_time);
-
-    // Calculate uncached ranges (gaps in coverage)
-    let uncached_ranges = calculate_uncached_ranges(&cache_entries, query_start, query_end);
-
-    // Calculate cache coverage ratio
-    let total_duration = query_end - query_start;
-    let cached_duration = calculate_cached_duration(&cache_entries, query_start, query_end);
-    let cache_coverage_ratio = if total_duration > 0 {
-        cached_duration as f64 / total_duration as f64
-    } else {
-        0.0
-    };
-
-    Ok(CacheDiscoveryResult::new(
+    Ok(CacheDiscoveryResult::from_entries(
         cache_entries,
-        uncached_ranges,
-        cache_coverage_ratio,
+        query_start,
+        query_end,
     ))
+}
+
+fn select_disjoint_cache_entries(mut cache_entries: Vec<CacheEntry>) -> Vec<CacheEntry> {
+    cache_entries.sort_unstable_by_key(|entry| {
+        (
+            Reverse(entry.interval.get_duration_minutes()),
+            entry.start_time,
+        )
+    });
+
+    let mut selected = BTreeMap::<i64, CacheEntry>::new();
+    for entry in cache_entries {
+        // With disjoint ranges, checking the last entry starting before this one's end suffices.
+        if entry.start_time < entry.end_time
+            && selected
+                .range(..entry.end_time)
+                .next_back()
+                .is_none_or(|(_, existing)| existing.end_time <= entry.start_time)
+        {
+            selected.insert(entry.start_time, entry);
+        }
+    }
+    selected.into_values().collect()
 }
 
 /// Parses a cache file name to extract cache entry metadata
@@ -295,10 +319,51 @@ fn calculate_cached_duration(
 
 #[cfg(test)]
 mod tests {
+    use config::meta::{search::CardinalityLevel, sql::OrderBy};
+
     use super::*;
+    use crate::datafusion::physical_plan::streaming_aggs_exec::partition::partition_optimizer::generate_optimal_partitions;
 
     #[test]
-    fn test_cache_entry_overlaps_with() {
+    fn test_overlapping_cache_files_produce_disjoint_partitions() {
+        let hour = 60 * MICROS_PER_MINUTE;
+        for (start_minute, crossing_file) in [(60, None), (105, Some((105, 135)))] {
+            let cache_entries = (120..1440)
+                .step_by(120)
+                .map(|start| (start, start + 120))
+                .chain((1380..1500).step_by(30).map(|start| (start, start + 30)))
+                .chain(crossing_file)
+                .map(|(start, end)| {
+                    let start = start * MICROS_PER_MINUTE;
+                    let end = end * MICROS_PER_MINUTE;
+                    parse_cache_file_name("test", &format!("{start}_{end}.arrow")).unwrap()
+                })
+                .collect();
+            let query_start = start_minute * MICROS_PER_MINUTE;
+            let query_end = 25 * hour;
+            let discovery =
+                CacheDiscoveryResult::from_entries(cache_entries, query_start, query_end);
+            let strategy = generate_optimal_partitions(
+                discovery,
+                query_start,
+                query_end,
+                CardinalityLevel::Low,
+            );
+
+            assert_eq!(
+                strategy.to_time_partitions(OrderBy::Asc),
+                vec![
+                    [query_start, 2 * hour],
+                    [2 * hour, 24 * hour],
+                    [24 * hour, query_end]
+                ],
+                "query starting at minute {start_minute}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_cache_entry_is_within() {
         let interval = Interval::OneHour;
         let entry = CacheEntry {
             file_path: "test.arrow".to_string(),
@@ -307,17 +372,17 @@ mod tests {
             interval,
         };
 
-        // Test overlapping ranges
-        assert!(entry.overlaps_with(500, 1500, interval)); // Starts before, ends during
-        assert!(entry.overlaps_with(1500, 2500, interval)); // Starts during, ends after
-        assert!(entry.overlaps_with(1200, 1800, interval)); // Completely within
-        assert!(entry.overlaps_with(500, 2500, interval)); // Completely encompasses
+        assert!(entry.is_within(1000, 2000, interval)); // Same range
+        assert!(entry.is_within(500, 2500, interval)); // Completely encompassed by the query
 
-        // Test non-overlapping ranges
-        assert!(!entry.overlaps_with(0, 1000, interval)); // Ends exactly at start
-        assert!(!entry.overlaps_with(2000, 3000, interval)); // Starts exactly at end
-        assert!(!entry.overlaps_with(0, 500, interval)); // Completely before
-        assert!(!entry.overlaps_with(2500, 3000, interval)); // Completely after
+        // The file's rows outside the query window would be merged into the result
+        assert!(!entry.is_within(500, 1500, interval)); // Query ends inside the file
+        assert!(!entry.is_within(1500, 2500, interval)); // Query starts inside the file
+        assert!(!entry.is_within(1200, 1800, interval)); // Query inside the file
+
+        assert!(!entry.is_within(0, 1000, interval)); // Ends exactly at start
+        assert!(!entry.is_within(2000, 3000, interval)); // Starts exactly at end
+        assert!(!entry.is_within(500, 2500, Interval::ThirtyMinutes)); // Coarser than the query
     }
 
     #[test]

@@ -1623,11 +1623,12 @@ mod tests {
             window_end: 20,
             ..DigestRun::default()
         };
+        let listed = LISTED_RULES.map(|rule| format!("'{rule}'")).join(", ");
         assert_eq!(
             alert_records_sql(&run, "ab'c"),
             format!(
                 "SELECT * FROM \"{DIGEST_STREAM}\" WHERE window_start = 10 AND window_end = 20 \
-                 AND kind = 'finding' AND rule_id IN ('failure', 'no_destination', 'notify_failed') \
+                 AND kind = 'finding' AND rule_id IN ({listed}) \
                  AND scope_kind = 'alert' \
                  AND _timestamp = 30 AND finding_id > 'ab''c' ORDER BY finding_id ASC"
             )

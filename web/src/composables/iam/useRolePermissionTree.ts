@@ -25,6 +25,9 @@ type TreeDeps = {
   store: any;
 };
 
+// Per-stream resources whose only actions are All and Get.
+export const GET_ONLY_STREAM_RESOURCES = ["logs_pattern", "logs_insights", "logs_unredacted"];
+
 /** Builds the permission tree from the resource catalogue, and finds nodes in it. */
 export const useRolePermissionTree = (deps: TreeDeps) => {
   const { permissionsState, resourceMapper, store } = deps;
@@ -135,7 +138,7 @@ export const useRolePermissionTree = (deps: TreeDeps) => {
       resource.permission.AllowDelete.show = false;
       resource.permission.AllowPost.show = false;
     }
-    if (resource.resourceName === "logs_pattern" || resource.resourceName === "logs_insights") {
+    if (GET_ONLY_STREAM_RESOURCES.includes(resource.resourceName)) {
       resource.permission.AllowList.show = false;
       resource.permission.AllowDelete.show = false;
       resource.permission.AllowPost.show = false;

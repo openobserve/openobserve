@@ -61,6 +61,7 @@ in **both** repos automatically — no more hand-syncing two workflow files.
 | `disabled`            | *(optional)* specs intentionally turned off — see below                 |
 | `quick_mode_enabled`  | *(optional)* `true` starts this shard's server with `ZO_QUICK_MODE_ENABLED` |
 | `synthetics_enabled`  | *(optional)* `true` starts this shard's server with `ZO_SYNTHETICS_ENABLED` |
+| `restricted_routes_on_empty_data` | *(optional)* `true` starts this shard's server with `ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA` and creates the empty `onboarding_test` org |
 | `ingest_allowed_upto` | *(optional)* hours of backdated ingestion this shard's server accepts    |
 | `slo_backfill_chunk_secs` | *(optional)* seconds of history one SLO backfill chunk covers on this shard's server |
 | `workers`             | *(optional)* pin `--workers=N` for this shard                            |
@@ -72,6 +73,9 @@ read once at server start (or, for `workers`, once per Playwright run).
 - `synthetics_enabled` — synthetics is off by default and its `/api/{org}/synthetics*`
   routes register only when the flag is `true` at start, so only the `Synthetics`
   shard sets it. Every other shard omits it and keeps the product default (off).
+- `restricted_routes_on_empty_data` — off by default; `true` starts the server with
+  `ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA`, and the workflow then creates an empty
+  `onboarding_test` org that never receives data. Only `Onboarding-Empty-Data` sets it.
 
 - `ingest_allowed_upto` — the workflow default is **5 hours**, and older rows are
   dropped while ingestion still answers `200`. A suite that seeds history needs a

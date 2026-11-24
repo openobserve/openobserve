@@ -38,8 +38,6 @@ use super::{FrequencyType, TriggerCondition, level::AlertLevel};
 pub const MAX_CHILDREN: usize = 10;
 /// Minimum children — a "composite" of one is just the child.
 pub const MIN_CHILDREN: usize = 2;
-/// Maximum composite nesting depth (D6).
-pub const MAX_DEPTH: usize = 2;
 /// Staleness multiplier: a child is stale after K x its own frequency (§6.4).
 pub const STALE_FREQUENCY_MULTIPLIER: i64 = 3;
 /// Maximum accepted expression size, measured in UTF-8 bytes.
@@ -112,11 +110,6 @@ pub enum CompositeError {
         max: usize,
     },
     DuplicateChild(String),
-    /// The reference chain loops; carries the offending path.
-    Cycle(Vec<String>),
-    TooDeep {
-        max: usize,
-    },
     Parse(String),
 }
 
@@ -131,8 +124,6 @@ impl std::fmt::Display for CompositeError {
                 write!(f, "composite allows at most {max} children, got {got}")
             }
             Self::DuplicateChild(c) => write!(f, "child `{c}` referenced more than once"),
-            Self::Cycle(path) => write!(f, "composite reference cycle: {}", path.join(" -> ")),
-            Self::TooDeep { max } => write!(f, "composite nesting exceeds depth {max}"),
             Self::Parse(m) => write!(f, "invalid expression: {m}"),
         }
     }
@@ -572,80 +563,6 @@ pub fn validate_children(children: &[String]) -> Result<(), CompositeError> {
     Ok(())
 }
 
-/// Reject reference cycles and over-deep nesting at write time (C-4, D6).
-///
-/// Detected on write, never at evaluation: a cycle discovered mid-evaluation
-/// would be an infinite loop in the scheduler.
-pub fn validate_no_cycle(
-    composite_id: &str,
-    children: &[String],
-    existing: &HashMap<String, Vec<String>>,
-) -> Result<(), CompositeError> {
-    let mut candidate = existing.clone();
-    candidate.insert(composite_id.to_string(), children.to_vec());
-
-    fn visit(
-        id: &str,
-        graph: &HashMap<String, Vec<String>>,
-        visiting: &mut Vec<String>,
-        complete: &mut HashSet<String>,
-    ) -> Result<(), CompositeError> {
-        if complete.contains(id) || !graph.contains_key(id) {
-            return Ok(());
-        }
-        if let Some(position) = visiting.iter().position(|entry| entry == id) {
-            let mut cycle = visiting[position..].to_vec();
-            if cycle.len() > 1 {
-                cycle.push(id.to_string());
-            }
-            return Err(CompositeError::Cycle(cycle));
-        }
-        visiting.push(id.to_string());
-        for child in graph.get(id).into_iter().flatten() {
-            visit(child, graph, visiting, complete)?;
-        }
-        visiting.pop();
-        complete.insert(id.to_string());
-        Ok(())
-    }
-
-    let mut complete = HashSet::new();
-    for id in candidate.keys() {
-        visit(id, &candidate, &mut Vec::new(), &mut complete)?;
-    }
-
-    fn candidate_depth(
-        id: &str,
-        graph: &HashMap<String, Vec<String>>,
-        memo: &mut HashMap<String, usize>,
-    ) -> usize {
-        if let Some(depth) = memo.get(id) {
-            return *depth;
-        }
-        let depth = match graph.get(id) {
-            None => 0,
-            Some(children) => {
-                1 + children
-                    .iter()
-                    .map(|child| candidate_depth(child, graph, memo))
-                    .max()
-                    .unwrap_or(0)
-            }
-        };
-        memo.insert(id.to_string(), depth);
-        depth
-    }
-
-    let mut memo = HashMap::new();
-    if candidate
-        .keys()
-        .any(|id| candidate_depth(id, &candidate, &mut memo) > MAX_DEPTH)
-    {
-        return Err(CompositeError::TooDeep { max: MAX_DEPTH });
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -657,7 +574,7 @@ mod tests {
         composite::{
             ChildState, CompositeError, CompositeExpr, StaleChildPolicy,
             alert_stale_deadline_micros, canonical_expression, collect_references, evaluate_expr,
-            parse_expr, validate_children, validate_no_cycle,
+            parse_expr, validate_children,
         },
         level::AlertLevel,
     };
@@ -1295,76 +1212,6 @@ mod tests {
         assert_eq!(
             validate_children(&kids).unwrap_err(),
             CompositeError::DuplicateChild("a".to_string())
-        );
-    }
-
-    // ── C-4: cycle rejection ────────────────────────────────────────────────
-
-    #[test]
-    fn test_rejects_direct_self_reference() {
-        let err = validate_no_cycle("c1", &["c1".to_string()], &HashMap::new()).unwrap_err();
-        assert_eq!(err, CompositeError::Cycle(vec!["c1".to_string()]));
-    }
-
-    #[test]
-    fn test_rejects_transitive_cycle() {
-        // c1 -> c2 -> c1
-        let mut existing = HashMap::new();
-        existing.insert("c2".to_string(), vec!["c1".to_string()]);
-
-        let err = validate_no_cycle("c1", &["c2".to_string()], &existing).unwrap_err();
-        assert!(
-            matches!(err, CompositeError::Cycle(_)),
-            "a transitive cycle must be rejected at write time, not discovered at eval"
-        );
-    }
-
-    #[test]
-    fn test_accepts_acyclic_composite_of_composite() {
-        // c1 -> c2 -> (plain alerts). Depth 2, no cycle (D6).
-        let mut existing = HashMap::new();
-        existing.insert("c2".to_string(), vec![]);
-        assert!(validate_no_cycle("c1", &["c2".to_string()], &existing).is_ok());
-    }
-
-    /// D6: depth beyond 2 is rejected in v1.
-    #[test]
-    fn test_rejects_depth_greater_than_two() {
-        // c1 -> c2 -> c3 is depth 3.
-        let mut existing = HashMap::new();
-        existing.insert("c2".to_string(), vec!["c3".to_string()]);
-        existing.insert("c3".to_string(), vec![]);
-
-        let err = validate_no_cycle("c1", &["c2".to_string()], &existing).unwrap_err();
-        assert_eq!(err, CompositeError::TooDeep { max: 2 });
-    }
-
-    #[test]
-    fn candidate_graph_validation_rejects_a_cycle_outside_the_edited_subtree() {
-        // The whole organization graph is the candidate. A pre-existing
-        // corrupt B<->C cycle cannot be ignored merely because this edit is A.
-        let mut existing = HashMap::new();
-        existing.insert("b".to_string(), vec!["c".to_string()]);
-        existing.insert("c".to_string(), vec!["b".to_string()]);
-
-        let err = validate_no_cycle("a", &["plain".to_string()], &existing).unwrap_err();
-        assert!(matches!(err, CompositeError::Cycle(_)));
-    }
-
-    #[test]
-    fn candidate_graph_validation_rechecks_ancestor_depth_after_an_edit() {
-        // Before the edit: parent(depth 2) -> edited(depth 1) -> plain.
-        // Candidate edit: edited -> nested(depth 1) -> plain, making parent
-        // depth 3 even though the edited node itself remains at the legal
-        // depth 2. Validating only the edited subtree misses this.
-        let mut existing = HashMap::new();
-        existing.insert("parent".to_string(), vec!["edited".to_string()]);
-        existing.insert("edited".to_string(), vec!["plain-a".to_string()]);
-        existing.insert("nested".to_string(), vec!["plain-b".to_string()]);
-
-        assert_eq!(
-            validate_no_cycle("edited", &["nested".to_string()], &existing).unwrap_err(),
-            CompositeError::TooDeep { max: 2 }
         );
     }
 

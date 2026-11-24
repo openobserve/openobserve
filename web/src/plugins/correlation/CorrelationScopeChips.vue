@@ -95,6 +95,8 @@ const props = defineProps<{
   instanceVersion: string | null | undefined;
   /** The services an ambiguous name covers; each is offered in the menu. */
   candidates?: string[];
+  /** The trace stream holding the service; without it the catalog opens on its last-used stream. */
+  traceStream?: string;
 }>();
 const emit = defineEmits<{ close: [] }>();
 const { t } = useI18nTyped();
@@ -184,6 +186,7 @@ function openService(service: string) {
     query: {
       org_identifier: store.state.selectedOrganization?.identifier,
       tab: "services-catalog",
+      stream: props.traceStream || undefined,
       panel: "versions",
       panelSvc: service,
       panelWhere: service === props.scope?.service ? props.scope.where_key : undefined,

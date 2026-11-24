@@ -20,7 +20,10 @@ use db::workflows::WorkflowTriggerType;
 use infra::table::workflows::get_all_associations_for_trigger_type;
 use serde_json::Value;
 
-use crate::{alerts::incidents::get_incident_with_triggers, workflows::send_workflow_trigger};
+use crate::{
+    alerts::incidents::get_incident_with_triggers,
+    workflows::{TriggerRequest, send_member_workflow_trigger},
+};
 
 async fn get_event_metadata(
     org_id: &str,
@@ -77,7 +80,9 @@ async fn get_event_metadata(
             metadata.push(("first_alert_at", first_at.into()));
             metadata.push(("last_alert_at", last_at.into()));
         }
-        IncidentEventType::SeverityUpgrade { from, to, reason } => {
+        IncidentEventType::SeverityUpgrade {
+            from, to, reason, ..
+        } => {
             metadata.push(("event_type", "severity_upgrade".into()));
             metadata.push(("old_severity", from.to_string().into()));
             metadata.push(("new_severity", to.to_string().into()));
@@ -193,6 +198,22 @@ async fn get_event_metadata(
             metadata.push(("comment", comment.into()));
         }
 
+        IncidentEventType::SplitFrom {
+            from_incident_id,
+            alert_id,
+            alert_name,
+            inferred_by,
+            reason,
+            ..
+        } => {
+            metadata.push(("event_type", "split_from".into()));
+            metadata.push(("from_incident_id", from_incident_id.into()));
+            metadata.push(("alert_id", alert_id.into()));
+            metadata.push(("alert_name", alert_name.into()));
+            metadata.push(("inferred_by", inferred_by.as_str().to_string().into()));
+            metadata.push(("reason", reason.into()));
+        }
+
         IncidentEventType::AIAnalysisBegin => {
             metadata.push(("event_type", "ai_analysis_begin".into()));
         }
@@ -263,6 +284,20 @@ pub async fn send_incident_event_trigger(
     incident_id: &str,
     event: IncidentEvent,
 ) -> Result<(), anyhow::Error> {
+    let member = match &event.event_type {
+        IncidentEventType::Alert { alert_id, .. } => Some(alert_id.clone()),
+        _ => None,
+    };
+    send_member_event_trigger(org_id, incident_id, event, member).await
+}
+
+/// The event's workflows run only while `member` is still in the incident when they start.
+pub async fn send_member_event_trigger(
+    org_id: &str,
+    incident_id: &str,
+    event: IncidentEvent,
+    member: Option<String>,
+) -> Result<(), anyhow::Error> {
     let workflows = match get_all_associations_for_trigger_type(
         org_id,
         &WorkflowTriggerType::IncidentEvent.to_string(),
@@ -290,17 +325,16 @@ pub async fn send_incident_event_trigger(
             "associating trace id {trace_id} with workflow {} for incident {incident_id} event trigger",
             workflow.workflow_id
         );
-        if let Err(e) = send_workflow_trigger(
-            &trace_id,
+        let request = TriggerRequest {
+            trace_id: &trace_id,
             org_id,
-            incident_id.to_string(),
-            WorkflowTriggerType::IncidentEvent,
-            &workflow.workflow_id,
-            metadata.clone(),
-            &[],
-        )
-        .await
-        {
+            source_id: incident_id.to_string(),
+            trigger_type: WorkflowTriggerType::IncidentEvent,
+            workflow_id: &workflow.workflow_id,
+            metadata: metadata.clone(),
+            member_alert_id: member.clone(),
+        };
+        if let Err(e) = send_member_workflow_trigger(request, &[]).await {
             log::error!(
                 "error sending workflow trigger for {org_id}/{} trace_id {trace_id} incident {incident_id} : {e}",
                 workflow.workflow_id

@@ -4,6 +4,7 @@ import type { StreamInfo } from "@/services/service_streams";
 import type { FieldAlias } from "@/services/service_streams";
 import {
   buildSqlCondition,
+  buildStreamFilterCondition,
   extractSemanticDimensions,
   quoteSqlLiteral,
 } from "@/utils/telemetryCorrelation";
@@ -217,7 +218,7 @@ export function rankCorrelatedStreams(streams: StreamWithOverlap[]): StreamWithO
 export function appliedFilterSql(stream: StreamInfo | undefined): string {
   return Object.entries(stream?.filters ?? {})
     .filter(([, value]) => value !== SELECT_ALL_VALUE)
-    .map(([field, value]) => buildSqlCondition(field, value, stream?.filter_spellings?.[field]))
+    .map(([field, value]) => buildStreamFilterCondition(stream, field, value))
     .join(" AND ");
 }
 

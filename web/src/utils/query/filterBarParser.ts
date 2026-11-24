@@ -15,6 +15,7 @@
 
 import {
   emptyFilterGroup,
+  groupAndRuns,
   newFilterId,
   type FilterCondition,
   type FilterConnector,
@@ -23,7 +24,7 @@ import {
   type FilterOperatorId,
 } from "@/utils/query/filterBar";
 
-type TokenKind = "ident" | "string" | "number" | "op" | "lparen" | "rparen" | "comma";
+type TokenKind = "ident" | "string" | "number" | "op" | "concat" | "lparen" | "rparen" | "comma";
 
 interface Token {
   kind: TokenKind;
@@ -51,7 +52,7 @@ const FUNCTION_OPERATORS: Record<string, FilterOperatorId> = {
 };
 
 const TOKEN_PATTERN =
-  /\s*(?:('(?:[^']|'')*')|("(?:[^"]|"")*")|(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\b|(>=|<=|!=|<>|==|=|>|<)|(\()|(\))|(,)|([A-Za-z_][A-Za-z0-9_]*))/y;
+  /\s*(?:('(?:[^']|'')*')|("(?:[^"]|"")*")|(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\b|(>=|<=|!=|<>|==|=|>|<)|(\|\|)|(\()|(\))|(,)|([A-Za-z_][A-Za-z0-9_]*))/y;
 
 const WHITESPACE = /\s*/y;
 
@@ -64,13 +65,14 @@ const tokenize = (text: string): Token[] | null => {
     if (WHITESPACE.lastIndex >= text.length) break;
     const match = TOKEN_PATTERN.exec(text);
     if (!match) return null;
-    const [, str, quoted, num, op, lparen, rparen, comma, ident] = match;
+    const [, str, quoted, num, op, concat, lparen, rparen, comma, ident] = match;
     if (str !== undefined)
       tokens.push({ kind: "string", text: str.slice(1, -1).replace(/''/g, "'") });
     else if (quoted !== undefined)
       tokens.push({ kind: "ident", text: quoted.slice(1, -1).replace(/""/g, '"'), quoted: true });
     else if (num !== undefined) tokens.push({ kind: "number", text: num });
     else if (op !== undefined) tokens.push({ kind: "op", text: op });
+    else if (concat !== undefined) tokens.push({ kind: "concat", text: concat });
     else if (lparen !== undefined) tokens.push({ kind: "lparen", text: "(" });
     else if (rparen !== undefined) tokens.push({ kind: "rparen", text: ")" });
     else if (comma !== undefined) tokens.push({ kind: "comma", text: "," });
@@ -131,7 +133,7 @@ class Parser {
         connector = this.tokens[this.pos++].text.toUpperCase() as FilterConnector;
         continue;
       }
-      return items;
+      return groupAndRuns(items);
     }
   }
 
@@ -150,7 +152,7 @@ class Parser {
   private value(): string | null {
     const token = this.peek();
     if (!token) return null;
-    if (token.kind === "string" || token.kind === "number") {
+    if (token.kind === "number") {
       this.pos++;
       return token.text;
     }
@@ -158,7 +160,26 @@ class Parser {
       this.pos++;
       return token.text.toLowerCase();
     }
-    return null;
+    return this.text();
+  }
+
+  /** A string literal, or literals joined by `||` and maybe bracketed, as `sqlLiteral` writes a `\'`. */
+  private text(): string | null {
+    const bracketed = this.peek()?.kind === "lparen";
+    if (bracketed) this.pos++;
+    let text = "";
+    for (;;) {
+      const token = this.peek();
+      if (token?.kind !== "string") return null;
+      this.pos++;
+      text += token.text;
+      if (this.peek()?.kind !== "concat") break;
+      this.pos++;
+    }
+    if (!bracketed) return text;
+    if (this.peek()?.kind !== "rparen") return null;
+    this.pos++;
+    return text;
   }
 
   private condition(
@@ -174,25 +195,27 @@ class Parser {
     const name = this.peek()!.text.toLowerCase();
     if (name === "match_all") return this.matchAllPredicate(connector);
     const operator = FUNCTION_OPERATORS[name];
-    if (!operator || this.peek(1)?.kind !== "lparen") return null;
     const field = this.peek(2);
-    const value = this.peek(4);
     if (
+      !operator ||
+      this.peek(1)?.kind !== "lparen" ||
       field?.kind !== "ident" ||
-      this.peek(3)?.kind !== "comma" ||
-      value?.kind !== "string" ||
-      this.peek(5)?.kind !== "rparen"
+      this.peek(3)?.kind !== "comma"
     )
       return null;
-    this.pos += 6;
-    return this.condition(connector, field.text, operator, [value.text]);
+    this.pos += 4;
+    const value = this.text();
+    if (value === null || this.peek()?.kind !== "rparen") return null;
+    this.pos++;
+    return this.condition(connector, field.text, operator, [value]);
   }
 
   private matchAllPredicate(connector: FilterConnector): FilterCondition | null {
-    const value = this.peek(2);
-    if (value?.kind !== "string" || this.peek(3)?.kind !== "rparen") return null;
-    this.pos += 4;
-    return this.condition(connector, "", "match_all", [value.text]);
+    this.pos += 2;
+    const value = this.text();
+    if (value === null || this.peek()?.kind !== "rparen") return null;
+    this.pos++;
+    return this.condition(connector, "", "match_all", [value]);
   }
 
   private listPredicate(connector: FilterConnector, field: string, negate: boolean) {
@@ -215,10 +238,9 @@ class Parser {
   }
 
   private likePredicate(connector: FilterConnector, field: string, negate: boolean) {
-    const pattern = this.peek();
-    if (pattern?.kind !== "string") return null;
-    this.pos++;
-    const parts = likeParts(pattern.text);
+    const pattern = this.text();
+    if (pattern === null) return null;
+    const parts = likeParts(pattern);
     if (!parts) return null;
     const { starts, ends, inner } = parts;
     if (negate) {

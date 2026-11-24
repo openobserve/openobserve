@@ -18,6 +18,7 @@ import { effectScope, nextTick, ref } from "vue";
 import "@/locales";
 import { gt, raw } from "@/types/i18n";
 import {
+  percentText,
   coverageSentence,
   coverageWord,
   agoText,
@@ -98,6 +99,18 @@ describe("liveFailureOf / liveNotice", () => {
     const notice = liveNotice(gt, "suggestions", "failed");
     expect(notice).toMatchObject({ severity: "error", retry: true, details: true });
     expect(notice.title).toBe("Couldn't load suggestions");
+  });
+});
+
+describe("percentText", () => {
+  it.each([
+    [1200, 1205, "99%"],
+    [1, 1205, "<1%"],
+    [1205, 1205, "100%"],
+    [0, 1205, "0%"],
+    [0, 0, "0%"],
+  ])("%i of %i reads %s", (part, whole, expected) => {
+    expect(String(percentText(gt, "en-US", part, whole))).toBe(expected);
   });
 });
 

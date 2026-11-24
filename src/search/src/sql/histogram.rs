@@ -138,9 +138,8 @@ pub fn convert_to_histogram_query(
     is_multi_stream_search: bool,
     breakdown_field: Option<&str>,
 ) -> Result<String, Error> {
-    let (is_eligible, is_sub_query) =
-        is_eligible_for_histogram(original_query, is_multi_stream_search)
-            .map_err(|e| Error::Message(e.to_string()))?;
+    let is_eligible = is_eligible_for_histogram(original_query, is_multi_stream_search)
+        .map_err(|e| Error::Message(e.to_string()))?;
     if !is_eligible {
         let error = Error::ErrorCode(ErrorCodes::SearchHistogramNotAvailable(
             "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.".to_string(),
@@ -155,7 +154,7 @@ pub fn convert_to_histogram_query(
     let histogram_query = if is_multi_stream_search {
         multi_stream_histogram_query(&statements, stream_names)?
     } else {
-        single_stream_histogram_query(&statements, stream_names, is_sub_query, breakdown_field)?
+        single_stream_histogram_query(&statements, stream_names, breakdown_field)?
     };
 
     Ok(histogram_query)
@@ -164,7 +163,6 @@ pub fn convert_to_histogram_query(
 fn single_stream_histogram_query(
     statements: &[Statement],
     stream_names: &[String],
-    is_sub_query: bool,
     breakdown_field: Option<&str>,
 ) -> Result<String, Error> {
     let statement = statements
@@ -191,9 +189,7 @@ fn single_stream_histogram_query(
         ),
     };
 
-    // Add WHERE clause if it exists
-    // skip where clause for sub query
-    if !where_clause.is_empty() && !is_sub_query {
+    if !where_clause.is_empty() {
         histogram_query.push_str(&format!(" WHERE {where_clause}"));
     }
 
@@ -746,16 +742,21 @@ mod tests {
     }
 
     #[test]
-    fn test_single_stream_sub_query_skips_where_clause() {
-        // When is_sub_query=true, the WHERE clause from the original must be dropped.
-        // is_eligible_for_histogram returns (true, true) for a sub-query pattern
-        // which we trigger via a UNION ALL (multi-stream) is_sub_query path.
-        // Instead, call single_stream_histogram_query directly with is_sub_query=true.
-        let sql = "SELECT * FROM logs WHERE level = 'error'";
-        let statements = Parser::parse_sql(&PostgreSqlDialect {}, sql).unwrap();
-        let stream_names = vec!["logs".to_string()];
-        let result = single_stream_histogram_query(&statements, &stream_names, true, None).unwrap();
-        // WHERE clause must be absent when is_sub_query is true
-        assert!(!result.contains("WHERE"), "expected no WHERE: {result}");
+    fn test_convert_query_with_subquery_not_eligible() {
+        let stream_names = vec!["a".to_string()];
+        for sql in [
+            r#"SELECT * FROM "a" WHERE seq IN (SELECT seq FROM "b" WHERE seq < 4)"#,
+            r#"SELECT * FROM (SELECT seq AS s FROM "a") WHERE s < 4"#,
+            r#"WITH ids AS (SELECT seq FROM "b") SELECT * FROM "a" WHERE seq IN (SELECT seq FROM ids)"#,
+        ] {
+            let result = convert_to_histogram_query(sql, &stream_names, false, None);
+            assert!(
+                matches!(
+                    result,
+                    Err(Error::ErrorCode(ErrorCodes::SearchHistogramNotAvailable(_)))
+                ),
+                "{sql} -> {result:?}"
+            );
+        }
     }
 }

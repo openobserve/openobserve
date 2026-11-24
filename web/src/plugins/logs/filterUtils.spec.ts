@@ -15,6 +15,8 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  appendSqlFilter,
+  replaceInOuterWhere,
   getFieldFromExpression,
   hasFieldCondition,
   removeFieldCondition,
@@ -378,6 +380,14 @@ describe("values with embedded quotes and replacement tokens (issue 11966)", () 
   });
 });
 
+describe("removeFieldCondition with brackets", () => {
+  it("removes only the field's comparison inside a group and keeps the rest", () => {
+    expect(removeFieldCondition("svc = 'c' AND (code = '500' OR level = 'error')", "code")).toBe(
+      "svc = 'c' AND (level = 'error')",
+    );
+  });
+});
+
 describe("removeFieldCondition with AND inside a quoted value (issue 11966)", () => {
   it("removes only the target condition and keeps a quoted ' and ' intact", () => {
     expect(removeFieldCondition("a = 'x and y' AND b = '1'", "b")).toBe("a = 'x and y'");
@@ -467,5 +477,147 @@ describe("a field whose name ends another field's name", () => {
         "(name = 'al' OR name = 'eve')",
       ),
     ).toBe("username = 'bob' and (name = 'al' OR name = 'eve')");
+  });
+});
+
+describe("appendSqlFilter", () => {
+  const f = "svc_name = 'alpha'";
+  const base = `SELECT * FROM "qb_logs"`;
+  const or = "level = 'error' OR level = 'warn'";
+
+  it("brackets a top-level OR before AND", () => {
+    expect(appendSqlFilter(`${base} WHERE ${or}`, f)).toBe(`${base} WHERE (${or}) AND ${f}`);
+  });
+
+  it.each([
+    ["ORDER BY _timestamp DESC", "ORDER BY _timestamp DESC"],
+    ["LIMIT 10", "LIMIT 10"],
+    ["GROUP BY level", "GROUP BY level"],
+    ["group by level having count(*) > 1", "group by level having count(*) > 1"],
+    ["ORDER BY a LIMIT 5 OFFSET 2", "ORDER BY a LIMIT 5 OFFSET 2"],
+    ["OFFSET 2", "OFFSET 2"],
+  ])("brackets the OR and keeps trailing %s", (tail, expectedTail) => {
+    expect(appendSqlFilter(`${base} WHERE ${or} ${tail}`, f)).toBe(
+      `${base} WHERE (${or}) AND ${f} ${expectedTail}`,
+    );
+  });
+
+  it("adds WHERE when there is none, before a trailing clause", () => {
+    expect(appendSqlFilter(base, f)).toBe(`${base} where ${f}`);
+    expect(appendSqlFilter(`${base} ORDER BY a`, f)).toBe(`${base} where ${f} ORDER BY a`);
+  });
+
+  it("does not bracket AND-only conditions", () => {
+    expect(appendSqlFilter(`${base} WHERE a = 1 AND b = 2`, f)).toBe(
+      `${base} WHERE a = 1 AND b = 2 AND ${f}`,
+    );
+  });
+
+  it("does not re-bracket an already bracketed expression or nested OR", () => {
+    expect(appendSqlFilter(`${base} WHERE (${or})`, f)).toBe(`${base} WHERE (${or}) AND ${f}`);
+    expect(appendSqlFilter(`${base} WHERE a = 1 AND (b = 1 OR b = 2)`, f)).toBe(
+      `${base} WHERE a = 1 AND (b = 1 OR b = 2) AND ${f}`,
+    );
+  });
+
+  it("ignores OR and keywords inside quoted literals", () => {
+    expect(appendSqlFilter(`${base} WHERE msg = 'a OR b'`, f)).toBe(
+      `${base} WHERE msg = 'a OR b' AND ${f}`,
+    );
+    expect(appendSqlFilter(`${base} WHERE msg = 'order by x'`, f)).toBe(
+      `${base} WHERE msg = 'order by x' AND ${f}`,
+    );
+  });
+
+  it("ignores keywords inside comments, escaped quotes and quoted identifiers", () => {
+    expect(appendSqlFilter(`${base} WHERE a = 1 /* order by x */`, f)).toBe(
+      `${base} WHERE a = 1 AND ${f} /* order by x */`,
+    );
+    expect(appendSqlFilter(`${base} WHERE a = 1 /* ( */ ORDER BY a`, f)).toBe(
+      `${base} WHERE a = 1 AND ${f} /* ( */ ORDER BY a`,
+    );
+    expect(appendSqlFilter(`${base} WHERE msg = 'it''s limit 5 or x'`, f)).toBe(
+      `${base} WHERE msg = 'it''s limit 5 or x' AND ${f}`,
+    );
+    expect(appendSqlFilter(`${base} WHERE "limit" = 1 AND order_by_col = 2`, f)).toBe(
+      `${base} WHERE "limit" = 1 AND order_by_col = 2 AND ${f}`,
+    );
+  });
+
+  it("matches keywords case-insensitively across newlines", () => {
+    expect(appendSqlFilter(`${base}\nwhere a = 1\nor b = 2\norder\nby a`, f)).toBe(
+      `${base}\nwhere (a = 1\nor b = 2) AND ${f} order\nby a`,
+    );
+  });
+
+  it("keeps offsets right for leading whitespace and indented UNION branches", () => {
+    expect(appendSqlFilter(`  ${base} WHERE ${or}`, f)).toBe(`  ${base} WHERE (${or}) AND ${f}`);
+    expect(appendSqlFilter(`\t\n${base} WHERE ${or} LIMIT 1`, f)).toBe(
+      `\t\n${base} WHERE (${or}) AND ${f} LIMIT 1`,
+    );
+    expect(appendSqlFilter(`\n  ${base} WHERE a = 1`, f)).toBe(`\n  ${base} WHERE a = 1 AND ${f}`);
+  });
+
+  it("keeps a trailing comment after the appended filter", () => {
+    expect(appendSqlFilter(`${base} WHERE ${or} -- note`, f)).toBe(
+      `${base} WHERE (${or}) AND ${f} -- note`,
+    );
+    expect(appendSqlFilter(`${base} WHERE a = 1 -- note`, f)).toBe(
+      `${base} WHERE a = 1 AND ${f} -- note`,
+    );
+    expect(appendSqlFilter(`${base} WHERE ${or} /* note */`, f)).toBe(
+      `${base} WHERE (${or}) AND ${f} /* note */`,
+    );
+    expect(appendSqlFilter(`${base} -- note`, f)).toBe(`${base} where ${f} -- note`);
+    expect(appendSqlFilter(`${base} WHERE ${or} -- note\nORDER BY a`, f)).toBe(
+      `${base} WHERE (${or}) AND ${f} -- note\nORDER BY a`,
+    );
+  });
+
+  it("works for Exclude filters", () => {
+    expect(appendSqlFilter(`${base} WHERE ${or}`, "svc_name != 'alpha'")).toBe(
+      `${base} WHERE (${or}) AND svc_name != 'alpha'`,
+    );
+  });
+
+  it("does not touch a WHERE inside a subquery or CTE", () => {
+    expect(
+      appendSqlFilter(`WITH x AS (SELECT * FROM t WHERE a = 1 OR b = 2) SELECT * FROM x`, f),
+    ).toBe(`WITH x AS (SELECT * FROM t WHERE a = 1 OR b = 2) SELECT * FROM x where ${f}`);
+    expect(
+      appendSqlFilter(`SELECT * FROM (SELECT * FROM t WHERE a = 1 OR b = 2 LIMIT 5) ORDER BY a`, f),
+    ).toBe(`SELECT * FROM (SELECT * FROM t WHERE a = 1 OR b = 2 LIMIT 5) where ${f} ORDER BY a`);
+  });
+});
+
+describe("replaceInOuterWhere", () => {
+  const swap = (piece: string) =>
+    piece.includes("a = 1") ? piece.replace("a = 1", "a = 9") : null;
+
+  it("skips sub-selects and string literals", () => {
+    expect(
+      replaceInOuterWhere("SELECT 1 FROM t WHERE x IN (SELECT 1 FROM u WHERE a = 1)", swap),
+    ).toBeNull();
+    expect(replaceInOuterWhere("SELECT 1 FROM t WHERE m = 'a = 1'", swap)).toBeNull();
+    expect(replaceInOuterWhere("SELECT 1 FROM t WHERE m = 'a = 1' AND a = 1", swap)).toBe(
+      "SELECT 1 FROM t WHERE m = 'a = 1' AND a = 9",
+    );
+  });
+
+  it("ignores a comment and stops at the next clause", () => {
+    expect(replaceInOuterWhere("SELECT 1 FROM t WHERE b = 2 /* a = 1 */", swap)).toBeNull();
+    expect(replaceInOuterWhere("SELECT 1 FROM t WHERE b = 2 ORDER BY a = 1", swap)).toBeNull();
+    expect(replaceInOuterWhere("SELECT 1 FROM t", swap)).toBeNull();
+  });
+});
+
+describe("appendSqlFilter trailing line break", () => {
+  it("keeps the newline after a trailing line comment", () => {
+    expect(appendSqlFilter("SELECT 1 FROM t WHERE a = 1 -- c\n", "b = 2")).toBe(
+      "SELECT 1 FROM t WHERE a = 1 AND b = 2 -- c\n",
+    );
+    expect(appendSqlFilter("SELECT 1 FROM t -- c\n", "b = 2")).toBe(
+      "SELECT 1 FROM t where b = 2 -- c\n",
+    );
   });
 });

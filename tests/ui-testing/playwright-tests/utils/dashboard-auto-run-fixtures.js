@@ -25,6 +25,7 @@ const NAMESPACE_FIELD = 'kubernetes_namespace_name';
 const CONTAINER_FIELD = 'kubernetes_container_name';
 // Each fixture namespace has exactly one container, so a chained child value is known per parent.
 const CONTAINER_OF = { ziox: 'ziox', 'ingress-nginx': 'controller', velero: 'velero' };
+const HOME_PIN_KEY = 'home_dashboard';
 
 let layoutSeq = 0;
 const createdDashboardIds = [];
@@ -63,7 +64,7 @@ function namespaceTablePanel(id, key, where = '') {
   };
 }
 
-async function createDashboard(title, { panels }) {
+async function createDashboard(title, { panels, variables = [] }) {
   const res = await fetch(`${BASE}/api/${ORG()}/dashboards?folder=default`, {
     method: 'POST',
     headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
@@ -71,7 +72,7 @@ async function createDashboard(title, { panels }) {
       version: 8,
       title,
       description: 'auto run e2e',
-      variables: { list: [], showDynamicFilters: false },
+      variables: { list: variables, showDynamicFilters: false },
       tabs: [{ tabId: 'default', name: 'Default', panels }],
     }),
   });
@@ -100,6 +101,36 @@ async function deleteCreatedDashboards() {
   while (createdDashboardIds.length) await deleteDashboard(createdDashboardIds.pop());
 }
 
+async function settingsApi(method, path, body) {
+  const res = await fetch(`${BASE}/api/${ORG()}/settings/v2${path}`, {
+    method,
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  return { status: res.status, body: await res.json().catch(() => ({})) };
+}
+
+async function setHomePin(value) {
+  const { status } = await settingsApi('POST', '', { setting_key: HOME_PIN_KEY, setting_value: value, setting_category: 'ui' });
+  if (status >= 400) throw new Error(`pin home dashboard -> ${status}`);
+}
+
+// The pin is org-wide, so the previous value is put back rather than deleted.
+async function restoreHomePin(previous) {
+  if (previous) return setHomePin(previous);
+  const { status } = await settingsApi('DELETE', `/${HOME_PIN_KEY}`);
+  // 404 is the clean end state: deleting the pinned dashboard already cleared the pin on the server.
+  if (status >= 400 && status !== 404) throw new Error(`unpin home dashboard -> ${status}`);
+}
+
+// An unreadable pin must stop the test, or the restore in `finally` would delete the org's real pin.
+async function readHomePin() {
+  const { status, body } = await settingsApi('GET', `/${HOME_PIN_KEY}`);
+  if (status === 404) return null;
+  if (status >= 400) throw new Error(`read home dashboard pin -> ${status}`);
+  return body?.setting_value ?? null;
+}
+
 // ZO_AUTO_QUERY_ENABLED is read once at server start, so it is pinned in the config response instead of needing its own shard.
 async function pinAutoQuery(page, enabled) {
   await page.route(/\/api\/[^/]+\/config(\?.*)?$/, async (route) => {
@@ -110,14 +141,23 @@ async function pinAutoQuery(page, enabled) {
   });
 }
 
-// SQL is sent URL-safe base64 with "." padding when sql_base64_enabled is on.
+// The UI's URL-safe base64 uses "-", "_" and "." padding, for search SQL and for the Logs `query` URL parameter.
+function decodeUrlSafeBase64(encoded) {
+  const std = encoded.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '=');
+  return Buffer.from(std, 'base64').toString('utf8');
+}
+
 function decodeSql(body) {
   const query = body && typeof body.query === 'object' ? body.query : body;
   const sql = query?.sql;
   if (typeof sql !== 'string') return '';
   if (body.encoding !== 'base64') return sql;
-  const std = sql.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '=');
-  return Buffer.from(std, 'base64').toString('utf8');
+  return decodeUrlSafeBase64(sql);
+}
+
+function inListValues(sql) {
+  const match = /IN \(([^)]*)\)/.exec(sql);
+  return match ? match[1].split(',').map((v) => v.trim()).sort() : null;
 }
 
 function trackPanelRuns(page) {
@@ -138,6 +178,7 @@ function trackPanelRuns(page) {
 }
 
 module.exports = {
+  BASE,
   ORG,
   STREAM,
   NAMESPACES,
@@ -151,4 +192,9 @@ module.exports = {
   trackDashboard,
   pinAutoQuery,
   trackPanelRuns,
+  decodeUrlSafeBase64,
+  inListValues,
+  readHomePin,
+  setHomePin,
+  restoreHomePin,
 };

@@ -2359,6 +2359,133 @@ describe("value quotes, late values, the empty-values copy and the typed prefix"
       const range = { startTime: 1_000_000, endTime: 2_000_000 };
       expect(await emptyRow("e-range", { valuesTimeRange: range })).toContain("valuesEmptyInRange");
     });
+
+    it("speaks of the latest hours when only those were searched", { timeout: 30000 }, async () => {
+      const range = { startTime: 1_000_000, endTime: 2_000_000, capped: true };
+      expect(await emptyRow("e-capped", { valuesTimeRange: range })).toContain(
+        "valuesEmptyInLatestHours",
+      );
+    });
+  });
+
+  describe("a typed word's match_all row follows the streams' full-text fields", () => {
+    const wordInserts = async (editorId: string, props: any) => {
+      const { editor, model, provide } = await mountWith(editorId, props);
+      const text = "SELECT * FROM logs WHERE alp";
+      placeCaret(editor, model, text);
+      model.getWordUntilPosition.mockReturnValue({
+        word: "alp",
+        startColumn: text.length - 2,
+        endColumn: text.length + 1,
+      });
+      const result = await provide(model, { lineNumber: 1, column: text.length + 1 }, {}, {});
+      return rowsOf(result).map((s: any) => s.insertText);
+    };
+
+    it("offers match_all('alp') when nothing says otherwise", { timeout: 30000 }, async () => {
+      expect(await wordInserts("fts-default", {})).toContain("match_all('alp')");
+    });
+
+    it("drops it when the streams have no full-text field", { timeout: 30000 }, async () => {
+      const inserts = await wordInserts("fts-none", { fullTextSearch: false });
+      expect(inserts).not.toContain("match_all('alp')");
+      expect(inserts).toContain("str_match(${1}, 'alp')");
+    });
+
+    const FULL_TEXT = ["match_all", "match_all_raw", "match_all_raw_ignore_case"];
+    const menuNames = async (editorId: string, props: any, before: string, after = "") => {
+      const { editor, model, provide } = await mountWith(editorId, props);
+      placeCaret(editor, model, before, after);
+      const word = /\w*$/.exec(before)![0];
+      model.getWordUntilPosition.mockReturnValue({
+        word,
+        startColumn: before.length + 1 - word.length,
+        endColumn: before.length + 1,
+      });
+      const result = await provide(model, { lineNumber: 1, column: before.length + 1 }, {}, {});
+      return rowsOf(result).map(nameOf);
+    };
+
+    it(
+      "keeps the full-text functions out of the function list too, without full-text fields",
+      { timeout: 30000 },
+      async () => {
+        const props = { fullTextSearch: false };
+        const typed = await menuNames("fts-list-word", props, "SELECT * FROM logs WHERE mat");
+        const slot = await menuNames(
+          "fts-list-slot",
+          props,
+          "SELECT * FROM logs WHERE str_match(",
+          ", 'alp')",
+        );
+        for (const names of [typed, slot]) {
+          expect(names).toContain("str_match");
+          expect(names.filter((name: string) => FULL_TEXT.includes(name))).toEqual([]);
+        }
+      },
+    );
+
+    it(
+      "still explains match_all on hover and in signature help without full-text fields",
+      { timeout: 30000 },
+      async () => {
+        const { api, editor, model } = await mountWith("fts-docs", { fullTextSearch: false });
+        const lastFor = (register: any) =>
+          vi
+            .mocked(register)
+            .mock.calls.filter((c: any) => c[0] === "sql")
+            .at(-1)![1] as any;
+        model.getWordAtPosition.mockReturnValue({
+          word: "match_all",
+          startColumn: 1,
+          endColumn: 10,
+        });
+        const hover = await lastFor(api.languages.registerHoverProvider).provideHover(
+          model,
+          { lineNumber: 1, column: 3 },
+          {},
+        );
+        expect(hover?.contents?.[0]?.value).toContain("match_all");
+        placeCaret(editor, model, "SELECT * FROM logs WHERE match_all(");
+        const help = await lastFor(
+          api.languages.registerSignatureHelpProvider,
+        ).provideSignatureHelp(model, { lineNumber: 1, column: 36 }, {}, {});
+        expect(help?.value?.signatures?.[0]?.label).toContain("match_all");
+      },
+    );
+
+    it("lists match_all where the streams have full-text fields", { timeout: 30000 }, async () => {
+      const slot = await menuNames(
+        "fts-list-default",
+        {},
+        "SELECT * FROM logs WHERE str_match(",
+        ", 'alp')",
+      );
+      expect(slot).toContain("match_all");
+    });
+  });
+
+  describe("a matching recent search in the typed-word menu", () => {
+    it(
+      "ranks after every other row, so Tab or Enter keeps the word",
+      { timeout: 30000 },
+      async () => {
+        const { editor, model, provide } = await mountWith("recent-rank", {
+          recentQueries: ["code = '500'"],
+        });
+        const text = "code";
+        placeCaret(editor, model, text);
+        model.getValue.mockReturnValue(text);
+        model.getLineMaxColumn = vi.fn(() => text.length + 1);
+        model.getWordUntilPosition.mockReturnValue({ word: text, startColumn: 1, endColumn: 5 });
+        const { suggestions } = await provide(model, { lineNumber: 1, column: 5 }, {}, {});
+        const recent = suggestions.find((s: any) => s.insertText === "code = '500'");
+        const others = suggestions.filter((s: any) => s !== recent);
+        expect(others.length).toBeGreaterThan(0);
+        expect(recent.range.startColumn).toBe(5);
+        for (const other of others) expect(recent.sortText > String(other.sortText)).toBe(true);
+      },
+    );
   });
 
   describe("the typed prefix reaches the resolver", () => {

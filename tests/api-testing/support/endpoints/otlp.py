@@ -54,6 +54,18 @@ class OtlpAPI:
             headers[STREAM_HEADER] = stream
         return self.c.post("v1/logs", json=body, headers=headers, org=org)
 
+    def traces_json(
+        self,
+        body: dict[str, Any],
+        *,
+        stream: str | None = None,
+        org: str | None = None,
+    ) -> requests.Response:
+        headers = {"Content-Type": CONTENT_TYPE_JSON}
+        if stream is not None:
+            headers[STREAM_HEADER] = stream
+        return self.c.post("v1/traces", json=body, headers=headers, org=org)
+
     def traces_protobuf(
         self,
         payload: bytes,

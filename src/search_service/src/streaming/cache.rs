@@ -441,18 +441,6 @@ async fn send_cached_responses(
         cached.cached_response.result_cache_ratio,
     );
 
-    #[cfg(feature = "vectorscan")]
-    crate::cache::apply_regex_to_response(
-        req,
-        org_id,
-        all_streams,
-        stream_type,
-        &mut cached.cached_response,
-        trace_id,
-        "cached_res",
-    )
-    .await?;
-
     if is_result_array_skip_vrl {
         cached.cached_response.hits = crate::cache::apply_vrl_to_response(
             backup_query_fn.clone(),
@@ -497,9 +485,10 @@ async fn send_cached_responses(
     }
 
     let num_fn = req.query.query_fn.is_some() as u16;
+    let (response_time, took_wait_in_queue) = cache_hit_usage_timing(cached.cached_response.took);
     let req_stats = RequestStats {
         records: cached.cached_response.hits.len() as i64,
-        response_time: cached.cached_response.took as f64,
+        response_time,
         size: cached.cached_response.scan_size as f64,
         request_body: Some(req.query.sql.clone()),
         function: req.query.query_fn.clone(),
@@ -510,7 +499,7 @@ async fn send_cached_responses(
         search_type: req.search_type,
         search_event_context: req.search_event_context.clone(),
         trace_id: Some(trace_id.to_string()),
-        took_wait_in_queue: Some(cached.cached_response.took_detail.wait_in_queue),
+        took_wait_in_queue,
         work_group: None, // TODO: add work group
         result_cache_ratio: Some(cached.cached_response.result_cache_ratio),
         peak_memory_usage: cached.cached_response.peak_memory_usage,
@@ -572,6 +561,12 @@ pub async fn write_partial_results_to_cache(
         }
         _ => {}
     }
+}
+
+/// Usage timing for a cache hit: `took_ms` in seconds, and 0 queue wait because the
+/// cached `wait_in_queue` belongs to the query that filled the cache.
+fn cache_hit_usage_timing(took_ms: usize) -> (f64, Option<usize>) {
+    (took_ms as f64 / 1000.0, Some(0))
 }
 
 #[cfg(test)]
@@ -829,5 +824,19 @@ mod tests {
         .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(hits, 3);
+    }
+
+    #[test]
+    fn test_cache_hit_usage_timing_reports_seconds_and_no_queue_wait() {
+        use super::cache_hit_usage_timing;
+
+        let (response_time, took_wait_in_queue) = cache_hit_usage_timing(40);
+        assert!((response_time - 0.04).abs() < f64::EPSILON);
+        assert_eq!(took_wait_in_queue, Some(0));
+
+        let (response_time, _) = cache_hit_usage_timing(5185);
+        assert!((response_time - 5.185).abs() < 1e-9);
+
+        assert_eq!(cache_hit_usage_timing(0), (0.0, Some(0)));
     }
 }

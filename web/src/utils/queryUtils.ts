@@ -68,7 +68,7 @@ export function addSpacesToOperators(input: string): string {
     if (shouldProcessOperators) {
       if (i < input.length - 1) {
         const twoChar = char + nextChar;
-        if (twoChar === "!=" || twoChar === "<=" || twoChar === ">=") {
+        if (twoChar === "!=" || twoChar === "<>" || twoChar === "<=" || twoChar === ">=") {
           if (prevChar && prevChar !== " ") {
             result += " ";
           }

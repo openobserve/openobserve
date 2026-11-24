@@ -608,7 +608,14 @@ export default defineComponent({
       }
     };
 
-    // The form owns the rows: these mutate it, and the `form.useStore` read above re-renders them.
+    // -----------------------------------------------------------------------
+    // Dynamic array-fields — FORM-OWNED (mcp.headers).
+    // The form is the single source of truth; add/remove/toggle mutate it via
+    // the form API directly, and the `form.useStore` reads above re-render the
+    // v-for rows (playbook §2).
+    // -----------------------------------------------------------------------
+    // MCP headers. (useOForm erases the form generic to Record<string, unknown>,
+    // so TanStack's array-field paths collapse to `never` — hence the casts.)
     const addHeader = () =>
       form.pushFieldValue("mcp.headers", { key: "", value: "", visible: false });
     const removeHeader = (i: number) => form.removeFieldValue("mcp.headers", i);
@@ -799,7 +806,7 @@ export default defineComponent({
       };
     };
 
-    const HEADER_PATH = /^\/mcp\/headers\/(\d+)\/value$/;
+    const SECRET_PATH = /^\/mcp\/headers\/(\d+)\/value$/;
     const MCP_URL_PATH = "/mcp/url";
     const TOKEN_URL_PATH = "/mcp/auth/token_url";
     const CLIENT_SECRET_PATH = "/mcp/auth/client_secret";
@@ -829,9 +836,8 @@ export default defineComponent({
       return { data: copy, paths };
     };
 
-    /** The key of the header row a redacted path names; `null` for any other path. */
     const headerKeyOf = (path: string, data: AiToolsetDraftData): string | null => {
-      const match = HEADER_PATH.exec(path);
+      const match = SECRET_PATH.exec(path);
       return match ? (data.mcp?.headers?.[Number(match[1])]?.key ?? "") : null;
     };
 
@@ -852,15 +858,15 @@ export default defineComponent({
     };
 
     // A not-kept header is found again by its key, since rows may have moved since the draft was written.
-    const notKeptHeaders = shallowRef(new Map<string, string>());
+    const notKeptRows = shallowRef(new Map<string, string>());
 
     const fieldNameFor = (path: string): FormFieldPath<AddAiToolsetForm> | null => {
       if (path === MCP_URL_PATH) return "mcp.url";
       if (path === TOKEN_URL_PATH) return "mcp.auth.token_url";
       if (path === CLIENT_SECRET_PATH) return "mcp.auth.client_secret";
-      const key = notKeptHeaders.value.get(path);
+      const key = notKeptRows.value.get(path);
       if (key === undefined) return null;
-      const index = (formValues.value.mcp?.headers ?? []).findIndex((row) => row.key === key);
+      const index = (formValues.value.mcp?.headers ?? []).findIndex((r) => r.key === key);
       return index < 0 ? null : (`mcp.headers[${index}].value` as FormFieldPath<AddAiToolsetForm>);
     };
 
@@ -882,7 +888,7 @@ export default defineComponent({
         .filter((path) =>
           path === TOKEN_URL_PATH || path === CLIENT_SECRET_PATH
             ? oauth
-            : !oauth || !isAuthorizationHeader({ key: notKeptHeaders.value.get(path) }),
+            : !oauth || !isAuthorizationHeader({ key: notKeptRows.value.get(path) }),
         );
     };
 
@@ -900,28 +906,28 @@ export default defineComponent({
       entityLabel: () => t("common.editorDraft.entities.ai_toolset"),
       entityId: editId,
       snapshot: toolsetSnapshot,
-      apply: async (data, { notKeptPaths }) => {
+      apply: async (draft, { notKeptPaths: draftNotKeptPaths }) => {
+        // A draft saved while the CLI kind existed restores as the default kind, without its CLI fields.
+        const data = { ...draft } as AiToolsetDraftData & { cli?: unknown };
+        delete data.cli;
+        if (!kindOptions.some((option) => option.value === data.kind)) {
+          data.kind = addAiToolsetDefaults().kind;
+        }
+        const notKeptPaths = draftNotKeptPaths.filter((path) => !path.startsWith("/cli/"));
         const withHidden = (rows: SecretPair[]) => rows.map((row) => ({ ...row, visible: false }));
         // A saved toolset's name and kind are locked, so the draft can never change them.
         const locked = isEditing.value
           ? { name: form.state.values.name, kind: form.state.values.kind }
           : {};
-        // An older draft may hold a kind or fields this form no longer has.
-        const { name, description, region_only, skill } = data;
-        const kind = kindOptions.some((o) => o.value === data.kind) ? data.kind : "mcp";
         // A draft from before the form had `auth` says nothing about it, so the loaded one stays.
         const loaded = (form.state.values as AddAiToolsetForm).mcp.auth;
         const auth = { ...(data.mcp.auth ?? loaded), extra: loaded.extra };
         form.reset({
-          name,
-          kind,
-          description,
-          region_only,
+          ...data,
           ...locked,
           mcp: { ...data.mcp, headers: withHidden(data.mcp.headers), auth },
-          skill,
         } as AddAiToolsetForm);
-        notKeptHeaders.value = new Map(
+        notKeptRows.value = new Map(
           notKeptPaths.flatMap((path) => {
             const key = headerKeyOf(path, data);
             return key === null ? [] : [[path, key] as const];

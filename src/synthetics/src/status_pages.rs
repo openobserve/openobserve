@@ -226,40 +226,83 @@ async fn holds_ready(
     rt: &mut RebuilderState,
 ) -> Result<bool, infra::errors::Error> {
     let db = infra::db::get_db().await;
-    if !infra::cluster::all_online_nodes_run_this_build().await {
+    let gate_open = infra::cluster::all_online_nodes_run_this_build().await;
+    // Read the key only while it can decide something.
+    let key_matches = gate_open
+        && !rt.holds_build_checked
+        && db.get(HOLDS_BUILD_KEY).await.ok().as_deref() == Some(config::COMMIT_HASH.as_bytes());
+    match holds_gate_step(rt, gate_open, key_matches, now, holds_drain_grace_micros()) {
+        HoldsGateStep::Closed { clear_key } => {
+            if clear_key {
+                let _ = db.delete(HOLDS_BUILD_KEY, false, false, None).await;
+            }
+            Ok(false)
+        }
+        HoldsGateStep::Wait => Ok(false),
+        HoldsGateStep::Allowed => Ok(true),
+        HoldsGateStep::Reset => {
+            infra::table::synthetics_checks::reset_false_alarm_holds(conn, now).await?;
+            db.put(
+                HOLDS_BUILD_KEY,
+                config::COMMIT_HASH.as_bytes().to_vec().into(),
+                false,
+                None,
+            )
+            .await?;
+            tracing::info!("[status_pages] new build — false alarm holds reset");
+            rt.holds_build_checked = true;
+            Ok(true)
+        }
+    }
+}
+
+/// What [`holds_ready`] does this tick.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HoldsGateStep {
+    /// Another build is online: no holds. `clear_key` removes the stored build once per closed
+    /// period, so the next opening resets again, also after a restart.
+    Closed { clear_key: bool },
+    /// The gate is open, but not yet for longer than the drain grace.
+    Wait,
+    /// Reset every hold, store this build, then allow holds.
+    Reset,
+    /// Holds apply.
+    Allowed,
+}
+
+/// The state machine of [`holds_ready`] without its I/O. `key_matches` says that the stored build
+/// is this build.
+fn holds_gate_step(
+    rt: &mut RebuilderState,
+    gate_open: bool,
+    key_matches: bool,
+    now: i64,
+    grace: i64,
+) -> HoldsGateStep {
+    if !gate_open {
         // Another build writes now, for example a rollback. Its recoveries may not move the stamp,
-        // so the next opening must wait for the grace and reset again, also after a restart.
+        // so the next opening must wait for the grace and reset again.
         rt.gate_open_since = None;
-        if rt.holds_build_checked || !rt.gate_closed_cleared {
-            let _ = db.delete(HOLDS_BUILD_KEY, false, false, None).await;
+        let clear_key = rt.holds_build_checked || !rt.gate_closed_cleared;
+        if clear_key {
             rt.holds_build_checked = false;
             rt.gate_closed_cleared = true;
         }
-        return Ok(false);
+        return HoldsGateStep::Closed { clear_key };
     }
     rt.gate_closed_cleared = false;
     if rt.holds_build_checked {
-        return Ok(true);
+        return HoldsGateStep::Allowed;
     }
-    if db.get(HOLDS_BUILD_KEY).await.ok().as_deref() == Some(config::COMMIT_HASH.as_bytes()) {
+    if key_matches {
         rt.holds_build_checked = true;
-        return Ok(true);
+        return HoldsGateStep::Allowed;
     }
     let since = *rt.gate_open_since.get_or_insert(now);
-    if now - since < holds_drain_grace_micros() {
-        return Ok(false);
+    if now - since < grace {
+        return HoldsGateStep::Wait;
     }
-    infra::table::synthetics_checks::reset_false_alarm_holds(conn, now).await?;
-    db.put(
-        HOLDS_BUILD_KEY,
-        config::COMMIT_HASH.as_bytes().to_vec().into(),
-        false,
-        None,
-    )
-    .await?;
-    tracing::info!("[status_pages] new build — false alarm holds reset");
-    rt.holds_build_checked = true;
-    Ok(true)
+    HoldsGateStep::Reset
 }
 
 /// Twice the HTTP drain timeout plus a minute, and at least ten minutes, so an old node that went
@@ -1037,6 +1080,112 @@ pub async fn run_domain_verifier() {}
 #[cfg(test)]
 mod fast_pass_tests {
     use super::*;
+
+    const GRACE: i64 = 600;
+
+    #[test]
+    fn a_new_build_waits_for_the_grace_then_resets_once() {
+        let mut rt = RebuilderState::default();
+        assert_eq!(
+            holds_gate_step(&mut rt, true, false, 1_000, GRACE),
+            HoldsGateStep::Wait
+        );
+        assert_eq!(
+            holds_gate_step(&mut rt, true, false, 1_599, GRACE),
+            HoldsGateStep::Wait
+        );
+        assert_eq!(
+            holds_gate_step(&mut rt, true, false, 1_600, GRACE),
+            HoldsGateStep::Reset
+        );
+        // `holds_ready` marks the build checked after the reset; then holds apply at once.
+        rt.holds_build_checked = true;
+        assert_eq!(
+            holds_gate_step(&mut rt, true, false, 1_601, GRACE),
+            HoldsGateStep::Allowed
+        );
+    }
+
+    #[test]
+    fn a_restart_of_the_same_build_allows_holds_at_once() {
+        let mut rt = RebuilderState::default();
+        assert_eq!(
+            holds_gate_step(&mut rt, true, true, 1_000, GRACE),
+            HoldsGateStep::Allowed
+        );
+        assert!(rt.holds_build_checked);
+    }
+
+    #[test]
+    fn a_closed_gate_clears_the_key_once_and_the_next_opening_waits_again() {
+        let mut rt = RebuilderState {
+            holds_build_checked: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            holds_gate_step(&mut rt, false, false, 1_000, GRACE),
+            HoldsGateStep::Closed { clear_key: true }
+        );
+        assert!(!rt.holds_build_checked);
+        assert_eq!(
+            holds_gate_step(&mut rt, false, false, 1_060, GRACE),
+            HoldsGateStep::Closed { clear_key: false },
+            "one delete per closed period"
+        );
+        // The gate opens again: no stored key, so the grace starts from this tick.
+        assert_eq!(
+            holds_gate_step(&mut rt, true, false, 2_000, GRACE),
+            HoldsGateStep::Wait
+        );
+        assert_eq!(
+            holds_gate_step(&mut rt, true, false, 2_600, GRACE),
+            HoldsGateStep::Reset
+        );
+    }
+
+    #[test]
+    fn a_gate_that_closes_during_the_grace_restarts_it() {
+        let mut rt = RebuilderState::default();
+        assert_eq!(
+            holds_gate_step(&mut rt, true, false, 1_000, GRACE),
+            HoldsGateStep::Wait
+        );
+        assert_eq!(
+            holds_gate_step(&mut rt, false, false, 1_500, GRACE),
+            HoldsGateStep::Closed { clear_key: true }
+        );
+        assert_eq!(
+            holds_gate_step(&mut rt, true, false, 1_700, GRACE),
+            HoldsGateStep::Wait
+        );
+        assert_eq!(
+            holds_gate_step(&mut rt, true, false, 2_299, GRACE),
+            HoldsGateStep::Wait,
+            "the grace counts from the new opening, not the first one"
+        );
+        assert_eq!(
+            holds_gate_step(&mut rt, true, false, 2_300, GRACE),
+            HoldsGateStep::Reset
+        );
+    }
+
+    #[test]
+    fn a_closed_gate_after_holds_applied_stops_them_and_needs_a_new_reset() {
+        let mut rt = RebuilderState::default();
+        assert_eq!(
+            holds_gate_step(&mut rt, true, true, 1_000, GRACE),
+            HoldsGateStep::Allowed
+        );
+        assert_eq!(
+            holds_gate_step(&mut rt, false, true, 1_100, GRACE),
+            HoldsGateStep::Closed { clear_key: true }
+        );
+        // The key is gone now, so `holds_ready` reads no match.
+        assert_eq!(
+            holds_gate_step(&mut rt, true, false, 1_200, GRACE),
+            HoldsGateStep::Wait
+        );
+    }
 
     fn row(id: &str, status: i32) -> table::CheckStateRow {
         table::CheckStateRow {

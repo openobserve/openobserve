@@ -36,6 +36,11 @@ pub struct Model {
     /// a row is one firing; the incident resolves once every linked alert's
     /// latest row has this set. NULL = still firing.
     pub resolved_at: Option<i64>,
+    /// The firing's labels as a sorted JSON object string; NULL for rows written before them.
+    #[sea_orm(column_type = "Text", nullable)]
+    pub labels: Option<String>,
+    /// The firing's own severity (P1-P4), so a put-back can restore a level another raise hid.
+    pub severity: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -71,6 +76,8 @@ mod tests {
             correlation_reason: Some("service_discovery".to_string()),
             created_at: 1000,
             resolved_at: None,
+            labels: None,
+            severity: None,
         };
         assert_eq!(m.incident_id, "inc-1");
         assert_eq!(m.alert_id, "alert-1");

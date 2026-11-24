@@ -18,7 +18,12 @@ import type { AlertHistorySummaryRow } from "@/services/alerts.queries";
 import { isFiringOutcome } from "@/utils/alerts/runOutcome";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { getCronIntervalInMinutes } from "@/utils/queryUtils";
-import { unfoldDuration, type IncidentAlertRow } from "./incidentUnfold";
+import {
+  incidentRangeEnd,
+  incidentTime,
+  unfoldDuration,
+  type IncidentAlertRow,
+} from "./incidentUnfold";
 
 const MINUTE_US = 60_000_000;
 const DAY_US = 24 * 60 * MINUTE_US;
@@ -341,12 +346,5 @@ export function lastWeekOf(
   };
 }
 
-/** "Jul 12 → Jul 27" past a day, else "23:15 → 01:10", each time dated when it is not today. */
-export function firingRange(zone: string, first: number, last: number, now: number) {
-  const fmt = (us: number, format: string) => formatTimestampInTimezone(us, format, zone);
-  if (last - first >= DAY_US) return `${fmt(first, "MMM D")} → ${fmt(last, "MMM D")}`;
-  const today = dayKey(zone, now);
-  const at = (us: number) => fmt(us, dayKey(zone, us) === today ? "HH:mm" : "MMM D, HH:mm");
-  const end = dayKey(zone, last) === dayKey(zone, first) ? fmt(last, "HH:mm") : at(last);
-  return `${at(first)} → ${end}`;
-}
+export const firingRange = (zone: string, first: number, last: number) =>
+  `${incidentTime(zone, first)} → ${incidentRangeEnd(zone, first, last)}`;

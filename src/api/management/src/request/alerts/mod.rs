@@ -89,6 +89,7 @@ pub mod history;
 pub mod history_summary;
 pub mod incident_integrations;
 pub mod incidents;
+pub mod leases;
 pub mod mute;
 #[cfg(feature = "cloud")]
 pub mod slack_oauth;
@@ -416,6 +417,18 @@ pub async fn create_alert(
         ));
     }
 
+    if req_body.lease.is_some()
+        && matches!(
+            req_body.alert_type,
+            Some(AlertTypeFilter::AnomalyDetection | AlertTypeFilter::Composite)
+        )
+    {
+        return MetaHttpResponse::bad_request(
+            "Only a scheduled or real-time alert can be created as a temporary alert",
+        );
+    }
+    let lease = req_body.lease.clone();
+
     // Anomaly detection path: delegate to anomaly config creation (enterprise only).
     #[cfg(feature = "enterprise")]
     if req_body.alert_type == Some(AlertTypeFilter::AnomalyDetection) {
@@ -465,10 +478,26 @@ pub async fn create_alert(
     {
         return resp;
     }
-    alert.last_edited_by = Some(user_email.user_id);
+    alert.last_edited_by = Some(user_email.user_id.clone());
 
     let client = get_orm_client_rw().await;
-    match alert::create(client, &org_id, &folder_id, alert, overwrite).await {
+    let created = match &lease {
+        Some(spec) => openobserve_core::alerts::leases::create_leased(
+            &org_id,
+            &folder_id,
+            alert,
+            overwrite,
+            spec,
+            &user_email.user_id,
+        )
+        .await
+        .map(|(alert, _)| alert)
+        .map_err(leases::error_response),
+        None => alert::create(client, &org_id, &folder_id, alert, overwrite)
+            .await
+            .map_err(Into::into),
+    };
+    match created {
         Ok(v) => {
             let warnings = save_warnings(&org_id, &v, workflows_locked(), oncall_locked()).await;
             MetaHttpResponse::json(
@@ -478,7 +507,7 @@ pub async fn create_alert(
                     .with_warnings(warnings),
             )
         }
-        Err(e) => e.into(),
+        Err(resp) => resp,
     }
 }
 
@@ -953,6 +982,7 @@ fn composite_list_item(
         active_downtime: None,
         firing_started_at: None,
         ack: None,
+        leases: vec![],
         incident: None,
         downtime_dimensions: Default::default(),
         context_attributes: None,
@@ -986,11 +1016,8 @@ fn composite_error_response(
         CompositeServiceError::ChildNotEligible(_) => {
             composite_machine_error(StatusCode::BAD_REQUEST, "child_not_eligible", error)
         }
-        CompositeServiceError::Cycle => {
-            composite_machine_error(StatusCode::CONFLICT, "composite_cycle", error)
-        }
-        CompositeServiceError::TooDeep => {
-            composite_machine_error(StatusCode::CONFLICT, "composite_too_deep", error)
+        CompositeServiceError::ChildIsComposite(_) => {
+            composite_machine_error(StatusCode::BAD_REQUEST, "child_is_composite", error)
         }
         CompositeServiceError::NotFound => {
             composite_machine_error(StatusCode::NOT_FOUND, "composite_not_found", error)
@@ -1009,11 +1036,6 @@ fn composite_error_response(
         CompositeServiceError::WritesDisabled => composite_machine_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "composite_writes_disabled",
-            error,
-        ),
-        CompositeServiceError::SuperClusterUnsupported => composite_machine_error(
-            StatusCode::CONFLICT,
-            "composite_super_cluster_unsupported",
             error,
         ),
         CompositeServiceError::PermissionDenied => {
@@ -1179,15 +1201,12 @@ pub async fn validate_composite_alert(
                     format!("child alert {id} is not eligible for composite evaluation"),
                 );
             }
-            Some(infra::table::alert_composites::Resolution::Composite(composite)) => {
-                children.push(serde_json::json!({
-                    "alert_id": id,
-                    "accessible": true,
-                    "name": composite.name.clone(),
-                    "alert_type": "composite",
-                    "folder_id": composite.folder_id.clone(),
-                    "enabled": composite.enabled,
-                }));
+            Some(infra::table::alert_composites::Resolution::Composite(_)) => {
+                return composite_error_response(
+                    openobserve_core::alerts::composite::CompositeServiceError::ChildIsComposite(
+                        id,
+                    ),
+                );
             }
             _ => inaccessible.push(id),
         }
@@ -3488,6 +3507,7 @@ pub async fn list_alerts(
     let status_unavailable = enrich_with_run_state(&org_id, &mut list).await;
     enrich_with_composite_metadata(&org_id, &visibility, &mut list).await;
     crate::models::alerts::responses::fill_active_downtimes(&org_id, &mut list).await;
+    crate::models::alerts::responses::fill_active_leases(&org_id, &mut list).await;
 
     // Feature-scoped fields: keep destinations/template off the default list path
     // (bytes + module-scoped names) unless the dependency view explicitly opted in.
@@ -5164,6 +5184,21 @@ mod tests {
         let parsed: GetAlertResponseBody = serde_json::from_value(named).unwrap();
         assert_eq!(parsed.locked_target_names["wf"], "Restart pods");
         assert_eq!(parsed.alert.name, body.alert.name);
+    }
+
+    #[tokio::test]
+    async fn a_composite_child_answers_400_with_a_stable_code() {
+        use openobserve_core::alerts::composite::CompositeServiceError;
+
+        let response = super::composite_error_response(CompositeServiceError::ChildIsComposite(
+            "c1".to_string(),
+        ));
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["code"], "child_is_composite");
     }
 
     // 400 Bad Request

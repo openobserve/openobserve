@@ -115,17 +115,17 @@ describe("IncidentUnfoldGraph", () => {
     expect(graph.props("cards").map((c) => c.id)).toEqual(["alert-a", "alert-b", "team-open"]);
   });
 
-  it("reads the app's time zone, names it once, and dates each card time that is not today", async () => {
+  it("reads the app's time zone, leaves naming it to the page, and dates each card time that is not today", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(min(30) / 1000);
     const today = mountGraph(incident([firing("a", min(0))]), "Asia/Kolkata");
     expect(today.get('[data-test="autoobserve-unfold-card-alert-a"]').text()).toContain("20:45");
-    expect(today.text().match(/GMT\+5:30/g)).toHaveLength(1);
+    expect(today.text()).not.toMatch(/GMT\+5:30/);
     today.unmount();
     vi.setSystemTime(min(24 * 60) / 1000);
     const yesterday = mountGraph(incident([firing("a", min(0)), firing("b", min(5))]));
     expect(yesterday.get('[data-test="autoobserve-unfold-card-alert-a"]').text()).toContain(
-      "Nov 11, 15:15",
+      "2026-11-11 15:15",
     );
   });
 

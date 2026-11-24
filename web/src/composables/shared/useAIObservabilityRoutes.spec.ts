@@ -17,6 +17,7 @@ import { describe, expect, it, vi } from "vitest";
 import { useAIObservabilityRouteChildren } from "./useAIObservabilityRoutes";
 
 vi.mock("@/utils/zincutils", () => ({ routeGuard: vi.fn() }));
+vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "false", isCloud: "false" } }));
 
 describe("useAIObservabilityRouteChildren — online evaluations gate", () => {
   const children = useAIObservabilityRouteChildren();
@@ -83,5 +84,23 @@ describe("useAIObservabilityRouteChildren — tab titles", () => {
 
   it("gives a route that only one rail item uses no per-tab titles", () => {
     expect(children.find((r) => r.name === "aiExperiments")!.meta?.titleKeyByTab).toBeUndefined();
+  });
+});
+
+describe("useAIObservabilityRouteChildren — OSS model pricing", () => {
+  it("lets an OSS build into the model pricing pages instead of the locked page", () => {
+    const children = useAIObservabilityRouteChildren();
+    for (const name of ["modelPricing", "modelPricingGaps", "modelPricingEditor"]) {
+      const route = children.find((r) => r.name === name)!;
+      const next = vi.fn();
+      (route.beforeEnter as ((to: unknown, from: unknown, next: unknown) => void) | undefined)?.(
+        { query: {}, fullPath: `/ai/${name}` },
+        {},
+        next,
+      );
+      expect(next, name).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: "enterpriseFeatureLocked" }),
+      );
+    }
   });
 });

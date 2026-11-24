@@ -221,11 +221,10 @@ describe("incidentAlertPanel", () => {
     expect(week).toMatchObject({ total: 7, silenced: 3, firingDays: 2 });
   });
 
-  it("states a range by date past a day, else by time, dated when not today", () => {
+  it("writes both ends of a range as a full moment in the zone", () => {
     const at = (h: number, m = 0) => Date.UTC(2026, 10, 11, h, m) * 1000;
-    const now = at(25, 13);
-    expect(firingRange("UTC", at(23, 15), at(25, 10), now)).toBe("Nov 11, 23:15 → 01:10");
-    expect(firingRange("UTC", at(9), at(9 + 15 * 24), now)).toBe("Nov 11 → Nov 26");
-    expect(firingRange("UTC", at(9), at(10), now)).toBe("Nov 11, 09:00 → 10:00");
+    expect(firingRange("UTC", at(23, 15), at(25, 10))).toBe("2026-11-11 23:15 → 2026-11-12 01:10");
+    expect(firingRange("UTC", at(9), at(9 + 15 * 24))).toBe("2026-11-11 09:00 → 2026-11-26 09:00");
+    expect(firingRange("UTC", at(9), at(10))).toBe("2026-11-11 09:00 → 10:00");
   });
 });

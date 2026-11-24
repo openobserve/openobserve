@@ -48,13 +48,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test-comment-input="incident-timeline-comment-input"
     data-test-comment-send="incident-timeline-comment-send"
     @submit="submitComment"
-  />
+  >
+    <template #inline-text="{ event, html }">
+      <span
+        v-if="event.type === 'SplitFrom'"
+        class="text-text-body text-sm"
+        data-test="incident-timeline-split-from"
+      >
+        <i18n-t keypath="alerts.incidents.timeline.splitFrom" tag="span">
+          <template #alert>
+            <span class="text-text-heading font-semibold">{{
+              raw(event.data?.alert_name || t("alerts.incidents.timeline.unnamedAlert"))
+            }}</span>
+          </template>
+          <template #incident>
+            <router-link
+              :to="splitFromLink(event)"
+              class="text-text-link underline"
+              data-test="incident-timeline-split-from-link"
+              >{{
+                event.data?.from_title
+                  ? raw(event.data.from_title)
+                  : t("alerts.incidents.timeline.splitFromUntitled")
+              }}</router-link
+            >
+          </template>
+        </i18n-t>
+        <span v-if="splitSource(event)" class="text-text-secondary ms-1 text-xs">{{
+          splitSource(event)
+        }}</span>
+      </span>
+      <span v-else class="text-text-body text-sm" v-html="html"></span>
+    </template>
+  </ActivityTimeline>
 </template>
 
 <script lang="ts" setup>
 import { ref, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
 import incidentsService from "@/services/incidents";
 import DOMPurify from "dompurify";
@@ -150,11 +182,32 @@ const getCurrentUserId = (): string => {
 
 const getAvatarColor = getActivityAvatarColor;
 
+// The wording each source of a move-out verdict carries wherever the source is named.
+const SPLIT_SOURCE_KEY: Record<string, I18nKey> = {
+  ai: "alerts.incidents.timeline.inferredByAi",
+  alert_history: "alerts.incidents.timeline.inferredFromAlertHistory",
+  service_graph: "alerts.incidents.timeline.inferredFromServiceGraph",
+  workload: "alerts.incidents.timeline.inferredFromWorkload",
+};
+
+const splitSource = (event: any): I18nText | null => {
+  const key = SPLIT_SOURCE_KEY[event.data?.inferred_by];
+  return key ? t(key) : null;
+};
+
+const splitFromLink = (event: any) => ({
+  name: "incidentDetail",
+  params: { id: event.data?.from_incident_id ?? "" },
+  query: { org_identifier: store.state.selectedOrganization?.identifier },
+});
+
 // Get event icon
 const getEventIcon = (event: any): string => {
   switch (event.type) {
     case "Created":
       return "add-circle";
+    case "SplitFrom":
+      return "alt-route";
     case "Alert":
       return "notifications";
     case "SeverityUpgrade":
@@ -197,6 +250,7 @@ const getEventIcon = (event: any): string => {
 const getEventBadgeColor = (event: any): string => {
   switch (event.type) {
     case "Created":
+    case "SplitFrom":
       return "var(--color-indigo-500)";
     case "Alert":
       return "var(--color-amber-500)";
@@ -237,10 +291,14 @@ const getEventBadgeText = (event: any): string => {
   switch (event.type) {
     case "Created":
       return t("alerts.incidents.timeline.badgeCreated");
+    case "SplitFrom":
+      return t("alerts.incidents.timeline.badgeOpenedOnItsOwn");
     case "Alert":
       return t("alerts.incidents.timeline.badgeAlert");
     case "SeverityUpgrade":
-      return t("alerts.incidents.timeline.badgeSeverityUpgraded");
+      return severityLowered(event.data)
+        ? t("alerts.incidents.timeline.badgeSeverityLowered")
+        : t("alerts.incidents.timeline.badgeSeverityUpgraded");
     case "SeverityOverride":
       return t("alerts.incidents.timeline.badgeSeverityChanged");
     case "Acknowledged":
@@ -285,6 +343,12 @@ const AI_TYPES = [
 ];
 const SEVERITY_TYPES = ["SeverityUpgrade", "SeverityOverride"];
 
+// P1 is the most urgent; a SeverityUpgrade to a less urgent level is a put-back.
+const severityLowered = (data: any): boolean => {
+  const rank = (s: unknown) => Number(String(s ?? "").replace(/^P/, ""));
+  return rank(data?.to) > rank(data?.from);
+};
+
 // True only for the fixed "AI SRE" badge treatment: a system-authored AI
 // event. A user-cancelled AI event goes through the normal badge instead.
 const isAiLabelled = (event: any): boolean => {
@@ -299,7 +363,7 @@ const getEventLayout = (event: any): "no-badge" | "before" | "after" => {
   if (SEVERITY_TYPES.includes(event.type)) return "no-badge";
   const isSystemEvent = getUserId(event) === "System";
   if (!isSystemEvent) return "before";
-  if (isAiLabelled(event) || event.type === "Alert") return "before";
+  if (isAiLabelled(event) || event.type === "Alert" || event.type === "SplitFrom") return "before";
   return "after";
 };
 
@@ -364,6 +428,15 @@ const getInlineEventText = (event: any): string => {
     case "SeverityUpgrade": {
       const from = severityBadge(data.from);
       const to = severityBadge(data.to);
+      if (isSystemEvent && severityLowered(data)) {
+        return data.reason
+          ? t("alerts.incidents.timeline.severityLoweredWithReason", {
+              from,
+              to,
+              reason: esc(data.reason),
+            })
+          : t("alerts.incidents.timeline.severityLowered", { from, to });
+      }
       if (isSystemEvent) {
         return data.reason
           ? t("alerts.incidents.timeline.severityUpgradedWithReason", {
@@ -443,8 +516,8 @@ const getSanitizedInlineHtml = (event: any): string =>
 
 const getCommentBody = (event: any): string => event.data?.comment || "";
 
-// Get tooltip text for AI analysis failure events
 const getFailureTooltip = (event: any): I18nText | undefined => {
+  if (event.type === "SplitFrom") return event.data?.reason ? raw(event.data.reason) : undefined;
   return event.data?.error_details ? raw(event.data.error_details) : undefined;
 };
 

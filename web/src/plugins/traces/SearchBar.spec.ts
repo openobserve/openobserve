@@ -67,7 +67,10 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 // The last autoCompleteData the component created, so tests can read the stream context it was given.
-const suggestState = vi.hoisted(() => ({ autoCompleteData: null as any }));
+const suggestState = vi.hoisted(() => ({
+  autoCompleteData: null as any,
+  setValuesTimeRange: vi.fn(),
+}));
 
 vi.mock("@/composables/useSuggestions", () => ({
   default: () => ({
@@ -85,6 +88,7 @@ vi.mock("@/composables/useSuggestions", () => ({
     getSuggestions: vi.fn(),
     updateFieldKeywords: vi.fn(),
     updateStreamKeywords: vi.fn(),
+    setValuesTimeRange: suggestState.setValuesTimeRange,
   }),
 }));
 
@@ -331,6 +335,7 @@ import queryHistory from "@/services/query_history";
 import { queryClient } from "@/composables/query/queryClient";
 // ---------------------------------------------------------------------------
 import SearchBar from "@/plugins/traces/SearchBar.vue";
+import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
 import analytics from "@/services/product_analytics";
 import SavedViewsSubmenu from "@/components/savedViews/SavedViewsSubmenu.vue";
 import { useToolbarPins } from "@/composables/useToolbarPins";
@@ -389,6 +394,8 @@ const sharedStubs = {
       "hideNlToggle",
       "nlpMode",
       "transformGeneratedQuery",
+      "fullTextSearch",
+      "valuesTimeRange",
     ],
     emits: ["update:query", "run-query", "focus", "blur", "user-edit", "update:nlpMode"],
     setup(_: unknown, { emit }: { emit: (event: "focus") => void }) {
@@ -678,7 +685,7 @@ describe("SearchBar", () => {
       expect(wrapper.find('[data-test="services-catalog-date-time-picker"]').exists()).toBe(false);
     });
 
-    it("should show the Services Catalog toolbar (DateTime) in services-catalog mode", async () => {
+    it("should show the Services Catalog toolbar (DateTime, refresh) in services-catalog mode", async () => {
       searchObjInstance.meta.searchMode = "services-catalog";
       wrapper = mountSearchBar();
       await flushPromises();
@@ -701,6 +708,40 @@ describe("SearchBar", () => {
       },
     );
 
+    it("should emit services-catalog-refresh from the toolbar refresh button in services-catalog mode", async () => {
+      searchObjInstance.meta.searchMode = "services-catalog";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      await wrapper.find('[data-test="services-catalog-refresh-btn"]').trigger("click");
+
+      expect(wrapper.emitted("services-catalog-refresh")).toHaveLength(1);
+      expect(wrapper.emitted("service-graph-refresh")).toBeFalsy();
+    });
+
+    it.each([
+      ["service-graph", "service-graph-refresh-btn"],
+      ["services-catalog", "services-catalog-refresh-btn"],
+    ])(
+      "shows one refresh button beside the %s time picker with the tab's own load state",
+      async (mode, testId) => {
+        searchObjInstance.meta.searchMode = mode;
+        wrapper = mountSearchBar({ refreshLoading: true, refreshLastRunAt: 1_700_000_000_000 });
+        await flushPromises();
+
+        const buttons = wrapper.findAllComponents({ name: "ORefreshButton" });
+        expect(buttons).toHaveLength(1);
+        expect(buttons[0].props()).toMatchObject({
+          dataTest: testId,
+          layout: "inline",
+          loading: true,
+          lastRunAt: 1_700_000_000_000,
+        });
+        const picker = wrapper.find(`[data-test="${mode}-date-time-picker"]`).element;
+        expect(picker.nextElementSibling?.getAttribute("data-test")).toBe(testId);
+      },
+    );
+
     it("should emit service-graph-refresh when the graph refresh button is clicked", async () => {
       searchObjInstance.meta.searchMode = "service-graph";
       wrapper = mountSearchBar();
@@ -709,6 +750,27 @@ describe("SearchBar", () => {
       await wrapper.find('[data-test="service-graph-refresh-btn"]').trigger("click");
 
       expect(wrapper.emitted("service-graph-refresh")).toBeTruthy();
+    });
+
+    it("shows how long ago the Service Graph last loaded beside its refresh control", async () => {
+      searchObjInstance.meta.searchMode = "service-graph";
+      const lastRunAt = Date.now() - 3 * 60 * 1000;
+      wrapper = mountSearchBar({ refreshLastRunAt: lastRunAt });
+      await flushPromises();
+
+      const refresh = wrapper.findComponent({ name: "ORefreshButton" });
+      expect(refresh.props("lastRunAt")).toBe(lastRunAt);
+      expect(refresh.find('[data-test="service-graph-refresh-btn"]').exists()).toBe(true);
+      // vue-i18n is mocked to return keys, so the age renders as its key.
+      expect(refresh.text()).toContain("refreshButton.minutesAgo");
+    });
+
+    it("marks the Service Graph refresh control busy while the graph loads", async () => {
+      searchObjInstance.meta.searchMode = "service-graph";
+      wrapper = mountSearchBar({ refreshLoading: true });
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "ORefreshButton" }).props("loading")).toBe(true);
     });
   });
 
@@ -1106,6 +1168,35 @@ describe("SearchBar", () => {
       expect(btn.attributes("aria-disabled")).toBeUndefined();
       await btn.trigger("click");
       expect(wrapper.emitted("drill-down")).toHaveLength(1);
+    });
+
+    it("is aria-disabled and inert to clicks when the search found nothing", async () => {
+      applySearch();
+      const hits = searchObjInstance.data.queryResults.hits;
+      searchObjInstance.data.queryResults.hits = [];
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const btn = wrapper.find('[data-test="insights-button"]');
+      expect(btn.attributes("aria-disabled")).toBe("true");
+      await btn.trigger("click");
+      expect(wrapper.emitted("drill-down")).toBeUndefined();
+      searchObjInstance.data.queryResults.hits = hits;
+    });
+
+    it("stays available on an empty page when the search total has matches", async () => {
+      applySearch();
+      const { hits, total } = searchObjInstance.data.queryResults;
+      searchObjInstance.data.queryResults.hits = [];
+      searchObjInstance.data.queryResults.total = 1200;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="insights-button"]').attributes("aria-disabled"),
+      ).toBeUndefined();
+      searchObjInstance.data.queryResults.hits = hits;
+      searchObjInstance.data.queryResults.total = total;
     });
 
     it("should be hidden when the org has no trace streams", async () => {
@@ -1531,6 +1622,54 @@ describe("SearchBar", () => {
     });
   });
 
+  describe("share link of an unrun query", () => {
+    const shareBtn = () => wrapper.find('[data-test="logs-search-bar-share-link-btn"]');
+    const markRun = () => {
+      searchObjInstance.meta.lastRunSignature = tracesSearchRunSignature(searchObjInstance);
+    };
+    const mountWithShare = () =>
+      mount(SearchBar, {
+        attachTo: "#app",
+        props: { fieldValues: {}, isLoading: false },
+        global: { plugins: [store, router], stubs: { ...sharedStubs, ShareButton: false } },
+      });
+
+    beforeEach(() => {
+      store.state.zoConfig = { ...store.state.zoConfig, web_url: "http://localhost" };
+    });
+
+    afterEach(() => {
+      store.state.zoConfig = { ...store.state.zoConfig, web_url: "" };
+    });
+
+    it("disables Share with the Logs reason once a builder chip waits for Run", async () => {
+      markRun();
+      wrapper = mountWithShare();
+      await flushPromises();
+      expect(shareBtn().attributes("aria-disabled")).toBeUndefined();
+
+      expect((wrapper.vm as any).onFilterBuilderQuery("operation_name = 'POST /checkout'")).toBe(
+        false,
+      );
+      await flushPromises();
+
+      expect(shareBtn().attributes("aria-disabled")).toBe("true");
+      expect(shareBtn().text()).toContain("search.autoRunPersistNeedsRun");
+
+      markRun();
+      await flushPromises();
+
+      expect(shareBtn().attributes("aria-disabled")).toBeUndefined();
+    });
+
+    it("disables Share before the first run", async () => {
+      wrapper = mountWithShare();
+      await flushPromises();
+
+      expect(shareBtn().attributes("aria-disabled")).toBe("true");
+    });
+  });
+
   describe("toolbar collapse stages", () => {
     let widthSpy: ReturnType<typeof mockToolbarWidth>;
     const { isPinned, togglePin } = useToolbarPins("traces");
@@ -1817,6 +1956,20 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
+  describe("filter builder free text", () => {
+    afterEach(() => localStorage.removeItem("o2.traces.queryInput"));
+
+    it("never offers a search-text row, since trace streams have no full-text fields", async () => {
+      localStorage.setItem("o2.traces.queryInput", "builder");
+      searchObjInstance.meta.showQuery = true;
+      searchObjInstance.meta.sqlMode = false;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.findComponent(SqlFilterBuilder).props("freeText")).toBe(false);
+    });
+  });
+
   describe("filter builder growth", () => {
     let rectSpy: ReturnType<typeof vi.spyOn> | undefined;
 
@@ -1946,6 +2099,51 @@ describe("SearchBar", () => {
       await flushPromises();
 
       expect(editorProps().props("filterMode")).toBe(true);
+    });
+
+    it("never offers match_all for a typed word, since trace streams have no full-text fields", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(editorProps().props("fullTextSearch")).toBe(false);
+    });
+
+    it("looks up values over the selected range, cut to its latest day", async () => {
+      const HOUR = 3_600_000_000;
+      const end = 29_000_000 * 60_000_000;
+      searchObjInstance.data.datetime.type = "absolute";
+      searchObjInstance.data.datetime.startTime = end - 7 * 24 * HOUR;
+      searchObjInstance.data.datetime.endTime = end;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const window = { startTime: end - 24 * HOUR, endTime: end, capped: true };
+      const readRange = suggestState.setValuesTimeRange.mock.calls.at(-1)![0];
+      expect(readRange()).toEqual(window);
+      expect(editorProps().props("valuesTimeRange")).toEqual(window);
+    });
+
+    it("looks up a relative range from the time of the lookup", async () => {
+      const MINUTE = 60_000_000;
+      const end = 29_000_000 * MINUTE;
+      searchObjInstance.data.datetime.type = "relative";
+      searchObjInstance.data.datetime.startTime = end - 15 * MINUTE;
+      searchObjInstance.data.datetime.endTime = end;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime((end + 60 * MINUTE) / 1000);
+        const readRange = suggestState.setValuesTimeRange.mock.calls.at(-1)![0];
+        expect(readRange()).toEqual({
+          startTime: end + 45 * MINUTE,
+          endTime: end + 60 * MINUTE,
+          capped: false,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("hands the query to suggestions after 100 ms, as Logs does", async () => {
@@ -3083,11 +3281,7 @@ describe("SearchBar", () => {
       await flushPromises();
       searchObjInstance.data.editorValue = "";
       searchObjInstance.meta.queryEditorPlaceholderFlag = true;
-      const vm = wrapper.vm as unknown as {
-        recentFocusOpen: boolean;
-        toggleFilterBuilder: () => void;
-      };
-      vm.toggleFilterBuilder();
+      const vm = wrapper.vm as unknown as { recentFocusOpen: boolean };
       vm.recentFocusOpen = false;
       await flushPromises();
       expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
@@ -3164,7 +3358,7 @@ describe("SearchBar", () => {
         >);
       store.state.zoConfig.query_history_enabled = true;
       queryClient.clear();
-      localStorage.removeItem("o2.traces.queryInput");
+      localStorage.setItem("o2.traces.queryInput", "builder");
       searchObjInstance.data.editorValue = "";
       wrapper = mountSearchBar();
       await flushPromises();
@@ -3178,6 +3372,7 @@ describe("SearchBar", () => {
         expect.objectContaining({ id: "a" }),
       ]);
       expect(wrapper.emitted("recent-restore")![0][2]).toBe(true);
+      localStorage.removeItem("o2.traces.queryInput");
       delete store.state.zoConfig.query_history_enabled;
       list.mockRestore();
       count.mockRestore();

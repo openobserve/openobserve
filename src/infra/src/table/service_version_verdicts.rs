@@ -182,6 +182,26 @@ pub async fn get<C: ConnectionTrait>(
     Ok(row)
 }
 
+/// Verdicts of one org by key, in one read; a key with no row is left out.
+pub async fn get_by_keys<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    verdict_keys: &[String],
+) -> Result<Vec<Model>, errors::Error> {
+    if verdict_keys.is_empty() {
+        return Ok(Vec::new());
+    }
+    let rows = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::VerdictKey.is_in(verdict_keys.iter().cloned()))
+        .all(conn)
+        .await?;
+    for row in &rows {
+        validate(row)?;
+    }
+    Ok(rows)
+}
+
 pub async fn list_evaluating<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,

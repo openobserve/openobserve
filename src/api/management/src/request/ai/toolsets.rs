@@ -241,7 +241,10 @@ pub async fn create(
             ));
         }
         Err(infra::errors::Error::DbError(infra::errors::DbError::UniqueViolation)) => {
-            return name_taken(&org_id, &body.name).await;
+            return MetaHttpResponse::conflict(format!(
+                "toolset '{}' already exists in org '{}'",
+                body.name, org_id
+            ));
         }
         Err(e) => return MetaHttpResponse::internal_error(e),
     }
@@ -608,20 +611,6 @@ pub struct ResyncResponse {
 pub async fn resync(Path(org_id): Path<String>) -> Response {
     match db::ai_toolsets::resync(&org_id, now_micros()).await {
         Ok(published) => Json(ResyncResponse { published }).into_response(),
-        Err(e) => MetaHttpResponse::internal_error(e),
-    }
-}
-
-/// The 409 for a name another row holds, saying so when that row is one no list shows.
-async fn name_taken(org_id: &str, name: &str) -> Response {
-    match infra::table::org_ai_toolsets::is_name_held_unread(org_id, name).await {
-        Ok(true) => MetaHttpResponse::conflict(format!(
-            "the name '{name}' is held in org '{org_id}' by a CLI toolset, a kind no longer \
-             supported; choose another name"
-        )),
-        Ok(false) => {
-            MetaHttpResponse::conflict(format!("toolset '{name}' already exists in org '{org_id}'"))
-        }
         Err(e) => MetaHttpResponse::internal_error(e),
     }
 }
@@ -1087,69 +1076,6 @@ mod tests {
         assert!(!toolsets[0].rename_needed);
         let stored = stored_mcp();
         assert!(updated_data("mcp", Some(&stored), Some(json!({"timeout_seconds": 9}))).is_ok());
-    }
-
-    #[tokio::test]
-    async fn a_cli_row_reads_as_not_existing_and_still_holds_its_name() {
-        if !crate::request::ai::memory::tests::meta_store().await {
-            return;
-        }
-        let org = format!("cli_{}", now_micros());
-        let id = Ksuid::new(None, None).to_string();
-        let stored = OrgToolset {
-            id: id.clone(),
-            org: org.clone(),
-            name: "gh".to_string(),
-            ..row(
-                "cli",
-                json!({"command": "gh", "env": {"GH_TOKEN": "s3cret"}}),
-            )
-        };
-        infra::table::org_ai_toolsets::add(stored).await.unwrap();
-
-        let user = || {
-            Headers(UserEmail {
-                user_id: "u@example.com".to_string(),
-            })
-        };
-        let at = || Path((org.clone(), id.clone()));
-        assert_eq!(get(at(), user()).await.status(), StatusCode::NOT_FOUND);
-        assert_eq!(delete(at()).await.status(), StatusCode::NOT_FOUND);
-        let change = ToolsetUpdateRequest {
-            description: Some("x".to_string()),
-            data: None,
-            region_only: None,
-        };
-        assert_eq!(
-            update(at(), Json(change)).await.status(),
-            StatusCode::NOT_FOUND
-        );
-        for kind in [None, Some("cli".to_string())] {
-            let query = ListQuery {
-                kind,
-                ..Default::default()
-            };
-            let listed = body_of(list(Path(org.clone()), Query(query), user()).await).await;
-            assert_eq!(listed["toolsets"], json!([]));
-        }
-
-        let request: ToolsetCreateRequest = serde_json::from_value(
-            json!({"name": "gh", "kind": "mcp", "data": {"url": "https://x.example/mcp"}}),
-        )
-        .unwrap();
-        let resp = create(Path(org.clone()), user(), Json(request)).await;
-        assert_eq!(resp.status(), StatusCode::CONFLICT);
-        let message = body_of(resp).await["message"].to_string();
-        assert!(message.contains("held in org"), "{message}");
-        assert!(
-            infra::table::org_ai_toolsets::is_name_held_unread(&org, "gh")
-                .await
-                .unwrap(),
-            "the row stays"
-        );
-        infra::table::org_ai_toolsets::delete_by_org(&org)
-            .await
-            .unwrap();
     }
 
     #[test]

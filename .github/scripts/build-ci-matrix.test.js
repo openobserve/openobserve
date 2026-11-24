@@ -175,6 +175,20 @@ test("only-shards emits exactly the named shards and dies on an unknown name", (
   assert.throws(() => only("Org", ["--select-for-changes", changed]), /cannot be combined/);
 });
 
+test("restricted_routes_on_empty_data is emitted on every shard, true only where set", () => {
+  const include = JSON.parse(
+    execFileSync("node", [SCRIPT, BASE], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+  ).include;
+  const on = include.filter((s) => s.restricted_routes_on_empty_data === "true").map((s) => s.testfolder);
+  assert.deepStrictEqual(on, ["Onboarding-Empty-Data"]);
+  assert.ok(include.every((s) => ["true", "false"].includes(s.restricted_routes_on_empty_data)));
+  const base = fixture("restricted", [
+    { testfolder: "X", actual_folder: "X", run_files: ["a.spec.js"], restricted_routes_on_empty_data: true },
+  ], { core_shards: ["X"], folder_paths: { X: ["web/x/**"] } });
+  const [x] = JSON.parse(execFileSync("node", [SCRIPT, base], { encoding: "utf8" })).include;
+  assert.strictEqual(x.restricted_routes_on_empty_data, "true");
+});
+
 test("config errors die eagerly, even when the changed file is global", () => {
   const shard = { testfolder: "X", actual_folder: "X", run_files: ["a.spec.js"] };
   const goodPaths = { folder_paths: { X: ["web/x/**"] }, global_paths: ["web/global/**"] };

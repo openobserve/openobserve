@@ -916,7 +916,7 @@ async fn stored_dashboard(
 ) -> Result<Dashboard, Response> {
     use crate::dashboards::DashboardError;
 
-    infra::table::dashboards::get_from_folder(org_id, folder_id, dashboard_id)
+    infra::table::dashboards::get_from_folder_primary(org_id, folder_id, dashboard_id)
         .await
         .map_err(|e| Response::from(DashboardError::from(e)))?
         .ok_or_else(|| Response::from(DashboardError::DashboardNotFound))

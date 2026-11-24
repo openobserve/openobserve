@@ -549,7 +549,6 @@ pub(crate) mod tests {
     }
 
     /// The migrated SQLite meta store, set up once per test process.
-    #[cfg(feature = "enterprise")]
     pub(crate) async fn meta_store() {
         static READY: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
         READY

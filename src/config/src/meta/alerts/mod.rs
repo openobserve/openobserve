@@ -41,6 +41,7 @@ pub mod content_spec;
 pub mod dispatch;
 pub mod grouping;
 pub mod incidents;
+pub mod lease;
 pub mod level;
 pub mod notification_kind;
 pub mod priority;

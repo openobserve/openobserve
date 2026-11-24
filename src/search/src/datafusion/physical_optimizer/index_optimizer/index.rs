@@ -63,6 +63,7 @@ pub struct IndexRule {
     // this set to true when all filter can be extract to
     // index condition(except _timestamp filter)
     pub can_optimize: Arc<AtomicBool>,
+    match_all: bool,
 }
 
 impl IndexRule {
@@ -76,7 +77,14 @@ impl IndexRule {
             fts_fields,
             index_condition,
             can_optimize: Arc::new(AtomicBool::new(false)),
+            match_all: true,
         }
+    }
+
+    /// `match_all` reads the combined FTS terms, which hold raw values of redacted fields.
+    pub fn without_match_all(mut self) -> Self {
+        self.match_all = false;
+        self
     }
 
     pub fn can_optimize(&self) -> bool {
@@ -99,6 +107,7 @@ impl PhysicalOptimizerRule for IndexRule {
             self.fts_fields.clone(),
             self.index_condition.clone(),
         );
+        rewriter.match_all = self.match_all;
         let plan = plan.rewrite(&mut rewriter).data()?;
 
         // If no filter was found at all (e.g., SELECT count(*) FROM table),
@@ -141,6 +150,7 @@ struct IndexOptimizer {
     has_filter: bool,
     is_remove_filter: bool,
     optimizer_enabled: bool,
+    match_all: bool,
 }
 
 impl IndexOptimizer {
@@ -161,6 +171,7 @@ impl IndexOptimizer {
             optimizer_enabled: config::get_config()
                 .search
                 .inverted_index_count_optimizer_enabled,
+            match_all: true,
         }
     }
 
@@ -180,6 +191,7 @@ impl IndexOptimizer {
             has_filter: false,
             is_remove_filter,
             optimizer_enabled,
+            match_all: true,
         }
     }
 }
@@ -193,7 +205,7 @@ impl TreeNodeRewriter for IndexOptimizer {
             let mut index_conditions = IndexCondition::new();
             let mut other_conditions = Vec::new();
             for expr in split_conjunction(filter.predicate()) {
-                if is_expr_valid_for_index(expr, &self.index_fields) {
+                if is_expr_valid_for_index(expr, &self.index_fields, self.match_all) {
                     let condition = Condition::from_physical_expr(expr);
                     index_conditions.add_condition(condition);
                 } else if let Some(condition) = fts_like_condition(expr, &self.fts_fields) {
@@ -268,7 +280,11 @@ fn construct_filter_exec(
 }
 
 // Check if the expression is valid for the index.
-fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<String>) -> bool {
+fn is_expr_valid_for_index(
+    expr: &Arc<dyn PhysicalExpr>,
+    index_fields: &HashSet<String>,
+    match_all: bool,
+) -> bool {
     if let Some(expr) = expr.downcast_ref::<BinaryExpr>() {
         match expr.op() {
             Operator::Eq | Operator::NotEq => {
@@ -285,8 +301,8 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
                 }
             }
             Operator::And | Operator::Or => {
-                return is_expr_valid_for_index(expr.left(), index_fields)
-                    && is_expr_valid_for_index(expr.right(), index_fields);
+                return is_expr_valid_for_index(expr.left(), index_fields, match_all)
+                    && is_expr_valid_for_index(expr.right(), index_fields, match_all);
             }
             _ => return false,
         }
@@ -304,12 +320,13 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
         let name = expr.name();
         return match name {
             MATCH_ALL_UDF_NAME => {
-                expr.args().len() == 1
+                match_all
+                    && expr.args().len() == 1
                     && extract_string_literal(&expr.args()[0])
                         .map(|s| !o2_collect_search_tokens(&s).is_empty())
                         .unwrap_or(false)
             }
-            FUZZY_MATCH_ALL_UDF_NAME => expr.args().len() == 2,
+            FUZZY_MATCH_ALL_UDF_NAME => match_all && expr.args().len() == 2,
             STR_MATCH_UDF_NAME
             | STR_MATCH_UDF_IGNORE_CASE_NAME
             | MATCH_FIELD_UDF_NAME
@@ -319,7 +336,7 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
             _ => false,
         };
     } else if let Some(expr) = expr.downcast_ref::<NotExpr>() {
-        return is_expr_valid_for_index(expr.arg(), index_fields);
+        return is_expr_valid_for_index(expr.arg(), index_fields, match_all);
     } else {
         return false;
     }
@@ -561,9 +578,9 @@ mod tests {
 
         for (expr, is_valid, condition) in case {
             if is_valid {
-                assert!(is_expr_valid_for_index(&expr, &index_fields));
+                assert!(is_expr_valid_for_index(&expr, &index_fields, true));
             } else {
-                assert!(!is_expr_valid_for_index(&expr, &index_fields));
+                assert!(!is_expr_valid_for_index(&expr, &index_fields, true));
             }
             if let Some(condition) = condition {
                 assert_eq!(Condition::from_physical_expr(&expr), condition);
@@ -617,7 +634,10 @@ mod tests {
 
         for (expr, condition) in cases {
             assert_eq!(fts_like_condition(&expr, &fts_fields), condition, "{expr}");
-            assert!(!is_expr_valid_for_index(&expr, &index_fields), "{expr}");
+            assert!(
+                !is_expr_valid_for_index(&expr, &index_fields, true),
+                "{expr}"
+            );
         }
     }
 

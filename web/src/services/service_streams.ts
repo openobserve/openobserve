@@ -55,6 +55,8 @@ export interface StreamInfo {
   filters?: Record<string, string>; // omitted by backend when empty (skip_serializing_if)
   /** Lowercased spellings a filter field matches case-insensitively (the service key's spellings). */
   filter_spellings?: Record<string, string[]>;
+  /** Other fields of a filter's group this stream holds, keyed by the filter field; each matches the same value. */
+  filter_aliases?: Record<string, string[]>;
   /** Identity dimensions the backend could not resolve on this stream's schema (query is wider than chips imply). */
   dropped_dimensions?: string[];
 }

@@ -98,9 +98,10 @@ pub async fn published_delete(row: &OrgToolset, deleted_at: i64) -> Result<()> {
     Ok(())
 }
 
-/// The tombstone a delete leaves, or `None` for a "this region only" row.
+/// The tombstone a delete leaves, or `None` for a row [`put_message`] never sends.
 pub fn tombstone_for(row: &OrgToolset, deleted_at: i64) -> Option<Tombstone> {
-    (!row.region_only).then(|| Tombstone {
+    let replicated = !row.region_only && row.kind.parse::<ToolsetKind>().is_ok();
+    replicated.then(|| Tombstone {
         org: row.org.clone(),
         key: normalize_tool_name(&row.name),
         deleted_at,
@@ -167,14 +168,6 @@ async fn apply_put(msg: AiToolsetMessage) -> Result<Applied> {
     let Ok(parsed_kind) = kind.parse::<ToolsetKind>() else {
         return Ok(Applied::Ignored);
     };
-    // The unique name can't be taken over and the row holding it must stay as it is.
-    if table::is_name_held_unread(&org, &name).await? {
-        log::warn!(
-            "[SUPER_CLUSTER:sync] toolset '{name}' of org '{org}' isn't applied here: a row of a \
-             kind no longer supported has its name"
-        );
-        return Ok(Applied::Ignored);
-    }
     let version = (updated_at, region.as_str());
     if let Some(t) = table::get_tombstone(&org, &key).await?
         && !wins(version, (t.deleted_at, &t.region))
@@ -407,10 +400,11 @@ mod tests {
             ..row("gh", r#"{"env":{"GH_TOKEN":"s3cret"}}"#)
         };
         assert!(put_message(&r).is_none());
+        assert!(tombstone_for(&r, 9).is_none());
     }
 
     #[tokio::test]
-    async fn a_received_cli_row_and_one_whose_name_a_cli_row_holds_are_ignored() {
+    async fn a_received_cli_row_is_ignored() {
         if !meta_store().await {
             return;
         }
@@ -432,21 +426,7 @@ mod tests {
             Applied::Ignored,
             "the kind is not applied"
         );
-        assert!(!table::is_name_held_unread(&org, "gh").await.unwrap());
-
-        let held = OrgToolset {
-            id: String::new(),
-            org: org.clone(),
-            kind: "cli".into(),
-            ..row("dd", "{}")
-        };
-        table::add(held).await.unwrap();
-        let taken = put(&org, 10, json!({"url": "https://a"}));
-        assert_eq!(apply_replicated(taken).await.unwrap(), Applied::Ignored);
-        assert!(stored(&org).await.is_none());
-        assert!(table::is_name_held_unread(&org, "dd").await.unwrap());
-        table::delete_by_org(&org).await.unwrap();
-        assert!(!table::is_name_held_unread(&org, "dd").await.unwrap());
+        assert!(table::list_names(&org).await.unwrap().is_empty());
     }
 
     #[test]

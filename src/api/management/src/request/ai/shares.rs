@@ -29,7 +29,6 @@ use axum::{
 };
 use config::{
     axum::middlewares::RealIp,
-    meta::user::UserRole,
     utils::{
         hash::{Sum64, fnv},
         time::now_micros,
@@ -47,10 +46,13 @@ use o2_enterprise::enterprise::ai::chat::{
     batcher::DurableEvent,
     lease::{self, LeaseError},
 };
-use openobserve_core::ai_chat::{
-    ReadError,
-    admission::{normalize_uuid, resolve_owner},
-    projection,
+use openobserve_core::{
+    ai_chat::{
+        ReadError,
+        admission::{normalize_uuid, resolve_owner},
+        projection,
+    },
+    users::is_org_admin,
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -1341,15 +1343,6 @@ async fn owner_name(chat: &ChatModel, public: bool) -> Option<String> {
     } else {
         name.or_else(|| Some(chat.user_email.clone()))
     }
-}
-
-async fn is_org_admin(org_id: &str, user_email: &str) -> bool {
-    if db::user::is_root_user(user_email) {
-        return true;
-    }
-    openobserve_core::users::get_user(Some(org_id), user_email)
-        .await
-        .is_some_and(|u| matches!(u.role, UserRole::Root | UserRole::Admin))
 }
 
 /// Views of `shares` whose active chat its creator still owns; only the caller's own carry links.

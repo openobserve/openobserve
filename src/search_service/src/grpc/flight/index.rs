@@ -77,16 +77,23 @@ pub(super) fn apply_index_rules(
     index_info: &IndexInfo,
 ) -> Result<(Arc<dyn ExecutionPlan>, IndexPlan), Error> {
     let index_condition_ref = Arc::new(Mutex::new(None));
-    let index_mode = index_info.index_optimize_mode.clone().map(Into::into);
+    let index_mode = index_info
+        .index_optimize_mode
+        .clone()
+        .map(Into::into)
+        .filter(|mode| !settings.reads_redacted(mode));
     let index_optimizer_rule_ref = Arc::new(Mutex::new(index_mode));
     let index_fields: HashSet<String> = settings.index_fields.iter().cloned().collect();
 
     // files written before a field joined FTS have none of its terms in `_all`
-    let index_rule = IndexRule::new(
+    let mut index_rule = IndexRule::new(
         index_fields.clone(),
         settings.fts_fields_indexed_since(time_range.0),
         index_condition_ref.clone(),
     );
+    if settings.fts_index_disabled {
+        index_rule = index_rule.without_match_all();
+    }
     let original_plan = Arc::clone(&plan);
     // a skipped rule leaves no condition and cannot optimize, which also drops the leader's mode
     let plan = if index_info.use_index {
@@ -117,7 +124,8 @@ pub(super) fn apply_index_rules(
     {
         let mut index_optimizer_rule = index_optimizer_rule_ref.lock();
         *index_optimizer_rule =
-            index_optimize_mode_for_stream(stream_type, index_optimizer_rule.take());
+            index_optimize_mode_for_stream(stream_type, index_optimizer_rule.take())
+                .filter(|mode| !settings.reads_redacted(mode));
     }
 
     let rewrite_match_rule = RewriteMatchPhysical::new(

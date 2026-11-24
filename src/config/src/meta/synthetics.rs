@@ -141,6 +141,7 @@ pub struct Synthetic {
     #[serde(default)]
     pub destinations: Vec<String>,
     /// Template override for this check's messages; null or "" uses the destination's.
+    /// On update, an absent field keeps the stored override.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub template: Option<String>,
     /// Number of retries before marking a check failed (0 = no retry).

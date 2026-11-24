@@ -14,6 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { orgKey } from "@/composables/query/keys";
+import type { AnomalyExploreQuery } from "@/types/anomalyExplore";
+
+const stableExploreQuery = (q: AnomalyExploreQuery) => [
+  q.start ?? null,
+  q.end ?? null,
+  q.pad ?? null,
+  q.model_version ?? null,
+];
 
 /**
  * Keys only, dependency-free apart from `orgKey`, so a write in another domain
@@ -27,4 +35,6 @@ export const anomalyKeys = {
   detail: (org: string, id: string) => orgKey(org, "anomalyDetection", "detail", id),
   list: (org: string) => orgKey(org, "anomalyDetection", "list"),
   history: (org: string, limit: number) => orgKey(org, "anomalyDetection", "history", limit),
+  explore: (org: string, id: string, query: AnomalyExploreQuery) =>
+    orgKey(org, "anomalyDetection", "explore", id, stableExploreQuery(query)),
 };

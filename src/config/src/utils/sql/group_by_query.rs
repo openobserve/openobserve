@@ -13,9 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sqlparser::{ast::Statement, dialect::GenericDialect, parser::Parser};
+use std::ops::ControlFlow;
 
-use super::helpers::has_group_by;
+use sqlparser::{
+    ast::{
+        Expr, GroupByExpr, SelectItem, SetExpr, Statement, Value, ValueWithSpan, visit_expressions,
+    },
+    dialect::GenericDialect,
+    parser::Parser,
+};
+
+use super::helpers::{has_group_by, is_aggregate_expression};
+
+const TIME_BUCKETS: [&str; 3] = ["histogram", "date_bin", "date_trunc"];
 
 /// Top-level GROUP BY only: a grouped subquery does not group the outer result set.
 pub fn is_group_by_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
@@ -23,6 +33,102 @@ pub fn is_group_by_query(query: &str) -> Result<bool, sqlparser::parser::ParserE
     Ok(ast
         .iter()
         .any(|statement| matches!(statement, Statement::Query(query) if has_group_by(query))))
+}
+
+/// The top-level GROUP BY keys (under GROUP BY ALL, every non-aggregate select item) as result
+/// columns; time buckets and unnamed expressions are left out, and unparseable SQL has none.
+pub fn group_by_columns(query: &str) -> Vec<String> {
+    let Ok(ast) = Parser::parse_sql(&GenericDialect {}, query) else {
+        return Vec::new();
+    };
+    let Some(Statement::Query(query)) = ast.first() else {
+        return Vec::new();
+    };
+    let SetExpr::Select(select) = query.body.as_ref() else {
+        return Vec::new();
+    };
+    let columns: Vec<String> = match &select.group_by {
+        GroupByExpr::Expressions(keys, _) => keys
+            .iter()
+            .filter_map(|key| result_column(key, &select.projection))
+            .collect(),
+        GroupByExpr::All(_) => select
+            .projection
+            .iter()
+            .filter(|item| !is_aggregate_item(item))
+            .filter_map(projected_column)
+            .collect(),
+    };
+    columns
+        .into_iter()
+        .filter(|column| column != crate::TIMESTAMP_COL_NAME)
+        .collect()
+}
+
+fn result_column(key: &Expr, projection: &[SelectItem]) -> Option<String> {
+    if let Some(position) = ordinal(key) {
+        return projected_column(projection.get(position.checked_sub(1)?)?);
+    }
+    let name = column_name(key);
+    for item in projection {
+        if let SelectItem::ExprWithAlias { expr, alias } = item
+            && (name == Some(alias.value.as_str())
+                || name.is_some() && column_name(expr) == name
+                || expr.to_string() == key.to_string())
+        {
+            return (!is_time_bucket(expr)).then(|| alias.value.clone());
+        }
+    }
+    name.map(str::to_string)
+}
+
+fn projected_column(item: &SelectItem) -> Option<String> {
+    match item {
+        SelectItem::ExprWithAlias { expr, alias } => {
+            (!is_time_bucket(expr)).then(|| alias.value.clone())
+        }
+        SelectItem::UnnamedExpr(expr) => column_name(expr).map(str::to_string),
+        _ => None,
+    }
+}
+
+fn is_aggregate_item(item: &SelectItem) -> bool {
+    match item {
+        // An aggregate at any depth, e.g. round(avg(x)), makes the item a measurement, not a key.
+        SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. } => {
+            visit_expressions(expr, |e| {
+                if is_aggregate_expression(e) {
+                    ControlFlow::Break(())
+                } else {
+                    ControlFlow::Continue(())
+                }
+            })
+            .is_break()
+        }
+        _ => false,
+    }
+}
+
+fn ordinal(expr: &Expr) -> Option<usize> {
+    match expr {
+        Expr::Value(ValueWithSpan {
+            value: Value::Number(n, _),
+            ..
+        }) => n.parse().ok(),
+        _ => None,
+    }
+}
+
+fn column_name(expr: &Expr) -> Option<&str> {
+    match expr {
+        Expr::Identifier(ident) => Some(&ident.value),
+        Expr::CompoundIdentifier(parts) => parts.last().map(|part| part.value.as_str()),
+        _ => None,
+    }
+}
+
+fn is_time_bucket(expr: &Expr) -> bool {
+    matches!(expr, Expr::Function(f) if TIME_BUCKETS.contains(&f.name.to_string().to_lowercase().as_str()))
 }
 
 #[cfg(test)]

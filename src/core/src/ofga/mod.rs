@@ -850,8 +850,9 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         pending.profiles = true;
     }
     // 0.0.64 (`security`) relies on explicit grants only, so it needs no back-fill.
-    let v0_0_65 = version_compare::Version::from("0.0.65").unwrap();
-    if meta_version >= v0_0_65 && existing_model_version < v0_0_65 {
+    // 0.0.65 (`logs_unredacted`) also relies on explicit grants only.
+    let v0_0_66 = version_compare::Version::from("0.0.66").unwrap();
+    if meta_version >= v0_0_66 && existing_model_version < v0_0_66 {
         log::info!("[OFGA:Local] ai_memory permissions migration needed");
         pending.ai_memory = true;
     }
@@ -1065,12 +1066,13 @@ mod tests {
     }
 
     #[test]
-    fn ai_memory_back_fill_runs_once_across_0_0_65() {
-        let pending = pending_migrations("0.0.65", "0.0.64");
+    fn ai_memory_back_fill_runs_once_across_0_0_66() {
+        // A store on 0.0.65 has `logs_unredacted` but no `ai_memory`.
+        let pending = pending_migrations("0.0.66", "0.0.65");
         assert!(pending.ai_memory && !pending.incident_integrations);
         assert_eq!(all_org_ownership_keys(&pending), vec!["ai_memory"]);
-        assert!(!pending_migrations("0.0.65", "0.0.65").ai_memory);
-        assert!(!pending_migrations("0.0.64", "0.0.63").ai_memory);
+        assert!(!pending_migrations("0.0.66", "0.0.66").ai_memory);
+        assert!(!pending_migrations("0.0.65", "0.0.64").ai_memory);
         assert!(OFGA_MODELS.contains_key("ai_memory"));
     }
 

@@ -639,6 +639,18 @@ describe("usePanelAggregation", () => {
         expect(fields.breakdown).toEqual([{ alias: "b1" }]);
       });
 
+      it("drops a time bucket from the group levels", () => {
+        const panelData = makePanelData("treemap");
+        const fields = panelData.data.queries[0].fields;
+        fields.x = [
+          { alias: "x_axis_1", column: "_timestamp", functionName: "histogram" },
+          { alias: "x_axis_2", functionName: null },
+        ];
+        fields.y = [yField("count")];
+        makeAggregation(panelData).resetAggregationFunction();
+        expect(fields.x).toEqual([{ alias: "x_axis_2", functionName: null }]);
+      });
+
       it("turns a size a parent tile cannot add up into a count, and keeps a sum", () => {
         const panelData = makePanelData("treemap");
         const fields = panelData.data.queries[0].fields;
@@ -687,6 +699,15 @@ describe("usePanelAggregation", () => {
       const yField = (functionName: string | null) => ({
         functionName,
         args: [{ type: "field" }, { type: "extra" }],
+      });
+
+      it("drops a time bucket from the rings", () => {
+        const sunburst = makePanelData("sunburst");
+        const ring = sunburst.data.queries[0].fields;
+        ring.x = [{ alias: "x_axis_1", column: "_timestamp", functionName: "histogram" }];
+        ring.y = [yField("count")];
+        makeAggregation(sunburst).resetAggregationFunction();
+        expect(ring.x).toEqual([]);
       });
 
       it("keeps every x ring, one y counted and one breakdown", () => {

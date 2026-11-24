@@ -116,8 +116,12 @@ export function shownChecks(checks: DataHealthCheck[], pricingEnabled: boolean):
 export const AI_INSTRUMENTATION_DOCS_URL = "https://openobserve.ai/docs/integration/ai/";
 
 export type FixTarget =
-  /** `feature` gates the setting; an edition that locks it (OSS) offers no fix. */
-  | { kind: "route"; to: { name: string; query: Record<string, string> }; feature: FeatureKey }
+  /** `feature` gates the setting: an edition that locks it offers no fix. `null` = no gate. */
+  | {
+      kind: "route";
+      to: { name: string; query: Record<string, string> };
+      feature: FeatureKey | null;
+    }
   | { kind: "url"; href: string };
 
 /** A time window in epoch microseconds. */
@@ -138,7 +142,7 @@ export function fixTarget(
       return {
         kind: "route",
         to: pricingGapsRoute(stream, orgId, window),
-        feature: "modelPricing",
+        feature: null,
       };
     case "missing_agent_identity":
       return {

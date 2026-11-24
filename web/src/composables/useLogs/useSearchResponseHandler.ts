@@ -179,10 +179,10 @@ export const useSearchResponseHandler = () => {
   ) => {
     const hits = response.content?.results?.hits || [];
 
-    if ((isPagination && searchPartitionMap[payload.traceId].partition === 1) || !appendResult) {
+    if (!appendResult) {
       clearCache();
       searchObj.data.queryResults.hits = hits;
-    } else if (appendResult) {
+    } else {
       searchObj.data.queryResults.hits.push(...hits);
     }
 

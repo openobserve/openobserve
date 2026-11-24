@@ -13,7 +13,8 @@ on:
   merge_group:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
+  # A label that changes nothing here skips every job, so it must neither replace nor queue behind a real run.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci"]'), github.event.label.name)) && '-mirror' || '' }}
   # Only a new commit cancels: a cancelled same-SHA run leaves a failed required summary that a newer run cannot clear.
   cancel-in-progress: ${{ github.event_name != 'pull_request' || github.event.action == 'synchronize' }}
 
@@ -30,7 +31,8 @@ env:
 jobs:
   check_changes:
     # Paid CI runs only on PRs carrying the 'ready-for-ci' label; the merge queue runs unit tests on the merged code.
-    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) }}
+    # Other labels change nothing here, so they skip the whole run; db_tests_summary is not a required check.
+    if: ${{ (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) && !(contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci"]'), github.event.label.name)) }}
     name: check_changes
     runs-on: ubuntu-latest
     permissions:
@@ -232,7 +234,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {}
     needs: [check_changes, db_validation_tests]
-    if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
+    if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) && !(contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci"]'), github.event.label.name))
     steps:
       - name: Check test results
         run: |

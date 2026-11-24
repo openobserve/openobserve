@@ -335,10 +335,11 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     }).toBeGreaterThan(0);
 
     const slackPayload = JSON.parse(received.slack[0].body);
-    // Block Kit sits at the top level; the title's status dot carries severity, so no attachment.
-    const slackBlocks = slackPayload.blocks ?? [];
-    expect(Array.isArray(slackPayload.blocks)).toBe(true);
-    expect(slackPayload.attachments).toBeUndefined();
+    // Block Kit rides in attachments whose color bar repeats the title's status dot.
+    expect(slackPayload.blocks).toBeUndefined();
+    expect(Array.isArray(slackPayload.attachments)).toBe(true);
+    expect(slackPayload.attachments.every((a) => typeof a.color === 'string')).toBe(true);
+    const slackBlocks = slackPayload.attachments.flatMap((a) => a.blocks ?? []);
     expect(slackBlocks.length).toBeGreaterThan(0);
     const slackHeaderText = JSON.stringify(slackBlocks);
     expect(slackHeaderText).toContain(alertName);
@@ -384,9 +385,9 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     }).toBeGreaterThan(0);
 
     const hookOverridePayload = JSON.parse(received.hook[0].body);
-    const hookOverrideBlocks = hookOverridePayload.blocks ?? [];
-    expect(Array.isArray(hookOverridePayload.blocks)).toBe(true);
-    expect(hookOverridePayload.attachments).toBeUndefined();
+    expect(hookOverridePayload.blocks).toBeUndefined();
+    expect(Array.isArray(hookOverridePayload.attachments)).toBe(true);
+    const hookOverrideBlocks = hookOverridePayload.attachments.flatMap((a) => a.blocks ?? []);
     expect(hookOverrideBlocks.length).toBeGreaterThan(0);
     testLogger.info('Verified render_format override: hook destination now received Block Kit, not the Webhook envelope', {
       blocksCount: hookOverrideBlocks.length,

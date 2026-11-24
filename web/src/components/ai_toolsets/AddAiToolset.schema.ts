@@ -1,7 +1,15 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// One flat record with `superRefine`, not a discriminated union, so switching `kind` (mcp / skill)
-// never reshapes the form data.
+// Validation schema for AddAiToolset.vue. The form is keyed on `kind`
+// (mcp / skill): a few fields are always validated (name, kind) and the
+// rest are conditional on the selected kind. Built as a base object +
+// `superRefine` (rather than a discriminated union) so all kind-specific fields
+// can coexist in one flat record — the template only renders the subset for the
+// active kind, but switching kind never reshapes the form data. Factory keeps
+// the messages i18n-driven (pass useI18n's `t`).
+//
+// Validation timing is owned by OForm (submit-then-change via revalidateLogic);
+// this file only describes what is valid.
 
 import { z } from "zod";
 import {
@@ -16,7 +24,10 @@ import {
 export const aiToolsetNameRegex = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 export const AI_TOOLSET_NAME_MAX = 64;
 
-// All optional: a blank starter row is valid, and only keyed rows are saved, without `visible`.
+// One row of a key/value secret list (mcp headers). All fields are
+// free-form and optional (a blank starter row is valid — only non-empty rows are
+// persisted on save). `visible` is the per-row password-visibility UI flag; it is
+// form-owned bookkeeping excluded from the saved payload.
 export const secretRowSchema = z.object({
   key: z.string().optional(),
   value: z.string().optional(),
@@ -86,7 +97,9 @@ export const makeAddAiToolsetSchema = (
           });
         }
       }
-      // Not trimmed, unlike skill.content below: a whitespace-only url is accepted here.
+      // mcp.url required when kind === "mcp". Bare empty check (NO trim): a
+      // whitespace-only url is accepted. (Note the asymmetry: skill.content below
+      // DOES trim; url does not.)
       if (val.kind === "mcp" && !String(val.mcp?.url ?? "")) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -121,6 +134,8 @@ export const makeAddAiToolsetSchema = (
           refuse(["auth", "client_id"], "aiToolset.clientIdRequired");
         }
       }
+      // skill.content required when kind === "skill". Trim IS applied here —
+      // unlike url above.
       if (val.kind === "skill" && !String(val.skill?.content ?? "").trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

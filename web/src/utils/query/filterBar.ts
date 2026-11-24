@@ -109,6 +109,8 @@ export interface FilterGroup {
   items: FilterNode[];
   /** The group matches what its items do not; only `any-of-groups` profiles offer it. */
   negate?: boolean;
+  /** Made by the bar to keep AND and OR apart; lifted again once its level no longer mixes them. */
+  auto?: boolean;
   meta?: FilterNodeMeta;
 }
 
@@ -629,23 +631,58 @@ export const ungroupNode = (root: FilterGroup, id: string): FilterGroup => {
   return parent.id === root.id ? next : replaceNode(root, parent.id, next);
 };
 
-/** Whether lifting group `id` into its parent keeps the filter's meaning; `perGroup` allows one AND/OR per group. */
-export const canUngroupNode = (root: FilterGroup, id: string, perGroup = false): boolean => {
+/** Whether lifting group `id` into its parent leaves that level on one AND/OR, so it keeps its meaning. */
+export const canUngroupNode = (root: FilterGroup, id: string): boolean => {
   const parent = findParent(root, id);
-  const index = parent ? parent.items.findIndex((item) => item.id === id) : -1;
-  const group = parent?.items[index];
+  const group = parent?.items.find((item) => item.id === id);
   if (!parent || group?.kind !== "group") return false;
   if (group.items.length <= 1) return true;
-  const inner = group.items.slice(1).map((item) => item.connector);
-  if (perGroup) {
-    const outer = parent.items.slice(1).map((item) => item.connector);
-    return outer.every((connector) => connector === inner[0]);
+  const joined = [...parent.items.slice(1), ...group.items.slice(1)];
+  return joined.every((item) => item.connector === group.items[1].connector);
+};
+
+const mixesConnectors = (items: FilterNode[]): boolean =>
+  items.slice(2).some((item) => item.connector !== items[1].connector);
+
+const wrapInGroup = (items: FilterNode[]): FilterGroup => ({
+  kind: "group",
+  id: newFilterId(),
+  connector: items[0].connector,
+  items,
+});
+
+/** A level that mixes AND and OR, with each AND run in a group of its own, as SQL precedence reads it. */
+export const groupAndRuns = (items: FilterNode[]): FilterNode[] => {
+  if (!mixesConnectors(items)) return items;
+  const runs: FilterNode[][] = [];
+  items.forEach((item, index) => {
+    if (index === 0 || item.connector === "OR") runs.push([item]);
+    else runs[runs.length - 1].push(item);
+  });
+  return runs.map((run) => (run.length === 1 ? run[0] : wrapInGroup(run)));
+};
+
+/** A level that mixes AND and OR, nested so it runs left to right: `a OR b AND c` becomes `(a OR b) AND c`. */
+export const nestLeftToRight = (items: FilterNode[]): FilterNode[] => {
+  if (!mixesConnectors(items)) return items;
+  let level = [items[0]];
+  for (const item of items.slice(1)) {
+    if (level.length > 1 && item.connector !== level[1].connector)
+      level = [{ ...wrapInGroup(level), auto: true }];
+    level.push(item);
   }
-  // AND binds tighter than OR, so an all-AND group reads the same unbracketed; an OR inside needs OR on both sides.
-  if (inner.every((connector) => connector === "AND")) return true;
-  const before = index > 0 ? group.connector : "OR";
-  const after = parent.items[index + 1]?.connector ?? "OR";
-  return before === "OR" && after === "OR";
+  return level;
+};
+
+/** Lifts the groups `nestLeftToRight` made in group `id`, and `id` itself, where its level no longer mixes AND and OR. */
+export const liftAutoGroups = (root: FilterGroup, id: string): FilterGroup => {
+  const group = id === root.id ? root : findNode(root, id);
+  if (group?.kind !== "group") return root;
+  const lift = (tree: FilterGroup, node: FilterNode) =>
+    node.kind === "group" && node.auto && canUngroupNode(tree, node.id)
+      ? ungroupNode(tree, node.id)
+      : tree;
+  return lift(group.items.reduce(lift, root), group);
 };
 
 /** A node's position as indexes from the root, joined by `-`; used for stable test ids. */
@@ -665,14 +702,30 @@ export const nodePath = (root: FilterGroup, id: string, prefix = ""): string | n
 export const conditionValueLabel = (condition: FilterCondition): string =>
   OPERATORS[condition.operator].arity === "none" ? "" : condition.values.join(", ");
 
-/** Field-list rows as the bar needs them; stream header rows and duplicates across streams are dropped. */
+const mixedTypeFields = (schemas: { name?: string; type?: string }[][]): Set<string> => {
+  const types = new Map<string, FilterFieldType>();
+  const mixed = new Set<string>();
+  for (const { name, type } of schemas.flat()) {
+    if (!name) continue;
+    const kind = toFilterFieldType(type);
+    if ((types.get(name) ?? kind) !== kind) mixed.add(name);
+    types.set(name, kind);
+  }
+  return mixed;
+};
+
+/** Field-list rows as the bar needs them; a field the selected `streamSchemas` type differently is text. */
 export const toFilterFields = (
   rows: { name?: string; dataType?: string; type?: string; label?: boolean }[],
+  streamSchemas: { name?: string; type?: string }[][] = [],
 ): FilterField[] => {
+  // The merged row carries one stream's type; a number literal fails to cast on the stream holding text.
+  const mixed = mixedTypeFields(streamSchemas);
   const seen = new Map<string, FilterField>();
   for (const row of rows) {
     if (!row?.name || row.label || seen.has(row.name)) continue;
-    seen.set(row.name, { name: row.name, type: toFilterFieldType(row.dataType ?? row.type) });
+    const type = mixed.has(row.name) ? "string" : toFilterFieldType(row.dataType ?? row.type);
+    seen.set(row.name, { name: row.name, type });
   }
   return [...seen.values()];
 };

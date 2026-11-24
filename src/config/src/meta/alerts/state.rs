@@ -303,6 +303,23 @@ impl EvalLedgerWrite {
     }
 }
 
+/// The three columns of a state row that every evaluation moves, even when nothing else changed.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RunStamps {
+    pub last_outcome_at: i64,
+    pub level_at: Option<i64>,
+    pub last_seen: Option<i64>,
+}
+
+/// Super-cluster payload for an evaluation that moved only the rollup row's [`RunStamps`].
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StateTouch {
+    pub alert_id: String,
+    pub stamps: RunStamps,
+    #[serde(default)]
+    pub ledger: Option<EvalLedgerWrite>,
+}
+
 /// Whether this evaluation is one the ledger records, and with what.
 ///
 /// `None` means write nothing — the gap forms on its own, which is the safe
@@ -1235,5 +1252,27 @@ mod tests {
         let bytes = crate::utils::json::to_vec(&with).unwrap();
         let back: StateUpdate = crate::utils::json::from_slice(&bytes).unwrap();
         assert_eq!(back.state.unwrap().firing_started_at, Some(42));
+    }
+
+    /// The payload is a wire format other regions decode, so its field names are pinned.
+    #[test]
+    fn a_state_touch_decodes_from_its_wire_form() {
+        let wire = r#"{"alert_id":"alert-1",
+            "stamps":{"last_outcome_at":2000,"level_at":null,"last_seen":2000}}"#;
+
+        let decoded: StateTouch = crate::utils::json::from_str(wire).unwrap();
+
+        assert_eq!(
+            decoded,
+            StateTouch {
+                alert_id: "alert-1".to_string(),
+                stamps: RunStamps {
+                    last_outcome_at: 2_000,
+                    level_at: None,
+                    last_seen: Some(2_000),
+                },
+                ledger: None,
+            }
+        );
     }
 }

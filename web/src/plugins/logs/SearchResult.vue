@@ -351,6 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="h-full w-full"
               @updated:dataZoom="onChartUpdate"
               @finished="onHistogramFinished"
+              @painted="onHistogramPainted"
             />
           </div>
 
@@ -866,6 +867,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="showPatternDetails"
         :selectedPattern="selectedPattern"
         :totalPatterns="patternNavTotal"
+        :filterBlockedReason="
+          showPatternDetails ? filterBlockedReason(selectedPattern?.pattern) : null
+        "
         @navigate="navigatePatternDetail"
         @filter-value="addWildcardValueToSearch"
         @add-to-search="addPatternToSearch"
@@ -927,13 +931,16 @@ import { formatLargeNumber } from "@/utils/formatters";
 import { CUSTOM_THEME_NAME, THEME_STORAGE_KEYS } from "@/constants/themes";
 import useLogs from "../../composables/useLogs";
 import { BREAKDOWN_EMPTY_LABEL, BREAKDOWN_EMPTY_VALUE } from "@/utils/logs/constants";
-import { getEmptyBreakdownFilter } from "@/utils/logs/breakdownFilter";
+import { emptyValueFieldType, getEmptyBreakdownFilter } from "@/utils/logs/breakdownFilter";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
 import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
 import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
-import { extractConstantsFromPattern } from "@/plugins/logs/patterns/patternUtils";
+import {
+  extractConstantsFromPattern,
+  FILTER_BLOCKED_MESSAGE,
+} from "@/plugins/logs/patterns/patternUtils";
 import {
   convertLogData,
   convertStackedLogData,
@@ -1392,6 +1399,7 @@ export default defineComponent({
       navigatePatternDetail,
       navTotal: patternNavTotal,
       addPatternToSearch,
+      filterBlockedReason,
       addWildcardValueToSearch,
       buildSinglePatternAlertPrefill,
     } = usePatternActions();
@@ -1405,11 +1413,14 @@ export default defineComponent({
      * surface.
      */
     const createAlertFromPattern = (pattern: any) => {
-      const launched = openAlertCreation(buildSinglePatternAlertPrefill(pattern));
+      const blocked = filterBlockedReason(pattern);
+      const launched = !blocked && openAlertCreation(buildSinglePatternAlertPrefill(pattern));
       if (!launched) {
         toast({
           variant: "warning",
-          message: t("logs.patternList.alertBroadMatch"),
+          message: t(
+            blocked ? FILTER_BLOCKED_MESSAGE[blocked] : "logs.patternList.alertBroadMatch",
+          ),
         });
       }
     };
@@ -1428,6 +1439,7 @@ export default defineComponent({
         streamName: searchObj.data.stream.selectedStream[0],
         window: props.queryWindowUs as { start: number; end: number } | undefined,
         lastQuery: patternsState.value?.lastQuery,
+        allTemplates: (patternsState.value?.patterns?.patterns ?? []).map((p: any) => p.template),
       });
     });
 
@@ -1743,9 +1755,14 @@ export default defineComponent({
       if (rawValue === BREAKDOWN_EMPTY_VALUE) {
         const quote = (f: string) =>
           searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(f) : f;
-        const fieldType = searchObj.data.stream.selectedStreamFields.find(
-          (f: { name: string; dataType?: string }) => f.name === field,
-        )?.dataType;
+        const fieldType = emptyValueFieldType(
+          field,
+          searchObj.data.stream.selectedStreamFields.find(
+            (f: { name: string; dataType?: string }) => f.name === field,
+          )?.dataType,
+          searchObj.data.streamResults?.list ?? [],
+          searchObj.data.stream.selectedStream,
+        );
         searchObj.data.stream.addToFilterMode = "append";
         searchObj.data.stream.addToFilter = getEmptyBreakdownFilter(
           field,
@@ -1799,8 +1816,6 @@ export default defineComponent({
     const columnSizes = ref({});
 
     const reDrawChart = () => {
-      // Partitions stream in while loading; the chart paints once when the histogram settles.
-      if (searchObj.loadingHistogram) return;
       if (
         Object.prototype.hasOwnProperty.call(searchObj.data.histogram, "xData") &&
         searchObj.data.histogram.xData.length > 0
@@ -2043,6 +2058,8 @@ export default defineComponent({
     // The histogram response lands frames before ECharts paints it, so the run settles on the paint.
     const CHART_PAINT_WAIT_MS = 1500;
     const chartPaintPending = ref(false);
+    const streamPainted = ref(false);
+    const hasPlotChart = () => Object.keys(plotChart.value ?? {}).length > 0;
     let chartPaintTimer: ReturnType<typeof setTimeout> | undefined;
     const settleChartPaint = () => {
       clearTimeout(chartPaintTimer);
@@ -2053,10 +2070,19 @@ export default defineComponent({
       () => !!searchObj.loadingHistogram,
       (loadingNow, loadingBefore) => {
         settleChartPaint();
+        if (loadingNow && !loadingBefore) streamPainted.value = !hasPlotChart();
         if (!loadingBefore || loadingNow || !searchObj.meta.showHistogram || autoRefreshOn())
           return;
         chartPaintPending.value = true;
         chartPaintTimer = setTimeout(settleChartPaint, CHART_PAINT_WAIT_MS);
+      },
+      { flush: "sync" },
+    );
+    // A replacing run can keep loadingHistogram true, so a run's cleared points also start a new stream.
+    watch(
+      () => (searchObj.data.histogram?.xData?.length ?? 0) === 0,
+      (cleared) => {
+        if (cleared) streamPainted.value = !hasPlotChart();
       },
       { flush: "sync" },
     );
@@ -2094,21 +2120,27 @@ export default defineComponent({
     const histogramView = computed(() =>
       resolveHistogramView({
         showHistogram: !!searchObj.meta.showHistogram,
-        hasChart: Object.keys(plotChart.value ?? {}).length > 0,
+        hasChart: hasPlotChart(),
         loading: !!searchObj.loading,
         loadingHistogram: !!searchObj.loadingHistogram,
         histogramPoints: searchObj.data.histogram?.xData?.length ?? 0,
         liveMode: autoRefreshOn(),
+        streamPainted: streamPainted.value,
       }),
     );
     const histogramDimmed = useDelayedFlag(
-      () => histogramView.value.stale || chartPaintPending.value,
+      () => histogramView.value.stale || (chartPaintPending.value && !streamPainted.value),
       STALE_DIM_DELAY_MS,
     );
     const histogramPainted = ref(false);
     const onHistogramFinished = () => {
       histogramPainted.value = true;
-      settleChartPaint();
+    };
+    // A paint with no points of the new run is the previous chart redrawn, so it must not undim it.
+    const onHistogramPainted = () => {
+      if (!searchObj.data.histogram?.xData?.length) return;
+      streamPainted.value = true;
+      if (chartPaintPending.value) settleChartPaint();
     };
     let histogramPaintFrame = 0;
     // Reveal on "finished" so the bars never grow from empty axes; the frame cap only guards a lost event.
@@ -2547,7 +2579,7 @@ export default defineComponent({
 
     const addSearchTerm = (
       field: string | number,
-      field_value: string | number | boolean,
+      field_value: string | number | boolean | null,
       action: string,
     ) => {
       const searchExpression = getFilterExpressionByFieldType(field, field_value, action);
@@ -2953,11 +2985,11 @@ export default defineComponent({
       () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
     );
 
-    const toSearchTermValue = (value: unknown): string | number | boolean => {
+    const toSearchTermValue = (value: unknown): string | number | boolean | null => {
       if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
         return value;
       }
-      if (value === null || value === undefined) return "null";
+      if (value === null || value === undefined) return null;
       return JSON.stringify(value);
     };
 
@@ -3140,6 +3172,7 @@ export default defineComponent({
       histogramSettling,
       chartPaintPending,
       onHistogramFinished,
+      onHistogramPainted,
       histogramPainted,
       canChangePage,
       hasPrevPage,
@@ -3275,6 +3308,7 @@ export default defineComponent({
       patternVolumeContext,
       patternWindowTotal,
       addPatternToSearch,
+      filterBlockedReason,
       addWildcardValueToSearch,
       createAlertFromPattern,
       extractConstantsFromPattern,

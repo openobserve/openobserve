@@ -134,6 +134,9 @@ interface EditorConfig {
   enabled: () => boolean;
   keywords: () => any[];
   suggestions: () => any[];
+  /** The catalog before the menu's own cuts, so hover and signature help still explain what was typed. */
+  allKeywords: () => any[];
+  allSuggestions: () => any[];
   resolveFieldValues: () => FieldValueResolver | null;
   editor: () => any;
   /** Esc presses so far, so a value answer that lands after one is dropped. */
@@ -148,7 +151,7 @@ interface EditorConfig {
   /** Text after the caret that is never a menu row; null clears it. */
   showHint: (text: string | null) => void;
   /** Set when the value lookup searches a caller's own time range instead of the default lookback. */
-  valuesTimeRange: () => { startTime: number; endTime: number } | null;
+  valuesTimeRange: () => FieldValuesWindow | null;
   /** The user's recent queries, offered as clock rows that replace the editor text. */
   recents: () => string[];
 }
@@ -325,6 +328,9 @@ import {
   buildSignatureHelp,
   buildHoverContents,
   buildOperatorLane,
+  buildFilledValueEntries,
+  buildFilledWordEntries,
+  withoutFullTextFunctions,
   fieldEntriesOf,
   findCatalogEntry,
   findFunctionEntry,
@@ -333,6 +339,7 @@ import {
   groupEntries,
   isValueFunction,
   parseLogicalLeadContext,
+  aggregatesAllowed,
   logicalLeadNames,
   buildLogicalLead,
   CHAINING_KEYWORDS,
@@ -355,7 +362,9 @@ import {
 } from "@/composables/usePromqlSuggestions";
 import {
   FIELD_VALUES_LOOKBACK_MINUTES,
+  FIELD_VALUES_MAX_RANGE_HOURS,
   isNoValueLookup,
+  type FieldValuesWindow,
   type ValueLookupOptions,
 } from "@/composables/fieldValueStore";
 import { findDoubleQuoteIssues } from "@/utils/query/doubleQuoteWarnings";
@@ -502,6 +511,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** False when a selected stream has no full-text search field, so no menu offers match_all or its kin. */
+    fullTextSearch: {
+      type: Boolean,
+      default: true,
+    },
     /** Replaces the default commented-SQL write of an AI result; null leaves the editor unchanged. */
     transformGeneratedQuery: {
       type: Function as PropType<(sql: string) => string | null>,
@@ -509,7 +523,7 @@ export default defineComponent({
     },
     /** The range the field-value resolver searches, in microseconds; null means the default lookback. */
     valuesTimeRange: {
-      type: Object as PropType<{ startTime: number; endTime: number } | null>,
+      type: Object as PropType<FieldValuesWindow | null>,
       default: null,
     },
     freeTextDecorations: {
@@ -621,6 +635,12 @@ export default defineComponent({
     const keywords = computed(() => resolveKeywords(props.language, props.keywords as any[]));
     const suggestions = computed(() =>
       resolveSuggestions(props.language, props.suggestions as any[] | null),
+    );
+    const offeredKeywords = computed(() =>
+      props.fullTextSearch ? keywords.value : withoutFullTextFunctions(keywords.value),
+    );
+    const offeredSuggestions = computed(() =>
+      props.fullTextSearch ? suggestions.value : withoutFullTextFunctions(suggestions.value),
     );
 
     /**
@@ -860,8 +880,10 @@ export default defineComponent({
       // change as the stream schema and server catalog arrive.
       editorConfigs.set(key, {
         enabled: () => props.showAutoComplete,
-        keywords: () => keywords.value as any[],
-        suggestions: () => suggestions.value as any[],
+        keywords: () => offeredKeywords.value as any[],
+        suggestions: () => offeredSuggestions.value as any[],
+        allKeywords: () => keywords.value as any[],
+        allSuggestions: () => suggestions.value as any[],
         resolveFieldValues: () => (props.fieldValueResolver as any) ?? null,
         editor: () => editorObj,
         escapeCount: () => escapeCount,
@@ -1588,9 +1610,15 @@ export default defineComponent({
       ) => {
         const asHint = (inQuote && status !== "loading") || (highlighted && !others.length);
         // PromQL label values always use the default lookback.
-        const inRange = language === "sql" && status === "empty" && !!config.valuesTimeRange();
-        const text = inRange
-          ? t("sqlEditor.completion.valuesEmptyInRange", { field })
+        const lookupRange =
+          language === "sql" && status === "empty" ? config.valuesTimeRange() : null;
+        const text = lookupRange
+          ? t(
+              lookupRange.capped
+                ? "sqlEditor.completion.valuesEmptyInLatestHours"
+                : "sqlEditor.completion.valuesEmptyInRange",
+              { field, hours: FIELD_VALUES_MAX_RANGE_HOURS },
+            )
           : valueStatusText(t, status, field, { minutes: FIELD_VALUES_LOOKBACK_MINUTES });
         if (asHint) {
           config.showHint(text);
@@ -1601,7 +1629,7 @@ export default defineComponent({
         });
         const row = {
           ...entry,
-          label: inRange ? text : entry.label,
+          label: lookupRange ? text : entry.label,
           range: caretRange(position, 0),
         };
         return highlighted ? [...others, { ...row, sortText: "\uffff" }] : [row, ...others];
@@ -1632,6 +1660,7 @@ export default defineComponent({
         config: EditorConfig,
         context: ValueContext,
         highlighted: boolean,
+        textUntilCaret: string,
       ): Promise<any[] | null> => {
         const allFields = fieldEntriesOf(config.keywords(), config.suggestions());
         // `x IN (sel` may start a subquery, so SELECT stays offered after the values and fields.
@@ -1650,7 +1679,6 @@ export default defineComponent({
                 .map(objectEntry)
                 .filter(isValueFunction)
             : [];
-        const fields = context.hasOpenQuote ? [] : [...allFields, ...subquery, ...functions];
         const named = (name: string) =>
           allFields.find((f) => (f.name ?? f.label).toLowerCase() === name.toLowerCase());
         const resolver = config.resolveFieldValues();
@@ -1658,6 +1686,20 @@ export default defineComponent({
           !context.hasOpenQuote && (isQualified(context.typed) || !!named(context.typed));
         // An empty field list means it has not loaded yet, not that the field is unknown.
         const unknownField = allFields.length > 0 && !named(context.field);
+        const filled =
+          groupsMenus(config) && !typedIsColumn && !unknownField
+            ? buildFilledValueEntries({
+                context,
+                textUntilCaret,
+                filterMode: config.filterMode(),
+                fieldType: named(context.field)?.detail,
+                lineNumber: position.lineNumber,
+                column: position.column,
+                closingQuoteAhead: lineAfterCaret(model, position).startsWith("'"),
+                catalog: [...config.keywords(), ...config.suggestions()].map(objectEntry),
+              })
+            : [];
+        const fields = context.hasOpenQuote ? [] : [...allFields, ...subquery, ...functions];
         if (!resolver || typedIsColumn || unknownField) return fields;
 
         const outcome = await awaitValues(config, token, (options) =>
@@ -1690,7 +1732,9 @@ export default defineComponent({
           pattern: context.operator === "like",
           typed: context.typed,
         });
-        return [...values, ...fields, ...capRow(context.field, outcome.length, position)];
+        // Only under a matching value: alone they would take Enter, which must close an open quote.
+        const withFilled = values.length ? [...fields, ...filled] : fields;
+        return [...values, ...withFilled, ...capRow(context.field, outcome.length, position)];
       };
 
       const promqlValueEntries = async (
@@ -1869,8 +1913,17 @@ export default defineComponent({
         // Inside avg( or approx_percentile_cont(, numeric columns lead; on a metrics stream every label would sort above `value`.
         const numericFirst = wantsNumericColumn(parseCallContext(textUntilPosition));
         const rank = (list: any[]) => (numericFirst ? rankNumericFieldsFirst(list) : list);
-        const entries = [...rank(config.keywords()), ...rank(config.suggestions())];
         const textBeforeWord = textUntilPosition.slice(0, textUntilPosition.length - word.length);
+        const allowAggregates =
+          language !== "sql" || aggregatesAllowed(textBeforeWord, config.filterMode());
+        const catalog = [...rank(config.keywords()), ...rank(config.suggestions())].filter(
+          (raw) => allowAggregates || !objectEntry(raw)?.aggregate,
+        );
+        const filled =
+          groupsMenus(config) && isPredicatePosition(textBeforeWord, config.filterMode())
+            ? buildFilledWordEntries(word, catalog.map(objectEntry))
+            : [];
+        const entries = [...catalog, ...filled];
         const canChain = chainsHere(config, model, position);
         const lead =
           language === "sql" ? parseLogicalLeadContext(textBeforeWord, config.filterMode()) : null;
@@ -1879,6 +1932,7 @@ export default defineComponent({
               entries,
               logicalLeadNames(lead, config.filterMode()),
               canChain ? acceptCommand("operator", true) : undefined,
+              word,
             )
           : entries;
         if (!canChain) return ranked;
@@ -1960,6 +2014,7 @@ export default defineComponent({
                 config,
                 valueContext,
                 highlighted,
+                textUntilPosition,
               );
               const qualified = isQualified(valueContext.typed);
               const typedRange = qualified
@@ -2040,7 +2095,7 @@ export default defineComponent({
 
           // The parser reports any identifier before the paren; the catalog
           // decides whether it is a function.
-          const entry = findFunctionEntry(call.name, config.keywords(), config.suggestions());
+          const entry = findFunctionEntry(call.name, config.allKeywords(), config.allSuggestions());
           const value = buildSignatureHelp(entry as any, call.activeParameter);
           if (!value) return null;
           // monaco reads `.value` off a SignatureHelpResult and disposes it.
@@ -2058,7 +2113,7 @@ export default defineComponent({
 
           const word = model.getWordAtPosition(position);
           if (!word?.word) return null;
-          const entry = findCatalogEntry(word.word, config.keywords(), config.suggestions());
+          const entry = findCatalogEntry(word.word, config.allKeywords(), config.allSuggestions());
           const contents = buildHoverContents(t, entry as any);
           if (!contents) return null;
           return {

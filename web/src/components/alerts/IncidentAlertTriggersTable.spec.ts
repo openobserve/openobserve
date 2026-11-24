@@ -15,8 +15,11 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { createStore } from "vuex";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import { relativeTimeText } from "@/lib/core/Table/cells/relativeTime";
 import incidentsService from "@/services/incidents";
 
 vi.mock("@/services/incidents", async (importOriginal) => {
@@ -56,9 +59,9 @@ function makeAlerts(count = 3, overrides: Record<string, any> = {}) {
 }
 
 // No local i18n: setupTests.ts installs the real en-US messages globally.
-function mountComp(props: Record<string, any> = {}) {
+function mountComp(props: Record<string, any> = {}, timezone?: string) {
   const store = createStore({
-    state: { selectedOrganization: { identifier: "myorg" } },
+    state: { selectedOrganization: { identifier: "myorg" }, timezone },
   });
   return mount(IncidentAlertTriggersTable, {
     props: {
@@ -76,9 +79,10 @@ function mountComp(props: Record<string, any> = {}) {
                 <slot name="empty" />
               </template>
               <table v-else>
+                <button data-test="stub-next-page" @click="page++; $emit('pagination-change', { page: page + 1, size: 20 })" />
                 <thead><tr><th>Alert Name</th><th>Source</th><th>Labels</th><th>Fired At</th><th>Reason</th><th>Actions</th></tr></thead>
                 <tbody>
-                  <tr v-for="(row, idx) in data" :key="idx" @click="$emit('row-click', row)">
+                  <tr v-for="(row, idx) in data.slice(page * 20, page * 20 + 20)" :key="idx" @click="$emit('row-click', row)">
                     <td><slot :name="'cell-alert_name'" :row="row" /></td>
                     <td><slot :name="'cell-detected_source'" :row="row" /></td>
                     <td><slot :name="'cell-labels'" :row="row" /></td>
@@ -91,13 +95,17 @@ function mountComp(props: Record<string, any> = {}) {
             </div>
           `,
           props: ["data", "columns", "rowKey", "pagination", "pageSize"],
-          emits: ["row-click"],
+          emits: ["row-click", "pagination-change"],
+          data: () => ({ page: 0 }),
         },
         OBadge: {
           template: '<span data-test="correlation-reason-badge"><slot /></span>',
           props: ["variant"],
         },
-        OTooltip: { template: "<span />" },
+        OTooltip: {
+          template: '<span data-test="o-tooltip" :data-content="content" />',
+          props: ["content"],
+        },
         ODialog: {
           template: `<div data-test="trigger-payload-dialog"><slot v-if="open" /></div>`,
           props: ["open"],
@@ -160,27 +168,34 @@ describe("IncidentAlertTriggersTable", () => {
   });
 
   describe("timestamp column", () => {
-    it("renders a formatted timestamp element for each row", () => {
-      wrapper = mountComp({ triggers: makeAlerts(2) });
-      const timestamps = wrapper.findAll('[data-test="fired-at-timestamp"]');
-      expect(timestamps.length).toBe(2);
+    it.each([
+      ["a firing", 1700000000000000, false],
+      ["zero", 0, true],
+      ["null", null, true],
+    ])("renders Fired At as the list's time cell in the picked zone: %s", (_c, firedAt, empty) => {
+      wrapper = mountComp(
+        { triggers: [makeAlert({ alert_fired_at: firedAt })] },
+        "America/New_York",
+      );
+      const cell = wrapper.findComponent(OTimeCell);
+      expect(cell.props()).toMatchObject({ timezone: "America/New_York", mode: "relative" });
+      expect(wrapper.find('[data-test="fired-at-timestamp"]').text() === "—").toBe(empty);
     });
 
-    it("shows N/A when alert_fired_at is 0", () => {
-      wrapper = mountComp({ triggers: [makeAlert({ alert_fired_at: 0 })] });
-      expect(wrapper.find('[data-test="fired-at-timestamp"]').text()).toBe("N/A");
-    });
-
-    it("shows N/A when alert_fired_at is null", () => {
-      wrapper = mountComp({ triggers: [makeAlert({ alert_fired_at: null })] });
-      expect(wrapper.find('[data-test="fired-at-timestamp"]').text()).toBe("N/A");
-    });
-
-    it("shows formatted date when alert_fired_at is non-zero", () => {
-      wrapper = mountComp({ triggers: [makeAlert({ alert_fired_at: 1700000000000000 })] });
-      const text = wrapper.find('[data-test="fired-at-timestamp"]').text();
-      expect(text).not.toBe("N/A");
-      expect(text.length).toBeGreaterThan(0);
+    it("keeps the Fired At age current while the table stays open", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-11-17T12:00:00Z"));
+        const firedMs = Date.now() - 2 * 60_000;
+        wrapper = mountComp({ triggers: [makeAlert({ alert_fired_at: firedMs * 1000 })] });
+        vi.advanceTimersByTime(10 * 60_000);
+        await nextTick();
+        expect(wrapper.find('[data-test="fired-at-timestamp"]').text()).toBe(
+          relativeTimeText(firedMs, Date.now()),
+        );
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -301,20 +316,42 @@ describe("IncidentAlertTriggersTable", () => {
       expect(cells[0].find('[data-test="trigger-source-badge"]').exists()).toBe(false);
     });
 
-    it("renders a label chip per key/value pair", () => {
+    it("renders every label of a row as a chip, sorted by key", () => {
       wrapper = mountComp({
         triggers: [
           makeAlert({
             alert_kind: "external",
-            labels: { service: "checkout-api", region: "us-east" },
+            labels: { service: "checkout-api", region: "us-east", pod: "api-1", zone: "a" },
           }),
+          makeAlert({ alert_kind: "external", labels: { env: "prod" } }),
         ],
       });
       const chips = wrapper.findAll('[data-test="trigger-label-chip"]');
-      expect(chips.length).toBe(2);
-      expect(chips.map((c) => c.text())).toEqual(
-        expect.arrayContaining(["service=checkout-api", "region=us-east"]),
-      );
+      expect(chips.map((c) => c.text())).toEqual([
+        "pod=api-1",
+        "region=us-east",
+        "service=checkout-api",
+        "zone=a",
+        "env=prod",
+      ]);
+    });
+
+    it("fits the labels of rows a page change brings in", async () => {
+      const spies = [
+        vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(220),
+        vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(100),
+      ];
+      try {
+        const labels = { a: "1", b: "2", c: "3", d: "4" };
+        wrapper = mountComp({ triggers: makeAlerts(25, { alert_kind: "external", labels }) });
+        await flushPromises();
+        expect(wrapper.findAll('[data-test="trigger-label-more"]')).toHaveLength(20);
+        await wrapper.find('[data-test="stub-next-page"]').trigger("click");
+        await flushPromises();
+        expect(wrapper.findAll('[data-test="trigger-label-more"]')).toHaveLength(5);
+      } finally {
+        spies.forEach((spy) => spy.mockRestore());
+      }
     });
 
     it("shows a dash when a trigger has no labels", () => {
@@ -371,7 +408,7 @@ describe("IncidentAlertTriggersTable", () => {
 });
 
 describe("IncidentAlertTriggersTable per-page options", () => {
-  it("drops the empty Labels and action columns, uses the page's clock and shows only a known reason", async () => {
+  it("drops the empty Source, Labels and action columns, uses the page's clock and shows only a known reason", async () => {
     const w = mountComp({
       triggers: makeAlerts(2, { correlation_reason: "alert_id" }),
       hideEmptyColumns: true,
@@ -381,6 +418,7 @@ describe("IncidentAlertTriggersTable per-page options", () => {
     });
     await flushPromises();
     expect((w.vm as any).columns.map((c: { id: string }) => c.id)).not.toContain("labels");
+    expect((w.vm as any).columns.map((c: { id: string }) => c.id)).not.toContain("detected_source");
     expect((w.vm as any).columns.map((c: { id: string }) => c.id)).not.toContain("actions");
     expect(w.findAll('[data-test="fired-at-timestamp"]').map((c) => c.text())).toEqual([
       "4:45 PM",
@@ -393,13 +431,29 @@ describe("IncidentAlertTriggersTable per-page options", () => {
 
   it("keeps a column a row fills, and every column by default", async () => {
     const filled = mountComp({
-      triggers: [makeAlert({ labels: { env: "prod" }, alert_kind: "external" })],
+      triggers: [
+        makeAlert({
+          labels: { env: "prod" },
+          alert_kind: "external",
+          detected_source: "external-source",
+        }),
+      ],
       hideEmptyColumns: true,
     });
     const ids = (filled.vm as any).columns.map((c: { id: string }) => c.id);
     expect(ids).toContain("labels");
     expect(ids).toContain("actions");
+    expect(ids).toContain("detected_source");
     const plain = mountComp();
     expect((plain.vm as any).columns.map((c: { id: string }) => c.id)).toContain("labels");
+    const incident = mountComp({ showCorrelationReason: false });
+    const incidentIds = (incident.vm as any).columns.map((c: { id: string }) => c.id);
+    expect(incidentIds).toEqual([
+      "alert_name",
+      "detected_source",
+      "labels",
+      "alert_fired_at",
+      "actions",
+    ]);
   });
 });

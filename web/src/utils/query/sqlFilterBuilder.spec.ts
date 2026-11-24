@@ -22,6 +22,7 @@ import {
   sqlIsNull,
   unescapeSqlLiteral,
   splitOnAnd,
+  removeConditions,
 } from "./sqlFilterBuilder";
 
 // Values here are arbitrary log/trace field data.
@@ -218,11 +219,35 @@ describe("splitOnAnd", () => {
       ["-- it's noisy\nservice = 'api'", "level = 'error'\n-- that's all"],
     ],
     [
+      "keeps an AND inside brackets with its group",
+      "(service_name='a' AND span_status='ERROR') OR duration > 1000",
+      ["(service_name='a' AND span_status='ERROR') OR duration > 1000"],
+    ],
+    [
+      "splits only the top-level AND of a bracketed filter",
+      "service_name='c' AND (http_status_code='500' AND span_status='ERROR')",
+      ["service_name='c'", "(http_status_code='500' AND span_status='ERROR')"],
+    ],
+    ["does not count a bracket inside a quoted value", "a = '(' AND b = 1", ["a = '('", "b = 1"]],
+    [
+      "does not count a bracket inside a quoted field name",
+      `"a(b" = 'x' AND c = 1`,
+      [`"a(b" = 'x'`, "c = 1"],
+    ],
+    [
       "falls back to a plain AND split when a quote is left unbalanced",
       "a = 'x AND b = 1",
       ["a = 'x", "b = 1"],
     ],
   ])("%s", (_name, query, expected) => {
     expect(splitOnAnd(query)).toEqual(expected);
+  });
+});
+
+describe("removeConditions", () => {
+  it("removes a condition next to a field whose quoted name holds a bracket", () => {
+    const query = `"a(b" = 'x' AND c = 1`;
+    expect(removeConditions(query, (condition) => condition.startsWith("c "))).toBe(`"a(b" = 'x'`);
+    expect(removeConditions(query, (condition) => condition.startsWith(`"a(b"`))).toBe("c = 1");
   });
 });

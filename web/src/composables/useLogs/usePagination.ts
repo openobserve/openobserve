@@ -48,6 +48,7 @@ export const usePagination = () => {
     fnParsedSQL,
     hasAggregation,
     isLimitQuery,
+    getOuterLimit,
     isDistinctQuery,
     isWithQuery,
     addTraceId,
@@ -101,12 +102,13 @@ export const usePagination = () => {
         }
         //if the query has limit then we need to set the size to the limit and we are doing it as we also don't support pagination for limit
         if (isLimitQuery(parsedSQL)) {
-          queryReq.query.size = parsedSQL.limit.value[0].value;
+          const limit: any = getOuterLimit(parsedSQL);
+          queryReq.query.size = limit.value[0].value;
           searchObj.meta.resultGrid.showPagination = false;
           //searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
 
-          if (parsedSQL.limit.separator == "offset") {
-            queryReq.query.from = parsedSQL.limit.value[1].value || 0;
+          if (limit.separator == "offset") {
+            queryReq.query.from = limit.value[1].value || 0;
           }
           delete queryReq.query.track_total_hits;
         }

@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+import { expect } from '@playwright/test';
 import { discardEditorDraftIfAsked, clearEditorDrafts } from '../alertsPages/editorDraftHelpers.js';
 
 export class AiToolsetsFormValidationPage {
@@ -17,16 +18,25 @@ export class AiToolsetsFormValidationPage {
         // ── List page ─────────────────────────────────────────────────────────
         this.addToolsetBtn = '[data-test="ai-toolsets-add-btn"]';
         this.addCustomMcpItem = '[data-test="ai-toolsets-add-custom-mcp"]';
+        this.settingsMenuEntry = '[data-test="ai-toolsets-tab"]';
 
         // ── AddAiToolset form ─────────────────────────────────────────────────
         // OInput data-test="ai-toolset-name-input" → -field / -error
         this.nameInput      = '[data-test="ai-toolset-name-input-field"]';
         this.nameError      = '[data-test="ai-toolset-name-input-error"]';
 
+        // OSelect data-test="ai-toolset-kind-select" → -popover / -error
+        this.kindSelect     = '[data-test="ai-toolset-kind-select"]';
+        this.kindError      = '[data-test="ai-toolset-kind-select-error"]';
+
         // MCP URL — shown when kind === 'mcp' (default)
         // OInput data-test="ai-toolset-mcp-url" → -field / -error
         this.mcpUrlInput    = '[data-test="ai-toolset-mcp-url-field"]';
         this.mcpUrlError    = '[data-test="ai-toolset-mcp-url-error"]';
+
+        // OSelect kind — trigger popover and option selectors
+        this.kindSelectPopover = '[data-test="ai-toolset-kind-select-popover"]';
+        this.kindSelectOption  = '[data-test="ai-toolset-kind-select-option"]';
 
         // Action buttons (plain OButton — not dialog built-ins)
         this.saveBtn        = '[data-test="ai-toolset-save-btn"]';
@@ -67,6 +77,26 @@ export class AiToolsetsFormValidationPage {
         }
     }
 
+    /** Opens Settings on its default section, so the AI Toolsets page is reached only through the menu. */
+    async openSettingsHome() {
+        const orgId = process.env['ORGNAME'] || 'default';
+        const baseUrl = process.env['ZO_BASE_URL'] || 'http://localhost:5080';
+        await this.page.goto(`${baseUrl}/web/settings?org_identifier=${orgId}`);
+        await expect(this.page.locator('[data-test="section-rail"]')).toBeVisible({ timeout: 30000 });
+    }
+
+    async openAiToolsetsFromSettingsMenu() {
+        const entry = this.page.locator(this.settingsMenuEntry);
+        await expect(entry, 'Settings must list AI Toolsets').toBeVisible({ timeout: 15000 });
+        await entry.click();
+        await this.page.waitForURL(/\/settings\/ai_toolsets/, { timeout: 15000 });
+        await expect(this.page.locator(this.addToolsetBtn)).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectSettingsMenuEntryActive() {
+        await expect(this.page.locator(this.settingsMenuEntry)).toHaveAttribute('aria-selected', 'true', { timeout: 10000 });
+    }
+
     // ── List page actions ─────────────────────────────────────────────────────
 
     async clickAddToolset() {
@@ -95,6 +125,19 @@ export class AiToolsetsFormValidationPage {
         await this.page.locator(this.mcpUrlInput).fill(url);
     }
 
+    getKindOptionLocator(value) {
+        return this.page.locator(`${this.kindSelectOption}[data-test-value="${value}"]`);
+    }
+
+    async selectKind(label) {
+        testLogger.debug('Selecting toolset kind', { label });
+        const labelToValue = { 'MCP Server': 'mcp', 'Skill': 'skill' };
+        const value = labelToValue[label] || label;
+        await this.page.locator(this.kindSelect).click();
+        await this.page.locator(this.kindSelectPopover).waitFor({ state: 'visible', timeout: 8000 });
+        await this.getKindOptionLocator(value).click();
+    }
+
     async clickSave() {
         testLogger.debug('Clicking Save button');
         await this.page.locator(this.saveBtn).click();
@@ -110,6 +153,7 @@ export class AiToolsetsFormValidationPage {
 
     getNameInputLocator()    { return this.page.locator(this.nameInput); }
     getNameErrorLocator()    { return this.page.locator(this.nameError); }
+    getKindErrorLocator()    { return this.page.locator(this.kindError); }
     getMcpUrlInputLocator()      { return this.page.locator(this.mcpUrlInput); }
     getMcpUrlErrorLocator()      { return this.page.locator(this.mcpUrlError); }
     getSaveBtnLocator()      { return this.page.locator(this.saveBtn); }

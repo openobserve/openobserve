@@ -77,11 +77,10 @@ const GATED_IN_OSS = [
   "shortcuts.pages.iamInvitations",
   "shortcuts.pages.regexPatterns",
   "shortcuts.pages.cipherKeys",
-  "shortcuts.pages.nodes",
-  "shortcuts.pages.modelPricing",
   "shortcuts.pages.llmProviders",
   "shortcuts.pages.aiToolsets",
   "shortcuts.pages.orgManagement",
+  "shortcuts.pages.userManagement",
   "shortcuts.pages.actions",
   "shortcuts.pages.evalTemplates",
   "shortcuts.pages.scorers",
@@ -128,6 +127,12 @@ describe("shortcut cheatsheet OSS gating", () => {
     expect(titles).not.toContain("shortcuts.modules.security");
   });
 
+  // Nodes is meta-org-only, not enterprise-only: OSS clusters too.
+  it("shows Nodes in the meta org of an OSS build only", () => {
+    expect(visiblePages({ ...OSS, isMetaOrg: true }).has("shortcuts.pages.nodes")).toBe(true);
+    expect(visiblePages(OSS).has("shortcuts.pages.nodes")).toBe(false);
+  });
+
   it("shows enterprise-only pages on enterprise and hides the cloud-only ones", () => {
     const pages = visiblePages(ENTERPRISE);
     for (const p of [
@@ -145,12 +150,17 @@ describe("shortcut cheatsheet OSS gating", () => {
     // Cloud-only pages stay hidden on a pure enterprise build.
     expect(pages.has("shortcuts.pages.iamInvitations")).toBe(false);
     expect(pages.has("shortcuts.pages.orgManagement")).toBe(false);
+    expect(pages.has("shortcuts.pages.userManagement")).toBe(false);
   });
 
   it("shows cloud-only pages on cloud and hides the enterprise-only ones", () => {
     const pages = visiblePages(CLOUD);
     expect(pages.has("shortcuts.pages.iamInvitations")).toBe(true);
     expect(pages.has("shortcuts.pages.orgManagement")).toBe(true);
+    expect(pages.has("shortcuts.pages.userManagement")).toBe(true);
+    expect(visiblePages({ ...CLOUD, isMetaOrg: false }).has("shortcuts.pages.userManagement")).toBe(
+      false,
+    );
     // Enterprise-only pages (incl. _meta-org cluster pages) stay hidden on cloud.
     for (const p of [
       "shortcuts.pages.regexPatterns",
@@ -180,6 +190,12 @@ describe("shortcut cheatsheet OSS gating", () => {
     // llmProviders follows online_evals_enabled; modelPricing follows model_pricing_enabled.
     expect(pages.has("shortcuts.pages.llmProviders")).toBe(false);
     expect(pages.has("shortcuts.pages.modelPricing")).toBe(false);
+  });
+
+  it("lists Model Pricing on an OSS build while model_pricing_enabled is on", () => {
+    expect(
+      visiblePages({ ...OSS, modelPricingEnabled: true }).has("shortcuts.pages.modelPricing"),
+    ).toBe(true);
   });
 
   it("hides Downtimes on enterprise and cloud while downtimes_enabled is off", () => {

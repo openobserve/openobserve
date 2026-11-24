@@ -160,6 +160,11 @@ const ASSISTANT_SCOPE: &[ScopeRoute] = &[
     v1(&[Param, Lit("mcp")], GET_POST),
     v2(&[Param, Lit("downtimes")], POST),
     v2(&[Param, Lit("downtimes"), Param, Lit("cancel")], POST),
+    // Read only: the assistant explains an issue; deciding stays with the person's own buttons.
+    #[cfg(feature = "enterprise")]
+    v2(&[Param, Lit("autoobserve"), Lit("suggestions")], GET),
+    #[cfg(feature = "enterprise")]
+    v2(&[Param, Lit("autoobserve"), Lit("incidents")], GET),
 ];
 
 /// The alert buttons' routes (spec 8.1); segments start at `{org_id}`, below `/api` and `/v2`.

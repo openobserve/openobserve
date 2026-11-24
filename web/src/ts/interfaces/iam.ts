@@ -117,3 +117,45 @@ export interface Entity {
 }
 
 interface User {}
+
+/** `ListedMembership` of `GET /api/{meta}/all_users`. */
+export interface ListedMembership {
+  org_id: string;
+  org_name: string;
+  role: string;
+}
+
+/** `ListedUser` of `GET /api/{meta}/all_users`; `id` is the `users.id` primary key. */
+export interface ListedUser {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  is_external: boolean;
+  created_at: number;
+  orgs: ListedMembership[];
+}
+
+/** `UserListPage`, the body of `GET /api/{meta}/all_users`. */
+export interface UserListPage {
+  data: ListedUser[];
+  total: number;
+}
+
+/** `DomainConfig` inside the SSO domain-management response. */
+export interface DomainConfig {
+  domain: string;
+  allow_all_users: boolean;
+  allowed_emails: string[];
+  /** A rule switched off is skipped by the allow-list check. */
+  enabled: boolean;
+}
+
+/** `DomainManagementResponse` of `GET /api/{meta}/domain_management`. */
+export interface DomainManagementResponse {
+  domains: DomainConfig[];
+  enabled: boolean;
+  blocked_emails: string[];
+  blocked_domains: string[];
+  updated_at: number;
+}

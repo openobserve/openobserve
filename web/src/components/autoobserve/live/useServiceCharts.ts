@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { scopeFieldsOf } from "@/utils/alerts/prefill/fromAutoObserve";
+import type { RouteScope } from "@/utils/metrics/metricDrilldown";
 import {
   computed,
   onBeforeUnmount,
@@ -80,6 +81,7 @@ interface Source {
   kind: ChartSource;
   name: string;
   filters: Record<string, string | null>;
+  aliases: Record<string, string[]>;
   wide: boolean;
   fields: Map<string, string>;
 }
@@ -219,6 +221,7 @@ export const useServiceCharts = (row: Ref<CoverageRow | null>, range: Ref<ChartR
       kind,
       name: info.stream_name,
       filters,
+      aliases: info.filter_aliases ?? {},
       wide: !!info.dropped_dimensions?.length,
       fields: new Map(schema.map((f) => [f.name, f.type])),
     };
@@ -355,11 +358,11 @@ export const useServiceCharts = (row: Ref<CoverageRow | null>, range: Ref<ChartR
     const queries: Query[] = [];
     if (traces && toTraces.length) {
       const want = { errors: has(toTraces, "errors"), latency: has(toTraces, "latency") };
-      const sql = tracesSql(traces.name, traces.filters, range.value, want);
+      const sql = tracesSql(traces.name, traces.filters, range.value, want, traces.aliases);
       queries.push({ source: traces, sql, range: range.value, now, serves: toTraces });
     }
     if (logs && toLogs.length) {
-      const sql = logsSql(logs.name, logs.filters, range.value, rule);
+      const sql = logsSql(logs.name, logs.filters, range.value, rule, logs.aliases);
       queries.push({ source: logs, sql, range: range.value, now, serves: toLogs });
     }
     return queries;
@@ -387,11 +390,13 @@ export const useServiceCharts = (row: Ref<CoverageRow | null>, range: Ref<ChartR
   };
 
   // The equality filters each source's charts read, for the pages the drawer opens.
-  const scopes = shallowRef<Partial<Record<ChartSource, Record<string, string>>>>({});
+  const scopes = shallowRef<Partial<Record<ChartSource, RouteScope>>>({});
+  const traceStream = shallowRef<string | undefined>();
 
   const load = async () => {
     const gen = ++generation;
     scopes.value = {};
+    traceStream.value = undefined;
     cancelAll();
     nowMs.value = Date.now();
     LIVE_SIGNALS.forEach((s) => set(s, blank(s)));
@@ -416,14 +421,18 @@ export const useServiceCharts = (row: Ref<CoverageRow | null>, range: Ref<ChartR
           ? [
               [
                 kind,
-                Object.fromEntries(
-                  Object.entries(src.filters).filter((e): e is [string, string] => e[1] !== null),
-                ),
+                {
+                  filters: Object.fromEntries(
+                    Object.entries(src.filters).filter((e): e is [string, string] => e[1] !== null),
+                  ),
+                  aliases: src.aliases,
+                },
               ],
             ]
           : [],
       ),
     );
+    traceStream.value = sources.traces?.name;
     if (!sources.traces && !sources.logs) return noMatch();
     plan(sources, nowMs.value).forEach(runQuery);
   };
@@ -463,5 +472,5 @@ export const useServiceCharts = (row: Ref<CoverageRow | null>, range: Ref<ChartR
     return { start, end: last };
   });
 
-  return { charts, span, scopes: readonly(scopes) };
+  return { charts, span, scopes: readonly(scopes), traceStream: readonly(traceStream) };
 };

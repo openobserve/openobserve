@@ -32,6 +32,8 @@ pub const MAX_TRIAGE_BUDGET_SECONDS: i64 = 600;
 /// Actor recorded for anything the agent itself produced.
 pub const AGENT_ACTOR: &str = "o2-sre";
 
+pub const MAX_STEP_WHY_CHARS: usize = 200;
+
 // §2.1 — the verdict contract
 
 /// How sure the agent is, as a band rather than a number.
@@ -221,6 +223,22 @@ pub struct AnalysisVerdict {
     pub proposed_actions: Vec<ProposedAction>,
     /// Pointer to the full markdown report in its existing storage.
     pub report_ref: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_step: Option<SubmittedNextStep>,
+}
+
+/// The model's pick from an [EvidenceBundle](super::rca::EvidenceBundle); unchecked until the
+/// engine accepts it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SubmittedNextStep {
+    /// An offered action id (`A1`); `None` is a check-only step.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action: Option<String>,
+    /// Bundle item ids (`B1`), never ledger evidence ids.
+    #[serde(default)]
+    pub leads: Vec<String>,
+    /// At most [MAX_STEP_WHY_CHARS]; the engine drops a longer one.
+    pub why: String,
 }
 
 // §3 — the analysis state that rides the escalation row
@@ -1179,6 +1197,7 @@ mod tests {
                 detail: "buys time; then roll back v0.14.2".into(),
             }],
             report_ref: "inc_9/rca/1".into(),
+            next_step: None,
         }
     }
 
@@ -3415,6 +3434,7 @@ mod tests {
             },
             proposed_actions: vec![],
             report_ref: "r".into(),
+            next_step: None,
         };
         let json = serde_json::to_string(&bare).unwrap();
         assert!(!json.contains("suspect_change"));

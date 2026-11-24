@@ -280,6 +280,16 @@ impl FileData {
         format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file)
     }
 
+    fn dirs(&self) -> Vec<String> {
+        let mut dirs = vec![self.root_dir.clone()];
+        dirs.extend(
+            self.multi_dir
+                .iter()
+                .map(|dir| format!("{}{dir}/", self.root_dir)),
+        );
+        dirs
+    }
+
     fn canonical_root(&self) -> Option<&PathBuf> {
         if let Some(root) = self.canonical_root.get() {
             return Some(root);
@@ -1557,15 +1567,12 @@ pub async fn get_dir() -> String {
 
 /// Every directory a cache key can live under: the root, then each `multi_dir` subdirectory.
 pub async fn get_dirs() -> Vec<String> {
-    let files = FILES[0].read().await;
-    let mut dirs = vec![files.root_dir.clone()];
-    dirs.extend(
-        files
-            .multi_dir
-            .iter()
-            .map(|dir| format!("{}{dir}/", files.root_dir)),
-    );
-    dirs
+    FILES[0].read().await.dirs()
+}
+
+/// Keys of the cached files under the key prefix `prefix` with extension `ext`, in every cache dir.
+pub async fn scan_keys(prefix: &str, ext: &str) -> Vec<String> {
+    scan_keys_in(&get_dirs().await, prefix, ext)
 }
 
 pub async fn download(
@@ -1673,6 +1680,17 @@ fn is_legacy_metrics_result_file(file_key: &str) -> bool {
             .next()
             .unwrap_or_default()
             .starts_with(METRICS_RESULT_CACHE_FILE_PREFIX)
+}
+
+fn scan_keys_in(dirs: &[String], prefix: &str, ext: &str) -> Vec<String> {
+    dirs.iter()
+        .flat_map(|dir| {
+            scan_files(format!("{dir}{prefix}"), ext, None)
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|file| file.strip_prefix(dir.as_str()).map(str::to_string))
+        })
+        .collect()
 }
 
 async fn remove_legacy_metrics_files(files: Vec<PathBuf>) {
@@ -2135,6 +2153,33 @@ mod tests {
         assert!(file_data.size().0 > 0);
 
         assert_eq!(file_data.get(&file_key, None).await, Some(content))
+    }
+
+    #[tokio::test]
+    async fn test_scan_keys_finds_multi_dir_files() {
+        let mut file_data =
+            FileData::with_capacity_and_cache_strategy(FileType::Result, 1024 * 1024, "lru");
+        file_data.multi_dir = vec!["scan1".to_string(), "scan2".to_string()];
+        let prefix = format!("results/scan_org/logs/{}", config::ider::uuid());
+        let keys: Vec<String> = (0..4)
+            .map(|i| format!("{prefix}/hash/{i}000_{i}999_0_0.json"))
+            .collect();
+        for key in &keys {
+            let (key, tmp_file) = write_tmp_file(key, Bytes::from("x")).await.unwrap();
+            file_data.set(&key, &tmp_file, 1).await.unwrap();
+        }
+
+        let mut found = scan_keys_in(&file_data.dirs(), &prefix, "json");
+        found.sort();
+        assert_eq!(found, keys);
+        for key in &found {
+            assert!(matches!(
+                file_data.remove(key).await,
+                RemoveOutcome::Removed(Some(_))
+            ));
+            assert!(!file_data.exist(key).await);
+            assert!(!Path::new(&file_data.get_file_path(key)).exists());
+        }
     }
 
     #[tokio::test]

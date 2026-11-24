@@ -22,7 +22,10 @@
 use config::{
     DEFAULT_ORG,
     meta::{
-        alerts::content_spec::{ChartSpec, ContentField, ContentLink, ContentSpec, RowsSpec},
+        alerts::{
+            content_spec::{ChartSpec, ContentField, ContentLink, ContentSpec, RowsSpec},
+            notification_kind::NotificationKind,
+        },
         destinations::{Template, TemplateKind, TemplateType},
     },
 };
@@ -31,14 +34,26 @@ use db::alerts::templates::TemplateError;
 /// Reserved name of the compiled default's seeded copy.
 pub const DEFAULT_CONTENT_TEMPLATE_NAME: &str = infra::table::templates::DEFAULT_TEMPLATE_NAME;
 
+/// A result column of the same name fills a field first, so these show for an anomaly only.
+const ANOMALY_FIELDS: [(&str, &str); 3] = [
+    ("Expected", "{expected_lower}-{expected_upper}"),
+    ("Change", "{value_change_percent}%"),
+    ("Started", "{anomaly_started}"),
+];
+/// An anomaly speaks in its metric's units, so this field shows for every other kind only.
+const SCORE_FIELD: (&str, &str) = ("Score", "{anomaly_score}");
+
 /// The field superset in the amendment's order; Slack shows at most ten, and no kind fills more.
-const FIELDS: [(&str, &str); 17] = [
+const FIELDS: [(&str, &str); 20] = [
     ("Level", "{alert_level_label}"),
     ("Event", "{notification_event_label}"),
     ("Stream", "{stream_name}"),
     ("Threshold", "{alert_operator} {alert_threshold}"),
     ("Value", "{alert_agg_value}"),
-    ("Score", "{anomaly_score}"),
+    SCORE_FIELD,
+    ANOMALY_FIELDS[0],
+    ANOMALY_FIELDS[1],
+    ANOMALY_FIELDS[2],
     ("Check", "{check_name} ({check_type})"),
     ("Target", "{check_target}"),
     ("Status", "{check_status_label}"),
@@ -51,6 +66,53 @@ const FIELDS: [(&str, &str); 17] = [
     ("Reason", "{oncall_reason}"),
     ("Time", "{alert_trigger_time_utc}"),
 ];
+
+/// The field list of the default before the anomaly fields, from main 83d4ccbfe8 (#16323).
+const MAIN_FIELDS: [(&str, &str); 17] = [
+    ("Level", "{alert_level_label}"),
+    ("Event", "{notification_event_label}"),
+    ("Stream", "{stream_name}"),
+    ("Threshold", "{alert_operator} {alert_threshold}"),
+    ("Value", "{alert_agg_value}"),
+    SCORE_FIELD,
+    ("Check", "{check_name} ({check_type})"),
+    ("Target", "{check_target}"),
+    ("Status", "{check_status_label}"),
+    ("Locations", "{check_locations_line}"),
+    ("Environments", "{check_environments}"),
+    ("Error", "{check_error}"),
+    ("Window", "{downtime_window}"),
+    ("Muted", "{downtime_targets}"),
+    ("Team", "{oncall_team}"),
+    ("Reason", "{oncall_reason}"),
+    ("Time", "{alert_trigger_time_utc}"),
+];
+
+/// The fields a send of `kind` renders, and whether they are the default's, whose selection
+/// applies; an anomaly through a copy of main's default gets the current default's fields.
+pub fn fields_for(
+    fields: &[ContentField],
+    kind: NotificationKind,
+) -> (std::borrow::Cow<'_, [ContentField]>, bool) {
+    use std::borrow::Cow;
+    if same_list(fields, &FIELDS) {
+        return (Cow::Borrowed(fields), true);
+    }
+    if kind == NotificationKind::Anomaly && same_list(fields, &MAIN_FIELDS) {
+        return (Cow::Owned(compiled_default_content().fields), true);
+    }
+    (Cow::Borrowed(fields), false)
+}
+
+/// Whether `field` of the default's field list applies to a send of `kind`.
+pub fn default_field_applies(field: &ContentField, kind: NotificationKind) -> bool {
+    let is = |(label, value): &(&str, &str)| field.label == *label && field.value == *value;
+    if kind == NotificationKind::Anomaly {
+        !is(&SCORE_FIELD)
+    } else {
+        !ANOMALY_FIELDS.iter().any(is)
+    }
+}
 
 /// Terminal fallback, infallible by construction (asserted by test).
 pub fn compiled_default_content() -> ContentSpec {
@@ -72,8 +134,8 @@ pub fn compiled_default_content() -> ContentSpec {
             columns: None,
             format: None,
         },
-        // resolve_content appends View in OpenObserve to alert_url; the explore link is anomaly's
-        // own.
+        // An anomaly's alert_url is this explore link, so resolve drops the copy; it stays for a
+        // context whose data button points elsewhere.
         links: vec![ContentLink {
             label: "{anomaly_explore_label}".into(),
             url: "{anomaly_explore_url}".into(),
@@ -147,6 +209,14 @@ async fn ensure_compiled_row(
     Ok(())
 }
 
+/// Names, order and values exactly; one changed field makes the list authored.
+fn same_list(fields: &[ContentField], list: &[(&str, &str)]) -> bool {
+    fields.len() == list.len()
+        && fields.iter().zip(list).all(|(field, (label, value))| {
+            field.label == *label && field.value == *value && field.show_when.is_none()
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::alerts::{level::AlertLevel, notification_kind::NotificationKind};
@@ -199,6 +269,73 @@ mod tests {
     }
 
     #[test]
+    fn an_authored_score_field_stays_on_an_anomaly_and_the_default_drops_it() {
+        let mut ctx = example_context(NotificationKind::Anomaly, false);
+        ctx.context_attributes.retain(|(k, _)| k != "anomaly_score");
+        ctx.context_attributes
+            .push(("anomaly_score".into(), "0.91 vs 0.80".into()));
+        let labels = |spec: &ContentSpec| -> Vec<String> {
+            resolve_content(spec, &ctx, "slack")
+                .fields
+                .into_iter()
+                .map(|(label, _)| label)
+                .collect()
+        };
+        assert!(!labels(&compiled_default_content()).contains(&"Score".to_string()));
+        let mut authored = compiled_default_content();
+        authored.fields = vec![
+            ContentField {
+                label: "Score".into(),
+                value: "{anomaly_score}".into(),
+                show_when: None,
+            },
+            ContentField {
+                label: "Expected".into(),
+                value: "{expected_lower}-{expected_upper}".into(),
+                show_when: None,
+            },
+        ];
+        assert_eq!(labels(&authored), ["Score", "Expected"]);
+        let mut edited = compiled_default_content();
+        edited.fields.pop();
+        assert!(
+            labels(&edited).contains(&"Score".to_string()),
+            "an edited copy of the default is an authored list"
+        );
+    }
+
+    #[test]
+    fn an_anomaly_through_a_copy_of_the_main_default_gets_the_current_fields() {
+        let ctx = example_context(NotificationKind::Anomaly, false);
+        let labels = |spec: &ContentSpec| -> Vec<String> {
+            resolve_content(spec, &ctx, "slack")
+                .fields
+                .into_iter()
+                .map(|(label, _)| label)
+                .collect()
+        };
+        let field = |(label, value): &(&str, &str)| ContentField {
+            label: (*label).into(),
+            value: (*value).into(),
+            show_when: None,
+        };
+        let main_copy = ContentSpec {
+            fields: MAIN_FIELDS.iter().map(field).collect(),
+            ..compiled_default_content()
+        };
+        assert_eq!(labels(&main_copy), labels(&compiled_default_content()));
+        assert!(labels(&main_copy).contains(&"Expected".to_string()));
+        let mut edited = main_copy.clone();
+        edited.fields[0].value = "{alert_level}".into();
+        assert!(
+            labels(&edited).contains(&"Score".to_string()),
+            "one changed field makes the list authored"
+        );
+        let (_, default) = fields_for(&main_copy.fields, NotificationKind::Alert);
+        assert!(!default, "another kind renders the copy as written");
+    }
+
+    #[test]
     fn each_kind_shows_only_its_own_fields_under_ten() {
         let labels = |kind: NotificationKind| -> Vec<String> {
             let ctx = example_context(kind, false);
@@ -218,7 +355,9 @@ mod tests {
             ),
             (
                 Anomaly,
-                &["Level", "Event", "Stream", "Value", "Score", "Time"],
+                &[
+                    "Level", "Event", "Stream", "Value", "Expected", "Change", "Started", "Time",
+                ],
             ),
             (
                 Synthetics,
@@ -261,7 +400,7 @@ mod tests {
     }
 
     #[test]
-    fn only_an_anomaly_with_a_link_renders_the_explore_link() {
+    fn only_an_anomaly_with_a_separate_link_renders_the_explore_link() {
         let explore = |ctx: &crate::alerts::notifications::NotificationContext| {
             resolve_content(&compiled_default_content(), ctx, "slack")
                 .links
@@ -283,19 +422,25 @@ mod tests {
                 "{kind:?}"
             );
         }
+        // The explore link is the data button now, so its authored copy drops as a duplicate.
         let anomaly = example_context(NotificationKind::Anomaly, false);
-        let links = explore(&anomaly);
-        assert_eq!(links.len(), 1);
-        assert_eq!(links[0].0, "View data around the window");
-        assert!(links[0].1.contains("/web/logs?"));
+        assert!(explore(&anomaly).is_empty());
+        let links = resolve_content(&compiled_default_content(), &anomaly, "slack").links;
+        assert_eq!(links[0].label, "View logs");
+        assert!(links[0].url.contains("/web/logs?"));
 
-        let mut no_link = anomaly.clone();
-        for (k, v) in no_link.context_attributes.iter_mut() {
+        let mut own = anomaly.clone();
+        own.alert_url = "https://o2.acme.com/web/alerts/detail/a1b2c3".into();
+        let links = explore(&own);
+        assert_eq!(links.len(), 1, "a custom alert_url keeps the explore link");
+        assert_eq!(links[0].0, "View logs");
+
+        for (k, v) in own.context_attributes.iter_mut() {
             if k.starts_with("anomaly_explore_") {
                 v.clear();
             }
         }
-        assert!(explore(&no_link).is_empty());
+        assert!(explore(&own).is_empty());
     }
 
     #[test]

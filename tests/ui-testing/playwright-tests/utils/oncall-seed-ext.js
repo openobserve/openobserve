@@ -135,6 +135,20 @@ async function createOrgUser(page, { email, role = 'admin', password = SEED_USER
   if (!ok && !/already exist/i.test(text)) {
     throw new Error(`Creating org user ${email} failed: HTTP ${status} — ${text.slice(0, 200)}`);
   }
+  // The users list reads a cache the create path fills asynchronously, so a read right after the POST can miss it.
+  const rosterTimeoutMs = 15_000;
+  const deadline = Date.now() + rosterTimeoutMs;
+  let pollMs = 250;
+  for (;;) {
+    const body = await read(page, '/users');
+    const list = Array.isArray(body) ? body : (body?.data ?? []);
+    if (Array.isArray(list) && list.some((u) => String(u?.email).toLowerCase() === email.toLowerCase())) break;
+    if (Date.now() >= deadline) {
+      throw new Error(`Org user ${email} was created but is not on the org roster after ${rosterTimeoutMs} ms`);
+    }
+    await page.waitForTimeout(pollMs);
+    pollMs = Math.min(pollMs * 2, 1000);
+  }
   testLogger.info('Org user seeded', { email, role });
   return { email, password, role };
 }

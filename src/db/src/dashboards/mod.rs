@@ -89,10 +89,22 @@ pub async fn watch_id_to_org() -> Result<(), anyhow::Error> {
                     log::warn!("[Dashboard::watch_id_to_org] malformed put key: {}", ev.key);
                     continue;
                 };
-                DASHBOARD_ID_TO_ORG
-                    .write()
-                    .await
-                    .insert(dashboard_id.to_string(), org_id.to_string());
+                // A put can arrive after the delete that followed it, so the primary decides.
+                match table::dashboards::get_by_id_primary(org_id, dashboard_id).await {
+                    Ok(Some(_)) => {
+                        DASHBOARD_ID_TO_ORG
+                            .write()
+                            .await
+                            .insert(dashboard_id.to_string(), org_id.to_string());
+                    }
+                    Ok(None) => {
+                        DASHBOARD_ID_TO_ORG.write().await.remove(dashboard_id);
+                    }
+                    Err(e) => {
+                        log::warn!("[Dashboard::watch_id_to_org] {org_id}/{dashboard_id}: {e}");
+                        DASHBOARD_ID_TO_ORG.write().await.remove(dashboard_id);
+                    }
+                }
             }
             Event::Delete(ev) => {
                 let Some((_org_id, dashboard_id)) = parse_key(&ev.key) else {

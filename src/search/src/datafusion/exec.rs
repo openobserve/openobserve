@@ -67,7 +67,7 @@ use crate::{
 
 pub const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 
-fn create_session_config(
+pub(crate) fn create_session_config(
     sort_order: FileSortOrder,
     target_partitions: usize,
 ) -> Result<SessionConfig> {

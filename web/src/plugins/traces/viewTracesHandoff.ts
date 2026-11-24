@@ -26,6 +26,8 @@ export interface ViewTracesPayload {
   /** Every raw spelling a folded catalog row covers; absent means serviceName alone. */
   serviceNames?: string[];
   serviceType?: string;
+  /** SQL expression that names the node when it is not `infer_service_name` (GenAI nodes). */
+  identityExpr?: string;
   serviceSystem?: string | null;
   operationName?: string;
   nodeName?: string;
@@ -54,7 +56,7 @@ export function buildViewTracesFilter(data: ViewTracesPayload): string {
   if (!data.serviceName) return "";
 
   let filterQuery = data.serviceType
-    ? `infer_service_name = '${escapeSingleQuotes(data.serviceName)}'`
+    ? `${data.identityExpr || "infer_service_name"} = '${escapeSingleQuotes(data.serviceName)}'`
     : serviceNamesSql(
         "service_name",
         data.serviceNames?.length ? data.serviceNames : [data.serviceName],

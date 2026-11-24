@@ -70,6 +70,8 @@ vi.mock("@/services/organizations", async (importOriginal) => {
       revoke_external_contract: vi.fn(),
       set_quota_usage_limit: vi.fn(),
       resurrect_org: vi.fn(),
+      block_org: vi.fn(),
+      unblock_org: vi.fn(),
     },
   });
 });
@@ -254,11 +256,12 @@ describe("OrganizationManagement.vue", () => {
     vi.clearAllTimers();
   });
 
-  const createWrapper = (propsData = {}) => {
+  const createWrapper = (propsData = {}, extraStubs: Record<string, any> = {}) => {
     return mount(OrganizationManagement, {
       global: {
         plugins: [i18n, store, router],
         stubs: {
+          ...extraStubs,
           ODialog: ODialogStub,
           OTable: OTableStub,
           // Stub heavy sub-components that are not under test
@@ -1013,6 +1016,192 @@ describe("OrganizationManagement.vue", () => {
 
       expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({ variant: "error", message: "Grace period expired" }),
+      );
+    });
+  });
+
+  describe("Organization Block Status", () => {
+    const orgRow = (overrides: Record<string, any> = {}) => ({
+      id: 1,
+      name: "Test Org",
+      identifier: "test-org",
+      plan: "0",
+      created_at: 123456789,
+      trial_expires_at: 987654321,
+      billing_provider: "-",
+      org_storage_enabled: true,
+      ...overrides,
+    });
+
+    // The real overflow menu renders its items only while open; this one renders them inline.
+    const menuStubs = {
+      ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        emits: ["select"],
+        template: `<button @click="$emit('select')"><slot /></button>`,
+      },
+    };
+
+    const mountWithRow = async (row: Record<string, any>) => {
+      store.state.zoConfig.meta_org = "default";
+      mockGetAdminOrg.mockResolvedValue({ data: { data: [row] } });
+      wrapper = createWrapper({}, menuStubs);
+      await flushPromises();
+      await nextTick();
+    };
+
+    const orgService = async () => (await import("@/services/organizations")).default as any;
+
+    it("should render a distinct Blocked badge with only the unblock action", async () => {
+      await mountWithRow(orgRow({ status: "blocked" }));
+      const badge = wrapper.findComponent({ name: "OBadge" });
+      expect(wrapper.find('[data-test="otable-status-0"]').text()).toBe("Blocked");
+      expect(badge.props("variant")).toBe("error-soft");
+      expect(wrapper.find('[data-test="org-management-unblock-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="org-management-unblock-btn-menu"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="org-management-block-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="org-management-resurrect-btn"]').exists()).toBe(false);
+    });
+
+    it("should keep the Blocked badge apart from active and deletion badges", async () => {
+      await mountWithRow(orgRow({ status: "active" }));
+      const variants: Record<string, string> = {};
+      for (const status of ["active", "blocked", "pending_deletion", "deleting"]) {
+        variants[status] = wrapper.vm.statusVariant({ status });
+      }
+      expect(variants.blocked).not.toBe(variants.active);
+      expect(variants.blocked).not.toBe(variants.pending_deletion);
+      expect(variants.pending_deletion).toBe(variants.deleting);
+    });
+
+    it("should offer block on an active org in the row and the overflow menu", async () => {
+      await mountWithRow(orgRow({ status: "active" }));
+      expect(wrapper.find('[data-test="org-management-block-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="org-management-block-btn-menu"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="org-management-unblock-btn"]').exists()).toBe(false);
+    });
+
+    it.each(["_meta", "default"])("should not offer block on the %s org", async (identifier) => {
+      await mountWithRow(orgRow({ status: "active", identifier }));
+      expect(wrapper.find('[data-test="org-management-block-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="org-management-block-btn-menu"]').exists()).toBe(false);
+    });
+
+    it.each(["pending_deletion", "deleting"])(
+      "should offer neither block nor unblock on a %s org",
+      async (status) => {
+        await mountWithRow(orgRow({ status }));
+        expect(wrapper.find('[data-test="org-management-block-btn"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="org-management-unblock-btn"]').exists()).toBe(false);
+      },
+    );
+
+    it("should block after confirmation against the configured meta org", async () => {
+      const mockBlock = (await orgService()).block_org;
+      mockBlock.mockResolvedValue({});
+      mockConfirmFn.mockResolvedValueOnce(true);
+      await mountWithRow(orgRow({ status: "active" }));
+      mockGetAdminOrg.mockClear();
+      store.state.zoConfig.meta_org = "meta-distinct";
+
+      await wrapper.find('[data-test="org-management-block-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockConfirmFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Block organization",
+          messageKeypath: "organization.blockConfirmMessage",
+          messageName: "Test Org",
+          confirmVariant: "destructive",
+        }),
+      );
+      expect(mockBlock).toHaveBeenCalledWith("meta-distinct", "test-org");
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success", message: "Organization blocked." }),
+      );
+      expect(mockGetAdminOrg).toHaveBeenCalled();
+    });
+
+    it("should not block when the confirmation is declined", async () => {
+      const mockBlock = (await orgService()).block_org;
+      mockBlock.mockClear();
+      mockConfirmFn.mockResolvedValueOnce(false);
+      await mountWithRow(orgRow({ status: "active" }));
+
+      await wrapper.find('[data-test="org-management-block-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockBlock).not.toHaveBeenCalled();
+    });
+
+    it("should surface the server message, or a fallback, when block fails", async () => {
+      const mockBlock = (await orgService()).block_org;
+      await mountWithRow(orgRow({ status: "active" }));
+      mockBlock.mockRejectedValueOnce({ response: { data: { message: "Not active" } } });
+      mockConfirmFn.mockResolvedValueOnce(true);
+      await wrapper.vm.confirmBlockOrganization(orgRow({ status: "active" }));
+      mockBlock.mockRejectedValueOnce({});
+      mockConfirmFn.mockResolvedValueOnce(true);
+      await wrapper.vm.confirmBlockOrganization(orgRow({ status: "active" }));
+
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error", message: "Not active" }),
+      );
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error", message: "Failed to block." }),
+      );
+    });
+
+    it("should unblock without confirmation and refresh the list", async () => {
+      const mockUnblock = (await orgService()).unblock_org;
+      mockUnblock.mockResolvedValue({});
+      mockConfirmFn.mockClear();
+      await mountWithRow(orgRow({ status: "blocked" }));
+      mockGetAdminOrg.mockClear();
+      store.state.zoConfig.meta_org = "meta-distinct";
+
+      await wrapper.find('[data-test="org-management-unblock-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockConfirmFn).not.toHaveBeenCalled();
+      expect(mockUnblock).toHaveBeenCalledWith("meta-distinct", "test-org");
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success", message: "Organization unblocked." }),
+      );
+      expect(mockGetAdminOrg).toHaveBeenCalled();
+    });
+
+    it("should run block and unblock from the overflow menu items", async () => {
+      const service = await orgService();
+      service.block_org.mockResolvedValue({});
+      service.unblock_org.mockResolvedValue({});
+      mockConfirmFn.mockResolvedValueOnce(true);
+      await mountWithRow(orgRow({ status: "active" }));
+      await wrapper.find('[data-test="org-management-block-btn-menu"]').trigger("click");
+      await flushPromises();
+      wrapper.unmount();
+      await mountWithRow(orgRow({ status: "blocked" }));
+      await wrapper.find('[data-test="org-management-unblock-btn-menu"]').trigger("click");
+      await flushPromises();
+
+      expect(service.block_org).toHaveBeenCalledWith("default", "test-org");
+      expect(service.unblock_org).toHaveBeenCalledWith("default", "test-org");
+    });
+
+    it("should surface the server message, or a fallback, when unblock fails", async () => {
+      const mockUnblock = (await orgService()).unblock_org;
+      await mountWithRow(orgRow({ status: "blocked" }));
+      mockUnblock.mockRejectedValueOnce({ response: { data: { message: "Not blocked" } } });
+      await wrapper.vm.unblockOrganization(orgRow({ status: "blocked" }));
+      mockUnblock.mockRejectedValueOnce({});
+      await wrapper.vm.unblockOrganization(orgRow({ status: "blocked" }));
+
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error", message: "Not blocked" }),
+      );
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error", message: "Failed to unblock." }),
       );
     });
   });

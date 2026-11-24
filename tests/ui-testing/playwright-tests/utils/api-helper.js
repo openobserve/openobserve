@@ -199,6 +199,7 @@ async function createAnomalyViaApi(page, name, opts = {}) {
   const org = getOrgName();
   const {
     streamName = 'e2e_automate',
+    streamType = 'logs',
     destinations = [],
     threshold = 97,
     histogramInterval = '5m',
@@ -208,7 +209,7 @@ async function createAnomalyViaApi(page, name, opts = {}) {
     alert_type: 'anomaly_detection',
     name,
     stream_name: streamName,
-    stream_type: 'logs',
+    stream_type: streamType,
     enabled: true,
     folder_id: 'default',
     alert_destinations: destinations,

@@ -24,6 +24,10 @@ import type {
   AutoObserveCoverageRow,
   AutoObserveLearning,
   AutoObserveStatedEvidence,
+  AutoObserveCauseLine,
+  AutoObserveDeepLink,
+  AutoObserveIssueContext,
+  AutoObserveProviderCheck,
   AutoObserveSuggestion,
   AutoObserveSuggestionList,
 } from "@/services/autoobserve";
@@ -43,6 +47,7 @@ import {
   agoText,
   coverageWord,
   formatDay,
+  NAMES_SHOWN,
   placeLabels,
   placeOf,
   whereText,
@@ -50,7 +55,6 @@ import {
   type LiveFailure,
   type LiveStale,
 } from "./liveCopy";
-import { serviceLearning, type LearningStream } from "./LiveCoverageLearning";
 import { alertFindingBody, alertFindingHeadline, analysedText } from "./alertFindingCopy";
 import {
   gapGroupInsight,
@@ -351,7 +355,6 @@ const toRow = (
   service: string,
   minutes: number | null,
   locale: string,
-  nowMs: number,
 ): CoverageRow => {
   const cells = Object.fromEntries(
     SIGNALS.map((signal) => {
@@ -363,10 +366,7 @@ const toRow = (
     }),
   ) as Record<Signal, CoverageCell>;
   const covered = GAP_CLASSES.filter((cls) => row.cells[cls]?.state === "covered").length;
-  const state = serviceStateOf(
-    covered,
-    serviceLearning((row.streams ?? []) as LearningStream[], nowMs),
-  );
+  const state = serviceStateOf(covered);
   const checks = Object.fromEntries(
     GAP_CLASSES.map((cls) => [cls, toCell(t, row.cells[cls], t(CLASS_LABEL[cls]), locale)]),
   ) as Record<LiveCheck, CoverageCell>;
@@ -386,8 +386,11 @@ const toRow = (
       cluster: row.cluster,
       namespace: row.namespace,
       streams: row.streams ?? [],
+      trafficPerHour: row.traffic_per_hour ?? null,
     },
     status: { state, label: coverageWord(t, state) },
+    traffic: row.traffic_per_hour ?? null,
+    engine: row,
     extra: EXTRA_CLASSES.map((cls) => {
       const label = t(CLASS_LABEL[cls]);
       return { key: cls, label, cell: toCell(t, row.cells[cls], label, locale) };
@@ -395,11 +398,10 @@ const toRow = (
   };
 };
 
-// Watched needs every check; a service still learning its baseline is not yet a gap.
-const serviceStateOf = (covered: number, learning: boolean): LiveCoverageState => {
+const serviceStateOf = (covered: number): LiveCoverageState => {
   if (covered >= GAP_CLASSES.length) return "watched";
   if (covered > 0) return "partial";
-  return learning ? "learning" : "gap";
+  return "gap";
 };
 
 // Closest engine match for the design's "can't watch": a monitor exists but can't see or reach the service.
@@ -439,7 +441,7 @@ export const toCoverageSource = (
     };
   const names = placeLabels(t, data.rows.map(placeOf));
   const minutes = minutesSince(data.pass_at, now);
-  const rows = data.rows.map((row, i) => toRow(t, row, names[i], minutes, locale, now));
+  const rows = data.rows.map((row, i) => toRow(t, row, names[i], minutes, locale));
   const planned = new Set(data.rows.flatMap((row, i) => (cannotWatch(row) ? [names[i]] : [])));
   return {
     ...base,
@@ -557,9 +559,8 @@ const cappedList = (
   );
 };
 
-// The approved copy names the first destination and counts the rest, and up to three services.
+// The approved copy names the first destination and counts the rest.
 const DESTINATION_CAP = 1;
-const SERVICE_CAP = 3;
 
 const blindParts = (
   t: TranslateFn,
@@ -620,7 +621,7 @@ const silentParts = (t: TranslateFn, locale: string, s: AutoObserveSuggestion): 
     why: services.length
       ? t("autoobserveLive.suggestions.body.silentWhy", {
           monitor,
-          services: cappedList(t, locale, services, count, SERVICE_CAP),
+          services: cappedList(t, locale, services, count, NAMES_SHOWN),
         })
       : t("autoobserveLive.suggestions.body.silentWhyNoNames", { monitor }),
     next: t("autoobserveLive.suggestions.body.silentNext"),
@@ -894,3 +895,66 @@ export const toSuggestionRows = (
       detail: parts.body,
     };
   });
+
+export const CAUSES_SHOWN = 3;
+
+export interface CauseFold {
+  shown: AutoObserveCauseLine[];
+  folded: AutoObserveCauseLine[];
+  // Ranked below the served rows, so counted but never listed.
+  unlisted: number;
+}
+
+export interface CheckGroups {
+  ok: string[];
+  failed: string[];
+  off: string[];
+  partial: string[];
+  notRecorded: string[];
+}
+
+/** The issue context a drawer's item carries; null while the server sends none. */
+export const issueContextOf = (
+  item: { context?: AutoObserveIssueContext } | null | undefined,
+): AutoObserveIssueContext | null => item?.context ?? null;
+
+/** The Next step box shows while the context loads, then only when the asked context carries a step. */
+export const showsNextStep = (cx: AutoObserveIssueContext | null): boolean =>
+  !cx || cx.asked_at === null || cx.next_step !== null;
+
+/** A served page link as a route in this org; the server's own org_identifier wins. */
+export const deepLinkRoute = (
+  link: AutoObserveDeepLink,
+  org: string,
+): { path: string; query: Record<string, string> } => ({
+  path: `/${link.path.replace(/^\/+/, "")}`,
+  query: { org_identifier: org, ...link.query },
+});
+
+/** Rows the step used fill the slots first, so none is folded away while an unused one shows (R9). */
+export const foldCauses = (
+  causes: AutoObserveIssueContext["causes"],
+  shown = CAUSES_SHOWN,
+): CauseFold => {
+  const used = causes.top.filter((c) => c.used);
+  const rest = causes.top.filter((c) => !c.used);
+  const keep = new Set([...used, ...rest].slice(0, shown));
+  return {
+    shown: causes.top.filter((c) => keep.has(c)),
+    folded: causes.top.filter((c) => !keep.has(c)),
+    unlisted: causes.more,
+  };
+};
+
+export const checkGroups = (checks: AutoObserveProviderCheck[]): CheckGroups => {
+  const groups: CheckGroups = { ok: [], failed: [], off: [], partial: [], notRecorded: [] };
+  const into: Record<AutoObserveProviderCheck["state"]["kind"], keyof CheckGroups> = {
+    ok: "ok",
+    failed: "failed",
+    off: "off",
+    partial: "partial",
+    not_recorded: "notRecorded",
+  };
+  for (const check of checks) groups[into[check.state.kind]].push(check.label);
+  return groups;
+};

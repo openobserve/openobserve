@@ -14,11 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod ai_prompts;
+pub mod alert_composites;
 pub mod alerts;
+pub mod anomaly_detection;
 pub mod dashboards;
 pub mod downtimes;
 pub mod events;
 pub mod fleet;
+pub mod folders;
 pub mod ingest_rejection;
 pub mod oncall;
 pub mod org_status;

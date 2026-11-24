@@ -72,6 +72,7 @@ describe("logs recent searches with the filter builder on", () => {
   };
 
   beforeEach(() => {
+    localStorage.setItem("o2.logs.queryInput", "builder");
     store.state.zoConfig.query_history_enabled = true;
     queryClient.clear();
     api.list.mockResolvedValue({ data: [entry] });
@@ -79,6 +80,7 @@ describe("logs recent searches with the filter builder on", () => {
   });
 
   afterEach(() => {
+    localStorage.removeItem("o2.logs.queryInput");
     wrapper?.unmount();
     wrapper = null;
     delete store.state.zoConfig.query_history_enabled;

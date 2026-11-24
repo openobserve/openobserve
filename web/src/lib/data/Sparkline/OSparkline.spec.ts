@@ -80,6 +80,11 @@ describe("OSparkline", () => {
     expect(wrapper.find("svg").classes()).toContain("text-status-error-text");
   });
 
+  it("draws a series slot in its dashboard series colour, whatever the tone", () => {
+    const wrapper = mount(OSparkline, { props: { points: [1, 2], tone: "danger", series: 2 } });
+    expect(wrapper.find("svg").attributes("style")).toContain("var(--color-chart-series-2)");
+  });
+
   it("dims a provisional bar so a live tail is distinguishable", () => {
     const wrapper = mount(OSparkline, {
       props: { shape: "bar", points: [{ value: 5 }, { value: 6, provisional: true }] },

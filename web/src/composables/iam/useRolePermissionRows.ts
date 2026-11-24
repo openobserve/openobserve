@@ -15,6 +15,7 @@
 
 import type { Ref } from "vue";
 import type { Resource, Entity } from "@/ts/interfaces";
+import { GET_ONLY_STREAM_RESOURCES } from "@/composables/iam/useRolePermissionTree";
 
 type RowDeps = {
   /** The permission tree the rows are pushed onto. */
@@ -210,8 +211,7 @@ export const useRolePermissionRows = (deps: RowDeps) => {
         childName: childName || "",
         top_level: !!resource.childs.find((child) => child.name === childName)?.top_level,
       });
-      // Hide non-applicable permissions for logs_pattern and logs_insights entities
-      if (resourceName === "logs_pattern" || resourceName === "logs_insights") {
+      if (GET_ONLY_STREAM_RESOURCES.includes(resourceName)) {
         const entity = resource.entities[resource.entities.length - 1];
         entity.permission.AllowList.show = false;
         entity.permission.AllowDelete.show = false;

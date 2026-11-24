@@ -49,7 +49,7 @@ const router = useRouter();
 const store = useStore();
 const { label, detail, truncatedNote, fixLabel, statusLabel } = useDataHealthText();
 
-// OSS locks Model Pricing and GenAI Agent Mapping, so those checks offer no fix there.
+// OSS locks GenAI Agent Mapping, so that check offers no fix there.
 const target = computed(() => {
   const to = fixTarget(
     props.check.id,
@@ -59,6 +59,7 @@ const target = computed(() => {
   );
   const locked =
     to.kind === "route" &&
+    !!to.feature &&
     !checkFeatureAccess(to.feature, buildFeatureGateContext(store.state.zoConfig)).allowed;
   return locked ? null : to;
 });

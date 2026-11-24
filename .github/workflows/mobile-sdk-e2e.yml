@@ -73,7 +73,8 @@ concurrency:
   # PR pushes supersede each other (share the PR-number group); every non-PR run (each SDK-release
   # dispatch / manual run) gets its OWN group via run_id, so a second SDK release can't cancel the
   # first's in-flight device gate.
-  group: mobile-sdk-e2e-${{ github.event.pull_request.number || github.run_id }}
+  # A label that changes nothing here skips every job, so it must neither replace nor queue behind a real run.
+  group: mobile-sdk-e2e-${{ github.event.pull_request.number || github.run_id }}${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","mobile-e2e"]'), github.event.label.name)) && '-mirror' || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -108,7 +109,8 @@ jobs:
   # -------------------------------------------------------------------------------------------
   preflight:
     # Paid CI runs only on PRs carrying the 'ready-for-ci' label; the merge queue runs unit tests on the merged code.
-    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) }}
+    # Other labels change nothing here, so they skip the whole run; this is not a required check.
+    if: ${{ (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) && !(contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","mobile-e2e"]'), github.event.label.name)) }}
     name: Preflight & readiness
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -835,7 +837,7 @@ jobs:
   merge_reports:
     name: Merge Reports
     needs: [android, ios]
-    if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
+    if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) && !(contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","mobile-e2e"]'), github.event.label.name))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

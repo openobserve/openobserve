@@ -451,6 +451,21 @@ describe("DashboardQueryEditor", () => {
       panelData.type = previousType;
     });
 
+    it("offers no second query for a treemap, which draws one measure", async () => {
+      wrapper = createWrapper();
+      const panelData = wrapper.vm.dashboardPanelData.data;
+      const previousType = panelData.type;
+      const addButton = () => wrapper.find('[data-test="dashboard-panel-query-tab-add"]');
+      panelData.type = "line";
+      await wrapper.vm.$nextTick();
+      expect(addButton().exists()).toBe(true);
+
+      panelData.type = "treemap";
+      await wrapper.vm.$nextTick();
+      expect(addButton().exists()).toBe(false);
+      panelData.type = previousType;
+    });
+
     it("should handle query index changes", async () => {
       wrapper = createWrapper();
 

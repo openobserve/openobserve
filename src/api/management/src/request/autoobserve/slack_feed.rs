@@ -18,15 +18,24 @@
 use o2_enterprise::enterprise::{
     autoobserve::{
         alert_findings::AlertFindingsRead,
-        api::{self, Deps, MAX_LIMIT, Page, SuggestionFilter},
+        api::{self, DEFAULT_LIMIT, Deps, MAX_LIMIT, Page, SuggestionFilter},
+        context::{self, ChannelResolver, IssueView},
+        contract::WEEK_US,
+        decisions::Family,
     },
     slack::insights::feed::{
         FeedHooks,
         sweep::{FeedInput, ReadAs},
     },
 };
+use openobserve_core::autoobserve::incidents;
 
 use super::{LiveDigest, decisions, readable_subjects, run_read_by};
+
+/// As far back as an issue decision finds its issue, so a thread can still close a long outage.
+const ISSUES_SINCE_US: i64 = WEEK_US;
+/// Every decision a feed message reflects, an applied change and its effect included.
+const FEED_FAMILIES: [Family; 3] = [Family::Suggestion, Family::Issue, Family::AlertFinding];
 
 /// Registered once at startup, beside the HTTP server.
 pub fn hooks() -> FeedHooks {
@@ -54,6 +63,7 @@ async fn read(at: ReadAs) -> anyhow::Result<FeedInput> {
             at.now,
             readable,
             &LiveDigest,
+            &ChannelResolver,
         )
         .await
         .map_err(|e| anyhow::anyhow!("suggestions: {e:?}"))?;
@@ -71,15 +81,53 @@ async fn read(at: ReadAs) -> anyhow::Result<FeedInput> {
         None => None,
     };
     // A failed read must fail the pass: an empty list would read as every decision undone.
-    let decisions = decisions::feed_decisions(&at.org_id, &at.user_id, at.now)
-        .await
-        .map_err(|e| anyhow::anyhow!("decisions: {e:?}"))?;
+    let mut decided = Vec::new();
+    for family in FEED_FAMILIES {
+        decided.extend(
+            every_page(|page| async move {
+                decisions::feed_decisions(&at.org_id, &at.user_id, family, page, at.now)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("decisions: {e:?}"))
+            })
+            .await?,
+        );
+    }
+    let issues = open_issues(deps, &at.org_id, at.now).await?;
     Ok(FeedInput {
         items,
         calibration_run_at,
         calibration_open,
-        decisions,
+        decisions: decided,
+        issues,
     })
+}
+
+/// Issue threads need the context switch; each issue carries the incident and page it opened.
+async fn open_issues(deps: &Deps, org: &str, now: i64) -> anyhow::Result<Vec<IssueView>> {
+    if !context::enabled() {
+        return Ok(Vec::new());
+    }
+    let since = now - ISSUES_SINCE_US;
+    let mut issues = context::open_issues(deps, org, since, &ChannelResolver)
+        .await
+        .map_err(|e| anyhow::anyhow!("issues: {e:?}"))?;
+    if issues.is_empty() {
+        return Ok(issues);
+    }
+    // One default page each sweep: every incident costs an on-call read, and threads are recent.
+    let page = Page {
+        limit: DEFAULT_LIMIT,
+        offset: 0,
+    };
+    let listed = incidents::list(org, page, None).await?.items;
+    for view in &mut issues {
+        view.incident = incidents::incident_of(org, &view.issue, &listed);
+        view.issue.recovered_us = incidents::recovery_of(org, &view.issue, &listed);
+        if view.closed.is_none() {
+            view.closed = context::closed_of(deps, org, &view.issue).await;
+        }
+    }
+    Ok(issues)
 }
 
 /// Every readable row, page by page, so counts and recoveries past the first page are seen.

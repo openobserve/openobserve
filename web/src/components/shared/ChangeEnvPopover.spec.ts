@@ -707,6 +707,15 @@ describe("ChangeEnvPopover", () => {
     });
   });
 
+  it("scrolls only the env options, keeping New env outside the list so it stays reachable", async () => {
+    await openPopover();
+    const list = document.body.querySelector('[role="listbox"]')!;
+    const options = document.body.querySelectorAll('[role="option"]');
+    expect(options.length).toBeGreaterThan(1);
+    expect([...options].every((option) => list.contains(option))).toBe(true);
+    expect(list.contains($("svcver-env-new"))).toBe(false);
+  });
+
   it("shows the read-only view without options or writes when can_edit is false", async () => {
     serveEnvs(false);
     await openPopover();

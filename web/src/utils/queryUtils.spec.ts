@@ -184,6 +184,12 @@ describe("addSpacesToOperators", () => {
     expect(result).toContain("<");
   });
 
+  it("keeps <> together as one operator", () => {
+    expect(addSpacesToOperators("level<>'error'")).toBe("level <> 'error'");
+    expect(addSpacesToOperators("level <> 'error'")).toBe("level <> 'error'");
+    expect(addSpacesToOperators("a<>b AND c<d")).toBe("a <> b AND c < d");
+  });
+
   it("does NOT modify operators inside single quotes", () => {
     const input = "name='a!=b'";
     const result = addSpacesToOperators(input);

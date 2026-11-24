@@ -60,7 +60,7 @@ const rows = [
 
 describe("category nodes", () => {
   it("nests by x then breakdown, sums values and sorts tiles largest first", () => {
-    const nodes = buildTreemapNodes(
+    const { nodes } = buildTreemapNodes(
       panel("pie", { x: [serviceX], y: [count], breakdown: [regionB] }),
       [rows],
     );
@@ -75,10 +75,34 @@ describe("category nodes", () => {
   });
 
   it("makes flat tiles without a breakdown", () => {
-    const nodes = buildTreemapNodes(panel("pie", { x: [serviceX], y: [count] }), [rows]);
+    const { nodes } = buildTreemapNodes(panel("pie", { x: [serviceX], y: [count] }), [rows]);
     expect(nodes).toEqual([
       { name: "web", value: 50, path: ["web"] },
       { name: "api", value: 40, path: ["api"] },
     ]);
+  });
+
+  it('keeps a missing, an empty and a literal "(null)" group apart, each with its own value', () => {
+    const { nodes } = buildTreemapNodes(panel("pie", { x: [serviceX], y: [count] }), [
+      [
+        { x_axis_1: null, y_axis_1: 3 },
+        { x_axis_1: "", y_axis_1: 2 },
+        { y_axis_1: 1 },
+        { x_axis_1: "(null)", y_axis_1: 7 },
+      ],
+    ]);
+    expect(nodes).toEqual([
+      { name: "(null)", value: 7, path: ["(null)"] },
+      { name: "(null)", rawName: null, value: 4, path: ["(null)"], rawPath: [null] },
+      { name: "(empty)", rawName: "", value: 2, path: ["(empty)"], rawPath: [""] },
+    ]);
+  });
+
+  it("counts the rows without a positive value it leaves out of the totals", () => {
+    const { nodes, skippedRows } = buildTreemapNodes(panel("pie", { x: [serviceX], y: [count] }), [
+      [...rows, { x_axis_1: "api", y_axis_1: -5 }],
+    ]);
+    expect(skippedRows).toBe(3);
+    expect(nodes.find((node) => node.name === "api")?.value).toBe(40);
   });
 });

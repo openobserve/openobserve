@@ -18,6 +18,7 @@ use axum::{
     http::{HeaderValue, StatusCode},
     response::{IntoResponse, Response},
 };
+use config::meta::search::StreamResponses;
 use db::alerts::{destinations::DestinationError, templates::TemplateError};
 use infra::errors;
 
@@ -55,6 +56,29 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
         // `X-Error-Message` header (it should only carry error codes). The full
         // message is still returned in the JSON response body.
         _ => (status, Json(MetaHttpResponse::error(status, err))).into_response(),
+    }
+}
+
+/// The stream `error` event for `code`, plus the hint, suggestions and trace id a one-shot body
+/// built from `suggest_from` carries.
+pub fn error_code_event(
+    code: &errors::ErrorCodes,
+    suggest_from: &errors::ErrorCodes,
+    status: u16,
+    trace_id: &str,
+) -> StreamResponses {
+    let mut guidance =
+        MetaHttpResponse::error_code_with_trace_id(suggest_from, Some(trace_id.to_string()));
+    crate::error_suggest::enrich(&mut guidance, suggest_from);
+    // UI clients render message and detail, so those stay; agents read the hint and suggestions
+    StreamResponses::Error {
+        code: status,
+        message: code.get_message(),
+        error_detail: Some(code.get_error_detail()),
+        hint: guidance.hint,
+        suggestions: guidance.suggestions,
+        trace_id: guidance.trace_id,
+        error_code: Some(code.get_code()),
     }
 }
 
@@ -214,9 +238,6 @@ impl From<DashboardError> for Response {
             DashboardError::CreateDefaultFolder => {
                 MetaHttpResponse::internal_error("Error saving default folder")
             }
-            DashboardError::DistinctValueError => {
-                MetaHttpResponse::internal_error("Error in updating distinct values")
-            }
             DashboardError::MoveDashboardDeleteOld(dashb_id, folder_id, e) => {
                 MetaHttpResponse::internal_error(format!(
                     "error deleting the dashboard {dashb_id} from old folder {folder_id} : {e}"
@@ -374,5 +395,33 @@ mod tests {
         let resp = map_error_to_http_response(&err, None);
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         assert!(resp.headers().get(ERROR_HEADER).is_none());
+    }
+
+    #[test]
+    fn a_stream_error_keeps_its_text_and_suggests_from_the_full_schema() {
+        let engine = errors::ErrorCodes::SearchFieldNotFound(
+            "No field named satus. Valid fields are _timestamp.".to_string(),
+        );
+        let full = errors::ErrorCodes::SearchFieldNotFound(
+            "No field named satus. Valid fields are _timestamp, status.".to_string(),
+        );
+        let StreamResponses::Error {
+            code,
+            message,
+            error_detail,
+            suggestions,
+            trace_id,
+            error_code,
+            ..
+        } = error_code_event(&engine, &full, 400, "t1")
+        else {
+            panic!("not an error event");
+        };
+        assert_eq!(code, 400);
+        assert_eq!(message, engine.get_message());
+        assert_eq!(error_detail, Some(engine.get_error_detail()));
+        assert_eq!(suggestions, Some(vec!["status".to_string()]));
+        assert_eq!(trace_id.as_deref(), Some("t1"));
+        assert_eq!(error_code, Some(engine.get_code()));
     }
 }

@@ -635,6 +635,16 @@ describe("DrilldownPopUp", () => {
       expect(selectedValues.some((val: any) => val.value === "${series.__value}")).toBe(true);
     });
 
+    it("offers a treemap tile's full path beside its name and value", () => {
+      mockDashboardPanelData.data.type = "treemap";
+      wrapper = createWrapper();
+
+      const values = wrapper.vm.options.selectedValue.map((val: { value: string }) => val.value);
+      expect(values).toEqual(
+        expect.arrayContaining(["${series.__name}", "${series.__value}", "${series.__path}"]),
+      );
+    });
+
     it("should generate correct values for metric type", () => {
       mockDashboardPanelData.data.type = "metric";
       wrapper = createWrapper();

@@ -250,6 +250,7 @@ mod tests {
             search_infos: Default::default(),
             index_info: Default::default(),
             super_cluster_info: Default::default(),
+            raw_streams: Default::default(),
         };
         Arc::new(RemoteScanExec::new(input, node).unwrap())
     }

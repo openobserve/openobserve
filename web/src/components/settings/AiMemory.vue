@@ -194,7 +194,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODialog
       :open="!!opened"
-      :title="revision ? t('aiMemory.revisionTitle', { rev: revision.rev ?? revision.state }) : ''"
+      :title="
+        revision ? t('aiMemory.revisionTitle', { rev: revision.rev ?? revision.state }) : undefined
+      "
       :primary-button-label="canRevert ? t('aiMemory.revert') : undefined"
       primary-button-data-test="ai-memory-revert"
       @update:open="(open: boolean) => !open && (opened = null)"

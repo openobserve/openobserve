@@ -235,7 +235,7 @@ describe("AddAiToolset", () => {
     });
   });
 
-  describe("form-owned array-field (headers)", () => {
+  describe("form-owned array-fields (headers)", () => {
     it("adds a header row through the form API and mirrors it for the v-for", async () => {
       wrapper = createWrapper();
       wrapper.vm.addHeader();

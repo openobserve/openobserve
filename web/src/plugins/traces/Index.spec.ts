@@ -26,7 +26,9 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import * as useDurationPercentilesModule from "@/composables/useDurationPercentiles";
 import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
+import { b64DecodeUnicode } from "@/utils/zincutils";
 import { tracesSearchRunSignature } from "@/plugins/traces/tracesSearchBar.utils";
+import { isMacOS } from "@/utils/keyboardShortcuts";
 import analytics from "@/services/product_analytics";
 import queryHistory from "@/services/query_history";
 import type { QueryHistoryEntry } from "@/services/query_history";
@@ -233,7 +235,7 @@ vi.mock("@/composables/useTraces", () => ({
     getUrlQueryParams: vi.fn(() => ({})),
     applyUrlListState: mockApplyUrlListState,
     syncUrlViewState: mockSyncUrlViewState,
-    copyTracesUrl: vi.fn(),
+    copyTracesUrl: mockCopyTracesUrl,
     formatTracesMetaData: vi.fn((hits) => hits),
     setServiceColors: mockSetServiceColors,
     loadLocalLogFilterField: mockLoadLocalLogFilterField,
@@ -287,8 +289,9 @@ const { createdTracesParsers, trackTracesParser } = vi.hoisted(() => {
 });
 
 // Hoisted so tests can assert resetSearchObj was called by the component lifecycle.
-const { mockResetSearchObj } = vi.hoisted(() => ({
+const { mockResetSearchObj, mockCopyTracesUrl } = vi.hoisted(() => ({
   mockResetSearchObj: vi.fn(),
+  mockCopyTracesUrl: vi.fn(),
 }));
 
 // Hoisted so tests can control what restoreTracesStream returns.
@@ -757,6 +760,40 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(wrapper.findComponent({ name: "services-catalog" }).exists()).toBe(false);
     });
 
+    it("passes the graph's last load time and loading state to the search bar", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { tab: "service-graph" }, name: "traces", path: "/traces" },
+      } as any);
+      const ServiceGraphStub = defineComponent({
+        name: "service-graph",
+        setup(_, { expose }) {
+          expose({ lastRunAt: 123, loading: true, refresh: vi.fn() });
+          return () => h("div");
+        },
+      });
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": ServiceGraphStub,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+
+      // SearchBar is an async component, so its stub declares no props and the values land as attributes.
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      expect(searchBarEl.attributes("refresh-last-run-at")).toBe("123");
+      expect(searchBarEl.attributes("refresh-loading")).toBe("true");
+    });
+
     it("should render the ServicesCatalog stub inline in services-catalog mode", async () => {
       routerCurrentRouteSpy.mockReturnValue({
         value: { query: { tab: "services-catalog" }, name: "traces", path: "/traces" },
@@ -829,6 +866,33 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(mockSearchObj.data.editorValue).toBe("");
     });
+    it("clears a stale editor filter when the route has a stream and no query", async () => {
+      routerCurrentRouteSpy.mockReturnValue(
+        ref({
+          query: { stream: "default", period: "2h" },
+          name: "traces",
+          path: "/traces",
+        }) as typeof router.currentRoute,
+      );
+      mockSearchObj.data.editorValue = "service_name='x'";
+
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe("");
+    });
+
+    it("keeps the editor when the route has no stream (bare menu link)", async () => {
+      routerCurrentRouteSpy.mockReturnValue(
+        ref({ query: {}, name: "traces", path: "/traces" }) as typeof router.currentRoute,
+      );
+      mockSearchObj.data.editorValue = "service_name='x'";
+
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe("service_name='x'");
+    });
   });
 
   describe("Auto Run off (#14760)", () => {
@@ -897,6 +961,50 @@ describe("Index.vue (Main Traces Page)", () => {
       await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled(), {
         timeout: 3000,
       });
+    });
+  });
+
+  describe("Copy link shortcut", () => {
+    const pressCopyLink = async () => {
+      const modifier = isMacOS() ? { metaKey: true } : { ctrlKey: true };
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "c", shiftKey: true, ...modifier }));
+      await flushPromises();
+    };
+
+    it("copies the link only while the shown results come from the current query", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      mockSearchObj.meta.lastRunSignature = tracesSearchRunSignature(mockSearchObj as any);
+      mockCopyTracesUrl.mockClear();
+
+      await pressCopyLink();
+      expect(mockCopyTracesUrl).toHaveBeenCalledTimes(1);
+
+      mockToast.mockClear();
+      mockSearchObj.data.editorValue = "operation_name = 'POST /checkout'";
+      await pressCopyLink();
+      expect(mockCopyTracesUrl).toHaveBeenCalledTimes(1);
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "warning",
+          message: i18n.global.t("search.autoRunPersistNeedsRun"),
+        }),
+      );
+      mockSearchObj.meta.lastRunSignature = null;
     });
   });
 
@@ -1129,7 +1237,6 @@ describe("Index.vue (Main Traces Page)", () => {
               setup() {
                 return {
                   applyFilters: mockApplyFiltersAppend,
-                  removeFilterByField: vi.fn(),
                   setEditorValue: vi.fn(),
                 };
               },
@@ -1737,6 +1844,65 @@ describe("Index.vue (Main Traces Page)", () => {
       record.mockRestore();
     });
 
+    describe("spans ORDER BY across pages", () => {
+      const field = (name: string) => ({ name });
+      const spansSql = async (
+        sortBy: string,
+        fields = ["duration", "trace_id", "span_id"],
+        sortOrder = "desc",
+      ) => {
+        await mountPage();
+        mockSearchObj.data.stream.selectedStreamFields = fields.map(field);
+        mockSearchObj.meta.resultGrid.sortBy = sortBy;
+        mockSearchObj.meta.resultGrid.sortOrder = sortOrder;
+        await wrapper.vm.getMoreData();
+        const calls = mockFetchQueryDataWithHttpStream.mock.calls;
+        return b64DecodeUnicode((calls[calls.length - 1][0] as any).queryReq.query.sql);
+      };
+
+      afterEach(() => {
+        mockSearchObj.data.stream.selectedStreamFields = [];
+        mockSearchObj.meta.resultGrid.sortBy = "start_time";
+        mockSearchObj.meta.resultGrid.sortOrder = "desc";
+      });
+
+      it("adds trace and span id tie-breaks to a non-time sort", async () => {
+        expect(await spansSql("duration")).toBe(
+          'SELECT * FROM "default" ORDER BY duration DESC, trace_id ASC, span_id ASC',
+        );
+      });
+
+      it("keeps the time sort as a single key", async () => {
+        expect(await spansSql("start_time")).toBe(
+          'SELECT * FROM "default" ORDER BY _timestamp DESC',
+        );
+      });
+
+      it("does not repeat the sort column as a tie-break", async () => {
+        expect(await spansSql("span_id")).toBe(
+          'SELECT * FROM "default" ORDER BY span_id DESC, trace_id ASC',
+        );
+      });
+
+      it("skips a tie-break column the stream schema lacks", async () => {
+        expect(await spansSql("duration", ["duration", "trace_id"])).toBe(
+          'SELECT * FROM "default" ORDER BY duration DESC, trace_id ASC',
+        );
+      });
+
+      it("keeps both tie-breaks while the stream schema is not loaded", async () => {
+        expect(await spansSql("duration", [])).toBe(
+          'SELECT * FROM "default" ORDER BY duration DESC, trace_id ASC, span_id ASC',
+        );
+      });
+
+      it("keeps the tie-breaks ascending on an ascending sort", async () => {
+        expect(await spansSql("duration", undefined, "asc")).toBe(
+          'SELECT * FROM "default" ORDER BY duration ASC, trace_id ASC, span_id ASC',
+        );
+      });
+    });
+
     describe("page landings and restores from another page", () => {
       const restoredEntry: QueryHistoryEntry = {
         id: "t1",
@@ -1974,6 +2140,28 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.queryResults.hits).toEqual([]);
     });
 
+    it("carries a landed count only into a re-run of the same query, never a placeholder total", async () => {
+      await mountPage();
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      Object.assign(mockSearchObj.data.queryResults, { total: 600, countLanded: true });
+
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      expect(mockSearchObj.data.queryResults.lastTotal).toBe(600);
+
+      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      expect(mockSearchObj.data.queryResults.lastTotal).toBeUndefined();
+
+      mockSearchObj.data.editorValue = "";
+      mockSearchObj.data.queryResults = { hits: [], total: 0 };
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      expect(mockSearchObj.data.queryResults.lastTotal).toBeUndefined();
+    });
+
     // Logs shows its error banner over the last results rather than blanking; traces matches it.
     it("keeps the previous rows when a page fails before writing any", async () => {
       await mountPage();
@@ -2157,7 +2345,6 @@ describe("Index.vue (Main Traces Page)", () => {
   describe("Metrics Filters Integration", () => {
     // Spies for SearchBar ref methods exposed via stub
     const mockApplyFilters = vi.fn();
-    const mockRemoveFilterByField = vi.fn();
     const mockSetEditorValue = vi.fn();
 
     function mountWithSearchBarStub() {
@@ -2172,7 +2359,6 @@ describe("Index.vue (Main Traces Page)", () => {
               setup() {
                 return {
                   applyFilters: mockApplyFilters,
-                  removeFilterByField: mockRemoveFilterByField,
                   setEditorValue: mockSetEditorValue,
                 };
               },
@@ -2189,12 +2375,21 @@ describe("Index.vue (Main Traces Page)", () => {
 
     beforeEach(() => {
       mockApplyFilters.mockReset();
-      mockRemoveFilterByField.mockReset();
       mockSetEditorValue.mockReset();
       mockSearchObj.data.editorValue = "";
       mockSearchObj.meta.metricsRangeFilters.clear();
       // Reset auto_query_enabled to undefined for each test
       delete store.state.zoConfig.auto_query_enabled;
+    });
+
+    it.each([
+      ["one branch of an OR", "service_name='a' OR span_status='ERROR'", false],
+      ["a top-level AND condition", "service_name='a' AND span_status='ERROR'", true],
+    ])("shows errors-only as on for %s: %s", async (_name, filter, on) => {
+      mockSearchObj.data.editorValue = filter;
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+      expect(wrapper.vm.showErrorOnly).toBe(on);
     });
 
     it("should grow the query pane with the filter builder and shrink it back", async () => {
@@ -2276,25 +2471,45 @@ describe("Index.vue (Main Traces Page)", () => {
       });
     });
 
-    it("should call applyFilters with error condition when error only toggle is turned on", async () => {
+    it.each([
+      [
+        "one with a top-level OR",
+        "service_name='a' OR span_status='ERROR'",
+        "(service_name='a' OR span_status='ERROR') and span_status = 'ERROR'",
+      ],
+      [
+        "a bracketed OR",
+        "(service_name='a' OR span_status='ERROR')",
+        "(service_name='a' OR span_status='ERROR') and span_status = 'ERROR'",
+      ],
+      ["a plain AND filter", "service_name='a'", "service_name='a' and span_status = 'ERROR'"],
+    ])("turning errors-only on ANDs the condition onto %s", async (_name, filter, expected) => {
+      mockSearchObj.data.editorValue = filter;
       wrapper = mountWithSearchBarStub();
       await flushPromises();
 
       wrapper.vm.onErrorOnlyToggled(true);
       await flushPromises();
 
-      expect(mockApplyFilters).toHaveBeenCalledWith(["span_status = 'ERROR'"]);
+      expect(mockSearchObj.data.editorValue).toBe(expected);
+      expect(mockSetEditorValue).toHaveBeenLastCalledWith(expected);
     });
 
-    it("should call removeFilterByField when error only toggle is turned off", async () => {
-      wrapper = mountWithSearchBarStub();
-      await flushPromises();
+    it.each(["service_name='a' OR span_status='ERROR'", "service_name='a'", ""])(
+      "turning errors-only on then off gives back %j",
+      async (original) => {
+        mockSearchObj.data.editorValue = original;
+        wrapper = mountWithSearchBarStub();
+        await flushPromises();
 
-      wrapper.vm.onErrorOnlyToggled(false);
-      await flushPromises();
+        wrapper.vm.onErrorOnlyToggled(true);
+        wrapper.vm.onErrorOnlyToggled(false);
+        await flushPromises();
 
-      expect(mockRemoveFilterByField).toHaveBeenCalledWith("span_status");
-    });
+        expect(mockSearchObj.data.editorValue).toBe(original);
+        expect(mockSetEditorValue).toHaveBeenLastCalledWith(original);
+      },
+    );
   });
 
   describe("Splitter Behavior", () => {
@@ -3917,6 +4132,96 @@ describe("Index.vue (Main Traces Page)", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Shared toolbar refresh for Service Graph / Services Catalog
+  // ---------------------------------------------------------------------------
+  describe("shared toolbar refresh", () => {
+    const graph = { refresh: vi.fn(), loading: ref(false), lastRunAt: ref<number | null>(null) };
+    const catalog = { refresh: vi.fn(), loading: ref(false), lastRunAt: ref<number | null>(null) };
+
+    function mountWithViews() {
+      const view = (name: string, state: typeof graph) =>
+        defineComponent({
+          name,
+          emits: ["request:stream-change", "view-traces", "jump-to-stream-data"],
+          setup(_p, { expose }) {
+            expose(state);
+            return () => h("div");
+          },
+        });
+      return mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": {
+              name: "search-bar",
+              props: ["refreshLoading", "refreshLastRunAt"],
+              template: "<div />",
+            },
+            "index-list": true,
+            "search-result": true,
+            "service-graph": view("service-graph", graph),
+            "services-catalog": view("services-catalog", catalog),
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+    }
+
+    async function openTab(mode: string) {
+      mockSearchObj.meta.searchMode = mode;
+      await flushPromises();
+    }
+
+    beforeEach(() => {
+      graph.loading.value = true;
+      graph.lastRunAt.value = 111;
+      catalog.loading.value = false;
+      catalog.lastRunAt.value = 222;
+    });
+
+    it("follows the open tab's own loading and last-run time, live, across tab switches", async () => {
+      wrapper = mountWithViews();
+      await flushPromises();
+      const bar = () => wrapper.findComponent({ name: "search-bar" });
+
+      await openTab("service-graph");
+      expect(bar().props()).toMatchObject({ refreshLoading: true, refreshLastRunAt: 111 });
+      graph.loading.value = false;
+      graph.lastRunAt.value = 333;
+      await flushPromises();
+      expect(bar().props()).toMatchObject({ refreshLoading: false, refreshLastRunAt: 333 });
+
+      await openTab("services-catalog");
+      expect(bar().props()).toMatchObject({ refreshLoading: false, refreshLastRunAt: 222 });
+      catalog.loading.value = true;
+      await flushPromises();
+      expect(bar().props("refreshLoading")).toBe(true);
+
+      await openTab("service-graph");
+      expect(bar().props()).toMatchObject({ refreshLoading: false, refreshLastRunAt: 333 });
+      // Switching tabs is not a toolbar refresh.
+      expect(graph.refresh).not.toHaveBeenCalled();
+      expect(catalog.refresh).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["service-graph", "service-graph-refresh", graph],
+      ["services-catalog", "services-catalog-refresh", catalog],
+    ])("refreshes the %s tab when the toolbar asks", async (mode, event, view) => {
+      wrapper = mountWithViews();
+      await flushPromises();
+      await openTab(mode);
+
+      wrapper.findComponent({ name: "search-bar" }).vm.$emit(event);
+      await flushPromises();
+
+      expect(view.refresh).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Stream Change Confirmation Dialog
   // ---------------------------------------------------------------------------
   describe("Stream Change Confirmation Dialog", () => {
@@ -4684,6 +4989,95 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(err).not.toHaveBeenCalledWith("Failed to fetch traces count");
       warn.mockRestore();
       err.mockRestore();
+      mockSearchObj.data.queryPayload = null;
+    });
+
+    it.each([
+      ["keeps the last count of the query and reports a failed refresh", 200, { total: 200 }],
+      [
+        "has no count and no failed refresh when none was kept",
+        undefined,
+        { total: null, countFailed: true },
+      ],
+    ])("on a failed count %s", async (_name, lastTotal, expected) => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.data.queryPayload = { query: { start_time: 1, end_time: 2 } };
+      const results = { hits: new Array(25).fill({}), total: null, countPending: true, lastTotal };
+      mockSearchObj.data.queryResults = results;
+      mockSearchObj.meta.refreshFailedAt = null;
+      mockFetchQueryDataWithHttpStream.mockClear();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      wrapper.vm.fetchTracesCount();
+      const [, handlers] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      handlers.error({}, { content: { message: "network error" } });
+
+      expect(results).toMatchObject({ ...expected, countPending: false });
+      expect(!!(results as any).countFailed).toBe(lastTotal === undefined);
+      expect(mockSearchObj.meta.refreshFailedAt).toEqual(
+        lastTotal === undefined ? null : expect.any(Number),
+      );
+      warn.mockRestore();
+      mockSearchObj.data.queryPayload = null;
+      mockSearchObj.meta.refreshFailedAt = null;
+    });
+
+    it("keeps a count that landed when the stream errors after it", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.data.queryPayload = { query: { start_time: 1, end_time: 2 } };
+      mockSearchObj.meta.searchMode = "spans";
+      const results = {
+        hits: new Array(25).fill({}),
+        total: null,
+        countPending: true,
+        lastTotal: 600,
+      };
+      mockSearchObj.data.queryResults = results;
+      mockSearchObj.meta.refreshFailedAt = null;
+      mockFetchQueryDataWithHttpStream.mockClear();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      wrapper.vm.fetchTracesCount();
+      const [, handlers] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      handlers.data({}, { content: { results: { hits: [{ span_count: 531, error_count: 0 }] } } });
+      handlers.error({}, { content: { message: "late error" } });
+
+      expect(results).toMatchObject({ total: 531, errorCount: 0, countPending: false });
+      expect((results as any).countFailed).toBeUndefined();
+      expect(mockSearchObj.meta.refreshFailedAt).toBeNull();
+      warn.mockRestore();
       mockSearchObj.data.queryPayload = null;
     });
   });

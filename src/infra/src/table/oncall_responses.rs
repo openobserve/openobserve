@@ -35,6 +35,49 @@ use crate::{
     errors::{self, DbError, Error},
 };
 
+/// Subject ids per [team_pages_of] query, far below SQLite's and Postgres's bind limits.
+const PAGE_SUBJECTS_PER_QUERY: usize = 500;
+
+/// A record read only by the columns that make it a page, so a state this build cannot decode
+/// still counts and can still be named.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TeamPage {
+    pub id: String,
+    pub team_id: Option<String>,
+    pub opened_at: i64,
+    pub subject_id: String,
+}
+
+impl TeamPage {
+    /// The paged subject's own id, `subject_id` without its firing suffix.
+    pub fn source_id(&self) -> &str {
+        self.subject_id
+            .rsplit_once('#')
+            .map_or(self.subject_id.as_str(), |(source, _)| source)
+    }
+}
+
+/// A [TeamPage]'s columns, in the order `into_tuple` reads them.
+type TeamPageRow = (String, Option<String>, i64, String);
+
+fn team_page_columns() -> Select<oncall_responses::Entity> {
+    oncall_responses::Entity::find()
+        .select_only()
+        .column(oncall_responses::Column::Id)
+        .column(oncall_responses::Column::TeamId)
+        .column(oncall_responses::Column::OpenedAt)
+        .column(oncall_responses::Column::SubjectId)
+}
+
+fn team_page_of_row((id, team_id, opened_at, subject_id): TeamPageRow) -> TeamPage {
+    TeamPage {
+        id,
+        team_id,
+        opened_at,
+        subject_id,
+    }
+}
+
 /// Rows whose stored discriminants this build cannot interpret are dropped. A
 /// record whose state we cannot read must not be shown as `triggered` and
 /// re-escalated.
@@ -1131,6 +1174,49 @@ pub async fn history_for_source(
         .into_iter()
         .filter_map(to_response)
         .collect())
+}
+
+/// The newest `limit` records of these exact subject ids that went to a team after `since`, on
+/// the primary; exact ids keep each query on the unique subject index.
+pub async fn team_pages_of(
+    org_id: &str,
+    subject_type: SubjectType,
+    subject_ids: &[String],
+    since: i64,
+    limit: u64,
+) -> Result<Vec<TeamPage>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let mut pages = Vec::new();
+    for chunk in subject_ids.chunks(PAGE_SUBJECTS_PER_QUERY) {
+        let rows: Vec<TeamPageRow> = team_page_columns()
+            .filter(oncall_responses::Column::OrgId.eq(org_id))
+            .filter(oncall_responses::Column::SubjectType.eq(subject_type.to_i32()))
+            .filter(oncall_responses::Column::SubjectId.is_in(chunk.iter().map(String::as_str)))
+            .filter(oncall_responses::Column::TeamId.is_not_null())
+            .filter(oncall_responses::Column::OpenedAt.gt(since))
+            .order_by_desc(oncall_responses::Column::OpenedAt)
+            .order_by_desc(oncall_responses::Column::Id)
+            .limit(limit)
+            .into_tuple()
+            .all(client)
+            .await?;
+        pages.extend(rows.into_iter().map(team_page_of_row));
+    }
+    // Each chunk's newest `limit` hold the newest `limit` of them all.
+    pages.sort_by(|a, b| (b.opened_at, &b.id).cmp(&(a.opened_at, &a.id)));
+    pages.truncate(usize::try_from(limit).unwrap_or(usize::MAX));
+    Ok(pages)
+}
+
+/// One record as a [TeamPage], on the primary; found even when [get] cannot decode its state.
+pub async fn team_page(org_id: &str, id: &str) -> Result<Option<TeamPage>, errors::Error> {
+    let row: Option<TeamPageRow> = team_page_columns()
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .filter(oncall_responses::Column::Id.eq(id))
+        .into_tuple()
+        .one(get_orm_client_rw().await)
+        .await?;
+    Ok(row.map(team_page_of_row))
 }
 
 /// Acknowledges a record. Returns `None` if it is gone, and the unchanged record

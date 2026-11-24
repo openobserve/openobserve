@@ -58,7 +58,7 @@ describe("parseSqlFilter", () => {
 
   it("accepts hand-typed lowercase keywords and <> / ==", () => {
     expect(roundTrip("level='error' and status<>200 or ok==true")).toBe(
-      "level = 'error' AND status != 200 OR ok = true",
+      "(level = 'error' AND status != 200) OR ok = true",
     );
   });
 
@@ -109,6 +109,23 @@ describe("parseSqlFilter", () => {
     expect(tree.items.map((item) => item.connector)).toEqual(["AND", "OR"]);
   });
 
+  it("draws SQL's AND-before-OR as groups, so the chips read the way the query runs", () => {
+    const tree = parseSqlFilter("level = 'a' OR level = 'b' AND status = 1")!;
+    expect(tree.items.map((item) => [item.kind, item.connector])).toEqual([
+      ["condition", "AND"],
+      ["group", "OR"],
+    ]);
+    expect(roundTrip("level = 'a' OR level = 'b' AND status = 1")).toBe(
+      "level = 'a' OR (level = 'b' AND status = 1)",
+    );
+    expect(roundTrip("level = 'a' AND status = 1 OR ok = true AND level = 'b'")).toBe(
+      "(level = 'a' AND status = 1) OR (ok = true AND level = 'b')",
+    );
+    expect(roundTrip("(level = 'a' OR level = 'b' AND ok = true) AND status = 1")).toBe(
+      "(level = 'a' OR (level = 'b' AND ok = true)) AND status = 1",
+    );
+  });
+
   it("reads backslash-escaped LIKE wildcards back as the literal value", () => {
     const value = "50%_o'k\\";
     for (const operator of ["starts_with", "ends_with", "not_contains"] as const) {
@@ -132,6 +149,45 @@ describe("parseSqlFilter", () => {
       );
       const node = parseSqlFilter(sql)!.items[0] as FilterCondition;
       expect(node).toMatchObject({ field: "level", operator, values: [value] });
+      expect(roundTrip(sql)).toBe(sql);
+    }
+  });
+
+  it("reads the `||`-joined literal written for a backslash before a quote as one value", () => {
+    expect(parseSqlFilter("level != ('x\\' || '''y')")!.items[0]).toMatchObject({
+      operator: "neq",
+      values: ["x\\'y"],
+    });
+    const value = "a\\'b''c";
+    const operators = [
+      "eq",
+      "neq",
+      "in",
+      "not_in",
+      "contains",
+      "contains_ci",
+      "not_contains",
+      "starts_with",
+      "ends_with",
+      "regex",
+      "not_regex",
+      "match_all",
+    ] as const;
+    for (const operator of operators) {
+      const field = operator === "match_all" ? "" : "level";
+      const values = operator === "in" || operator === "not_in" ? [value, "z"] : [value];
+      const sql = filterTreeToSql(
+        {
+          kind: "group",
+          id: "root",
+          connector: "AND",
+          items: [{ kind: "condition", id: "c", connector: "AND", field, operator, values }],
+        },
+        fields,
+      );
+      expect(sql, operator).toContain("||");
+      const node = parseSqlFilter(sql)?.items[0];
+      expect(node, sql).toMatchObject({ field, operator, values });
       expect(roundTrip(sql)).toBe(sql);
     }
   });

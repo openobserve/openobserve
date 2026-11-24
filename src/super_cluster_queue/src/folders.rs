@@ -102,6 +102,11 @@ async fn delete_folder<C: ConnectionTrait>(
         return Ok(());
     }
     model.delete(conn).await?;
+    if let Err(e) =
+        infra::coordinator::folders::emit_delete_event(org_id, folder_type, folder_id).await
+    {
+        log::error!("[FOLDERS] delete event failed for {org_id}/{folder_id}: {e}");
+    }
     Ok(())
 }
 

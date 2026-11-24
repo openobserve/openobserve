@@ -15,6 +15,7 @@
 
 import http from "./http";
 import analytics from "./product_analytics";
+import type { AnomalyExploreQuery } from "@/types/anomalyExplore";
 
 const anomaly_detection = {
   list: (org_identifier: string) => {
@@ -90,6 +91,19 @@ const anomaly_detection = {
     return http().get(
       `/api/${org_identifier}/anomaly_detection/${anomaly_id}/history?limit=${limit}`,
     );
+  },
+
+  /** State, summary and data link of a detector; one bucket as start and end with pad 0 links that bucket only. */
+  explore: (
+    org_identifier: string,
+    anomaly_id: string,
+    query: AnomalyExploreQuery = {},
+    options: { silentForbidden?: boolean } = {},
+  ) => {
+    return http().get(`/api/${org_identifier}/anomaly_detection/${anomaly_id}/explore`, {
+      params: query,
+      ...options,
+    });
   },
 
   // Bulk endpoint — returns history for ALL configs in one request

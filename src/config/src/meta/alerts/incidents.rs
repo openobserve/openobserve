@@ -23,6 +23,10 @@ use super::rca_steering::SteerKind;
 /// The `Reopened` reason of a manual status change; an unacknowledge writes another one.
 pub const MANUAL_REOPEN_REASON: &str = "Manually reopened";
 
+pub const FIRING_LABELS_MAX_KEYS: usize = 64;
+pub const FIRING_LABELS_MAX_BYTES: usize = 4096;
+const FIRING_LABEL_VALUE_MAX_BYTES: usize = 256;
+
 /// Incident status lifecycle: Open → Acknowledged → Resolved
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
@@ -64,6 +68,17 @@ pub enum IncidentSeverity {
     #[default]
     P3,
     P4,
+}
+
+impl IncidentSeverity {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::P1 => "P1",
+            Self::P2 => "P2",
+            Self::P3 => "P3",
+            Self::P4 => "P4",
+        }
+    }
 }
 
 impl std::fmt::Display for IncidentSeverity {
@@ -405,6 +420,64 @@ pub struct IncidentAlert {
     pub detected_source: Option<String>,
 }
 
+/// The membership check's verdict on an alert that joined an incident.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MemberVerdict {
+    Related,
+    Unrelated,
+    Unsure,
+}
+
+impl MemberVerdict {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Related => "related",
+            Self::Unrelated => "unrelated",
+            Self::Unsure => "unsure",
+        }
+    }
+}
+
+/// What a membership verdict was inferred from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum InferredBy {
+    Ai,
+    AlertHistory,
+    ServiceGraph,
+    Workload,
+}
+
+impl InferredBy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Ai => "ai",
+            Self::AlertHistory => "alert_history",
+            Self::ServiceGraph => "service_graph",
+            Self::Workload => "workload",
+        }
+    }
+
+    pub fn from_stored(s: &str) -> Option<Self> {
+        match s {
+            "ai" => Some(Self::Ai),
+            "alert_history" => Some(Self::AlertHistory),
+            "service_graph" => Some(Self::ServiceGraph),
+            "workload" => Some(Self::Workload),
+            _ => None,
+        }
+    }
+}
+
+/// Why and by what an alert was moved out of an incident it had joined.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SplitNote {
+    pub alert_id: String,
+    pub alert_name: String,
+    pub inferred_by: InferredBy,
+    pub reason: String,
+}
+
 /// A composite alert's light summary, for the incident's live-definition list.
 /// Composites have no `alerts` row, so they cannot be a [`super::alert::Alert`];
 /// this carries the fields the topology/detail surface needs.
@@ -703,6 +776,9 @@ pub enum IncidentEventType {
         from: IncidentSeverity,
         to: IncidentSeverity,
         reason: String,
+        /// The alert whose firing raised it, so a later "unrelated" verdict can put it back.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        alert_id: Option<String>,
     },
 
     /// Severity changed manually by user (any direction)
@@ -849,6 +925,18 @@ pub enum IncidentEventType {
         deadline_at: i64,
     },
 
+    /// Opens an incident an alert was moved into, found unrelated to the one it had joined.
+    /// A recovery naming `from_incident_id` follows the firings here.
+    SplitFrom {
+        from_incident_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from_title: Option<String>,
+        alert_id: String,
+        alert_name: String,
+        inferred_by: InferredBy,
+        reason: String,
+    },
+
     /// Forward-compatibility catch-all for event types this binary does not know.
     ///
     /// During a rolling deploy an old node reads rows written by a newer node. Without
@@ -897,6 +985,7 @@ impl IncidentEventType {
         "ai_analysis_cancelled",
         "ai_analysis_steered",
         "ai_analysis_needs_input",
+        "SplitFrom",
     ];
 
     /// True when `raw` carries a `type` tag this binary recognizes.
@@ -946,6 +1035,37 @@ impl IncidentEvent {
             from,
             to,
             reason: reason.into(),
+            alert_id: None,
+        })
+    }
+
+    /// A severity change made by one alert's firing, or put back after that alert moved out.
+    pub fn severity_changed_by_alert(
+        from: IncidentSeverity,
+        to: IncidentSeverity,
+        reason: impl Into<String>,
+        alert_id: impl Into<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::SeverityUpgrade {
+            from,
+            to,
+            reason: reason.into(),
+            alert_id: Some(alert_id.into()),
+        })
+    }
+
+    pub fn split_from(
+        split: &SplitNote,
+        from_incident_id: &str,
+        from_title: Option<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::SplitFrom {
+            from_incident_id: from_incident_id.to_string(),
+            from_title,
+            alert_id: split.alert_id.clone(),
+            alert_name: split.alert_name.clone(),
+            inferred_by: split.inferred_by,
+            reason: split.reason.clone(),
         })
     }
 
@@ -1193,6 +1313,56 @@ pub fn push_alert_event(
     events.push(IncidentEvent::alert(alert_id, alert_name, triggered_at));
 }
 
+/// A firing's labels as stored on its membership row; `None` when it has none.
+pub fn firing_labels_json(labels: &HashMap<String, String>) -> Option<String> {
+    let mut kept: std::collections::BTreeMap<&str, &str> = labels
+        .iter()
+        .map(|(k, v)| (k.as_str(), truncate_utf8(v, FIRING_LABEL_VALUE_MAX_BYTES)))
+        .collect();
+    while kept.len() > FIRING_LABELS_MAX_KEYS {
+        kept.pop_last();
+    }
+    loop {
+        if kept.is_empty() {
+            return None;
+        }
+        let json = serde_json::to_string(&kept).ok()?;
+        if json.len() <= FIRING_LABELS_MAX_BYTES {
+            return Some(json);
+        }
+        kept.pop_last();
+    }
+}
+
+/// A firing's group-by dimensions, SQL GROUP BY columns included: never its measured values or the
+/// WHERE clause's fixed fields, so an ungrouped alert has none.
+pub fn firing_labels(
+    query: &super::QueryCondition,
+    row: &serde_json::Map<String, serde_json::Value>,
+) -> HashMap<String, String> {
+    let group_by = query
+        .aggregation
+        .as_ref()
+        .and_then(|a| a.group_by.as_deref())
+        .filter(|g| !g.is_empty());
+    match (&query.query_type, group_by) {
+        (super::QueryType::PromQL, _) => super::dispatch::promql_series_labels(row)
+            .into_iter()
+            .collect(),
+        (_, Some(group_by)) => super::dispatch::row_group_labels(row, group_by)
+            .into_iter()
+            .collect(),
+        (super::QueryType::SQL, None) => {
+            let sql = query.sql.as_deref().unwrap_or_default();
+            let group_by = crate::utils::sql::group_by_columns(sql);
+            super::dispatch::row_group_labels(row, &group_by)
+                .into_iter()
+                .collect()
+        }
+        _ => HashMap::new(),
+    }
+}
+
 /// Whether no firing followed the latest manual reopen; metadata edits do not end the wait.
 pub fn manual_reopen_awaits_firing(events: &[IncidentEvent]) -> bool {
     for event in events.iter().rev() {
@@ -1204,6 +1374,17 @@ pub fn manual_reopen_awaits_firing(events: &[IncidentEvent]) -> bool {
         }
     }
     false
+}
+
+fn truncate_utf8(s: &str, max: usize) -> &str {
+    if s.len() <= max {
+        return s;
+    }
+    let mut end = max;
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    &s[..end]
 }
 
 #[cfg(test)]
@@ -1415,6 +1596,142 @@ mod tests {
         assert!(!IncidentEventType::is_known_tag(future_inner));
     }
 
+    #[test]
+    fn firing_labels_keep_only_the_group_by_dimensions() {
+        use super::super::{
+            AggFunction, Aggregation, Condition, Operator, QueryCondition, QueryType,
+        };
+        let row = serde_json::json!({
+            "pod": "api-1", "service": "checkout", "hits": 12, "value": 3.5, "_timestamp": 1,
+            "level": "error", "message": "timeout", "code": 500, "ns": "prod", "t": "2026-11-16",
+            "service_group": "checkout"
+        });
+        let row = row.as_object().unwrap();
+        let sql = |sql: &str| QueryCondition {
+            query_type: QueryType::SQL,
+            sql: Some(sql.to_string()),
+            ..Default::default()
+        };
+        let grouped = QueryCondition {
+            aggregation: Some(Aggregation {
+                group_by: Some(vec!["pod".to_string(), "absent".to_string()]),
+                function: AggFunction::Count,
+                having: Condition {
+                    column: "hits".to_string(),
+                    operator: Operator::GreaterThan,
+                    value: serde_json::json!(10),
+                    ignore_case: false,
+                    case_insensitive: None,
+                },
+                warning_value: None,
+                multi_alert: false,
+            }),
+            ..Default::default()
+        };
+        let promql = QueryCondition {
+            query_type: QueryType::PromQL,
+            ..Default::default()
+        };
+        let labels = |pairs: &[(&str, &str)]| -> HashMap<String, String> {
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect()
+        };
+        let all = labels(&[
+            ("pod", "api-1"),
+            ("service", "checkout"),
+            ("hits", "12"),
+            ("level", "error"),
+            ("message", "timeout"),
+            ("code", "500"),
+            ("ns", "prod"),
+            ("t", "2026-11-16"),
+            ("service_group", "checkout"),
+        ]);
+        for (query, want) in [
+            (grouped, labels(&[("pod", "api-1")])),
+            (QueryCondition::default(), labels(&[])),
+            (sql("SELECT * FROM logs WHERE level = 'error'"), labels(&[])),
+            (
+                sql(
+                    "SELECT pod, code, count(*) AS hits FROM logs WHERE level = 'error' GROUP BY pod, code",
+                ),
+                labels(&[("pod", "api-1"), ("code", "500")]),
+            ),
+            (
+                sql(
+                    "SELECT histogram(_timestamp) AS t, k8s_ns AS ns, count(*) AS hits FROM logs GROUP BY t, k8s_ns, _timestamp",
+                ),
+                labels(&[("ns", "prod")]),
+            ),
+            (
+                sql(
+                    "SELECT histogram(_timestamp) AS t, service, count(*) AS hits FROM logs GROUP BY 1, 2",
+                ),
+                labels(&[("service", "checkout")]),
+            ),
+            (
+                sql(
+                    "SELECT lower(service) AS service_group, count(*) AS hits FROM logs GROUP BY lower(service)",
+                ),
+                labels(&[("service_group", "checkout")]),
+            ),
+            (
+                sql(
+                    "SELECT histogram(_timestamp) AS t, k8s_ns AS ns, pod, lower(service) AS service_group, max(code) AS code, count(*) AS hits FROM logs GROUP BY ALL",
+                ),
+                labels(&[
+                    ("ns", "prod"),
+                    ("pod", "api-1"),
+                    ("service_group", "checkout"),
+                ]),
+            ),
+            (
+                sql("SELECT pod, round(avg(code), 2) AS code FROM logs GROUP BY ALL"),
+                labels(&[("pod", "api-1")]),
+            ),
+            (sql("SELECT FROM WHERE GROUP"), labels(&[])),
+            (promql, all),
+        ] {
+            assert_eq!(firing_labels(&query, row), want, "{:?}", query.sql);
+        }
+    }
+
+    #[test]
+    fn firing_labels_are_sorted_and_capped_by_keys_and_bytes() {
+        let many: HashMap<String, String> = (0..100)
+            .map(|i| (format!("k{i:03}"), "v".to_string()))
+            .collect();
+        let long: HashMap<String, String> = (0..40)
+            .map(|i| (format!("k{i:02}"), "é".repeat(400)))
+            .collect();
+        for (labels, keys, first) in [
+            (HashMap::new(), 0, None),
+            (
+                HashMap::from([("b".into(), "2".into()), ("a".into(), "1".into())]),
+                2,
+                Some("a"),
+            ),
+            (many, FIRING_LABELS_MAX_KEYS, Some("k000")),
+            (long, 15, Some("k00")),
+        ] {
+            let Some(json) = firing_labels_json(&labels) else {
+                assert_eq!(keys, 0);
+                continue;
+            };
+            assert!(
+                json.len() <= FIRING_LABELS_MAX_BYTES,
+                "{} bytes",
+                json.len()
+            );
+            let parsed: serde_json::Map<String, serde_json::Value> =
+                serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed.len(), keys);
+            assert_eq!(parsed.keys().next().map(String::as_str), first);
+        }
+    }
+
     /// `KNOWN_TAGS` must list exactly the tags the enum actually serializes.
     ///
     /// Guards the hand-maintained list: a new variant whose tag is not added here would
@@ -1435,6 +1752,7 @@ mod tests {
                 from: IncidentSeverity::P3,
                 to: IncidentSeverity::P1,
                 reason: "r".into(),
+                alert_id: None,
             },
             IncidentEventType::SeverityOverride {
                 from: IncidentSeverity::P3,
@@ -1513,6 +1831,14 @@ mod tests {
                 need: "n".into(),
                 question: "?".into(),
                 deadline_at: 1,
+            },
+            IncidentEventType::SplitFrom {
+                from_incident_id: "i".into(),
+                from_title: None,
+                alert_id: "a".into(),
+                alert_name: "n".into(),
+                inferred_by: InferredBy::Ai,
+                reason: "r".into(),
             },
         ];
 

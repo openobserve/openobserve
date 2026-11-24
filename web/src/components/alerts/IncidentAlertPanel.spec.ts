@@ -195,7 +195,9 @@ describe("IncidentAlertPanel", () => {
 
   it("sums up its firings in this incident on one line, with a histogram only above 8", async () => {
     const twice = await mountPanel();
-    expect(text(twice, "incident")).toMatch(/^×2 · Nov 11, 15:35 → 16:05 · every ~30 min/);
+    expect(text(twice, "incident")).toMatch(
+      /^×2 · 2026-11-11 15:35 → 16:05 · last fired .+ · every ~30 min/,
+    );
     expect(twice.find('[data-test="incident-alert-panel-histogram"]').exists()).toBe(false);
     twice.unmount();
     const histogram = { points: [1, 0, 8], caption: raw("c"), ticks: [raw("from"), raw("to")] };
@@ -230,20 +232,25 @@ describe("IncidentAlertPanel", () => {
     listIncidents.mockResolvedValue({ data: { incidents: [elsewhere], total: 1 } });
     const linked = await mountPanel({ row: row(later) });
     const link = linked.get('[data-test="incident-alert-panel-fired-again"]');
-    expect(link.text()).toBe("Fired again 15:35 in another incident");
+    expect(link.text()).toBe("Fired again 2026-11-12 15:35 in another incident");
     expect(link.attributes("href")).toContain("/incidents/inc-2");
   });
 
   // History rows carry processing time; the firing's own evaluation is the first at or after it.
   it.each([
-    ["a later firing", FIRST + 31 * MIN - 1_000_000, 50_000_000, "16:05"],
+    ["a later firing", FIRST + 31 * MIN - 1_000_000, 50_000_000, "2026-11-11 16:05"],
     [
       "an evaluation processed before the firing",
       FIRST + 30 * MIN - 5_000_000,
       50_000_000,
-      "16:05",
+      "2026-11-11 16:05",
     ],
-    ["a later firing when the queue held it past one check", FIRST + 38 * MIN, 7 * MIN, "16:12"],
+    [
+      "a later firing when the queue held it past one check",
+      FIRST + 38 * MIN,
+      7 * MIN,
+      "2026-11-11 16:12",
+    ],
   ])(
     "puts the incident's last firing's own value beside what the alert needs, not %s",
     async (_name, otherAt, delay, at) => {
@@ -289,7 +296,7 @@ describe("IncidentAlertPanel", () => {
       },
     });
     const wrapper = await mountPanel();
-    expect(text(wrapper, "value")).toBe("16.3 at 16:05 · alert needs > 10");
+    expect(text(wrapper, "value")).toBe("16.3 at 2026-11-11 16:05 · alert needs > 10");
     expect(
       wrapper
         .get('[data-test="incident-alert-panel-schedule"]')
@@ -310,9 +317,9 @@ describe("IncidentAlertPanel", () => {
       .findAllComponents({ name: "OTooltip" })
       .map((tip) => tip.props("content"));
     expect(tips.slice(4)).toEqual([
-      "Tue, Nov 10: no firings",
-      "Wed, Nov 11: 48 firings",
-      "Thu, Nov 12: no firings",
+      "2026-11-10: no firings",
+      "2026-11-11: 48 firings",
+      "2026-11-12: no firings",
     ]);
     const windows = getHistorySummary.mock.calls.map(([, query]) => query);
     expect(windows).toHaveLength(2);

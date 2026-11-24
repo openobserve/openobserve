@@ -19,6 +19,7 @@ import {
   filterTreeToPromMatchers,
   filterTreeToSql,
   operatorsFor,
+  toFilterFields,
   toFilterFieldType,
   type FilterCondition,
   type FilterField,
@@ -56,6 +57,47 @@ describe("toFilterFieldType", () => {
     expect(toFilterFieldType("UInt32")).toBe("number");
     expect(toFilterFieldType("Boolean")).toBe("boolean");
     expect(toFilterFieldType(undefined)).toBe("string");
+  });
+});
+
+describe("toFilterFields", () => {
+  // The logs field list keeps one row per field shared by the selected streams, typed by one of them.
+  const merged = [
+    { name: "Common group fields", label: true },
+    { name: "code", dataType: "Int64" },
+    { name: "level", dataType: "Utf8" },
+    { name: "took", dataType: "Int64" },
+  ];
+  const aaLogs = [
+    { name: "code", type: "Utf8" },
+    { name: "level", type: "Utf8" },
+    { name: "took", type: "Int64" },
+  ];
+  const appLogs = [
+    { name: "code", type: "Int64" },
+    { name: "level", type: "Utf8" },
+    { name: "took", type: "Float64" },
+  ];
+  const typeOf = (list: FilterField[], name: string) => list.find((f) => f.name === name)?.type;
+
+  it("types a field the selected streams disagree on as text, in either stream order", () => {
+    for (const schemas of [
+      [aaLogs, appLogs],
+      [appLogs, aaLogs],
+    ]) {
+      const list = toFilterFields(merged, schemas);
+      expect(list.map((f) => [f.name, f.type])).toEqual([
+        ["code", "string"],
+        ["level", "string"],
+        ["took", "number"],
+      ]);
+      expect(filterTreeToSql(root(cond("code", "eq", ["500"])), list)).toBe("code = '500'");
+    }
+  });
+
+  it("keeps the field list's own type for one stream", () => {
+    expect(typeOf(toFilterFields(merged, [appLogs]), "code")).toBe("number");
+    expect(typeOf(toFilterFields(merged), "code")).toBe("number");
   });
 });
 

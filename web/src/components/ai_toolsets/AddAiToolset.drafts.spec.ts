@@ -202,24 +202,6 @@ describe("AddAiToolset drafts", () => {
     expect(note).toContain("X-Tenant header");
   });
 
-  it("opens an older draft of a removed kind as an MCP server, without its extra fields", async () => {
-    writeEditorDraft(newScope, {
-      data: {
-        name: "kube",
-        kind: "cli",
-        description: "From the draft",
-        mcp: { url: "", timeout_seconds: 30, headers: [], extra: {} },
-        cli: { command: "kubectl", env: [], credFiles: [] },
-        skill: { content: "" },
-      },
-    });
-    await mountPage();
-    click("editor-draft-continue");
-    await flushPromises();
-    expect(form().state.values).toMatchObject({ name: "kube", kind: "mcp" });
-    expect(form().state.values).not.toHaveProperty("cli");
-  });
-
   it("names a header value with no header name in lowercase, as part of the sentence", async () => {
     await mountPage();
     await edit({
@@ -600,10 +582,38 @@ describe("AddAiToolset drafts", () => {
     await flushPromises();
     expect(aiToolsetsService.create).not.toHaveBeenCalled();
 
-    await edit({ kind: "skill", "skill.content": "# Runbook" });
+    await edit({ kind: "skill", "skill.content": "# Ops" });
     await form().handleSubmit();
     await flushPromises();
     expect(aiToolsetsService.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores a draft of the removed CLI kind as an MCP toolset that saves", async () => {
+    writeEditorDraft(newScope, {
+      data: {
+        name: "kube-cli",
+        kind: "cli",
+        description: "",
+        mcp: { url: "", timeout_seconds: 30, headers: [] },
+        cli: { command: "kubectl", env: [{ key: "GH_TOKEN", value: "" }], credFiles: [] },
+        skill: { content: "" },
+      },
+      redactedPaths: ["/cli/env/0/value"],
+      changedRedactedPaths: ["/cli/env/0/value"],
+    });
+    await mountPage();
+    click("editor-draft-continue");
+    await flushPromises();
+
+    expect(form().state.values.kind).toBe("mcp");
+    expect(form().state.values).not.toHaveProperty("cli");
+    await edit({ "mcp.url": "https://mcp.example.com/" });
+    await form().handleSubmit();
+    await flushPromises();
+    expect(aiToolsetsService.create).toHaveBeenCalledWith(
+      ORG,
+      expect.objectContaining({ name: "kube-cli", kind: "mcp" }),
+    );
   });
 
   it("Cancel asks; Keep draft returns to the list with a dot on Add, Discard drops it", async () => {

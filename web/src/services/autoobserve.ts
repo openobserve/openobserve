@@ -136,6 +136,140 @@ export interface AutoObserveSuggestion {
   advice?: string | null;
   actions?: AutoObserveInsightAction[];
   quality?: AutoObserveInsightQuality | null;
+  // Sent only for an issue item while the server's issue context is on.
+  context?: AutoObserveIssueContext;
+}
+
+export interface AutoObserveEntityRef {
+  kind: string;
+  key_dims: Record<string, string>;
+}
+
+// A page below the org, with its query; the path may or may not start with "/".
+export interface AutoObserveDeepLink {
+  path: string;
+  query: Record<string, string>;
+}
+
+export type AutoObserveChecked =
+  { kind: "ok" | "off" | "not_recorded" | "partial" } | { kind: "failed"; reason: string };
+
+export type AutoObserveChangeKind =
+  | "deploy"
+  | "rollback"
+  | "config_rollout"
+  | "collector_offline"
+  | "collector_export_errors"
+  | "pipeline_failing"
+  | "pipeline_changed"
+  | "ingestion_refused"
+  | "settings_changed"
+  | "token_changed"
+  | "alert_changed"
+  | "stream_deleted";
+
+export interface AutoObserveChangeRecord {
+  provider: string;
+  kind: AutoObserveChangeKind;
+  at: number;
+  until: number | null;
+  actor: string | null;
+  subject: AutoObserveEntityRef;
+  subject_name: string;
+  affects: AutoObserveEntityRef[];
+  link: "exact" | "inferred" | "stream_wide" | "unmapped";
+  // [n, of] for a counted condition such as 3 of 4 collectors.
+  count: [number, number] | null;
+  facts: Record<string, string>;
+  needs: "security" | "subject" | null;
+  open: AutoObserveDeepLink | null;
+}
+
+export interface AutoObserveImpactItem {
+  dependent: AutoObserveEntityRef;
+  name: string;
+  attrs: Record<string, string>;
+  open: AutoObserveDeepLink | null;
+}
+
+export interface AutoObserveImpactRecord {
+  provider: string;
+  kind: "detection" | "alert" | "slo" | "dashboard" | "service";
+  effect: "blind" | "partial";
+  subject: AutoObserveEntityRef;
+  counts: Record<string, number>;
+  items: AutoObserveImpactItem[];
+  more: number;
+  needs: "security" | "subject" | null;
+  classes: string[];
+  issue: string | null;
+}
+
+export interface AutoObserveCauseLine {
+  id: string;
+  record: AutoObserveChangeRecord;
+  relates: "direct" | "related" | "org_wide";
+  grade: "likely" | "possible";
+  sentence: string;
+  used: boolean;
+}
+
+export interface AutoObserveImpactLine {
+  id: string;
+  record: AutoObserveImpactRecord;
+  // Empty when nothing depends on the subject.
+  sentence: string;
+  redacted: boolean;
+  used: boolean;
+}
+
+export interface AutoObserveProviderCheck {
+  label: string;
+  state: AutoObserveChecked;
+}
+
+export type AutoObserveStepAction =
+  { open: AutoObserveDeepLink } | { insight: AutoObserveInsightAction } | "check_only";
+
+export interface AutoObserveNextStep {
+  step_id: string;
+  source: "engine" | "ai";
+  action: AutoObserveStepAction;
+  label: string;
+  why: string;
+  // Cause and impact line ids the step rests on.
+  cites: string[];
+  at: number;
+  run_id: string | null;
+}
+
+// since and until are microseconds; an older server sends no until, and then no deadline shows.
+export type AutoObserveStepState =
+  "engine_only" | { working: { since: number; until?: number } } | "ready";
+
+export interface AutoObserveStepView {
+  step: AutoObserveNextStep;
+  state: AutoObserveStepState;
+  // false once someone marked this step not helpful.
+  judged: boolean | null;
+  // The issue's decision id; sent back as the decide route's id, never shown.
+  issue_id: string;
+}
+
+// Times are microseconds; asked_at is null until the first ask is stored. recheck_at is the next
+// planned ask, past once it is due, null when none is planned; an older server leaves it out.
+export interface AutoObserveIssueContext {
+  causes: { top: AutoObserveCauseLine[]; more: number };
+  impact: AutoObserveImpactLine[];
+  classes: string[];
+  window: [number, number];
+  asked_at: number | null;
+  recheck_at?: number | null;
+  settled: boolean;
+  checks: AutoObserveProviderCheck[];
+  hidden: number;
+  region_only: boolean;
+  next_step: AutoObserveStepView | null;
 }
 
 export interface AutoObserveSuggestionParams {
@@ -203,6 +337,8 @@ export interface AutoObserveIncidentItem {
   };
   page?: AutoObservePage;
   members?: AutoObserveIncidentMember[];
+  // Absent while the server's issue context is off.
+  context?: AutoObserveIssueContext;
 }
 
 // available is false when the deployment turns paging off; the switch then cannot be turned on.
@@ -223,7 +359,7 @@ const autoobserve = {
     http().get<AutoObserveCoverage>(`/api/v2/${org}/autoobserve/coverage`, { params: { view } }),
   suggestions: (org: string, params: AutoObserveSuggestionParams) =>
     http().get<AutoObserveSuggestionList>(`/api/v2/${org}/autoobserve/suggestions`, { params }),
-  incidents: (org: string, params: { limit: number; offset: number }) =>
+  incidents: (org: string, params: { limit: number; offset: number; incident_id?: string }) =>
     http().get<AutoObserveIncidentList>(`/api/v2/${org}/autoobserve/incidents`, { params }),
   pagingSettings: (org: string) =>
     http().get<AutoObservePagingSettings>(`/api/v2/${org}/autoobserve/settings/paging`, {
