@@ -36,10 +36,7 @@ pub enum DashboardRequestBody {
     V8(v8::Dashboard),
 }
 
-/// Tracks the max version of dashboard currently supported.
-/// This value is used as the default when `version` key is missing
-/// in body. This helps avoid manually updating the code when a new
-/// version of dashboard is added.
+/// Newest dashboard version; the default when `version` is missing and panels are not v1/v2.
 const LATEST_DASHBOARD_VERSION: i64 = std::mem::variant_count::<DashboardRequestBody>() as i64;
 
 impl<'de> Deserialize<'de> for DashboardRequestBody {
@@ -47,16 +44,34 @@ impl<'de> Deserialize<'de> for DashboardRequestBody {
     where
         D: Deserializer<'de>,
     {
-        let value = Map::<String, Value>::deserialize(deserializer)?;
+        let mut value = Map::<String, Value>::deserialize(deserializer)?;
 
-        let version = value
-            .get("version")
-            .and_then(Value::as_i64)
-            .unwrap_or(LATEST_DASHBOARD_VERSION);
+        let given_version = value.get("version").and_then(Value::as_i64);
+        let inferred = given_version.is_none();
+        let version = match given_version {
+            Some(version) => version,
+            None => {
+                let version = infer_missing_version(&value).map_err(serde::de::Error::custom)?;
+                // Unlike v1, the v2 struct requires the `version` key itself.
+                if version == 2 {
+                    value.insert("version".to_string(), Value::from(version));
+                }
+                version
+            }
+        };
 
+        let legacy_err = |err: serde_json::Error| {
+            if inferred {
+                serde::de::Error::custom(format!(
+                    "{err}; no `version` given: send `version: {LATEST_DASHBOARD_VERSION}` with `tabs`"
+                ))
+            } else {
+                serde::de::Error::custom(err)
+            }
+        };
         let dash = match version {
-            1 => Self::V1(v1::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
-            2 => Self::V2(v2::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
+            1 => Self::V1(v1::Dashboard::deserialize(value).map_err(legacy_err)?),
+            2 => Self::V2(v2::Dashboard::deserialize(value).map_err(legacy_err)?),
             3 => Self::V3(v3::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
             4 => Self::V4(v4::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
             5 => Self::V5(v5::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
@@ -303,6 +318,30 @@ impl From<(MetaFolder, MetaDashboard)> for ListDashboardsResponseBodyItem {
     }
 }
 
+/// Picks the schema for a body without `version`: tab-less bodies with panels are v1 or v2.
+fn infer_missing_version(value: &Map<String, Value>) -> Result<i64, String> {
+    let has_tabs = value
+        .get("tabs")
+        .and_then(Value::as_array)
+        .is_some_and(|tabs| !tabs.is_empty());
+    let panels = match value.get("panels").and_then(Value::as_array) {
+        Some(panels) if !panels.is_empty() && !has_tabs => panels,
+        _ => return Ok(LATEST_DASHBOARD_VERSION),
+    };
+    let every_panel_has = |is_shape: fn(&Value) -> bool, key: &str| {
+        panels
+            .iter()
+            .all(|panel| panel.get(key).is_some_and(is_shape))
+    };
+    if every_panel_has(Value::is_array, "queries") {
+        Ok(2)
+    } else if every_panel_has(Value::is_string, "query") {
+        Ok(1)
+    } else {
+        Err("missing `version` and `panels` match neither the v1 nor the v2 shape".to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -392,6 +431,153 @@ mod tests {
         });
         let result: Result<DashboardRequestBody, _> = serde_json::from_value(json);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_v1_body_without_version_keeps_its_panels() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../tests/test-data/dashboardAzure.json"
+        ));
+        let value: Value = serde_json::from_str(json).unwrap();
+        assert!(value.get("version").is_none());
+
+        let saved: MetaDashboard = serde_json::from_value::<DashboardRequestBody>(value)
+            .unwrap()
+            .into();
+        assert_eq!(saved.version, 1);
+        assert_eq!(saved.v1.unwrap().panels.len(), 4);
+    }
+
+    #[test]
+    fn test_v2_body_without_version_keeps_its_panels() {
+        let json = serde_json::json!({
+            "title": "V2 Dashboard",
+            "description": "test",
+            "panels": [{
+                "id": "Panel_ID1",
+                "type": "bar",
+                "title": "Panel",
+                "description": "",
+                "config": { "show_legends": true },
+                "queries": [{
+                    "query": "SELECT 1",
+                    "customQuery": true,
+                    "fields": {
+                        "stream": "default",
+                        "stream_type": "logs",
+                        "x": [],
+                        "y": [],
+                        "filter": []
+                    },
+                    "config": { "promql_legend": "" }
+                }],
+                "layout": { "x": 0, "y": 0, "w": 12, "h": 13, "i": 1 }
+            }]
+        });
+
+        let saved: MetaDashboard = serde_json::from_value::<DashboardRequestBody>(json)
+            .unwrap()
+            .into();
+        assert_eq!(saved.version, 2);
+        assert_eq!(saved.v2.unwrap().panels.len(), 1);
+    }
+
+    #[test]
+    fn test_body_without_version_with_unknown_panel_shape_returns_err() {
+        let json = serde_json::json!({
+            "title": "Ambiguous",
+            "description": "test",
+            "panels": [{ "id": "Panel_ID1" }]
+        });
+        let result: Result<DashboardRequestBody, _> = serde_json::from_value(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_v1_body_without_version_ignores_null_queries_key() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../tests/test-data/dashboardAzure.json"
+        ));
+        let mut value: Value = serde_json::from_str(json).unwrap();
+        for panel in value["panels"].as_array_mut().unwrap() {
+            panel["queries"] = Value::Null;
+        }
+
+        let saved: MetaDashboard = serde_json::from_value::<DashboardRequestBody>(value)
+            .unwrap()
+            .into();
+        assert_eq!(saved.version, 1);
+        assert_eq!(saved.v1.unwrap().panels.len(), 4);
+    }
+
+    #[test]
+    fn test_body_without_version_with_null_panel_queries_returns_shape_err() {
+        for key in ["queries", "query"] {
+            let mut panel = Map::new();
+            panel.insert("id".to_string(), Value::from("Panel_ID1"));
+            panel.insert(key.to_string(), Value::Null);
+            let json = serde_json::json!({
+                "title": "Null queries",
+                "description": "test",
+                "panels": [panel]
+            });
+            let err = serde_json::from_value::<DashboardRequestBody>(json).unwrap_err();
+            assert!(
+                err.to_string().contains("neither the v1 nor the v2"),
+                "{key}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_v1_body_without_version_with_empty_or_null_tabs_keeps_its_panels() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../tests/test-data/dashboardAzure.json"
+        ));
+        for tabs in [serde_json::json!([]), Value::Null] {
+            let mut value: Value = serde_json::from_str(json).unwrap();
+            value["tabs"] = tabs.clone();
+
+            let saved: MetaDashboard = serde_json::from_value::<DashboardRequestBody>(value)
+                .unwrap()
+                .into();
+            assert_eq!(saved.version, 1, "tabs: {tabs}");
+            assert_eq!(saved.v1.unwrap().panels.len(), 4, "tabs: {tabs}");
+        }
+    }
+
+    #[test]
+    fn test_inferred_v1_parse_failure_hints_at_version() {
+        let json = serde_json::json!({
+            "title": "Broken v1",
+            "description": "test",
+            "panels": [{ "id": "Panel_ID1", "query": "SELECT 1" }]
+        });
+        let err = serde_json::from_value::<DashboardRequestBody>(json).unwrap_err();
+        assert!(
+            err.to_string().contains("send `version: 8` with `tabs`"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn test_tabbed_body_without_version_dispatches_to_v8() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let mut value: Value = serde_json::from_str(json).unwrap();
+        value.as_object_mut().unwrap().remove("version");
+        let expected_tabs = value["tabs"].as_array().unwrap().len();
+
+        let body: DashboardRequestBody = serde_json::from_value(value).unwrap();
+        let DashboardRequestBody::V8(dash) = body else {
+            panic!("expected v8");
+        };
+        assert_eq!(dash.tabs.len(), expected_tabs);
     }
 
     #[test]

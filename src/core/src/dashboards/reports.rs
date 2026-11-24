@@ -391,6 +391,23 @@ pub async fn delete_by_id(org_id: &str, report_id: &str) -> Result<(), ReportErr
     Ok(())
 }
 
+/// Removes the trigger, ownership and super-cluster copy of a report whose row is already deleted.
+pub async fn forget_deleted(org_id: &str, report_id: &str, folder_id: &str) {
+    if let Err(e) = db::dashboards::reports::forget_deleted(org_id, report_id).await {
+        log::error!("[Report] error cleaning up deleted report {report_id}: {e}");
+    }
+    remove_ownership(
+        org_id,
+        "reports",
+        Authz {
+            obj_id: report_id.to_string(),
+            parent_type: "report_folders".to_owned(),
+            parent: folder_id.to_owned(),
+        },
+    )
+    .await;
+}
+
 /// Sends a report now and returns the history row of that run; a failed send is a row too.
 pub async fn trigger(
     org_id: &str,
