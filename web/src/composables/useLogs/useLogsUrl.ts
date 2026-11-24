@@ -287,10 +287,11 @@ export function writeLogsUrl(mode: LogsUrlMode, query: LocationQueryRaw): Promis
   if (isLeavingRoute("logs")) return Promise.resolve();
   if (changedParams(currentLogsQuery(), query).length === 0) return Promise.resolve();
   const target = { query, state: { ...historyStateProvider() } as Record<string, any> };
-  inFlightQuery = query;
+  const pending = { ...query };
+  inFlightQuery = pending;
   const navigation = mode === "replace" ? router.replace(target) : router.push(target);
   const settle = () => {
-    if (inFlightQuery === query) inFlightQuery = null;
+    if (inFlightQuery === pending) inFlightQuery = null;
   };
   Promise.resolve(navigation).then(settle, settle);
   return navigation;

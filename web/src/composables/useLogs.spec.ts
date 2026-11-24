@@ -440,6 +440,30 @@ describe("Use Logs Composable", () => {
       expect(wrapper.vm.searchObj.meta.drillDownDimensions).toBeNull();
     });
 
+    it("restores an emptied Drill down pick list as empty, not as the defaults", async () => {
+      const { restoreUrlQueryParams } = wrapper.vm;
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+        drilldown_dims: "",
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.drillDownDimensions).toEqual([]);
+    });
+
+    it("restores a Drill down dimension whose name holds a comma", async () => {
+      const { restoreUrlQueryParams } = wrapper.vm;
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+        drilldown_dims: `${encodeURIComponent("a,b")},level,%E0%A4`,
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.drillDownDimensions).toEqual(["a,b", "level", "%E0%A4"]);
+    });
+
     it("should restore stream and datetime parameters", async () => {
       wrapper.vm.router.currentRoute.value.query = {
         stream: "stream1,stream2",

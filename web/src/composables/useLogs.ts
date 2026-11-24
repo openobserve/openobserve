@@ -59,6 +59,14 @@ import {
 } from "@/composables/useLogs/useLogsUrl";
 import { columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
 
+const safeDecode = (value: string): string => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
 const useLogs = (t: TranslateFn) => {
   const store = useStore();
 
@@ -556,9 +564,13 @@ const useLogs = (t: TranslateFn) => {
       );
     }
 
-    searchObj.meta.drillDownDimensions = queryParams.drilldown_dims
-      ? String(queryParams.drilldown_dims).split(",").filter(Boolean)
-      : null;
+    searchObj.meta.drillDownDimensions =
+      queryParams.drilldown_dims !== undefined
+        ? String(queryParams.drilldown_dims ?? "")
+            .split(",")
+            .filter(Boolean)
+            .map(safeDecode)
+        : null;
 
     //here we restore the fn editor state from the url query params
     if (queryParams.fn_editor) {

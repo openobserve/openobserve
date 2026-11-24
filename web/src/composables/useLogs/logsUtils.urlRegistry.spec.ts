@@ -365,6 +365,20 @@ describe("logsUtils URL registry (4c C7, C7b)", () => {
       expect(route.value.query.to).toBe(9000);
     });
 
+    it("writes a Drill down dimension that holds a comma as one encoded item", () => {
+      searchObj.meta.logsVisualizeToggle = "drilldown";
+      searchObj.meta.drillDownDimensions = ["a,b", "level"];
+      expect(utils.generateURLQuery().drilldown_dims).toBe("a%2Cb,level");
+    });
+
+    it("writes an emptied Drill down pick list as an empty param so a refresh keeps it empty", () => {
+      searchObj.meta.logsVisualizeToggle = "drilldown";
+      searchObj.meta.drillDownDimensions = [];
+      expect(utils.generateURLQuery().drilldown_dims).toBe("");
+      searchObj.meta.drillDownDimensions = null;
+      expect(utils.generateURLQuery()).not.toHaveProperty("drilldown_dims");
+    });
+
     it("drops the RCA evidence handoff type so a later reload does not re-run the handoff", async () => {
       route.value = { name: "logs", query: { stream: "app", type: "rca_evidence_query" } };
       await utils.patchUrlViewState();

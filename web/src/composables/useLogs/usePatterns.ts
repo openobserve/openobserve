@@ -15,8 +15,9 @@
 
 import { ref } from "vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import type { TranslateFn } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 import patternsService from "@/services/patterns";
+import { partialDownloadReason } from "@/utils/logs/downloadRange";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 
 // A single UI-shaped pattern (raw backend fields + values derived in extractPatterns)
@@ -136,10 +137,10 @@ export default function usePatterns(t: TranslateFn) {
         patterns: transformedPatterns,
       };
 
-      const reasons = [response.data.function_error].flat().filter(Boolean).join(" ");
-      if (response.data.is_partial === true || reasons) {
+      const reasons = partialDownloadReason(response.data);
+      if (reasons !== null) {
         toast({
-          message: reasons || t("search.patternsPartialResult"),
+          message: reasons ? raw(reasons) : t("search.patternsPartialResult"),
           variant: "warning",
         });
       }

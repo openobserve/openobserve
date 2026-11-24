@@ -609,9 +609,11 @@ export const logsUtils = () => {
 
     if (
       searchObj.meta.logsVisualizeToggle === "drilldown" &&
-      searchObj.meta.drillDownDimensions?.length
+      Array.isArray(searchObj.meta.drillDownDimensions)
     ) {
-      query["drilldown_dims"] = searchObj.meta.drillDownDimensions.join(",");
+      query["drilldown_dims"] = searchObj.meta.drillDownDimensions
+        .map(encodeURIComponent)
+        .join(",");
     }
 
     // Preserve visualization data in URL
