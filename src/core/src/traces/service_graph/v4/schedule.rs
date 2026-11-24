@@ -23,7 +23,10 @@ use config::{
     utils::time::{SECOND_MICRO_SECS, now_micros},
 };
 use futures::StreamExt;
-use infra::{cluster::get_node_by_uuid, dist_lock};
+use infra::{
+    cluster::{get_node_by_uuid, is_node_alive},
+    dist_lock,
+};
 use serde_json::Value;
 use tokio::sync::{Mutex, RwLock};
 
@@ -97,6 +100,7 @@ pub fn claim_decision(node: &str, local: &str, node_alive: bool) -> ClaimDecisio
 pub(crate) async fn node_alive(node: &str) -> bool {
     !node.is_empty()
         && node != LOCAL_NODE.uuid
+        && is_node_alive(node).await
         && get_node_by_uuid(node).await.is_some_and(|owner| {
             owner.http_addr != LOCAL_NODE.http_addr || owner.grpc_addr != LOCAL_NODE.grpc_addr
         })
@@ -879,6 +883,14 @@ mod tests {
                 "peer",
                 Some(node("peer", "peer-host", peer_http, peer_grpc)),
                 ClaimDecision::Skip,
+            ),
+            (
+                "stopped-peer",
+                Some(config::meta::cluster::Node {
+                    status: config::meta::cluster::NodeStatus::Offline,
+                    ..node("stopped-peer", "stopped-host", peer_http, peer_grpc)
+                }),
+                ClaimDecision::Claim,
             ),
         ];
         for (_, entry, _) in &cases {

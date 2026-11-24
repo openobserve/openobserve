@@ -456,8 +456,11 @@ async fn run() -> Result<(), anyhow::Error> {
     _ = db.close().await;
 
     // leave the cluster
-    _ = cluster::leave().await;
-    log::info!("Node left cluster");
+    if let Err(e) = cluster::leave().await {
+        log::error!("Failed to leave cluster: {e}");
+    } else {
+        log::info!("Node left cluster");
+    }
 
     // stop telemetry
     if cfg.common.telemetry_enabled {
