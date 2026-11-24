@@ -79,11 +79,11 @@ test.describe('Database Monitoring — scope integrity', () => {
       });
       await dbm.expectLoaded();
       expect(await dbm.settleTab(tab), `${tab} hung under a real scope`).not.toBe('timeout');
-      // The chip proves the NEW scope is the one on screen. Without this the
+      // The instance select proves the NEW scope is the one on screen. Without this the
       // read can land on the kept-alive previous render and report the old
       // scope's rows beside the new scope's badge — a false result that looks
       // exactly like the bug under test.
-      await expect(dbm.scopeChip).toBeVisible({ timeout: 15000 });
+      await expect(dbm.instanceFilter).not.toContainText(/^\s*All\s*$/, { timeout: 15000 });
 
       // Read the API FIRST, then wait for the table to agree with it. A bare
       // `rowsOn` here races the re-render: the chip is applied the moment the

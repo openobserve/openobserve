@@ -2166,8 +2166,7 @@ const queryHeaderTip = computed(() =>
 const fromTraces = (row: QueryRow) =>
   row.overlapCalls.source === "client" || row.overlapTime.source === "client";
 
-// Columns with nothing to show on any row are dropped from the table only;
-// the toggle and the saved visibility keep using the full `columns`.
+// Empty columns are dropped from the table only; the toggle and saved visibility keep the full list.
 const emptyColumns = computed(() =>
   emptyColumnIds<QueryRow>(tableRows.value, {
     perTrace: (row) => (showsPerRequest(row.callsPerTrace) ? row.callsPerTrace : null),
@@ -2277,11 +2276,7 @@ const onStmtClassChange = (value: unknown) => {
  * above): assign, publish to the URL, refetch — so a shared link carries the
  * term and the rows below match it.
  *
- * The refetch is not per keystroke: `OSearchInput` is bound with
- * `:debounce="400"`, so `update:model-value` fires 400ms after typing stops.
- * This restores the `@search="load"` behaviour the control had inside
- * `DbmTableToolbar`, which emitted `update:search` and `search` together and
- * was lost when the box was hoisted out of the table toolbar.
+ * Refetches once typing stops, because `OSearchInput` debounces by 400ms.
  */
 const onSearchInput = (value: unknown) => {
   search.value = typeof value === "string" ? value : "";
@@ -2289,13 +2284,7 @@ const onSearchInput = (value: unknown) => {
   load();
 };
 
-/**
- * Drop every refinement at once, from the toolbar's clear affordance.
- *
- * "Clear all" means all: the search box and the active insight are refinements
- * too, and leaving them set while the scope chips disappear left the table
- * looking filtered with nothing on screen explaining why.
- */
+/** Clear all means all: a leftover search or insight leaves the table looking filtered with no explanation. */
 const clearScope = () => {
   systemFilter.value = null;
   instanceFilter.value = null;

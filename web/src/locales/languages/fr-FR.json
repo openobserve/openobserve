@@ -26992,20 +26992,8 @@
       }
     },
     "coverage": {
-      "unknownNote": "Rien à mesurer dans la plage et les filtres que vous avez choisis.",
-      "lineHealthy": "Vous voyez {percent}% du temps de cette base de données — les {count} types de requêtes les plus lourds.",
-      "lineRemainder": "Vous voyez {percent}% du temps de cette base de données. Le reste est dans des requêtes plus légères que nous ne listons pas une par une.",
       "lineTruncated": "Il y avait plus de données dans la dernière période que ce que nous pouvions absorber, donc les nombres les plus récents sont sous-estimés.",
       "lineGap": "{minutes} minutes manquent dans cette fenêtre. Notre comptage s'est arrêté à {stopped} et ne peut remonter que {reach} minutes en arrière, donc rien ne couvre {from}–{to}.",
-      "lineSubset": "Vous avez filtré sur {filter}, donc ces pourcentages décrivent les lignes affichées, pas toute la base de données.",
-      "lineHealthyAll": "Vous voyez chaque requête qui a été exécutée. Les vitesses ici sont mesurées sur chaque appel, donc elles sont exactes.",
-      "lineHealthyAllEstimated": "Vous voyez chaque requête qui a été exécutée. Les vitesses ici sont mélangées à partir de plusieurs périodes, donc elles sont approximatives mais pas exactes.",
-      "lineCountedTo": "Compté jusqu'à {time} ; la dernière demi-minute arrive encore.",
-      "lineExact": "Toutes les bases de données rapportent. Les vitesses ici sont mesurées sur chaque appel, donc elles sont exactes.",
-      "lineExactEstimated": "Toutes les bases de données rapportent. Les vitesses ici sont mélangées à partir de plusieurs périodes, donc elles sont approximatives mais pas exactes.",
-      "lineExactSlowestSchema": "Toutes les bases de données remontent des données. Les vitesses sont exactes par schéma ; une base de données comportant plusieurs schémas affiche le plus lent.",
-      "lineSubsetUnnamed": "Vos filtres réduisent cela en dessous du niveau auquel ces totaux s'additionnent, donc les pourcentages décrivent les lignes affichées plutôt que toute la base de données.",
-      "lineQuery": "Les temps sont mesurés depuis votre application, donc ils incluent le temps réseau et toute attente d'une connexion disponible.",
       "lineUncodedErrors": "{percent} des échecs ici sont revenus sans code de raison, donc ils peuvent être comptés mais pas expliqués."
     },
     "breakdown": {

@@ -26992,20 +26992,8 @@
       }
     },
     "coverage": {
-      "unknownNote": "Nada para medir no intervalo e nos filtros que selecionou.",
-      "lineHealthy": "Está a ver {percent}% do tempo desta base de dados — os {count} tipos de consulta mais pesados.",
-      "lineRemainder": "Está a ver {percent}% do tempo desta base de dados. O restante está em consultas mais leves que não listamos uma a uma.",
       "lineTruncated": "Havia mais dados no último período do que conseguimos processar, pelo que os números mais recentes estão subestimados.",
       "lineGap": "Faltam {minutes} minutos nesta janela. A nossa contagem parou às {stopped} e só consegue recuar {reach} minutos, pelo que nada cobre {from}–{to}.",
-      "lineSubset": "Filtrou por {filter}, pelo que estas percentagens descrevem as linhas apresentadas, não a base de dados inteira.",
-      "lineHealthyAll": "Está a ver todas as consultas que foram executadas. As velocidades aqui são medidas em cada chamada, pelo que são exatas.",
-      "lineHealthyAllEstimated": "Está a ver todas as consultas que foram executadas. As velocidades aqui são combinadas a partir de vários períodos de tempo, pelo que são aproximadas, mas não exatas.",
-      "lineCountedTo": "Contado até {time}; o último meio minuto ainda está a chegar.",
-      "lineExact": "Todas as bases de dados a reportar. As velocidades aqui são medidas em cada chamada, pelo que são exatas.",
-      "lineExactEstimated": "Todas as bases de dados a reportar. As velocidades aqui são combinadas a partir de vários períodos de tempo, pelo que são aproximadas, mas não exatas.",
-      "lineExactSlowestSchema": "Todas as bases de dados estão a comunicar. As velocidades são exatas por esquema; uma base de dados com vários esquemas mostra o esquema mais lento.",
-      "lineSubsetUnnamed": "Os seus filtros reduzem isto abaixo do nível em que estes totais são somados, pelo que as percentagens descrevem as linhas apresentadas em vez da base de dados inteira.",
-      "lineQuery": "Os tempos são medidos a partir da sua aplicação, pelo que incluem o tempo de rede e qualquer espera por uma ligação livre.",
       "lineUncodedErrors": "{percent} das falhas aqui foram devolvidas sem código de motivo, pelo que podem ser contadas, mas não explicadas."
     },
     "breakdown": {

@@ -235,10 +235,10 @@ test.describe('Database Monitoring — filter matrix', () => {
   });
 
   // =========================================================================
-  // POSITIVE: the chip reflects what was applied
+  // POSITIVE: the instance select reflects what was applied
   // =========================================================================
 
-  test('P1: the applied scope is visible as a chip on every tab that accepts it', {
+  test('P1: the applied scope is visible in the instance select on every tab that accepts it', {
     tag: ['@dbm', '@infra', '@P1', '@filters', '@all'],
   }, async () => {
     test.skip(!scope.instance, 'no instance value in this org');
@@ -251,9 +251,9 @@ test.describe('Database Monitoring — filter matrix', () => {
       // A filter the reader cannot SEE is worse than no filter: the numbers are
       // narrowed and nothing on screen says so.
       await expect(
-        dbm.scopeChip,
-        `${tab} applied a scope but rendered no chip for it`,
-      ).toBeVisible({ timeout: 15000 });
+        dbm.instanceFilter,
+        `${tab} applied a scope but its instance select still reads All`,
+      ).not.toContainText(/^\s*All\s*$/, { timeout: 15000 });
     }
   });
 });

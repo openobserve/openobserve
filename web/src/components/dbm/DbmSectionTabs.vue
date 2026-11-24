@@ -74,8 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            absent for the counts that exist in one vantage only: qualifying a
            deadlock count would imply a choice between feeds that was never
            available. -->
-        <!-- Same box as the badge, so the count arriving swaps in place and
-           pushes no following tab. Only a tab that WILL have a count gets one. -->
+        <!-- Same box as the badge, so the arriving count pushes no following tab. -->
         <OSkeleton
           v-if="section.count == null && section.countPending"
           class="h-5 w-12 rounded-full"

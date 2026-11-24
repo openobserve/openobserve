@@ -26992,20 +26992,8 @@
       }
     },
     "coverage": {
-      "unknownNote": "In dem ausgewählten Zeitraum und mit den gewählten Filtern gibt es nichts zu messen.",
-      "lineHealthy": "Sie sehen {percent}% der Zeit dieser Datenbank — die {count} schwersten Arten von Abfragen.",
-      "lineRemainder": "Sie sehen {percent}% der Zeit dieser Datenbank. Der Rest entfällt auf leichtere Abfragen, die wir nicht einzeln auflisten.",
       "lineTruncated": "Im letzten Abschnitt gab es mehr Daten, als wir aufnehmen konnten, daher sind die neuesten Zahlen unterzählt.",
       "lineGap": "{minutes} Minuten fehlen in diesem Fenster. Unsere Zählung wurde bei {stopped} gestoppt und kann nur {reach} Minuten zurückreichen, daher deckt nichts {from}–{to} ab.",
-      "lineSubset": "Sie haben auf {filter} gefiltert, daher beschreiben diese Prozentsätze die angezeigten Zeilen, nicht die gesamte Datenbank.",
-      "lineHealthyAll": "Sie sehen jede Abfrage, die ausgeführt wurde. Die Geschwindigkeiten hier werden über jeden Aufruf gemessen, sind also exakt.",
-      "lineHealthyAllEstimated": "Sie sehen jede Abfrage, die ausgeführt wurde. Die Geschwindigkeiten hier werden aus mehreren Zeitabschnitten gemischt, sind also ungefähr, aber nicht exakt.",
-      "lineCountedTo": "Gezählt bis {time}; die letzte halbe Minute wird noch erfasst.",
-      "lineExact": "Alle Datenbanken melden. Die Geschwindigkeiten hier werden über jeden Aufruf gemessen, sind also exakt.",
-      "lineExactEstimated": "Alle Datenbanken melden. Die Geschwindigkeiten hier werden aus mehreren Zeitabschnitten gemischt, sind also ungefähr, aber nicht exakt.",
-      "lineExactSlowestSchema": "Alle Datenbanken melden. Die Geschwindigkeiten sind pro Schema exakt; eine Datenbank mit mehreren Schemas zeigt ihr langsamstes.",
-      "lineSubsetUnnamed": "Ihre Filter grenzen dies unter die Ebene ein, auf der diese Summen gebildet werden, daher beschreiben die Prozentsätze die angezeigten Zeilen statt der gesamten Datenbank.",
-      "lineQuery": "Zeiten werden von Ihrer Anwendung aus gemessen, daher enthalten sie Netzwerkzeit und Wartezeit auf eine freie Verbindung.",
       "lineUncodedErrors": "{percent} der Fehler hier kamen ohne einen Grundcode zurück, daher können sie gezählt, aber nicht erklärt werden."
     },
     "breakdown": {

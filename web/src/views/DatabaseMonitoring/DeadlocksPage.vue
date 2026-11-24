@@ -57,8 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filters="dimensionFilters"
         @search="load"
       >
-        <!-- What a ROW means. Not a data-processing mode — the reader is
-             choosing between "name the bug" and "give me a timestamp". -->
+        <!-- What a row means: a named bug (pair) or a timestamp (event). -->
         <OToggleGroup
           v-model="grouping"
           class="shrink-0"
@@ -115,9 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dbm-deadlocks-summary"
           />
 
-          <!-- ONE warning band: the storm and the capped read are two facts about
-               the same window, so they share a sentence and the long
-               explanation sits behind Details. -->
+          <!-- One band: the storm and the capped read are facts about the same window. -->
           <OBanner
             v-if="storm || (truncated && rows.length)"
             variant="warning"
@@ -629,7 +626,15 @@ const victimSummaryFor = (pair: DeadlockPair): I18nText | null => {
   const apps = new Set(
     pair.events.flatMap((e) => e.participants.map((p) => p.application?.trim()).filter(Boolean)),
   );
-  if (apps.size < 2) return null;
+  if (apps.size < 2) {
+    // One app or none: name the newest cancelled side by app, else by pid or thread.
+    const side = victimOf(pair.events[0]);
+    if (!side) return null;
+    const app = side.application?.trim();
+    const pid = side.pid != null ? (t(pidKeyFor(pair.db_system), { pid: side.pid }) as string) : "";
+    const label = app ? (pid ? `${app} (${pid})` : app) : pid;
+    return label ? t("dbm.deadlocks.detail.victimIs", { side: label }) : null;
+  }
   const counts = Object.entries(pair.victimAppCounts).sort((x, y) => y[1] - x[1]);
   if (counts.length > 1) {
     return t("dbm.deadlocks.detail.bothSidesLose", {
@@ -668,7 +673,7 @@ const cellFacts = (objects: string[], participants: DeadlockParticipant[], dbSys
       ...participants
         .map((p) => p.transaction_id)
         .filter(Boolean)
-        .map((id) => `transaction ${id}`),
+        .map((id) => t("dbm.deadlocks.detail.transaction", { id }) as string),
     ]),
   ];
   const appDetails = participants.flatMap((p) => {

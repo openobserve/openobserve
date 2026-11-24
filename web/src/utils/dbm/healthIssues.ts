@@ -45,10 +45,7 @@ export const healthIssues = (metrics: DbmRowMetrics): DbmHealthIssue[] => {
 export const hasThresholdedReading = (metrics: DbmRowMetrics): boolean =>
   metrics.saturation.ratio !== null || metrics.cacheHitRatio !== null || metrics.deadlocks !== null;
 
-/**
- * Health column sort key, descending = needs attention first: no reading, then
- * error, then warning, then healthy; ties by issue count, then connection share.
- */
+/** Sort key, descending = needs attention first: no reading, error, warning, healthy. */
 export const healthColumnSortValue = (metrics?: DbmRowMetrics): number => {
   if (!metrics || healthScalar(metrics).state === "absent") return 1000;
   const issues = healthIssues(metrics);

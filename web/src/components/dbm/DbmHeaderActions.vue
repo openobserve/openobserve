@@ -14,11 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  DbmHeaderActions — the header's last-run dot, time picker and Refresh button,
-  in the same form AI Observability's page header wears. The range is the
-  page's own URL-backed range, so every tab shows and writes the same window.
--->
+<!-- DbmHeaderActions: the header's last-run dot, time picker and Refresh button, on the page's URL-backed range. -->
 <template>
   <AiLastRefreshed
     class="me-1"
@@ -38,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @on:date-change="(value: DbmDateChange) => emit('date-change', value)"
   />
   <OButton
-    variant="primary"
+    variant="outline"
     size="sm-toolbar"
     icon-left="refresh"
     :disabled="loading"

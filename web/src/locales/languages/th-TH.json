@@ -26986,20 +26986,8 @@
       }
     },
     "coverage": {
-      "unknownNote": "Nothing to measure in the range and filters you've picked.",
-      "lineHealthy": "You're seeing {percent}% of this database's time — the {count} heaviest kinds of query.",
-      "lineRemainder": "You're seeing {percent}% of this database's time. The rest is in lighter queries we don't list one by one.",
       "lineTruncated": "There was more data in the last stretch than we could take in, so the newest numbers are undercounts.",
       "lineGap": "{minutes} minutes are missing from this window. Our counting stopped at {stopped} and can only reach back {reach} minutes, so nothing covers {from}–{to}.",
-      "lineSubset": "You've filtered to {filter}, so these percentages describe the rows shown, not the whole database.",
-      "lineHealthyAll": "You're seeing every query that ran. Speeds here are measured across every call, so they're exact.",
-      "lineHealthyAllEstimated": "You're seeing every query that ran. Speeds here are blended from several stretches of time, so they're close but not exact.",
-      "lineCountedTo": "Counted up to {time}; the last half-minute is still coming in.",
-      "lineExact": "All databases reporting. Speeds here are measured across every call, so they're exact.",
-      "lineExactEstimated": "All databases reporting. Speeds here are blended from several stretches of time, so they're close but not exact.",
-      "lineExactSlowestSchema": "ฐานข้อมูลทั้งหมดรายงานแล้ว ความเร็วเป็นค่าที่แน่นอนรายสคีมา ฐานข้อมูลที่มีหลายสคีมาจะแสดงสคีมาที่ช้าที่สุด",
-      "lineSubsetUnnamed": "Your filters narrow this below the level these totals add up at, so the percentages describe the rows shown rather than the whole database.",
-      "lineQuery": "Timings are measured from your application, so they include network time and any wait for a free connection.",
       "lineUncodedErrors": "{percent} of the failures here came back without a reason code, so they can be counted but not explained."
     },
     "breakdown": {

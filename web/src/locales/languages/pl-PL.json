@@ -26992,20 +26992,8 @@
       }
     },
     "coverage": {
-      "unknownNote": "Nie ma czego mierzyć w wybranym zakresie i przy wybranych filtrach.",
-      "lineHealthy": "Widzisz {percent}% czasu tej bazy danych — najcięższe rodzaje zapytań ({count}).",
-      "lineRemainder": "Widzisz {percent}% czasu tej bazy danych. Reszta to lżejsze zapytania, których nie wymieniamy pojedynczo.",
       "lineTruncated": "W ostatnim odcinku było więcej danych, niż mogliśmy przyjąć, więc najnowsze liczby są zaniżone.",
       "lineGap": "W tym oknie brakuje {minutes} min. Nasze zliczanie zatrzymało się o {stopped} i może sięgnąć tylko {reach} min wstecz, więc nic nie obejmuje przedziału {from}–{to}.",
-      "lineSubset": "Zawęziłeś do {filter}, więc te wartości procentowe opisują wyświetlane wiersze, a nie całą bazę danych.",
-      "lineHealthyAll": "Widzisz każde zapytanie, które zostało wykonane. Czasy są tutaj mierzone dla każdego wywołania, więc są dokładne.",
-      "lineHealthyAllEstimated": "Widzisz każde zapytanie, które zostało wykonane. Czasy są tutaj uśrednione z kilku odcinków czasu, więc są przybliżone, ale nie dokładne.",
-      "lineCountedTo": "Zliczono do {time}; ostatnie pół minuty wciąż napływa.",
-      "lineExact": "Wszystkie bazy danych raportują. Czasy są tutaj mierzone dla każdego wywołania, więc są dokładne.",
-      "lineExactEstimated": "Wszystkie bazy danych raportują. Czasy są tutaj uśrednione z kilku odcinków czasu, więc są przybliżone, ale nie dokładne.",
-      "lineExactSlowestSchema": "Wszystkie bazy danych raportują. Szybkości są dokładne dla każdego schematu; baza danych z kilkoma schematami pokazuje najwolniejszy z nich.",
-      "lineSubsetUnnamed": "Twoje filtry zawężają to poniżej poziomu, na którym sumują się te wartości, więc wartości procentowe opisują wyświetlane wiersze, a nie całą bazę danych.",
-      "lineQuery": "Czasy są mierzone z poziomu Twojej aplikacji, więc obejmują czas sieci i oczekiwanie na wolne połączenie.",
       "lineUncodedErrors": "{percent} błędów tutaj nie miało kodu przyczyny, więc można je policzyć, ale nie wyjaśnić."
     },
     "breakdown": {

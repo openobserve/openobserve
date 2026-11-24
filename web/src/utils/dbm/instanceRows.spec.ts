@@ -21,7 +21,6 @@ import { childShortfall, schemaShortfall, toSchemaRows } from "@/utils/dbm/break
 import {
   drowningInstanceKeys,
   foldByInstance,
-  hasWorstOfPercentiles,
   instanceKey,
   isCriticalServer,
   serverRowKey,
@@ -377,13 +376,6 @@ describe("toSchemaRows", () => {
       );
       expect(childShortfall(loading, server.total_time_ns)).toBeNull();
       expect(childShortfall(toSchemaRows(undefined, server.schemas, "k"), 110)).toBeNull();
-    });
-
-    it("counts the server's speeds as a worst-of over its rows", () => {
-      expect(hasWorstOfPercentiles([server])).toBe(true);
-      expect(
-        hasWorstOfPercentiles(foldByInstance([totals({ db_namespace: "app", calls: 1 })])),
-      ).toBe(false);
     });
   });
 

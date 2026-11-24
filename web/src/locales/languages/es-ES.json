@@ -26992,20 +26992,8 @@
       }
     },
     "coverage": {
-      "unknownNote": "No hay nada que medir en el rango y los filtros que has elegido.",
-      "lineHealthy": "Estás viendo el {percent}% del tiempo de esta base de datos: los {count} tipos de consulta más pesados.",
-      "lineRemainder": "Estás viendo el {percent}% del tiempo de esta base de datos. El resto está en consultas más livianas que no enumeramos una por una.",
       "lineTruncated": "Hubo más datos en el último tramo de los que pudimos asimilar, por lo que los números más recientes están subestimados.",
       "lineGap": "Faltan {minutes} minutos en esta ventana. Nuestro conteo se detuvo en {stopped} y solo puede retroceder {reach} minutos, por lo que nada cubre {from}–{to}.",
-      "lineSubset": "Has filtrado a {filter}, por lo que estos porcentajes describen las filas mostradas, no toda la base de datos.",
-      "lineHealthyAll": "Estás viendo todas las consultas que se ejecutaron. Las velocidades aquí se miden en cada llamada, por lo que son exactas.",
-      "lineHealthyAllEstimated": "Estás viendo todas las consultas que se ejecutaron. Las velocidades aquí se combinan de varios tramos de tiempo, por lo que son aproximadas pero no exactas.",
-      "lineCountedTo": "Contado hasta {time}; el último medio minuto aún está llegando.",
-      "lineExact": "Todas las bases de datos informando. Las velocidades aquí se miden en cada llamada, por lo que son exactas.",
-      "lineExactEstimated": "Todas las bases de datos informando. Las velocidades aquí se combinan de varios tramos de tiempo, por lo que son aproximadas pero no exactas.",
-      "lineExactSlowestSchema": "Todas las bases de datos están informando. Las velocidades son exactas por esquema; si una base de datos tiene varios esquemas, se muestra la velocidad del más lento.",
-      "lineSubsetUnnamed": "Tus filtros reducen esto por debajo del nivel en que se suman estos totales, por lo que los porcentajes describen las filas mostradas en lugar de toda la base de datos.",
-      "lineQuery": "Los tiempos se miden desde tu aplicación, por lo que incluyen el tiempo de red y cualquier espera por una conexión libre.",
       "lineUncodedErrors": "{percent} de los fallos aquí devolvieron sin un código de razón, por lo que pueden contarse pero no explicarse."
     },
     "breakdown": {

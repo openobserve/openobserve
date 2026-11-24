@@ -26992,20 +26992,8 @@
       }
     },
     "coverage": {
-      "unknownNote": "Niente da misurare nell'intervallo e nei filtri che hai selezionato.",
-      "lineHealthy": "Stai vedendo il {percent}% del tempo di questo database — i {count} tipi di query più pesanti.",
-      "lineRemainder": "Stai vedendo il {percent}% del tempo di questo database. Il resto è in query più leggere che non elenchiamo una per una.",
       "lineTruncated": "C'erano più dati nell'ultimo tratto di quanto potessimo ricevere, quindi i numeri più recenti sono sottostimati.",
       "lineGap": "{minutes} minuti mancano in questa finestra. Il nostro conteggio si è fermato alle {stopped} e può risalire solo di {reach} minuti, quindi nulla copre {from}–{to}.",
-      "lineSubset": "Hai filtrato su {filter}, quindi queste percentuali descrivono le righe mostrate, non l'intero database.",
-      "lineHealthyAll": "Stai vedendo ogni query eseguita. Le velocità qui sono misurate su ogni chiamata, quindi sono esatte.",
-      "lineHealthyAllEstimated": "Stai vedendo ogni query eseguita. Le velocità qui sono una combinazione di più intervalli di tempo, quindi sono vicine ma non esatte.",
-      "lineCountedTo": "Conteggiato fino a {time}; l'ultimo mezzo minuto sta ancora arrivando.",
-      "lineExact": "Tutti i database stanno riportando. Le velocità qui sono misurate su ogni chiamata, quindi sono esatte.",
-      "lineExactEstimated": "Tutti i database stanno riportando. Le velocità qui sono una combinazione di più intervalli di tempo, quindi sono vicine ma non esatte.",
-      "lineExactSlowestSchema": "Tutti i database stanno riportando dati. Le velocità sono esatte per schema; un database con più schemi mostra quello più lento.",
-      "lineSubsetUnnamed": "I tuoi filtri restringono questo al di sotto del livello a cui questi totali vengono sommati, quindi le percentuali descrivono le righe mostrate piuttosto che l'intero database.",
-      "lineQuery": "I tempi sono misurati dalla tua applicazione, quindi includono il tempo di rete e l'attesa per una connessione libera.",
       "lineUncodedErrors": "{percent} dei fallimenti qui sono tornati senza un codice di motivo, quindi possono essere contati ma non spiegati."
     },
     "breakdown": {

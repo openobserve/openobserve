@@ -26992,20 +26992,8 @@
       }
     },
     "coverage": {
-      "unknownNote": "Seçtiğiniz aralık ve filtrelerde ölçülecek bir şey yok.",
-      "lineHealthy": "Bu veritabanının süresinin %{percent}'ini görüyorsunuz — en ağır {count} sorgu türü.",
-      "lineRemainder": "Bu veritabanının süresinin %{percent}'ini görüyorsunuz. Geri kalanı tek tek listelemediğimiz daha hafif sorgularda.",
       "lineTruncated": "Son bölümde alabileceğimizden daha fazla veri vardı, bu yüzden en yeni sayılar eksik hesaplandı.",
       "lineGap": "Bu pencerede {minutes} dakika eksik. Sayımımız {stopped} saatinde durdu ve yalnızca {reach} dakika geriye gidebiliyor, bu yüzden {from}–{to} aralığını hiçbir şey kapsamıyor.",
-      "lineSubset": "{filter} filtresini uyguladınız, bu yüzden bu yüzdeler gösterilen satırları tanımlıyor, tüm veritabanını değil.",
-      "lineHealthyAll": "Çalışan her sorguyu görüyorsunuz. Buradaki hızlar her çağrı üzerinden ölçülür, bu yüzden tamdırlar.",
-      "lineHealthyAllEstimated": "Çalışan her sorguyu görüyorsunuz. Buradaki hızlar birkaç zaman diliminden harmanlanır, bu yüzden yaklaşıktır ancak tam değildir.",
-      "lineCountedTo": "{time} saatine kadar sayıldı; son yarım dakika hâlâ işleniyor.",
-      "lineExact": "Tüm veritabanları raporluyor. Buradaki hızlar her çağrı üzerinden ölçülür, bu yüzden tamdırlar.",
-      "lineExactEstimated": "Tüm veritabanları raporluyor. Buradaki hızlar birkaç zaman diliminden harmanlanır, bu yüzden yaklaşıktır ancak tam değildir.",
-      "lineExactSlowestSchema": "Tüm veritabanları rapor veriyor. Hızlar şema başına kesindir; birden çok şeması olan bir veritabanı en yavaş olanı gösterir.",
-      "lineSubsetUnnamed": "Filtreleriniz bunu bu toplamların toplandığı seviyenin altına daraltıyor, bu yüzden yüzdeler tüm veritabanı yerine gösterilen satırları tanımlıyor.",
-      "lineQuery": "Zamanlamalar uygulamanızdan ölçülür, bu yüzden ağ süresini ve boş bir bağlantı için bekleme süresini içerir.",
       "lineUncodedErrors": "Buradaki hataların %{percent}'i bir neden kodu olmadan döndü, bu yüzden sayılabilirler ancak açıklanamazlar."
     },
     "breakdown": {

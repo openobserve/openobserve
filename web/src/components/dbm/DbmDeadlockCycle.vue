@@ -136,8 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <!-- What happened and what to do, as one neutral note. Names both sides, so
-         it is suppressed when only one side reached us. -->
+    <!-- Names both sides, so it is hidden when only one side reached us. -->
     <div
       class="border-border-default bg-surface-base rounded-default flex flex-col gap-2 border px-2.5 py-2 text-xs leading-relaxed"
       :data-test="`${dataTest}-plain`"

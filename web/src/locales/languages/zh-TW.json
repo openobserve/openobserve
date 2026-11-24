@@ -26987,20 +26987,8 @@
       }
     },
     "coverage": {
-      "unknownNote": "您選擇的範圍和篩選條件中沒有可測量的資料。",
-      "lineHealthy": "您看到的是此資料庫時間的 {percent}%——最重的 {count} 種查詢。",
-      "lineRemainder": "您看到的是此資料庫時間的 {percent}%。其餘分散在較輕量的查詢中，我們不會逐一列出。",
       "lineTruncated": "最後一段的資料量超出我們能接收的量，因此最新的數字被低估。",
       "lineGap": "此時間視窗缺少 {minutes} 分鐘。我們的計數在 {stopped} 停止，且只能回溯 {reach} 分鐘，因此沒有資料涵蓋 {from}–{to}。",
-      "lineSubset": "您已篩選至 {filter}，因此這些百分比描述的是顯示的列，而非整個資料庫。",
-      "lineHealthyAll": "您看到的是所有執行過的查詢。這裡的速度是針對每次呼叫測量的，因此是精確的。",
-      "lineHealthyAllEstimated": "您看到的是所有執行過的查詢。這裡的速度是從多段時間混合而來，因此接近但不精確。",
-      "lineCountedTo": "計數截至 {time}；最後半分鐘仍在陸續進入。",
-      "lineExact": "所有資料庫都已在回報。這裡的速度是針對每次呼叫測量的，因此是精確的。",
-      "lineExactEstimated": "所有資料庫都已在回報。這裡的速度是從多段時間混合而來，因此接近但不精確。",
-      "lineExactSlowestSchema": "所有資料庫皆有回報。速度依各結構描述精確計算；含多個結構描述的資料庫會顯示最慢的那一個。",
-      "lineSubsetUnnamed": "您的篩選條件將此範圍縮小到低於這些總計的彙總層級，因此百分比描述的是顯示的列，而非整個資料庫。",
-      "lineQuery": "時間是從您的應用程式測量，因此包含網路時間以及等待可用連線的時間。",
       "lineUncodedErrors": "{percent} 的失敗沒有回傳原因代碼，因此可以被計數但無法解釋。"
     },
     "breakdown": {

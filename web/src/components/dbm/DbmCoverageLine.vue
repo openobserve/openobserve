@@ -14,46 +14,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  DbmCoverageLine — how much of this database's time you are actually looking
-  at, as ONE quiet line.
-
-  Two rules it holds to:
-
-  1. QUIET WHEN FINE. A permanent row of qualifier chips ("estimated", "live",
-     "traces ~") fires on nearly every view, so it reads as a standing warning
-     that says neither what is wrong nor why to care — and costs the table its
-     space to say nothing. A healthy page renders nothing. A banner appears only
-     when something changes how the numbers should be read: a warning (data is
-     missing or behind) or an info note (read the numbers this way).
-
-  2. ONE state, never an inventory. The reader needs the worst problem, not a
-     list. `summary` returns the most degrading sentence only, and every
-     sentence carries a number — a caveat with a number attached is a
-     disclosure; one without is a disclaimer nobody reads.
-
-  No term of art survives. "The 200 heaviest kinds of query" rather than
-  "top-N"; "still coming in" rather than "live tail"; "close, not exact" rather
-  than "estimated".
--->
+<!-- DbmCoverageLine: a banner shown only when counting is behind, missing data, truncated or the scope is narrowed. -->
 <template>
-  <!-- Inline: one toolbar note, hidden while empty because the empty state already says so. -->
-  <DbmToolbarNote
-    v-if="inline && !isEmpty"
-    :tone="noteTone"
-    :icon="noteTone === 'neutral' ? 'data-usage' : undefined"
-    :text="summary"
-    :detail="noteDetail"
-    data-test="dbm-coverage"
-  />
-  <OBanner
-    v-else-if="!inline && !isEmpty && entry.variant === 'warning'"
-    :variant="entry.variant"
-    :icon="entry.variant === 'warning' ? 'warning-amber' : 'info-outline'"
-    bar
-    dense
-    data-test="dbm-coverage"
-  >
+  <OBanner v-if="entry" variant="warning" icon="warning-amber" bar dense data-test="dbm-coverage">
     <span data-test="dbm-coverage-text">{{ entry.short }}</span>
     <template #actions>
       <!-- The long sentence lives here so the banner stays one line. -->
@@ -74,13 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
-import DbmToolbarNote, { type DbmToolbarNoteTone } from "./DbmToolbarNote.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import type { Freshness, QueryStatsRow } from "@/services/db_monitoring";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { formatCount, formatPercent } from "@/utils/dbm/format";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { formatPercent } from "@/utils/dbm/format";
 
 const props = withDefaults(
   defineProps<{
@@ -92,82 +54,32 @@ const props = withDefaults(
     other?: Pick<QueryStatsRow, "total_time_ns">[];
     /** The response's `top_n_subset` marker. */
     topNSubset?: boolean;
-    /** How many rows the server ranks individually, for the plain sentence. */
-    trackedCount?: number;
     /** Errors carrying a driver status code, over all errors, `0`–`1`. */
     codedErrorShare?: number;
     /** Total failures in scope, so the uncoded-failures line has a denominator. */
     errorCount?: number;
-    /**
-     * A scope filter narrowing the page, named in plain words ("checkout-service").
-     * Set only when the reader should know the percentages describe a subset.
-     */
+    /** A scope filter narrowing the page, named in plain words ("checkout-service"). */
     filterLabel?: string | null;
-    /**
-     * This grain measures every call rather than ranking a subset, so it can
-     * speak about the whole database. Whether the SPEEDS are exact is a
-     * separate question the response answers via `percentiles_estimated`.
-     */
-    exactPercentiles?: boolean;
-    /** Some row folds several schemas, so its speeds are its slowest schema's, not its own. */
-    slowestSchemaSpeeds?: boolean;
-    /**
-     * What these rows ARE. `list` (default) is a ranked table, where the share
-     * of total time is the headline claim. `query` is one statement, where that
-     * claim would be nonsense and the honest thing to report is how the
-     * measurement was taken.
-     */
-    subject?: "list" | "query";
     /** The selected window, microseconds; a data gap is counted only inside it. */
     windowStart?: number;
     windowEnd?: number;
-    /** Renders as a toolbar note instead of a full-width line. */
-    inline?: boolean;
   }>(),
   {
     hits: () => [],
     other: () => [],
     topNSubset: false,
-    exactPercentiles: false,
-    slowestSchemaSpeeds: false,
     filterLabel: null,
-    subject: "list",
-    inline: false,
   },
 );
 
 const { t } = useI18nTyped();
 
 const MINUTE_MS = 60_000;
+const MIN_US = 60_000_000;
 /** Beyond this our counting is behind far enough to change what a chart shows. */
 const STALE_MINUTES = 30;
-/**
- * Beyond this the "the last half-minute is still coming in" trailer is no longer
- * true, so the line reports the real lag instead. Well under {@link STALE_MINUTES}
- * on purpose: this is not a second staleness threshold, it is the point past
- * which the EXISTING sentence stops being honest. A rollup that has merely not
- * fired yet leaves a few minutes of lag on a healthy page, so the floor sits
- * above that rather than correcting a page that is fine.
- */
-const BEHIND_NOTE_MINUTES = 4;
-/**
- * A remainder under this does not change how any row's share reads. Above it,
- * "31% of database time" is measured against a total with a meaningful unshown
- * part, and the reader should know before acting on the number.
- */
-const NOISY_REMAINDER = 0.2;
-
-const sumTime = (rows: Pick<QueryStatsRow, "total_time_ns">[]) =>
-  rows.reduce((acc, row) => acc + (row.total_time_ns ?? 0), 0);
-
-const shownTime = computed(() => sumTime(props.hits));
-const otherTime = computed(() => sumTime(props.other));
-const totalTime = computed(() => shownTime.value + otherTime.value);
-
-const coverage = computed(() => (totalTime.value > 0 ? shownTime.value / totalTime.value : null));
-
-const pct = (part: number) =>
-  totalTime.value > 0 ? Math.round((part / totalTime.value) * 100) : 0;
+/** The two gap boundaries come from different clocks, so nothing under one aggregation interval is a real stall. */
+const GAP_TOLERANCE_US = 60_000_000;
 
 /** `0` = we have never finished counting, which is distinct from "behind". */
 const neverAggregated = computed(() => !!props.freshness && props.freshness.data_through === 0);
@@ -177,23 +89,6 @@ const behindMinutes = computed(() => {
   if (through <= 0) return null;
   return Math.max(0, Math.round((Date.now() - through / 1000) / MINUTE_MS));
 });
-
-/**
- * The genuine coverage gap: counting stalled beyond the reach of the most
- * recent stretch, so part of the range is covered by nothing at all. This is
- * the ONLY state that earns red, because it is the only one where data is
- * missing rather than merely qualified — which is exactly why it needs a
- * tolerance.
- *
- * The two boundaries are produced by different clocks a few seconds apart, so a
- * strict `>` fires on a routine skew of a few seconds and renders it as "1
- * minutes are missing" — crying wolf in red on a healthy page, and rounding a
- * 10-second overlap up to a whole minute while doing it. Nothing shorter than
- * one aggregation interval can be a real stall, so that is the floor.
- */
-const GAP_TOLERANCE_US = 60_000_000;
-
-const MIN_US = 60_000_000;
 
 /** The uncovered stretch, clipped to the selected window so minutes outside it are not counted. */
 const gap = computed<{ from: number; to: number; minutes: number } | null>(() => {
@@ -207,68 +102,17 @@ const gap = computed<{ from: number; to: number; minutes: number } | null>(() =>
   return minutes >= 1 ? { from, to, minutes } : null;
 });
 
-const hasGap = computed(() => gap.value !== null);
-
 const isStale = computed(() => (behindMinutes.value ?? 0) > STALE_MINUTES);
-const bigRemainder = computed(
-  () => coverage.value !== null && 1 - coverage.value >= NOISY_REMAINDER,
-);
 const truncated = computed(() => !!props.freshness?.tail_truncated);
 
-/**
- * The server fused speeds across stretches of time by weighting them per call,
- * which averages rather than re-measures. Any sentence below claiming exactness
- * has to answer to this, or the page contradicts the summary copied off it.
- */
-const estimatedSpeeds = computed(() => !!props.freshness?.percentiles_estimated);
-
-/**
- * No rows at all. Every qualifier below describes rows the reader can see, so
- * with none of them on screen the whole apparatus has nothing to qualify —
- * and a red "data is missing" banner over an empty table caused by a search
- * term is the worst kind of false alarm.
- */
+/** No rows at all: the empty state explains, so a banner over an empty table would be a false alarm. */
 const isEmpty = computed(() => !props.hits.length && !props.other.length);
 
-/**
- * Failures the driver gave us no reason code for. This one earns a place in the
- * summary chain because an empty Failed column otherwise cannot be told apart
- * from "we could not tell" — and unlike the structural caveats it disappears the
- * moment every failure is explained.
- */
+/** Failures the driver gave us no reason code for. */
 const uncodedErrorShare = computed(() => {
   if (props.codedErrorShare === undefined || (props.errorCount ?? 0) <= 0) return null;
   const uncoded = 1 - props.codedErrorShare;
   return uncoded > 0 ? uncoded : null;
-});
-
-/** Anything here changes how the numbers should be read. Everything else is fine. */
-const degraded = computed(
-  () =>
-    !isEmpty.value &&
-    (hasGap.value ||
-      neverAggregated.value ||
-      isStale.value ||
-      truncated.value ||
-      bigRemainder.value ||
-      uncodedErrorShare.value !== null ||
-      props.topNSubset ||
-      !!props.filterLabel),
-);
-
-/** Wall-clock time the counting reaches; `behind` is set only past {@link BEHIND_NOTE_MINUTES}, where the "still coming in" phrasing would assert a freshness the lag no longer supports. */
-const countedTo = computed<{ time: string; behind: number | null } | null>(() => {
-  if (degraded.value) return null;
-  const through = props.freshness?.data_through ?? 0;
-  if (through <= 0) return null;
-  const time = new Date(through / 1000).toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-  const behind = behindMinutes.value ?? 0;
-  return { time, behind: behind > BEHIND_NOTE_MINUTES ? behind : null };
 });
 
 /** Time of day, with the date when it is not today: "13:00", "yesterday 23:30", "Nov 22, 23:30". */
@@ -297,18 +141,6 @@ const stamp = (us: number) => {
 const spanEnd = (us: number) =>
   dayOffset(us) === 0 ? t("dbm.coverage.bannerToday", { time: clock(us) }) : stamp(us);
 
-type CoverageVariant = "warning" | "info";
-interface CoverageEntry {
-  /** `null` = nothing to say, so no banner. */
-  variant: CoverageVariant | null;
-  short: I18nText;
-  long: I18nText;
-}
-
-/**
- * One entry, most-degrading first. Only one is shown: the reader needs the
- * worst problem and a way in, not a full inventory of qualifiers.
- */
 /** Minutes up to an hour, then hours, then days from 48 h, so "2400 min" reads as "40 hours". */
 const lagText = (minutes: number, short: boolean): I18nText => {
   const suffix = short ? "Short" : "";
@@ -318,23 +150,20 @@ const lagText = (minutes: number, short: boolean): I18nText => {
   return t(`dbm.coverage.lagDays${suffix}`, { n: Math.round(hours / 24) });
 };
 
-const entry = computed<CoverageEntry>(() => {
-  const mk = (variant: CoverageVariant | null, short: I18nText, long: I18nText = short) => ({
-    variant,
-    short,
-    long,
-  });
+interface CoverageEntry {
+  short: I18nText;
+  long: I18nText;
+}
+
+/** The most-degrading warning, most-degrading first; `null` = nothing to warn about. */
+const entry = computed<CoverageEntry | null>(() => {
+  const mk = (short: I18nText, long: I18nText = short): CoverageEntry => ({ short, long });
+  if (isEmpty.value) return null;
   const lagLong = lagText(behindMinutes.value ?? 0, false);
   const lagShort = lagText(behindMinutes.value ?? 0, true);
   const stale = isStale.value;
-  // Nothing on screen: the empty state is doing the explaining.
-  if (isEmpty.value) return mk(null, t("dbm.coverage.unknownNote"));
   if (neverAggregated.value) {
-    return mk(
-      "warning",
-      t("dbm.coverage.bannerNeverAggregated"),
-      t("dbm.freshness.neverAggregated"),
-    );
+    return mk(t("dbm.coverage.bannerNeverAggregated"), t("dbm.freshness.neverAggregated"));
   }
   const g = gap.value;
   if (g) {
@@ -342,7 +171,6 @@ const entry = computed<CoverageEntry>(() => {
     const reach = Math.max(1, Math.floor(((f?.tail_through ?? g.to) - g.to) / MIN_US));
     const today = dayOffset(g.from) === 0 && dayOffset(g.to) === 0;
     return mk(
-      "warning",
       today
         ? t("dbm.coverage.bannerGapToday", {
             from: clock(g.from),
@@ -367,96 +195,41 @@ const entry = computed<CoverageEntry>(() => {
   if (props.filterLabel) {
     return stale
       ? mk(
-          "warning",
           t("dbm.coverage.bannerStale", { lag: lagShort }),
           t("dbm.coverage.lineSubsetStale", { filter: props.filterLabel, lag: lagLong }),
         )
-      : mk(
-          "info",
-          t("dbm.coverage.bannerSubset", { filter: props.filterLabel }),
-          t("dbm.coverage.lineSubset", { filter: props.filterLabel }),
-        );
+      : null;
   }
   if (props.topNSubset) {
     return stale
       ? mk(
-          "warning",
           t("dbm.coverage.bannerStale", { lag: lagShort }),
           t("dbm.coverage.lineSubsetUnnamedStale", { lag: lagLong }),
         )
-      : mk("info", t("dbm.coverage.bannerSubsetUnnamed"), t("dbm.coverage.lineSubsetUnnamed"));
+      : null;
   }
   // Same rule: a truncated tail must not evict the staleness warning.
   if (truncated.value) {
     return stale
       ? mk(
-          "warning",
           t("dbm.coverage.bannerTruncatedStale", { lag: lagShort }),
           t("dbm.coverage.lineTruncatedStale", { lag: lagLong }),
         )
-      : mk("warning", t("dbm.coverage.bannerTruncated"), t("dbm.coverage.lineTruncated"));
+      : mk(t("dbm.coverage.bannerTruncated"), t("dbm.coverage.lineTruncated"));
   }
   if (stale) {
     return mk(
-      "warning",
       t("dbm.coverage.bannerStale", { lag: lagShort }),
       t("dbm.coverage.lineStale", { lag: lagLong }),
-    );
-  }
-  if (bigRemainder.value) {
-    return mk(
-      "info",
-      t("dbm.coverage.bannerShare", { percent: pct(shownTime.value) }),
-      t("dbm.coverage.lineRemainder", { percent: pct(shownTime.value) }),
     );
   }
   if (uncodedErrorShare.value !== null) {
     const percent = formatPercent(uncodedErrorShare.value, 0);
     return mk(
-      "warning",
       t("dbm.coverage.bannerUncodedErrors", { percent }),
       t("dbm.coverage.lineUncodedErrors", { percent }),
     );
   }
-  if (coverage.value === null) return mk(null, t("dbm.coverage.unknownNote"));
-  // A single-query page has no share-of-the-list to report.
-  if (props.subject === "query") {
-    return mk("info", t("dbm.coverage.bannerQuery"), t("dbm.coverage.lineQuery"));
-  }
-  const estimated = (long: I18nText) => mk("info", t("dbm.coverage.bannerEstimated"), long);
-  if (props.exactPercentiles) {
-    if (estimatedSpeeds.value) return estimated(t("dbm.coverage.lineExactEstimated"));
-    return props.slowestSchemaSpeeds
-      ? mk("info", t("dbm.coverage.bannerSlowestSchema"), t("dbm.coverage.lineExactSlowestSchema"))
-      : mk(null, t("dbm.coverage.lineExact"));
-  }
-  if (otherTime.value <= 0) {
-    return estimatedSpeeds.value
-      ? estimated(t("dbm.coverage.lineHealthyAllEstimated"))
-      : mk(null, t("dbm.coverage.lineHealthyAll"));
-  }
-  const percent = pct(shownTime.value);
-  return mk(
-    "info",
-    t("dbm.coverage.bannerShare", { percent }),
-    t("dbm.coverage.lineHealthy", { percent, count: formatCount(props.trackedCount ?? 200) }),
-  );
-});
-
-const summary = computed(() => entry.value.long);
-
-const noteTone = computed<DbmToolbarNoteTone>(() => {
-  return degraded.value || hasGap.value || neverAggregated.value ? "warning" : "neutral";
-});
-
-// The line shows "counted up to" beside the sentence; the note has one tooltip, so it rides there.
-const noteDetail = computed<I18nText>(() => {
-  const c = countedTo.value;
-  if (!c) return summary.value;
-  const counted =
-    c.behind !== null
-      ? t("dbm.coverage.lineCountedToBehind", { time: c.time, lag: lagText(c.behind, false) })
-      : t("dbm.coverage.lineCountedTo", { time: c.time });
-  return raw(`${summary.value} ${counted}`);
+  return null;
 });
 </script>

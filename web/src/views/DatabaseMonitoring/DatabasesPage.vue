@@ -77,8 +77,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :hits="rows"
             :top-n-subset="topNSubset"
             :error-count="errorCount"
-            exact-percentiles
-            :slowest-schema-speeds="showsSlowestSchemaSpeeds"
             data-test="dbm-databases-coverage"
           />
         </template>
@@ -500,7 +498,6 @@ import {
 import {
   drowningInstanceKeys,
   foldByInstance,
-  hasWorstOfPercentiles,
   instanceKey,
   isCriticalServer,
   serverRowKey,
@@ -808,8 +805,6 @@ const visibleRows = computed(() => {
       .some((field) => String(field).toLowerCase().includes(needle)),
   );
 });
-
-const showsSlowestSchemaSpeeds = computed(() => hasWorstOfPercentiles(visibleRows.value));
 
 // ── the in-place breakdown ──────────────────────────────────────────────────
 //
@@ -1473,12 +1468,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
       headerTooltip: t("dbm.databases.columnHints.instance"),
     },
   },
-  // Two adjacent columns of DIFFERENT provenance, which is the one thing this
-  // pair must not hide. `load` is client-observed span time — what the
-  // applications waited — and `attention` is the server's own saturation
-  // against its own published limit. They are not two views of one measurement
-  // and must never be read as comparable, so each carries a sub-label naming
-  // the vantage it came from.
+  // `load` is client-observed span time and `attention` is server saturation: never comparable.
   {
     id: "attention",
     hideable: true,

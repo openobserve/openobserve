@@ -15,11 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  DbmFilterBar — the one-row filter block every DBM tab shares:
-  [search] [Instance / Engine / Schema selects] [page toggles] [More Filters] [trailing].
-  Any other dimension (Environment, Service) and the `more` slot live in the
-  More Filters popover, so the row never wraps at lg and up. The selects are
-  always rendered so a change never moves the search or the rows below.
+  DbmFilterBar: [Instance / Engine / Schema selects] [More Filters] [search] [page toggles] [trailing].
 -->
 <template>
   <div class="flex shrink-0 flex-col" data-test="dbm-filter-bar">
@@ -74,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <slot name="more" />
         </div>
       </OPopover>
-      <!-- Filters first, then the search takes the rest of the row; the wrapper sets the width because OSearchInput's own w-full beats a class on it. -->
+      <!-- Wrapper sets the width because OSearchInput's own w-full beats a class on it. -->
       <div v-if="searchDataTest" class="min-w-48 flex-1 max-md:w-full max-md:basis-full">
         <OSearchInput
           :model-value="search"

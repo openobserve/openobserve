@@ -222,8 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-else class="text-text-muted">{{ raw("—") }}</span>
         </template>
 
-        <!-- One column: "running 40s and still going" and "the last query
-             took 40s" differ by label and weight, not by column. -->
+        <!-- One column: running and last-query times differ by label and weight. -->
         <template #cell-time="{ row }">
           <span
             v-if="row.runningMs !== null"
@@ -446,7 +445,7 @@ const sampledAt = ref<number | null>(null);
 // The time cells are a snapshot, not a live timer; the tooltip says when it was taken.
 const timeSnapshotTip = computed(() =>
   t("dbm.activity.timeSnapshot", {
-    age: sampledAt.value ? ` (${formatAge(sampledAt.value)})` : "",
+    age: sampledAt.value ? t("dbm.activity.snapshotAge", { age: formatAge(sampledAt.value) }) : "",
   }),
 );
 const sampleInterval = ref<number | null>(null);
@@ -515,7 +514,9 @@ const allRows = computed(() =>
       waitLabel: waitBucketLabel(waitBucketLabelParts(row.wait_event_type, row.wait_event), t),
       // MySQL says "running" where PostgreSQL says "active": one label for both.
       stateLabel: row.state
-        ? raw(row.state.toLowerCase() === "running" ? "active" : row.state)
+        ? row.state.toLowerCase() === "running"
+          ? t("dbm.activity.state.active")
+          : raw(row.state)
         : t("dbm.activity.state.unknown"),
       stateRaw: row.state && row.state.toLowerCase() === "running" ? row.state : null,
       timeSort: activityTimeSortKey(row),
@@ -547,7 +548,7 @@ const recommendationItems = computed<DbmRecommendationMenuItem[]>(() =>
         tone: rec.tone,
         title: t("dbm.recommendations.long-running-query.title"),
         body: t("dbm.recommendations.long-running-query.body", {
-          pid: rec.subject || "?",
+          pid: rec.subject || t("dbm.activity.pidUnknown"),
           duration: formatDurationMs(rec.evidence.runningMs ?? 0),
         }),
         rule: t(key as Parameters<typeof t>[0], params),

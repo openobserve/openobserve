@@ -17,10 +17,7 @@ import type { DbmScopeFilter } from "@/utils/dbm/scopeFilter";
 import type { DbmInstanceHit } from "@/services/db_monitoring";
 import { raw, type I18nText } from "@/types/i18n";
 
-/**
- * Display-only: when an instance is selected, show its engine on the Engine
- * filter and lock it, only when every hit for that name has the same engine. Never touches the filter models or the URL.
- */
+/** Display-only: locks the Engine filter to the instance's engine when all its hits agree; never touches models or the URL. */
 export const applyInstanceEngine = (
   filters: DbmScopeFilter[],
   hits: DbmInstanceHit[],

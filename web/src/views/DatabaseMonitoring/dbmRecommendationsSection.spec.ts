@@ -110,5 +110,7 @@ describe("recommendations section wiring", () => {
     expect(src).toContain('rec.id === "unused-index"');
     expect(src).toContain("DbmRecommendationMenu");
     expect(src).not.toContain('dbm-recommendations"');
+    const menu = readFileSync(join(here, "../../components/dbm/DbmRecommendationMenu.vue"), "utf8");
+    expect(menu).not.toContain("dbm-insights");
   });
 });

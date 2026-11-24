@@ -26992,20 +26992,8 @@
       }
     },
     "coverage": {
-      "unknownNote": "Niets te meten in het bereik en de filters die je hebt gekozen.",
-      "lineHealthy": "Je ziet {percent}% van de tijd van deze database — de {count} zwaarste soorten query's.",
-      "lineRemainder": "Je ziet {percent}% van de tijd van deze database. De rest zit in lichtere query's die we niet één voor één vermelden.",
       "lineTruncated": "Er was meer data in het laatste deel dan we konden verwerken, dus de nieuwste cijfers zijn onderschattingen.",
       "lineGap": "{minutes} minuten ontbreken in dit venster. Onze telling stopte om {stopped} en kan slechts {reach} minuten teruggaan, dus niets dekt {from}–{to}.",
-      "lineSubset": "Je hebt gefilterd op {filter}, dus deze percentages beschrijven de getoonde rijen, niet de hele database.",
-      "lineHealthyAll": "Je ziet elke query die draaide. Snelheden hier zijn gemeten over elke aanroep, dus ze zijn exact.",
-      "lineHealthyAllEstimated": "Je ziet elke query die draaide. Snelheden hier zijn gemengd over meerdere tijdsperioden, dus ze zijn bij benadering maar niet exact.",
-      "lineCountedTo": "Geteld tot {time}; de laatste halve minuut komt nog binnen.",
-      "lineExact": "Alle databases rapporteren. Snelheden hier zijn gemeten over elke aanroep, dus ze zijn exact.",
-      "lineExactEstimated": "Alle databases rapporteren. Snelheden hier zijn gemengd over meerdere tijdsperioden, dus ze zijn bij benadering maar niet exact.",
-      "lineExactSlowestSchema": "Alle databases rapporteren. Snelheden zijn exact per schema; een database met meerdere schema's toont het traagste schema.",
-      "lineSubsetUnnamed": "Je filters beperken dit tot onder het niveau waarop deze totalen worden opgeteld, dus de percentages beschrijven de getoonde rijen in plaats van de hele database.",
-      "lineQuery": "Tijden worden gemeten vanuit je applicatie, dus ze omvatten netwerktijd en eventueel wachten op een vrije verbinding.",
       "lineUncodedErrors": "{percent} van de mislukkingen hier kwam terug zonder een redencode, dus ze kunnen worden geteld maar niet verklaard."
     },
     "breakdown": {

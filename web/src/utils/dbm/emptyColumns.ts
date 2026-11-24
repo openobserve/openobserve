@@ -15,10 +15,7 @@
 
 const isEmpty = (v: unknown) => v === null || v === undefined || v === "" || v === "—";
 
-/**
- * Ids of columns whose value is empty on every row. No rows hides nothing, so a
- * loading or empty table keeps its full header.
- */
+/** Ids of columns empty on every row; no rows hides nothing. */
 export const emptyColumnIds = <T>(
   rows: readonly T[],
   accessors: Record<string, (row: T) => unknown>,

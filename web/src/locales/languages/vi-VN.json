@@ -26992,20 +26992,8 @@
       }
     },
     "coverage": {
-      "unknownNote": "Không có gì để đo trong phạm vi và bộ lọc bạn đã chọn.",
-      "lineHealthy": "Bạn đang xem {percent}% thời gian của cơ sở dữ liệu này — {count} loại truy vấn nặng nhất.",
-      "lineRemainder": "Bạn đang xem {percent}% thời gian của cơ sở dữ liệu này. Phần còn lại nằm trong các truy vấn nhẹ hơn mà chúng tôi không liệt kê từng cái.",
       "lineTruncated": "Có nhiều dữ liệu hơn trong đoạn cuối so với những gì chúng tôi có thể tiếp nhận, vì vậy các con số mới nhất bị đếm thiếu.",
       "lineGap": "{minutes} phút bị thiếu trong cửa sổ này. Việc đếm của chúng tôi dừng lúc {stopped} và chỉ có thể lùi lại {reach} phút, vì vậy không có gì bao phủ {from}–{to}.",
-      "lineSubset": "Bạn đã lọc theo {filter}, vì vậy các tỷ lệ phần trăm này mô tả các hàng được hiển thị, không phải toàn bộ cơ sở dữ liệu.",
-      "lineHealthyAll": "Bạn đang xem mọi truy vấn đã chạy. Tốc độ ở đây được đo trên mọi lệnh gọi, vì vậy chúng chính xác.",
-      "lineHealthyAllEstimated": "Bạn đang xem mọi truy vấn đã chạy. Tốc độ ở đây được kết hợp từ một số khoảng thời gian, vì vậy chúng gần đúng nhưng không chính xác.",
-      "lineCountedTo": "Đã đếm đến {time}; nửa phút cuối vẫn đang được cập nhật.",
-      "lineExact": "Tất cả cơ sở dữ liệu đang báo cáo. Tốc độ ở đây được đo trên mọi lệnh gọi, vì vậy chúng chính xác.",
-      "lineExactEstimated": "Tất cả cơ sở dữ liệu đang báo cáo. Tốc độ ở đây được kết hợp từ một số khoảng thời gian, vì vậy chúng gần đúng nhưng không chính xác.",
-      "lineExactSlowestSchema": "Tất cả cơ sở dữ liệu đều đang gửi dữ liệu. Tốc độ chính xác theo từng lược đồ; cơ sở dữ liệu có nhiều lược đồ sẽ hiển thị lược đồ chậm nhất.",
-      "lineSubsetUnnamed": "Bộ lọc của bạn thu hẹp phạm vi này xuống dưới mức mà các tổng này cộng lại, vì vậy tỷ lệ phần trăm mô tả các hàng được hiển thị thay vì toàn bộ cơ sở dữ liệu.",
-      "lineQuery": "Thời gian được đo từ ứng dụng của bạn, vì vậy chúng bao gồm thời gian mạng và thời gian chờ kết nối trống.",
       "lineUncodedErrors": "{percent} số lỗi ở đây trả về mà không có mã lý do, vì vậy chúng có thể được đếm nhưng không giải thích được."
     },
     "breakdown": {

@@ -22,24 +22,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Always shown, so the filter row never jumps; an empty list says so. -->
   <OPopover align="end">
     <template #trigger>
-      <OButton variant="outline" size="sm" class="shrink-0" data-test="dbm-insights">
+      <OButton variant="outline" size="sm" class="shrink-0" data-test="dbm-recommendations">
         {{ t("dbm.insights.title") }}
         <OTag
           :label="raw(String(items.length))"
           size="xs"
           class="ms-1"
-          data-test="dbm-insights-count"
+          data-test="dbm-recommendations-count"
         />
       </OButton>
     </template>
     <div
       class="flex max-h-80 w-96 max-w-full flex-col overflow-y-auto p-1"
-      data-test="dbm-insights-panel"
+      data-test="dbm-recommendations-panel"
     >
       <p
         v-if="!items.length"
         class="text-text-secondary px-2 py-1.5 text-xs"
-        data-test="dbm-insights-empty"
+        data-test="dbm-recommendations-empty"
       >
         {{ emptyText ?? t("dbm.recommendations.menuEmpty") }}
       </p>

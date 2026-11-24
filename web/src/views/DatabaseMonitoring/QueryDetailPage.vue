@@ -533,7 +533,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :top-n-subset="topNSubset"
             :coded-error-share="uncodedErrorShare === undefined ? undefined : 1 - uncodedErrorShare"
             :error-count="row?.errors"
-            subject="query"
             data-test="dbm-detail-coverage"
           />
 

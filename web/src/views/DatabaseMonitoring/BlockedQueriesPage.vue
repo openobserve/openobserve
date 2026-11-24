@@ -284,7 +284,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="flex min-w-0 items-center gap-1">
               <OTruncatedText class="text-text-body max-w-full text-xs">
                 {{
-                  raw(blockerName(row) ?? (row.blockerPid != null ? `pid ${row.blockerPid}` : "—"))
+                  raw(
+                    blockerName(row) ??
+                      (row.blockerPid != null
+                        ? t("dbm.deadlocks.detail.pid", { pid: row.blockerPid })
+                        : "—"),
+                  )
                 }}
                 <OTooltip
                   v-if="blockerState(row)"
