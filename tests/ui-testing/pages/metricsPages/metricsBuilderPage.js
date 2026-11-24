@@ -394,7 +394,7 @@ export class MetricsBuilderPage {
      * @param {string} metricName
      */
     async selectMetric(metricName) {
-        if (!await this.streamSelectorInput.isVisible({ timeout: 5000 })) {
+        if (!await this.streamSelectorInput.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false)) {
             return false;
         }
 
@@ -403,7 +403,7 @@ export class MetricsBuilderPage {
         await this.streamPopover.waitFor({ state: 'visible', timeout: 5000 });
 
         // OSelect popover search: Ctrl+A → Backspace → fill (via the ListboxFilter input)
-        if (await this.streamSearchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+        if (await this.streamSearchInput.waitFor({ state: 'visible', timeout: 2000 }).then(() => true).catch(() => false)) {
             await this.streamSearchInput.press('ControlOrMeta+a').catch(() => {});
             await this.streamSearchInput.press('Backspace').catch(() => {});
             await this.streamSearchInput.fill(metricName);

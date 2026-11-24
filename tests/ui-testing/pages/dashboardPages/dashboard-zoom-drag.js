@@ -111,11 +111,7 @@ export default class DashboardZoomDrag {
   // the chart. Position matters as much as size, and the reflow outlasts a
   // couple of frames — hence the dwell.
   async waitForChartMounted(timeout = 30000) {
-    if (this.chartHostSelector === GRID_CHART_HOST) {
-      await this.waitForPanelsIdle(timeout);
-    } else {
-      await this.waitForExpandedPanelIdle(timeout);
-    }
+    await this.waitForQueriesIdle(timeout);
     await this.page.waitForFunction(
       (selector) => {
         const host = document.querySelector(selector);
@@ -135,6 +131,16 @@ export default class DashboardZoomDrag {
       this.chartHostSelector,
       { timeout, polling: 100 }
     );
+    // The panel reads as idle until its first query starts, so the first check can pass too early.
+    await this.waitForQueriesIdle(timeout);
+  }
+
+  async waitForQueriesIdle(timeout = 30000) {
+    if (this.chartHostSelector === GRID_CHART_HOST) {
+      await this.waitForPanelsIdle(timeout);
+    } else {
+      await this.waitForExpandedPanelIdle(timeout);
+    }
   }
 
   // A streamed chunk landing mid-gesture re-renders the chart and drops the in-progress brush.
