@@ -68,12 +68,17 @@ test.describe("Logs Result Display Regression", () => {
     const bucketStartMs = Math.floor((Date.now() - 5 * 60 * 1000) / WIDE_BUCKET_MS) * WIDE_BUCKET_MS;
     const secondStartMs = bucketStartMs + WIDE_BUCKET_MS / 2;
 
-    const row = (timestampMs, log) => ({ _timestamp: timestampMs * 1000, level: 'info', job: 'test_13896', log });
     // The defect counted rows between the bucket start and the range start, so without decoys there it cannot show.
-    const rows = [
-      ...Array.from({ length: DENSE_ROWS }, (_, i) => row(secondStartMs + i * 20, `dense row ${i}`)),
-      ...Array.from({ length: DECOY_ROWS }, (_, i) => row(bucketStartMs + 500 + i * 1000, `decoy row ${i}`)),
+    const offsetsMs = [
+      ...Array.from({ length: DENSE_ROWS }, (_, i) => WIDE_BUCKET_MS / 2 + i * 20),
+      ...Array.from({ length: DECOY_ROWS }, (_, i) => 500 + i * 1000),
     ];
+    const rows = offsetsMs.map((offset, i) => ({
+      _timestamp: (bucketStartMs + offset) * 1000,
+      level: 'info',
+      job: 'test_13896',
+      log: `row ${i}`,
+    }));
     await sendRequest(page, getIngestionUrl(orgId, denseStream), rows, getHeaders());
 
     await pm.logsPage.waitForStreamAvailable(denseStream);
@@ -88,12 +93,13 @@ test.describe("Logs Result Display Regression", () => {
       (secondStartMs + 1000) * 1000,
     );
 
+    await pm.logsPage.captureHistogramFrames();
     await page.goto(
       `${logData.logsUrl}?org_identifier=${orgId}&stream=${denseStream}&stream_type=logs` +
       `&from=${secondStartMs}&to=${secondStartMs + 1000}`,
     );
     // The banner can read the search total before the histogram replaces it, so the bucket sum is checked on its own.
-    const bucketSum = await pm.logsPage.runQueryAndSumHistogram(denseStream);
+    const bucketSum = await pm.logsPage.runQueryAndSumHistogram();
     expect(bucketSum, 'the histogram must count only the rows in the range').toBe(DENSE_ROWS);
     await pm.logsPage.expectResultsGridSettledWithRows();
 

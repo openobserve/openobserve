@@ -2211,15 +2211,19 @@ export class LogsPage {
             .toContainText(`1 to ${size}`, { timeout: 30000 });
     }
 
-    /** Run the query and return the event count summed over the histogram buckets of `stream`. */
-    async runQueryAndSumHistogram(stream) {
-        const histogram = this.page.waitForResponse((r) =>
-            r.url().includes('is_ui_histogram=true') && (r.request().postData() || '').includes(stream),
-        { timeout: 30000 });
+    /** Run the query and return its histogram's total event count; needs captureHistogramFrames() before the page loads. */
+    async runQueryAndSumHistogram() {
+        await this.page.evaluate(() => { /** @type {any} */ (window).__histFrames = []; });
         await this.clickRefreshButton();
-        const body = await (await histogram).text();
-        const counts = [...body.matchAll(/"zo_sql_num":\s*(\d+)/g)].map((m) => Number(m[1]));
-        return counts.reduce((sum, count) => sum + count, 0);
+        let totals = [];
+        await expect.poll(async () => {
+            totals = (await this.getHistogramFrames())
+                .map((frame) => frame.hits ?? frame.results?.hits ?? [])
+                .filter((hits) => hits.some((hit) => hit.zo_sql_num !== undefined))
+                .map((hits) => hits.reduce((sum, hit) => sum + Number(hit.zo_sql_num || 0), 0));
+            return totals.length;
+        }, { timeout: 30000, message: 'the histogram must return its buckets' }).toBeGreaterThan(0);
+        return totals[totals.length - 1];
     }
 
     /**

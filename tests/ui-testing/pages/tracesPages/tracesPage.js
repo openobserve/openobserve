@@ -3242,6 +3242,37 @@ export class TracesPage {
     return { requests, stop: () => this.page.off('request', onRequest) };
   }
 
+  // Only a catalog load totals requests per service without filtering on one service; all its queries share one window.
+  servicesCatalogWindow(capture, service) {
+    const loads = capture.requests.filter((r) => /\bAS total_requests\b/.test(r.sql) && !r.sql.includes(`'${service}'`));
+    expect(loads.length, 'the catalog must have loaded its rows').toBeGreaterThan(0);
+    const { startTime, endTime } = loads[loads.length - 1];
+    return { startTime, endTime };
+  }
+
+  sidePanelRequests(capture, service) {
+    return capture.requests.filter((r) => r.sql.includes(`'${service}'`));
+  }
+
+  /** Distinct windows the side panel has queried, oldest first. */
+  serviceSidePanelWindows(capture, service) {
+    const windows = this.sidePanelRequests(capture, service)
+      .map(({ startTime, endTime }) => JSON.stringify({ startTime, endTime }));
+    return [...new Set(windows)].map((w) => JSON.parse(w));
+  }
+
+  /** Waits until the operations search and the RED charts of the side panel last queried `window`. */
+  async expectServiceSidePanelWindow(capture, service, window, message) {
+    // On its default Operations tab the table is the panel's only UI search; panel names stay URL-encoded in the request.
+    const names = ['results', 'Rate', 'Errors', 'Duration%20p95'];
+    const lastWindows = () => Object.fromEntries(names.map((name) => {
+      const last = this.sidePanelRequests(capture, service).filter((r) => r.panel === name).pop();
+      return [name, last ? { startTime: last.startTime, endTime: last.endTime } : null];
+    }));
+    await expect.poll(lastWindows, { timeout: 30000, message })
+      .toEqual(Object.fromEntries(names.map((name) => [name, window])));
+  }
+
   // Traces searches are a span-list SQL POST or a traces/latest GET whose `filter` param carries the editor text.
   /** Live list of the filter text (latest GET) or decoded SQL (UI span-list POST, no counts) of each `stream` search sent from now on. */
   trackTraceSearchFilters(stream) {
