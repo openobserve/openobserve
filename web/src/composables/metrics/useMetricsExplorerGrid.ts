@@ -998,13 +998,9 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     return counts;
   };
 
-  const facetOrder = (a: FacetTally, b: FacetTally): number => {
-    const aOpen = a.unchecked > 0;
-    if (aOpen !== b.unchecked > 0) return aOpen ? 1 : -1;
-    // A row still waiting on checks has no settled count to rank by.
-    if (aOpen) return a.label.localeCompare(b.label);
-    return b.count - a.count || a.label.localeCompare(b.label);
-  };
+  // Rank by possible size so big prefixes stay on top and rows hold still while checks land.
+  const facetOrder = (a: FacetTally, b: FacetTally): number =>
+    b.count + b.unchecked - (a.count + a.unchecked) || a.label.localeCompare(b.label);
 
   const prefixFacets = computed<(PrefixGroup & FacetTally)[]>(() => {
     const counts = tallyFacet(prefixEligible.value, prefixOf);

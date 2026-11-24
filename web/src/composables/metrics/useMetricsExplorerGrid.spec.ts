@@ -3716,20 +3716,31 @@ describe("useMetricsExplorerGrid", () => {
       expect(facet(grid.suffixFacets.value, "d")).toEqual({ count: 2, unchecked: 0 });
     });
 
-    it("sorts settled rows by count, then unchecked rows A–Z, with misc last", async () => {
+    it("ranks rows by count + unchecked, so a big unchecked prefix outranks a smaller settled one", async () => {
       const grid = await orgGrid();
       for (const s of ["a", "b", "c"]) await answer(grid, `beta_${s}`, SERIES);
-      for (const s of ["a", "b"]) await answer(grid, `delta_${s}`, SERIES);
-      // alpha has data on one card but is still a floor, so it ranks with the unchecked rows.
-      await answer(grid, "alpha_a", SERIES);
+      expect(facet(grid.prefixFacets.value, "zeta")).toEqual({ count: 0, unchecked: 4 });
+      expect(facet(grid.prefixFacets.value, "beta")).toEqual({ count: 3, unchecked: 0 });
       expect(grid.prefixFacets.value.map((f: any) => f.id)).toEqual([
+        "alpha",
+        "zeta",
         "beta",
         "delta",
-        "alpha",
         "omega",
-        "zeta",
         "misc",
       ]);
+    });
+
+    it("rows hold their place while checks land with data, and drop only once a check settles empty", async () => {
+      const grid = await orgGrid();
+      const order = () => grid.prefixFacets.value.map((f: any) => f.id);
+      const before = order();
+      await answer(grid, "alpha_a", SERIES);
+      for (const s of ["a", "b"]) await answer(grid, `delta_${s}`, SERIES);
+      expect(order()).toEqual(before);
+
+      for (const s of ["a", "b", "c", "d"]) await answer(grid, `zeta_${s}`, NO_SERIES);
+      expect(order()).toEqual(["alpha", "beta", "delta", "omega", "zeta", "misc"]);
     });
 
     it("suffix facets carry the same confirmed / unchecked split and order", async () => {
@@ -3739,7 +3750,7 @@ describe("useMetricsExplorerGrid", () => {
       expect(facet(grid.suffixFacets.value, "e")).toEqual({ count: 1, unchecked: 0 });
       await answer(grid, "alpha_d", NO_SERIES);
       expect(facet(grid.suffixFacets.value, "d")).toEqual({ count: 0, unchecked: 1 });
-      expect(grid.suffixFacets.value[0].id).toBe("e");
+      expect(grid.suffixFacets.value[0].id).toBe("a");
     });
 
     it("ticking a prefix pulls its metrics into the swept slice, so its row settles", async () => {

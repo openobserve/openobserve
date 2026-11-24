@@ -470,8 +470,7 @@
       "metrics-explorer-drilldown.spec.js",
       "metrics-explorer-used-in.spec.js",
       "metrics-promql-builder-roundtrip.spec.js",
-      "metrics-promql-formula.spec.js",
-      "metrics-explorer-prefix-counts.spec.js"
+      "metrics-promql-formula.spec.js"
     ],
     "disabled": [],
     "paths": [
