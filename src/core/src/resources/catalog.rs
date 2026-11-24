@@ -37,6 +37,9 @@ const REBUILD_INTERVAL: Duration = Duration::from_secs(60);
 const COLD_RETRY: Duration = Duration::from_secs(5);
 // Bounds how stale an entry gets when an event is lost.
 const MAX_AGE: Duration = Duration::from_secs(5 * 60);
+// Scans are CPU-bound, so concurrent ones scale with the cores this node may use.
+const SCANS_PER_CPU: usize = 4;
+const MAX_SCANS: usize = 64;
 
 pub(super) type Rows = Arc<Vec<IndexedRecord>>;
 pub(super) type Snapshot = Result<Rows, SourceReason>;
@@ -54,6 +57,7 @@ pub(super) type PageReader = Arc<
 pub(super) struct Limits {
     pub max_bytes: usize,
     pub max_pending: usize,
+    pub max_scans: usize,
 }
 
 impl Default for Limits {
@@ -61,6 +65,7 @@ impl Default for Limits {
         Self {
             max_bytes: 512 * 1024 * 1024,
             max_pending: 32,
+            max_scans: scan_permits(config::get_config().limit.cpu_num),
         }
     }
 }
@@ -102,7 +107,7 @@ impl Catalog {
             max_bytes: limits.max_bytes,
             max_pending: limits.max_pending,
             builds: Semaphore::new(2),
-            scans: Arc::new(Semaphore::new(4)),
+            scans: Arc::new(Semaphore::new(limits.max_scans)),
             built: Notify::new(),
         })
     }
@@ -414,6 +419,10 @@ fn rows_bytes(rows: &Vec<IndexedRecord>) -> usize {
             .sum::<usize>()
 }
 
+fn scan_permits(cpu_num: usize) -> usize {
+    (cpu_num * SCANS_PER_CPU).clamp(1, MAX_SCANS)
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -701,6 +710,7 @@ mod tests {
         let limits = |max_bytes, max_pending| Limits {
             max_bytes,
             max_pending,
+            ..Limits::default()
         };
         let x = fixture_with(vec![row("f1", "Old")], limits(entry * 3 / 2, 32));
         ensure(&x.catalog, "one").await;
@@ -721,6 +731,14 @@ mod tests {
             full.catalog.ensure("org", &[ResourceKind::Function]).await,
             Err(SearchError::Overloaded)
         ));
+    }
+
+    #[test]
+    fn scan_permits_scale_with_cpus_up_to_the_cap() {
+        assert_eq!(scan_permits(2), 8);
+        assert_eq!(scan_permits(16), 64);
+        assert_eq!(scan_permits(32), MAX_SCANS);
+        assert_eq!(scan_permits(0), 1);
     }
 
     #[test]
