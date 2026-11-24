@@ -116,6 +116,7 @@ const {
   atConditionLimit,
   valuesAtLimit,
   fieldEmptyText,
+  valueHint,
 } = editor;
 
 const hasFilters = computed(() => countConditions(props.modelValue) > 0);
@@ -199,7 +200,10 @@ const emptyText = computed(() => {
     if (fieldEmptyText.value) return fieldEmptyText.value;
     return props.fieldsLoading ? t("filterBar.loadingFields") : t("filterBar.noFields");
   }
-  if (step.value === "value") return valuesLoading.value ? undefined : t("filterBar.noValues");
+  if (step.value === "value") {
+    if (valueHint.value) return valueHint.value;
+    return valuesLoading.value ? undefined : t("filterBar.noValues");
+  }
   return t("filterBar.noOperators");
 });
 

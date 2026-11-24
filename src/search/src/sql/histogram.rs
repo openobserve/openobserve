@@ -16,7 +16,7 @@
 use std::ops::ControlFlow;
 
 use config::{
-    HISTOGRAM_BREAKDOWN_FIELDS,
+    HISTOGRAM_BREAKDOWN_FIELDS, TIMESTAMP_COL_NAME,
     meta::stream::StreamType,
     utils::{
         sql::is_eligible_for_histogram,
@@ -89,7 +89,8 @@ pub fn pin_histogram_timezone(
     })
 }
 
-/// Returns the shared histogram offset at the supplied instant, or None when offsets differ.
+/// Returns the shared histogram offset at the supplied instant, or None when offsets differ or a
+/// call buckets anything but `_timestamp`, whose grid partitions and the result cache split on.
 pub fn histogram_offset(
     statement: &Statement,
     timezone: Option<&str>,
@@ -104,7 +105,9 @@ pub fn histogram_offset(
             let offset = histogram_timezone(&list.args, timezone)
                 .and_then(|timezone| timezone_offset_micros(timezone.as_deref(), reference_time));
             match offset {
-                Ok(offset) => offsets.push(offset),
+                Ok(offset) => {
+                    offsets.push(is_timestamp_column(list.args.first()).then_some(offset))
+                }
                 Err(error) => return ControlFlow::Break(error),
             }
         }
@@ -113,11 +116,12 @@ pub fn histogram_offset(
     if let ControlFlow::Break(error) = result {
         return Err(error);
     }
-    let first = offsets.first().copied().unwrap_or_default();
+    let first = offsets.first().copied().unwrap_or(Some(0));
     Ok(offsets
         .iter()
         .all(|offset| *offset == first)
-        .then_some(first))
+        .then_some(first)
+        .flatten())
 }
 
 /// Cheap pre-check shared by every caller that would otherwise parse the SQL for `histogram()`.
@@ -424,6 +428,23 @@ fn histogram_timezone(
     })
 }
 
+fn is_timestamp_column(arg: Option<&FunctionArg>) -> bool {
+    let Some(FunctionArg::Unnamed(FunctionArgExpr::Expr(expr))) = arg else {
+        return false;
+    };
+    let mut expr = expr;
+    while let Expr::Nested(inner) = expr {
+        expr = inner;
+    }
+    match expr {
+        Expr::Identifier(ident) => ident.value == TIMESTAMP_COL_NAME,
+        Expr::CompoundIdentifier(parts) => parts
+            .last()
+            .is_some_and(|part| part.value == TIMESTAMP_COL_NAME),
+        _ => false,
+    }
+}
+
 fn string_literal(arg: &mut FunctionArg) -> Option<&mut Value> {
     let FunctionArg::Unnamed(FunctionArgExpr::Expr(expr)) = arg else {
         return None;
@@ -467,6 +488,35 @@ mod tests {
         handle_histogram(&mut sql, time_range, 10);
         assert!(sql.contains("histogram(_timestamp,"));
         assert!(sql.contains("second"));
+    }
+
+    #[test]
+    fn test_histogram_offset_needs_bare_timestamp() {
+        let eight_hours = 8 * 3600 * 1_000_000;
+        for (call, offset) in [
+            ("histogram(_timestamp, '1 day')", Some(0)),
+            ("histogram(\"_timestamp\", '1 day')", Some(0)),
+            ("histogram(t._timestamp, '1 day')", Some(0)),
+            ("histogram((_timestamp), '1 day')", Some(0)),
+            (
+                "histogram(_timestamp, '1 day', '+08:00')",
+                Some(eight_hours),
+            ),
+            ("histogram(_timestamp + 28800000000, '1 day')", None),
+            ("histogram(_timestamp - 3600000000, '1 hour')", None),
+            ("histogram(CAST(_timestamp AS BIGINT), '1 day')", None),
+            ("histogram(event_time, '1 day')", None),
+        ] {
+            let sql = format!("SELECT {call} AS ts, count(*) FROM t GROUP BY ts");
+            let statement = Parser::parse_sql(&PostgreSqlDialect {}, &sql)
+                .unwrap()
+                .remove(0);
+            assert_eq!(
+                histogram_offset(&statement, None, 1_735_689_600_000_000).unwrap(),
+                offset,
+                "{sql}"
+            );
+        }
     }
 
     #[test]

@@ -305,19 +305,23 @@ class FilterBuilderDriver {
     if (spec.close) await this.close();
   }
 
-  /** Builds a condition on the `position`-th listed field (0 is the first), for specs that take any column. */
-  async addConditionOnListedField(position, operator, value) {
+  /**
+   * Builds a condition on the `position`-th listed field (0 is the first), for specs that take any column.
+   * `{ type: "Text" }` counts only fields of that type: a number field refuses text for `=` and the other comparisons.
+   */
+  async addConditionOnListedField(position, operator, value, { type } = {}) {
     await this.openForNew();
-    const field = await this.pickListedField(position);
+    const field = await this.pickListedField(position, type);
     const id = await this.pickOperator(operator);
     await this.enterValues(id, value);
     await this.close();
     return field;
   }
 
-  /** Clicks the `position`-th listed field in the open picker (0 is the first) and returns its name. */
-  async pickListedField(position = 0) {
-    const fields = this.page.locator(`[data-test^="${this.dataTest}-suggest-item-"]:not([data-test$="group"])`);
+  /** Clicks the `position`-th listed field (of `type` — "Text", "Number" — when given) and returns its name. */
+  async pickListedField(position = 0, type) {
+    let fields = this.page.locator(`[data-test^="${this.dataTest}-suggest-item-"]:not([data-test$="group"])`);
+    if (type) fields = fields.filter({ hasText: new RegExp(`${type}\\s*$`) });
     await fields.first().waitFor({ state: "visible", timeout: 10000 });
     const count = await fields.count();
     const row = fields.nth(Math.min(position, count - 1));

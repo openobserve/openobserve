@@ -1281,6 +1281,8 @@ pub async fn search_multi_stream(
     let search_event_context = search_type
         .as_ref()
         .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
+    // Per-query stream tasks expect a search type, like the single-stream handler.
+    let search_type = search_type.or(Some(search::SearchEventType::Other));
 
     let fallback_order_by_col = get_fallback_order_by_col_from_request(&query);
 
