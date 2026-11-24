@@ -843,7 +843,6 @@ export const convertPromQLData = async (
         show: true,
         type: "cross",
         label: {
-          fontSize: 12,
           precision: panelSchema.config?.decimals,
           show: true,
           ...chartCrosshairLabel(),
