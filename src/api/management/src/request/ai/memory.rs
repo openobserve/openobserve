@@ -1477,7 +1477,8 @@ pub(crate) mod tests {
     }
 
     fn unique_org(label: &str) -> String {
-        format!("{label}_{}", config::utils::time::now_micros())
+        // Not the time: tests that start in the same microsecond would share an org.
+        format!("{label}_{}", config::ider::uuid())
     }
 
     #[tokio::test]
