@@ -18,7 +18,6 @@ import { getDecodedUserInfo, getPath, mergeRoutes } from "@/utils/zincutils";
 import { gt } from "@/types/i18n";
 import { openobserveRum } from "@openobserve/browser-rum";
 import config from "@/aws-exports";
-import { ingestionSearchIndex } from "@/utils/ingestionSearchIndex";
 
 import userCloudRoutes from "@/enterprise/composables/router";
 import userRoutes from "@/composables/shared/router";
@@ -83,17 +82,7 @@ export default function (store: any) {
       to.meta?.titleKeyByTab?.[to.query?.tab] ??
       to.meta?.titleKeyByFolder?.[to.query?.folder] ??
       to.meta?.titleKey;
-    // Ingestion guides inherit the section title, so name each guide after its source.
-    const leafMeta = to.matched[to.matched.length - 1]?.meta;
-    const guide =
-      leafMeta?.titleKey || leafMeta?.title
-        ? undefined
-        : ingestionSearchIndex.find((item) => item.name === to.name);
-    const routeTitle = guide
-      ? gt("routeTitles.ingestionSource", { source: guide.label })
-      : titleKey
-        ? gt(titleKey)
-        : to.meta?.title;
+    const routeTitle = titleKey ? gt(titleKey) : to.meta?.title;
     if (routeTitle) {
       // The brand prefix is a product noun, never translated; the page name is.
       document.title = `OpenObserve - ${routeTitle}`;

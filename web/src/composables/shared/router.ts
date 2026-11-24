@@ -530,7 +530,7 @@ const useRoutes = () => {
           component: DbmDatabasesPage,
           meta: {
             keepAlive: true,
-            titleKey: "menu.databases",
+            title: "Databases",
           },
         },
         {
@@ -539,7 +539,7 @@ const useRoutes = () => {
           component: DbmMetricsPage,
           meta: {
             keepAlive: true,
-            titleKey: "dbm.page.tabs.metrics",
+            title: "Databases",
           },
         },
         {
@@ -548,7 +548,7 @@ const useRoutes = () => {
           component: DbmQueriesPage,
           meta: {
             keepAlive: true,
-            titleKey: "dbm.page.tabs.queries",
+            title: "Databases",
           },
         },
         {
@@ -557,7 +557,7 @@ const useRoutes = () => {
           component: DbmSamplesPage,
           meta: {
             keepAlive: true,
-            titleKey: "dbm.page.tabs.samples",
+            title: "Databases",
           },
         },
         {
@@ -566,7 +566,7 @@ const useRoutes = () => {
           component: DbmActivityPage,
           meta: {
             keepAlive: true,
-            titleKey: "dbm.page.tabs.activity",
+            title: "Databases",
           },
         },
         {
@@ -576,7 +576,7 @@ const useRoutes = () => {
           beforeEnter: withFeatureGate("dbmInsights", routeGuard),
           meta: {
             keepAlive: true,
-            titleKey: "dbm.page.tabs.deadlocks",
+            title: "Databases",
           },
         },
         {
@@ -588,7 +588,7 @@ const useRoutes = () => {
           beforeEnter: withFeatureGate("dbmInsights", routeGuard),
           meta: {
             keepAlive: true,
-            titleKey: "dbm.page.tabs.blocked",
+            title: "Databases",
           },
         },
         {
@@ -598,7 +598,7 @@ const useRoutes = () => {
           beforeEnter: withFeatureGate("dbmInsights", routeGuard),
           meta: {
             keepAlive: true,
-            titleKey: "dbm.page.tabs.tableHealth",
+            title: "Databases",
           },
         },
         {
@@ -612,7 +612,7 @@ const useRoutes = () => {
           name: "dbmQueryDetail",
           component: DbmQueryDetailPage,
           meta: {
-            titleKey: "dbm.detail.title",
+            title: "Query detail",
           },
         },
       ],
@@ -849,7 +849,6 @@ const useRoutes = () => {
         {
           path: "functions",
           name: "functionList",
-          meta: { titleKey: "function.header" },
           component: FunctionList,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -869,7 +868,6 @@ const useRoutes = () => {
         {
           path: "enrichment-tables",
           name: "enrichmentTables",
-          meta: { titleKey: "function.enrichmentTables" },
           component: EnrichmentTableList,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -880,7 +878,6 @@ const useRoutes = () => {
           name: "pipelines",
           component: PipelinesList,
           meta: {
-            titleKey: "function.streamPipeline",
             accessResource: "pipelines",
           },
           beforeEnter(to: any, from: any, next: any) {
@@ -891,7 +888,7 @@ const useRoutes = () => {
               path: "edit",
               name: "pipelineEditor",
               component: PipelineEditor,
-              meta: { titleKey: "pipeline.editPipeline", accessScopeQuery: ["id"] },
+              meta: { accessScopeQuery: ["id"] },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -899,7 +896,6 @@ const useRoutes = () => {
             {
               path: "add",
               name: "createPipeline",
-              meta: { titleKey: "pipeline.addPipeline" },
               component: PipelineEditor,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
@@ -909,7 +905,6 @@ const useRoutes = () => {
               path: "import",
               name: "importPipeline",
               component: ImportPipeline,
-              meta: { titleKey: "pipeline.pipelineLabel" },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -1307,7 +1302,6 @@ const useRoutes = () => {
           name: "Sessions",
           component: AppSessions,
           meta: {
-            titleKey: "rum.sessions",
             keepAlive: true,
           },
           beforeEnter(to: any, from: any, next: any) {
@@ -1331,7 +1325,6 @@ const useRoutes = () => {
           name: "ErrorTracking",
           component: AppErrors,
           meta: {
-            titleKey: "rum.errorTracking",
             keepAlive: true,
           },
           beforeEnter(to: any, from: any, next: any) {
@@ -1359,7 +1352,6 @@ const useRoutes = () => {
           name: "SourceMaps",
           component: SourceMaps,
           meta: {
-            titleKey: "rum.sourceMaps",
             keepAlive: true,
           },
           beforeEnter(to: any, from: any, next: any) {
@@ -1371,7 +1363,6 @@ const useRoutes = () => {
           name: "UploadSourceMaps",
           component: UploadSourceMaps,
           meta: {
-            titleKey: "rum.uploadSourceMaps",
             keepAlive: false,
           },
           beforeEnter(to: any, from: any, next: any) {
@@ -1384,7 +1375,6 @@ const useRoutes = () => {
           component: AppPerformance,
           props: true,
           meta: {
-            titleKey: "rum.performance",
             keepAlive: true,
           },
           beforeEnter(to: any, from: any, next: any) {
@@ -1441,7 +1431,6 @@ const useRoutes = () => {
         {
           path: "overview",
           name: PA_ROUTES.overview,
-          meta: { titleKey: "rum.analytics.subtabs.overview" },
           component: AnalyticsOverview,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -1450,7 +1439,6 @@ const useRoutes = () => {
         {
           path: "funnels",
           name: PA_ROUTES.funnels,
-          meta: { titleKey: "rum.analytics.subtabs.funnels" },
           component: SavedFunnelsPage,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -1459,7 +1447,6 @@ const useRoutes = () => {
         {
           path: "funnels/build",
           name: PA_ROUTES.funnelBuilder,
-          meta: { titleKey: "rum.analytics.subtabs.funnels" },
           component: AnalyticsFunnels,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -1468,7 +1455,6 @@ const useRoutes = () => {
         {
           path: "paths",
           name: PA_ROUTES.paths,
-          meta: { titleKey: "rum.analytics.subtabs.paths" },
           component: AnalyticsPaths,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -1477,7 +1463,6 @@ const useRoutes = () => {
         {
           path: "heatmaps",
           name: PA_ROUTES.heatmaps,
-          meta: { titleKey: "rum.analytics.subtabs.heatmaps" },
           component: ClickHeatmap,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -1486,7 +1471,6 @@ const useRoutes = () => {
         {
           path: "retention",
           name: PA_ROUTES.retention,
-          meta: { titleKey: "rum.analytics.subtabs.retention" },
           component: AnalyticsRetention,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -1495,7 +1479,6 @@ const useRoutes = () => {
         {
           path: "events",
           name: PA_ROUTES.events,
-          meta: { titleKey: "rum.analytics.subtabs.events" },
           component: NamedEventsListPage,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);

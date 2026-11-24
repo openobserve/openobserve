@@ -526,7 +526,6 @@ const useEnterpriseRoutes = () => {
     withLicenseFeature("ratelimit", {
       path: "quota",
       name: "quota",
-      meta: { titleKey: "iam.quota" },
       component: Quota,
       beforeEnter: withFeatureGate("rbac", routeGuard),
     }),

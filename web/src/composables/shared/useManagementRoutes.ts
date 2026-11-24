@@ -276,7 +276,6 @@ const useManagementRoutes = () => {
         {
           path: "license",
           name: "license",
-          meta: { titleKey: "settings.license" },
           component: () => import("@/components/settings/License.vue"),
           beforeEnter: withFeatureGate("license", routeGuard),
         },
