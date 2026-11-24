@@ -26789,6 +26789,7 @@
       "scope": "Filters",
       "moreFilters": "More Filters",
       "setByInstance": "Set by the selected instance",
+      "failedOnly": "Failed Only",
       "clearScope": "Clear all",
       "removeScope": "Remove this filter",
       "popoverTitle": "Narrow this down",
@@ -26863,6 +26864,8 @@
       }
     },
     "queries": {
+      "allFromApp": "All queries here come from {app}.",
+      "allOnInstance": "All queries here run on {instance}.",
       "searchPlaceholder": "Search query text, table or service…",
       "trendLabel": "How this query's time has moved across the range",
       "otherRow": "All other queries",
@@ -26942,6 +26945,8 @@
       }
     },
     "insights": {
+      "title": "Insights",
+      "empty": "Nothing stands out against this comparison period.",
       "showRows": "Show this query | Show these {count} queries",
       "clearFilter": "Clear filter",
       "alsoAffects": "and {count} other query | and {count} other queries",

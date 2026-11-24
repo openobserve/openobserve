@@ -140,9 +140,11 @@ describe("QueriesPage sources its overlap measures from the database", () => {
     expect(cellSlot(source, "calls")).toContain("row.overlapCalls.source === 'client'");
   });
 
-  it("labels the columns with their provenance in the header", () => {
-    expect(source).toContain("dbm.queries.columnSubLabels.calls");
-    expect(source).toContain("dbm.queries.columnSubLabels.load");
+  // The header tooltip states the vantage in full, so no second header line repeats it.
+  it("states the columns' provenance in the header tooltip", () => {
+    expect(source).toContain("dbm.queries.columnHints.calls");
+    expect(source).toContain("dbm.queries.columnHints.load");
+    expect(source).not.toContain("headerSubLabel");
   });
 
   describe("the summary tiles", () => {
@@ -208,9 +210,10 @@ describe("QueriesPage sources its overlap measures from the database", () => {
       expect(source).not.toContain('data-test="dbm-queries-app-source-legend"');
     });
 
-    // Here the glyph separates trace-only rows from server-counted ones, so it must stay on.
-    it("keeps the marker on trace-only rows", () => {
-      expect(source).not.toContain(':with-marker="false"');
+    // The glyph separates trace-only rows from server-counted ones; it shows once, beside the query.
+    it("shows the marker once per trace-sourced row, beside the query", () => {
+      expect(source).toContain('<DbmAppSourceMarker v-if="fromTraces(row)"');
+      expect(cellSlot(source, "calls")).toContain(':with-marker="false"');
     });
 
     /**

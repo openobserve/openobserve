@@ -116,6 +116,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
+        <DbmInsightMenu
+          :insights="stripInsights"
+          :active-id="activeInsightId"
+          :baseline="baseline"
+          @filter="toggleInsightFilter"
+        />
+        <!-- Nothing failed means nothing to narrow to; it stays while active so it can be cleared. -->
+        <OCheckbox
+          v-if="errorCount > 0 || statFilter === 'failed'"
+          :model-value="statFilter === 'failed'"
+          size="sm"
+          :label="t('dbm.filters.failedOnly')"
+          data-test="dbm-queries-failed-only"
+          @update:model-value="(on) => (statFilter = on === true ? 'failed' : null)"
+        />
+
         <template #more>
           <!-- Off = real SQL only; on also includes the driver's connection bookkeeping. -->
           <span class="inline-flex items-center" data-test="dbm-queries-stmt-class">
@@ -179,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!serverListShown"
         ref="tableRef"
         :data="tableRows"
-        :columns="columns"
+        :columns="visibleTableColumns"
         row-key="rowKey"
         :loading="loading"
         :frame="false"
@@ -218,24 +234,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
           <div data-test="dbm-queries-summary">
-            <OStatStrip
-              :items="visibleSummaryStats"
-              :loading="loading"
-              selectable
-              :selected-key="statFilter"
-              default-key="queries"
-              @select="onStatSelect"
-            />
+            <OStatStrip :items="visibleSummaryStats" :loading="loading" row />
           </div>
-          <DbmInsightStrip
-            v-if="!insightsHidden && stripInsights.length"
-            :insights="stripInsights"
-            :active-id="activeInsightId"
-            :baseline="baseline"
-            data-test="dbm-queries-insights"
-            @filter="toggleInsightFilter"
-            @dismiss-all="insightsHidden = true"
-          />
         </template>
 
         <!-- The statement, what ran it, and the facts that are about THIS row. -->
@@ -277,20 +277,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <div
               v-if="!row.isOther"
-              class="text-text-secondary text-3xs flex min-w-0 items-center gap-1"
+              class="text-text-secondary flex min-h-4 min-w-0 items-center gap-1 text-xs"
               :class="row.isTail ? 'ps-4' : ''"
+              data-test="dbm-queries-meta"
             >
-              <OTag type="dbSystem" :value="row.db_system" size="xs" />
-              <span class="opacity-45">·</span>
               <OTruncatedText
-                :tooltip="raw([row.serviceLabel, row.db_instance].filter(Boolean).join(' · '))"
+                :tooltip="
+                  raw(
+                    [!uniformInstance && row.db_instance, !uniformApp && row.serviceLabel]
+                      .filter(Boolean)
+                      .join(' · '),
+                  )
+                "
               >
-                <span class="text-text-secondary font-medium">{{ row.serviceLabel }}</span>
-                <template v-if="row.db_instance">
-                  <span class="px-1 opacity-45">·</span>
-                  <span>{{ row.db_instance }}</span>
+                <span v-if="!uniformInstance && row.db_instance">
+                  {{ row.db_instance }}
+                  <OTooltip :content="raw(engineName(row.db_system))" />
+                </span>
+                <template
+                  v-if="!uniformInstance && row.db_instance && !uniformApp && row.serviceLabel"
+                >
+                  <span class="px-1">·</span>
                 </template>
+                <span v-if="!uniformApp && row.serviceLabel">{{ row.serviceLabel }}</span>
               </OTruncatedText>
+              <DbmAppSourceMarker v-if="fromTraces(row)" data-test="dbm-queries-app-source" />
               <DbmRowChips :chips="chipsByFingerprint.get(row.fingerprint) ?? []" />
             </div>
             <!-- Every remainder states its own call count; only the first
@@ -322,6 +333,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :source="row.overlapCalls.source"
             :qualifier-key="row.overlapCalls.qualifierKey"
             :engine="row.db_system"
+            :with-marker="false"
+            sublabel="tooltip"
             data-test="dbm-queries-calls"
           >
             <template #trailing>
@@ -423,6 +436,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :source="row.overlapTime.source"
             :qualifier-key="row.overlapTime.qualifierKey"
             :engine="row.db_system"
+            :with-marker="false"
+            sublabel="tooltip"
             :flagged="row.flagged"
             :critical="row.critical"
             data-test="dbm-queries-load"
@@ -564,7 +579,8 @@ import { useStore } from "vuex";
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmDeltaCell from "@/components/dbm/DbmDeltaCell.vue";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
-import DbmInsightStrip from "@/components/dbm/DbmInsightStrip.vue";
+import DbmInsightMenu from "@/components/dbm/DbmInsightMenu.vue";
+import DbmAppSourceMarker from "@/components/dbm/DbmAppSourceMarker.vue";
 import DbmLoadCell from "@/components/dbm/DbmLoadCell.vue";
 import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
 import DbmFilterBar from "@/components/dbm/DbmFilterBar.vue";
@@ -576,7 +592,6 @@ import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { copyToClipboard } from "@/utils/clipboard";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -612,10 +627,11 @@ import { createDbmContextProvider } from "@/composables/contextProviders";
 import { buildQueryFixPrompt } from "@/utils/dbm/aiPrompts";
 import { buildDbmPrefill } from "@/utils/alerts/prefill/fromDbm";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
+import { emptyColumnIds } from "@/utils/dbm/emptyColumns";
+import { engineName, uniformValue } from "@/utils/dbm/uniformValue";
 import {
   countClaim,
   discriminatingPart,
-  failedCellKind,
   formatCount,
   formatMultiplier,
   formatNs,
@@ -960,7 +976,6 @@ useDbmOwnFilterSync(
 );
 
 const insights = ref<DbmInsight[]>([]);
-const insightsHidden = ref(false);
 const activeInsightId = ref<DbmInsightId | null>(null);
 
 interface QueryRow extends QueryStatsRow {
@@ -1105,9 +1120,6 @@ const fallbackTimeQualifier = computed(() =>
  */
 // The Failed tile narrows the table to the queries with a failed call; Calls and Database time are totals, not rows.
 const statFilter = ref<"failed" | null>(null);
-const onStatSelect = (key: string) => {
-  statFilter.value = key === "failed" && statFilter.value !== "failed" ? "failed" : null;
-};
 
 const summaryStats = computed<StatItem[]>(() => {
   const totals = overlapTotals.value;
@@ -1162,7 +1174,6 @@ const summaryStats = computed<StatItem[]>(() => {
         : {}),
       icon: "bar-chart",
       tone: "info",
-      selectable: false,
       dataTest: "dbm-queries-summary-calls",
     },
     {
@@ -1174,7 +1185,6 @@ const summaryStats = computed<StatItem[]>(() => {
         : {}),
       icon: "timer",
       tone: "teal",
-      selectable: false,
       dataTest: "dbm-queries-summary-time",
     },
     // TRACE-ONLY: the server feed carries no error counts. In fallback mode
@@ -1186,7 +1196,6 @@ const summaryStats = computed<StatItem[]>(() => {
       value: errorCount.value ? formatCount(errorCount.value) : raw("—"),
       icon: "error-outline",
       tone: errorCount.value ? "error" : "neutral",
-      selectable: errorCount.value > 0 || statFilter.value === "failed",
       dataTest: "dbm-queries-summary-failed",
     },
   ];
@@ -1877,13 +1886,10 @@ const rowStyle = (row: QueryRow) => {
  * genuinely is yes/no rather than how-many, and "0" in a column of counts reads
  * as a measurement where "none" reads as an all-clear.
  */
-const errorLabel = (row: QueryRow): I18nText =>
-  failedCellKind(row.errors) === "none"
-    ? t("dbm.queries.errorsNone")
-    : raw(formatCount(row.errors));
+const errorLabel = (row: QueryRow): I18nText => raw(formatCount(row.errors ?? 0));
 
 const errorClass = (row: QueryRow) => {
-  if ((row.errors ?? 0) <= 0) return "text-text-secondary";
+  if ((row.errors ?? 0) <= 0) return "text-text-muted";
   return row.critical ? "text-status-error-text font-bold" : "text-status-error-text";
 };
 
@@ -2006,8 +2012,12 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     // identifying, and at 380 every row truncated inside its SELECT list.
     size: 520,
     sortable: false,
-    meta: { isName: true },
+    meta: {
+      isName: true,
+      headerTooltip: queryHeaderTip.value ? raw(queryHeaderTip.value) : undefined,
+    },
   },
+
   // An OVERLAP column: the value shown is the DATABASE's count where it has
   // one. The sub-label states that provenance once, in the header; the
   // per-row marker states it again on the rows where it differs, because the
@@ -2037,8 +2047,7 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     sortable: false,
     meta: {
       align: "right",
-      headerSubLabel: t("dbm.queries.columnSubLabels.calls"),
-      headerTooltip: t("dbm.queries.columnHints.calls"),
+      headerTooltip: raw(`${t("dbm.queries.columnHints.calls")}`),
     },
   },
   {
@@ -2049,9 +2058,8 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("p95"),
       headerTooltip: raw(
-        `${t("dbm.queries.columnHints.p95")} ${t("dbm.coverage.tipBlendedSpeeds")}`,
+        `p95: ${t("dbm.queries.columnHints.p95")} ${t("dbm.coverage.tipBlendedSpeeds")}`,
       ),
     },
   },
@@ -2089,7 +2097,6 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     sortable: false,
     meta: {
       align: "right",
-      headerSubLabel: t("dbm.queries.columnSubLabels.load"),
       headerTooltip: raw(`${t("dbm.queries.columnHints.load")} ${t("dbm.coverage.tipRowsShown")}`),
     },
   },
@@ -2109,9 +2116,8 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     hideable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("p99"),
       headerTooltip: raw(
-        `${t("dbm.queries.columnHints.p99")} ${t("dbm.coverage.tipBlendedSpeeds")}`,
+        `p99: ${t("dbm.queries.columnHints.p99")} ${t("dbm.coverage.tipBlendedSpeeds")}`,
       ),
     },
   },
@@ -2124,8 +2130,7 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     hideable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("max"),
-      headerTooltip: t("dbm.queries.columnHints.max"),
+      headerTooltip: raw(`max: ${t("dbm.queries.columnHints.max")}`),
     },
   },
   {
@@ -2142,6 +2147,35 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
  *  what fits without horizontal scrolling at 1440. */
 const defaultColumnVisibility = { p99_ns: false, max_ns: false, services: false };
 const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("dbm-queries");
+
+/** Traced figures show one source marker per row, beside the query. */
+const dataRows = computed(() => tableRows.value.filter((r) => !r.isOther && !r.isFold));
+const uniformApp = computed(() => uniformValue(dataRows.value, (r) => r.serviceLabel));
+const uniformInstance = computed(() => uniformValue(dataRows.value, (r) => r.db_instance));
+
+const queryHeaderTip = computed(() =>
+  [
+    uniformApp.value && t("dbm.queries.allFromApp", { app: uniformApp.value }),
+    uniformInstance.value && t("dbm.queries.allOnInstance", { instance: uniformInstance.value }),
+  ]
+    .filter(Boolean)
+    .join(" "),
+);
+
+const fromTraces = (row: QueryRow) =>
+  row.overlapCalls.source === "client" || row.overlapTime.source === "client";
+
+// Columns with nothing to show on any row are dropped from the table only;
+// the toggle and the saved visibility keep using the full `columns`.
+const emptyColumns = computed(() =>
+  emptyColumnIds<QueryRow>(tableRows.value, {
+    perTrace: (row) => (showsPerRequest(row.callsPerTrace) ? row.callsPerTrace : null),
+    errors: (row) => ((row.errors ?? 0) > 0 ? row.errors : null),
+  }),
+);
+const visibleTableColumns = computed(() =>
+  columns.value.filter((c) => !emptyColumns.value.includes(c.id)),
+);
 if (!Object.keys(columnVisibility.value).length) columnVisibility.value = defaultColumnVisibility;
 
 /**
