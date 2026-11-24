@@ -5235,7 +5235,18 @@
     "block": "Block organization",
     "unblock": "Unblock organization",
     "blockConfirmMessage": "Block {name}? It stops accepting ingestion, queries and sign-ins until it is unblocked.",
-    "blockConfirmLabel": "Block"
+    "blockConfirmLabel": "Block",
+    "favorites": "Favorites",
+    "recent": "Recent",
+    "allOrganizations": "All organizations",
+    "addToFavorites": "Add to favorites",
+    "removeFromFavorites": "Remove from favorites",
+    "addNamedToFavorites": "Add {name} to favorites",
+    "removeNamedFromFavorites": "Remove {name} from favorites",
+    "favoritesLimitReached": "Up to {max} favorites",
+    "manageOrganizations": "Manage organizations",
+    "switchToIt": "Switch to it",
+    "switchToNewFailed": "The new organization is not in the list yet. Refresh the list and switch from its row."
   },
   "template": {
     "search": "Search Template"
@@ -23875,6 +23886,7 @@
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
+      "openOrgSwitcher": "Open the organization switcher",
       "closeDialog": "Close any dialog, drawer, or modal",
       "focusSearch": "Focus search bar",
       "focusQuery": "Focus query editor",

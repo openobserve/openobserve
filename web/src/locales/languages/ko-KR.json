@@ -5235,7 +5235,18 @@
     "block": "조직 차단",
     "unblock": "조직 차단 해제",
     "blockConfirmMessage": "{name}을(를) 차단하시겠습니까? 차단을 해제할 때까지 수집, 쿼리, 로그인을 받지 않습니다.",
-    "blockConfirmLabel": "차단"
+    "blockConfirmLabel": "차단",
+    "favorites": "즐겨찾기",
+    "recent": "최근",
+    "allOrganizations": "모든 조직",
+    "addToFavorites": "즐겨찾기에 추가",
+    "removeFromFavorites": "즐겨찾기에서 제거",
+    "addNamedToFavorites": "{name}을(를) 즐겨찾기에 추가",
+    "removeNamedFromFavorites": "{name}을(를) 즐겨찾기에서 제거",
+    "favoritesLimitReached": "즐겨찾기 최대 {max}개",
+    "manageOrganizations": "조직 관리",
+    "switchToIt": "해당 조직으로 전환",
+    "switchToNewFailed": "새 조직이 아직 목록에 없습니다. 목록을 새로 고친 후 해당 행에서 전환하세요."
   },
   "template": {
     "search": "템플릿 검색"
@@ -23877,6 +23888,7 @@
     },
     "actions": {
       "openCheatsheet": "키보드 단축키 치트시트 열기",
+      "openOrgSwitcher": "조직 전환기 열기",
       "closeDialog": "모든 대화 상자, 서랍 또는 모달 닫기",
       "focusSearch": "검색창에 포커스",
       "focusQuery": "쿼리 편집기에 포커스",

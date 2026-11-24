@@ -11,6 +11,7 @@ import organizationsService from "@/services/organizations";
 import config from "@/aws-exports";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { orgCreatePending } from "@/utils/orgScopedRoutes";
 
 // Mock the organizations service
 vi.mock("@/services/organizations", async (importOriginal) => {
@@ -25,6 +26,11 @@ vi.mock("@/services/organizations", async (importOriginal) => {
       delete_org: vi.fn(),
     },
   });
+});
+
+vi.mock("@/lib/forms/SaveBar/useLeaveGuard", async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, confirmLeave: vi.fn(actual.confirmLeave) };
 });
 
 // Mock product analytics
@@ -47,6 +53,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { confirmLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
 
 describe("ListOrganizations", () => {
   let wrapper;
@@ -776,6 +783,216 @@ describe("ListOrganizations", () => {
         to_be_updated_org_id: "org-rename-1",
         to_be_updated_org_name: "Test Org",
       });
+    });
+  });
+  describe("Create from the org switcher", () => {
+    const mountList = () =>
+      mount(ListOrganizations, {
+        global: {
+          plugins: [i18n, router],
+          provide: { store: mockStore },
+          stubs: { AddUpdateOrganization: true, NoData: true },
+        },
+      });
+
+    afterEach(() => {
+      orgCreatePending.value = false;
+    });
+
+    it("F1 opens the create dialog on mount when the flag is set, and clears it", async () => {
+      orgCreatePending.value = true;
+      const list = mountList();
+      await flushPromises();
+      expect(list.vm.showAddOrganizationDialog).toBe(true);
+      expect(list.vm.toBeUpdatedOrganization.id).toBe("");
+      expect(orgCreatePending.value).toBe(false);
+      list.unmount();
+    });
+
+    it("F1 opens the dialog in place when the flag is set while mounted", async () => {
+      await router.push({ path: "/organizations", query: { org_identifier: "test-org" } });
+      await flushPromises();
+      wrapper.vm.toBeUpdatedOrganization = { id: "stale", name: "Stale", identifier: "stale" };
+      orgCreatePending.value = true;
+      await flushPromises();
+      expect(wrapper.vm.showAddOrganizationDialog).toBe(true);
+      expect(wrapper.vm.toBeUpdatedOrganization.id).toBe("");
+      expect(orgCreatePending.value).toBe(false);
+      expect(router.currentRoute.value.query).toEqual({ org_identifier: "test-org" });
+    });
+
+    it("F2 a reload of action=add with the flag clear stays on the list", async () => {
+      await router.push({ path: "/organizations", query: { action: "add" } });
+      await flushPromises();
+      const list = mountList();
+      await flushPromises();
+      expect(list.vm.showAddOrganizationDialog).toBe(false);
+      list.unmount();
+    });
+
+    it("F4 the create toast offers to switch to the new org", async () => {
+      mockStore.state.organizations = mockOrganizations.data.data;
+      toast.mockClear();
+      await wrapper.vm.updateOrganizationList("test-org-2", "Test Org 2");
+      await flushPromises();
+      const { action, title } = toast.mock.calls.at(-1)[0];
+      expect(title).toBe("Test Org 2 (test-org-2)");
+      expect(action).toMatchObject({
+        label: "Switch to it",
+        dataTest: "organization-created-toast-switch",
+      });
+      mockStore.dispatch.mockClear();
+      await action.handler();
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setSelectedOrganization",
+        expect.objectContaining({ identifier: "test-org-2" }),
+      );
+    });
+
+    it("F4 a switch clicked before the list reload lands waits for it", async () => {
+      mockStore.state.organizations = mockOrganizations.data.data;
+      const created = { name: "Brand new", identifier: "brand-new", type: "custom", plan: "0" };
+      let resolveList;
+      organizationsService.list.mockReturnValueOnce(new Promise((r) => (resolveList = r)));
+      mockStore.dispatch.mockImplementation((name, payload) => {
+        if (name === "setOrganizations") mockStore.state.organizations = payload;
+      });
+      toast.mockClear();
+      wrapper.vm.updateOrganizationList("brand-new");
+      const { action } = toast.mock.calls.at(-1)[0];
+
+      const pending = action.handler();
+      await flushPromises();
+      expect(mockStore.dispatch).not.toHaveBeenCalledWith(
+        "setSelectedOrganization",
+        expect.anything(),
+      );
+
+      resolveList({ data: { data: [...mockOrganizations.data.data, created] } });
+      await pending;
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setSelectedOrganization",
+        expect.objectContaining({ identifier: "brand-new" }),
+      );
+    });
+
+    const createdToastAction = async (identifier, name) => {
+      mockStore.state.organizations = mockOrganizations.data.data;
+      toast.mockClear();
+      wrapper.vm.updateOrganizationList(identifier, name);
+      await flushPromises();
+      mockStore.dispatch.mockClear();
+      return toast.mock.calls.at(-1)[0];
+    };
+
+    it("C1 asks the leave guard first and does not switch when the user keeps editing", async () => {
+      const { action } = await createdToastAction("test-org-2", "Test Org 2");
+      vi.mocked(confirmLeave).mockResolvedValueOnce(false);
+      await action.handler();
+      expect(confirmLeave).toHaveBeenCalled();
+      expect(mockStore.dispatch).not.toHaveBeenCalledWith(
+        "setSelectedOrganization",
+        expect.anything(),
+      );
+    });
+
+    it("F7 a second click while a switch waits does nothing more", async () => {
+      const { action } = await createdToastAction("test-org-2", "Test Org 2");
+      await Promise.all([action.handler(), action.handler()]);
+      const switches = mockStore.dispatch.mock.calls.filter(
+        ([name]) => name === "setSelectedOrganization",
+      );
+      expect(switches).toHaveLength(1);
+    });
+
+    it("F13 a newer toast's switch wins over an older one still waiting for its reload", async () => {
+      const a = { name: "Org A", identifier: "org-a", type: "custom", plan: "0" };
+      const b = { name: "Org B", identifier: "org-b", type: "custom", plan: "0" };
+      let resolveA;
+      organizationsService.list
+        .mockReturnValueOnce(new Promise((r) => (resolveA = r)))
+        .mockResolvedValueOnce({ data: { data: [...mockOrganizations.data.data, a, b] } });
+      mockStore.state.organizations = mockOrganizations.data.data;
+      mockStore.dispatch.mockImplementation((name, payload) => {
+        if (name === "setOrganizations") mockStore.state.organizations = payload;
+      });
+      toast.mockClear();
+      wrapper.vm.updateOrganizationList("org-a", "Org A");
+      const actionA = toast.mock.calls.at(-1)[0].action;
+      wrapper.vm.updateOrganizationList("org-b", "Org B");
+      const actionB = toast.mock.calls.at(-1)[0].action;
+      await flushPromises();
+      mockStore.dispatch.mockClear();
+
+      const pendingA = actionA.handler();
+      await actionB.handler();
+      resolveA({ data: { data: [...mockOrganizations.data.data, a, b] } });
+      await pendingA;
+      const switches = mockStore.dispatch.mock.calls.filter(
+        ([name]) => name === "setSelectedOrganization",
+      );
+      expect(switches.map(([, org]) => org.identifier)).toEqual(["org-b"]);
+    });
+
+    it("F7 does not switch once the user has left the organizations page", async () => {
+      router.addRoute({
+        path: "/elsewhere",
+        name: "elsewhere",
+        component: { template: "<div />" },
+      });
+      const { action } = await createdToastAction("test-org-2", "Test Org 2");
+      await router.push("/elsewhere");
+      await action.handler();
+      expect(mockStore.dispatch).not.toHaveBeenCalledWith(
+        "setSelectedOrganization",
+        expect.anything(),
+      );
+      expect(router.currentRoute.value.name).toBe("elsewhere");
+    });
+
+    it("C2 titles each create toast with its org so two creates never share one action", async () => {
+      const first = await createdToastAction("test-org-1", "Test Org 1");
+      const second = await createdToastAction("test-org-2", "Test Org 2");
+      expect(first.message).toBe(second.message);
+      expect(first.title).toBe("Test Org 1 (test-org-1)");
+      expect(second.title).toBe("Test Org 2 (test-org-2)");
+    });
+
+    it("C4 keeps two creates with the same name apart by identifier", async () => {
+      const first = await createdToastAction("acme", "Acme");
+      const second = await createdToastAction("acme_2", "Acme");
+      expect(first.title).toBe("Acme (acme)");
+      expect(second.title).toBe("Acme (acme_2)");
+      expect(first.title).not.toBe(second.title);
+    });
+
+    it("C4 shows the identifier alone when it equals the name", async () => {
+      const { title } = await createdToastAction("default", "default");
+      expect(title).toBe("default");
+    });
+
+    it("F4 says so when the new org is still missing after the reload", async () => {
+      mockStore.state.organizations = mockOrganizations.data.data;
+      organizationsService.list.mockRejectedValueOnce(new Error("network"));
+      toast.mockClear();
+      wrapper.vm.updateOrganizationList("brand-new");
+      await flushPromises();
+      const { action } = toast.mock.calls.at(-1)[0];
+      await action.handler();
+      expect(toast).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message:
+            "The new organization is not in the list yet. Refresh the list and switch from its row.",
+        }),
+      );
+    });
+
+    it("F4 the rename toast has no switch action", async () => {
+      wrapper.vm.toBeUpdatedOrganization = { id: "test-org-2", name: "", identifier: "" };
+      toast.mockClear();
+      await wrapper.vm.updateOrganizationList();
+      expect(toast.mock.calls.at(-1)[0].action).toBeUndefined();
     });
   });
 });

@@ -5235,7 +5235,18 @@
     "block": "封鎖組織",
     "unblock": "解除封鎖組織",
     "blockConfirmMessage": "封鎖 {name}？在解除封鎖之前，該組織將不再接受資料擷取、查詢和登入。",
-    "blockConfirmLabel": "封鎖"
+    "blockConfirmLabel": "封鎖",
+    "favorites": "收藏",
+    "recent": "最近",
+    "allOrganizations": "所有組織",
+    "addToFavorites": "加入收藏",
+    "removeFromFavorites": "移除收藏",
+    "addNamedToFavorites": "將 {name} 加入收藏",
+    "removeNamedFromFavorites": "將 {name} 從收藏移除",
+    "favoritesLimitReached": "最多 {max} 個收藏",
+    "manageOrganizations": "管理組織",
+    "switchToIt": "切換至該組織",
+    "switchToNewFailed": "新組織尚未出現在清單中。請重新整理清單，並從其所在列切換。"
   },
   "template": {
     "search": "搜尋範本"
@@ -23872,6 +23883,7 @@
     },
     "actions": {
       "openCheatsheet": "開啟鍵盤快捷鍵速查表",
+      "openOrgSwitcher": "開啟組織切換器",
       "closeDialog": "關閉任何對話框、抽屜或模態視窗",
       "focusSearch": "聚焦搜尋列",
       "focusQuery": "聚焦查詢編輯器",

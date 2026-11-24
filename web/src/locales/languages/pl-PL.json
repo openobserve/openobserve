@@ -5235,7 +5235,18 @@
     "block": "Zablokuj organizację",
     "unblock": "Odblokuj organizację",
     "blockConfirmMessage": "Zablokować {name}? Do czasu odblokowania organizacja nie będzie przyjmować danych, zapytań ani logowań.",
-    "blockConfirmLabel": "Zablokuj"
+    "blockConfirmLabel": "Zablokuj",
+    "favorites": "Ulubione",
+    "recent": "Ostatnie",
+    "allOrganizations": "Wszystkie organizacje",
+    "addToFavorites": "Dodaj do ulubionych",
+    "removeFromFavorites": "Usuń z ulubionych",
+    "addNamedToFavorites": "Dodaj {name} do ulubionych",
+    "removeNamedFromFavorites": "Usuń {name} z ulubionych",
+    "favoritesLimitReached": "Do {max} ulubionych",
+    "manageOrganizations": "Zarządzaj organizacjami",
+    "switchToIt": "Przełącz się na nią",
+    "switchToNewFailed": "Nowej organizacji nie ma jeszcze na liście. Odśwież listę i przełącz się z jej wiersza."
   },
   "template": {
     "search": "Szukaj szablonu"
@@ -23877,6 +23888,7 @@
     },
     "actions": {
       "openCheatsheet": "Otwórz ściągawkę skrótów klawiszowych",
+      "openOrgSwitcher": "Otwórz przełącznik organizacji",
       "closeDialog": "Zamknij dowolne okno dialogowe, panel lub modal",
       "focusSearch": "Skup na pasku wyszukiwania",
       "focusQuery": "Skup na edytorze zapytań",

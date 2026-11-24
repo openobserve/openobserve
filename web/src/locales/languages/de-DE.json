@@ -5235,7 +5235,18 @@
     "block": "Organisation sperren",
     "unblock": "Organisation entsperren",
     "blockConfirmMessage": "{name} sperren? Bis zur Entsperrung nimmt die Organisation keine Datenaufnahme, Abfragen oder Anmeldungen mehr an.",
-    "blockConfirmLabel": "Sperren"
+    "blockConfirmLabel": "Sperren",
+    "favorites": "Favoriten",
+    "recent": "Zuletzt verwendet",
+    "allOrganizations": "Alle Organisationen",
+    "addToFavorites": "Zu Favoriten hinzufügen",
+    "removeFromFavorites": "Aus Favoriten entfernen",
+    "addNamedToFavorites": "{name} zu Favoriten hinzufügen",
+    "removeNamedFromFavorites": "{name} aus Favoriten entfernen",
+    "favoritesLimitReached": "Bis zu {max} Favoriten",
+    "manageOrganizations": "Organisationen verwalten",
+    "switchToIt": "Zu dieser wechseln",
+    "switchToNewFailed": "Die neue Organisation ist noch nicht in der Liste. Aktualisieren Sie die Liste und wechseln Sie über ihre Zeile."
   },
   "template": {
     "search": "Vorlage suchen"
@@ -23877,6 +23888,7 @@
     },
     "actions": {
       "openCheatsheet": "Cheatsheet mit Tastenkombinationen öffnen",
+      "openOrgSwitcher": "Organisationswechsler öffnen",
       "closeDialog": "Dialog, Seitenleiste oder Modal schließen",
       "focusSearch": "Fokus-Suchleiste",
       "focusQuery": "Fokusabfrage-Editor",

@@ -5235,7 +5235,18 @@
     "block": "حظر المؤسسة",
     "unblock": "إلغاء حظر المؤسسة",
     "blockConfirmMessage": "حظر {name}؟ لن تقبل المؤسسة استيعاب البيانات أو الاستعلامات أو تسجيلات الدخول حتى يُلغى حظرها.",
-    "blockConfirmLabel": "حظر"
+    "blockConfirmLabel": "حظر",
+    "favorites": "المفضلة",
+    "recent": "الأخيرة",
+    "allOrganizations": "جميع المؤسسات",
+    "addToFavorites": "إضافة إلى المفضلة",
+    "removeFromFavorites": "إزالة من المفضلة",
+    "addNamedToFavorites": "إضافة {name} إلى المفضلة",
+    "removeNamedFromFavorites": "إزالة {name} من المفضلة",
+    "favoritesLimitReached": "حتى {max} من المفضلة",
+    "manageOrganizations": "إدارة المؤسسات",
+    "switchToIt": "التبديل إليها",
+    "switchToNewFailed": "المؤسسة الجديدة ليست في القائمة بعد. حدّث القائمة وبدّل إليها من صفها."
   },
   "template": {
     "search": "البحث في القوالب"
@@ -23877,6 +23888,7 @@
     },
     "actions": {
       "openCheatsheet": "فتح ورقة مرجعية لاختصارات لوحة المفاتيح",
+      "openOrgSwitcher": "فتح مبدّل المؤسسات",
       "closeDialog": "إغلاق أي حوار أو درج أو نمط",
       "focusSearch": "شريط البحث في مركز التركيز",
       "focusQuery": "محرر استعلامات التركيز",

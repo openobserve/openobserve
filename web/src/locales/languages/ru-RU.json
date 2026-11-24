@@ -5235,7 +5235,18 @@
     "block": "Заблокировать организацию",
     "unblock": "Разблокировать организацию",
     "blockConfirmMessage": "Заблокировать {name}? До разблокировки организация не будет принимать данные, запросы и входы.",
-    "blockConfirmLabel": "Заблокировать"
+    "blockConfirmLabel": "Заблокировать",
+    "favorites": "Избранное",
+    "recent": "Недавние",
+    "allOrganizations": "Все организации",
+    "addToFavorites": "Добавить в избранное",
+    "removeFromFavorites": "Удалить из избранного",
+    "addNamedToFavorites": "Добавить {name} в избранное",
+    "removeNamedFromFavorites": "Удалить {name} из избранного",
+    "favoritesLimitReached": "До {max} в избранном",
+    "manageOrganizations": "Управление организациями",
+    "switchToIt": "Переключиться на неё",
+    "switchToNewFailed": "Новая организация ещё не в списке. Обновите список и переключитесь из её строки."
   },
   "template": {
     "search": "Поиск шаблона"
@@ -23877,6 +23888,7 @@
     },
     "actions": {
       "openCheatsheet": "Открыть шпаргалку по клавиатурным сокращениям",
+      "openOrgSwitcher": "Открыть переключатель организаций",
       "closeDialog": "Закрыть любой диалог, панель или модальное окно",
       "focusSearch": "Фокус на строке поиска",
       "focusQuery": "Фокус на редакторе запросов",

@@ -5235,7 +5235,18 @@
     "block": "Bloquer l'organisation",
     "unblock": "Débloquer l'organisation",
     "blockConfirmMessage": "Bloquer {name} ? Elle n'accepte plus l'ingestion, les requêtes ni les connexions jusqu'à son déblocage.",
-    "blockConfirmLabel": "Bloquer"
+    "blockConfirmLabel": "Bloquer",
+    "favorites": "Favoris",
+    "recent": "Récents",
+    "allOrganizations": "Toutes les organisations",
+    "addToFavorites": "Ajouter aux favoris",
+    "removeFromFavorites": "Retirer des favoris",
+    "addNamedToFavorites": "Ajouter {name} aux favoris",
+    "removeNamedFromFavorites": "Retirer {name} des favoris",
+    "favoritesLimitReached": "Jusqu'à {max} favoris",
+    "manageOrganizations": "Gérer les organisations",
+    "switchToIt": "Basculer vers celle-ci",
+    "switchToNewFailed": "La nouvelle organisation n'est pas encore dans la liste. Actualisez la liste et basculez depuis sa ligne."
   },
   "template": {
     "search": "Rechercher un modèle"
@@ -23877,6 +23888,7 @@
     },
     "actions": {
       "openCheatsheet": "Ouvrir un aide-mémoire sur les raccourcis clavier",
+      "openOrgSwitcher": "Ouvrir le sélecteur d'organisation",
       "closeDialog": "Fermez une boîte de dialogue, un tiroir ou une fenêtre modale",
       "focusSearch": "Barre de recherche Focus",
       "focusQuery": "Éditeur de requêtes Focus",

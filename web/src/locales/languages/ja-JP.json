@@ -5235,7 +5235,18 @@
     "block": "組織をブロック",
     "unblock": "組織のブロックを解除",
     "blockConfirmMessage": "{name} をブロックしますか？ブロックを解除するまで、取り込み、クエリ、サインインを受け付けません。",
-    "blockConfirmLabel": "ブロック"
+    "blockConfirmLabel": "ブロック",
+    "favorites": "お気に入り",
+    "recent": "最近",
+    "allOrganizations": "すべての組織",
+    "addToFavorites": "お気に入りに追加",
+    "removeFromFavorites": "お気に入りから削除",
+    "addNamedToFavorites": "{name} をお気に入りに追加",
+    "removeNamedFromFavorites": "{name} をお気に入りから削除",
+    "favoritesLimitReached": "お気に入りは最大 {max} 件",
+    "manageOrganizations": "組織を管理",
+    "switchToIt": "切り替える",
+    "switchToNewFailed": "新しい組織はまだリストにありません。リストを更新し、その行から切り替えてください。"
   },
   "template": {
     "search": "テンプレートを検索"
@@ -23877,6 +23888,7 @@
     },
     "actions": {
       "openCheatsheet": "キーボードショートカットのチートシートを開く",
+      "openOrgSwitcher": "組織スイッチャーを開く",
       "closeDialog": "ダイアログ、ドロワー、またはモーダルを閉じる",
       "focusSearch": "フォーカス検索バー",
       "focusQuery": "フォーカスクエリエディター",
