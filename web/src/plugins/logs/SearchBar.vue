@@ -2192,9 +2192,15 @@ export default defineComponent({
           const partialMessage =
             partialReason === null
               ? null
-              : partialReason
-                ? this.t("logs.searchBar.downloadMayBeIncompleteReason", { reason: partialReason })
-                : this.t("logs.searchBar.downloadMayBeIncomplete");
+              : hits.length === 0
+                ? partialReason
+                  ? this.t("logs.searchBar.noDataToDownloadPartial", { reason: partialReason })
+                  : this.t("logs.searchBar.noDataToDownload")
+                : partialReason
+                  ? this.t("logs.searchBar.downloadMayBeIncompleteReason", {
+                      reason: partialReason,
+                    })
+                  : this.t("logs.searchBar.downloadMayBeIncomplete");
           if (hits.length > 0) this.downloadLogs(hits, this.downloadCustomFileType);
           if (partialMessage !== null || hits.length === 0) {
             toast({

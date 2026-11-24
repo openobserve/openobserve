@@ -21782,6 +21782,7 @@
       "initialNumberPositive": "Initial number must be positive number.",
       "runQueryBeforeDownload": "Please run a query first before downloading.",
       "noDataToDownload": "No data found to download.",
+      "noDataToDownloadPartial": "No data found to download. The result is partial: {reason}",
       "downloadMayBeIncomplete": "The downloaded file may be incomplete.",
       "downloadMayBeIncompleteReason": "The downloaded file may be incomplete: {reason}",
       "transformTypeFunction": "Function",

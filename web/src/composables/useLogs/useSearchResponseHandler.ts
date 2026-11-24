@@ -475,18 +475,15 @@ export const useSearchResponseHandler = () => {
 
     const isReplace =
       response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs;
-    const rowOffset =
-      isReplace || !searchObj.data.queryResults.aggs?.length
-        ? Number(payload.meta?.rowOffset ?? 0)
-        : 0;
-    const countHits =
-      rowOffset > 0
-        ? response.content.results.hits.map((hit: any) =>
-            hit.zo_sql_num == null
-              ? hit
-              : { ...hit, zo_sql_num: Math.max(hit.zo_sql_num - rowOffset, 0) },
-          )
-        : response.content.results.hits;
+    const startsCount = isReplace || !searchObj.data.queryResults.aggs?.length;
+    const queryResults = searchObj.data.queryResults;
+    if (startsCount) queryResults.offsetLeft = Number(payload.meta?.rowOffset ?? 0);
+    const countHits = response.content.results.hits.map((hit: any) => {
+      if (hit.zo_sql_num == null || !(queryResults.offsetLeft > 0)) return hit;
+      const skipped = Math.min(queryResults.offsetLeft, hit.zo_sql_num);
+      queryResults.offsetLeft -= skipped;
+      return { ...hit, zo_sql_num: hit.zo_sql_num - skipped };
+    });
 
     if (isReplace) {
       searchObj.data.queryResults.aggs = countHits;

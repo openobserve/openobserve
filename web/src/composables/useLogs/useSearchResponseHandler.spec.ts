@@ -833,7 +833,7 @@ describe("useSearchResponseHandler", () => {
 
     it("takes the OFFSET off once when several partitions add up, not once per partition", () => {
       mockState.searchObj.data.queryResults.aggs = [];
-      for (const rows of [600, 400]) {
+      for (const rows of [3, 600]) {
         responseHandler.handleSearchResponse(
           {
             type: "pageCount",
@@ -848,8 +848,8 @@ describe("useSearchResponseHandler", () => {
         );
       }
       expect(mockState.searchObj.data.queryResults.aggs).toEqual([
-        { zo_sql_num: 595 },
-        { zo_sql_num: 400 },
+        { zo_sql_num: 0 },
+        { zo_sql_num: 598 },
       ]);
     });
 

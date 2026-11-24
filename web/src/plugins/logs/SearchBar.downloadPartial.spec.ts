@@ -91,7 +91,6 @@ describe("SearchBar custom range download with a partial response", () => {
   });
 
   it("explains the range restriction instead of 'no data' when the slice is empty", async () => {
-    wrapper!.vm.downloadCustomInitialNumber = 1000;
     vi.mocked(searchService.search).mockResolvedValue({
       data: { hits: rows(999), is_partial: true, function_error: ["range restriction of 1 hours"] },
     } as any);
