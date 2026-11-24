@@ -524,6 +524,7 @@ pub(crate) async fn run_profiles_sql(
         clear_cache: false,
         local_mode: None,
         agent_options: None,
+        raw_streams: None,
     };
 
     match SearchService::cache::search(

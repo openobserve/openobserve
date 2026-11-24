@@ -25,6 +25,8 @@ pub mod utils;
 
 use std::{collections::HashMap, sync::Arc};
 
+#[cfg(feature = "vectorscan")]
+use config::meta::sql::TableReferenceExt;
 use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, datafusion::request::Request};
 use datafusion::{
     common::{Result, TableReference},
@@ -76,6 +78,8 @@ use infra::schema::get_stream_setting_index_fields;
 
 #[cfg(feature = "enterprise")]
 use crate::datafusion::optimizer::cipher::{RewriteCipherCall, RewriteCipherKey};
+#[cfg(feature = "vectorscan")]
+use crate::datafusion::physical_optimizer::sdr_redact::protected_columns;
 use crate::{
     datafusion::{
         optimizer::{
@@ -324,15 +328,16 @@ fn stream_index_fields(sql: &Sql) -> HashMap<TableReference, HashSet<String>> {
             .into_iter()
             .filter(|index_field| schema.contains_field(index_field))
             .collect::<HashSet<_>>();
-        // An index shortcut on a redacted field would return its raw terms.
+        // Keeps leader planning in line with the scan: the follower never indexes a redacted field.
         #[cfg(feature = "vectorscan")]
         let idx_fields = {
-            use config::meta::sql::TableReferenceExt;
-            let protected = crate::datafusion::physical_optimizer::sdr_redact::protected_columns(
-                &sql.org_id,
-                stream_name.get_stream_type(sql.stream_type),
-                &stream_name.stream_name(),
-            );
+            let stream_type = stream_name.get_stream_type(sql.stream_type);
+            let name = stream_name.stream_name();
+            let protected = if sql.raw_streams.contains(stream_type, &name) {
+                Default::default()
+            } else {
+                protected_columns(&sql.org_id, stream_type, &name)
+            };
             idx_fields
                 .into_iter()
                 .filter(|field| !protected.contains(field))
@@ -436,6 +441,7 @@ mod tests {
             histogram_offset: Some(0),
             sorted_by_time: false,
             sampling_config: None,
+            raw_streams: Default::default(),
         }
     }
 

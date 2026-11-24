@@ -68,6 +68,8 @@ test.describe('IAM · Edit Role · navigation and filtering', { tag: '@enterpris
                         // rendered count disagree with the API for a reason unrelated to
                         // anything under test here.
                         .filter((p) => !(k === 'settings' && p === 'AllowList'))
+                        // logs_unredacted has no LIST in OpenFGA; granting it rejects the whole save.
+                        .filter((p) => !(k === 'logs_unredacted' && p === 'AllowList'))
                         .map((permission) => ({ object: `${k}:_all_${org()}`, permission })),
                 ),
             );

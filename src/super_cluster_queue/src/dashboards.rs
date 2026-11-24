@@ -41,6 +41,7 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
                 new_folder_id.as_deref(),
                 dashboard,
                 true,
+                table::dashboards::PutMode::Upsert,
             )
             .await?;
             // Logged, not returned: a redelivered update could land after a newer one.

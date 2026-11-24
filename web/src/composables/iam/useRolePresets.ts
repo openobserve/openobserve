@@ -81,6 +81,9 @@ const READONLY_PERMS: readonly PermissionType[] = ["AllowList", "AllowGet"];
 // AllowGet on it grants nothing beyond the module itself.
 const DBM_MODULE_PERMS: readonly PermissionType[] = ["AllowList", "AllowGet"];
 
+// Unredacted reads are granted one role at a time, never by a preset.
+const PRESET_EXCLUDED_RESOURCES = ["logs_unredacted"];
+
 const ACTION_ORDER = ["AllowAll", "AllowList", "AllowGet", "AllowPost", "AllowPut", "AllowDelete"];
 
 // The ids AddRole's "Start from" and the `?preset=` link send.
@@ -257,9 +260,9 @@ export const useRolePresets = (deps: PresetDeps) => {
   const resolvePreset = (presetId: string): { grants: Grant[]; matched?: number } | null => {
     if (presetId === "readonly")
       return {
-        grants: permissionsState.permissions.flatMap((resource) =>
-          visible(resource, READONLY_PERMS),
-        ),
+        grants: permissionsState.permissions
+          .filter((resource) => !PRESET_EXCLUDED_RESOURCES.includes(resource.resourceName))
+          .flatMap((resource) => visible(resource, READONLY_PERMS)),
       };
     if (presetId === "dbm") {
       const streams = curatedStreamGrants(
