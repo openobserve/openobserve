@@ -342,7 +342,8 @@ async fn write_logs_by_stream(
                 &json_data,
                 columnar,
                 status,
-                (bulk::STREAM_BEING_DELETED, "stream is being deleted"),
+                bulk::STREAM_BEING_DELETED,
+                "stream is being deleted",
                 response_order.as_deref_mut(),
             );
             continue;
@@ -355,7 +356,8 @@ async fn write_logs_by_stream(
                 &json_data,
                 columnar,
                 status,
-                (bulk::STREAM_NAME_TOO_LONG, &e.to_string()),
+                bulk::STREAM_NAME_TOO_LONG,
+                &e.to_string(),
                 response_order.as_deref_mut(),
             );
             continue;
@@ -466,7 +468,8 @@ fn reject_stream_rows(
     json_data: &[(i64, Map<String, Value>)],
     columnar: Option<columnar::JsonColumnar>,
     status: &mut IngestionStatus,
-    (err_type, reason): (&str, &str),
+    err_type: &str,
+    reason: &str,
     response_order: Option<&mut BulkResponseOrder>,
 ) {
     match status {
@@ -584,7 +587,7 @@ async fn write_logs(
     // End get stream alert
 
     // start check for schema
-    let (mut schema_evolution, mut infer_schema) = resolve_batch_schema(
+    let resolved = resolve_batch_schema(
         org_id,
         stream_name,
         StreamType::Logs,
@@ -593,7 +596,23 @@ async fn write_logs(
         is_derived,
         has_uds,
     )
-    .await?;
+    .await;
+    let (mut schema_evolution, mut infer_schema) = match resolved {
+        // the JSON routes answer from `status`, so count the refused rows before the error
+        Err(e) if e.is_columns_limit_exceeded() => {
+            reject_stream_rows(
+                stream_name,
+                &json_data,
+                columnar,
+                status,
+                SCHEMA_CONFORMANCE_FAILED,
+                &e.to_string(),
+                response_order,
+            );
+            return Err(e);
+        }
+        resolved => resolved?,
+    };
     // the check that turned the UDS on projected the schema, which would drop unpacked columns
     if let Some(fields) = newly_enabled_uds_fields(
         StreamType::Logs,
@@ -942,7 +961,8 @@ mod tests {
             &rows,
             None,
             &mut record,
-            (bulk::STREAM_NAME_TOO_LONG, "too long"),
+            bulk::STREAM_NAME_TOO_LONG,
+            "too long",
             None,
         );
         let IngestionStatus::Record(status) = record else {
@@ -961,7 +981,8 @@ mod tests {
             &rows,
             None,
             &mut bulk,
-            (bulk::STREAM_NAME_TOO_LONG, "too long"),
+            bulk::STREAM_NAME_TOO_LONG,
+            "too long",
             None,
         );
         let IngestionStatus::Bulk(bulk) = bulk else {
@@ -1107,7 +1128,8 @@ mod tests {
             &rows,
             Some(columnar),
             &mut status,
-            (bulk::STREAM_NAME_TOO_LONG, "too long"),
+            bulk::STREAM_NAME_TOO_LONG,
+            "too long",
             Some(&mut order),
         );
         let IngestionStatus::Bulk(mut response) = status else {
