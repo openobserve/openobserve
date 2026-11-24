@@ -25,6 +25,8 @@ const HIDDEN_READONLY_PERMS: Record<string, string[]> = {
   settings: ["AllowList"],
   logs_pattern: ["AllowList"],
   logs_insights: ["AllowList"],
+  // Unredacted reads are granted one role at a time, never by a preset.
+  logs_unredacted: ["AllowList", "AllowGet"],
   logs_cache: ["AllowList", "AllowGet"],
   rum_analytics: ["AllowList", "AllowGet"],
   slack_integration: ["AllowGet"],

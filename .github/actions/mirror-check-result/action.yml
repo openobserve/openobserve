@@ -7,6 +7,9 @@ inputs:
   step-name:
     description: Name of the calling step, which tells earlier mirrors apart from real results
     default: Mirror the last real result
+  checkout-step:
+    description: Name of the calling job's step that checks out this action
+    default: Check out the mirror action
   skipped-is-result:
     description: "'true' when a skipped job is a real verdict (no relevant changes), not a run that never tested"
     default: "false"
@@ -27,6 +30,7 @@ runs:
         RUN_ID: ${{ github.run_id }}
         CHECK_NAME: ${{ inputs.check-name }}
         MIRROR_STEP: ${{ inputs.step-name }}
+        CHECKOUT_STEP: ${{ inputs.checkout-step }}
         SKIPPED_IS_RESULT: ${{ inputs.skipped-is-result }}
         POLL_MINUTES: ${{ inputs.poll-minutes }}
       run: '"$GITHUB_ACTION_PATH/mirror.sh"'
