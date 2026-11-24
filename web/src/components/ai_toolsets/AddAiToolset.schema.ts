@@ -63,6 +63,8 @@ export const makeAddAiToolsetSchema = (
       // `headers` is a form-owned dynamic array-field (no validation rule).
       mcp: z.object({
         url: z.string().optional(),
+        // A preset's URL-template fields; the URL is rebuilt from them, and they are never saved.
+        preset_params: z.record(z.string(), z.string()).optional().default({}),
         timeout_seconds: z.coerce.number().optional(),
         headers: z.array(secretRowSchema).optional().default([]),
         // `null` is an absent key, so the agent's default for that list applies.
@@ -114,6 +116,15 @@ export const makeAddAiToolsetSchema = (
       }
       if (val.kind === "mcp") {
         const mcp = val.mcp ?? ({} as any);
+        for (const [param, value] of Object.entries(mcp.preset_params ?? {})) {
+          if (!String(value).trim()) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["mcp", "preset_params", param],
+              message: t("aiToolset.presetParamRequired"),
+            });
+          }
+        }
         const limits: [string, unknown, readonly [number, number], string][] = [
           [
             "max_calls_per_turn",
@@ -176,6 +187,7 @@ export const addAiToolsetDefaults = (): AddAiToolsetForm => ({
   // A new custom MCP starts with every tool off; the picker turns tools on.
   mcp: {
     url: "",
+    preset_params: {},
     timeout_seconds: 30,
     headers: [],
     allowed_tools: [],

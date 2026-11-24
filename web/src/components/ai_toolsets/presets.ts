@@ -184,3 +184,11 @@ export function reviewUpdate(
   data.preset = { id: ref.id, revision: preset.revision, skipped };
   return description === undefined ? { data } : { description, data };
 }
+
+/** "Datadog: metrics, logs" -> "metrics, logs"; the preset's name is already shown beside it. */
+export function stripPresetName(description: string, name: string): string {
+  const prefix = `${name}:`.toLowerCase();
+  if (!description.toLowerCase().startsWith(prefix)) return description;
+  const rest = description.slice(prefix.length).trim();
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
+}

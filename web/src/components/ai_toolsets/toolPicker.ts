@@ -30,12 +30,6 @@ export interface ToolLists {
 
 export type ToolState = "off" | "allowed" | "write";
 
-/** Which list an "Other entries" row came from. */
-export interface OtherEntry {
-  list: keyof ToolLists;
-  entry: string;
-}
-
 export type ToolsetBadge = "allTools" | "noTools" | "notVerified";
 
 /** A tool the server doesn't promise is harmless: no `readOnlyHint: true`, or `destructiveHint`. */
@@ -77,13 +71,6 @@ export function toolState(lists: ToolLists, tool: DiscoveredTool): ToolState {
   return writes ? "write" : "allowed";
 }
 
-/** A glob, not an exact name, decides this tool, so its control can't change it. */
-export function setByGlob(lists: ToolLists, name: string): boolean {
-  return [lists.allowed, lists.blocked, lists.write].some((list) =>
-    (list ?? []).some((g) => isGlob(g) && globMatches(g, name)),
-  );
-}
-
 const without = (list: string[] | null, name: string) => (list ?? []).filter((e) => e !== name);
 const withName = (list: string[] | null, name: string) =>
   (list ?? []).includes(name) ? [...(list ?? [])] : [...(list ?? []), name];
@@ -119,46 +106,36 @@ export function prefillFromDiscovery(lists: ToolLists, tools: DiscoveredTool[]):
   return lists;
 }
 
-/** "Allow all" turns every tool on, tagged ones as "can change things"; globs keep their say. */
-export function allowAll(lists: ToolLists, tools: DiscoveredTool[]): ToolLists {
-  return tools
-    .filter((t) => !setByGlob(lists, t.name))
-    .reduce((acc, t) => setToolState(acc, t.name, mayWrite(t) ? "write" : "allowed"), lists);
-}
-
-/** "Allow read-only" turns on only the tools the server marks read-only; the rest go off. */
-export function allowReadOnly(lists: ToolLists, tools: DiscoveredTool[]): ToolLists {
-  return tools
-    .filter((t) => !setByGlob(lists, t.name))
-    .reduce((acc, t) => setToolState(acc, t.name, mayWrite(t) ? "off" : "allowed"), lists);
-}
-
-/** Entries naming no listed tool (globs, typed names, tools the server dropped); saved as they are. */
-export function otherEntries(lists: ToolLists, tools: DiscoveredTool[] | null): OtherEntry[] {
+/** Allowed entries naming no listed tool (globs, tools the server dropped); saved as they are. */
+export function otherEntries(lists: ToolLists, tools: DiscoveredTool[] | null): string[] {
   const names = new Set((tools ?? []).map((t) => t.name));
-  const rows: OtherEntry[] = [];
-  for (const list of ["allowed", "blocked", "write"] as const) {
-    for (const entry of lists[list] ?? []) {
-      if (!names.has(entry)) rows.push({ list, entry });
-    }
-  }
-  return rows;
+  return (lists.allowed ?? []).filter((entry) => !names.has(entry));
 }
 
-export function removeEntry(lists: ToolLists, { list, entry }: OtherEntry): ToolLists {
-  return { ...lists, [list]: lists[list] === null ? null : without(lists[list], entry) };
+/** The literal start of a glob such as `apm_*`, or null for an exact name or a leading `*`. */
+export function globPrefix(entry: string): string | null {
+  if (!isGlob(entry)) return null;
+  return entry.split("*")[0] || null;
 }
 
-/** Why a typed tool name can't be added; the field takes exact names, never globs. */
-export function typedToolError(name: string): "glob" | null {
-  return name.includes("*") ? "glob" : null;
+/** Turns one exact tool on or off in `allowed`; `write` is only ever trimmed, never added to. */
+export function setToolOn(lists: ToolLists, name: string, on: boolean): ToolLists {
+  if (!on) return setToolState(lists, name, "off");
+  return {
+    allowed: withName(lists.allowed, name),
+    blocked: lists.blocked === null ? null : without(lists.blocked, name),
+    write: lists.write,
+  };
 }
 
-/** A typed tool name, for when the server can't be listed. */
-export function addTypedTool(lists: ToolLists, name: string, canWrite: boolean): ToolLists {
-  const trimmed = name.trim();
-  if (!trimmed || typedToolError(trimmed)) return lists;
-  return setToolState(lists, trimmed, canWrite ? "write" : "allowed");
+/** Spells globs out as the discovered names they match (a glob matching none stays), so one switch changes exactly one tool. */
+export function expandGlobs(lists: ToolLists, tools: DiscoveredTool[]): ToolLists {
+  const allowed = lists.allowed;
+  if (allowed === null) return { ...lists, allowed: tools.map((t) => t.name) };
+  if (!allowed.some(isGlob)) return lists;
+  const kept = allowed.filter((e) => !isGlob(e) || !tools.some((t) => globMatches(e, t.name)));
+  const matched = tools.filter((t) => matchesAny(allowed, t.name)).map((t) => t.name);
+  return { ...lists, allowed: [...new Set([...kept, ...matched])] };
 }
 
 /** The list page's badges for a saved MCP toolset's `data`. */

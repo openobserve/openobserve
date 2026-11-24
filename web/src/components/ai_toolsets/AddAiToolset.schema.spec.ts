@@ -249,6 +249,7 @@ describe("AddAiToolset.schema", () => {
         region_only: false,
         mcp: {
           url: "",
+          preset_params: {},
           timeout_seconds: 30,
           headers: [],
           allowed_tools: [],

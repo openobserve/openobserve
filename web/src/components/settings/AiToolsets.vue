@@ -34,42 +34,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("aiToolset.resync") }}
         </OButton>
-        <ODropdown align="end">
-          <template #trigger>
-            <OButton
-              data-test="ai-toolsets-add-btn"
-              variant="primary"
-              size="sm"
-              icon-right="keyboard-arrow-down"
-              :aria-label="
-                toolsetDrafts.hasNew
-                  ? t('common.editorDraft.newDot', { label: t('aiToolset.add') })
-                  : undefined
-              "
-              >{{ t("aiToolset.add") }}
-              <EditorDraftDot
-                v-if="toolsetDrafts.hasNew"
-                :saved-at="toolsetDrafts.savedAt(null)"
-                corner
-                data-test="ai-toolsets-add-draft-dot"
-            /></OButton>
-          </template>
-          <ODropdownItem
-            v-for="preset in mcpPresets"
-            :key="preset.id"
-            :data-test="`ai-toolsets-add-${preset.id}`"
-            @select="addToolset({ preset: preset.id })"
-          >
-            {{ preset.label }}
-          </ODropdownItem>
-          <ODropdownItem data-test="ai-toolsets-add-custom-mcp" @select="addToolset()">
-            {{ t("aiToolset.addCustomMcp") }}
-          </ODropdownItem>
-          <ODropdownSeparator />
-          <ODropdownItem data-test="ai-toolsets-add-skill" @select="addToolset({ kind: 'skill' })">
-            {{ t("aiToolset.kindSkill") }}
-          </ODropdownItem>
-        </ODropdown>
+        <OButton
+          data-test="ai-toolsets-add-btn"
+          variant="primary"
+          size="sm"
+          :aria-label="
+            toolsetDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('aiToolset.add') })
+              : undefined
+          "
+          @click="showTypePicker = true"
+        >
+          {{ t("aiToolset.add") }}
+          <EditorDraftDot
+            v-if="toolsetDrafts.hasNew"
+            :saved-at="toolsetDrafts.savedAt(null)"
+            corner
+            data-test="ai-toolsets-add-draft-dot"
+          />
+        </OButton>
       </template>
 
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
@@ -138,73 +121,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :saved-at="toolsetDrafts.savedAt(row.id)"
                 :data-test="`ai-toolsets-${row.name}-draft-dot`"
               />
-              <OBadge
-                v-if="row.needs_credentials"
-                variant="warning-outline"
-                size="sm"
-                :data-test="`ai-toolsets-${row.name}-needs-credentials`"
+              <span
+                v-if="rowNotes(row).warn.length"
+                class="inline-flex"
+                role="img"
+                :aria-label="rowNotes(row).warn.join(' ')"
+                :data-test="`ai-toolsets-${row.name}-warning-icon`"
               >
-                {{ t("aiToolset.needsCredentials") }}
-              </OBadge>
-              <span v-if="row.rename_needed" class="relative inline-flex">
-                <OBadge
-                  variant="warning-outline"
-                  size="sm"
-                  :data-test="`ai-toolsets-${row.name}-rename-needed`"
-                >
-                  {{ t("aiToolset.renameNeeded") }}
-                </OBadge>
-                <OTooltip :max-width="'25rem'" :content="t('aiToolset.renameNeededHint')" />
+                <OIcon name="error-outline" size="sm" class="text-status-warning-text" />
+                <OTooltip :max-width="'25rem'">
+                  <template #content>
+                    <div v-for="line in rowNotes(row).warn" :key="line">{{ line }}</div>
+                  </template>
+                </OTooltip>
               </span>
-              <button
-                v-if="row.presetBadge === 'updated'"
-                type="button"
-                :data-test="`ai-toolsets-${row.name}-preset-updated`"
-                @click.stop="openReview(row)"
+              <span
+                v-if="rowNotes(row).info.length"
+                class="inline-flex"
+                role="img"
+                :aria-label="rowNotes(row).info.join(' ')"
+                :data-test="`ai-toolsets-${row.name}-info-icon`"
               >
-                <OBadge variant="primary-outline" size="sm">
-                  {{ t("aiToolset.presetUpdated") }}
-                </OBadge>
-              </button>
-              <OBadge
-                v-if="row.presetBadge === 'retired'"
-                variant="default-outline"
-                size="sm"
-                :data-test="`ai-toolsets-${row.name}-preset-retired`"
+                <OIcon name="info-outline" size="sm" class="text-text-secondary" />
+                <OTooltip :max-width="'25rem'">
+                  <template #content>
+                    <div v-for="line in rowNotes(row).info" :key="line">{{ line }}</div>
+                  </template>
+                </OTooltip>
+              </span>
+              <span
+                v-if="rowNotes(row).notConnected"
+                class="inline-flex"
+                role="img"
+                :aria-label="t('aiToolset.noteNotConnected')"
+                :data-test="`ai-toolsets-${row.name}-not-connected-icon`"
               >
-                {{ t("aiToolset.presetRetired") }}
-              </OBadge>
-              <OBadge
-                v-if="row.failing"
-                variant="error-outline"
-                size="sm"
-                :data-test="`ai-toolsets-${row.name}-failing`"
-              >
-                {{
-                  t("aiToolset.failingSince", {
-                    time: formatTime(row.failing.since),
-                    error: row.failing.error,
-                  })
-                }}
-              </OBadge>
-              <OBadge
-                v-for="badge in row.badges"
-                :key="badge"
-                :variant="badge === 'allTools' ? 'default-outline' : 'warning-outline'"
-                size="sm"
-                :data-test="`ai-toolsets-${row.name}-badge-${badge}`"
-              >
-                {{ t(BADGE_LABELS[badge]) }}
-                <button
-                  v-if="badge === 'allTools'"
-                  type="button"
-                  class="text-primary-600 ms-1 underline"
-                  :data-test="`ai-toolsets-${row.name}-choose-tools`"
-                  @click.stop="chooseTools(row)"
-                >
-                  {{ t("aiToolset.chooseTools") }}
-                </button>
-              </OBadge>
+                <OIcon name="link-off" size="sm" class="text-text-secondary" />
+                <OTooltip :max-width="'25rem'" :content="t('aiToolset.noteNotConnected')" />
+              </span>
             </div>
           </template>
 
@@ -216,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OPageLayout>
 
     <!-- Add / Edit form -->
-    <div v-else>
+    <div v-else class="min-h-0 flex-1">
       <AddAiToolset @cancel:hideform="hideAddDialog" @update:list="refreshData" />
     </div>
   </div>
@@ -245,6 +199,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:ok="resync"
     @update:cancel="confirmResync = false"
   />
+  <ODialog
+    v-model:open="showTypePicker"
+    :title="t('aiToolset.addModalTitle')"
+    size="lg"
+    data-test="ai-toolsets-type-picker-dialog"
+  >
+    <AiToolsetTypePicker
+      :mcp-presets="mcpPresets"
+      data-test="ai-toolsets-type-picker"
+      @select="onTypeSelected"
+    />
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -269,7 +235,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -282,14 +248,9 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
 import AiToolsetPresetReview from "@/components/ai_toolsets/AiToolsetPresetReview.vue";
 import { presetBadge, type Preset } from "@/components/ai_toolsets/presets";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import {
-  failingSince,
-  toolsetBadges,
-  type ToolsetBadge,
-} from "@/components/ai_toolsets/toolPicker";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import AiToolsetTypePicker from "@/components/ai_toolsets/AiToolsetTypePicker.vue";
+import { failingSince, toolsetBadges } from "@/components/ai_toolsets/toolPicker";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { forbiddenState } from "@/utils/featureGate";
@@ -308,13 +269,12 @@ export default defineComponent({
     ConfirmDialog,
     AddAiToolset,
     AiToolsetPresetReview,
-    ODropdown,
-    ODropdownItem,
-    ODropdownSeparator,
+    ODialog,
+    AiToolsetTypePicker,
     OButton,
     ORefreshButton,
     OTag,
-    OBadge,
+    OIcon,
     OTooltip,
     OSearchInput,
     OTable,
@@ -469,6 +429,22 @@ export default defineComponent({
         dataTest: (row) => `ai-toolset-${row.name}-edit`,
       },
       {
+        id: "review-preset",
+        label: t("aiToolset.reviewPresetUpdate"),
+        icon: "sync",
+        visible: (row) => row.presetBadge === "updated",
+        onSelect: (row) => openReview(row),
+        dataTest: (row) => `ai-toolset-${row.name}-review-preset`,
+      },
+      {
+        id: "choose-tools",
+        label: t("aiToolset.chooseTools"),
+        icon: "tune",
+        visible: (row) => row.badges?.includes("allTools"),
+        onSelect: (row) => chooseTools(row),
+        dataTest: (row) => `ai-toolset-${row.name}-choose-tools`,
+      },
+      {
         id: "delete",
         label: t("common.delete"),
         icon: "delete",
@@ -587,13 +563,37 @@ export default defineComponent({
       });
     };
 
+    const showTypePicker = ref(false);
+    const onTypeSelected = (from: { preset?: string; kind?: string }) => {
+      showTypePicker.value = false;
+      addToolset(from);
+    };
+
     const formatTime = (us: number) =>
       new Date(us / 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-    const BADGE_LABELS: Record<ToolsetBadge, string> = {
-      allTools: "aiToolset.badgeAllTools",
-      noTools: "aiToolset.badgeNoTools",
-      notVerified: "aiToolset.badgeNotVerified",
+    // Lines for the row's three icons: needs action (warn), information only (info), not connected.
+    const rowNotes = (row: any) => {
+      const warn: string[] = [];
+      const info: string[] = [];
+      if (row.needs_credentials) warn.push(t("aiToolset.noteNeedsCredentials"));
+      if (row.rename_needed) warn.push(t("aiToolset.renameNeededHint"));
+      if (row.failing) {
+        warn.push(
+          t("aiToolset.failingSince", {
+            time: formatTime(row.failing.since),
+            error: row.failing.error,
+          }),
+        );
+      }
+      if (row.presetBadge === "retired") warn.push(t("aiToolset.notePresetRetired"));
+      if (row.badges?.includes("noTools")) warn.push(t("aiToolset.noteNoTools"));
+      if (row.presetBadge === "updated") {
+        const preset = (presets.value ?? []).find((p) => p.id === row.data?.preset?.id);
+        info.push(t("aiToolset.notePresetUpdated", { preset: preset?.label ?? row.name }));
+      }
+      if (row.badges?.includes("allTools")) info.push(t("aiToolset.noteAllTools"));
+      return { warn, info, notConnected: !!row.badges?.includes("notVerified") };
     };
 
     // Opens the editor scrolled to the tool picker.
@@ -726,9 +726,11 @@ export default defineComponent({
       visibleRows,
       confirmDelete,
       addToolset,
+      showTypePicker,
+      onTypeSelected,
       editToolset,
       chooseTools,
-      BADGE_LABELS,
+      rowNotes,
       mcpPresets,
       review,
       openReview,

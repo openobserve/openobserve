@@ -21,6 +21,7 @@ import {
   presetDiff,
   renderUrl,
   reviewUpdate,
+  stripPresetName,
   valueHash,
   type Preset,
 } from "./presets";
@@ -123,5 +124,14 @@ describe("presets", () => {
     expect(row.data.allowed_tools).toEqual(["search_datadog_logs"]);
     save(v4, ["allowed_tools"]);
     expect(row.data.preset.skipped).toEqual({});
+  });
+});
+
+describe("stripPresetName", () => {
+  it("drops the name prefix and capitalizes what is left", () => {
+    expect(stripPresetName("Datadog: metrics, logs.", "Datadog")).toBe("Metrics, logs.");
+  });
+  it("keeps a description without the prefix as it is", () => {
+    expect(stripPresetName("metrics, logs.", "Datadog")).toBe("metrics, logs.");
   });
 });

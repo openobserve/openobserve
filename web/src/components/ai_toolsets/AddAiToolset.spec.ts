@@ -281,16 +281,6 @@ describe("AddAiToolset", () => {
       expect(getForm().state.values.mcp.headers[0].key).toBe("B");
       expect(wrapper.vm.mcpHeaders).toHaveLength(1);
     });
-
-    it("toggles a header's password-visibility flag on the form", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.addHeader();
-      await flushPromises();
-
-      wrapper.vm.toggleHeaderVisible(0);
-      await flushPromises();
-      expect(getForm().state.values.mcp.headers[0].visible).toBe(true);
-    });
   });
 
   // The non-negotiable field-array gate (START-HERE ① / brief §2): build >=3
@@ -395,10 +385,8 @@ describe("AddAiToolset", () => {
 
     const picker = () => wrapper.findComponent({ name: "AiToolsetToolPicker" });
 
-    const stateButton = (tool: string, state: string) =>
-      wrapper.find(
-        `[data-test="ai-toolset-tool-${tool}"] [data-test="ai-toolset-tool-state-${state}"]`,
-      );
+    const toolBox = (tool: string) =>
+      wrapper.find(`[data-test="ai-toolset-tool-${tool}"] button[role="checkbox"]`);
 
     it("discovers an edited toolset by id, keeps unknown keys, sends schema 2 and verifies", async () => {
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -433,9 +421,9 @@ describe("AddAiToolset", () => {
         },
       });
       expect(picker().props("status")).toBe("ok");
-      expect(wrapper.find('[data-test="ai-toolset-other-entries"]').text()).toContain("get_*");
+      expect(wrapper.find('[data-test="ai-toolset-tool-get_*"]').text()).toContain("get_*");
 
-      await stateButton("create_monitor", "write").trigger("click");
+      await toolBox("create_monitor").trigger("click");
       await flushPromises();
       await getForm().handleSubmit();
       await flushPromises();
@@ -446,7 +434,7 @@ describe("AddAiToolset", () => {
         url: "https://mcp.example.com/mcp",
         headers: { "DD-API-KEY": "***" },
         allowed_tools: ["search_logs", "get_*", "gone_tool", "create_monitor"],
-        write_tools: ["create_monitor"],
+        write_tools: [],
         rate_limit: { calls: 50, per_seconds: 10 },
         tool_classes: [{ tool: "search_*", class: "logs" }],
         preset: "datadog",
@@ -472,8 +460,12 @@ describe("AddAiToolset", () => {
       });
     });
 
-    it("still saves after a failed discovery, without tools_verified_at, with typed tool names", async () => {
-      editRecord({ url: "https://mcp.example.com/mcp", timeout_seconds: 30, allowed_tools: [] });
+    it("still saves after a failed discovery, without tools_verified_at, and Retry lists again", async () => {
+      editRecord({
+        url: "https://mcp.example.com/mcp",
+        timeout_seconds: 30,
+        allowed_tools: ["run_query"],
+      });
       vi.mocked(aiToolsetsService.discover).mockRejectedValue({
         response: { status: 503, data: { code: "internal_secret_required", message: "no secret" } },
       });
@@ -484,9 +476,10 @@ describe("AddAiToolset", () => {
 
       expect(picker().props("status")).toBe("failed");
       expect(wrapper.find('[data-test="ai-toolset-tools-error"]').text()).toContain("no secret");
-      await wrapper.find('[data-test="ai-toolset-typed-tool"] input').setValue("run_query");
-      await wrapper.find('[data-test="ai-toolset-typed-tool-add"]').trigger("click");
+      await wrapper.find('[data-test="ai-toolset-tools-retry"]').trigger("click");
       await flushPromises();
+      // Opening the saved toolset lists once, then the manual call and Retry.
+      expect(aiToolsetsService.discover).toHaveBeenCalledTimes(3);
 
       await getForm().handleSubmit();
       await flushPromises();
@@ -495,12 +488,12 @@ describe("AddAiToolset", () => {
       expect(data).not.toHaveProperty("tools_verified_at");
     });
 
-    it("warns when a tool that may write is only Allowed", async () => {
+    it("turns a may-write tool on without adding it to write_tools, and off drops it", async () => {
       editRecord({
         url: "https://mcp.example.com/mcp",
         timeout_seconds: 30,
-        allowed_tools: [],
-        write_tools: [],
+        allowed_tools: ["create_monitor"],
+        write_tools: ["create_monitor"],
       });
       vi.mocked(aiToolsetsService.discover).mockResolvedValue({
         data: { tools: DISCOVERED },
@@ -510,17 +503,13 @@ describe("AddAiToolset", () => {
       await (wrapper.vm as any).discoverTools();
       await flushPromises();
 
-      await stateButton("create_monitor", "allowed").trigger("click");
+      await toolBox("create_monitor").trigger("click");
       await flushPromises();
-      expect(picker().props("lists").write).toEqual(["create_monitor"]);
-      expect(wrapper.find('[data-test="ai-toolset-tool-write-warning"]').exists()).toBe(false);
+      expect(picker().props("lists")).toMatchObject({ allowed: [], write: [] });
 
-      await stateButton("create_monitor", "allowed").trigger("click");
+      await toolBox("create_monitor").trigger("click");
       await flushPromises();
-      expect(picker().props("lists").write).toEqual([]);
-      expect(wrapper.find('[data-test="ai-toolset-tool-write-warning"]').text()).toContain(
-        "automatic RCA",
-      );
+      expect(picker().props("lists")).toMatchObject({ allowed: ["create_monitor"], write: [] });
     });
 
     it("drops a discovery for URL A that answers after the form moved to URL B", async () => {
@@ -538,7 +527,7 @@ describe("AddAiToolset", () => {
       getForm().setFieldValue("mcp.url", "https://b.example.com/mcp");
       await flushPromises();
       expect(picker().props("tools")).toBeNull();
-      answers[0]([{ name: "only_on_a" }]);
+      answers[1]([{ name: "only_on_a" }]);
       await discoverA;
       await flushPromises();
       expect(picker().props("tools")).toBeNull();
@@ -546,14 +535,14 @@ describe("AddAiToolset", () => {
 
       const discoverB = (wrapper.vm as any).discoverTools();
       await flushPromises();
-      answers[1]([{ name: "on_b", read_only_hint: true }]);
+      answers[2]([{ name: "on_b", read_only_hint: true }]);
       await discoverB;
       await flushPromises();
       expect(picker().props("tools")).toEqual([{ name: "on_b", read_only_hint: true }]);
       expect(picker().props("lists").allowed).toEqual(["on_b"]);
     });
 
-    it("saves exactly the tools shown as can change things, on a row that had no write_tools", async () => {
+    it("turns a tool on in allowed_tools only, on a row that had no write_tools", async () => {
       editRecord({
         url: "https://mcp.example.com/mcp",
         timeout_seconds: 30,
@@ -567,13 +556,13 @@ describe("AddAiToolset", () => {
       await (wrapper.vm as any).discoverTools();
       await flushPromises();
 
-      await stateButton("search_logs", "write").trigger("click");
+      await toolBox("search_logs").trigger("click");
       await flushPromises();
       await getForm().handleSubmit();
       await flushPromises();
       const data = savedData();
       expect(data.allowed_tools).toEqual(["create_monitor", "search_logs"]);
-      expect(data.write_tools).toEqual(["create_monitor", "search_logs"]);
+      expect(data.write_tools).toEqual(["create_monitor"]);
     });
 
     it("drops a result that answers while a header row has a value but no key yet", async () => {
@@ -590,34 +579,23 @@ describe("AddAiToolset", () => {
 
       getForm().pushFieldValue("mcp.headers", { key: "", value: "secret", visible: false });
       await flushPromises();
-      answers[0]([{ name: "without_the_header" }]);
+      answers[1]([{ name: "without_the_header" }]);
       await pending;
       await flushPromises();
       expect(picker().props("tools")).toBeNull();
       expect(picker().props("lists").allowed).toBeNull();
     });
 
-    it("shows an inline error and adds nothing for a glob typed as a tool name", async () => {
-      editRecord({ url: "https://mcp.example.com/mcp", timeout_seconds: 30, allowed_tools: [] });
-      vi.mocked(aiToolsetsService.discover).mockRejectedValue({
-        response: { status: 503, data: { code: "internal_secret_required", message: "no secret" } },
-      });
+    it("never lists tools on its own while a new toolset is typed in", async () => {
+      vi.useFakeTimers();
       wrapper = createWrapper();
       await flushPromises();
-      await (wrapper.vm as any).discoverTools();
+      getForm().setFieldValue("mcp.url", "https://mcp.example.com/mcp");
       await flushPromises();
-
-      await wrapper.find('[data-test="ai-toolset-typed-tool"] input').setValue("*");
+      vi.advanceTimersByTime(5000);
       await flushPromises();
-      expect(wrapper.find('[data-test="ai-toolset-tool-picker"]').text()).toContain(
-        "* isn't allowed here",
-      );
-      expect(
-        wrapper.find('[data-test="ai-toolset-typed-tool-add"]').attributes("disabled"),
-      ).toBeDefined();
-      await wrapper.find('[data-test="ai-toolset-typed-tool"] input').trigger("keydown.enter");
-      await flushPromises();
-      expect(picker().props("lists").allowed).toEqual([]);
+      expect(aiToolsetsService.discover).not.toHaveBeenCalled();
+      vi.useRealTimers();
     });
 
     it("sends a new toolset's limits and starts with every tool off", async () => {
@@ -655,6 +633,7 @@ describe("AddAiToolset", () => {
       expect(wrapper.find('[data-test="ai-toolset-region-only"]').exists()).toBe(true);
       getForm().setFieldValue("name", "dt-eu");
       getForm().setFieldValue("region_only", true);
+      getForm().setFieldValue("mcp.preset_params.environment", "abc12345");
       getForm().setFieldValue("mcp.headers[0].value", "Bearer t");
       await getForm().handleSubmit();
       await flushPromises();
@@ -663,16 +642,24 @@ describe("AddAiToolset", () => {
       store.state.zoConfig.super_cluster_enabled = false;
     });
 
+    it("blocks the save while a required preset field is blank", async () => {
+      mockQuery = { action: "add", preset: "dynatrace" };
+      wrapper = createWrapper();
+      await flushPromises();
+      getForm().setFieldValue("mcp.headers[0].value", "Bearer t");
+      await getForm().handleSubmit();
+      await flushPromises();
+      expect(aiToolsetsService.create).not.toHaveBeenCalled();
+    });
+
     it("fills an MCP toolset from a preset and stores the preset with its tool classes", async () => {
       mockQuery = { action: "add", preset: "dynatrace" };
       wrapper = createWrapper();
       await flushPromises();
 
       expect(aiToolsetsService.prebuilt).toHaveBeenCalledWith("test-org");
-      expect(wrapper.find('[data-test="ai-toolset-preset-tools"]').text()).toContain(
-        "Preset tools (2)",
-      );
-      const env = wrapper.find('[data-test="ai-toolset-preset-param-environment"]');
+      expect(wrapper.find('[data-test="ai-toolset-tools-count"]').text()).toBe("2 of 2 enabled");
+      const env = wrapper.find('[data-test="ai-toolset-preset-param-environment"] input');
       await env.setValue("abc12345");
       await flushPromises();
       expect(getForm().state.values.mcp.url).toBe("https://abc12345.apps.dynatrace.com/mcp");
@@ -692,7 +679,6 @@ describe("AddAiToolset", () => {
       });
       expect(JSON.stringify(body.data.preset)).not.toContain("abc12345");
 
-      await wrapper.find('[data-test="ai-toolset-preset-tools-customize"]').trigger("click");
       expect(wrapper.find('[data-test="ai-toolset-tool-picker"]').exists()).toBe(true);
     });
 

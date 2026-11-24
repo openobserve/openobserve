@@ -16,7 +16,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import AiToolsets from "./AiToolsets.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import aiToolsetsService from "@/services/ai_toolsets";
 import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
@@ -182,16 +181,14 @@ describe("AiToolsets rename needed badge", () => {
       },
     });
     await flushPromises();
-    const badges = w.findAll("[data-test$='-rename-needed']");
-    expect(badges.map((b) => b.attributes("data-test"))).toEqual([
-      "ai-toolsets-Datadog Prod-rename-needed",
-      "ai-toolsets-datadog-prod-rename-needed",
+    const icons = w.findAll("[data-test$='-warning-icon']");
+    expect(icons.map((b) => b.attributes("data-test"))).toEqual([
+      "ai-toolsets-Datadog Prod-warning-icon",
+      "ai-toolsets-datadog-prod-warning-icon",
     ]);
-    expect(badges[0].text()).toBe("Rename needed");
     const hint =
       "Another toolset has the same name once normalized; delete and re-create one of them";
-    const hints = w.findAllComponents(OTooltip).filter((c) => c.props("content") === hint);
-    expect(hints).toHaveLength(2);
+    expect(icons[0].attributes("aria-label")).toBe(hint);
     w.unmount();
   });
 });
@@ -232,8 +229,10 @@ describe("AiToolsets across regions", () => {
     } as any);
     const w = mountList();
     await flushPromises();
-    const badges = w.findAll("[data-test$='-needs-credentials']");
-    expect(badges.map((b) => b.text())).toEqual(["Add this region's credentials"]);
+    const icons = w.findAll("[data-test$='-warning-icon']");
+    expect(icons.map((b) => b.attributes("aria-label"))).toEqual([
+      "Add this region's credentials.",
+    ]);
     expect(w.find('[data-test="ai-toolsets-resync-btn"]').exists()).toBe(false);
     w.unmount();
   });
@@ -325,25 +324,39 @@ describe("AiToolsets tool badges", () => {
     });
     await flushPromises();
 
-    const badges = w
-      .findAll("[data-test*='-badge-']")
-      .map((b) => [b.attributes("data-test"), b.text()]);
-    expect(badges).toEqual([
-      ["ai-toolsets-legacy-badge-allTools", "All tools allowed choose tools"],
-      ["ai-toolsets-empty-badge-noTools", "No tools allowed"],
-      ["ai-toolsets-typed-badge-notVerified", "Not verified"],
+    const label = (kind: string) =>
+      w
+        .findAll(`[data-test$='-${kind}-icon']`)
+        .map((i) => [i.attributes("data-test"), i.attributes("aria-label")]);
+    expect(label("info")).toEqual([
+      ["ai-toolsets-legacy-info-icon", "Every tool on the server is allowed."],
     ]);
+    expect(label("not-connected")).toEqual([
+      [
+        "ai-toolsets-typed-not-connected-icon",
+        "Not connected yet. Its tools were never checked against the server. Open it and click Connect.",
+      ],
+    ]);
+    const warn = label("warning");
+    expect(warn.map((x) => x[0])).toEqual([
+      "ai-toolsets-empty-warning-icon",
+      "ai-toolsets-down-warning-icon",
+    ]);
+    expect(warn[0][1]).toBe("No tools are allowed.");
+    expect(warn[1][1]).toMatch(/^Failing since .+: 401 Unauthorized$/);
+    expect(w.find("[data-test^='ai-toolsets-ok-']").exists()).toBe(false);
+    expect(w.find("[data-test^='ai-toolsets-stale-']").exists()).toBe(false);
 
-    const failing = w.findAll("[data-test$='-failing']");
-    expect(failing.map((b) => b.attributes("data-test"))).toEqual(["ai-toolsets-down-failing"]);
-    expect(failing[0].text()).toMatch(/^Failing since .+: 401 Unauthorized$/);
-
+    const vm = w.vm as any;
+    const action = (id: string) => vm.rowActions.find((x: any) => x.id === id);
     const push = vi.spyOn(router, "push");
-    await w.find("[data-test='ai-toolsets-legacy-choose-tools']").trigger("click");
+    action("choose-tools").onSelect({ id: "a", name: "legacy", badges: ["allTools"] });
     expect(push).toHaveBeenCalledWith({
       query: expect.objectContaining({ action: "edit", id: "a", section: "tools" }),
     });
     push.mockRestore();
+    expect(action("choose-tools").visible({ badges: ["allTools"] })).toBe(true);
+    expect(action("choose-tools").visible({ badges: ["noTools"] })).toBe(false);
     w.unmount();
   });
 });
@@ -394,11 +407,11 @@ describe("AiToolsets failing badge", () => {
       },
     });
     await flushPromises();
-    expect(w.find("[data-test='ai-toolsets-down-failing']").exists()).toBe(true);
+    expect(w.find("[data-test='ai-toolsets-down-warning-icon']").exists()).toBe(true);
 
     vi.advanceTimersByTime(90_000);
     await flushPromises();
-    expect(w.find("[data-test='ai-toolsets-down-failing']").exists()).toBe(false);
+    expect(w.find("[data-test='ai-toolsets-down-warning-icon']").exists()).toBe(false);
     w.unmount();
   });
 });
@@ -462,16 +475,33 @@ describe("AiToolsets presets", () => {
     await flushPromises();
     const vm = w.vm as any;
     expect(vm.mcpPresets.map((p: any) => p.id)).toEqual(["datadog"]);
-    expect(w.find("[data-test='ai-toolsets-old-preset-retired']").exists()).toBe(true);
+    expect(w.find("[data-test='ai-toolsets-old-warning-icon']").attributes("aria-label")).toBe(
+      "This preset is retired.",
+    );
+    expect(w.find("[data-test='ai-toolsets-dd-info-icon']").attributes("aria-label")).toBe(
+      "A newer version of the Datadog preset is available.",
+    );
+    const reviewAction = vm.rowActions.find((x: any) => x.id === "review-preset");
+    expect(reviewAction.visible({ presetBadge: "updated" })).toBe(true);
+    expect(reviewAction.visible({ presetBadge: "retired" })).toBe(false);
 
     const push = vi.spyOn(router, "push");
     vm.addToolset({ preset: "datadog" });
     expect(push).toHaveBeenCalledWith({
       query: expect.objectContaining({ action: "add", preset: "datadog" }),
     });
+
+    push.mockClear();
+    await w.find("[data-test='ai-toolsets-add-btn']").trigger("click");
+    expect(vm.showTypePicker).toBe(true);
+    await w.find("[data-test='ai-toolsets-add-skill']").trigger("click");
+    expect(vm.showTypePicker).toBe(false);
+    expect(push).toHaveBeenCalledWith({
+      query: expect.objectContaining({ action: "add", kind: "skill" }),
+    });
     push.mockRestore();
 
-    await w.find("[data-test='ai-toolsets-dd-preset-updated']").trigger("click");
+    reviewAction.onSelect(vm.tabledata.find((r: any) => r.name === "dd"));
     await flushPromises();
     expect(w.find("[data-test='ai-toolset-preset-diff-allowed_tools']").exists()).toBe(true);
     await w.find("[data-test='apply']").trigger("click");

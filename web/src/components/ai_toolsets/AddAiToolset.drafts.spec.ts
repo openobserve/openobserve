@@ -228,7 +228,7 @@ describe("AddAiToolset drafts", () => {
     window.dispatchEvent(new Event("pagehide"));
     expect(readEditorDraft(editScope)).toBeNull();
 
-    click("ai-toolset-cancel-btn");
+    click("ai-toolset-back-btn");
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).toBeNull();
     expect(router.currentRoute.value.query.action).toBeUndefined();
