@@ -16,7 +16,10 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(async () => undefined),
 }));
 
-vi.mock("vuex", () => ({ useStore: () => ({ state: mocks.state }) }));
+vi.mock("vuex", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vuex")>()),
+  useStore: () => ({ state: mocks.state }),
+}));
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock("@/composables/query/readQuery", () => ({
   readQuery: async () => (mocks.read ? mocks.read() : mocks.destinations),
@@ -1443,6 +1446,7 @@ describe("StarterPackDrawer", () => {
     const confirm = wrapper.get('[data-test="starter-pack-drawer-confirm"]');
     expect(confirm.text()).toContain("Remove pack?");
     expect(confirm.text()).toContain("Removes 1 item · 1 live alert loses cover");
+    expect(flow.countAlertsOn).toHaveBeenCalledWith("remove");
     expect(has(wrapper, "starter-pack-drawer-open-btn")).toBe(false);
     await wrapper.get('[data-test="starter-pack-drawer-confirm-cancel-btn"]').trigger("click");
     expect(has(wrapper, "starter-pack-drawer-confirm")).toBe(false);

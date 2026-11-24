@@ -18,6 +18,7 @@ import { ref } from "vue";
 
 import type { FindMoreSource } from "./findMore";
 import { matchesKey, resetBrowserMatches, useBrowserMatches } from "./useBrowserMatches";
+import store from "@/stores";
 import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
 
 loadCatalogFixture();
@@ -35,22 +36,48 @@ const NGINX = source("postgresql", "postgresql");
 const DOCKER = source("docker", "docker");
 const LIBRARY = source("library-k8s");
 
+const ME = "me@x.io";
+
 const result = (sources: FindMoreSource[]) => ({ checkedAt: 1, sources, dismissed: 0 });
 
 describe("useBrowserMatches", () => {
   beforeEach(() => {
     window.localStorage.clear();
     resetBrowserMatches();
+    store.commit("setUserInfo", { email: ME });
   });
   afterEach(() => vi.restoreAllMocks());
 
   it("keeps each org's copy under its own key", () => {
     useBrowserMatches("a").saveFull(result([NGINX]), ["hosts"]);
     useBrowserMatches("b").saveFull(result([DOCKER]), []);
-    expect(JSON.parse(window.localStorage.getItem(matchesKey("a"))!).sources).toEqual([NGINX]);
-    expect(JSON.parse(window.localStorage.getItem(matchesKey("b"))!).sources).toEqual([DOCKER]);
+    expect(JSON.parse(window.localStorage.getItem(matchesKey("a", ME))!).sources).toEqual([NGINX]);
+    expect(JSON.parse(window.localStorage.getItem(matchesKey("b", ME))!).sources).toEqual([DOCKER]);
     resetBrowserMatches();
     expect(useBrowserMatches("a").copy.value?.sources).toEqual([NGINX]);
+  });
+
+  it("keeps each signed-in user's copy under its own key", () => {
+    useBrowserMatches("a").saveFull(result([NGINX]), []);
+    store.commit("setUserInfo", { email: "other@x.io" });
+    expect(useBrowserMatches("a").copy.value).toBeNull();
+    expect(matchesKey("a", ME)).not.toBe(matchesKey("a", "other@x.io"));
+    expect(JSON.parse(window.localStorage.getItem(matchesKey("a", ME))!).sources).toEqual([NGINX]);
+    expect(window.localStorage.getItem(matchesKey("a", "other@x.io"))).toBeNull();
+  });
+
+  it("neither reads nor stores a copy while no signed-in user is known", () => {
+    const saved = { checkedAt: 1, sources: [NGINX], installedPackIds: [], interrupted: null };
+    window.localStorage.setItem(matchesKey("a", ""), JSON.stringify(saved));
+    store.commit("setUserInfo", {});
+    const matches = useBrowserMatches("a");
+    expect(matches.copy.value).toBeNull();
+
+    window.localStorage.removeItem(matchesKey("a", ""));
+    matches.saveFull(result([DOCKER]), []);
+
+    expect(matches.copy.value?.sources).toEqual([DOCKER]);
+    expect(window.localStorage.length).toBe(0);
   });
 
   it("follows the org it is given", () => {
@@ -82,12 +109,12 @@ describe("useBrowserMatches", () => {
   });
 
   it("reads invalid JSON as nothing saved", () => {
-    window.localStorage.setItem(matchesKey("org"), "{not json");
+    window.localStorage.setItem(matchesKey("org", ME), "{not json");
     expect(useBrowserMatches("org").copy.value).toBeNull();
   });
 
   it("reads a copy of the wrong shape as nothing saved", () => {
-    window.localStorage.setItem(matchesKey("org"), JSON.stringify({ sources: "x" }));
+    window.localStorage.setItem(matchesKey("org", ME), JSON.stringify({ sources: "x" }));
     expect(useBrowserMatches("org").copy.value).toBeNull();
   });
 
@@ -112,12 +139,12 @@ describe("useBrowserMatches", () => {
     now.mockReturnValue(3000);
     matches.saveBuiltIn([HOSTS], ["kubernetes"], null);
     expect(matches.copy.value?.checkedAt).toBe(3000);
-    expect(JSON.parse(window.localStorage.getItem(matchesKey("org"))!).checkedAt).toBe(3000);
+    expect(JSON.parse(window.localStorage.getItem(matchesKey("org", ME))!).checkedAt).toBe(3000);
   });
 
   it("drops saved sources without a streams list", () => {
     window.localStorage.setItem(
-      matchesKey("org"),
+      matchesKey("org", ME),
       JSON.stringify({
         checkedAt: 1,
         sources: [NGINX, { ...DOCKER, streams: undefined }, { ...HOSTS, streams: "x" }],
@@ -132,12 +159,14 @@ describe("useBrowserMatches", () => {
     const matches = useBrowserMatches("org");
     matches.saveFull(result([HOSTS, LIBRARY]), []);
     expect(matches.visible.value).toEqual([HOSTS]);
-    expect(JSON.parse(window.localStorage.getItem(matchesKey("org"))!).sources).toEqual([HOSTS]);
+    expect(JSON.parse(window.localStorage.getItem(matchesKey("org", ME))!).sources).toEqual([
+      HOSTS,
+    ]);
   });
 
   it("drops Library groups from a copy saved by an older version", () => {
     window.localStorage.setItem(
-      matchesKey("org"),
+      matchesKey("org", ME),
       JSON.stringify({ checkedAt: 1, sources: [LIBRARY, HOSTS], installedPackIds: [] }),
     );
     expect(useBrowserMatches("org").visible.value).toEqual([HOSTS]);
@@ -227,7 +256,7 @@ describe("useBrowserMatches", () => {
     useBrowserMatches("a").clear();
     expect(reader.copy.value).toBeNull();
     expect(reader.show.value).toBe(false);
-    expect(window.localStorage.getItem(matchesKey("a"))).toBeNull();
+    expect(window.localStorage.getItem(matchesKey("a", ME))).toBeNull();
     resetBrowserMatches();
     expect(useBrowserMatches("a").copy.value).toBeNull();
     expect(useBrowserMatches("b").copy.value?.sources).toEqual([DOCKER]);

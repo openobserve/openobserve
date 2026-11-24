@@ -85,6 +85,23 @@ describe("expireSession", () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
+  it.each([false, true])(
+    "removes this browser's starter pack keys whatever clearLocalStorage is (%s)",
+    (clearLocalStorage) => {
+      vi.stubGlobal("location", { ...window.location, reload: vi.fn() });
+      localStorage.setItem("o2.starterPacks.browserMatches.org.me@x.io", "{}");
+      localStorage.setItem("o2.starterPacks.browserMatches.other.you@x.io", "{}");
+      localStorage.setItem("o2_draft:function:o:f:me%40x.io", "{}");
+      const store = { state: { zoConfig: { rum: { enabled: false } } }, dispatch: vi.fn() };
+
+      expireSession(store, { clearLocalStorage });
+
+      const keys = Object.keys(localStorage);
+      expect(keys.filter((key) => key.startsWith("o2.starterPacks."))).toEqual([]);
+      expect(localStorage.getItem("o2_draft:function:o:f:me%40x.io")).toBe("{}");
+    },
+  );
+
   it("goes to the login page instead of reloading when asked, keeping the drafts", () => {
     const reload = vi.fn();
     const assign = vi.fn();
