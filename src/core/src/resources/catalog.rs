@@ -32,7 +32,7 @@ const COLD_WAIT: Duration = Duration::from_millis(300);
 const BUILD_TIMEOUT: Duration = Duration::from_secs(30);
 const IDLE: Duration = Duration::from_secs(15 * 60);
 // Builds of one entry start at least this far apart, so a burst of events costs one rebuild.
-const REBUILD_INTERVAL: Duration = Duration::from_secs(5);
+const REBUILD_INTERVAL: Duration = Duration::from_secs(60);
 // Bounds how stale an entry gets when an event is lost.
 const MAX_AGE: Duration = Duration::from_secs(5 * 60);
 
