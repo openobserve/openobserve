@@ -34,6 +34,7 @@ const testLogger = require("../utils/test-logger.js");
 const { JoinHelper, getTableRowCount, verifyJoinChipVisible } = require("../../pages/dashboardPages/dashboard-joins.js");
 const { getAuthHeaders, getOrgIdentifier } = require("../utils/cloud-auth.js");
 const { deleteDashboardsTitled, deleteLogStream } = require("../utils/dashboard-seed-api.js");
+const { waitForStreamData } = require("../utils/data-ingestion.js");
 
 // Test data files (from CI-accessible location)
 const testAppUsers = require("../../../test-data/joins/test_app_users.json");
@@ -77,43 +78,20 @@ const ingestJoinTestData = async (streamName, data) => {
   return fetchResponse.json();
 };
 
-const verifyStreamExists = async (streamName, maxWaitMs = 60000) => {
-  const orgId = getOrgIdentifier();
-  const baseUrl = process.env["INGESTION_URL"] || "http://localhost:5080";
-  const headers = getAuthHeaders();
-  const startTime = Date.now();
-
-  while (Date.now() - startTime < maxWaitMs) {
-    try {
-      const response = await fetch(`${baseUrl}/api/${orgId}/streams?type=logs`, { headers });
-      if (response.ok) {
-        const data = await response.json();
-        const streams = data.list || [];
-        if (streams.some(s => s.name === streamName)) {
-          testLogger.info(`Stream ${streamName} verified as available`);
-          return true;
-        }
-      }
-    } catch (e) {
-      // Ignore errors, continue polling
-    }
-    await new Promise(resolve => setTimeout(resolve, 2000));
-  }
-  testLogger.info(`Stream ${streamName} not found after ${maxWaitMs}ms`);
-  return false;
+const waitForRows = async (page, streamName, expectedRows) => {
+  expect(await waitForStreamData(page, streamName, expectedRows, 60000), `${streamName} must be searchable`).toBe(true);
 };
 
-const ingestTestData = async (streams) => {
+const ingestTestData = async (page, streams) => {
   testLogger.info(`Ingesting test data for streams: ${streams.WEB_REQUESTS}, ${streams.APP_USERS}, ${streams.SESSIONS}`);
   await ingestJoinTestData(streams.APP_USERS, testAppUsers);
   await ingestJoinTestData(streams.SESSIONS, testSessions);
   await ingestJoinTestData(streams.WEB_REQUESTS, testWebRequests);
 
-  testLogger.info("Verifying streams are indexed (polling up to 60 seconds)...");
   await Promise.all([
-    verifyStreamExists(streams.WEB_REQUESTS, 60000),
-    verifyStreamExists(streams.APP_USERS, 60000),
-    verifyStreamExists(streams.SESSIONS, 60000),
+    waitForRows(page, streams.WEB_REQUESTS, testWebRequests.length),
+    waitForRows(page, streams.APP_USERS, testAppUsers.length),
+    waitForRows(page, streams.SESSIONS, testSessions.length),
   ]);
   testLogger.info("All streams verified");
 };
@@ -168,7 +146,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
     const dashboardName = generateDashboardName(testId);
 
     // Ingest data FIRST, then navigate to ensure fresh stream data is loaded
-    await ingestTestData(STREAMS);
+    await ingestTestData(page, STREAMS);
 
     await navigateToDashboards(page);
 
@@ -281,7 +259,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
     const dashboardName = generateDashboardName(testId);
 
     // Ingest data FIRST, then navigate to ensure fresh stream data is loaded
-    await ingestTestData(STREAMS);
+    await ingestTestData(page, STREAMS);
 
     await navigateToDashboards(page);
 
@@ -404,7 +382,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
     const dashboardName = generateDashboardName(testId);
 
     // Ingest data FIRST, then navigate to ensure fresh stream data is loaded
-    await ingestTestData(STREAMS);
+    await ingestTestData(page, STREAMS);
 
     await navigateToDashboards(page);
 
@@ -541,7 +519,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
     const dashboardName = generateDashboardName(testId);
 
     // Ingest data FIRST, then navigate to ensure fresh stream data is loaded
-    await ingestTestData(STREAMS);
+    await ingestTestData(page, STREAMS);
 
     await navigateToDashboards(page);
 
@@ -670,7 +648,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
     const dashboardName = generateDashboardName(testId);
 
     // Ingest data FIRST, then navigate to ensure fresh stream data is loaded
-    await ingestTestData(STREAMS);
+    await ingestTestData(page, STREAMS);
 
     await navigateToDashboards(page);
 
@@ -861,7 +839,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
     const dashboardName = generateDashboardName(testId);
 
     // Ingest data FIRST, then navigate to ensure fresh stream data is loaded
-    await ingestTestData(STREAMS);
+    await ingestTestData(page, STREAMS);
 
     await navigateToDashboards(page);
 
@@ -956,7 +934,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
     const dashboardName = generateDashboardName(testId);
 
     // Ingest data FIRST, then navigate to ensure fresh stream data is loaded
-    await ingestTestData(STREAMS);
+    await ingestTestData(page, STREAMS);
 
     await navigateToDashboards(page);
 
@@ -1032,7 +1010,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
     const dashboardName = generateDashboardName(testId);
 
     // Ingest data FIRST, then navigate to ensure fresh stream data is loaded
-    await ingestTestData(STREAMS);
+    await ingestTestData(page, STREAMS);
 
     await navigateToDashboards(page);
 

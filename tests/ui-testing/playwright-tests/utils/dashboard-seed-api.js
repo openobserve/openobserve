@@ -219,7 +219,8 @@ async function pinnedHomeDashboardId(page) {
 async function restoreHomePin(page, before) {
   const priorValue = (before.status < 400 ? before.body : null)?.setting_value ?? null;
   if (priorValue) {
-    await dashboardApi(page, 'POST', `/api/${orgIdentifier()}/settings/v2`, { setting_key: HOME_PIN_KEY, setting_value: priorValue, setting_category: 'ui' });
+    const { status, body } = await dashboardApi(page, 'POST', `/api/${orgIdentifier()}/settings/v2`, { setting_key: HOME_PIN_KEY, setting_value: priorValue, setting_category: 'ui' });
+    if (status >= 400) testLogger.warn(`restoring the home pin -> ${status}`, { body });
   } else {
     await deleteOrWarn(page, `/api/${orgIdentifier()}/settings/v2/${HOME_PIN_KEY}`);
   }
