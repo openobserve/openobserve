@@ -15,13 +15,13 @@
 
 //! The investigation thread of an RCA run, projected from its chat session.
 
-use std::borrow::Cow;
-
 use config::{
     meta::{
         alerts::rca_steering::SteerKind,
         oncall::{
-            confidence::{KEY_ARG_MAX_BYTES, cut_bytes, is_prometheus_tool, strip_call_ref},
+            confidence::{
+                KEY_ARG_MAX_BYTES, ToolsetNames, cut_bytes, is_prometheus_tool, strip_call_ref,
+            },
             rca_run::summarize_result,
         },
     },
@@ -38,8 +38,7 @@ use utoipa::ToSchema;
 use super::{
     projection::{
         Folded, HIDDEN_TOOLS, SESSION_ARG, coerce_tool_output, extract_error_message,
-        extract_mcp_response, gateway_call, is_gateway_call, is_injected, obj, strip_mcp_prefix,
-        truthy,
+        extract_mcp_response, is_injected, obj, strip_mcp_prefix, truthy, vendor_label,
     },
     rca_ledger::{ASK_RESPONDERS, question_of, split_steers},
 };
@@ -92,16 +91,9 @@ impl ThreadPart {
 
 pub(crate) struct ToolPart<'a> {
     part: &'a Map<String, Value>,
-    /// Empty when a `tools_call` or gateway call names no tool; a gateway call's key
-    /// (`<toolset>_<tool>`, `cli_<toolset>`) otherwise.
-    pub(crate) tool: Cow<'a, str>,
-    /// What a gateway call shows; set only for one, which is always a vendor row.
-    label: Option<String>,
-    /// A gateway CLI run, whose stdout is data and never its exit code or error.
-    gateway_cli: bool,
-    /// A gateway MCP call's own `(toolset, tool)`, which the grade classes by.
-    pub(crate) vendor: Option<(&'a str, &'a str)>,
-    /// `tools_call`'s or a gateway call's arguments, else the part's input.
+    /// Empty when a `tools_call` names no tool.
+    pub(crate) tool: &'a str,
+    /// `tools_call`'s arguments, else the part's input.
     input: Option<&'a Map<String, Value>>,
     pub(crate) state: Option<&'a Map<String, Value>>,
     /// `state.status`: `pending`, `running`, `completed` or `error`.
@@ -120,77 +112,40 @@ impl<'a> ToolPart<'a> {
             .and_then(Value::as_str)
             .unwrap_or_default();
         let mut input = state.and_then(|s| obj(s.get("input")));
-        let name = strip_mcp_prefix(part.get("tool").and_then(Value::as_str).unwrap_or_default());
-        let mut tool = Cow::Borrowed(name);
-        let mut label = None;
-        let mut gateway_cli = false;
-        let mut vendor = None;
-        if name == "tools_call" {
-            tool = Cow::Borrowed(strip_mcp_prefix(
+        let mut tool =
+            strip_mcp_prefix(part.get("tool").and_then(Value::as_str).unwrap_or_default());
+        if tool == "tools_call" {
+            tool = strip_mcp_prefix(
                 input
                     .and_then(|i| i.get("tool"))
                     .and_then(Value::as_str)
                     .unwrap_or_default(),
-            ));
+            );
             input = input.and_then(|i| obj(i.get("args")));
-        } else if let Some(call) = gateway_call(name, input) {
-            tool = Cow::Owned(call.key);
-            label = Some(call.label);
-            gateway_cli = call.cli;
-            vendor = (!call.cli).then_some((call.toolset, call.tool));
-            input = call.args;
-        } else if is_gateway_call(name) {
-            tool = Cow::Borrowed("");
         }
         Some(Self {
             part,
             tool,
-            label,
-            gateway_cli,
-            vendor,
             input,
             state,
             status,
         })
     }
 
-    /// How the part counts in the thread.
+    /// How the part counts in the thread; first-party names never split, so no toolset changes it.
     pub(crate) fn kind(&self) -> ThreadPart {
-        if self.label.is_some() {
-            return ThreadPart::Row;
-        }
-        ThreadPart::of(&self.tool, self.status, self.arg("stage"))
+        ThreadPart::of(self.tool, self.status, self.arg("stage"))
     }
 
-    /// What a row shows: `tool`, or `<toolset> · <tool>` for a vendor call.
-    pub(crate) fn label(&self) -> &str {
-        self.label.as_deref().unwrap_or(&self.tool)
+    /// A toolset call's own `(toolset, tool)`, from the part's name as the agent had it.
+    pub(crate) fn vendor(&self, toolsets: &ToolsetNames) -> Option<(&'a str, &'a str)> {
+        toolsets.split(self.part.get("tool")?.as_str()?)
     }
 
-    /// The result the summary and failure rules read: a gateway CLI's stdout stays one string,
-    /// with only the part's `metadata` beside it.
-    pub(crate) fn body(&self) -> Value {
-        let empty = Map::new();
-        let state = self.state.unwrap_or(&empty);
-        if !self.gateway_cli {
-            return tool_body(state);
-        }
-        let output = match state.get("output") {
-            Some(Value::String(text)) => text.clone(),
-            Some(Value::Null) | None => String::new(),
-            Some(other) => other.to_string(),
-        };
-        let mut body = Map::new();
-        body.insert("output".into(), Value::String(output));
-        if let Some(metadata) = state.get("metadata").filter(|m| truthy(m)) {
-            body.insert("metadata".into(), metadata.clone());
-        }
-        Value::Object(body)
-    }
-
-    /// The tool for matching RCA control tools; empty for a vendor call, whose key can spell one.
-    pub(crate) fn control_tool(&self) -> &str {
-        if self.label.is_some() { "" } else { &self.tool }
+    /// What a row shows: `tool`, or `<toolset> · <tool>` for a toolset call.
+    pub(crate) fn label(&self, toolsets: &ToolsetNames) -> String {
+        self.vendor(toolsets)
+            .map_or_else(|| self.tool.to_string(), vendor_label)
     }
 
     /// One argument.
@@ -443,17 +398,30 @@ pub fn state_version(
     format!("{last_committed_seq}.{session_updated_at}.{run_updated_at}{io}")
 }
 
-/// The thread of an RCA session.
+/// [`project_rca_thread_with`] for a caller that shows no tool names, such as one after the stats.
 pub fn project_rca_thread(
     events: &[DurableEvent],
     turns: &[ai_chat_turns::Model],
     active: bool,
     show_tool_io: bool,
 ) -> RcaThread {
+    let toolsets = ToolsetNames::default();
+    project_rca_thread_with(events, turns, active, show_tool_io, &toolsets)
+}
+
+/// The thread of an RCA session; a call of one of `toolsets` shows as `toolset · tool`.
+pub fn project_rca_thread_with(
+    events: &[DurableEvent],
+    turns: &[ai_chat_turns::Model],
+    active: bool,
+    show_tool_io: bool,
+    toolsets: &ToolsetNames,
+) -> RcaThread {
     let folded = Folded::fold(events);
     let mut builder = Builder {
         active,
         show_tool_io,
+        toolsets: Some(toolsets),
         ..Default::default()
     };
     let empty = Map::new();
@@ -482,9 +450,10 @@ pub fn project_rca_thread(
 }
 
 #[derive(Default)]
-struct Builder {
+struct Builder<'a> {
     active: bool,
     show_tool_io: bool,
+    toolsets: Option<&'a ToolsetNames>,
     started: Option<ThreadStart>,
     user_messages: Vec<ThreadUserMessage>,
     /// Steering messages in `user_messages` the agent has not read yet.
@@ -506,7 +475,7 @@ struct StepAcc {
     last_end: Option<i64>,
 }
 
-impl Builder {
+impl Builder<'_> {
     fn observe(&mut self, ms: Option<&Value>) {
         let Some(ms) = ms.and_then(as_i64) else {
             return;
@@ -619,7 +588,7 @@ impl Builder {
             ThreadPart::FailedStep => return,
             ThreadPart::Hidden => {
                 if call.status == "completed" {
-                    match call.control_tool() {
+                    match call.tool {
                         SUBMIT_REPORT => self.report_submitted = true,
                         ASK_RESPONDERS => {
                             let asked = question_of(&call);
@@ -644,7 +613,7 @@ impl Builder {
         let (status, result_summary, error) = match call.status {
             "completed" => (
                 ToolCallStatus::Ok,
-                Some(summarize_result(&call.tool, &call.body()).0),
+                Some(summarize_result(call.tool, &tool_body(state)).0),
                 None,
             ),
             "error" => (
@@ -668,8 +637,10 @@ impl Builder {
         };
         let row = ThreadToolCall {
             call_id,
-            key_arg: key_arg(&call.tool, &input),
-            tool: call.label().to_string(),
+            key_arg: key_arg(call.tool, &input),
+            tool: self
+                .toolsets
+                .map_or_else(|| call.tool.to_string(), |t| call.label(t)),
             status,
             interrupted: !self.active && !matches!(call.status, "completed" | "error"),
             started_at,
@@ -1358,169 +1329,105 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn a_toolset_tool_call_is_a_toolset_row_and_listings_are_hidden() {
+    fn a_toolset_call_is_a_toolset_row_and_an_unknown_prefix_keeps_its_name() {
         let mut s = Session::new();
         s.message("msg_a1", "assistant", json!({"created": T}));
-        s.tool(
-            "msg_a1",
-            "prt_t1",
-            "toolset_list_tools",
-            "completed",
-            json!({"toolset_name": "datadog-prod"}),
-            json!({"output": "[]"}),
-            100,
-            110,
-        );
-        s.tool(
-            "msg_a1",
-            "prt_t3",
-            "toolset_read_output",
-            "completed",
-            json!({"ref": "toolset_tool_call-call_1", "offset": 16000}),
-            json!({"output": "{\"text\":\"x\",\"next_offset\":null}"}),
-            112,
-            115,
-        );
-        s.tool(
-            "msg_a1",
-            "prt_t2",
-            "toolset_tool_call",
-            "completed",
-            json!({"toolset_name": "datadog-prod", "tool_name": "search_logs",
-                "args": {"query": "service:checkout status:error"}}),
-            json!({"output": "{\"hits\":3}"}),
-            120,
-            180,
-        );
-
-        let thread = project_rca_thread(&s.events, &[], false, false);
-        let rows = &thread.steps[0].tool_calls;
-        assert_eq!(
-            rows.len(),
-            1,
-            "toolset_list_tools and toolset_read_output are no rows"
-        );
-        assert_eq!(rows[0].tool, "datadog-prod · search_logs");
-        assert_eq!(
-            rows[0].key_arg.as_deref(),
-            Some("{\"query\":\"service:checkout status:error\"}")
-        );
-
-        let part = json!({"type": "tool", "tool": "toolset_tool_call", "state": {"status": "completed",
-            "input": {"toolset_name": "datadog-prod", "tool_name": "search_logs", "args": {"q": 1}}}});
-        let call = ToolPart::of(part.as_object().unwrap()).unwrap();
-        assert_eq!(
-            call.tool, "datadog-prod_search_logs",
-            "the signal-class key"
-        );
-        assert_eq!(call.args(), *json!({"q": 1}).as_object().unwrap());
-        let nameless = json!({"type": "tool", "tool": "toolset_tool_call",
-            "state": {"status": "completed", "input": {"toolset_name": "datadog-prod"}}});
-        let call = ToolPart::of(nameless.as_object().unwrap()).unwrap();
-        assert_eq!(call.kind(), ThreadPart::Hidden);
-    }
-
-    #[test]
-    fn a_vendor_call_whose_key_spells_a_control_or_hidden_tool_is_a_vendor_row() {
-        let mut s = Session::new();
-        s.message("msg_a1", "assistant", json!({"created": T}));
-        let cases = [
+        let calls = [
+            ("toolset_read_output", json!({"ref": "r1", "offset": 16000})),
             (
-                "record",
-                "step",
-                json!({"stage": "metrics", "title": "Vendor step"}),
+                "datadog-prod_search_logs",
+                json!({"query": "service:checkout"}),
             ),
-            ("submit", "report", json!({"markdown": "## Root cause"})),
-            ("tool", "search", json!({"query": "x"})),
+            ("datadog_search_logs", json!({"query": "x"})),
+            ("gone_search_logs", json!({"query": "x"})),
+            ("o2_datadog_search", json!({"query": "x"})),
+            (
+                "o2_tools_call",
+                json!({"tool": "o2_datadog_logs", "args": {"q": 1}}),
+            ),
         ];
-        for (i, (toolset, tool, args)) in cases.iter().enumerate() {
+        for (i, (tool, input)) in calls.into_iter().enumerate() {
             s.tool(
                 "msg_a1",
-                &format!("prt_v{i}"),
-                "toolset_tool_call",
+                &format!("prt_t{i}"),
+                tool,
                 "completed",
-                json!({"toolset_name": toolset, "tool_name": tool, "args": args}),
-                json!({"output": "{}"}),
+                input,
+                json!({"output": "{\"hits\":3}"}),
                 100 + i as i64 * 10,
                 105 + i as i64 * 10,
             );
         }
 
-        let thread = project_rca_thread(&s.events, &[], false, false);
-        assert_eq!(thread.steps.len(), 1, "record · step opens no step");
-        assert_eq!(thread.steps[0].title, "Investigation");
+        let toolsets = ["datadog", "datadog-prod"]
+            .map(String::from)
+            .into_iter()
+            .collect();
+        let thread = project_rca_thread_with(&s.events, &[], false, false, &toolsets);
         let rows: Vec<&str> = thread.steps[0]
             .tool_calls
             .iter()
             .map(|c| c.tool.as_str())
             .collect();
-        assert_eq!(rows, ["record · step", "submit · report", "tool · search"]);
-        assert!(!thread.report_submitted);
+        assert_eq!(
+            rows,
+            [
+                "datadog-prod · search_logs",
+                "datadog · search_logs",
+                "gone_search_logs",
+                "datadog_search",
+                "datadog_logs",
+            ],
+            "toolset_read_output is no row, and O2's own tools are no toolset's"
+        );
+        assert_eq!(
+            thread.steps[0].tool_calls[0].key_arg.as_deref(),
+            Some("{\"query\":\"service:checkout\"}")
+        );
     }
 
     #[test]
-    fn a_toolset_cli_run_is_a_cli_row_keyed_cli_toolset() {
+    fn no_toolset_name_takes_over_a_control_or_hidden_tool() {
+        let toolsets: ToolsetNames = HIDDEN_TOOLS
+            .iter()
+            .filter_map(|t| Some(t.split_once('_')?.0.to_string()))
+            .collect();
+        for tool in HIDDEN_TOOLS {
+            assert_eq!(toolsets.split(tool), None, "{tool}");
+        }
+
         let mut s = Session::new();
         s.message("msg_a1", "assistant", json!({"created": T}));
-        for (i, (toolset, command)) in [("k8s-prod", "get pods -n checkout"), ("record", "step")]
-            .into_iter()
-            .enumerate()
-        {
+        let calls = [
+            (
+                "record_step",
+                json!({"stage": "metrics", "title": "Metrics"}),
+            ),
+            ("record_search", json!({"query": "x"})),
+            ("submit_search", json!({"query": "x"})),
+        ];
+        for (i, (tool, input)) in calls.into_iter().enumerate() {
             s.tool(
                 "msg_a1",
-                &format!("prt_c{i}"),
-                "toolset_cli_run",
+                &format!("prt_v{i}"),
+                tool,
                 "completed",
-                json!({"toolset_name": toolset, "command": command}),
-                json!({"output": "ok"}),
+                input,
+                json!({"output": "{}"}),
                 100 + i as i64 * 10,
                 105 + i as i64 * 10,
             );
         }
-
-        let thread = project_rca_thread(&s.events, &[], false, false);
-        assert_eq!(
-            thread.steps.len(),
-            1,
-            "a CLI toolset named record opens no step"
-        );
-        let rows: Vec<(&str, Option<&str>)> = thread.steps[0]
+        let thread = project_rca_thread_with(&s.events, &[], false, false, &toolsets);
+        assert_eq!(thread.steps.len(), 1);
+        assert_eq!(thread.steps[0].title, "Metrics");
+        let rows: Vec<&str> = thread.steps[0]
             .tool_calls
             .iter()
-            .map(|c| (c.tool.as_str(), c.key_arg.as_deref()))
+            .map(|c| c.tool.as_str())
             .collect();
-        assert_eq!(
-            rows,
-            [
-                ("k8s-prod · run get", Some("get pods -n checkout")),
-                ("record · run step", Some("step")),
-            ]
-        );
-
-        let mut s = Session::new();
-        s.message("msg_a1", "assistant", json!({"created": T}));
-        s.tool(
-            "msg_a1",
-            "prt_d1",
-            "toolset_cli_run",
-            "completed",
-            json!({"toolset_name": "k8s-prod", "command": "get cm -o json"}),
-            json!({"output": r#"{"error": null, "return_code": 1}"#}),
-            100,
-            105,
-        );
-        let thread = project_rca_thread(&s.events, &[], false, false);
-        let row = &thread.steps[0].tool_calls[0];
-        assert_eq!(row.status, ToolCallStatus::Ok);
-        assert_eq!(row.result_summary.as_deref(), Some("exit 0 · 1 line"));
-
-        let part = json!({"type": "tool", "tool": "toolset_cli_run", "state": {"status": "completed",
-            "input": {"toolset_name": "bash", "command": "ls"}}});
-        let call = ToolPart::of(part.as_object().unwrap()).unwrap();
-        assert_eq!(call.tool, "cli_bash");
-        assert_eq!(call.label(), "bash · run ls");
-        assert_eq!(call.control_tool(), "");
-        assert_eq!(call.kind(), ThreadPart::Row);
+        assert_eq!(rows, ["record · search", "submit · search"]);
+        assert!(!thread.report_submitted);
     }
 
     #[test]

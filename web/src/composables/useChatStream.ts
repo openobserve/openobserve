@@ -129,10 +129,6 @@ const trackAnswerOutcome = (turn: AbortController | null, event: string, propert
   analytics.track(event, properties);
 };
 
-// o2-ai answers only the pending call the id names, so an old dialog's answer can't approve a newer command.
-const confirmationBody = (approved: boolean, confirmationId?: string) =>
-  confirmationId === undefined ? { approved } : { approved, confirmation_id: confirmationId };
-
 /** How a turn ended for the caller: `turnLimit` means the server refused it before it started; `creditsExhausted` (402) hands the draft back to the input. */
 export type TurnOutcome = "done" | "turnLimit" | "creditsExhausted";
 
@@ -243,7 +239,6 @@ export function useChatStream(options: UseChatStreamOptions) {
     args: Record<string, any>;
     message: I18nText;
     navAction?: NavigationAction;
-    confirmationId?: string;
   } | null>(null);
 
   const activeToolCall = ref<{
@@ -394,7 +389,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       }
     };
 
-    const postConfirmation = async (approved: boolean, confirmationId?: string) => {
+    const postConfirmation = async (approved: boolean) => {
       try {
         const orgId = store.state.selectedOrganization.identifier;
         const res = await fetch(
@@ -403,7 +398,7 @@ export function useChatStream(options: UseChatStreamOptions) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
-            body: JSON.stringify(confirmationBody(approved, confirmationId)),
+            body: JSON.stringify({ approved }),
           },
         );
         // A silent failure leaves the agent paused with nobody left to answer it.
@@ -477,7 +472,7 @@ export function useChatStream(options: UseChatStreamOptions) {
             await handleNavigationAction(effect.action);
             break;
           case "confirmPost":
-            await postConfirmation(effect.approved, effect.confirmationId);
+            await postConfirmation(effect.approved);
             break;
           case "dashboardEvent":
             emitDashboardEvent(effect.payload);
@@ -667,37 +662,20 @@ export function useChatStream(options: UseChatStreamOptions) {
     }
   };
 
-  // Found by id whatever its pending flag, so every answer to one dialog reaches the same block in
-  // any order; a legacy dialog without an id falls back to the open block.
-  const confirmationBlock = (confirmationId?: string): ContentBlock | undefined => {
+  const resolveConfirmationBlock = (approved: boolean) => {
     for (const msg of chatMessages.value) {
-      const block = msg.contentBlocks?.find((b) =>
-        confirmationId === undefined
-          ? b.pendingConfirmation && b.confirmationId === undefined
-          : b.confirmationId === confirmationId,
-      );
-      if (block) return block;
-    }
-    return undefined;
-  };
-
-  const markCancelled = (block: ContentBlock | undefined) => {
-    if (!block) return;
-    block.success = false;
-    block.resultMessage = t("aiAssistant.aiChat.actionCancelledByUser");
-  };
-
-  // o2-ai's 409 for an answer to a dialog it no longer holds (answered elsewhere, expired or
-  // replaced): this response did nothing, and any other answer's outcome is left as it is.
-  const STALE_CONFIRMATION_NOTICE =
-    "This dialog is no longer waiting for an answer; this response wasn't used.";
-
-  const isStaleConfirmation = async (res: Response): Promise<boolean> => {
-    try {
-      const body = await res.json();
-      return body?.code === "confirmation_not_found";
-    } catch {
-      return false;
+      if (msg.contentBlocks) {
+        for (const block of msg.contentBlocks) {
+          if (block.pendingConfirmation) {
+            block.pendingConfirmation = false;
+            if (!approved) {
+              block.success = false;
+              block.resultMessage = t("aiAssistant.aiChat.actionCancelledByUser");
+            }
+            return;
+          }
+        }
+      }
     }
   };
 
@@ -751,24 +729,16 @@ export function useChatStream(options: UseChatStreamOptions) {
   };
 
   /** POST a confirmation answer and report whether it landed, so a 404 from a replica without the pending confirmation isn't silent. */
-  const sendConfirmation = async (
-    sessionId: string,
-    approved: boolean,
-    confirmationId?: string,
-  ): Promise<boolean> => {
+  const sendConfirmation = async (sessionId: string, approved: boolean): Promise<boolean> => {
     try {
       const orgId = store.state.selectedOrganization.identifier;
       const res = await fetch(`${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${sessionId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(confirmationBody(approved, confirmationId)),
+        body: JSON.stringify({ approved }),
       });
 
-      if (res.status === 409 && (await isStaleConfirmation(res))) {
-        appendBlock({ type: "status", message: raw(STALE_CONFIRMATION_NOTICE), ephemeral: true });
-        return false;
-      }
       if (!res.ok) {
         console.error(`Confirmation not registered (HTTP ${res.status}) for session ${sessionId}`);
         appendErrorBlock(
@@ -789,45 +759,56 @@ export function useChatStream(options: UseChatStreamOptions) {
     }
   };
 
-  // Clears only the dialog this answer was for: another may have arrived while the POST was in flight.
-  const clearConfirmation = (answered: typeof pendingConfirmation.value) => {
-    if (pendingConfirmation.value === answered) pendingConfirmation.value = null;
-  };
+  const handleToolConfirm = async () => {
+    resolveConfirmationBlock(true);
 
-  // The cancel marker waits for the deny to land: a deny o2-ai didn't take cancelled nothing.
-  const answerConfirmation = async (approved: boolean) => {
-    const pending = pendingConfirmation.value;
-    const block = confirmationBlock(pending?.confirmationId);
-    if (block) block.pendingConfirmation = false;
-
-    if (pending?.tool === "navigation_action") {
-      if (approved && pending.navAction) {
-        await handleNavigationAction(pending.navAction);
-      } else if (!approved) {
-        markCancelled(block);
+    if (pendingConfirmation.value?.tool === "navigation_action") {
+      const navAction = pendingConfirmation.value?.navAction;
+      if (navAction) {
+        await handleNavigationAction(navAction);
       }
-      clearConfirmation(pending);
+      pendingConfirmation.value = null;
       return;
     }
 
     if (!currentSessionId.value) return;
 
-    const delivered = await sendConfirmation(
-      currentSessionId.value,
-      approved,
-      pending?.confirmationId,
-    );
-    if (delivered && !approved) markCancelled(block);
-    clearConfirmation(pending);
+    await sendConfirmation(currentSessionId.value, true);
+    pendingConfirmation.value = null;
   };
 
-  const handleToolConfirm = () => answerConfirmation(true);
+  const handleToolCancel = async () => {
+    resolveConfirmationBlock(false);
 
-  const handleToolCancel = () => answerConfirmation(false);
+    if (pendingConfirmation.value?.tool === "navigation_action") {
+      pendingConfirmation.value = null;
+      return;
+    }
+
+    if (!currentSessionId.value) return;
+
+    await sendConfirmation(currentSessionId.value, false);
+    pendingConfirmation.value = null;
+  };
 
   const handleToolAlwaysConfirm = async () => {
     isAutoNavigationEnabled.value = true;
-    await answerConfirmation(true);
+
+    resolveConfirmationBlock(true);
+
+    if (pendingConfirmation.value?.tool === "navigation_action") {
+      const navAction = pendingConfirmation.value?.navAction;
+      if (navAction) {
+        await handleNavigationAction(navAction);
+      }
+      pendingConfirmation.value = null;
+      return;
+    }
+
+    if (!currentSessionId.value) return;
+
+    await sendConfirmation(currentSessionId.value, true);
+    pendingConfirmation.value = null;
   };
 
   const generateNavigationFromToolResult = (

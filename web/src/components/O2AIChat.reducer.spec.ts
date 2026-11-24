@@ -397,98 +397,22 @@ describe("reduce: error", () => {
   });
 });
 
-describe("reduce: toolset gateway frames", () => {
-  const input = {
-    toolset_name: "datadog-prod",
-    tool_name: "search_logs",
-    args: { query: "service:checkout" },
-  };
-
-  it("shows a toolset_tool_call as toolset · tool and completes it with its result", () => {
+describe("reduce: toolset frames", () => {
+  it.each([
+    "datadog-prod · search_logs",
+    "datadog-prod_search_logs",
+    "record_step",
+    "update_memory",
+    "submit_report",
+    "o2_StreamList",
+  ])("shows %s under the name the server sent and completes it with its result", (tool) => {
     const msg = assistant();
     const state = makeState({ messages: [msg] });
-    reduce(
-      state,
-      { type: "tool_call", tool: "toolset_tool_call", call_id: "c1", context: input },
-      makeCtx(),
-    );
-    expect(state.activeToolCall?.tool).toBe("datadog-prod · search_logs");
-    reduce(
-      state,
-      { type: "tool_result", tool: "toolset_tool_call", call_id: "c1", message: "done" },
-      makeCtx(),
-    );
+    reduce(state, { type: "tool_call", tool, call_id: "c1" }, makeCtx());
+    expect(state.activeToolCall?.tool).toBe(tool);
+    reduce(state, { type: "tool_result", tool, call_id: "c1", message: "done" }, makeCtx());
     expect(state.activeToolCall).toBeNull();
-    expect(msg.contentBlocks?.[0]).toMatchObject({
-      type: "tool_call",
-      tool: "datadog-prod · search_logs",
-      success: true,
-    });
-  });
-
-  it("matches a result without call_id to the active call by its call_args", () => {
-    const msg = assistant();
-    const state = makeState({
-      messages: [msg],
-      activeToolCall: {
-        tool: "datadog-prod · search_logs",
-        message: raw("Executing"),
-        context: {},
-      },
-    });
-    reduce(
-      state,
-      { type: "tool_result", tool: "toolset_tool_call", call_args: input, message: "done" },
-      makeCtx(),
-    );
-    expect(msg.contentBlocks?.[0]).toMatchObject({ tool: "datadog-prod · search_logs" });
-  });
-
-  it.each(["toolset_list", "toolset_list_tools", "toolset_read_output"])(
-    "never shows %s",
-    (tool) => {
-      const msg = assistant();
-      const state = makeState({ messages: [msg] });
-      expect(reduce(state, { type: "tool_call", tool, call_id: "c1" }, makeCtx())).toEqual([]);
-      expect(reduce(state, { type: "tool_result", tool, call_id: "c1" }, makeCtx())).toEqual([]);
-      expect(state.activeToolCall).toBeNull();
-      expect(msg.contentBlocks).toEqual([]);
-    },
-  );
-
-  it("shows a toolset_cli_run as toolset · run and its first argument", () => {
-    const msg = assistant();
-    const state = makeState({ messages: [msg] });
-    const context = { toolset_name: "k8s-prod", command: "  get pods -n checkout" };
-    reduce(
-      state,
-      { type: "tool_call", tool: "toolset_cli_run", call_id: "c1", context },
-      makeCtx(),
-    );
-    expect(state.activeToolCall?.tool).toBe("k8s-prod · run get");
-    reduce(state, { type: "tool_result", tool: "toolset_cli_run", call_id: "c1" }, makeCtx());
-    expect(msg.contentBlocks?.[0]).toMatchObject({ tool: "k8s-prod · run get", success: true });
-
-    reduce(
-      state,
-      { type: "tool_call", tool: "toolset_cli_run", context: { toolset_name: "aws", command: "" } },
-      makeCtx(),
-    );
-    expect(state.activeToolCall?.tool).toBe("aws · run");
-  });
-
-  it("hides a toolset_cli_run that names no toolset", () => {
-    const state = makeState();
-    const frame = { type: "tool_call", tool: "toolset_cli_run", context: { command: "get pods" } };
-    expect(reduce(state, frame, makeCtx())).toEqual([]);
-    expect(state.activeToolCall).toBeNull();
-  });
-
-  it("hides a toolset_tool_call that names no toolset or tool", () => {
-    const state = makeState();
-    const frame = { type: "tool_call", tool: "toolset_tool_call", context: { tool_name: "x" } };
-    expect(reduce(state, frame, makeCtx())).toEqual([]);
-    expect(state.activeToolCall).toBeNull();
+    expect(msg.contentBlocks?.[0]).toMatchObject({ type: "tool_call", tool, success: true });
   });
 });
 

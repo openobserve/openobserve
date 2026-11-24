@@ -1428,7 +1428,7 @@ fn outcome_parts(outcome: Outcome) -> (StatusCode, Value) {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     async fn body_of(resp: Response) -> Value {
@@ -1454,7 +1454,7 @@ mod tests {
     }
 
     /// The handlers read the global meta store; CI points it at one through `ZO_META_STORE`.
-    async fn meta_store() -> bool {
+    pub(crate) async fn meta_store() -> bool {
         static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
         if std::env::var("ZO_META_STORE").is_err() {
             eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");

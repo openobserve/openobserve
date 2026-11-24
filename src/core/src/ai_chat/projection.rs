@@ -18,7 +18,7 @@
 use std::collections::HashMap;
 
 use config::{
-    meta::oncall::confidence::strip_call_ref,
+    meta::oncall::confidence::{ToolsetNames, strip_call_ref},
     utils::{
         json::{Map, Value, json},
         redact::redact_internal_details,
@@ -42,8 +42,6 @@ const NAVIGATION_TOOL: &str = "create_navigation";
 const FIRST_PARTY_MCP_PREFIX: &str = "o2_";
 const O2_DELETE_TOOL: &str = "o2_delete";
 const MCP_SERVER_PREFIXES: [&str; 1] = ["o2"];
-const TOOLSET_CALL: &str = "toolset_tool_call";
-const TOOLSET_CLI_RUN: &str = "toolset_cli_run";
 const SEARCH_SQL_MAX_HITS: usize = 10;
 const TEST_FUNCTION_MAX_INPUT_EVENTS: usize = 5;
 const TEST_FUNCTION_MAX_OUTPUT_RESULTS: usize = 5;
@@ -51,10 +49,8 @@ const ERROR_DUMP_CHARS: usize = 500;
 const FIRST_ERR_CHARS: usize = 200;
 
 /// Tools no projection shows; the sentinels at the end are RCA thread structure.
-pub(crate) const HIDDEN_TOOLS: [&str; 28] = [
+pub(crate) const HIDDEN_TOOLS: [&str; 26] = [
     "tool_search",
-    "toolset_list",
-    "toolset_list_tools",
     "toolset_read_output",
     "convert_time_to_microseconds",
     "calculate_time_range",
@@ -142,14 +138,15 @@ struct CallInfo {
 
 /// The per-turn state of o2-ai's live mapper (`StreamState`) that history uses.
 #[derive(Default)]
-struct StreamState {
+struct StreamState<'a> {
+    toolsets: Option<&'a ToolsetNames>,
     text_buffer: String,
     scrub_carry: String,
     pending_tool_calls: HashMap<String, CallInfo>,
     last_tools_call_info: Option<CallInfo>,
 }
 
-impl StreamState {
+impl StreamState<'_> {
     fn emit_text_delta(&mut self, delta: &str, frames: &mut Vec<Value>) {
         if delta.is_empty() {
             return;
@@ -233,7 +230,8 @@ impl StreamState {
                     .collect()
             })
             .unwrap_or_default();
-        let Some(mut event) = format_tool_call_event(tool_name, &tool_input) else {
+        let vendor = self.toolsets.and_then(|t| t.split(tool_name));
+        let Some(mut event) = format_tool_call_event(tool_name, vendor, &tool_input) else {
             return;
         };
         let call_info = CallInfo {
@@ -324,19 +322,19 @@ impl StreamState {
 
 /// One turn being projected: a user message and the assistant messages answering it.
 #[derive(Default)]
-struct Turn {
+struct Turn<'a> {
     user_message_id: Value,
     created: Value,
     user_parts: Vec<(String, bool)>,
     images: Vec<Value>,
     frames: Vec<Value>,
-    state: StreamState,
+    state: StreamState<'a>,
     error: Option<String>,
     aborted: bool,
     seqs: Option<(i64, i64)>,
 }
 
-impl Turn {
+impl Turn<'_> {
     /// Widen the turn's seq range by one of its messages' `(min, max)`.
     fn cover(&mut self, seqs: Option<&(i64, i64)>) {
         if let Some(&(low, high)) = seqs {
@@ -549,24 +547,9 @@ impl Folded {
     }
 }
 
-/// A vendor call through the toolset gateway (`toolset_tool_call` or `toolset_cli_run`).
-pub(crate) struct GatewayCall<'a> {
-    /// `toolset · tool`, or `toolset · run <first arg>` for a CLI, whose binary the part doesn't
-    /// carry.
-    pub(crate) label: String,
-    /// `<toolset>_<tool>`; `cli_<toolset>` for a CLI so the shell rules (exit code, signal) apply.
-    pub(crate) key: String,
-    /// The vendor tool's `args`; a CLI call's own input, which holds its `command`.
-    pub(crate) args: Option<&'a Map<String, Value>>,
-    /// A `toolset_cli_run`, whose stdout is data: its outcome is the part status and `metadata`.
-    pub(crate) cli: bool,
-    pub(crate) toolset: &'a str,
-    /// The vendor tool; `run` for a CLI.
-    pub(crate) tool: &'a str,
-}
-
-/// o2-ai's `project_events` output for ascending events, plus each turn's `first_seq`/`last_seq`.
-pub fn project(events: &[DurableEvent]) -> Value {
+/// o2-ai's `project_events` output for ascending events, plus each turn's `first_seq`/`last_seq`;
+/// a call of one of `toolsets` shows as `toolset · tool`, any other under its own name.
+pub fn project(events: &[DurableEvent], toolsets: &ToolsetNames) -> Value {
     let folded = Folded::fold(events);
     let empty = Map::new();
     let mut turns: Map<String, Value> = Map::new();
@@ -584,6 +567,10 @@ pub fn project(events: &[DurableEvent]) -> Value {
                 .and_then(|t| t.get("created"))
                 .cloned()
                 .unwrap_or(Value::Null),
+            state: StreamState {
+                toolsets: Some(toolsets),
+                ..Default::default()
+            },
             ..Default::default()
         };
         turn.cover(folded.spans.get(msg_id));
@@ -738,56 +725,20 @@ pub(crate) fn strip_mcp_prefix(tool_name: &str) -> &str {
     }
 }
 
-pub(crate) fn is_gateway_call(tool_name: &str) -> bool {
-    tool_name == TOOLSET_CALL || tool_name == TOOLSET_CLI_RUN
+/// What a toolset call shows instead of its part's name.
+pub(crate) fn vendor_label((toolset, tool): (&str, &str)) -> String {
+    format!("{toolset} · {tool}")
 }
 
-/// `None` for a non-gateway tool or a gateway call missing the names it needs.
-pub(crate) fn gateway_call<'a>(
-    tool_name: &str,
-    input: Option<&'a Map<String, Value>>,
-) -> Option<GatewayCall<'a>> {
-    let field = |key| {
-        input?
-            .get(key)
-            .and_then(Value::as_str)
-            .filter(|s| !s.trim().is_empty())
-    };
-    let toolset = field("toolset_name")?;
-    match tool_name {
-        TOOLSET_CALL => {
-            let tool = field("tool_name")?;
-            Some(GatewayCall {
-                label: format!("{toolset} · {tool}"),
-                key: format!("{toolset}_{tool}"),
-                args: input.and_then(|i| obj(i.get("args"))),
-                cli: false,
-                toolset,
-                tool,
-            })
-        }
-        TOOLSET_CLI_RUN => {
-            let first = field("command").and_then(|c| c.split_whitespace().next());
-            Some(GatewayCall {
-                label: match first {
-                    Some(arg) => format!("{toolset} · run {arg}"),
-                    None => format!("{toolset} · run"),
-                },
-                key: format!("cli_{toolset}"),
-                args: input,
-                cli: true,
-                toolset,
-                tool: "run",
-            })
-        }
-        _ => None,
-    }
-}
-
+/// `vendor` is the part's own `(toolset, tool)`, for a toolset call.
 fn resolve_tool_call(
     tool_name: &str,
+    vendor: Option<(&str, &str)>,
     args: &Map<String, Value>,
 ) -> Option<(String, Map<String, Value>)> {
+    if let Some(vendor) = vendor {
+        return Some((vendor_label(vendor), args.clone()));
+    }
     let tool_name = strip_mcp_prefix(tool_name);
     if HIDDEN_TOOLS.contains(&tool_name) {
         return None;
@@ -800,18 +751,15 @@ fn resolve_tool_call(
         let inner = obj(args.get("args")).cloned().unwrap_or_default();
         return Some((actual.to_string(), inner));
     }
-    if is_gateway_call(tool_name) {
-        let call = gateway_call(tool_name, Some(args))?;
-        return Some((call.label, call.args.cloned().unwrap_or_default()));
-    }
     Some((tool_name.to_string(), args.clone()))
 }
 
 fn format_tool_call_event(
     tool_name: &str,
+    vendor: Option<(&str, &str)>,
     args: &Map<String, Value>,
 ) -> Option<Map<String, Value>> {
-    let (tool_name, args) = resolve_tool_call(tool_name, args)?;
+    let (tool_name, args) = resolve_tool_call(tool_name, vendor, args)?;
     let mut message = tool_description(&tool_name);
     if tool_name == "StreamList" {
         let stream_type = py_strip(args.get("type").and_then(Value::as_str).unwrap_or_default());
@@ -1524,7 +1472,7 @@ mod tests {
         assert!(names.len() >= 5, "{names:?}");
         for name in names {
             let (events, expected) = load(&name);
-            let actual = project(&events);
+            let actual = project(&events, &ToolsetNames::default());
             if let Some(diff) = first_difference("", &actual, &expected) {
                 panic!("{name}: {diff}");
             }
@@ -1540,7 +1488,7 @@ mod tests {
                 .iter()
                 .any(|e| e.data.pointer("/part/tool") == Some(&json!("record_step")))
         );
-        let projected = project(&events).to_string();
+        let projected = project(&events, &ToolsetNames::default()).to_string();
         assert!(!projected.contains("record_step"), "{projected}");
     }
 
@@ -1549,8 +1497,12 @@ mod tests {
             "state": {"status": status, "input": input, "output": output}})
     }
 
-    fn frames_of(parts: &[Value]) -> Vec<Value> {
-        let mut state = StreamState::default();
+    fn frames_of(parts: &[Value], toolsets: &[&str]) -> Vec<Value> {
+        let toolsets: ToolsetNames = toolsets.iter().map(|t| t.to_string()).collect();
+        let mut state = StreamState {
+            toolsets: Some(&toolsets),
+            ..Default::default()
+        };
         let mut frames = Vec::new();
         for part in parts {
             state.handle_tool_part(part.as_object().unwrap(), &mut frames);
@@ -1559,99 +1511,73 @@ mod tests {
     }
 
     #[test]
-    fn a_toolset_tool_call_projects_as_toolset_and_tool() {
-        let input = json!({"toolset_name": "datadog-prod", "tool_name": "search_logs",
-            "args": {"query": "service:checkout"}});
-        let frames = frames_of(&[
-            tool_part("p1", "toolset_tool_call", "running", input.clone(), ""),
-            tool_part(
-                "p1",
-                "toolset_tool_call",
-                "completed",
-                input,
-                "{\"hits\":3}",
+    fn a_toolset_call_projects_as_toolset_and_tool() {
+        let toolsets = ["datadog", "datadog-prod"];
+        for (part_tool, want) in [
+            ("datadog-prod_search_logs", "datadog-prod · search_logs"),
+            ("datadog_search_logs", "datadog · search_logs"),
+            (
+                "datadog_observability_get_topology",
+                "datadog · observability_get_topology",
             ),
-        ]);
-        assert_eq!(frames.len(), 2, "{frames:?}");
-        assert_eq!(frames[0]["type"], "tool_call");
-        assert_eq!(frames[0]["tool"], "datadog-prod · search_logs");
-        assert_eq!(frames[0]["message"], "Executing datadog-prod · search_logs");
-        assert_eq!(frames[0]["context"], json!({"query": "service:checkout"}));
-        assert_eq!(frames[1]["type"], "tool_result");
-        assert_eq!(frames[1]["tool"], "datadog-prod · search_logs");
-        assert_eq!(frames[1]["success"], true);
+        ] {
+            let input = json!({"query": "service:checkout"});
+            let frames = frames_of(
+                &[
+                    tool_part("p1", part_tool, "running", input.clone(), ""),
+                    tool_part("p1", part_tool, "completed", input, "{\"hits\":3}"),
+                ],
+                &toolsets,
+            );
+            assert_eq!(frames.len(), 2, "{frames:?}");
+            assert_eq!(frames[0]["type"], "tool_call");
+            assert_eq!(frames[0]["tool"], want);
+            assert_eq!(frames[0]["message"], format!("Executing {want}"));
+            assert_eq!(frames[0]["context"], json!({"query": "service:checkout"}));
+            assert_eq!(frames[1]["type"], "tool_result");
+            assert_eq!(frames[1]["tool"], want);
+            assert_eq!(frames[1]["success"], true);
+        }
     }
 
     #[test]
-    fn a_toolset_cli_run_projects_as_toolset_run_and_its_first_argument() {
-        let input = json!({"toolset_name": "k8s-prod", "command": "get pods -n checkout"});
-        let frames = frames_of(&[
-            tool_part("p1", "toolset_cli_run", "running", input.clone(), ""),
-            tool_part(
-                "p1",
-                "toolset_cli_run",
-                "completed",
-                input.clone(),
-                "NAME READY",
-            ),
-        ]);
-        assert_eq!(frames.len(), 2, "{frames:?}");
-        assert_eq!(frames[0]["tool"], "k8s-prod · run get");
-        assert_eq!(frames[0]["context"], input);
-        assert_eq!(frames[1]["tool"], "k8s-prod · run get");
-        assert_eq!(frames[1]["success"], true);
-        let hidden = frames_of(&[tool_part(
-            "p2",
-            "toolset_cli_run",
-            "running",
-            json!({"command": "get pods"}),
-            "",
-        )]);
-        assert!(hidden.is_empty(), "no toolset name: {hidden:?}");
+    fn a_deleted_or_unknown_toolset_s_call_keeps_its_raw_name() {
+        for part_tool in ["datadog-prod_search_logs", "some-server_do_it"] {
+            let parts = [
+                tool_part("p1", part_tool, "running", json!({"q": 1}), ""),
+                tool_part("p1", part_tool, "completed", json!({"q": 1}), "{}"),
+            ];
+            for frame in frames_of(&parts, &["datadog"]) {
+                assert_eq!(frame["tool"], part_tool);
+            }
+        }
     }
 
     #[test]
-    fn toolset_listings_and_nameless_toolset_calls_are_hidden() {
-        let frames = frames_of(&[
-            tool_part("p1", "toolset_list", "running", json!({}), ""),
-            tool_part("p1", "toolset_list", "completed", json!({}), "[]"),
-            tool_part(
-                "p2",
-                "toolset_list_tools",
-                "running",
-                json!({"toolset_name": "dd"}),
-                "",
-            ),
-            tool_part(
-                "p2",
-                "toolset_list_tools",
-                "completed",
-                json!({"toolset_name": "dd"}),
-                "[]",
-            ),
-            tool_part(
-                "p4",
-                "toolset_read_output",
-                "running",
-                json!({"ref": "r1", "offset": 0}),
-                "",
-            ),
-            tool_part(
-                "p4",
-                "toolset_read_output",
-                "completed",
-                json!({"ref": "r1", "offset": 0}),
-                "{\"text\":\"x\"}",
-            ),
-            tool_part(
-                "p3",
-                "toolset_tool_call",
-                "running",
-                json!({"toolset_name": "dd"}),
-                "",
-            ),
-        ]);
-        assert!(frames.is_empty(), "{frames:?}");
+    fn a_first_party_tool_is_never_read_as_a_toolset_s() {
+        let toolsets = ["record", "submit", "toolset", "update", "o2", "datadog"];
+        for part_tool in ["record_step", "submit_report", "toolset_read_output"] {
+            let parts = [
+                tool_part("p1", part_tool, "running", json!({}), ""),
+                tool_part("p1", part_tool, "completed", json!({}), "{}"),
+            ];
+            let frames = frames_of(&parts, &toolsets);
+            assert!(frames.is_empty(), "{part_tool}: {frames:?}");
+        }
+        for (part_tool, want) in [
+            ("update_memory", "update_memory"),
+            ("o2_datadog_search", "datadog_search"),
+        ] {
+            let parts = [
+                tool_part("p1", part_tool, "running", json!({}), ""),
+                tool_part("p1", part_tool, "completed", json!({}), "{}"),
+            ];
+            let frames = frames_of(&parts, &toolsets);
+            assert_eq!(frames.len(), 2);
+            for frame in frames {
+                assert_eq!(frame["tool"], want);
+            }
+        }
     }
 
     #[test]
@@ -1672,7 +1598,7 @@ mod tests {
     #[test]
     fn turns_carry_the_seq_range_of_their_events() {
         let (events, _) = load("structure.json");
-        let projected = project(&events);
+        let projected = project(&events, &ToolsetNames::default());
         for turn in projected["turns"].as_array().unwrap() {
             let (first, last) = (
                 turn["first_seq"].as_i64().unwrap(),
@@ -1680,14 +1606,15 @@ mod tests {
             );
             assert!(0 <= first && first <= last, "{turn}");
         }
-        assert_eq!(project(&[])["last_seq"], -1);
-        assert_eq!(project(&[])["turns"], json!([]));
+        let empty = project(&[], &ToolsetNames::default());
+        assert_eq!(empty["last_seq"], -1);
+        assert_eq!(empty["turns"], json!([]));
     }
 
     #[test]
     fn redaction_keeps_text_and_tool_names_only() {
         let (events, _) = load("tool_heavy.json");
-        let mut projected = project(&events);
+        let mut projected = project(&events, &ToolsetNames::default());
         let full = projected.clone();
         redact(&mut projected);
         let frames = projected["turns"][0]["frames"].as_array().unwrap();

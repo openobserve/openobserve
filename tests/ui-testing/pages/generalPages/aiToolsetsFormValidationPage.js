@@ -16,29 +16,17 @@ export class AiToolsetsFormValidationPage {
 
         // ── List page ─────────────────────────────────────────────────────────
         this.addToolsetBtn = '[data-test="ai-toolsets-add-btn"]';
+        this.addCustomMcpItem = '[data-test="ai-toolsets-add-custom-mcp"]';
 
         // ── AddAiToolset form ─────────────────────────────────────────────────
         // OInput data-test="ai-toolset-name-input" → -field / -error
         this.nameInput      = '[data-test="ai-toolset-name-input-field"]';
         this.nameError      = '[data-test="ai-toolset-name-input-error"]';
 
-        // OSelect data-test="ai-toolset-kind-select" → -popover / -error
-        this.kindSelect     = '[data-test="ai-toolset-kind-select"]';
-        this.kindError      = '[data-test="ai-toolset-kind-select-error"]';
-
         // MCP URL — shown when kind === 'mcp' (default)
         // OInput data-test="ai-toolset-mcp-url" → -field / -error
         this.mcpUrlInput    = '[data-test="ai-toolset-mcp-url-field"]';
         this.mcpUrlError    = '[data-test="ai-toolset-mcp-url-error"]';
-
-        // OSelect kind — trigger popover and option selectors
-        this.kindSelectPopover = '[data-test="ai-toolset-kind-select-popover"]';
-        this.kindSelectOption  = '[data-test="ai-toolset-kind-select-option"]';
-
-        // CLI command — shown when kind === 'cli'
-        // OInput data-test="ai-toolset-cli-command" → -field / -error
-        this.cliCommandInput = '[data-test="ai-toolset-cli-command-field"]';
-        this.cliCommandError = '[data-test="ai-toolset-cli-command-error"]';
 
         // Action buttons (plain OButton — not dialog built-ins)
         this.saveBtn        = '[data-test="ai-toolset-save-btn"]';
@@ -82,9 +70,10 @@ export class AiToolsetsFormValidationPage {
     // ── List page actions ─────────────────────────────────────────────────────
 
     async clickAddToolset() {
-        testLogger.debug('Clicking Add AI Toolset button');
+        testLogger.debug('Adding a Custom MCP toolset');
         await clearEditorDrafts(this.page);
         await this.page.locator(this.addToolsetBtn).click();
+        await this.page.locator(this.addCustomMcpItem).click();
         // Wait for the form to mount — name input is the first interactive field
         await this.page.locator(this.nameInput).waitFor({ state: 'visible', timeout: 10000 });
     }
@@ -106,24 +95,6 @@ export class AiToolsetsFormValidationPage {
         await this.page.locator(this.mcpUrlInput).fill(url);
     }
 
-    getKindOptionLocator(value) {
-        return this.page.locator(`${this.kindSelectOption}[data-test-value="${value}"]`);
-    }
-
-    async selectKind(label) {
-        testLogger.debug('Selecting toolset kind', { label });
-        const labelToValue = { 'MCP Server': 'mcp', 'CLI Tool': 'cli', 'Skill': 'skill' };
-        const value = labelToValue[label] || label;
-        await this.page.locator(this.kindSelect).click();
-        await this.page.locator(this.kindSelectPopover).waitFor({ state: 'visible', timeout: 8000 });
-        await this.getKindOptionLocator(value).click();
-    }
-
-    async fillCliCommand(command) {
-        testLogger.debug('Filling CLI command', { command });
-        await this.page.locator(this.cliCommandInput).fill(command);
-    }
-
     async clickSave() {
         testLogger.debug('Clicking Save button');
         await this.page.locator(this.saveBtn).click();
@@ -139,11 +110,8 @@ export class AiToolsetsFormValidationPage {
 
     getNameInputLocator()    { return this.page.locator(this.nameInput); }
     getNameErrorLocator()    { return this.page.locator(this.nameError); }
-    getKindErrorLocator()    { return this.page.locator(this.kindError); }
     getMcpUrlInputLocator()      { return this.page.locator(this.mcpUrlInput); }
     getMcpUrlErrorLocator()      { return this.page.locator(this.mcpUrlError); }
-    getCliCommandInputLocator()  { return this.page.locator(this.cliCommandInput); }
-    getCliCommandErrorLocator()  { return this.page.locator(this.cliCommandError); }
     getSaveBtnLocator()      { return this.page.locator(this.saveBtn); }
     getCancelBtnLocator()    { return this.page.locator(this.cancelBtn); }
     getAddToolsetBtnLocator(){ return this.page.locator(this.addToolsetBtn); }

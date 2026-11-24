@@ -65,8 +65,8 @@ use o2_enterprise::enterprise::{
         },
         client::{QueryRequest, RCA_AGENT_TYPE, SESSION_ID_HEADER, get_agent_client},
         toolsets::{
-            CliEntry, McpEntry, SkillEntry,
-            push::{TurnMemory, load_agent_tools, load_turn_memory},
+            McpEntry, SkillEntry,
+            push::{AgentTools, TurnMemory, load_agent_tools, load_turn_memory},
         },
     },
     alerts::rca_service,
@@ -91,7 +91,7 @@ use crate::ai_chat::{
     admission::{self, AdmitError, AdmittedTurn},
     cancel::cancel_chat_turn,
     fork,
-    rca_ledger::{RunTranscript, TranscriptQuestion, decode_run_with, org_tool_classes},
+    rca_ledger::{RunTranscript, TranscriptQuestion, decode_run_with, run_tool_classes},
     rca_thread::{
         SUBMIT_REPORT, ThreadPart, ThreadStats, ToolPart, project_rca_thread, updated_part,
     },
@@ -393,7 +393,12 @@ async fn start_turn(
         }
     }
     let prompt = prompt.render();
-    let (mut mcps, clis, skills) = load_agent_tools(&run.org_id).await;
+    let AgentTools {
+        mut mcps,
+        skills,
+        unavailable,
+    } = load_agent_tools(&run.org_id).await;
+    let toolsets = mcps.iter().map(|m| m.name.clone()).collect();
     // No person is behind an RCA turn, so it gets no user memory.
     let memory = load_turn_memory(&run.org_id, None, false, true, &mut mcps).await;
 
@@ -404,7 +409,7 @@ async fn start_turn(
         }
         None => {
             let mut patch = RunUpdate {
-                context_used: Some(context_used(&run.context, &mcps, &clis, &skills, &memory)),
+                context_used: Some(context_used(&run.context, &mcps, &skills, &memory)),
                 ..Default::default()
             };
             let session_id = match fork {
@@ -489,7 +494,7 @@ async fn start_turn(
     let mut request = QueryRequest::new(prompt, context);
     request.org_memory = memory.org;
     request.mcps = (!mcps.is_empty()).then_some(mcps);
-    request.clis = (!clis.is_empty()).then_some(clis);
+    request.unavailable_toolsets = (!unavailable.is_empty()).then_some(unavailable);
     request.skills = (!skills.is_empty()).then_some(skills);
     admission::apply_admission(&mut request, &admitted);
     let AdmittedTurn {
@@ -546,6 +551,7 @@ async fn start_turn(
     let spec = TurnSpec {
         on_commit: Some(crate::ai_chat::toolset_calls::with_toolset_calls(
             &spec.identity,
+            toolsets,
             spec.on_commit,
         )),
         ..spec
@@ -572,7 +578,6 @@ async fn probe_health<T, E: std::fmt::Display>(
 fn context_used(
     context: &Value,
     mcps: &[McpEntry],
-    clis: &[CliEntry],
     skills: &[SkillEntry],
     memory: &TurnMemory,
 ) -> Value {
@@ -585,11 +590,7 @@ fn context_used(
         .filter_map(past_cause)
         .collect();
     let skills: Vec<&str> = skills.iter().map(|s| s.name.as_str()).collect();
-    let toolsets: Vec<&str> = mcps
-        .iter()
-        .map(|m| m.name.as_str())
-        .chain(clis.iter().map(|c| c.name.as_str()))
-        .collect();
+    let toolsets: Vec<&str> = mcps.iter().map(|m| m.name.as_str()).collect();
     json!({
         "past_causes": past_causes,
         "skills": skills,
@@ -731,7 +732,7 @@ async fn finalize(
         return false;
     }
 
-    let classes = org_tool_classes(&org_id).await;
+    let classes = run_tool_classes(&run).await;
     let ending = RunEnd {
         thread: events
             .as_deref()
@@ -1931,7 +1932,7 @@ where
     }
     // What the transcript shows read stays read; every other row is not read.
     let transcript = match read_session(org_id, run.session_id.as_deref()).await {
-        Ok((events, _)) => Some(decode_run_with(&events, &org_tool_classes(org_id).await)),
+        Ok((events, _)) => Some(decode_run_with(&events, &run_tool_classes(&run).await)),
         Err(e) => {
             log::warn!("[RCA_TURN] cannot read the transcript of cancelled run {run_id}: {e:#}");
             None
@@ -2127,7 +2128,7 @@ async fn end_at_deadline(org_id: &str, run_id: &str) -> bool {
     let ending = RunEnd {
         org_id: org_id.to_string(),
         thread: Some(project_rca_thread(&events, &turns, false, false).stats),
-        transcript: Some(decode_run_with(&events, &org_tool_classes(org_id).await)),
+        transcript: Some(decode_run_with(&events, &run_tool_classes(&run).await)),
         reusable_steps: fork::reusable_steps(&events),
         turn_error: None,
         turn_message: None,
@@ -2383,7 +2384,7 @@ mod tests {
             org: Some(block(Some("op-o1"), false)),
             user: None,
         };
-        let used = context_used(&json!({}), &mcps, &[], &[], &memory);
+        let used = context_used(&json!({}), &mcps, &[], &memory);
         assert_eq!(
             used["memory"],
             json!([
@@ -2391,7 +2392,11 @@ mod tests {
                 {"scope": "toolset", "scope_key": "loaded", "op_id": "op-t1"},
             ])
         );
-        let none = context_used(&json!({}), &[], &[], &[], &TurnMemory::default());
+        assert_eq!(
+            used["toolsets"],
+            json!(["loaded", "skipped", "never-written"])
+        );
+        let none = context_used(&json!({}), &[], &[], &TurnMemory::default());
         assert_eq!(none["memory"], json!([]));
     }
     use crate::{

@@ -176,7 +176,7 @@ describe("AddAiToolset drafts", () => {
     wrapper = null;
   });
 
-  it("never writes header, env or credential file values to storage", async () => {
+  it("never writes header values to storage", async () => {
     await mountPage();
     await edit({
       name: "ops_mcp",
@@ -185,23 +185,39 @@ describe("AddAiToolset drafts", () => {
         { key: "Authorization", value: "Bearer s3cr3t", visible: false },
         { key: "X-Tenant", value: "tenant-42", visible: true },
       ],
-      "cli.env": [{ key: "GH_TOKEN", value: "ghp_abcdef", visible: false }],
-      "cli.credFiles": [{ key: "KUBECONFIG", value: "apiVersion: v1\ntoken: kube-secret" }],
     });
     window.dispatchEvent(new Event("pagehide"));
 
     const stored = localStorage.getItem(editorDraftKey(newScope)) ?? "";
     expect(stored).toContain("X-Tenant");
     expect(stored).toContain("https://mcp.example.com/");
-    for (const secret of ["s3cr3t", "tenant-42", "ghp_abcdef", "kube-secret"]) {
+    for (const secret of ["s3cr3t", "tenant-42"]) {
       expect(stored).not.toContain(secret);
     }
     expect(stored).not.toContain("visible");
 
     await remount();
     const note = byTest("editor-draft-credentials-not-saved")?.textContent ?? "";
-    expect(note).toContain("environment variable GH_TOKEN");
-    expect(note).toContain("credential file KUBECONFIG");
+    expect(note).toContain("Authorization header");
+    expect(note).toContain("X-Tenant header");
+  });
+
+  it("opens an older draft of a removed kind as an MCP server, without its extra fields", async () => {
+    writeEditorDraft(newScope, {
+      data: {
+        name: "kube",
+        kind: "cli",
+        description: "From the draft",
+        mcp: { url: "", timeout_seconds: 30, headers: [], extra: {} },
+        cli: { command: "kubectl", env: [], credFiles: [] },
+        skill: { content: "" },
+      },
+    });
+    await mountPage();
+    click("editor-draft-continue");
+    await flushPromises();
+    expect(form().state.values).toMatchObject({ name: "kube", kind: "mcp" });
+    expect(form().state.values).not.toHaveProperty("cli");
   });
 
   it("names a header value with no header name in lowercase, as part of the sentence", async () => {
@@ -377,6 +393,163 @@ describe("AddAiToolset drafts", () => {
     expect(aiToolsetsService.update).toHaveBeenCalledTimes(1);
   });
 
+  const oauthToolset = () => ({
+    ...serverToolset(),
+    data: {
+      ...serverToolset().data,
+      headers: {},
+      auth: {
+        type: "oauth_client_credentials",
+        token_url: "https://sso.example.com/token",
+        client_id: "svc",
+        client_secret: "***",
+        extra_params: { resource: "urn:x" },
+      },
+    },
+  });
+  const savedAuth = () =>
+    vi.mocked(aiToolsetsService.update).mock.calls.at(-1)![2].data!.auth as Record<string, unknown>;
+
+  it("never writes the client secret to storage and asks for a new toolset's again", async () => {
+    await mountPage();
+    await edit({
+      name: "oauth-mcp",
+      "mcp.url": "https://mcp.example.com/",
+      "mcp.auth.token_url": "https://sso.example.com/token",
+      "mcp.auth.client_id": "svc-client",
+      "mcp.auth.client_secret": "t0p-s3cret",
+    });
+    window.dispatchEvent(new Event("pagehide"));
+    const stored = localStorage.getItem(editorDraftKey(newScope)) ?? "";
+    expect(stored).toContain("svc-client");
+    expect(stored).toContain("https://sso.example.com/token");
+    expect(stored).not.toContain("t0p-s3cret");
+
+    await remount();
+    expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain("Client secret");
+    click("editor-draft-continue");
+    await flushPromises();
+    expect(form().getFieldMeta("mcp.auth.client_secret")?.errors?.length).toBeGreaterThan(0);
+    await form().handleSubmit();
+    await flushPromises();
+    expect(aiToolsetsService.create).not.toHaveBeenCalled();
+
+    await edit({ "mcp.auth.client_secret": "typed-again" });
+    await form().handleSubmit();
+    await flushPromises();
+    expect(aiToolsetsService.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("refills an unchanged stored client secret and keeps its unedited keys", async () => {
+    vi.mocked(aiToolsetsService.get).mockResolvedValue({ data: oauthToolset() } as never);
+    await mountPage({ action: "edit", id: "ts1" });
+    await edit({ description: "Edited" });
+    window.dispatchEvent(new Event("pagehide"));
+
+    await remount({ action: "edit", id: "ts1" });
+    expect(byTest("editor-draft-credentials-not-saved")).toBeNull();
+    click("editor-draft-continue");
+    await flushPromises();
+    await form().handleSubmit();
+    await flushPromises();
+    expect(savedAuth()).toEqual(oauthToolset().data.auth);
+  });
+
+  it("keeps API-only auth keys out of the draft and takes them from the loaded toolset", async () => {
+    vi.mocked(aiToolsetsService.get).mockResolvedValue({ data: oauthToolset() } as never);
+    await mountPage({ action: "edit", id: "ts1" });
+    await edit({ "mcp.auth.scope": "read" });
+    window.dispatchEvent(new Event("pagehide"));
+    expect(localStorage.getItem(editorDraftKey(editScope))).not.toContain("extra_params");
+
+    const changed = oauthToolset();
+    changed.data.auth = {
+      ...changed.data.auth,
+      extra_params: { resource: "urn:new" },
+      client_auth: "body",
+    } as never;
+    vi.mocked(aiToolsetsService.get).mockResolvedValue({ data: changed } as never);
+    await remount({ action: "edit", id: "ts1" });
+    click("editor-draft-continue");
+    await flushPromises();
+    await form().handleSubmit();
+    await flushPromises();
+    expect(savedAuth()).toEqual({ ...changed.data.auth, scope: "read" });
+  });
+
+  it("never stores a token URL that carries a credential", async () => {
+    await mountPage();
+    await edit({
+      name: "oauth-mcp",
+      "mcp.auth.token_url": "https://bot:hidden-pass@sso.example.com/token",
+      "mcp.auth.client_id": "svc",
+    });
+    window.dispatchEvent(new Event("pagehide"));
+    expect(localStorage.getItem(editorDraftKey(newScope))).not.toContain("hidden-pass");
+    await remount();
+    expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain("Token URL");
+  });
+
+  it("doesn't ask for a not-kept client secret once the client ID is cleared", async () => {
+    await mountPage();
+    await edit({
+      name: "oauth-mcp",
+      "mcp.url": "https://mcp.example.com/",
+      "mcp.auth.client_id": "svc",
+      "mcp.auth.client_secret": "t0p-s3cret",
+    });
+    window.dispatchEvent(new Event("pagehide"));
+    await remount();
+    click("editor-draft-continue");
+    await flushPromises();
+    await edit({ "mcp.auth.client_id": "" });
+    await form().handleSubmit();
+    await flushPromises();
+    expect(aiToolsetsService.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("doesn't ask for a not-kept Authorization header once client credentials replace it", async () => {
+    await mountPage();
+    await edit({
+      name: "oauth-mcp",
+      "mcp.url": "https://mcp.example.com/",
+      "mcp.headers": [{ key: "Authorization", value: "Bearer s3cr3t", visible: false }],
+    });
+    window.dispatchEvent(new Event("pagehide"));
+    await remount();
+    click("editor-draft-continue");
+    await flushPromises();
+    await edit({
+      "mcp.auth.token_url": "https://sso.example.com/token",
+      "mcp.auth.client_id": "svc",
+      "mcp.auth.client_secret": "typed",
+    });
+    await form().handleSubmit();
+    await flushPromises();
+    expect(aiToolsetsService.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the saved client credentials when an older draft has no auth", async () => {
+    vi.mocked(aiToolsetsService.get).mockResolvedValue({ data: oauthToolset() } as never);
+    const { auth: _auth, ...data } = oauthToolset().data;
+    writeEditorDraft(editScope, {
+      data: {
+        name: "github_mcp",
+        kind: "mcp",
+        description: "From an older draft",
+        mcp: { ...data, headers: [], allowed_tools: [], write_tools: [], extra: {} },
+        skill: { content: "" },
+      },
+    });
+    await mountPage({ action: "edit", id: "ts1" });
+    click("editor-draft-continue");
+    await flushPromises();
+    expect(form().state.values.description).toBe("From an older draft");
+    await form().handleSubmit();
+    await flushPromises();
+    expect(savedAuth()).toEqual(oauthToolset().data.auth);
+  });
+
   it("warns when the toolset changed on the server", async () => {
     await mountPage({ action: "edit", id: "ts1" });
     await edit({ description: "Edited" });
@@ -427,42 +600,10 @@ describe("AddAiToolset drafts", () => {
     await flushPromises();
     expect(aiToolsetsService.create).not.toHaveBeenCalled();
 
-    await edit({ kind: "cli", "cli.command": "kubectl" });
+    await edit({ kind: "skill", "skill.content": "# Runbook" });
     await form().handleSubmit();
     await flushPromises();
     expect(aiToolsetsService.create).toHaveBeenCalledTimes(1);
-  });
-
-  it("marks a not-kept credential file under its editor until it is filled again", async () => {
-    vi.mocked(aiToolsetsService.get).mockResolvedValue({
-      data: {
-        id: "ts1",
-        name: "kube_cli",
-        kind: "cli",
-        description: "",
-        data: {
-          command: "kubectl",
-          timeout_seconds: 30,
-          max_output_bytes: 100000,
-          env: {},
-          credential_files: { KUBECONFIG: "apiVersion: v1" },
-        },
-      },
-    } as never);
-    await mountPage({ action: "edit", id: "ts1" });
-    await edit({ "cli.credFiles[0].value": "apiVersion: v2" });
-    window.dispatchEvent(new Event("pagehide"));
-
-    await remount({ action: "edit", id: "ts1" });
-    expect(byTest("editor-draft-credentials-not-saved")?.textContent).toContain("KUBECONFIG");
-    click("editor-draft-continue");
-    await flushPromises();
-    expect(byTest("ai-toolset-cred-file-reenter-0")).not.toBeNull();
-    expect(byTest("ai-toolset-cred-file-reenter-0")?.classList).toContain("text-status-error-text");
-
-    await edit({ "cli.credFiles[0].value": "apiVersion: v3" });
-    await flushPromises();
-    expect(byTest("ai-toolset-cred-file-reenter-0")).toBeNull();
   });
 
   it("Cancel asks; Keep draft returns to the list with a dot on Add, Discard drops it", async () => {

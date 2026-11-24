@@ -53,12 +53,13 @@ pub enum Applied {
     },
 }
 
-/// The message another region gets for `row`, or `None` for a "this region only" row.
+/// The message another region gets for `row`, or `None` for a "this region only" row or one of an
+/// unknown kind, whose secret values can't be told apart.
 pub fn put_message(row: &OrgToolset) -> Option<AiToolsetMessage> {
     if row.region_only {
         return None;
     }
-    let kind = row.kind.parse().unwrap_or(ToolsetKind::Generic);
+    let kind: ToolsetKind = row.kind.parse().ok()?;
     let data = row
         .data
         .as_deref()
@@ -163,6 +164,17 @@ async fn apply_put(msg: AiToolsetMessage) -> Result<Applied> {
     else {
         return Ok(Applied::Ignored);
     };
+    let Ok(parsed_kind) = kind.parse::<ToolsetKind>() else {
+        return Ok(Applied::Ignored);
+    };
+    // The unique name can't be taken over and the row holding it must stay as it is.
+    if table::is_name_held_unread(&org, &name).await? {
+        log::warn!(
+            "[SUPER_CLUSTER:sync] toolset '{name}' of org '{org}' isn't applied here: a row of a \
+             kind no longer supported has its name"
+        );
+        return Ok(Applied::Ignored);
+    }
     let version = (updated_at, region.as_str());
     if let Some(t) = table::get_tombstone(&org, &key).await?
         && !wins(version, (t.deleted_at, &t.region))
@@ -190,7 +202,6 @@ async fn apply_put(msg: AiToolsetMessage) -> Result<Applied> {
         if row.region_only || !wins(version, row_version(&row)) {
             return Ok(Applied::Ignored);
         }
-        let parsed_kind = kind.parse().unwrap_or(ToolsetKind::Generic);
         let stored = row
             .data
             .as_deref()
@@ -335,6 +346,110 @@ mod tests {
     }
 
     #[test]
+    fn an_oauth_row_is_sent_with_its_client_and_without_its_secrets() {
+        let data = json!({
+            "url": "https://m.example/mcp",
+            "auth": {
+                "type": "oauth_client_credentials",
+                "token_url": "https://sso.example.com/token",
+                "client_id": "id-1",
+                "client_secret": "c-s3cret",
+                "scope": "a b",
+                "extra_params": {"resource": "e-s3cret"},
+                "client_auth": "body"
+            }
+        });
+        let msg = put_message(&row("dt", &data.to_string())).unwrap();
+        assert!(!serde_json::to_string(&msg).unwrap().contains("s3cret"));
+        let AiToolsetMessage::Put { data: sent, .. } = msg else {
+            panic!("a put")
+        };
+        let mut expected = data["auth"].clone();
+        expected["client_secret"] = json!("");
+        expected["extra_params"] = json!({"resource": ""});
+        assert_eq!(sent.unwrap()["auth"], expected);
+    }
+
+    #[tokio::test]
+    async fn a_replicated_oauth_edit_keeps_the_local_secret_only_for_the_same_hosts() {
+        if !meta_store().await {
+            return;
+        }
+        let org = format!("r1_oauth_{}", config::utils::time::now_micros());
+        let auth = |token_url: &str, secret: &str| {
+            json!({"url": "https://m.example/mcp", "auth": {
+                "type": "oauth_client_credentials", "token_url": token_url,
+                "client_id": "id-1", "client_secret": secret
+            }})
+        };
+        let home = "https://sso.example.com/token";
+        apply_replicated(put(&org, 10, auth(home, "")))
+            .await
+            .unwrap();
+        edit_here(&org, 11, |r| r.data = Some(auth(home, "mine").to_string())).await;
+        for (at, token_url, want) in [
+            (20, "https://sso.example.com/v2/token", "mine"),
+            (30, "https://evil.example/token", ""),
+        ] {
+            apply_replicated(put(&org, at, auth(token_url, "")))
+                .await
+                .unwrap();
+            let data: serde_json::Value =
+                serde_json::from_str(&stored(&org).await.unwrap().data.unwrap()).unwrap();
+            assert_eq!(data["auth"]["client_secret"], want, "{token_url}");
+        }
+    }
+
+    #[test]
+    fn a_cli_row_is_never_sent() {
+        let r = OrgToolset {
+            kind: "cli".into(),
+            ..row("gh", r#"{"env":{"GH_TOKEN":"s3cret"}}"#)
+        };
+        assert!(put_message(&r).is_none());
+    }
+
+    #[tokio::test]
+    async fn a_received_cli_row_and_one_whose_name_a_cli_row_holds_are_ignored() {
+        if !meta_store().await {
+            return;
+        }
+        let org = format!("r1_cli_{}", config::utils::time::now_micros());
+        let received = AiToolsetMessage::Put {
+            org: org.clone(),
+            key: "gh".into(),
+            name: "gh".into(),
+            kind: "cli".into(),
+            description: None,
+            data: Some(json!({"command": "gh"})),
+            created_by: "u1".into(),
+            created_at: 1,
+            updated_at: 10,
+            region: "zz-1".into(),
+        };
+        assert_eq!(
+            apply_replicated(received).await.unwrap(),
+            Applied::Ignored,
+            "the kind is not applied"
+        );
+        assert!(!table::is_name_held_unread(&org, "gh").await.unwrap());
+
+        let held = OrgToolset {
+            id: String::new(),
+            org: org.clone(),
+            kind: "cli".into(),
+            ..row("dd", "{}")
+        };
+        table::add(held).await.unwrap();
+        let taken = put(&org, 10, json!({"url": "https://a"}));
+        assert_eq!(apply_replicated(taken).await.unwrap(), Applied::Ignored);
+        assert!(stored(&org).await.is_none());
+        assert!(table::is_name_held_unread(&org, "dd").await.unwrap());
+        table::delete_by_org(&org).await.unwrap();
+        assert!(!table::is_name_held_unread(&org, "dd").await.unwrap());
+    }
+
+    #[test]
     fn a_region_only_row_is_never_sent_and_leaves_no_tombstone() {
         let r = OrgToolset {
             region_only: true,
@@ -437,19 +552,22 @@ mod tests {
         })
         .await;
 
-        let newer = json!({"url": "https://b", "headers": {"K": "", "N": ""}});
-        let replaced = apply_replicated(put(&org, 20, newer)).await.unwrap();
-        assert!(matches!(replaced, Applied::Replaced { .. }), "{replaced:?}");
-        let data: serde_json::Value =
-            serde_json::from_str(&stored(&org).await.unwrap().data.unwrap()).unwrap();
-        assert_eq!(
-            data,
-            json!({"url": "https://b", "headers": {"K": "mine", "N": ""}})
-        );
+        for (at, url, kept) in [(20, "https://a/v2", "mine"), (22, "https://b", "")] {
+            let newer = json!({"url": url, "headers": {"K": "", "N": ""}});
+            let replaced = apply_replicated(put(&org, at, newer)).await.unwrap();
+            assert!(matches!(replaced, Applied::Replaced { .. }), "{replaced:?}");
+            let data: serde_json::Value =
+                serde_json::from_str(&stored(&org).await.unwrap().data.unwrap()).unwrap();
+            assert_eq!(
+                data,
+                json!({"url": url, "headers": {"K": kept, "N": ""}}),
+                "a value is kept only for the host it was entered for"
+            );
+        }
         let stale = put(&org, 5, json!({"url": "https://old"}));
         assert_eq!(apply_replicated(stale).await.unwrap(), Applied::Ignored);
 
-        edit_here(&org, 21, |r| r.region_only = true).await;
+        edit_here(&org, 23, |r| r.region_only = true).await;
         assert_eq!(
             apply_replicated(put(&org, 30, json!({}))).await.unwrap(),
             Applied::Ignored

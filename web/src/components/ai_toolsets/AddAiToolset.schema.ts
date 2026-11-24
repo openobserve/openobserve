@@ -1,62 +1,34 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Validation schema for AddAiToolset.vue. The form is keyed on `kind`
-// (mcp / cli / skill): a few fields are always validated (name, kind) and the
-// rest are conditional on the selected kind. Built as a base object +
-// `superRefine` (rather than a discriminated union) so all kind-specific fields
-// can coexist in one flat record — the template only renders the subset for the
-// active kind, but switching kind never reshapes the form data. Factory keeps
-// the messages i18n-driven (pass useI18n's `t`).
-//
-// Validation timing is owned by OForm (submit-then-change via revalidateLogic);
-// this file only describes what is valid.
+// One flat record with `superRefine`, not a discriminated union, so switching `kind` (mcp / skill)
+// never reshapes the form data.
 
 import { z } from "zod";
+import {
+  emptyAuth,
+  isAuthorizationHeader,
+  isHttpsUrl,
+  usesClientCredentials,
+  type ToolsetAuth,
+} from "./toolsetAuth";
 
 // The server's create rule: the name the agent sees, so normalization never changes it.
 export const aiToolsetNameRegex = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 export const AI_TOOLSET_NAME_MAX = 64;
 
-// The server's MCP limit bounds (o2-enterprise `McpPolicy::validate`); result size is entered in KiB.
-export const MCP_LIMITS = {
-  maxCallsPerTurn: [1, 500],
-  rateCalls: [1, 10_000],
-  rateSeconds: [1, 3_600],
-  resultKib: [1, 16_384],
-} as const;
-
-// A limit input is optional: blank keeps the agent's default.
-const optionalNumber = z.union([z.string(), z.number()]).optional();
-
-const isBlank = (v: unknown) => v === undefined || v === null || String(v).trim() === "";
-
-const inRange = (v: unknown, [min, max]: readonly [number, number]) => {
-  const n = Number(v);
-  return Number.isInteger(n) && n >= min && n <= max;
-};
-
-// One row of a key/value secret list (mcp headers, cli env vars). All fields are
-// free-form and optional (a blank starter row is valid — only non-empty rows are
-// persisted on save). `visible` is the per-row password-visibility UI flag; it is
-// form-owned bookkeeping excluded from the saved payload.
+// All optional: a blank starter row is valid, and only keyed rows are saved, without `visible`.
 export const secretRowSchema = z.object({
   key: z.string().optional(),
   value: z.string().optional(),
   visible: z.boolean().optional(),
 });
 
-// One row of a credential file (cli). `key` is the env-var name; `value` is the
-// file content edited in a Monaco editor (bridged into the form — Monaco has no
-// OForm* equivalent).
-export const credFileRowSchema = z.object({
-  key: z.string().optional(),
-  value: z.string().optional(),
-});
-
 // Saved toolsets keep legacy names (names are immutable), so the name rule only gates a create.
 export const makeAddAiToolsetSchema = (
   t: (_key: string) => string,
   isEditing: () => boolean = () => false,
+  // A row replicated without this region's secret takes edits that leave its credentials alone.
+  missingSecretOk: (_mcp: { url?: string; auth: ToolsetAuth }) => boolean = () => false,
 ) =>
   z
     .object({
@@ -66,37 +38,27 @@ export const makeAddAiToolsetSchema = (
       description: z.string().optional(),
       region_only: z.boolean().optional(),
 
-      // ── MCP fields (validated only when kind === "mcp" — see superRefine) ─
-      // Number inputs emit strings → z.coerce.number(); consumers coerce at use.
-      // `headers` is a form-owned dynamic array-field (no validation rule).
+      // Validated only when kind === "mcp" (see superRefine); number inputs emit strings.
       mcp: z.object({
         url: z.string().optional(),
         timeout_seconds: z.coerce.number().optional(),
         headers: z.array(secretRowSchema).optional().default([]),
+        auth: z
+          .object({
+            token_url: z.string().optional(),
+            client_id: z.string().optional(),
+            client_secret: z.string().optional(),
+            scope: z.string().optional(),
+            extra: z.record(z.string(), z.any()).optional().default({}),
+          })
+          .optional()
+          .default(emptyAuth()),
         // `null` is an absent key, so the agent's default for that list applies.
         allowed_tools: z.array(z.string()).nullable().default(null),
         blocked_tools: z.array(z.string()).nullable().default(null),
         write_tools: z.array(z.string()).nullable().default(null),
-        max_calls_per_turn: optionalNumber,
-        rate_calls: optionalNumber,
-        rate_seconds: optionalNumber,
-        max_result_kib: optionalNumber,
         // Stored keys this form doesn't edit (e.g. `tool_classes`), sent back as they are.
         extra: z.record(z.string(), z.any()).optional().default({}),
-      }),
-
-      // ── CLI fields (command validated only when kind === "cli") ───────────
-      // `env` + `credFiles` are form-owned dynamic array-fields (no validation).
-      cli: z.object({
-        command: z.string().optional(),
-        allowed_subcommands_raw: z.string().optional(),
-        timeout_seconds: z.coerce.number().optional(),
-        max_output_bytes: z.coerce.number().optional(),
-        requires_confirmation: z.boolean().optional(),
-        env: z.array(secretRowSchema).optional().default([]),
-        credFiles: z.array(credFileRowSchema).optional().default([]),
-        // The applied CLI preset; a form field, so a resumed draft still saves it.
-        preset: z.object({ id: z.string(), revision: z.number() }).optional(),
       }),
 
       // ── Skill fields (content validated only when kind === "skill") ───────
@@ -124,9 +86,7 @@ export const makeAddAiToolsetSchema = (
           });
         }
       }
-      // mcp.url required when kind === "mcp". Bare empty check (NO trim): a
-      // whitespace-only url is accepted. (Note the asymmetry: skill.content below
-      // DOES trim; url/command do not.)
+      // Not trimmed, unlike skill.content below: a whitespace-only url is accepted here.
       if (val.kind === "mcp" && !String(val.mcp?.url ?? "")) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -135,56 +95,32 @@ export const makeAddAiToolsetSchema = (
         });
       }
       if (val.kind === "mcp") {
-        const mcp = val.mcp ?? ({} as any);
-        const limits: [string, unknown, readonly [number, number], string][] = [
-          [
-            "max_calls_per_turn",
-            mcp.max_calls_per_turn,
-            MCP_LIMITS.maxCallsPerTurn,
-            "aiToolset.maxCallsInvalid",
-          ],
-          [
-            "max_result_kib",
-            mcp.max_result_kib,
-            MCP_LIMITS.resultKib,
-            "aiToolset.resultSizeInvalid",
-          ],
-          ["rate_calls", mcp.rate_calls, MCP_LIMITS.rateCalls, "aiToolset.rateCallsInvalid"],
-          [
-            "rate_seconds",
-            mcp.rate_seconds,
-            MCP_LIMITS.rateSeconds,
-            "aiToolset.rateSecondsInvalid",
-          ],
-        ];
-        for (const [field, value, range, message] of limits) {
-          if (!isBlank(value) && !inRange(value, range)) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ["mcp", field],
-              message: t(message),
-            });
-          }
-        }
-        if (isBlank(mcp.rate_calls) !== isBlank(mcp.rate_seconds)) {
+        const auth = val.mcp.auth;
+        const refuse = (path: (string | number)[], message: string) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            path: ["mcp", isBlank(mcp.rate_calls) ? "rate_calls" : "rate_seconds"],
-            message: t("aiToolset.rateBothRequired"),
+            path: ["mcp", ...path],
+            message: t(message),
           });
+        if (usesClientCredentials(auth)) {
+          if (!auth.token_url?.trim()) {
+            refuse(["auth", "token_url"], "aiToolset.tokenUrlRequired");
+          } else if (!isHttpsUrl(auth.token_url)) {
+            refuse(["auth", "token_url"], "aiToolset.tokenUrlHttps");
+          }
+          if (!auth.client_secret?.trim() && !missingSecretOk(val.mcp)) {
+            refuse(["auth", "client_secret"], "aiToolset.clientSecretRequired");
+          }
+          val.mcp.headers.forEach((row, index) => {
+            if (isAuthorizationHeader(row) && row.value) {
+              refuse(["headers", index, "key"], "aiToolset.authorizationWithOauth");
+            }
+          });
+        } else if (auth.client_secret?.trim()) {
+          // Without a client id the secret would be dropped without a word.
+          refuse(["auth", "client_id"], "aiToolset.clientIdRequired");
         }
       }
-      // cli.command required when kind === "cli". Bare empty check (NO trim): a
-      // whitespace-only command is accepted.
-      if (val.kind === "cli" && !String(val.cli?.command ?? "")) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["cli", "command"],
-          message: t("aiToolset.cliCommandRequired"),
-        });
-      }
-      // skill.content required when kind === "skill". Trim IS applied here —
-      // unlike url/command above.
       if (val.kind === "skill" && !String(val.skill?.content ?? "").trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -209,23 +145,11 @@ export const addAiToolsetDefaults = (): AddAiToolsetForm => ({
     url: "",
     timeout_seconds: 30,
     headers: [],
+    auth: emptyAuth(),
     allowed_tools: [],
     blocked_tools: null,
-    write_tools: [],
-    max_calls_per_turn: "",
-    rate_calls: "",
-    rate_seconds: "",
-    max_result_kib: "",
+    write_tools: null,
     extra: {},
-  },
-  cli: {
-    command: "",
-    allowed_subcommands_raw: "",
-    timeout_seconds: 30,
-    max_output_bytes: 100000,
-    requires_confirmation: false,
-    env: [],
-    credFiles: [],
   },
   skill: { content: "" },
 });

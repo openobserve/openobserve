@@ -72,19 +72,10 @@ const PRESETS = [
     url_template: "https://{environment}.apps.dynatrace.com/mcp",
     params: [{ name: "environment", label: "Environment ID" }],
     headers: [{ name: "Authorization" }],
+    auth: { type: "oauth_client_credentials", token_url: "https://sso.dynatrace.com/token" },
     allowed_tools: ["execute-dql", "query-problems"],
     write_tools: [],
     tool_classes: [{ tool: "execute-dql", class: "logs", args: { query: "^fetch logs" } }],
-  },
-  {
-    id: "kubectl",
-    kind: "cli",
-    label: "kubectl",
-    revision: 1,
-    command: "kubectl",
-    allowed_subcommands: ["get", "describe"],
-    env: [],
-    credential_files: ["KUBECONFIG"],
   },
 ];
 import i18n from "@/locales";
@@ -138,7 +129,12 @@ describe("AddAiToolset", () => {
     it("shows the MCP section by default (kind = mcp)", () => {
       wrapper = createWrapper();
       expect(wrapper.find('[data-test="ai-toolset-mcp-url"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="ai-toolset-cli-command"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="ai-toolset-skill-content"]').exists()).toBe(false);
+    });
+
+    it("offers MCP servers and skills only", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.kindOptions.map((o: any) => o.value)).toEqual(["mcp", "skill"]);
     });
 
     it("keeps the Save button enabled (R3 — never disabled to gate validity)", () => {
@@ -150,12 +146,12 @@ describe("AddAiToolset", () => {
 
     it("toggles the visible section off the form-owned kind value", async () => {
       wrapper = createWrapper();
-      getForm().setFieldValue("kind", "cli");
+      getForm().setFieldValue("kind", "skill");
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.selectedKind).toBe("cli");
-      expect(wrapper.find('[data-test="ai-toolset-cli-command"]').exists()).toBe(true);
+      expect(wrapper.vm.selectedKind).toBe("skill");
+      expect(wrapper.find('[data-test="ai-toolset-skill-content"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="ai-toolset-mcp-url"]').exists()).toBe(false);
     });
   });
@@ -237,34 +233,9 @@ describe("AddAiToolset", () => {
 
       expect(aiToolsetsService.create).not.toHaveBeenCalled();
     });
-
-    it("blocks a cli toolset with no command, then saves once command is set", async () => {
-      wrapper = createWrapper();
-      const form = getForm();
-      form.setFieldValue("kind", "cli");
-      form.setFieldValue("name", "valid");
-      await flushPromises();
-
-      await form.handleSubmit();
-      await flushPromises();
-      expect(aiToolsetsService.create).not.toHaveBeenCalled();
-
-      form.setFieldValue("cli.command", "kubectl");
-      await flushPromises();
-      await form.handleSubmit();
-      await flushPromises();
-
-      expect(aiToolsetsService.create).toHaveBeenCalledWith(
-        "test-org",
-        expect.objectContaining({
-          kind: "cli",
-          data: expect.objectContaining({ command: "kubectl" }),
-        }),
-      );
-    });
   });
 
-  describe("form-owned array-fields (headers / env / cred)", () => {
+  describe("form-owned array-field (headers)", () => {
     it("adds a header row through the form API and mirrors it for the v-for", async () => {
       wrapper = createWrapper();
       wrapper.vm.addHeader();
@@ -326,33 +297,6 @@ describe("AddAiToolset", () => {
       await flushPromises();
       expect(getForm().state.values.mcp.headers[0].visible).toBe(true);
     });
-
-    it("saves cli env + credential files (cred value bridged from Monaco)", async () => {
-      wrapper = createWrapper();
-      const form = getForm();
-      form.setFieldValue("kind", "cli");
-      form.setFieldValue("name", "valid");
-      form.setFieldValue("cli.command", "kubectl");
-      form.setFieldValue("cli.env", [{ key: "GH_TOKEN", value: "secret", visible: false }]);
-      form.setFieldValue("cli.credFiles", [{ key: "KUBECONFIG", value: "" }]);
-      await flushPromises();
-      // The Monaco editor bridges its value into the form.
-      wrapper.vm.setCredValue(0, "apiVersion: v1");
-      await flushPromises();
-
-      await form.handleSubmit();
-      await flushPromises();
-
-      expect(aiToolsetsService.create).toHaveBeenCalledWith(
-        "test-org",
-        expect.objectContaining({
-          data: expect.objectContaining({
-            env: { GH_TOKEN: "secret" },
-            credential_files: { KUBECONFIG: "apiVersion: v1" },
-          }),
-        }),
-      );
-    });
   });
 
   // The non-negotiable field-array gate (START-HERE ① / brief §2): build >=3
@@ -394,46 +338,6 @@ describe("AddAiToolset", () => {
       // RENDERED inputs must shift, not just form.state.values.
       expect(renderedKeys("mcp.headers")).toEqual(["AAA", "CCC"]);
       expect(getForm().state.values.mcp.headers.map((h: any) => h.key)).toEqual(["AAA", "CCC"]);
-    });
-
-    it("keeps cli.env inputs in sync after deleting a NON-last row", async () => {
-      wrapper = createWrapper();
-      const form = getForm();
-      form.setFieldValue("kind", "cli");
-      form.setFieldValue("cli.env", [
-        { key: "E_AAA", value: "1", visible: false },
-        { key: "E_BBB", value: "2", visible: false },
-        { key: "E_CCC", value: "3", visible: false },
-      ]);
-      await flushPromises();
-      await wrapper.vm.$nextTick();
-      expect(renderedKeys("cli.env")).toEqual(["E_AAA", "E_BBB", "E_CCC"]);
-
-      wrapper.vm.removeEnvVar(1); // delete the MIDDLE (non-last) row
-      await flushPromises();
-      await wrapper.vm.$nextTick();
-
-      expect(renderedKeys("cli.env")).toEqual(["E_AAA", "E_CCC"]);
-    });
-
-    it("keeps cli.credFiles inputs in sync after deleting a NON-last row", async () => {
-      wrapper = createWrapper();
-      const form = getForm();
-      form.setFieldValue("kind", "cli");
-      form.setFieldValue("cli.credFiles", [
-        { key: "C_AAA", value: "" },
-        { key: "C_BBB", value: "" },
-        { key: "C_CCC", value: "" },
-      ]);
-      await flushPromises();
-      await wrapper.vm.$nextTick();
-      expect(renderedKeys("cli.credFiles")).toEqual(["C_AAA", "C_BBB", "C_CCC"]);
-
-      wrapper.vm.removeCredFile(1); // delete the MIDDLE (non-last) row
-      await flushPromises();
-      await wrapper.vm.$nextTick();
-
-      expect(renderedKeys("cli.credFiles")).toEqual(["C_AAA", "C_CCC"]);
     });
   });
 
@@ -511,7 +415,6 @@ describe("AddAiToolset", () => {
           timeout_seconds: 30,
           allowed_tools: ["search_logs", "get_*", "gone_tool"],
           write_tools: [],
-          rate_limit: { calls: 50, per_seconds: 10 },
           tool_classes: [{ tool: "search_*", class: "logs" }],
           preset: "datadog",
         });
@@ -532,6 +435,7 @@ describe("AddAiToolset", () => {
           url: "https://mcp.example.com/mcp",
           headers: { "DD-API-KEY": "***" },
           timeout_seconds: 30,
+          auth: { type: "headers" },
         },
       });
       expect(picker().props("status")).toBe("ok");
@@ -549,7 +453,6 @@ describe("AddAiToolset", () => {
         headers: { "DD-API-KEY": "***" },
         allowed_tools: ["search_logs", "get_*", "gone_tool", "create_monitor"],
         write_tools: ["create_monitor"],
-        rate_limit: { calls: 50, per_seconds: 10 },
         tool_classes: [{ tool: "search_*", class: "logs" }],
         preset: "datadog",
       });
@@ -557,7 +460,7 @@ describe("AddAiToolset", () => {
       expect(typeof data.tools_verified_at).toBe("number");
     });
 
-    it("prefills a row without allowed_tools as all allowed, tagged tools as can change things", async () => {
+    it("prefills a row without allowed_tools as all allowed, with no write list", async () => {
       editRecord({ url: "https://mcp.example.com/mcp", timeout_seconds: 30 });
       vi.mocked(aiToolsetsService.discover).mockResolvedValue({
         data: { tools: DISCOVERED },
@@ -570,7 +473,7 @@ describe("AddAiToolset", () => {
       expect(picker().props("lists")).toEqual({
         allowed: ["search_logs", "create_monitor"],
         blocked: null,
-        write: ["create_monitor"],
+        write: null,
       });
     });
 
@@ -722,29 +625,465 @@ describe("AddAiToolset", () => {
       expect(picker().props("lists").allowed).toEqual([]);
     });
 
-    it("sends a new toolset's limits and starts with every tool off", async () => {
+    it("starts a new toolset with every tool off", async () => {
       wrapper = createWrapper();
       const form = getForm();
       form.setFieldValue("name", "new-mcp");
       form.setFieldValue("mcp.url", "https://mcp.example.com/mcp");
-      form.setFieldValue("mcp.max_calls_per_turn", "10");
-      form.setFieldValue("mcp.rate_calls", "50");
-      form.setFieldValue("mcp.rate_seconds", "10");
-      form.setFieldValue("mcp.max_result_kib", "64");
       await flushPromises();
       await form.handleSubmit();
       await flushPromises();
 
       const data = vi.mocked(aiToolsetsService.create).mock.calls.at(-1)![1].data!;
-      expect(data).toMatchObject({
-        schema: 2,
+      expect(data).toMatchObject({ schema: 2, allowed_tools: [] });
+      expect(data).not.toHaveProperty("write_tools");
+      expect(data).not.toHaveProperty("tools_verified_at");
+
+      vi.mocked(aiToolsetsService.discover).mockResolvedValue({
+        data: { tools: DISCOVERED },
+      } as any);
+      await (wrapper.vm as any).discoverTools();
+      await form.handleSubmit();
+      await flushPromises();
+      expect(vi.mocked(aiToolsetsService.create).mock.calls.at(-1)![1].data).toMatchObject({
         allowed_tools: [],
         write_tools: [],
-        max_calls_per_turn: 10,
-        rate_limit: { calls: 50, per_seconds: 10 },
-        max_result_bytes: 65536,
       });
-      expect(data).not.toHaveProperty("tools_verified_at");
+    });
+
+    describe("write_tools of a row saved without it", () => {
+      const ALLOWED = ["search_logs", "create_monitor"];
+      const legacyRow = async (data: Record<string, any> = { allowed_tools: ALLOWED }) => {
+        editRecord({ url: "https://mcp.example.com/mcp", timeout_seconds: 30, ...data });
+        wrapper = createWrapper();
+        await flushPromises();
+      };
+      const discover = async () => {
+        await (wrapper.vm as any).discoverTools();
+        await flushPromises();
+      };
+      const save = async () => {
+        getForm().setFieldValue("description", "edited");
+        await getForm().handleSubmit();
+        await flushPromises();
+        return savedData();
+      };
+      const succeed = () =>
+        vi.mocked(aiToolsetsService.discover).mockResolvedValue({
+          data: { tools: DISCOVERED },
+        } as any);
+      const fail = () => vi.mocked(aiToolsetsService.discover).mockRejectedValue(new Error("down"));
+
+      it("stays absent while discovery is pending", async () => {
+        vi.mocked(aiToolsetsService.discover).mockReturnValue(new Promise(() => {}) as any);
+        await legacyRow();
+        void (wrapper.vm as any).discoverTools();
+        await flushPromises();
+        const data = await save();
+        expect(data).not.toHaveProperty("write_tools");
+        expect(data.allowed_tools).toEqual(ALLOWED);
+      });
+
+      it("stays absent after discovery fails, also once it had succeeded", async () => {
+        fail();
+        await legacyRow();
+        await discover();
+        expect(await save()).not.toHaveProperty("write_tools");
+        succeed();
+        await discover();
+        fail();
+        await discover();
+        expect(await save()).not.toHaveProperty("write_tools");
+      });
+
+      it("is what the picker shows after discovery succeeds", async () => {
+        succeed();
+        await legacyRow();
+        await discover();
+        expect((await save()).write_tools).toEqual(["create_monitor"]);
+      });
+
+      it("is written once the admin sets a tool, without discovery", async () => {
+        fail();
+        await legacyRow();
+        await discover();
+        await wrapper.find('[data-test="ai-toolset-typed-tool"] input').setValue("run_query");
+        await wrapper.find('[data-test="ai-toolset-typed-tool-add"]').trigger("click");
+        await flushPromises();
+        const data = await save();
+        expect(data.allowed_tools).toEqual([...ALLOWED, "run_query"]);
+        expect(data.write_tools).toEqual(ALLOWED);
+
+        succeed();
+        await discover();
+        expect((await save()).write_tools).toEqual(ALLOWED);
+        await stateButton("search_logs", "allowed").trigger("click");
+        expect((await save()).write_tools).toEqual(["create_monitor"]);
+      });
+
+      it("drops a stale discovery's lists when the URL changes, even in the same tick", async () => {
+        succeed();
+        await legacyRow({});
+        await discover();
+        expect(picker().props("lists").allowed).toEqual(ALLOWED);
+        getForm().setFieldValue("mcp.url", "https://b.example.com/mcp");
+        const submitted = getForm().handleSubmit();
+        await submitted;
+        await flushPromises();
+        for (const data of [savedData(), await save()]) {
+          expect(data).not.toHaveProperty("write_tools");
+          expect(data).not.toHaveProperty("allowed_tools");
+        }
+      });
+
+      it("keeps the admin's choice when the URL changes", async () => {
+        succeed();
+        await legacyRow();
+        await discover();
+        await stateButton("search_logs", "write").trigger("click");
+        getForm().setFieldValue("mcp.url", "https://b.example.com/mcp");
+        await flushPromises();
+        expect((await save()).write_tools).toEqual(["create_monitor", "search_logs"]);
+      });
+
+      it.each([
+        ["no allowlist", {}],
+        ["an allowlist of *", { allowed_tools: ["*"] }],
+        ["a glob in the allowlist", { allowed_tools: ["search_*", "create_monitor"] }],
+      ])("stays absent after discovery succeeds with %s", async (_label, row) => {
+        succeed();
+        await legacyRow(row);
+        await discover();
+        expect(await save()).not.toHaveProperty("write_tools");
+      });
+
+      it("keeps a glob's unseen matches refused once the admin sets a tool", async () => {
+        succeed();
+        await legacyRow({ allowed_tools: ["search_*", "create_monitor"] });
+        await discover();
+        await stateButton("create_monitor", "allowed").trigger("click");
+        const data = await save();
+        expect(data.allowed_tools).toEqual(["search_*", "create_monitor"]);
+        expect(data.write_tools).toEqual(["search_*"]);
+      });
+
+      it("isn't copied into the form when an unrelated entry is removed", async () => {
+        succeed();
+        await legacyRow({ allowed_tools: ALLOWED, blocked_tools: ["delete_*"] });
+        await discover();
+        const entry = wrapper.find('[data-test="ai-toolset-other-blocked-delete_*"]');
+        await entry.find("button").trigger("click");
+        await flushPromises();
+        expect(getForm().state.values.mcp.blocked_tools).toEqual([]);
+        expect(getForm().state.values.mcp.write_tools).toBeNull();
+        fail();
+        await discover();
+        expect(await save()).not.toHaveProperty("write_tools");
+      });
+
+      it("keeps a stored empty list", async () => {
+        fail();
+        await legacyRow({ allowed_tools: ALLOWED, write_tools: [] });
+        expect((await save()).write_tools).toEqual([]);
+      });
+    });
+
+    it("voids a verified result when only the timeout changes", async () => {
+      editRecord({ url: "https://mcp.example.com/mcp", timeout_seconds: 30, allowed_tools: [] });
+      wrapper = createWrapper();
+      await flushPromises();
+      await (wrapper.vm as any).discoverTools();
+      await flushPromises();
+      getForm().setFieldValue("mcp.timeout_seconds", "5");
+      await getForm().handleSubmit();
+      await flushPromises();
+      expect(savedData()).not.toHaveProperty("tools_verified_at");
+    });
+
+    it("runs one discovery when Refresh comes before the pending one", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        editRecord({ url: "https://mcp.example.com/mcp", timeout_seconds: 30, allowed_tools: [] });
+        wrapper = createWrapper();
+        await flushPromises();
+        await wrapper.find('[data-test="ai-toolset-tools-refresh"]').trigger("click");
+        await flushPromises();
+        vi.advanceTimersByTime(2000);
+        await flushPromises();
+        expect(aiToolsetsService.discover).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("masks credentials, URLs and the discovery error in session replay", async () => {
+      const message = "401 for https://mcp.example.com/mcp?key=s3cret";
+      vi.mocked(aiToolsetsService.discover).mockRejectedValue({
+        response: { status: 400, data: { message } },
+      });
+      mockQuery = { action: "add", preset: "dynatrace" };
+      wrapper = createWrapper();
+      await flushPromises();
+      getForm().setFieldValue("mcp.headers[0].value", "Bearer t");
+      await wrapper.find('[data-test="ai-toolset-preset-tools-customize"]').trigger("click");
+      await (wrapper.vm as any).discoverTools();
+      await flushPromises();
+      for (const selector of [
+        '[name="mcp.headers[0].value"]',
+        '[data-test="ai-toolset-client-secret-field"]',
+        '[data-test="ai-toolset-token-url-field"]',
+        '[data-test="ai-toolset-mcp-url-field"]',
+        '[data-test="ai-toolset-preset-param-environment"]',
+        '[data-test="ai-toolset-tools-error"]',
+      ]) {
+        const element = wrapper.find(selector).element as HTMLElement;
+        expect(element.closest('[data-o2-privacy="mask"]'), selector).not.toBeNull();
+      }
+    });
+  });
+
+  describe("OAuth client credentials", () => {
+    const URL = "https://mcp.example.com/mcp";
+    const AUTH = {
+      type: "oauth_client_credentials",
+      token_url: "https://sso.example.com/token",
+      client_id: "svc",
+      client_secret: "***",
+      scope: "read",
+      client_auth: "body",
+      extra_params: { resource: "urn:x" },
+    };
+
+    const newToolset = async (values: Record<string, unknown>) => {
+      wrapper = createWrapper();
+      await flushPromises();
+      const all = { name: "oauth-mcp", "mcp.url": URL, ...values };
+      Object.entries(all).forEach(([field, value]) => getForm().setFieldValue(field, value));
+      await flushPromises();
+    };
+
+    const editRow = async (data: Record<string, any>) => {
+      mockQuery = { action: "edit", id: "tool-1" };
+      vi.mocked(aiToolsetsService.get).mockResolvedValue({
+        data: {
+          id: "tool-1",
+          name: "oauth-mcp",
+          kind: "mcp",
+          data: { url: URL, allowed_tools: [], write_tools: [], ...data },
+        },
+      } as any);
+      wrapper = createWrapper();
+      await flushPromises();
+    };
+
+    const submit = async () => {
+      await getForm().handleSubmit();
+      await flushPromises();
+    };
+
+    const discover = async () => {
+      vi.mocked(aiToolsetsService.discover).mockClear();
+      await wrapper.vm.discoverTools();
+      await flushPromises();
+      return vi.mocked(aiToolsetsService.discover).mock.calls.at(-1)?.[1] as any;
+    };
+
+    const created = () => vi.mocked(aiToolsetsService.create).mock.calls.at(-1)![1].data!;
+    const updated = () => vi.mocked(aiToolsetsService.update).mock.calls.at(-1)![2].data!;
+
+    const filled = {
+      "mcp.auth.token_url": " https://sso.example.com/token ",
+      "mcp.auth.client_id": " svc ",
+      "mcp.auth.client_secret": "s3cret",
+    };
+
+    it.each([
+      ["all fields are empty", {}],
+      ["only the token URL is filled", { "mcp.auth.token_url": "https://sso.example.com/token" }],
+    ])("sends no auth when %s", async (_label, values) => {
+      await newToolset(values);
+      await submit();
+      expect(aiToolsetsService.create).toHaveBeenCalledTimes(1);
+      expect(created()).not.toHaveProperty("auth");
+    });
+
+    it("groups the fields under their heading and help line", () => {
+      wrapper = createWrapper();
+      const group = wrapper.find('[data-test="ai-toolset-oauth"]');
+      const textOf = (attribute: string) => group.find(`#${group.attributes(attribute)}`).text();
+      expect(group.attributes("role")).toBe("group");
+      expect(textOf("aria-labelledby")).toContain("OAuth client credentials");
+      expect(textOf("aria-describedby")).toContain("Fill in the client ID");
+      expect(group.findAllComponents(OFormInput)).toHaveLength(4);
+    });
+
+    it("sends the filled fields, without an empty scope", async () => {
+      await newToolset(filled);
+      await submit();
+      expect(created().auth).toEqual({
+        type: "oauth_client_credentials",
+        token_url: "https://sso.example.com/token",
+        client_id: "svc",
+        client_secret: "s3cret",
+      });
+    });
+
+    it("drops an empty Authorization row, and shows an error on a filled one", async () => {
+      const rows = (value: string) => [
+        { key: "X-Tenant", value: "t", visible: false },
+        { key: "Authorization", value, visible: false },
+      ];
+      await newToolset({ ...filled, "mcp.headers": rows("Bearer t") });
+      await submit();
+      expect(aiToolsetsService.create).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain("Remove the Authorization header");
+
+      getForm().setFieldValue("mcp.headers", rows(""));
+      await submit();
+      expect(created().headers).toEqual({ "X-Tenant": "t" });
+    });
+
+    it("shows each missing field's error and masks the secret until it is revealed", async () => {
+      await newToolset({ "mcp.auth.client_id": "svc" });
+      await submit();
+      expect(aiToolsetsService.create).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="ai-toolset-token-url-error"]').text()).toContain(
+        "Token URL is required",
+      );
+      expect(wrapper.find('[data-test="ai-toolset-client-secret-error"]').text()).toContain(
+        "Client secret is required",
+      );
+      const secret = () => wrapper.find('[data-test="ai-toolset-client-secret-field"]');
+      expect(secret().attributes("type")).toBe("password");
+      await wrapper.find('[data-test="ai-toolset-client-secret-reveal"]').trigger("click");
+      expect(secret().attributes("type")).toBe("text");
+    });
+
+    it("sends a stored secret back unchanged and keeps the auth keys it doesn't edit", async () => {
+      await editRow({ auth: AUTH });
+      expect(getForm().state.values.mcp.auth).toMatchObject({ client_secret: "***" });
+      getForm().setFieldValue("mcp.auth.scope", "read write");
+      await submit();
+      expect(updated().auth).toEqual({ ...AUTH, scope: "read write" });
+    });
+
+    it("drops the stored auth when every field is cleared", async () => {
+      await editRow({ auth: AUTH });
+      for (const field of ["token_url", "client_id", "client_secret", "scope"]) {
+        getForm().setFieldValue(`mcp.auth.${field}`, "");
+      }
+      expect((await discover()).overrides.auth).toEqual({ type: "headers" });
+      await submit();
+      expect(updated()).not.toHaveProperty("auth");
+    });
+
+    it("saves an unrelated edit of a toolset replicated without its secret", async () => {
+      await editRow({ auth: { ...AUTH, client_secret: "" } });
+      expect(await discover()).toBeUndefined();
+      getForm().setFieldValue("description", "edited");
+      getForm().setFieldValue("mcp.url", `${URL}?v=2`);
+      getForm().setFieldValue("mcp.allowed_tools", ["search"]);
+      await submit();
+      expect(updated().auth).toEqual({ ...AUTH, client_secret: "" });
+    });
+
+    it.each([
+      ["the token URL", { "mcp.auth.token_url": "https://sso.example.com/v2/token" }],
+      ["the client ID", { "mcp.auth.client_id": "other" }],
+      ["the scope", { "mcp.auth.scope": "read write" }],
+      ["the URL's origin", { "mcp.url": "https://other.example.com/mcp" }],
+    ])("asks for a replicated toolset's secret once %s is edited", async (_label, values) => {
+      await editRow({ auth: { ...AUTH, client_secret: "" } });
+      Object.entries(values).forEach(([field, value]) => getForm().setFieldValue(field, value));
+      await submit();
+      expect(aiToolsetsService.update).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain("Client secret is required");
+    });
+
+    it("asks for a stored secret that the admin clears", async () => {
+      await editRow({ auth: AUTH });
+      getForm().setFieldValue("mcp.auth.client_secret", "");
+      await submit();
+      expect(aiToolsetsService.update).not.toHaveBeenCalled();
+    });
+
+    it("discovers a saved toolset with its auth, and one without auth as headers only", async () => {
+      await editRow({ auth: AUTH });
+      expect(await discover()).toEqual({
+        id: "tool-1",
+        overrides: { url: URL, headers: {}, timeout_seconds: 30, auth: AUTH },
+      });
+      wrapper.unmount();
+      await editRow({ headers: { "X-Key": "***" } });
+      expect((await discover()).overrides.auth).toEqual({ type: "headers" });
+    });
+
+    it("discovers an unsaved toolset with its auth", async () => {
+      await newToolset(filled);
+      expect(await discover()).toEqual({
+        url: URL,
+        headers: {},
+        timeout_seconds: 30,
+        auth: {
+          type: "oauth_client_credentials",
+          token_url: "https://sso.example.com/token",
+          client_id: "svc",
+          client_secret: "s3cret",
+        },
+      });
+    });
+
+    it.each([
+      ["no client secret", { "mcp.auth.client_secret": "" }],
+      ["no client ID", { "mcp.auth.client_id": "" }],
+      ["an http token URL", { "mcp.auth.token_url": "http://sso.example.com/token" }],
+    ])("doesn't discover with %s", async (_label, values) => {
+      await newToolset({ ...filled, ...values });
+      expect(await discover()).toBeUndefined();
+    });
+
+    it("shows the token endpoint's error and drops a verified result when the secret changes", async () => {
+      await newToolset(filled);
+      await discover();
+      expect(wrapper.vm.discoveryStatus).toBe("ok");
+      getForm().setFieldValue("mcp.auth.client_secret", "other");
+      await flushPromises();
+      expect(wrapper.vm.discoveryStatus).toBe("idle");
+
+      const message = "invalid_client: the client secret is wrong";
+      vi.mocked(aiToolsetsService.discover).mockRejectedValueOnce({
+        response: { status: 400, data: { code: "discovery_failed", message } },
+      });
+      await wrapper.vm.discoverTools();
+      await flushPromises();
+      expect(wrapper.find('[data-test="ai-toolset-tools-error"]').text()).toContain(message);
+      await submit();
+      expect(created()).not.toHaveProperty("tools_verified_at");
+    });
+
+    it("prefills a preset's token URL, which alone leaves the toolset on headers", async () => {
+      mockQuery = { action: "add", preset: "dynatrace" };
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(getForm().state.values.mcp.auth.token_url).toBe("https://sso.dynatrace.com/token");
+      getForm().setFieldValue("mcp.headers[0].value", "Bearer t");
+      await submit();
+      expect(created()).not.toHaveProperty("auth");
+      expect(created().headers).toEqual({ Authorization: "Bearer t" });
+    });
+
+    it("uses a preset with client credentials, leaving its empty Authorization row out", async () => {
+      mockQuery = { action: "add", preset: "dynatrace" };
+      wrapper = createWrapper();
+      await flushPromises();
+      getForm().setFieldValue("mcp.url", URL);
+      getForm().setFieldValue("mcp.auth.client_id", "svc");
+      getForm().setFieldValue("mcp.auth.client_secret", "s3cret");
+      await flushPromises();
+      expect(await discover()).toMatchObject({ url: URL, headers: {} });
+      await submit();
+      expect(created().headers).toEqual({});
+      expect(created().auth.token_url).toBe("https://sso.dynatrace.com/token");
     });
   });
 
@@ -798,21 +1137,19 @@ describe("AddAiToolset", () => {
       expect(wrapper.find('[data-test="ai-toolset-tool-picker"]').exists()).toBe(true);
     });
 
-    it("offers the server's CLI presets as quick fills", async () => {
-      mockQuery = { action: "add", preset: "kubectl" };
+    it("leaves write_tools absent for a preset that has none", async () => {
+      const { write_tools: _write, ...preset } = PRESETS[0];
+      vi.mocked(aiToolsetsService.prebuilt).mockResolvedValue({
+        data: { presets: [preset] },
+      } as any);
+      mockQuery = { action: "add", preset: "dynatrace" };
       wrapper = createWrapper();
       await flushPromises();
-      const values = getForm().state.values;
-      expect(values.kind).toBe("cli");
-      expect(values.cli.command).toBe("kubectl");
-      expect(values.cli.allowed_subcommands_raw).toBe("get, describe");
-      expect(values.cli.credFiles).toEqual([{ key: "KUBECONFIG", value: "" }]);
-      expect(wrapper.find('[data-test="cli-preset-kubectl"]').exists()).toBe(true);
-      getForm().setFieldValue("name", "kube-prod");
+      getForm().setFieldValue("mcp.headers[0].value", "Bearer t");
       await getForm().handleSubmit();
       await flushPromises();
       const body = vi.mocked(aiToolsetsService.create).mock.calls.at(-1)![1];
-      expect(body.data).toMatchObject({ preset: { id: "kubectl", revision: 1 } });
+      expect(body.data).not.toHaveProperty("write_tools");
     });
 
     it("drops a URL copy that older preset metadata held, so no draft or save keeps it", async () => {
@@ -899,31 +1236,6 @@ describe("AddAiToolset", () => {
         }),
       );
       expect(aiToolsetsService.create).not.toHaveBeenCalled();
-    });
-
-    it("sends a cleared CLI allowlist as null so the server's merge drops it", async () => {
-      mockQuery = { action: "edit", id: "tool-2" };
-      vi.mocked(aiToolsetsService.get).mockResolvedValue({
-        data: {
-          id: "tool-2",
-          name: "kubectl",
-          kind: "cli",
-          description: "",
-          data: { command: "kubectl", allowed_subcommands: ["get", "describe"] },
-        },
-      } as any);
-
-      wrapper = createWrapper();
-      await flushPromises();
-      expect(getForm().state.values.cli.allowed_subcommands_raw).toBe("get, describe");
-      getForm().setFieldValue("cli.allowed_subcommands_raw", "");
-      await flushPromises();
-
-      await getForm().handleSubmit();
-      await flushPromises();
-
-      const [, , body] = vi.mocked(aiToolsetsService.update).mock.calls.at(-1)!;
-      expect(body.data).toHaveProperty("allowed_subcommands", null);
     });
   });
 });

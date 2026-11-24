@@ -73,7 +73,6 @@ describe("presets", () => {
     data: {
       ...presetData(datadog(1), { site: "datadoghq.eu" }),
       headers: { DD_API_KEY: "***" },
-      max_calls_per_turn: 10,
     },
   });
 
@@ -87,7 +86,7 @@ describe("presets", () => {
     ]);
   });
 
-  it("applies some fields and never sends credentials, limits or the URL's parts", () => {
+  it("applies some fields and never sends credentials or the URL's parts", () => {
     const row = savedRow();
     const v2 = datadog(2, { allowed_tools: ["a", "b"] });
     const diffs = presetDiff(row, v2);
@@ -101,6 +100,39 @@ describe("presets", () => {
     const applied = { ...row, data: { ...row.data, ...body.data } };
     expect(presetBadge(applied.data, [v2])).toBeNull();
     expect(presetDiff(applied, v2)).toEqual([]);
+  });
+
+  it("tells a preset without write_tools from one with an empty list", () => {
+    const without = datadog(2, { description: "Datadog v1", write_tools: undefined });
+    const empty = datadog(2, { description: "Datadog v1" });
+    expect(presetData(without, {})).not.toHaveProperty("write_tools");
+    expect(presetData(empty, {}).write_tools).toEqual([]);
+
+    const row = savedRow();
+    row.data.write_tools = ["restart_pod"];
+    expect(presetDiff(row, without)).toEqual([]);
+    expect(presetDiff(row, empty).map((d) => d.field)).toEqual(["write_tools"]);
+    const legacy = savedRow();
+    delete legacy.data.write_tools;
+    expect(presetDiff(legacy, without)).toEqual([]);
+    const diffs = presetDiff(legacy, empty);
+    expect(diffs.map((d) => [d.field, d.shipped])).toEqual([["write_tools", []]]);
+    const body = reviewUpdate(legacy, empty, diffs, new Set(["write_tools"]));
+    expect(body.data.write_tools).toEqual([]);
+  });
+
+  it("never compares or sends the OAuth client credentials", () => {
+    const row = savedRow();
+    const auth = { type: "oauth_client_credentials", token_url: "https://old.example/token" };
+    Object.assign(row.data, { auth: { ...auth, client_id: "svc", client_secret: "***" } });
+    const v2 = datadog(2, {
+      allowed_tools: ["a"],
+      auth: { type: "oauth_client_credentials", token_url: "https://new.example/token" },
+    });
+    const diffs = presetDiff(row, v2);
+    expect(diffs.map((d) => d.field)).toEqual(["description", "allowed_tools"]);
+    const body = reviewUpdate(row, v2, diffs, new Set(diffs.map((d) => d.field)));
+    expect(Object.keys(body.data)).toEqual(["allowed_tools", "preset"]);
   });
 
   it("holds a skip across revisions until the skipped value changes", () => {
@@ -123,34 +155,5 @@ describe("presets", () => {
     expect(row.data.allowed_tools).toEqual(["search_datadog_logs"]);
     save(v4, ["allowed_tools"]);
     expect(row.data.preset.skipped).toEqual({});
-  });
-
-  it("reviews a CLI preset's command and subcommands, never its credentials", () => {
-    const kubectl: Preset = {
-      id: "kubectl",
-      kind: "cli",
-      label: "kubectl",
-      revision: 2,
-      command: "kubectl",
-      allowed_subcommands: ["get", "describe", "logs"],
-      env: [],
-      credential_files: ["KUBECONFIG"],
-    };
-    const row = {
-      description: "",
-      data: {
-        command: "kubectl",
-        allowed_subcommands: ["get"],
-        credential_files: { KUBECONFIG: "***" },
-        preset: { id: "kubectl", revision: 1 },
-      },
-    };
-    const diffs = presetDiff(row, kubectl);
-    expect(diffs.map((d) => d.field)).toEqual(["allowed_subcommands"]);
-    const body = reviewUpdate(row, kubectl, diffs, new Set(["allowed_subcommands"]));
-    expect(body.data).toEqual({
-      allowed_subcommands: ["get", "describe", "logs"],
-      preset: { id: "kubectl", revision: 2, skipped: {} },
-    });
   });
 });

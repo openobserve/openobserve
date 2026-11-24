@@ -266,7 +266,9 @@ pub(super) async fn load_turns(
         }
     };
 
-    let mut projected = openobserve_core::ai_chat::projection::project(&events);
+    // A stored chat doesn't record its toolsets; a deleted one's calls keep their raw name.
+    let classes = openobserve_core::ai_chat::rca_ledger::org_tool_classes(&row.org_id).await;
+    let mut projected = openobserve_core::ai_chat::projection::project(&events, classes.names());
     match projected.get_mut("turns").map(serde_json::Value::take) {
         Some(serde_json::Value::Array(turns)) => Ok(turns),
         _ => Ok(Vec::new()),

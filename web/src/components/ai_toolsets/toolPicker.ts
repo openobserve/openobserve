@@ -43,8 +43,14 @@ export function mayWrite(tool: DiscoveredTool): boolean {
   return tool.read_only_hint !== true || tool.destructive_hint === true;
 }
 
-/** The gateway's glob: `*` is any run of characters, everything else literal, whole name. */
-export function globMatches(glob: string, name: string): boolean {
+// The agent matches the names opencode gives tools, so both sides get its replacement of characters.
+const toolKey = (name: string) => name.replace(/[^a-zA-Z0-9_-]/g, "_");
+const globKey = (glob: string) => glob.replace(/[^a-zA-Z0-9_*-]/g, "_");
+
+/** The tool lists' glob: `*` is any run of characters, everything else literal, whole name. */
+export function globMatches(rawGlob: string, rawName: string): boolean {
+  const glob = globKey(rawGlob);
+  const name = toolKey(rawName);
   const parts = glob.split("*");
   if (parts.length === 1) return glob === name;
   const first = parts[0];
@@ -64,12 +70,12 @@ const matchesAny = (list: string[] | null, name: string) =>
 
 const isGlob = (entry: string) => entry.includes("*");
 
-/** The gateway's rule without `write_tools`: a tool may write unless it declares `readOnlyHint`. */
+/** Without `write_tools`, a read-only turn gets only the tools that declare `readOnlyHint`. */
 function impliedWrite(tool: DiscoveredTool): boolean {
   return tool.read_only_hint !== true;
 }
 
-/** What the gateway does with `name` under these lists. */
+/** What the agent's tool policy makes of `tool` under these lists. */
 export function toolState(lists: ToolLists, tool: DiscoveredTool): ToolState {
   if (matchesAny(lists.blocked, tool.name)) return "off";
   if (lists.allowed !== null && !matchesAny(lists.allowed, tool.name)) return "off";
@@ -77,76 +83,87 @@ export function toolState(lists: ToolLists, tool: DiscoveredTool): ToolState {
   return writes ? "write" : "allowed";
 }
 
-/** A glob, not an exact name, decides this tool, so its control can't change it. */
+/** Whether `entry` names exactly this tool, in the vendor's spelling or the agent's. */
+const isOwn = (entry: string, name: string) =>
+  !isGlob(entry) && (entry === name || entry === toolKey(name));
+
+/** A glob or another spelling, not the exact name, decides this tool, so its control can't change it. */
 export function setByGlob(lists: ToolLists, name: string): boolean {
   return [lists.allowed, lists.blocked, lists.write].some((list) =>
-    (list ?? []).some((g) => isGlob(g) && globMatches(g, name)),
+    (list ?? []).some((g) => !isOwn(g, name) && globMatches(g, name)),
   );
 }
 
-const without = (list: string[] | null, name: string) => (list ?? []).filter((e) => e !== name);
+const without = (list: string[] | null, name: string) =>
+  (list ?? []).filter((entry) => !isOwn(entry, name));
+// The normalized name, as a `*` in the vendor's own would be a wildcard.
 const withName = (list: string[] | null, name: string) =>
-  (list ?? []).includes(name) ? [...(list ?? [])] : [...(list ?? []), name];
+  (list ?? []).some((entry) => isOwn(entry, name))
+    ? [...(list ?? [])]
+    : [...(list ?? []), toolKey(name)];
+
+const keysOf = (tools: DiscoveredTool[]) => [...new Set(tools.map((t) => toolKey(t.name)))];
+
+// All that is allowed but not known to be read-only, so what no list showed stays off read-only turns.
+const cautiousWrites = (lists: ToolLists, tools: DiscoveredTool[]) =>
+  (lists.allowed ?? ["*"]).filter(
+    (entry) => !tools.some((t) => isOwn(entry, t.name) && toolState(lists, t) === "allowed"),
+  );
 
 /** The lists after one tool's control is set; only exact names change. */
-export function setToolState(lists: ToolLists, name: string, state: ToolState): ToolLists {
+export function setToolState(
+  lists: ToolLists,
+  name: string,
+  state: ToolState,
+  tools: DiscoveredTool[] = [],
+): ToolLists {
   const blocked = lists.blocked === null ? null : without(lists.blocked, name);
+  const write = lists.write ?? cautiousWrites(lists, tools);
   if (state === "off") {
-    return { allowed: without(lists.allowed, name), blocked, write: without(lists.write, name) };
+    return { allowed: without(lists.allowed, name), blocked, write: without(write, name) };
   }
   return {
     allowed: withName(lists.allowed, name),
     blocked,
-    write: state === "write" ? withName(lists.write, name) : without(lists.write, name),
+    write: state === "write" ? withName(write, name) : without(write, name),
   };
 }
 
 /** Spells out what the picker shows once the tools are known, so a save stores exactly that. */
 export function prefillFromDiscovery(lists: ToolLists, tools: DiscoveredTool[]): ToolLists {
-  if (lists.allowed === null) {
-    return {
-      allowed: tools.map((t) => t.name),
-      blocked: lists.blocked,
-      write: lists.write ?? tools.filter(mayWrite).map((t) => t.name),
-    };
-  }
-  if (lists.write === null) {
-    return {
-      ...lists,
-      write: tools.filter((t) => toolState(lists, t) === "write").map((t) => t.name),
-    };
-  }
-  return lists;
+  if (lists.allowed === null) return { ...lists, allowed: keysOf(tools) };
+  // Today's tools can't stand for what a glob matches, so the agent's own rule stays.
+  if (lists.write !== null || lists.allowed.some(isGlob)) return lists;
+  return { ...lists, write: keysOf(tools.filter((t) => toolState(lists, t) === "write")) };
 }
 
 /** "Allow all" turns every tool on, tagged ones as "can change things"; globs keep their say. */
 export function allowAll(lists: ToolLists, tools: DiscoveredTool[]): ToolLists {
   return tools
     .filter((t) => !setByGlob(lists, t.name))
-    .reduce((acc, t) => setToolState(acc, t.name, mayWrite(t) ? "write" : "allowed"), lists);
+    .reduce((acc, t) => setToolState(acc, t.name, mayWrite(t) ? "write" : "allowed", tools), lists);
 }
 
 /** "Allow read-only" turns on only the tools the server marks read-only; the rest go off. */
 export function allowReadOnly(lists: ToolLists, tools: DiscoveredTool[]): ToolLists {
   return tools
     .filter((t) => !setByGlob(lists, t.name))
-    .reduce((acc, t) => setToolState(acc, t.name, mayWrite(t) ? "off" : "allowed"), lists);
+    .reduce((acc, t) => setToolState(acc, t.name, mayWrite(t) ? "off" : "allowed", tools), lists);
 }
 
 /** Entries naming no listed tool (globs, typed names, tools the server dropped); saved as they are. */
 export function otherEntries(lists: ToolLists, tools: DiscoveredTool[] | null): OtherEntry[] {
-  const names = new Set((tools ?? []).map((t) => t.name));
   const rows: OtherEntry[] = [];
   for (const list of ["allowed", "blocked", "write"] as const) {
     for (const entry of lists[list] ?? []) {
-      if (!names.has(entry)) rows.push({ list, entry });
+      if (!(tools ?? []).some((t) => isOwn(entry, t.name))) rows.push({ list, entry });
     }
   }
   return rows;
 }
 
 export function removeEntry(lists: ToolLists, { list, entry }: OtherEntry): ToolLists {
-  return { ...lists, [list]: lists[list] === null ? null : without(lists[list], entry) };
+  return { ...lists, [list]: lists[list]?.filter((e) => e !== entry) ?? null };
 }
 
 /** Why a typed tool name can't be added; the field takes exact names, never globs. */

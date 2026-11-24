@@ -39,7 +39,9 @@ use {
                 DEFAULT_AGENT_TYPE, ImageAttachment, QueryRequest, RCA_AGENT_TYPE,
                 SESSION_OWNER_UNAVAILABLE, get_agent_client, is_session_owner_unavailable,
             },
-            toolsets::push::load_turn_memory,
+            toolsets::push::{
+                load_agent_tools, load_turn_memory, report_unavailable, unregistered,
+            },
         },
         common::{
             auditor::{AuditMessage, DelegatedAudit, Protocol, ResponseMeta},
@@ -358,19 +360,6 @@ fn bind_confirm_body_to_org(body: &[u8], org_id: &str) -> Option<Vec<u8>> {
         .as_object_mut()?
         .insert("org_id".to_string(), serde_json::Value::from(org_id));
     serde_json::to_vec(&value).ok()
-}
-
-/// o2-ai's 409 tells the browser which dialog is stale (`confirmation_not_found`) or that another
-/// replica owns the turn; any other agent failure stays a 500.
-#[cfg(any(feature = "enterprise", test))]
-fn confirm_failure_response(status: StatusCode, body: &str) -> Response {
-    if status == StatusCode::CONFLICT
-        && let Ok(value) = serde_json::from_str::<serde_json::Value>(body)
-        && value.is_object()
-    {
-        return (StatusCode::CONFLICT, Json(value)).into_response();
-    }
-    MetaHttpResponse::internal_error(format!("Confirmation failed: {body}"))
 }
 
 /// Cross-site forms cannot send JSON without a CORS preflight, so every state change requires it.
@@ -762,8 +751,8 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
                 .collect()
         });
 
-        let (mut tool_mcps, tool_clis, tool_skills) =
-            o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(org_id_str).await;
+        let mut tools = load_agent_tools(org_id_str).await;
+        let given_toolsets = tools.mcps.iter().map(|m| m.name.clone()).collect();
         // This endpoint never persists a turn, so its memory is read-only.
         let owner = memory_owner(user_id, agent_type).await;
         let memory = load_turn_memory(
@@ -771,7 +760,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             owner.as_deref(),
             delegated,
             false,
-            &mut tool_mcps,
+            &mut tools.mcps,
         )
         .await;
         let query_req = QueryRequest {
@@ -786,21 +775,9 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
                 Some(history)
             },
             images,
-            mcps: if tool_mcps.is_empty() {
-                None
-            } else {
-                Some(tool_mcps)
-            },
-            clis: if tool_clis.is_empty() {
-                None
-            } else {
-                Some(tool_clis)
-            },
-            skills: if tool_skills.is_empty() {
-                None
-            } else {
-                Some(tool_skills)
-            },
+            mcps: (!tools.mcps.is_empty()).then_some(tools.mcps),
+            unavailable_toolsets: (!tools.unavailable.is_empty()).then_some(tools.unavailable),
+            skills: (!tools.skills.is_empty()).then_some(tools.skills),
             // Set by persistence admission below; absent, o2-ai streams as before.
             turn_id: None,
             known_seq: None,
@@ -863,6 +840,9 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             .await
         {
             Ok(response) => {
+                let unavailable =
+                    unregistered(response.toolsets_unavailable.as_ref(), &given_toolsets);
+                report_unavailable(org_id_str, unavailable);
                 #[cfg(feature = "cloud")]
                 if let Err(error) = openobserve_core::trial_quota::authorize_ai_usage(
                     org_id_str,
@@ -1229,8 +1209,8 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 .collect()
         });
 
-        let (mut tool_mcps, tool_clis, tool_skills) =
-            o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(&org_id_str).await;
+        let mut tools = load_agent_tools(&org_id_str).await;
+        let toolsets = tools.mcps.iter().map(|m| m.name.clone()).collect();
         // A persisted turn always gets a turn id from admission below.
         let persisted = o2_enterprise::enterprise::ai::chat::is_enabled();
         let owner = memory_owner(&user_id, agent_type).await;
@@ -1239,7 +1219,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             owner.as_deref(),
             delegated,
             persisted,
-            &mut tool_mcps,
+            &mut tools.mcps,
         )
         .await;
         let query_req = QueryRequest {
@@ -1254,21 +1234,9 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 Some(history)
             },
             images,
-            mcps: if tool_mcps.is_empty() {
-                None
-            } else {
-                Some(tool_mcps)
-            },
-            clis: if tool_clis.is_empty() {
-                None
-            } else {
-                Some(tool_clis)
-            },
-            skills: if tool_skills.is_empty() {
-                None
-            } else {
-                Some(tool_skills)
-            },
+            mcps: (!tools.mcps.is_empty()).then_some(tools.mcps),
+            unavailable_toolsets: (!tools.unavailable.is_empty()).then_some(tools.unavailable),
+            skills: (!tools.skills.is_empty()).then_some(tools.skills),
             // Set by persistence admission below; absent, o2-ai streams as before.
             turn_id: None,
             known_seq: None,
@@ -1371,8 +1339,9 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 last_committed_seq: row.last_committed_seq,
                 opencode_session_id: row.opencode_session_id,
             };
-            let on_commit =
-                openobserve_core::ai_chat::toolset_calls::with_toolset_calls(&identity, None);
+            let on_commit = openobserve_core::ai_chat::toolset_calls::with_toolset_calls(
+                &identity, toolsets, None,
+            );
             let mut rx = spawn_turn(
                 TurnSpec {
                     identity,
@@ -1669,12 +1638,11 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
     request_body(
         content = Object,
         description = "Confirmation payload",
-        example = json!({"approved": true, "confirmation_id": "Zq3V0b2l2m0yZ1Jt5bFzQw"}),
+        example = json!({"approved": true}),
     ),
     responses(
         (status = StatusCode::OK, description = "Confirmation forwarded", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Invalid session ID, malformed body, or AI agent not configured", body = Object),
-        (status = StatusCode::CONFLICT, description = "The agent's 409, passed through: `confirmation_not_found` when the confirmation_id is no longer pending, or `session_owner_unavailable`", body = Object),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
     ),
     extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "create"})), 
@@ -1754,7 +1722,10 @@ pub async fn confirm_action(
                         status,
                         response_body
                     );
-                    confirm_failure_response(status, &response_body)
+                    MetaHttpResponse::internal_error(format!(
+                        "Confirmation failed: {}",
+                        response_body
+                    ))
                 }
             }
             Err(e) => {
@@ -2277,28 +2248,6 @@ mod tests {
         assert!(bind_confirm_body_to_org(b"", "acme").is_none());
         assert!(bind_confirm_body_to_org(b"not json", "acme").is_none());
         assert!(bind_confirm_body_to_org(b"[true]", "acme").is_none());
-    }
-
-    #[tokio::test]
-    async fn a_stale_confirmation_409_reaches_the_browser_and_other_failures_stay_500() {
-        let not_found = r#"{"code":"confirmation_not_found","message":"no longer pending"}"#;
-        let resp = confirm_failure_response(StatusCode::CONFLICT, not_found);
-        assert_eq!(resp.status(), StatusCode::CONFLICT);
-        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(body["code"], "confirmation_not_found");
-        assert_eq!(body["message"], "no longer pending");
-
-        for (status, raw) in [
-            (StatusCode::CONFLICT, "not json"),
-            (StatusCode::BAD_REQUEST, not_found),
-            (StatusCode::BAD_GATEWAY, "upstream"),
-        ] {
-            let resp = confirm_failure_response(status, raw);
-            assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR, "{status}");
-        }
     }
 
     #[test]

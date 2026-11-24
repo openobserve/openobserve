@@ -15,7 +15,7 @@
 
 //! Code grades an RCA verdict's confidence band from recorded evidence and the tool calls that ran.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -66,6 +66,37 @@ const CONTEXT_TOOLS: [&str; 9] = [
 
 /// Tool-name prefixes that are not an org AI Toolset MCP server (first-party and shell toolsets).
 const NOT_TOOLSET_SERVERS: [&str; 3] = ["o2", "cli", "custom"];
+
+/// First-party and built-in tools whose name a toolset's `<toolset>_<tool>` could spell; o2-ai's
+/// `_own_tool_names` refuses a server sharing any of these prefixes.
+const FIRST_PARTY_TOOLS: [&str; 22] = [
+    "acknowledge_steering",
+    "apply_patch",
+    "ask_responders",
+    "calculate_time_range",
+    "convert_time_to_microseconds",
+    "correlate_streams",
+    "create_navigation",
+    "fetch_openobserve_docs",
+    "format_timestamp_for_display",
+    "list_mcp_resource_templates",
+    "list_mcp_resources",
+    "plan_enter",
+    "plan_exit",
+    "read_mcp_resource",
+    "record_blind_spot",
+    "record_hypothesis",
+    "record_step",
+    "submit_report",
+    "tool_search",
+    "toolset_read_output",
+    "tools_call",
+    "update_memory",
+];
+
+/// The agent's own permissions, which its tool rules share a namespace with: a toolset's
+/// `<toolset>_*` rule would grant one of these.
+const AGENT_PERMISSIONS: [&str; 3] = ["doom_loop", "external_directory", "workflow_tool_approval"];
 
 /// Rules one toolset may carry, and the size of a rule's tool glob.
 const MAX_TOOL_CLASS_RULES: usize = 100;
@@ -131,25 +162,55 @@ pub struct ToolClassRule {
     pub args: Option<BTreeMap<String, String>>,
 }
 
-/// Each toolset's compiled `tool_classes`, by the name the agent uses; the first match wins.
+/// The MCP toolsets a tool part's name is split by, under the names the agent uses.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct ToolsetNames(HashSet<String>);
+
+impl ToolsetNames {
+    /// `(toolset, tool)` of a tool part named `<toolset>_<tool>`; `None` for a first-party tool or
+    /// an unknown prefix. Toolset names hold no `_`, so the first one ends the toolset.
+    pub fn split<'a>(&self, part_tool: &'a str) -> Option<(&'a str, &'a str)> {
+        toolset_tool(part_tool).filter(|(toolset, _)| self.0.contains(*toolset))
+    }
+}
+
+impl FromIterator<String> for ToolsetNames {
+    fn from_iter<I: IntoIterator<Item = String>>(names: I) -> Self {
+        Self(names.into_iter().collect())
+    }
+}
+
+/// Every known toolset's compiled `tool_classes`, by the name the agent uses; the first match wins.
 #[derive(Debug, Default, Clone)]
 pub struct ToolClassMap {
+    names: ToolsetNames,
     by_toolset: HashMap<String, Vec<CompiledRule>>,
 }
 
 impl ToolClassMap {
-    /// Compiles each toolset's rules; a toolset whose rules don't validate is left out with a log.
+    /// Compiles each toolset's rules; rules that don't validate are skipped with a log.
     pub fn new(rules: impl IntoIterator<Item = (String, Vec<ToolClassRule>)>) -> Self {
-        let mut by_toolset = HashMap::new();
+        let mut map = Self::default();
         for (toolset, rules) in rules {
             match compile_rules(&rules) {
                 Ok(compiled) => {
-                    by_toolset.insert(toolset, compiled);
+                    map.by_toolset.insert(toolset.clone(), compiled);
                 }
                 Err(e) => log::error!("[RCA] tool_classes of toolset '{toolset}' skipped: {e}"),
             }
+            map.names.0.insert(toolset);
         }
-        Self { by_toolset }
+        map
+    }
+
+    /// Also knows `toolsets`, such as those a run was given and the org has since deleted.
+    pub fn with_toolsets(mut self, toolsets: impl IntoIterator<Item = String>) -> Self {
+        self.names.0.extend(toolsets);
+        self
+    }
+
+    pub fn names(&self) -> &ToolsetNames {
+        &self.names
     }
 
     fn classify(
@@ -190,8 +251,7 @@ impl CompiledRule {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ToolCallRecord {
     pub call_id: String,
-    /// `o2_` stripped and `tools_call` unwrapped; a toolset call is `<toolset>_<tool>`, a
-    /// `toolset_tool_call` included.
+    /// `o2_` stripped and `tools_call` unwrapped; a toolset call is `<toolset>_<tool>`.
     pub tool: String,
     /// The same key argument as the thread's, max 4 KB.
     pub key_arg: String,
@@ -624,7 +684,7 @@ pub fn stream_type(tool: &str, input: &serde_json::Value) -> Option<String> {
 }
 
 /// From the bare tool name and unwrapped input, never from the ledger.
-pub fn signal_class(tool: &str, input: &serde_json::Value, classes: &ToolClassMap) -> SignalClass {
+pub fn signal_class(tool: &str, input: &serde_json::Value) -> SignalClass {
     if SEARCH_TOOLS.contains(&tool) {
         return match input.get("type").and_then(serde_json::Value::as_str) {
             Some("metrics") => SignalClass::Metrics,
@@ -656,31 +716,37 @@ pub fn signal_class(tool: &str, input: &serde_json::Value, classes: &ToolClassMa
     match toolset_tool(tool) {
         Some((_, t)) if TOOLSET_DIFF_TOOLS.contains(&t) => SignalClass::Change,
         Some((_, t)) if TOOLSET_CODE_TOOLS.contains(&t) => SignalClass::Context,
-        Some((toolset, t)) => classes
-            .classify(toolset, t, input)
-            .unwrap_or(SignalClass::Unclassified),
-        None => SignalClass::Unclassified,
+        _ => SignalClass::Unclassified,
     }
 }
 
-/// A gateway MCP call's class from its own toolset, tool and arguments: the toolset's rules
-/// first, then the code-tool rules; never the shell or `cli_` heuristics.
+/// A toolset call's class from its own toolset, tool and arguments: the code-tool rules first,
+/// then the toolset's; never the shell or `cli_` heuristics.
 pub fn toolset_signal_class(
     toolset: &str,
     tool: &str,
     args: &serde_json::Value,
     classes: &ToolClassMap,
 ) -> SignalClass {
-    if let Some(class) = classes.classify(toolset, tool, args) {
-        return class;
-    }
     if TOOLSET_DIFF_TOOLS.contains(&tool) {
         SignalClass::Change
     } else if TOOLSET_CODE_TOOLS.contains(&tool) {
         SignalClass::Context
     } else {
-        SignalClass::Unclassified
+        classes
+            .classify(toolset, tool, args)
+            .unwrap_or(SignalClass::Unclassified)
     }
+}
+
+/// Whether `<toolset>_*` could name a first-party or built-in tool, or an agent permission.
+pub fn collides_with_first_party_tools(toolset: &str) -> bool {
+    NOT_TOOLSET_SERVERS.contains(&toolset)
+        || FIRST_PARTY_TOOLS
+            .iter()
+            .chain(&AGENT_PERMISSIONS)
+            .filter_map(|tool| tool.split_once('_'))
+            .any(|(prefix, _)| prefix == toolset)
 }
 
 /// Checks a toolset's `tool_classes` as saved: count, tool globs, classes and regexes.
@@ -729,7 +795,7 @@ fn compile_rules(rules: &[ToolClassRule]) -> Result<Vec<CompiledRule>, String> {
                 })
                 .collect::<Result<_, _>>()?;
             Ok(CompiledRule {
-                tool: rule.tool.clone(),
+                tool: as_agent_tool_glob(&rule.tool),
                 class: rule.class,
                 args,
             })
@@ -737,8 +803,19 @@ fn compile_rules(rules: &[ToolClassRule]) -> Result<Vec<CompiledRule>, String> {
         .collect()
 }
 
-/// The gateway's glob: `*` is any run of characters, the rest literal, the whole name.
-pub fn glob_matches(glob: &str, name: &str) -> bool {
+/// `glob` with the agent's character rule for tool names, since a part's name went through it;
+/// the agent replaces each UTF-16 code unit.
+fn as_agent_tool_glob(glob: &str) -> String {
+    glob.encode_utf16()
+        .map(|unit| match u8::try_from(unit).map(char::from) {
+            Ok(c) if c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '*') => c,
+            _ => '_',
+        })
+        .collect()
+}
+
+/// `*` is any run of characters, the rest literal, the whole name.
+fn glob_matches(glob: &str, name: &str) -> bool {
     let parts: Vec<&str> = glob.split('*').collect();
     let [first, .., last] = parts.as_slice() else {
         return glob == name;
@@ -756,10 +833,12 @@ pub fn glob_matches(glob: &str, name: &str) -> bool {
     name.len() - last.len() >= at && name.ends_with(last)
 }
 
-/// Toolset server names are `[a-z0-9-]` only, so the server ends at the first `_`.
+/// Server names are `[a-z0-9-]` only, so the server ends at the first `_`; servers the operator
+/// configured count too, so this alone never makes a call an org toolset's.
 fn toolset_tool(tool: &str) -> Option<(&str, &str)> {
     let (server, bare) = tool.split_once('_')?;
     let is_server = !server.is_empty()
+        && !FIRST_PARTY_TOOLS.contains(&tool)
         && server
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
@@ -1511,18 +1590,10 @@ mod tests {
             ("Repo_git_show", json!({}), Unclassified),
         ];
         for (tool, input, want) in cases {
-            assert_eq!(
-                signal_class(tool, &input, &ToolClassMap::default()),
-                want,
-                "{tool} {input}"
-            );
+            assert_eq!(signal_class(tool, &input), want, "{tool} {input}");
         }
         for tool in CONTEXT_TOOLS {
-            assert_eq!(
-                signal_class(tool, &json!({}), &ToolClassMap::default()),
-                Context,
-                "{tool}"
-            );
+            assert_eq!(signal_class(tool, &json!({})), Context, "{tool}");
         }
         for (class, counts) in [
             (Logs, true),
@@ -2907,14 +2978,125 @@ mod tests {
             ("dynatrace-eu_execute-dql", dql("fetch logs"), Unclassified),
             ("dynatrace-prod_git_show", json!({}), Change),
         ];
-        for (tool, input, want) in cases {
-            assert_eq!(signal_class(tool, &input, &map), want, "{tool} {input}");
+        let map = map.with_toolsets(["dynatrace-eu".to_string()]);
+        for (part_tool, input, want) in cases {
+            let (toolset, tool) = map.names().split(part_tool).unwrap();
+            assert_eq!(
+                toolset_signal_class(toolset, tool, &input, &map),
+                want,
+                "{part_tool} {input}"
+            );
         }
-        let none = ToolClassMap::default();
         assert_eq!(
-            signal_class("dynatrace-prod_execute-dql", &dql("fetch logs"), &none),
+            signal_class("dynatrace-prod_execute-dql", &dql("fetch logs")),
             Unclassified
         );
+    }
+
+    #[test]
+    fn a_code_tool_s_class_comes_before_its_toolset_s_rules() {
+        let rules: Vec<ToolClassRule> = serde_json::from_value(json!([
+            {"tool": "*", "class": "logs"},
+        ]))
+        .unwrap();
+        let map = ToolClassMap::new([("code".to_string(), rules)]);
+        for (tool, want) in [
+            ("git_show", SignalClass::Change),
+            ("read_file", SignalClass::Context),
+            ("search_logs", SignalClass::Logs),
+        ] {
+            assert_eq!(
+                toolset_signal_class("code", tool, &json!({}), &map),
+                want,
+                "{tool}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_rule_s_wide_character_is_two_underscores_as_the_agent_writes_it() {
+        assert_eq!(as_agent_tool_glob("a.é*😀_b-9"), "a__*___b-9");
+    }
+
+    #[test]
+    fn a_part_name_splits_only_at_a_known_toolset() {
+        let names: ToolsetNames = [
+            "datadog",
+            "datadog-prod",
+            "github",
+            "record",
+            "submit",
+            "o2",
+        ]
+        .map(String::from)
+        .into_iter()
+        .collect();
+        for (part_tool, want) in [
+            ("datadog_search_logs", Some(("datadog", "search_logs"))),
+            (
+                "datadog-prod_search_logs",
+                Some(("datadog-prod", "search_logs")),
+            ),
+            (
+                "github_repos_list_commits",
+                Some(("github", "repos_list_commits")),
+            ),
+            ("record_search", Some(("record", "search"))),
+            ("datadog-eu_search_logs", None),
+            ("datadog-prod-2_search_logs", None),
+            ("datadog_", None),
+            ("datadog", None),
+            ("_search_logs", None),
+            ("record_step", None),
+            ("submit_report", None),
+            ("o2_SearchSQL", None),
+            ("invalid", None),
+        ] {
+            assert_eq!(names.split(part_tool), want, "{part_tool}");
+        }
+        assert_eq!(
+            ToolsetNames::default().split("datadog_search_logs"),
+            None,
+            "a deleted toolset's calls keep their raw name"
+        );
+    }
+
+    #[test]
+    fn a_name_collides_only_when_it_is_a_whole_first_party_prefix() {
+        for name in [
+            "record", "submit", "update", "tools", "o2", "cli", "custom", "external", "doom",
+            "workflow",
+        ] {
+            assert!(collides_with_first_party_tools(name), "{name}");
+        }
+        for name in ["datadog", "record-prod", "my-o2", "recorder", "search"] {
+            assert!(!collides_with_first_party_tools(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn a_rule_written_with_the_vendor_s_dotted_name_matches_the_agent_s() {
+        let rules: Vec<ToolClassRule> = serde_json::from_value(json!([
+            {"tool": "observability.get_*", "class": "traces"},
+            {"tool": "logs/search", "class": "logs"},
+        ]))
+        .unwrap();
+        let map = ToolClassMap::new([("elastic-prod".to_string(), rules)]);
+        for (part_tool, want) in [
+            (
+                "elastic-prod_observability_get_service_topology",
+                SignalClass::Traces,
+            ),
+            ("elastic-prod_logs_search", SignalClass::Logs),
+            ("elastic-prod_observability_list", SignalClass::Unclassified),
+        ] {
+            let (toolset, tool) = map.names().split(part_tool).unwrap();
+            assert_eq!(
+                toolset_signal_class(toolset, tool, &json!({}), &map),
+                want,
+                "{part_tool}"
+            );
+        }
     }
 
     #[test]
@@ -2942,13 +3124,17 @@ mod tests {
         let bad =
             ToolClassMap::new([("t".to_string(), vec![rule("x", "logs", json!({"q": "("}))])]);
         assert_eq!(
-            signal_class("t_x", &json!({"q": "a"}), &bad),
+            toolset_signal_class("t", "x", &json!({"q": "a"}), &bad),
             SignalClass::Unclassified
+        );
+        assert!(
+            bad.names().split("t_x").is_some(),
+            "a toolset with bad rules is still known"
         );
     }
 
     #[test]
-    fn globs_match_like_the_gateway() {
+    fn globs_match_the_whole_name() {
         for (glob, name, want) in [
             ("*", "anything", true),
             ("query_*", "query_prometheus", true),

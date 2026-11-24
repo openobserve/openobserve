@@ -16,7 +16,7 @@
 import http from "./http";
 import analytics from "./product_analytics";
 
-export type ToolsetKind = "mcp" | "cli" | "skill" | "generic";
+export type ToolsetKind = "mcp" | "skill" | "generic";
 
 export interface ToolsetCreateRequest {
   name: string;
@@ -37,6 +37,8 @@ export interface ToolsetMcpConfig {
   url: string;
   headers: Record<string, string>;
   timeout_seconds: number;
+  /** OAuth client credentials; left out for headers only. */
+  auth?: Record<string, any>;
 }
 
 /** An unsaved MCP config, or a saved toolset with unsaved changes (its `***` values are kept). */

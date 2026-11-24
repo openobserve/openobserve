@@ -3990,6 +3990,26 @@ mod tests {
     }
 
     #[test]
+    fn a_toolset_write_s_credentials_never_reach_the_audit() {
+        let body = audited(
+            Method::PUT,
+            "api/acme/ai/toolsets/t1",
+            r#"{"description":"kept","data":{"url":"https://m.example/mcp?k=u-1",
+                "headers":{"DD-API-KEY":"h-1","X-Tenant":"h-2"},
+                "auth":{"type":"oauth_client_credentials","token_url":"https://s.example/t?k=t-1",
+                    "client_id":"c-1","client_secret":"s-1","extra_params":{"assertion":"e-1"}},
+                "allowed_tools":["search_logs"]}}"#,
+        );
+        for secret in ["u-1", "h-1", "h-2", "t-1", "c-1", "s-1", "e-1"] {
+            assert!(!body.contains(secret), "{secret} leaked: {body}");
+        }
+        assert!(
+            body.contains("kept") && body.contains("search_logs"),
+            "{body}"
+        );
+    }
+
+    #[test]
     fn audit_body_never_stores_a_body_it_cannot_parse() {
         let body = audited(Method::POST, "api/default/users", "password=Form#Pass1");
         assert!(!body.contains("Form#Pass1"), "{body}");

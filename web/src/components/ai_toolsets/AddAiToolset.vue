@@ -103,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="border-border-default rounded-default w-full border px-2 py-1"
                   :placeholder="param.placeholder"
                   :value="presetParams[param.name]"
+                  data-o2-privacy="mask"
                   :data-test="`ai-toolset-preset-param-${param.name}`"
                   @input="setPresetParam(param.name, ($event.target as HTMLInputElement).value)"
                 />
@@ -115,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormInput
                 :placeholder="raw('https://api.example.com/mcp/')"
                 data-test="ai-toolset-mcp-url"
+                data-o2-privacy="mask"
                 name="mcp.url"
                 :label="t('aiToolset.mcpUrl')"
                 required
@@ -133,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- Headers — form-owned dynamic array-field (mcp.headers[i].*) -->
             <div class="mb-2 text-sm font-medium">{{ t("aiToolset.headers") }}</div>
-            <div v-for="(header, idx) in mcpHeaders" :key="idx" class="mb-2 flex items-end gap-2">
+            <div v-for="(header, idx) in mcpHeaders" :key="idx" class="mb-2 flex items-start gap-2">
               <OFormInput
                 :name="`mcp.headers[${idx}].key`"
                 :label="t('aiToolset.headerKey')"
@@ -142,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormInput
                 :name="`mcp.headers[${idx}].value`"
                 :label="t('aiToolset.headerValue')"
+                data-o2-privacy="mask"
                 class="o2-input flex-1"
                 :type="header.visible ? 'text' : 'password'"
               >
@@ -158,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('common.delete')"
                 variant="ghost-destructive"
                 size="icon-xs-sq"
+                class="mt-6"
                 @click="removeHeader(idx)"
               >
                 <OIcon name="delete" size="xs" />
@@ -166,6 +170,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton variant="outline" size="sm" class="mb-4" @click="addHeader" icon-left="add">
               {{ t("aiToolset.addHeader") }}
             </OButton>
+            <div
+              role="group"
+              aria-labelledby="ai-toolset-oauth-heading"
+              aria-describedby="ai-toolset-oauth-hint"
+              data-test="ai-toolset-oauth"
+            >
+              <div id="ai-toolset-oauth-heading" class="mb-2 text-sm font-medium">
+                {{ t("aiToolset.oauthClientCredentials") }}
+              </div>
+              <div id="ai-toolset-oauth-hint" class="text-text-secondary mb-2 text-xs">
+                {{ t("aiToolset.oauthHint") }}
+              </div>
+              <div class="o2-input mb-4">
+                <OFormInput
+                  data-test="ai-toolset-token-url"
+                  data-o2-privacy="mask"
+                  name="mcp.auth.token_url"
+                  :label="t('aiToolset.tokenUrl')"
+                  class="showLabelOnTop w-full"
+                />
+              </div>
+              <div class="o2-input mb-4">
+                <OFormInput
+                  data-test="ai-toolset-client-id"
+                  name="mcp.auth.client_id"
+                  :label="t('aiToolset.clientId')"
+                  class="showLabelOnTop w-full"
+                  autocomplete="off"
+                />
+              </div>
+              <div class="o2-input mb-4">
+                <OFormInput
+                  data-test="ai-toolset-client-secret"
+                  data-o2-privacy="mask"
+                  name="mcp.auth.client_secret"
+                  :label="t('aiToolset.clientSecret')"
+                  class="showLabelOnTop w-full"
+                  type="password"
+                  revealable
+                  autocomplete="new-password"
+                />
+              </div>
+              <div class="o2-input mb-4">
+                <OFormInput
+                  data-test="ai-toolset-scope"
+                  name="mcp.auth.scope"
+                  :label="t('aiToolset.scope')"
+                  class="showLabelOnTop w-full"
+                />
+              </div>
+            </div>
             <div ref="toolPickerAnchor">
               <AiToolsetToolPicker
                 :lists="toolLists"
@@ -174,204 +229,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :error="discoveryError"
                 :preset-tools="mcpPreset ? (toolLists.allowed ?? []).length : undefined"
                 @update:lists="setToolLists"
+                @remove="removeOtherEntry"
                 @refresh="discoverTools"
               />
             </div>
-            <div class="mb-2 text-sm font-medium">{{ t("aiToolset.limits") }}</div>
-            <div class="mb-4 grid grid-cols-2 gap-3">
-              <OFormInput
-                data-test="ai-toolset-mcp-max-calls"
-                name="mcp.max_calls_per_turn"
-                :label="t('aiToolset.maxCallsPerTurn')"
-                :placeholder="raw('40')"
-                class="o2-input showLabelOnTop"
-                type="number"
-                min="1"
-              />
-              <OFormInput
-                data-test="ai-toolset-mcp-max-result"
-                name="mcp.max_result_kib"
-                :label="t('aiToolset.maxResultKib')"
-                :placeholder="raw('1024')"
-                class="o2-input showLabelOnTop"
-                type="number"
-                min="1"
-              />
-              <OFormInput
-                data-test="ai-toolset-mcp-rate-calls"
-                name="mcp.rate_calls"
-                :label="t('aiToolset.rateCalls')"
-                :placeholder="raw('200')"
-                class="o2-input showLabelOnTop"
-                type="number"
-                min="1"
-              />
-              <OFormInput
-                data-test="ai-toolset-mcp-rate-seconds"
-                name="mcp.rate_seconds"
-                :label="t('aiToolset.rateSeconds')"
-                :placeholder="raw('60')"
-                class="o2-input showLabelOnTop"
-                type="number"
-                min="1"
-              />
-            </div>
-            <div class="text-text-secondary -mt-2 mb-4 text-xs">
-              {{ t("aiToolset.rateLimitHelp") }}
-            </div>
-          </template>
-
-          <!-- CLI fields -->
-          <template v-if="selectedKind === 'cli'">
-            <div class="mb-4 flex items-center gap-3">
-              <div class="text-base font-medium font-semibold">
-                {{ t("aiToolset.cliConfig") }}
-              </div>
-              <div class="flex items-center gap-1">
-                <span class="text-text-muted text-xs">{{ t("aiToolset.presets") }}:</span>
-                <OTag
-                  v-for="preset in cliPresets"
-                  :key="preset.id"
-                  type="cliPreset"
-                  :value="preset.id"
-                  clickable
-                  class="cursor-pointer"
-                  :data-test="`cli-preset-${preset.id}`"
-                  @click="applyPreset(preset)"
-                >
-                  {{ preset.label }}
-                </OTag>
-              </div>
-            </div>
-            <div class="o2-input mb-4">
-              <OFormInput
-                :placeholder="raw('kubectl')"
-                data-test="ai-toolset-cli-command"
-                name="cli.command"
-                :label="t('aiToolset.cliCommand')"
-                required
-                class="showLabelOnTop w-full"
-              />
-            </div>
-            <div class="o2-input mb-4">
-              <OFormInput
-                :placeholder="raw('get, describe, logs')"
-                name="cli.allowed_subcommands_raw"
-                :label="t('aiToolset.allowedSubcommands')"
-                :helpText="t('aiToolset.subcommandsHint')"
-                class="showLabelOnTop w-full"
-              />
-            </div>
-            <div class="mb-4 flex gap-4">
-              <div class="o2-input flex-1">
-                <OFormInput
-                  name="cli.timeout_seconds"
-                  :label="t('aiToolset.timeoutSeconds')"
-                  class="showLabelOnTop w-full"
-                  type="number"
-                  min="1"
-                />
-              </div>
-              <div class="o2-input flex-1">
-                <OFormInput
-                  name="cli.max_output_bytes"
-                  :label="t('aiToolset.maxOutputBytes')"
-                  class="showLabelOnTop w-full"
-                  type="number"
-                  min="1"
-                />
-              </div>
-            </div>
-            <div class="mb-4">
-              <OFormSwitch
-                name="cli.requires_confirmation"
-                :label="t('aiToolset.requiresConfirmation')"
-              />
-            </div>
-            <!-- Env vars — form-owned dynamic array-field (cli.env[i].*) -->
-            <div class="mb-2 text-sm font-medium">{{ t("aiToolset.envVars") }}</div>
-            <div
-              v-for="(env, idx) in cliEnvVars"
-              :key="'env-' + idx"
-              class="mb-2 flex items-end gap-2"
-            >
-              <OFormInput
-                :name="`cli.env[${idx}].key`"
-                :label="t('aiToolset.envKey')"
-                class="o2-input flex-1"
-              />
-              <OFormInput
-                :name="`cli.env[${idx}].value`"
-                :label="t('aiToolset.envValue')"
-                class="o2-input flex-1"
-                :type="env.visible ? 'text' : 'password'"
-              >
-                <template #icon-right>
-                  <OIcon
-                    :name="env.visible ? 'visibility-off' : 'visibility'"
-                    size="sm"
-                    class="cursor-pointer"
-                    @click="toggleEnvVisible(idx)"
-                  />
-                </template>
-              </OFormInput>
-              <OButton
-                :aria-label="t('common.delete')"
-                variant="ghost-destructive"
-                size="icon-xs-sq"
-                @click="removeEnvVar(idx)"
-              >
-                <OIcon name="delete" size="xs" />
-              </OButton>
-            </div>
-            <OButton variant="outline" size="sm" class="mb-4" @click="addEnvVar" icon-left="add">
-              {{ t("aiToolset.addEnvVar") }}
-            </OButton>
-
-            <!-- Credential files — form-owned array-field. `key` is an OFormInput
-                 (cli.credFiles[i].key); `value` is a Monaco editor (no OForm*
-                 equivalent) bridged into the form via setCredValue. -->
-            <div class="mb-2 text-sm font-medium">
-              {{ t("aiToolset.credentialFiles") }}
-            </div>
-            <div v-for="(cred, idx) in cliCredFiles" :key="'cred-' + idx" class="mb-4">
-              <div class="mb-1 flex items-center gap-2">
-                <OFormInput
-                  :name="`cli.credFiles[${idx}].key`"
-                  :label="t('aiToolset.credEnvVar')"
-                  :helpText="t('aiToolset.credEnvVarHint', { example: 'KUBECONFIG' })"
-                  class="o2-input w-48"
-                />
-                <OButton
-                  variant="ghost-destructive"
-                  size="icon-xs-sq"
-                  :title="t('common.delete')"
-                  @click="removeCredFile(idx)"
-                >
-                  <OIcon name="delete" size="xs" />
-                </OButton>
-              </div>
-              <div class="text-text-secondary mb-1 text-xs">
-                {{ t("aiToolset.credContentHint") }}
-              </div>
-              <QueryEditor
-                :editor-id="`cred-file-editor-${idx}`"
-                class="rounded-default border-card-glass-border min-h-50! w-full resize-y overflow-auto border"
-                language="yaml"
-                :query="cred.value"
-                @update:query="(v: string) => setCredValue(idx, v)"
-              />
-              <div
-                v-if="pendingCredFileRows.has(idx)"
-                class="text-status-error-text mt-1 text-xs"
-                :data-test="`ai-toolset-cred-file-reenter-${idx}`"
-              >
-                {{ t("common.editorDraft.reenterField") }}
-              </div>
-            </div>
-            <OButton variant="outline" size="sm" class="mb-4" @click="addCredFile" icon-left="add">
-              {{ t("aiToolset.addCredFile") }}
-            </OButton>
           </template>
 
           <!-- Skill fields — the Monaco editor (no OForm* equivalent) is bridged
@@ -444,7 +305,6 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
@@ -458,8 +318,26 @@ import { useEditorDraft, useEditorDraftIds } from "@/composables/useEditorDraft"
 import { urlCarriesCredential } from "@/utils/drafts/urlCredentials";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import AiToolsetToolPicker from "./AiToolsetToolPicker.vue";
-import { prefillFromDiscovery, type DiscoveredTool, type ToolLists } from "./toolPicker";
+import {
+  prefillFromDiscovery,
+  removeEntry,
+  type DiscoveredTool,
+  type OtherEntry,
+  type ToolLists,
+} from "./toolPicker";
 import { defaultParams, paramsFromUrl, presetData, renderUrl, type Preset } from "./presets";
+import {
+  authFromData,
+  authPayload,
+  authReady,
+  CLIENT_CREDENTIALS,
+  emptyAuth,
+  isAuthorizationHeader,
+  sameOrigin,
+  sentHeaderRows,
+  usesClientCredentials,
+  type ToolsetAuth,
+} from "./toolsetAuth";
 import { aiToolsetPresetsQuery } from "@/services/ai_toolsets.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import {
@@ -471,18 +349,11 @@ import {
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 type SecretPair = { key: string; value: string };
-type SecretRow = { key?: string; value?: string };
-type SecretList = "headers" | "env" | "credFiles";
-type SecretRowsSource = {
-  mcp?: { headers?: SecretRow[] };
-  cli?: { env?: SecretRow[]; credFiles?: SecretRow[] };
-};
 
-interface AiToolsetDraftData extends Omit<AddAiToolsetForm, "mcp" | "cli"> {
-  mcp: Omit<AddAiToolsetForm["mcp"], "headers"> & { headers: SecretPair[] };
-  cli: Omit<AddAiToolsetForm["cli"], "env" | "credFiles"> & {
-    env: SecretPair[];
-    credFiles: SecretPair[];
+interface AiToolsetDraftData extends Omit<AddAiToolsetForm, "mcp"> {
+  mcp: Omit<AddAiToolsetForm["mcp"], "headers" | "auth"> & {
+    headers: SecretPair[];
+    auth: ToolsetAuth;
   };
 }
 
@@ -490,7 +361,6 @@ export default defineComponent({
   name: "AddAiToolset",
   components: {
     OPageLayout,
-    OTag,
     OButton,
     OIcon,
     OForm,
@@ -514,28 +384,33 @@ export default defineComponent({
     const editingId = ref<string | null>(null);
     const isEditing = ref(false);
 
-    const addAiToolsetSchema = makeAddAiToolsetSchema(t, () => isEditing.value);
+    // The stored URL and auth an edit started from.
+    let loadedMcp: { url?: string; auth: ToolsetAuth } | null = null;
+
+    const addAiToolsetSchema = makeAddAiToolsetSchema(
+      t,
+      () => isEditing.value,
+      (mcp) =>
+        !!loadedMcp &&
+        sameOrigin(mcp.url, loadedMcp.url) &&
+        JSON.stringify(authPayload(mcp.auth)) === JSON.stringify(authPayload(loadedMcp.auth)),
+    );
 
     const kindOptions = [
       { label: t("aiToolset.kindMcp"), value: "mcp" },
-      { label: t("aiToolset.kindCli"), value: "cli" },
       { label: t("aiToolset.kindSkill"), value: "skill" },
     ];
 
-    // -----------------------------------------------------------------------
-    // MCP tool discovery: the picker's tool list, and whether it was verified
-    // for the URL and headers being saved.
-    // -----------------------------------------------------------------------
     const discoveredTools = ref<DiscoveredTool[] | null>(null);
     const discoveryStatus = ref<"idle" | "loading" | "ok" | "failed">("idle");
     const discoveryError = ref("");
-    // The URL and headers the last successful discovery used, and when it ran (microseconds).
+    // The request the last successful discovery made, and when it ran (microseconds).
     let verified: { key: string; at: number } | null = null;
     let discoverySeq = 0;
 
-    const headerMap = (rows: AddAiToolsetForm["mcp"]["headers"] | undefined) => {
+    const headerMap = (mcp: AddAiToolsetForm["mcp"]) => {
       const headers: Record<string, string> = {};
-      (rows ?? [])
+      sentHeaderRows(mcp.headers, mcp.auth)
         .filter((h) => (h.key ?? "").trim())
         .forEach((h) => {
           headers[(h.key ?? "").trim()] = h.value ?? "";
@@ -543,21 +418,27 @@ export default defineComponent({
       return headers;
     };
 
+    const discoveryTimeout = (mcp: AddAiToolsetForm["mcp"]) => Number(mcp.timeout_seconds) || 30;
+
     // Every row, half-typed ones included, so typing anywhere voids a result in flight.
     const discoveryKey = (mcp: AddAiToolsetForm["mcp"]) =>
-      JSON.stringify([mcp.url ?? "", (mcp.headers ?? []).map((h) => [h.key ?? "", h.value ?? ""])]);
+      JSON.stringify([
+        mcp.url ?? "",
+        discoveryTimeout(mcp),
+        (mcp.headers ?? []).map((h) => [h.key ?? "", h.value ?? ""]),
+        // Until a client id is typed, a token URL or scope changes nothing that is sent.
+        authPayload(mcp.auth) ?? mcp.auth?.client_secret ?? "",
+      ]);
 
     const MCP_RENDERED_KEYS = new Set([
       "schema",
       "url",
       "headers",
+      "auth",
       "timeout_seconds",
       "allowed_tools",
       "blocked_tools",
       "write_tools",
-      "max_calls_per_turn",
-      "rate_limit",
-      "max_result_bytes",
       "tools_verified_at",
     ]);
 
@@ -568,32 +449,23 @@ export default defineComponent({
       return { ...extra, preset };
     };
 
-    const blankToUndefined = (v: unknown) =>
-      v === undefined || v === null || String(v).trim() === "" ? undefined : Number(v);
-
     // `schema: 2` makes the save replace the stored config, so every key this form doesn't edit is
     // sent back from `extra`, and an absent list stays absent.
-    const buildMcpData = (mcp: AddAiToolsetForm["mcp"], headers: Record<string, string>) => {
+    const buildMcpData = (mcp: AddAiToolsetForm["mcp"]) => {
       const data: Record<string, any> = {
         ...(mcp.extra ?? {}),
         schema: 2,
         url: mcp.url ?? "",
-        headers,
+        headers: headerMap(mcp),
         timeout_seconds: Number(mcp.timeout_seconds),
       };
-      if (mcp.allowed_tools !== null) data.allowed_tools = mcp.allowed_tools;
-      if (mcp.blocked_tools !== null) data.blocked_tools = mcp.blocked_tools;
-      // The save stores what the picker shows, so `write_tools` is always explicit.
-      data.write_tools = mcp.write_tools ?? [];
-      const maxCalls = blankToUndefined(mcp.max_calls_per_turn);
-      if (maxCalls !== undefined) data.max_calls_per_turn = maxCalls;
-      const rateCalls = blankToUndefined(mcp.rate_calls);
-      const rateSeconds = blankToUndefined(mcp.rate_seconds);
-      if (rateCalls !== undefined && rateSeconds !== undefined) {
-        data.rate_limit = { calls: rateCalls, per_seconds: rateSeconds };
-      }
-      const resultKib = blankToUndefined(mcp.max_result_kib);
-      if (resultKib !== undefined) data.max_result_bytes = resultKib * 1024;
+      const auth = authPayload(mcp.auth);
+      if (auth) data.auth = auth;
+      const lists = shownLists(mcp);
+      if (lists.allowed !== null) data.allowed_tools = lists.allowed;
+      if (lists.blocked !== null) data.blocked_tools = lists.blocked;
+      // An empty list would let every tool run on read-only turns, so an unknown one stays absent.
+      if (lists.write !== null) data.write_tools = lists.write;
       if (verified && verified.key === discoveryKey(mcp)) data.tools_verified_at = verified.at;
       return data;
     };
@@ -604,45 +476,7 @@ export default defineComponent({
     // -----------------------------------------------------------------------
     const buildData = (value: AddAiToolsetForm) => {
       const kind = value.kind;
-      if (kind === "mcp") {
-        const headers: Record<string, string> = {};
-        (value.mcp.headers ?? [])
-          .filter((h) => (h.key ?? "").trim())
-          .forEach((h) => {
-            headers[(h.key ?? "").trim()] = h.value ?? "";
-          });
-        return buildMcpData(value.mcp, headers);
-      }
-      if (kind === "cli") {
-        const allowed = (value.cli.allowed_subcommands_raw ?? "")
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-        const env: Record<string, string> = {};
-        (value.cli.env ?? [])
-          .filter((e) => (e.key ?? "").trim())
-          .forEach((e) => {
-            env[(e.key ?? "").trim()] = e.value ?? "";
-          });
-        const credential_files: Record<string, string> = {};
-        (value.cli.credFiles ?? [])
-          .filter((c) => (c.key ?? "").trim())
-          .forEach((c) => {
-            credential_files[(c.key ?? "").trim()] = c.value ?? "";
-          });
-        return {
-          command: value.cli.command ?? "",
-          // An omitted key keeps the stored allowlist on update, so an emptied one is sent as null.
-          allowed_subcommands: allowed.length ? allowed : null,
-          timeout_seconds: Number(value.cli.timeout_seconds),
-          max_output_bytes: Number(value.cli.max_output_bytes),
-          requires_confirmation: value.cli.requires_confirmation ?? false,
-          env,
-          credential_files,
-          // An edit's merge keeps the stored `preset` unless a chip set a new one.
-          ...(value.cli.preset ? { preset: value.cli.preset } : {}),
-        };
-      }
+      if (kind === "mcp") return buildMcpData(value.mcp);
       if (kind === "skill") {
         return { content: value.skill.content ?? "" };
       }
@@ -719,12 +553,6 @@ export default defineComponent({
     const mcpHeaders = form.useStore(
       (s: any): AddAiToolsetForm["mcp"]["headers"] => s.values.mcp?.headers ?? [],
     );
-    const cliEnvVars = form.useStore(
-      (s: any): AddAiToolsetForm["cli"]["env"] => s.values.cli?.env ?? [],
-    );
-    const cliCredFiles = form.useStore(
-      (s: any): AddAiToolsetForm["cli"]["credFiles"] => s.values.cli?.credFiles ?? [],
-    );
     const skillContent = form.useStore((s: any) => s.values.skill?.content ?? "");
     const submitted = form.useStore((s: any) => (s.submissionAttempts ?? 0) > 0);
 
@@ -739,27 +567,9 @@ export default defineComponent({
     // Presets, from `GET /ai/toolsets/prebuilt` (the server's file is the only copy)
     // -----------------------------------------------------------------------
     const presets = ref<Preset[]>([]);
-    const cliPresets = computed(() => presets.value.filter((p) => p.kind === "cli"));
     // The MCP preset the form was opened with, and its URL template's fields.
     const mcpPreset = ref<Preset | null>(null);
     const presetParams = ref<Record<string, string>>({});
-
-    const applyPreset = (preset: Preset) => {
-      form.setFieldValue("cli.preset", { id: preset.id, revision: preset.revision });
-      form.setFieldValue("cli.command", preset.command ?? "");
-      form.setFieldValue(
-        "cli.allowed_subcommands_raw",
-        (preset.allowed_subcommands ?? []).join(", "),
-      );
-      form.setFieldValue(
-        "cli.env",
-        (preset.env ?? []).map((key) => ({ key, value: "", visible: false })),
-      );
-      form.setFieldValue(
-        "cli.credFiles",
-        (preset.credential_files ?? []).map((key) => ({ key, value: "" })),
-      );
-    };
 
     const applyMcpPreset = (preset: Preset) => {
       mcpPreset.value = preset;
@@ -773,7 +583,11 @@ export default defineComponent({
         "mcp.headers",
         (preset.headers ?? []).map((h) => ({ key: h.name, value: "", visible: false })),
       );
-      setToolLists({ allowed: data.allowed_tools, blocked: null, write: data.write_tools });
+      form.setFieldValue("mcp.auth", {
+        ...emptyAuth(),
+        token_url: preset.auth?.type === CLIENT_CREDENTIALS ? (preset.auth.token_url ?? "") : "",
+      });
+      setToolLists({ allowed: data.allowed_tools, blocked: null, write: data.write_tools ?? null });
       form.setFieldValue("mcp.extra", { tool_classes: data.tool_classes, preset: data.preset });
     };
 
@@ -794,14 +608,7 @@ export default defineComponent({
       }
     };
 
-    // -----------------------------------------------------------------------
-    // Dynamic array-fields — FORM-OWNED (mcp.headers / cli.env / cli.credFiles).
-    // The form is the single source of truth; add/remove/toggle mutate it via
-    // the form API directly, and the `form.useStore` reads above re-render the
-    // v-for rows (playbook §2).
-    // -----------------------------------------------------------------------
-    // MCP headers. (useOForm erases the form generic to Record<string, unknown>,
-    // so TanStack's array-field paths collapse to `never` — hence the casts.)
+    // The form owns the rows: these mutate it, and the `form.useStore` read above re-renders them.
     const addHeader = () =>
       form.pushFieldValue("mcp.headers", { key: "", value: "", visible: false });
     const removeHeader = (i: number) => form.removeFieldValue("mcp.headers", i);
@@ -812,22 +619,34 @@ export default defineComponent({
       });
     };
 
-    const toolLists = computed<ToolLists>(() => ({
-      allowed: formValues.value.mcp?.allowed_tools ?? null,
-      blocked: formValues.value.mcp?.blocked_tools ?? null,
-      write: formValues.value.mcp?.write_tools ?? null,
-    }));
+    // A discovery only spells out what is shown; the form's own lists change when the admin does.
+    const formLists = (mcp: AddAiToolsetForm["mcp"] | undefined): ToolLists => ({
+      allowed: mcp?.allowed_tools ?? null,
+      blocked: mcp?.blocked_tools ?? null,
+      write: mcp?.write_tools ?? null,
+    });
+    const shownLists = (mcp: AddAiToolsetForm["mcp"] | undefined): ToolLists => {
+      const lists = formLists(mcp);
+      const current = discoveredTools.value && mcp && verified?.key === discoveryKey(mcp);
+      return current ? prefillFromDiscovery(lists, discoveredTools.value ?? []) : lists;
+    };
+    const toolLists = computed(() => shownLists(formValues.value.mcp));
 
     const setToolLists = (lists: ToolLists) => {
       form.setFieldValue("mcp.allowed_tools", lists.allowed);
       form.setFieldValue("mcp.blocked_tools", lists.blocked);
       form.setFieldValue("mcp.write_tools", lists.write);
     };
+    const removeOtherEntry = (entry: OtherEntry) =>
+      setToolLists(removeEntry(formLists(formValues.value.mcp), entry));
 
-    // Every header row is filled in, so a discovery won't run on half-typed credentials.
+    // Every credential is filled in, so a discovery won't run on half-typed ones.
     const readyToDiscover = (mcp: AddAiToolsetForm["mcp"] | undefined) =>
       !!mcp?.url?.trim() &&
-      (mcp.headers ?? []).every((h) => !(h.key ?? "").trim() === !(h.value ?? ""));
+      authReady(mcp.auth) &&
+      sentHeaderRows(mcp.headers, mcp.auth).every(
+        (h) => !(h.key ?? "").trim() === !(h.value ?? ""),
+      );
 
     // The toolset and endpoint a result belongs to; a result for anything else is dropped.
     const discoveryTarget = () => {
@@ -838,28 +657,32 @@ export default defineComponent({
     const discoverTools = async () => {
       const values = form.state.values as AddAiToolsetForm;
       if (values.kind !== "mcp" || !readyToDiscover(values.mcp)) return;
+      clearTimeout(discoveryTimer);
       const org = store.state.selectedOrganization.identifier;
       const key = discoveryKey(values.mcp);
       const target = discoveryTarget();
+      const auth = authPayload(values.mcp.auth);
       const config = {
         url: values.mcp.url ?? "",
-        headers: headerMap(values.mcp.headers),
-        timeout_seconds: Number(values.mcp.timeout_seconds) || 30,
+        headers: headerMap(values.mcp),
+        timeout_seconds: discoveryTimeout(values.mcp),
+        ...(auth ? { auth } : {}),
       };
+      // An override left out keeps the stored value, so headers only is sent as such.
       const body =
-        isEditing.value && editingId.value ? { id: editingId.value, overrides: config } : config;
+        isEditing.value && editingId.value
+          ? { id: editingId.value, overrides: { auth: { type: "headers" }, ...config } }
+          : config;
       const seq = ++discoverySeq;
       discoveryStatus.value = "loading";
       try {
         const res = await aiToolsetsService.discover(org, body);
         if (seq !== discoverySeq || target !== discoveryTarget()) return;
-        const tools: DiscoveredTool[] = res.data?.tools ?? [];
-        discoveredTools.value = tools;
+        // Set before the tools, whose change is what makes the shown lists recompute.
+        verified = { key, at: Date.now() * 1000 };
+        discoveredTools.value = res.data?.tools ?? [];
         discoveryStatus.value = "ok";
         discoveryError.value = "";
-        verified = { key, at: Date.now() * 1000 };
-        const spelled = prefillFromDiscovery(toolLists.value, tools);
-        if (spelled !== toolLists.value) setToolLists(spelled);
       } catch (err: any) {
         if (seq !== discoverySeq || target !== discoveryTarget()) return;
         discoveredTools.value = null;
@@ -870,7 +693,7 @@ export default defineComponent({
       }
     };
 
-    // Discovery follows the URL and header rows, so it also runs when an edit loads.
+    // Discovery follows its request, so it also runs when an edit loads.
     let discoveryTimer: ReturnType<typeof setTimeout> | undefined;
     const mcpEndpoint = computed(() =>
       formValues.value.kind === "mcp" ? discoveryKey(formValues.value.mcp) : "",
@@ -888,25 +711,6 @@ export default defineComponent({
     onBeforeUnmount(() => clearTimeout(discoveryTimer));
 
     const toolPickerAnchor = ref<HTMLElement | null>(null);
-
-    // CLI env vars
-    const addEnvVar = () => form.pushFieldValue("cli.env", { key: "", value: "", visible: false });
-    const removeEnvVar = (i: number) => form.removeFieldValue("cli.env", i);
-    const toggleEnvVisible = (i: number) => {
-      const cur = !!(form.state.values as AddAiToolsetForm).cli?.env?.[i]?.visible;
-      form.setFieldValue(`cli.env[${i}].visible`, !cur, {
-        dontUpdateMeta: true,
-      });
-    };
-
-    // CLI credential files — `key` is an OFormInput; `value` is a Monaco editor
-    // bridged into the form (no OForm* equivalent).
-    const addCredFile = () => form.pushFieldValue("cli.credFiles", { key: "", value: "" });
-    const removeCredFile = (i: number) => form.removeFieldValue("cli.credFiles", i);
-    const setCredValue = (i: number, value: string) =>
-      form.setFieldValue(`cli.credFiles[${i}].value`, value, {
-        dontUpdateMeta: true,
-      });
 
     // Skill content (Monaco editor — no OForm* equivalent) bridged into the form.
     const setSkillContent = (value: string) =>
@@ -935,7 +739,6 @@ export default defineComponent({
         };
         if (toolset.kind === "mcp") {
           const list = (v: unknown) => (Array.isArray(v) ? (v as string[]) : null);
-          const asText = (v: unknown) => (typeof v === "number" ? String(v) : "");
           record.mcp = {
             url: data.url || "",
             timeout_seconds: data.timeout_seconds ?? 30,
@@ -944,39 +747,17 @@ export default defineComponent({
               value: v as string,
               visible: false,
             })),
+            auth: authFromData(data.auth),
             allowed_tools: list(data.allowed_tools),
             blocked_tools: list(data.blocked_tools),
             write_tools: list(data.write_tools),
-            max_calls_per_turn: asText(data.max_calls_per_turn),
-            rate_calls: asText(data.rate_limit?.calls),
-            rate_seconds: asText(data.rate_limit?.per_seconds),
-            max_result_kib:
-              typeof data.max_result_bytes === "number"
-                ? String(Math.ceil(data.max_result_bytes / 1024))
-                : "",
             extra: withoutUrlCopies(
               Object.fromEntries(
                 Object.entries(data).filter(([key]) => !MCP_RENDERED_KEYS.has(key)),
               ),
             ),
           };
-        } else if (toolset.kind === "cli") {
-          record.cli = {
-            command: data.command || "",
-            allowed_subcommands_raw: (data.allowed_subcommands || []).join(", "),
-            timeout_seconds: data.timeout_seconds ?? 30,
-            max_output_bytes: data.max_output_bytes ?? 100000,
-            requires_confirmation: data.requires_confirmation ?? false,
-            env: Object.entries(data.env || {}).map(([k, v]) => ({
-              key: k,
-              value: v as string,
-              visible: false,
-            })),
-            credFiles: Object.entries(data.credential_files || {}).map(([k, v]) => ({
-              key: k,
-              value: v as string,
-            })),
-          };
+          loadedMcp = { url: record.mcp.url, auth: record.mcp.auth };
         } else if (toolset.kind === "skill") {
           record.skill = { content: data.content || "" };
         }
@@ -1005,36 +786,25 @@ export default defineComponent({
     // Set while the leave dialog's Save runs, so a successful save does not close the editor itself.
     let leaveSave: { saved: boolean } | null = null;
 
-    // The password-visibility toggles are view state, so they are neither drafted nor counted as edits.
+    // View state (password visibility) and auth keys the form never edits are not drafted.
     const toolsetSnapshot = (): AiToolsetDraftData => {
       const values = formValues.value;
+      const { extra: _extra, ...auth } = values.mcp.auth;
       const pairs = (rows: { key?: string; value?: string }[] | undefined) =>
         (rows ?? []).map((row) => ({ key: row.key ?? "", value: row.value ?? "" }));
       return {
         ...values,
-        mcp: { ...values.mcp, headers: pairs(values.mcp?.headers) },
-        cli: {
-          ...values.cli,
-          env: pairs(values.cli?.env),
-          credFiles: pairs(values.cli?.credFiles),
-        },
+        mcp: { ...values.mcp, headers: pairs(values.mcp?.headers), auth },
         skill: { ...values.skill },
       };
     };
 
-    const SECRET_SECTION: Record<SecretList, "mcp" | "cli"> = {
-      headers: "mcp",
-      env: "cli",
-      credFiles: "cli",
-    };
-    const SECRET_PATH = /^\/(?:mcp|cli)\/(headers|env|credFiles)\/(\d+)\/value$/;
-
-    const secretRows = (data: SecretRowsSource, list: SecretList): SecretRow[] =>
-      (list === "headers" ? data.mcp?.headers : data.cli?.[list]) ?? [];
-
+    const HEADER_PATH = /^\/mcp\/headers\/(\d+)\/value$/;
     const MCP_URL_PATH = "/mcp/url";
+    const TOKEN_URL_PATH = "/mcp/auth/token_url";
+    const CLIENT_SECRET_PATH = "/mcp/auth/client_secret";
 
-    // Header and env values carry auth, credential files are kubeconfigs and a URL can embed a token, so none is drafted.
+    // Header values and the client secret carry auth and a URL can embed a token, so none is drafted.
     const redactToolsetDraft = (data: AiToolsetDraftData) => {
       const copy = JSON.parse(JSON.stringify(data)) as AiToolsetDraftData;
       const paths: string[] = [];
@@ -1042,99 +812,85 @@ export default defineComponent({
         copy.mcp.url = "";
         paths.push(MCP_URL_PATH);
       }
-      for (const list of Object.keys(SECRET_SECTION) as SecretList[]) {
-        secretRows(copy, list).forEach((row, index) => {
-          if (!row.value) return;
-          row.value = "";
-          paths.push(`/${SECRET_SECTION[list]}/${list}/${index}/value`);
-        });
+      const auth = copy.mcp?.auth;
+      if (auth?.token_url && urlCarriesCredential(auth.token_url)) {
+        auth.token_url = "";
+        paths.push(TOKEN_URL_PATH);
       }
+      if (auth?.client_secret) {
+        auth.client_secret = "";
+        paths.push(CLIENT_SECRET_PATH);
+      }
+      (copy.mcp?.headers ?? []).forEach((row, index) => {
+        if (!row.value) return;
+        row.value = "";
+        paths.push(`/mcp/headers/${index}/value`);
+      });
       return { data: copy, paths };
     };
 
-    const rowOf = (path: string, data: AiToolsetDraftData) => {
-      const match = SECRET_PATH.exec(path);
-      if (!match) return null;
-      const list = match[1] as SecretList;
-      return { list, key: secretRows(data, list)[Number(match[2])]?.key ?? "" };
+    /** The key of the header row a redacted path names; `null` for any other path. */
+    const headerKeyOf = (path: string, data: AiToolsetDraftData): string | null => {
+      const match = HEADER_PATH.exec(path);
+      return match ? (data.mcp?.headers?.[Number(match[1])]?.key ?? "") : null;
     };
 
     const describeRedactedToolset = (paths: string[], data: AiToolsetDraftData): I18nText[] => {
       const fields = paths.flatMap((path): I18nText[] => {
         if (path === MCP_URL_PATH) return [t("aiToolset.mcpUrl")];
-        const row = rowOf(path, data);
-        if (!row) return [];
-        if (row.list === "headers") {
-          return [
-            row.key
-              ? t("common.editorDraft.headerField", { name: row.key })
-              : t("common.editorDraft.headersField"),
-          ];
-        }
-        if (!row.key) {
-          return [row.list === "env" ? t("aiToolset.envVars") : t("aiToolset.credentialFiles")];
-        }
+        if (path === TOKEN_URL_PATH) return [t("aiToolset.tokenUrl")];
+        if (path === CLIENT_SECRET_PATH) return [t("aiToolset.clientSecret")];
+        const key = headerKeyOf(path, data);
+        if (key === null) return [];
         return [
-          row.list === "env"
-            ? t("common.editorDraft.envVarField", { name: row.key })
-            : t("common.editorDraft.credentialFileField", { name: row.key }),
+          key
+            ? t("common.editorDraft.headerField", { name: key })
+            : t("common.editorDraft.headersField"),
         ];
       });
       return [...new Set(fields)];
     };
 
-    // A not-kept row is found again by its key, since rows may have moved since the draft was written.
-    const notKeptRows = shallowRef(new Map<string, { list: SecretList; key: string }>());
-
-    const currentRowIndex = (path: string): number => {
-      const row = notKeptRows.value.get(path);
-      return row ? secretRows(formValues.value, row.list).findIndex((r) => r.key === row.key) : -1;
-    };
+    // A not-kept header is found again by its key, since rows may have moved since the draft was written.
+    const notKeptHeaders = shallowRef(new Map<string, string>());
 
     const fieldNameFor = (path: string): FormFieldPath<AddAiToolsetForm> | null => {
       if (path === MCP_URL_PATH) return "mcp.url";
-      const row = notKeptRows.value.get(path);
-      if (!row) return null;
-      const index = currentRowIndex(path);
-      return index < 0
-        ? null
-        : (`${SECRET_SECTION[row.list]}.${row.list}[${index}].value` as FormFieldPath<AddAiToolsetForm>);
+      if (path === TOKEN_URL_PATH) return "mcp.auth.token_url";
+      if (path === CLIENT_SECRET_PATH) return "mcp.auth.client_secret";
+      const key = notKeptHeaders.value.get(path);
+      if (key === undefined) return null;
+      const index = (formValues.value.mcp?.headers ?? []).findIndex((row) => row.key === key);
+      return index < 0 ? null : (`mcp.headers[${index}].value` as FormFieldPath<AddAiToolsetForm>);
     };
 
-    const flagReentries = (paths: string[]) => {
+    const flagReentries = (paths: string[], onSubmit?: I18nText) => {
       for (const path of paths) {
         const name = fieldNameFor(path);
         const meta = name ? form.getFieldMeta(name) : undefined;
         if (!name || !meta) continue;
-        form.setFieldMeta(name, {
-          ...meta,
-          errorMap: { ...meta.errorMap, onSubmit: t("common.editorDraft.reenterField") },
-        });
+        form.setFieldMeta(name, { ...meta, errorMap: { ...meta.errorMap, onSubmit } });
       }
     };
 
-    // A secret of a kind the user switched away from is never sent, so it is not asked for.
-    const activePendingReentries = (): string[] =>
-      toolsetDraft
+    // A secret the user switched away from (another kind or credential) is never sent, so it is not asked for.
+    const activePendingReentries = (): string[] => {
+      const oauth = usesClientCredentials(formValues.value.mcp?.auth);
+      return toolsetDraft
         .pendingReentries()
-        .filter((path) => path.startsWith(`/${String(selectedKind.value)}/`));
-
-    // The credential file editors are not form fields, so their re-entry note is drawn by hand.
-    const pendingCredFileRows = computed(
-      () =>
-        new Set(
-          activePendingReentries()
-            .filter((path) => notKeptRows.value.get(path)?.list === "credFiles")
-            .map(currentRowIndex)
-            .filter((index) => index >= 0),
-        ),
-    );
+        .filter((path) => path.startsWith(`/${String(selectedKind.value)}/`))
+        .filter((path) =>
+          path === TOKEN_URL_PATH || path === CLIENT_SECRET_PATH
+            ? oauth
+            : !oauth || !isAuthorizationHeader({ key: notKeptHeaders.value.get(path) }),
+        );
+    };
 
     /** A changed secret the draft could not keep must be typed again before saving. */
     const blockOnPendingReentries = (): boolean => {
       const pending = activePendingReentries();
       if (!pending.length) return false;
-      flagReentries(pending);
+      flagReentries(pending, t("common.editorDraft.reenterField"));
       toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
       return true;
     };
@@ -1150,21 +906,31 @@ export default defineComponent({
         const locked = isEditing.value
           ? { name: form.state.values.name, kind: form.state.values.kind }
           : {};
+        // An older draft may hold a kind or fields this form no longer has.
+        const { name, description, region_only, skill } = data;
+        const kind = kindOptions.some((o) => o.value === data.kind) ? data.kind : "mcp";
+        // A draft from before the form had `auth` says nothing about it, so the loaded one stays.
+        const loaded = (form.state.values as AddAiToolsetForm).mcp.auth;
+        const auth = { ...(data.mcp.auth ?? loaded), extra: loaded.extra };
         form.reset({
-          ...data,
+          name,
+          kind,
+          description,
+          region_only,
           ...locked,
-          mcp: { ...data.mcp, headers: withHidden(data.mcp.headers) },
-          cli: { ...data.cli, env: withHidden(data.cli.env), credFiles: data.cli.credFiles },
+          mcp: { ...data.mcp, headers: withHidden(data.mcp.headers), auth },
+          skill,
         } as AddAiToolsetForm);
-        notKeptRows.value = new Map(
+        notKeptHeaders.value = new Map(
           notKeptPaths.flatMap((path) => {
-            const row = rowOf(path, data);
-            return row ? [[path, row] as const] : [];
+            const key = headerKeyOf(path, data);
+            return key === null ? [] : [[path, key] as const];
           }),
         );
         // After the form's own error sweep, which runs on the reset values.
         await nextTick();
-        flagReentries(notKeptPaths);
+        flagReentries(notKeptPaths, t("common.editorDraft.reenterField"));
+        unflagUnsentReentries();
       },
       base: () => (editId() ? serverToolset : undefined),
       redactBase: (base) => redactToolsetDraft(base as AiToolsetDraftData).data,
@@ -1186,6 +952,13 @@ export default defineComponent({
         to.query.id !== from.query.id,
     });
 
+    // A flag stays until its own field changes, so one for a secret that isn't sent would block Save.
+    const unflagUnsentReentries = () => {
+      const active = activePendingReentries();
+      flagReentries(toolsetDraft.pendingReentries().filter((path) => !active.includes(path)));
+    };
+    watch(() => usesClientCredentials(formValues.value.mcp?.auth), unflagUnsentReentries);
+
     const closeEditor = async () => {
       if (await toolsetDraft.confirmLeave()) emit("cancel:hideform");
     };
@@ -1200,10 +973,6 @@ export default defineComponent({
       if (!id && query.kind === "skill") form.setFieldValue("kind", "skill");
       const opened = !id && presets.value.find((p) => p.id === query.preset);
       if (opened && opened.kind === "mcp") applyMcpPreset(opened);
-      if (opened && opened.kind === "cli") {
-        form.setFieldValue("kind", "cli");
-        applyPreset(opened);
-      }
       // A deleted toolset still starts the draft, so a draft left for it is dropped with a notice.
       await toolsetDraft.start();
       if (mcpPreset.value) {
@@ -1238,6 +1007,7 @@ export default defineComponent({
       // MCP tool picker
       toolLists,
       setToolLists,
+      removeOtherEntry,
       discoveredTools,
       discoveryStatus,
       discoveryError,
@@ -1246,17 +1016,6 @@ export default defineComponent({
       addHeader,
       removeHeader,
       toggleHeaderVisible,
-      // CLI env vars + credential files (form-owned array-fields)
-      cliEnvVars,
-      cliCredFiles,
-      addEnvVar,
-      removeEnvVar,
-      toggleEnvVisible,
-      addCredFile,
-      removeCredFile,
-      setCredValue,
-      cliPresets,
-      applyPreset,
       mcpPreset,
       presetParams,
       setPresetParam,
@@ -1266,7 +1025,6 @@ export default defineComponent({
       skillContentError,
       toolsetDraft,
       closeEditor,
-      pendingCredFileRows,
     };
   },
 });

@@ -66,14 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("aiToolset.addCustomMcp") }}
           </ODropdownItem>
           <ODropdownSeparator />
-          <ODropdownItem
-            v-for="preset in cliPresets"
-            :key="preset.id"
-            :data-test="`ai-toolsets-add-${preset.id}`"
-            @select="addToolset({ preset: preset.id })"
-          >
-            {{ t("aiToolset.addCli", { name: preset.label }) }}
-          </ODropdownItem>
           <ODropdownItem data-test="ai-toolsets-add-skill" @select="addToolset({ kind: 'skill' })">
             {{ t("aiToolset.kindSkill") }}
           </ODropdownItem>
@@ -353,7 +345,6 @@ export default defineComponent({
     );
     const presets = computed<Preset[] | undefined>(() => presetsList.data.value);
     const mcpPresets = computed(() => (presets.value ?? []).filter((p) => p.kind === "mcp"));
-    const cliPresets = computed(() => (presets.value ?? []).filter((p) => p.kind === "cli"));
 
     const review = ref<{ open: boolean; row: any; preset: Preset | null }>({
       open: false,
@@ -739,7 +730,6 @@ export default defineComponent({
       chooseTools,
       BADGE_LABELS,
       mcpPresets,
-      cliPresets,
       review,
       openReview,
       formatTime,

@@ -22,8 +22,7 @@ use utoipa::ToSchema;
 use super::{EvidenceLedger, Polarity, Strength, TimeWindow};
 use crate::meta::{
     oncall::confidence::{
-        CallLog, SignalClass, ToolCallRecord, ToolClassMap, UnverifiedCitation, is_prometheus_tool,
-        signal_class,
+        CallLog, SignalClass, ToolCallRecord, UnverifiedCitation, is_prometheus_tool, signal_class,
     },
     sql::resolve_stream_names,
 };
@@ -107,7 +106,7 @@ pub fn evidence_target(tool: &str, input: &Value) -> EvidenceTarget {
     let mut target = EvidenceTarget {
         // The ledger replaces it with the toolset-aware class, which needs the org's
         // `tool_classes`.
-        signal: signal_class(tool, input, &ToolClassMap::default()),
+        signal: signal_class(tool, input),
         streams: Vec::new(),
         sql: None,
         promql: None,

@@ -1,9 +1,4 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// Unit tests for the AddAiToolset Zod schema — the always-on name/kind rules
-// and the kind-conditional mcp.url / cli.command requireds (superRefine). This
-// is the BEFORE validation baseline re-encoded as Zod
-// ("4 blocks → 6 sub-rules").
 
 import { describe, it, expect } from "vitest";
 import { makeAddAiToolsetSchema, addAiToolsetDefaults } from "./AddAiToolset.schema";
@@ -107,17 +102,6 @@ describe("AddAiToolset.schema", () => {
       ).not.toContain("mcp.url");
     });
 
-    it("is NOT required when kind is cli", () => {
-      expect(
-        errorPaths({
-          ...base(),
-          kind: "cli",
-          mcp: { url: "", timeout_seconds: 30 },
-          cli: { ...addAiToolsetDefaults().cli, command: "kubectl" },
-        }),
-      ).not.toContain("mcp.url");
-    });
-
     it("is NOT required when kind is skill", () => {
       expect(
         errorPaths({
@@ -126,40 +110,6 @@ describe("AddAiToolset.schema", () => {
           mcp: { url: "", timeout_seconds: 30 },
         }),
       ).not.toContain("mcp.url");
-    });
-  });
-
-  describe("cli.command (required only when kind === cli)", () => {
-    it("is required when kind is cli", () => {
-      const msgs = messagesFor(
-        {
-          ...base(),
-          kind: "cli",
-          cli: { ...addAiToolsetDefaults().cli, command: "" },
-        },
-        "cli.command",
-      );
-      expect(msgs).toContain("aiToolset.cliCommandRequired");
-    });
-
-    it("accepts a whitespace-only command (BEFORE baseline used a bare !command check)", () => {
-      expect(
-        errorPaths({
-          ...base(),
-          kind: "cli",
-          cli: { ...addAiToolsetDefaults().cli, command: "   " },
-        }),
-      ).not.toContain("cli.command");
-    });
-
-    it("is NOT required when kind is mcp", () => {
-      expect(
-        errorPaths({
-          ...base(),
-          kind: "mcp",
-          cli: { ...addAiToolsetDefaults().cli, command: "" },
-        }),
-      ).not.toContain("cli.command");
     });
   });
 
@@ -208,11 +158,9 @@ describe("AddAiToolset.schema", () => {
     it("defaults the arrays to empty", () => {
       const d = addAiToolsetDefaults();
       expect(d.mcp.headers).toEqual([]);
-      expect(d.cli.env).toEqual([]);
-      expect(d.cli.credFiles).toEqual([]);
     });
 
-    it("accepts populated header / env / cred rows", () => {
+    it("accepts populated header rows", () => {
       const res = schema.safeParse({
         ...base(),
         mcp: {
@@ -239,49 +187,68 @@ describe("AddAiToolset.schema", () => {
     });
   });
 
-  describe("mcp limits", () => {
-    const withMcp = (mcp: Record<string, unknown>) => ({
+  describe("OAuth client credentials", () => {
+    const filled = {
+      token_url: "https://sso.example.com/token",
+      client_id: "svc",
+      client_secret: "s3cret",
+      scope: "",
+    };
+    const withAuth = (auth: Record<string, string>, headers: Record<string, string>[] = []) => ({
       ...base(),
-      mcp: { ...base().mcp, ...mcp },
+      mcp: { ...base().mcp, auth, headers },
     });
 
-    it("accepts blank limits and values at every bound", () => {
-      for (const mcp of [
-        {},
-        { max_calls_per_turn: "1", max_result_kib: "1", rate_calls: "1", rate_seconds: "1" },
-        { max_calls_per_turn: 500, max_result_kib: 16384, rate_calls: 10000, rate_seconds: 3600 },
-      ]) {
-        expect(schema.safeParse(withMcp(mcp)).success, JSON.stringify(mcp)).toBe(true);
-      }
+    it("are optional: all empty, or only a preset's token URL, is headers only", () => {
+      expect(errorPaths(withAuth({}))).toEqual([]);
+      expect(errorPaths(withAuth({ token_url: filled.token_url }))).toEqual([]);
+      const headers = [{ key: "Authorization", value: "Bearer t" }];
+      expect(errorPaths(withAuth({ token_url: filled.token_url }, headers))).toEqual([]);
     });
 
-    it("refuses limits out of bounds or a half-set rate", () => {
-      const cases: [Record<string, unknown>, string, string][] = [
-        [{ max_calls_per_turn: "0" }, "mcp.max_calls_per_turn", "aiToolset.maxCallsInvalid"],
-        [{ max_calls_per_turn: "501" }, "mcp.max_calls_per_turn", "aiToolset.maxCallsInvalid"],
-        [{ max_calls_per_turn: "2.5" }, "mcp.max_calls_per_turn", "aiToolset.maxCallsInvalid"],
-        [{ max_result_kib: "16385" }, "mcp.max_result_kib", "aiToolset.resultSizeInvalid"],
-        [
-          { rate_calls: "10001", rate_seconds: "60" },
-          "mcp.rate_calls",
-          "aiToolset.rateCallsInvalid",
-        ],
-        [
-          { rate_calls: "5", rate_seconds: "3601" },
-          "mcp.rate_seconds",
-          "aiToolset.rateSecondsInvalid",
-        ],
-        [{ rate_calls: "5" }, "mcp.rate_seconds", "aiToolset.rateBothRequired"],
-        [{ rate_seconds: "5" }, "mcp.rate_calls", "aiToolset.rateBothRequired"],
-      ];
-      for (const [mcp, path, message] of cases) {
-        expect(messagesFor(withMcp(mcp), path), JSON.stringify(mcp)).toContain(message);
-      }
+    it("require a token URL and a client secret once a client ID is filled", () => {
+      expect(errorPaths(withAuth(filled))).toEqual([]);
+      expect(errorPaths(withAuth({ ...filled, client_secret: "***" }))).toEqual([]);
+      const idOnly = withAuth({ client_id: "svc" });
+      expect(messagesFor(idOnly, "mcp.auth.token_url")).toEqual(["aiToolset.tokenUrlRequired"]);
+      expect(messagesFor(idOnly, "mcp.auth.client_secret")).toEqual([
+        "aiToolset.clientSecretRequired",
+      ]);
     });
 
-    it("doesn't check MCP limits on another kind", () => {
-      const cli = { ...base(), kind: "cli", cli: { ...base().cli, command: "kubectl" } };
-      expect(errorPaths({ ...cli, mcp: { ...cli.mcp, max_calls_per_turn: "0" } })).toEqual([]);
+    it("require a client ID once a client secret is filled", () => {
+      expect(messagesFor(withAuth({ ...filled, client_id: " " }), "mcp.auth.client_id")).toEqual([
+        "aiToolset.clientIdRequired",
+      ]);
+    });
+
+    it.each(["http://sso.example.com/token", "sso.example.com/token", "not a url"])(
+      "refuse the token URL %s",
+      (token_url) => {
+        expect(messagesFor(withAuth({ ...filled, token_url }), "mcp.auth.token_url")).toEqual([
+          "aiToolset.tokenUrlHttps",
+        ]);
+      },
+    );
+
+    it.each(["Authorization", " authorization "])(
+      "refuse a filled %s header but not an empty one",
+      (key) => {
+        const rows = (value: string) => [
+          { key: "X-Tenant", value: "t" },
+          { key, value },
+        ];
+        expect(messagesFor(withAuth(filled, rows("Bearer t")), "mcp.headers.1.key")).toEqual([
+          "aiToolset.authorizationWithOauth",
+        ]);
+        expect(errorPaths(withAuth(filled, rows("***")))).toEqual(["mcp.headers.1.key"]);
+        expect(errorPaths(withAuth(filled, rows("")))).toEqual([]);
+      },
+    );
+
+    it("aren't checked for a skill", () => {
+      const skill = { ...withAuth({ client_id: "svc" }), kind: "skill", skill: { content: "# x" } };
+      expect(errorPaths(skill)).toEqual([]);
     });
   });
 
@@ -296,23 +263,11 @@ describe("AddAiToolset.schema", () => {
           url: "",
           timeout_seconds: 30,
           headers: [],
+          auth: { token_url: "", client_id: "", client_secret: "", scope: "", extra: {} },
           allowed_tools: [],
           blocked_tools: null,
-          write_tools: [],
-          max_calls_per_turn: "",
-          rate_calls: "",
-          rate_seconds: "",
-          max_result_kib: "",
+          write_tools: null,
           extra: {},
-        },
-        cli: {
-          command: "",
-          allowed_subcommands_raw: "",
-          timeout_seconds: 30,
-          max_output_bytes: 100000,
-          requires_confirmation: false,
-          env: [],
-          credFiles: [],
         },
         skill: { content: "" },
       });

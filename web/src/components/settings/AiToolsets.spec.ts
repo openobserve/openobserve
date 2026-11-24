@@ -32,7 +32,6 @@ vi.mock("@/services/ai_toolsets", () => ({
       data: {
         presets: [
           { id: "datadog", kind: "mcp", label: "Datadog", revision: 2, allowed_tools: ["a", "b"] },
-          { id: "kubectl", kind: "cli", label: "kubectl", revision: 1 },
         ],
       },
     })),
@@ -283,7 +282,6 @@ describe("AiToolsets tool badges", () => {
             kind: "mcp",
             data: { allowed_tools: ["x"], tools_verified_at: 1 },
           },
-          { id: "e", name: "kube", kind: "cli", data: { command: "kubectl" } },
           {
             id: "f",
             name: "down",
@@ -463,7 +461,6 @@ describe("AiToolsets presets", () => {
     await flushPromises();
     const vm = w.vm as any;
     expect(vm.mcpPresets.map((p: any) => p.id)).toEqual(["datadog"]);
-    expect(vm.cliPresets.map((p: any) => p.id)).toEqual(["kubectl"]);
     expect(w.find("[data-test='ai-toolsets-old-preset-retired']").exists()).toBe(true);
 
     const push = vi.spyOn(router, "push");

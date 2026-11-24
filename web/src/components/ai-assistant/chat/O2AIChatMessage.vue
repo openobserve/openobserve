@@ -222,9 +222,9 @@ const isStopped = computed(() =>
           <div
             v-else-if="block.type === 'status'"
             class="text-text-secondary mb-2 flex flex-wrap items-center gap-2 text-xs"
-            :data-test="`o2-ai-chat-turn-status-${block.turnStatus ?? 'note'}`"
+            :data-test="`o2-ai-chat-turn-status-${block.turnStatus}`"
           >
-            <OIcon :name="block.turnStatus === 'running' ? 'hourglass-empty' : 'info'" size="sm" />
+            <OIcon name="hourglass-empty" size="sm" />
             <span class="min-w-0 flex-1">{{ block.message }}</span>
             <OButton
               v-if="!readonly && block.turnStatus === 'running'"

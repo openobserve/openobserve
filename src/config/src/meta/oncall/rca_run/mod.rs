@@ -705,7 +705,7 @@ pub(crate) mod fixtures {
     use super::*;
     use crate::meta::oncall::{
         agent::PageAction,
-        confidence::{ToolClassMap, signal_class, stream_type},
+        confidence::{signal_class, stream_type},
     };
 
     /// One `record_hypothesis` call; `at_us` is `seq` seconds.
@@ -783,7 +783,7 @@ pub(crate) mod fixtures {
             started_at_us,
             duration_ms: 12,
             error_type: (!success).then(|| "http_403".to_string()),
-            signal: signal_class(tool, &input, &ToolClassMap::default()),
+            signal: signal_class(tool, &input),
             target: evidence_target(tool, &input),
             observed: None,
             result_summary: format!("{call_id} summary"),

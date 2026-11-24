@@ -52,7 +52,7 @@ use super::{
 };
 use crate::ai_chat::{
     rca_ledger::{
-        RunTranscript, TranscriptAck, TranscriptSteer, decode_run_with, org_tool_classes,
+        RunTranscript, TranscriptAck, TranscriptSteer, decode_run_with, run_tool_classes,
     },
     read_committed_events,
 };
@@ -335,10 +335,7 @@ impl SteerDeps for LiveDeps {
             return Ok(None);
         };
         let events = read_committed_events(&session, -1).await?;
-        Ok(Some(decode_run_with(
-            &events,
-            &org_tool_classes(org_id).await,
-        )))
+        Ok(Some(decode_run_with(&events, &run_tool_classes(run).await)))
     }
 
     async fn relay(

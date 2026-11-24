@@ -25,21 +25,19 @@ export interface PresetParam {
 /** One preset from `GET /ai/toolsets/prebuilt`; the server's file is the only copy. */
 export interface Preset {
   id: string;
-  kind: "mcp" | "cli";
+  kind: "mcp";
   label: string;
   revision: number;
   description?: string;
   url_template?: string;
   params?: PresetParam[];
   headers?: { name: string; placeholder?: string }[];
+  /** Fills in the token URL only; a review never compares it. */
+  auth?: { type: string; token_url?: string };
   help?: string;
   allowed_tools?: string[];
   write_tools?: string[];
   tool_classes?: unknown[];
-  command?: string;
-  allowed_subcommands?: string[];
-  env?: string[];
-  credential_files?: string[];
 }
 
 /** What a saved toolset remembers of the preset it came from; never the URL or its parts. */
@@ -50,15 +48,8 @@ export interface PresetRef {
   skipped?: Record<string, string>;
 }
 
-/** The preset fields a review compares; credentials and limits are never among them. */
-export type PresetField =
-  | "url"
-  | "description"
-  | "allowed_tools"
-  | "write_tools"
-  | "tool_classes"
-  | "command"
-  | "allowed_subcommands";
+/** The preset fields a review compares; credentials are never among them. */
+export type PresetField = "url" | "description" | "allowed_tools" | "write_tools" | "tool_classes";
 
 export interface PresetDiff {
   field: PresetField;
@@ -67,15 +58,6 @@ export interface PresetDiff {
 }
 
 export type PresetBadge = "updated" | "retired";
-
-const DATA_FIELDS: PresetField[] = [
-  "url",
-  "allowed_tools",
-  "write_tools",
-  "tool_classes",
-  "command",
-  "allowed_subcommands",
-];
 
 export function renderUrl(template: string, params: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (_, name) => params[name] ?? "");
@@ -106,7 +88,7 @@ export function presetData(preset: Preset, params: Record<string, string>): Reco
   return {
     url: renderUrl(preset.url_template ?? "", params),
     allowed_tools: [...(preset.allowed_tools ?? [])],
-    write_tools: [...(preset.write_tools ?? [])],
+    ...(preset.write_tools ? { write_tools: [...preset.write_tools] } : {}),
     tool_classes: preset.tool_classes ?? [],
     preset: { id: preset.id, revision: preset.revision },
   };
@@ -124,11 +106,12 @@ export function presetBadge(
   return shipped.revision > (ref.revision ?? 0) ? "updated" : null;
 }
 
-// An absent value and an empty one say the same, so neither is offered as a change.
+// An absent value and an empty one say the same, except for `write_tools`: absent goes by annotations.
 const blank = (v: unknown) => v ?? null;
 const empty = (v: unknown) => v === null || v === "" || (Array.isArray(v) && !v.length);
-const same = (a: unknown, b: unknown) =>
-  (empty(blank(a)) && empty(blank(b))) || JSON.stringify(blank(a)) === JSON.stringify(blank(b));
+const same = (field: PresetField, a: unknown, b: unknown) =>
+  (field !== "write_tools" && empty(blank(a)) && empty(blank(b))) ||
+  JSON.stringify(blank(a)) === JSON.stringify(blank(b));
 
 /** A short, stable fingerprint of a shipped value, so a skip holds until that value changes. */
 export function valueHash(value: unknown): string {
@@ -142,13 +125,6 @@ function shippedFields(
   row: { data: Record<string, any> },
   preset: Preset,
 ): Partial<Record<PresetField, unknown>> {
-  if (preset.kind === "cli") {
-    return {
-      command: preset.command ?? "",
-      allowed_subcommands: preset.allowed_subcommands ?? [],
-      description: preset.description ?? "",
-    };
-  }
   const template = preset.url_template ?? "";
   const params = paramsFromUrl(template, row.data.url ?? "");
   return {
@@ -156,7 +132,7 @@ function shippedFields(
     ...(params ? { url: renderUrl(template, params) } : {}),
     description: preset.description ?? "",
     allowed_tools: preset.allowed_tools ?? [],
-    write_tools: preset.write_tools ?? [],
+    ...(preset.write_tools ? { write_tools: preset.write_tools } : {}),
     tool_classes: preset.tool_classes ?? [],
   };
 }
@@ -172,7 +148,7 @@ export function presetDiff(
     field === "description" ? (row.description ?? "") : row.data[field];
   return (Object.keys(shipped) as PresetField[])
     .filter((field) => ref.skipped?.[field] !== valueHash(shipped[field]))
-    .filter((field) => !same(current(field), shipped[field]))
+    .filter((field) => !same(field, current(field), shipped[field]))
     .map((field) => ({ field, current: current(field), shipped: shipped[field] }));
 }
 
@@ -194,7 +170,7 @@ export function reviewUpdate(
     }
     delete skipped[diff.field];
     if (diff.field === "description") description = diff.shipped as string;
-    else if (DATA_FIELDS.includes(diff.field)) data[diff.field] = diff.shipped;
+    else data[diff.field] = diff.shipped;
   }
   data.preset = { id: ref.id, revision: preset.revision, skipped };
   return description === undefined ? { data } : { description, data };

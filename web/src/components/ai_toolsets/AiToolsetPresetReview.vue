@@ -81,8 +81,6 @@ const FIELD_LABELS: Record<PresetField, string> = {
   allowed_tools: "aiToolset.listAllowed",
   write_tools: "aiToolset.listWrite",
   tool_classes: "aiToolset.toolClasses",
-  command: "aiToolset.cliCommand",
-  allowed_subcommands: "aiToolset.allowedSubcommands",
 };
 
 const diffs = computed(() =>
@@ -109,7 +107,7 @@ const toggle = (field: PresetField, on: boolean) => {
 const show = (value: unknown) =>
   typeof value === "string" ? value : JSON.stringify(value ?? null, null, 2);
 
-// A merge PUT: credentials and limits aren't sent, so they stay as stored.
+// A merge PUT: credentials aren't sent, so they stay as stored.
 const save = async (fields: Set<PresetField>) => {
   if (!props.row || !props.preset) return;
   saving.value = true;

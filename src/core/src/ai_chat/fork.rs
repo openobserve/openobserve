@@ -115,7 +115,7 @@ pub fn plan_resume(events: &[DurableEvent]) -> Result<ResumePlan, ResumeRefusal>
         let Some(call) = ToolPart::of(part) else {
             continue;
         };
-        match call.control_tool() {
+        match call.tool {
             // A blank report is no report: the run failed without one.
             SUBMIT_REPORT
                 if call.status == "completed"
@@ -942,21 +942,25 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn a_vendor_submit_report_does_not_refuse_the_resume() {
+    fn a_toolset_call_does_not_refuse_the_resume() {
         let mut s = Session {
             events: three_steps(),
         };
-        s.tool(
-            "msg_a3",
-            "prt_p1",
-            "toolset_tool_call",
-            "completed",
-            json!({"toolset_name": "submit", "tool_name": "report",
-                "args": {"markdown": "## Root cause"}}),
-            json!({}),
-            5_000,
-            5_001,
-        );
+        for (i, tool) in ["submit_search", "vendor_submit_report"]
+            .into_iter()
+            .enumerate()
+        {
+            s.tool(
+                "msg_a3",
+                &format!("prt_p{i}"),
+                tool,
+                "completed",
+                json!({"markdown": "## Root cause"}),
+                json!({}),
+                5_000,
+                5_001,
+            );
+        }
         assert_eq!(plan_resume(&s.events).unwrap().cut_seq, THREE_STEPS_CUT);
     }
 

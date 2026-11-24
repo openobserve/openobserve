@@ -475,6 +475,31 @@ impl Resolve for SsrfDnsResolver {
     }
 }
 
+/// Refuses at connect what [`is_always_blocked_host`] refuses by name; private ranges resolve.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct AlwaysBlockedResolver;
+
+impl Resolve for AlwaysBlockedResolver {
+    fn resolve(&self, name: Name) -> Resolving {
+        Box::pin(async move {
+            let addrs: Vec<SocketAddr> =
+                tokio::net::lookup_host((name.as_str(), 0)).await?.collect();
+            let is_proxy = PROXY_HOSTS
+                .iter()
+                .any(|p| p.eq_ignore_ascii_case(name.as_str()));
+            if !is_proxy
+                && !crate::get_config().common.skip_ssrf_checks
+                && let Some(blocked) = addrs.iter().find(|sa| is_always_blocked_ip(&sa.ip()))
+            {
+                let refusal = format!("{} resolves to {}", name.as_str(), blocked.ip());
+                return Err(SsrfRefusal(refusal).into());
+            }
+            let iter: Addrs = Box::new(addrs.into_iter());
+            Ok(iter)
+        })
+    }
+}
+
 /// Build a reqwest client that is hardened against SSRF on redirect chains
 /// and on DNS resolution. Use this anywhere the URL is derived from user input
 /// and the response is read back; it ignores the operator allowlist.
@@ -844,6 +869,17 @@ mod tests {
                 .await
                 .is_err()
         );
+    }
+
+    #[tokio::test]
+    async fn test_always_blocked_resolver_refuses_loopback_at_connect_time() {
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .dns_resolver(Arc::new(AlwaysBlockedResolver))
+            .build()
+            .unwrap();
+        let error = client.get("http://localhost:1/").send().await.unwrap_err();
+        assert!(find_ssrf_refusal(&error).is_some(), "{error:?}");
     }
 
     #[tokio::test]

@@ -1,14 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
-// AI Toolsets — form validation E2E tests
-//
-// Covers: AddAiToolset (name required, MCP URL required, CLI command required, happy path)
-//         CrossLinkDialog (name required, URL required, invalid URL, happy path)
-//
-// Cleanup notes:
-//   - AI Toolsets created in the happy-path test use the prefix ai_toolset_fv_001.
-//     Delete manually via Management > AI Toolsets if cleanup.spec.js does not yet
-//     support AI Toolset deletion via API.
-//   - Cross-link items created in the happy-path test are deleted within the test.
+
+// The happy-path test leaves an `ai-toolset-fv-*` toolset behind; delete it by hand when
+// cleanup.spec.js doesn't.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -62,7 +55,7 @@ test.describe('AI Toolsets form validation', { tag: '@enterprise' }, () => {
         testLogger.info('Testing MCP URL required validation on empty submit');
 
         // Fill a valid name but leave MCP URL empty (default kind is MCP)
-        await pm.aiToolsetsFormValidation.fillName('ai_toolset_fv_url_test');
+        await pm.aiToolsetsFormValidation.fillName('ai-toolset-fv-url-test');
         await pm.aiToolsetsFormValidation.clickSave();
 
         await expect(pm.aiToolsetsFormValidation.getMcpUrlErrorLocator()).toBeVisible();
@@ -95,43 +88,10 @@ test.describe('AI Toolsets form validation', { tag: '@enterprise' }, () => {
         await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).toBeVisible();
         await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).toContainText('Name is required');
 
-        await pm.aiToolsetsFormValidation.fillName('ai_toolset_fv_fix');
+        await pm.aiToolsetsFormValidation.fillName('ai-toolset-fv-fix');
         await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).not.toBeVisible();
 
         testLogger.info('Name error correctly cleared after input');
-    });
-
-    test('should show CLI command error when kind is CLI and command is empty', {
-        tag: ['@ai-toolsets-form-validation', '@P0', '@smoke']
-    }, async ({ page }) => {
-        testLogger.info('Testing CLI command required validation');
-
-        // Switch kind to CLI Tool
-        await pm.aiToolsetsFormValidation.selectKind('CLI Tool');
-        await pm.aiToolsetsFormValidation.fillName('ai_toolset_fv_cli_test');
-        // Leave command empty and submit
-        await pm.aiToolsetsFormValidation.clickSave();
-
-        await expect(pm.aiToolsetsFormValidation.getCliCommandErrorLocator()).toBeVisible();
-        await expect(pm.aiToolsetsFormValidation.getCliCommandErrorLocator()).toContainText('Command is required');
-
-        testLogger.info('CLI command required error correctly shown');
-    });
-
-    test('should show both name and CLI command errors when CLI kind is selected and form is empty', {
-        tag: ['@ai-toolsets-form-validation', '@P0', '@smoke']
-    }, async ({ page }) => {
-        testLogger.info('Testing both name and CLI command errors on empty CLI form submit');
-
-        await pm.aiToolsetsFormValidation.selectKind('CLI Tool');
-        await pm.aiToolsetsFormValidation.clickSave();
-
-        await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).toBeVisible();
-        await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).toContainText('Name is required');
-        await expect(pm.aiToolsetsFormValidation.getCliCommandErrorLocator()).toBeVisible();
-        await expect(pm.aiToolsetsFormValidation.getCliCommandErrorLocator()).toContainText('Command is required');
-
-        testLogger.info('Both name and CLI command required errors correctly shown');
     });
 
     test('should create AI Toolset successfully with valid name and MCP URL', {
@@ -139,10 +99,8 @@ test.describe('AI Toolsets form validation', { tag: '@enterprise' }, () => {
     }, async ({ page }) => {
         testLogger.info('Testing successful AI Toolset creation');
 
-        // Unique name per run — the suite has no automated cleanup, so a fixed
-        // name collides with a previously-created toolset and the save silently
-        // fails (duplicate), leaving the form open.
-        const toolsetName = `ai_toolset_fv_${Date.now()}`;
+        // Unique per run: nothing deletes it, and a duplicate name keeps the form open.
+        const toolsetName = `ai-toolset-fv-${Date.now()}`;
         await pm.aiToolsetsFormValidation.fillName(toolsetName);
         await pm.aiToolsetsFormValidation.fillMcpUrl('https://api.example.com/mcp/');
         await pm.aiToolsetsFormValidation.clickSave();

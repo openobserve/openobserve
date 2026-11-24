@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! One audit entry and one health update per finished gateway toolset call, as its part is stored.
+//! One audit entry and one health update per finished toolset call, as its part is stored.
 
 use std::sync::Arc;
 
 use config::{
-    meta::oncall::confidence::call_ref,
+    meta::oncall::confidence::{ToolsetNames, call_ref, strip_call_ref},
     utils::json::{Map, Value},
 };
 use infra::table::ai_toolset_health::{self, CallOutcome};
@@ -33,25 +33,84 @@ use o2_enterprise::enterprise::{
     },
 };
 
-use super::{
-    projection::{gateway_call, obj},
-    rca_thread::{ms_to_us, updated_part},
-};
+use super::rca_thread::{ToolPart, updated_part};
 
-/// A finished `toolset_tool_call` or `toolset_cli_run`, as audit and health record it.
+/// What opencode writes on a call that was running when its turn was stopped.
+const ABORTED_TEXT: &str = "Tool execution aborted";
+/// o2-ai's `toolset_policy.refusal`, whole: each names the toolset, which no vendor is told.
+const REFUSALS: [&str; 4] = [
+    "{tool} in {toolset} isn't allowed",
+    "{tool} in {toolset} may change things and isn't available on this turn",
+    "{tool} in {toolset} can't be called: its full name is over 64 characters",
+    "{toolset} isn't connected for this turn",
+];
+
+/// A finished toolset call, as audit and health record it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ToolsetCall {
     pub toolset: String,
-    /// The vendor tool; `run` for a CLI.
+    /// The vendor tool, as the agent names it.
     pub tool: String,
     pub call_id: String,
     pub call_ref: Option<String>,
+    /// Size of the stored result; a spilled one's is its pointer's.
     pub result_bytes: usize,
     pub duration_ms: Option<i64>,
     /// Microseconds; the part's end, else its start.
     pub at: Option<i64>,
-    /// A fixed error kind; no tool part text is kept, as it can echo arguments.
-    pub error: Option<String>,
+    /// Set when the part's state is `error`.
+    pub failure: Option<Failure>,
+}
+
+/// Why a call's part ended in `error`; fixed kinds, as its text can echo arguments.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Failure {
+    /// The call failed at, or on the way to, the vendor.
+    Tool,
+    /// Our own policy check refused it, so nothing reached the vendor.
+    Refused,
+    /// The turn was stopped while it ran.
+    Aborted,
+}
+
+impl Failure {
+    fn of(state: Option<&Map<String, Value>>, toolset: &str, tool: &str) -> Self {
+        let Some(state) = state else {
+            return Self::Tool;
+        };
+        let error = state
+            .get("error")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        // Only opencode sets `interrupted`; a vendor can only choose the text.
+        let interrupted = state
+            .get("metadata")
+            .and_then(|m| m.get("interrupted"))
+            .and_then(Value::as_bool);
+        if interrupted == Some(true) && error == ABORTED_TEXT {
+            Self::Aborted
+        } else if is_policy_refusal(error, toolset, tool) {
+            Self::Refused
+        } else {
+            Self::Tool
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Tool => "tool error",
+            Self::Refused => "refused by the toolset's policy",
+            Self::Aborted => "aborted",
+        }
+    }
+
+    fn status(self) -> u16 {
+        match self {
+            Self::Tool => 502,
+            Self::Refused => 403,
+            Self::Aborted => 499,
+        }
+    }
 }
 
 /// Who ran the turn whose parts are stored.
@@ -63,9 +122,13 @@ struct TurnOwner {
     turn_id: String,
 }
 
-/// `on_commit` that also records the batch's toolset calls; listings and `toolset_read_output`
-/// aren't.
-pub fn with_toolset_calls(identity: &TurnIdentity, inner: Option<OnCommit>) -> OnCommit {
+/// `on_commit` that also records the batch's calls of `toolsets`, the turn's own: one deleted while
+/// the turn runs is still recorded.
+pub fn with_toolset_calls(
+    identity: &TurnIdentity,
+    toolsets: ToolsetNames,
+    inner: Option<OnCommit>,
+) -> OnCommit {
     let owner = Arc::new(TurnOwner {
         org_id: identity.org_id.clone(),
         user_id: identity.user_id.clone(),
@@ -76,7 +139,7 @@ pub fn with_toolset_calls(identity: &TurnIdentity, inner: Option<OnCommit>) -> O
         if let Some(inner) = &inner {
             inner(events);
         }
-        let calls = toolset_calls(events);
+        let calls = toolset_calls(events, &toolsets);
         if calls.is_empty() {
             return;
         }
@@ -85,85 +148,46 @@ pub fn with_toolset_calls(identity: &TurnIdentity, inner: Option<OnCommit>) -> O
     })
 }
 
-/// The finished gateway calls among committed events, in event order.
-pub fn toolset_calls(events: &[DurableEvent]) -> Vec<ToolsetCall> {
+/// The finished calls of `toolsets` among committed events, in event order.
+pub fn toolset_calls(events: &[DurableEvent], toolsets: &ToolsetNames) -> Vec<ToolsetCall> {
     events
         .iter()
-        .filter_map(|event| call_of(updated_part(event)?))
+        .filter_map(|event| call_of(updated_part(event)?, toolsets))
         .collect()
 }
 
-fn call_of(part: &Map<String, Value>) -> Option<ToolsetCall> {
-    if part.get("type").and_then(Value::as_str) != Some("tool") {
-        return None;
-    }
-    let state = obj(part.get("state"))?;
-    let status = state.get("status").and_then(Value::as_str)?;
-    if status != "completed" && status != "error" {
-        return None;
-    }
-    let name = part.get("tool").and_then(Value::as_str)?;
-    let call = gateway_call(name, obj(state.get("input")))?;
-    let metadata = obj(state.get("metadata"));
-    // A spilled result's output is a pointer; o2-ai records the gateway result's own size.
-    let result_bytes = metadata
-        .and_then(|m| m.get("result_bytes"))
-        .and_then(Value::as_u64)
-        .unwrap_or(0) as usize;
-    let exit = metadata
-        .and_then(|m| m.get("exit"))
-        .and_then(Value::as_i64)
-        .filter(|code| *code != 0);
-    let error = match (status, exit) {
-        (_, Some(code)) if call.cli => Some(format!("exit {code}")),
-        ("error", _) => Some(error_kind(metadata, state.get("error")).to_string()),
-        _ => None,
+fn call_of(part: &Map<String, Value>, toolsets: &ToolsetNames) -> Option<ToolsetCall> {
+    let call = ToolPart::of(part)?;
+    let failed = match call.status {
+        "completed" => false,
+        "error" => true,
+        _ => return None,
     };
-    let time = obj(state.get("time"));
-    let start = time.and_then(|t| ms_to_us(t.get("start")));
-    let end = time.and_then(|t| ms_to_us(t.get("end")));
-    let call_id = part
-        .get("callID")
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .to_string();
+    let (toolset, tool) = call.vendor(toolsets)?;
+    let (start, end) = (call.started_at(), call.ended_at());
+    let call_id = call.call_id();
+    let result_bytes = call
+        .state
+        .and_then(|s| s.get("output")?.as_str())
+        .map_or(0, |output| strip_call_ref(output).len());
     Some(ToolsetCall {
-        toolset: call.toolset.to_string(),
-        tool: call.tool.to_string(),
+        toolset: toolset.to_string(),
+        tool: tool.to_string(),
         call_ref: (!call_id.is_empty()).then(|| call_ref(&call_id)),
         call_id,
         result_bytes,
         duration_ms: start.zip(end).map(|(s, e)| (e - s) / 1000),
         at: end.or(start),
-        error,
+        failure: failed.then(|| Failure::of(call.state, toolset, tool)),
     })
 }
 
-/// One of a few fixed kinds; the error text is only matched, never stored.
-fn error_kind(metadata: Option<&Map<String, Value>>, error: Option<&Value>) -> String {
-    let status = metadata
-        .and_then(|m| m.get("http_status").or_else(|| m.get("status")))
-        .and_then(Value::as_u64);
-    let text = match error {
-        Some(Value::String(t)) => t.to_ascii_lowercase(),
-        Some(other) => other.to_string().to_ascii_lowercase(),
-        None => String::new(),
-    };
-    let status = status.or_else(|| {
-        text.split(|c: char| !c.is_ascii_digit())
-            .filter(|w| w.len() == 3)
-            .filter_map(|w| w.parse::<u64>().ok())
-            .find(|code| (400..600).contains(code))
-    });
-    match status {
-        Some(429) => "rate limited".to_string(),
-        Some(code) if code >= 500 => "HTTP 5xx".to_string(),
-        Some(code) => format!("HTTP {code}"),
-        None if text.contains("timed out") || text.contains("timeout") => "timeout".to_string(),
-        None if text.contains("rate limit") => "rate limited".to_string(),
-        None if text.contains("unavailable") => "unavailable".to_string(),
-        None => "tool error".to_string(),
-    }
+fn is_policy_refusal(error: &str, toolset: &str, tool: &str) -> bool {
+    let error = error.strip_prefix("Error: ").unwrap_or(error);
+    REFUSALS.iter().any(|form| {
+        // The toolset goes in last: its name holds no braces, a tool's neither.
+        error == form.replace("{tool}", tool).replace("{toolset}", toolset)
+    })
 }
 
 async fn record(owner: &TurnOwner, calls: Vec<ToolsetCall>) {
@@ -172,11 +196,15 @@ async fn record(owner: &TurnOwner, calls: Vec<ToolsetCall>) {
         if get_o2_config().common.audit_enabled {
             audit::audit(audit_message(owner, &call, now)).await;
         }
+        // Neither says anything about the vendor.
+        if matches!(call.failure, Some(Failure::Refused | Failure::Aborted)) {
+            continue;
+        }
         let outcome = CallOutcome {
             org: &owner.org_id,
             toolset: &call.toolset,
             at: call.at.unwrap_or(now),
-            error: call.error.as_deref(),
+            error: call.failure.map(Failure::as_str),
         };
         let exists =
             |names: &[String]| names.iter().any(|n| normalize_tool_name(n) == call.toolset);
@@ -213,8 +241,8 @@ fn audit_message(owner: &TurnOwner, call: &ToolsetCall, now: i64) -> AuditMessag
             http_path: format!("/api/{}/ai/toolsets/{}/call", owner.org_id, call.toolset),
             http_query_params: String::new(),
             http_body: body.to_string(),
-            http_response_code: if call.error.is_some() { 502 } else { 200 },
-            error_msg: call.error.clone(),
+            http_response_code: call.failure.map_or(200, Failure::status),
+            error_msg: call.failure.map(|f| f.as_str().to_string()),
             trace_id: None,
         },
         delegated: None,
@@ -244,46 +272,53 @@ mod tests {
         s.message("msg_a1", "assistant", json!({"created": T}));
         let parts = [
             (
-                "toolset_list",
-                "completed",
-                json!({}),
-                json!({"output": "[]"}),
-            ),
-            (
-                "toolset_list_tools",
-                "completed",
-                json!({"toolset_name": "dd"}),
-                json!({"output": "[]"}),
-            ),
-            (
                 "toolset_read_output",
                 "completed",
                 json!({"ref": "r"}),
                 json!({"output": "x"}),
             ),
+            ("dd_search_logs", "running", json!({"q": 1}), json!({})),
             (
-                "toolset_tool_call",
-                "running",
-                json!({"toolset_name": "dd", "tool_name": "search_logs", "args": {"q": 1}}),
-                json!({}),
-            ),
-            (
-                "toolset_tool_call",
+                "dd_search_logs",
                 "completed",
-                json!({"toolset_name": "dd", "tool_name": "search_logs", "args": {"q": "service:checkout"}}),
-                json!({"output": "[saved to a file]", "metadata": {"result_bytes": 120000}}),
+                json!({"q": "service:checkout"}),
+                json!({"output": "{\"hits\":3}"}),
             ),
             (
-                "toolset_cli_run",
+                "dd-prod_logs_search",
                 "completed",
-                json!({"toolset_name": "k8s", "command": "get pods"}),
-                json!({"output": "denied", "metadata": {"exit": 1, "result_bytes": 6}}),
+                json!({"q": "get pods"}),
+                json!({"output": "{\"error\":\"denied\"}"}),
             ),
             (
-                "toolset_tool_call",
+                "dd_get_monitor",
                 "error",
-                json!({"toolset_name": "dd", "tool_name": "get_monitor", "args": {"id": "secret-id"}}),
-                json!({"error": "401 Unauthorized"}),
+                json!({"id": "secret-id"}),
+                json!({"error": "HTTP 401 for id=secret-id"}),
+            ),
+            (
+                "gone_search_logs",
+                "completed",
+                json!({"q": 1}),
+                json!({"output": "x"}),
+            ),
+            (
+                "record_step",
+                "completed",
+                json!({"stage": "metrics"}),
+                json!({"output": "x"}),
+            ),
+            (
+                "o2_dd_search",
+                "completed",
+                json!({"q": 1}),
+                json!({"output": "x"}),
+            ),
+            (
+                "invalid",
+                "completed",
+                json!({"tool": "dd_search_logs"}),
+                json!({"output": "x"}),
             ),
         ];
         for (i, (tool, status, input, result)) in parts.into_iter().enumerate() {
@@ -301,16 +336,23 @@ mod tests {
         s
     }
 
+    fn toolsets() -> ToolsetNames {
+        ["dd", "dd-prod", "record"]
+            .map(String::from)
+            .into_iter()
+            .collect()
+    }
+
     #[test]
-    fn only_finished_gateway_calls_are_recorded_with_their_metadata() {
-        let calls = toolset_calls(&session().events);
-        let summary: Vec<(&str, &str, Option<&str>, usize)> = calls
+    fn only_finished_calls_of_the_turn_s_toolsets_are_recorded_from_their_part() {
+        let calls = toolset_calls(&session().events, &toolsets());
+        let summary: Vec<(&str, &str, Option<Failure>, usize)> = calls
             .iter()
             .map(|c| {
                 (
                     c.toolset.as_str(),
                     c.tool.as_str(),
-                    c.error.as_deref(),
+                    c.failure,
                     c.result_bytes,
                 )
             })
@@ -318,12 +360,14 @@ mod tests {
         assert_eq!(
             summary,
             [
-                ("dd", "search_logs", None, 120000),
-                ("k8s", "run", Some("exit 1"), 6),
-                ("dd", "get_monitor", Some("HTTP 401"), 0),
-            ]
+                ("dd", "search_logs", None, 10),
+                ("dd-prod", "logs_search", None, 18),
+                ("dd", "get_monitor", Some(Failure::Tool), 0),
+            ],
+            "the outcome is the part's state, never its text"
         );
-        assert_eq!(calls[0].call_id, "call_prt_4");
+        assert!(toolset_calls(&session().events, &ToolsetNames::default()).is_empty());
+        assert_eq!(calls[0].call_id, "call_prt_2");
         assert_eq!(calls[0].duration_ms, Some(250));
         for call in &calls {
             assert_eq!(
@@ -334,54 +378,49 @@ mod tests {
     }
 
     #[test]
-    fn only_a_fixed_error_kind_is_kept_from_a_failed_call() {
-        let kind = |error: &str| error_kind(None, Some(&json!(error)));
+    fn only_our_own_refusal_or_abort_is_not_the_vendor_s_failure() {
+        let failure = |error: &str, metadata: Value| {
+            let state = json!({"status": "error", "error": error, "metadata": metadata});
+            Failure::of(state.as_object(), "dd-prod", "logs_delete")
+        };
+        for refusal in [
+            "logs_delete in dd-prod isn't allowed",
+            "Error: logs_delete in dd-prod isn't allowed",
+            "logs_delete in dd-prod may change things and isn't available on this turn",
+            "logs_delete in dd-prod can't be called: its full name is over 64 characters",
+            "dd-prod isn't connected for this turn",
+        ] {
+            assert_eq!(failure(refusal, json!({})), Failure::Refused, "{refusal}");
+        }
+        for vendor in [
+            "logs_delete isn't allowed",
+            "logs_delete in dd isn't allowed",
+            "other in dd-prod isn't allowed",
+            "logs_delete in dd-prod isn't allowed (HTTP 403)",
+            "upstream: logs_delete in dd-prod isn't allowed",
+            "the toolset policy check did not answer, so this call was not made",
+            "Tool execution aborted",
+            "MCP error -32000: Connection closed",
+            "",
+        ] {
+            assert_eq!(failure(vendor, json!({})), Failure::Tool, "{vendor}");
+        }
+        let interrupted = json!({"interrupted": true});
         assert_eq!(
-            kind("upstream answered HTTP 401 for query=secret-q"),
-            "HTTP 401"
+            failure("Tool execution aborted", interrupted.clone()),
+            Failure::Aborted
         );
-        assert_eq!(kind("HTTP 503 Service Unavailable"), "HTTP 5xx");
-        assert_eq!(kind("429 Too Many Requests"), "rate limited");
+        assert_eq!(failure("HTTP 500", interrupted), Failure::Tool);
+        assert_eq!(Failure::of(None, "dd", "x"), Failure::Tool);
         assert_eq!(
-            kind("rate limit for dd reached; retry after 3 s"),
-            "rate limited"
+            (Failure::Refused.status(), Failure::Aborted.status()),
+            (403, 499)
         );
-        assert_eq!(kind("dd: request timed out"), "timeout");
-        assert_eq!(kind("dd unavailable: 5xx"), "unavailable");
-        assert_eq!(
-            kind("datadog-prod unavailable for this turn"),
-            "unavailable"
-        );
-        assert_eq!(
-            kind("'secret-arg-value' is not valid under any of the given schemas"),
-            "tool error"
-        );
-        assert_eq!(
-            error_kind(Some(json!({"http_status": 403}).as_object().unwrap()), None),
-            "HTTP 403"
-        );
-
-        let mut s = Session::new();
-        s.message("msg_a1", "assistant", json!({"created": T}));
-        s.tool(
-            "msg_a1",
-            "prt_x",
-            "toolset_tool_call",
-            "error",
-            json!({"toolset_name": "dd", "tool_name": "q", "args": {"query": "secret-arg-value"}}),
-            json!({"error": "argument 'secret-arg-value' failed: HTTP 401"}),
-            100,
-            200,
-        );
-        let calls = toolset_calls(&s.events);
-        assert_eq!(calls[0].error.as_deref(), Some("HTTP 401"));
-        let entry = serde_json::to_string(&audit_message(&owner("u"), &calls[0], 1)).unwrap();
-        assert!(!entry.contains("secret-arg-value"), "{entry}");
     }
 
     #[test]
     fn an_audit_entry_never_carries_arguments() {
-        let calls = toolset_calls(&session().events);
+        let calls = toolset_calls(&session().events, &toolsets());
         let rca = owner("sysrcaagent@org.example");
         let entry = audit_message(&rca, &calls[0], 1);
         assert_eq!(entry.user_email, "sysrcaagent@org.example");
@@ -394,7 +433,7 @@ mod tests {
         assert_eq!(body["chat"], "chat-1");
         assert_eq!(body["turn"], "turn-1");
         assert_eq!(body["tool"], "search_logs");
-        assert_eq!(body["result_bytes"], 120000);
+        assert_eq!(body["result_bytes"], 10);
         assert!(body.get("arguments").is_none(), "{body}");
 
         for call in &calls {
@@ -405,12 +444,15 @@ mod tests {
         }
         let failed = audit_message(&owner("alice@example.com"), &calls[2], 1);
         assert_eq!(failed.response_meta.http_response_code, 502);
-        assert_eq!(failed.response_meta.error_msg.as_deref(), Some("HTTP 401"));
+        assert_eq!(
+            failed.response_meta.error_msg.as_deref(),
+            Some("tool error")
+        );
         assert!(
             failed
                 .response_meta
                 .http_body
-                .contains(&call_ref("call_prt_6"))
+                .contains(&call_ref("call_prt_4"))
         );
     }
 }

@@ -51,7 +51,7 @@ use super::{
 };
 use crate::ai_chat::{
     CommittedPrefix, ReadError, fork,
-    rca_ledger::{RunTranscript, decode_run_with, org_tool_classes},
+    rca_ledger::{RunTranscript, decode_run_with, run_tool_classes},
     rca_thread::{self, RcaThread, Transcript},
     read_committed_prefix,
 };
@@ -366,8 +366,14 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
         let turns = ai_chat_turns::list_for_session(self.org_id, &session.session_id)
             .await
             .map_err(PartError::internal)?;
-        let mut thread =
-            rca_thread::project_rca_thread(&prefix.events, &turns, active, show_tool_io);
+        let classes = run_tool_classes(self.run).await;
+        let mut thread = rca_thread::project_rca_thread_with(
+            &prefix.events,
+            &turns,
+            active,
+            show_tool_io,
+            classes.names(),
+        );
         thread.run_id = run_id.clone();
         thread.state_version = session_version(session, self.run, show_tool_io);
         if !active {
@@ -501,7 +507,7 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
         if let Some(decoded) = self.decoded.get() {
             return Ok(decoded);
         }
-        let classes = org_tool_classes(&session.org_id).await;
+        let classes = run_tool_classes(self.run).await;
         Ok(self
             .decoded
             .get_or_init(|| decode_run_with(&prefix.events, &classes)))

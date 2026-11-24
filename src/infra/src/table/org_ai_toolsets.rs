@@ -20,8 +20,8 @@
 //! org's per-org DEK via [`cipher::get_dek`].
 
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set,
-    SqlErr, TransactionTrait,
+    ColumnTrait, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Select,
+    Set, SqlErr, TransactionTrait,
     sea_query::{Expr, OnConflict},
 };
 use svix_ksuid::{Ksuid, KsuidLike};
@@ -33,24 +33,27 @@ use crate::{
     table::cipher,
 };
 
+/// A kind no longer supported: its rows stay stored, but no read here returns them.
+const UNREAD_KIND: &str = "cli";
+
 /// Filter options for [`list`].
 #[derive(Debug, Default)]
 pub struct ListFilter {
     /// Case-insensitive substring match on the `name` column (`LIKE '%val%'`).
     pub name: Option<String>,
-    /// Exact match on the `kind` column (e.g. `"mcp"`, `"cli"`, `"skill"`).
+    /// Exact match on the `kind` column (e.g. `"mcp"`, `"skill"`).
     pub kind: Option<String>,
 }
 
 /// Application-level view of an AI toolset record.
 /// The `data` field always holds **plaintext** JSON (or `None`) at this layer.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct OrgToolset {
     /// 27-character KSUID primary key.
     pub id: String,
     pub org: String,
     pub name: String,
-    /// One of: `mcp`, `cli`, `skill`, `generic`.
+    /// One of: `mcp`, `skill`, `generic`.
     pub kind: String,
     pub description: Option<String>,
     /// Kind-specific plaintext JSON payload. `None` when no config is needed.
@@ -156,8 +159,7 @@ pub async fn get_with<C: ConnectionTrait>(
     org: &str,
     id: &str,
 ) -> Result<Option<OrgToolset>, errors::Error> {
-    let row = Entity::find()
-        .filter(Column::Org.eq(org))
+    let row = find_in(org)
         .filter(Column::Id.eq(id))
         .one(conn)
         .await
@@ -176,8 +178,7 @@ pub async fn get_with<C: ConnectionTrait>(
 /// plaintext `data`.
 pub async fn get_by_name(org: &str, name: &str) -> Result<Option<OrgToolset>, errors::Error> {
     let client = get_orm_client_ro().await;
-    let row = Entity::find()
-        .filter(Column::Org.eq(org))
+    let row = find_in(org)
         .filter(Column::Name.eq(name))
         .one(client)
         .await
@@ -214,9 +215,7 @@ pub async fn list_with<C: ConnectionTrait>(
     filter: ListFilter,
     limit: Option<u64>,
 ) -> Result<Vec<OrgToolset>, errors::Error> {
-    let mut query = Entity::find()
-        .filter(Column::Org.eq(org))
-        .order_by(Column::CreatedAt, Order::Desc);
+    let mut query = find_in(org).order_by(Column::CreatedAt, Order::Desc);
 
     if let Some(ref name) = filter.name {
         query = query.filter(Column::Name.contains(name));
@@ -251,14 +250,25 @@ pub async fn list_names_with<C: ConnectionTrait>(
     conn: &C,
     org: &str,
 ) -> Result<Vec<String>, errors::Error> {
-    let names = Entity::find()
+    let names = find_in(org)
         .select_only()
         .column(Column::Name)
-        .filter(Column::Org.eq(org))
         .into_tuple::<String>()
         .all(conn)
         .await?;
     Ok(names)
+}
+
+/// Whether a row no read returns still holds the unique `(org, name)`.
+pub async fn is_name_held_unread(org: &str, name: &str) -> Result<bool, errors::Error> {
+    is_name_held_unread_with(get_orm_client_rw().await, org, name).await
+}
+
+/// The org's readable toolsets.
+fn find_in(org: &str) -> Select<Entity> {
+    Entity::find()
+        .filter(Column::Org.eq(org))
+        .filter(Column::Kind.ne(UNREAD_KIND))
 }
 
 /// Writes `entry`'s description, plaintext `data` and `updated_at` only if the row still has
@@ -388,6 +398,23 @@ fn to_tombstone(m: tombstones::Model) -> Tombstone {
         deleted_at: m.deleted_at,
         region: m.region,
     }
+}
+
+async fn is_name_held_unread_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    name: &str,
+) -> Result<bool, errors::Error> {
+    Ok(Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(Column::Org.eq(org))
+        .filter(Column::Name.eq(name))
+        .filter(Column::Kind.eq(UNREAD_KIND))
+        .into_tuple::<String>()
+        .one(conn)
+        .await?
+        .is_some())
 }
 
 async fn encrypt_entry_data(entry: &OrgToolset) -> Result<Option<String>, errors::Error> {
@@ -622,11 +649,15 @@ mod tests {
     }
 
     async fn insert(db: &DatabaseConnection, id: &str, name: &str, org: &str) {
+        insert_kind(db, id, name, org, "mcp").await
+    }
+
+    async fn insert_kind(db: &DatabaseConnection, id: &str, name: &str, org: &str, kind: &str) {
         ActiveModel {
             id: Set(id.to_string()),
             org: Set(org.to_string()),
             name: Set(name.to_string()),
-            kind: Set("mcp".to_string()),
+            kind: Set(kind.to_string()),
             description: Set(None),
             data: Set(Some("v0".to_string())),
             created_by: Set("u".to_string()),
@@ -685,6 +716,34 @@ mod tests {
         let mut names = list_names_with(&db, "org").await.unwrap();
         names.sort();
         assert_eq!(names, ["Datadog Prod", "github"]);
+    }
+
+    #[tokio::test]
+    async fn a_cli_row_stays_stored_but_no_read_returns_it() {
+        let db = db().await;
+        insert_kind(&db, "c1", "gh", "org", "cli").await;
+
+        assert!(get_with(&db, "org", "c1").await.unwrap().is_none());
+        for kind in [None, Some("cli".to_string())] {
+            let filter = ListFilter { name: None, kind };
+            assert!(
+                list_with(&db, "org", filter, None)
+                    .await
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+        assert!(list_names_with(&db, "org").await.unwrap().is_empty());
+        assert!(is_name_held_unread_with(&db, "org", "gh").await.unwrap());
+        assert!(!is_name_held_unread_with(&db, "org2", "gh").await.unwrap());
+
+        insert(&db, "m1", "datadog", "org").await;
+        assert!(
+            !is_name_held_unread_with(&db, "org", "datadog")
+                .await
+                .unwrap()
+        );
+        assert!(Entity::find_by_id("c1").one(&db).await.unwrap().is_some());
     }
 
     fn new_entry(id: &str, name: &str) -> OrgToolset {

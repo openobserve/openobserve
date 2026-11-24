@@ -50,7 +50,24 @@ describe("toolPicker", () => {
     expect([search, create, wipe].map(mayWrite)).toEqual([false, true, true]);
   });
 
-  it("matches globs like the gateway: * is any run, the rest literal, whole name", () => {
+  it("matches names as the agent sees them, with other characters replaced by _", () => {
+    expect(globMatches("update.*", "update_monitor")).toBe(true);
+    expect(globMatches("update.monitor", "update_monitor")).toBe(true);
+    expect(globMatches("get_*", "get.logs")).toBe(true);
+    expect(globMatches("a?b", "a_b")).toBe(true);
+    expect(globMatches("update-*", "update_monitor")).toBe(false);
+    expect(globMatches("x__", "x😀")).toBe(true);
+    const l = lists({ allowed: ["update.*"], write: ["update.*"] });
+    expect(toolState(l, { name: "update_monitor" })).toBe("write");
+    expect(toolState(lists({ allowed: ["*"], blocked: ["a.b"] }), { name: "a_b" })).toBe("off");
+  });
+
+  it("locks the control of a tool that another spelling decides, but not its own", () => {
+    expect(setByGlob(lists({ allowed: ["update.monitor"] }), "update_monitor")).toBe(true);
+    expect(setByGlob(lists({ allowed: ["update.monitor"] }), "update.monitor")).toBe(false);
+  });
+
+  it("matches globs like the agent: * is any run, the rest literal, whole name", () => {
     expect(globMatches("*", "anything")).toBe(true);
     expect(globMatches("search_*", "search_logs")).toBe(true);
     expect(globMatches("search_*", "my_search_logs")).toBe(false);
@@ -82,7 +99,7 @@ describe("toolPicker", () => {
     const l = lists({ allowed: ["*"], blocked: ["create_monitor"], write: null });
     expect(toolState(l, create)).toBe("off");
     expect(toolState(l, search)).toBe("allowed");
-    // Without write_tools the gateway goes by readOnlyHint alone, as wipe_index declares it.
+    // Without write_tools the agent goes by readOnlyHint alone, as wipe_index declares it.
     expect(toolState(l, wipe)).toBe("allowed");
     expect(toolState(l, { name: "x" })).toBe("write");
     const next = setToolState(l, "create_monitor", "write");
@@ -101,7 +118,7 @@ describe("toolPicker", () => {
     expect(l).toEqual({
       allowed: ["search_logs", "create_monitor", "wipe_index"],
       blocked: null,
-      write: ["create_monitor", "wipe_index"],
+      write: null,
     });
     const kept = prefillFromDiscovery(lists({ allowed: ["search_logs"], write: [] }), tools);
     expect(kept).toEqual(lists({ allowed: ["search_logs"], write: [] }));
@@ -112,6 +129,56 @@ describe("toolPicker", () => {
       blocked: null,
       write: ["create_monitor"],
     });
+  });
+
+  it.each([[["*"]], [["search_*", "create_monitor"]]])(
+    "spells out no writes for the allowlist %j, whose globs match tools not seen yet",
+    (allowed) => {
+      const row = lists({ allowed, write: null });
+      expect(prefillFromDiscovery(row, tools)).toEqual(row);
+    },
+  );
+
+  it("keeps an unseen match of a glob refused once the admin sets a tool", () => {
+    const row = lists({
+      allowed: ["search_*", "create_monitor", "wipe_index", "gone_tool"],
+      write: null,
+    });
+    const set = setToolState(row, "create_monitor", "allowed", tools);
+    expect(set.write).toEqual(["search_*", "gone_tool"]);
+    expect(toolState(set, { name: "search_added_later", read_only_hint: true })).toBe("write");
+    expect(toolState(set, create)).toBe("allowed");
+    const writes = ["search_*", "create_monitor", "gone_tool", "wipe_index"];
+    expect(allowAll(row, tools).write).toEqual(writes);
+    expect(allowReadOnly(row, tools).write).toEqual(["search_*", "gone_tool"]);
+  });
+
+  it("adds a tool under its normalized name, never as a wildcard", () => {
+    const star = { name: "run*all" };
+    const on = setToolState(lists(), star.name, "write");
+    expect(on).toEqual({ allowed: ["run_all"], blocked: null, write: ["run_all"] });
+    expect(toolState(on, star)).toBe("write");
+    expect(toolState(on, { name: "run_x_all" })).toBe("off");
+    expect(setByGlob(on, star.name)).toBe(false);
+    expect(otherEntries(on, [star])).toEqual([]);
+    expect(setToolState(on, star.name, "off")).toEqual(lists());
+    const row = { allowed: null, blocked: null, write: null };
+    expect(prefillFromDiscovery(row, [star, { name: "a.b" }]).allowed).toEqual(["run_all", "a_b"]);
+    // A stored `run*all` is a wildcard, so it isn't the tool's own entry.
+    expect(setByGlob(lists({ allowed: ["run*all"] }), star.name)).toBe(true);
+    expect(otherEntries(lists({ allowed: ["run*all"] }), [star])).toHaveLength(1);
+  });
+
+  it("takes a stored vendor spelling as the tool's own entry", () => {
+    const dotted = { name: "update.monitor" };
+    const row = lists({ allowed: ["update.monitor"] });
+    expect(otherEntries(row, [dotted])).toEqual([]);
+    expect(setToolState(row, dotted.name, "write")).toEqual({
+      allowed: ["update.monitor"],
+      blocked: null,
+      write: ["update_monitor"],
+    });
+    expect(setToolState(row, dotted.name, "off").allowed).toEqual([]);
   });
 
   it("Allow all turns tagged tools on as can change things; Allow read-only only the rest", () => {
@@ -166,6 +233,27 @@ describe("toolPicker", () => {
       "restart_pod",
       "restart_pod",
     ]);
+  });
+
+  it.each([
+    ["no allowlist", null, ["*"]],
+    ["an explicit allowlist", ["search_logs", "create_monitor"], ["search_logs", "create_monitor"]],
+    ["a glob allowlist", ["get_*", "create_monitor"], ["get_*", "create_monitor"]],
+  ])("counts all that %s allows as writes when a tool is typed", (_label, allowed, writes) => {
+    const row = lists({ allowed, write: null });
+    const read = addTypedTool(row, "run_query", false);
+    expect(read.allowed).toEqual([...(allowed ?? []), "run_query"]);
+    expect(read.write).toEqual(writes);
+    expect(addTypedTool(row, "run_query", true).write).toEqual([...writes, "run_query"]);
+    // The second typed tool finds write_tools set and adds no more.
+    expect(addTypedTool(read, "other", false).write).toEqual(writes);
+  });
+
+  it("writes the state picked for a typed tool that was already allowed", () => {
+    const row = lists({ allowed: ["a", "b"], write: null });
+    expect(addTypedTool(row, "a", false).write).toEqual(["b"]);
+    expect(addTypedTool(row, "a", true).write).toEqual(["a", "b"]);
+    expect(addTypedTool(lists({ allowed: ["a"], write: [] }), "b", false).write).toEqual([]);
   });
 
   it("derives each list badge from the saved data", () => {

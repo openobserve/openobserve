@@ -1,5 +1,5 @@
 {
-  "revision": 1,
+  "revision": 2,
   "presets": [
     {
       "id": "datadog",
@@ -51,7 +51,7 @@
       "id": "dynatrace",
       "kind": "mcp",
       "label": "Dynatrace",
-      "revision": 1,
+      "revision": 2,
       "description": "Dynatrace: DQL over logs, metrics, spans and Smartscape, problems and entities.",
       "url_template": "https://{environment}.apps.dynatrace.com/platform-reserved/mcp-gateway/v0.1/servers/dynatrace-mcp/mcp",
       "params": [
@@ -60,7 +60,11 @@
       "headers": [
         {"name": "Authorization", "placeholder": "Bearer <platform token with read scopes only>"}
       ],
-      "help": "Use a platform token that holds only read scopes.",
+      "auth": {
+        "type": "oauth_client_credentials",
+        "token_url": "https://sso.dynatrace.com/sso/oauth2/token"
+      },
+      "help": "A platform token needs mcp-gateway:servers:invoke and mcp-gateway:servers:read plus the storage read scopes; without invoke the server answers 403. With an OAuth client, give the client the same scopes and leave the scope field empty to get all of them: a token with only the two mcp-gateway scopes lists tools but its queries fail.",
       "allowed_tools": [
         "execute-dql",
         "query-problems",
@@ -109,26 +113,6 @@
         {"tool": "list_alert_groups", "class": "context"},
         {"tool": "get_annotations", "class": "change"}
       ]
-    },
-    {
-      "id": "kubectl",
-      "kind": "cli",
-      "label": "kubectl",
-      "revision": 1,
-      "command": "kubectl",
-      "allowed_subcommands": ["get", "describe", "logs", "top"],
-      "env": [],
-      "credential_files": ["KUBECONFIG"]
-    },
-    {
-      "id": "gh",
-      "kind": "cli",
-      "label": "gh",
-      "revision": 1,
-      "command": "gh",
-      "allowed_subcommands": ["*"],
-      "env": ["GH_TOKEN"],
-      "credential_files": []
     }
   ]
 }

@@ -3274,11 +3274,7 @@ mod tests {
             started_at_us: 900,
             duration_ms: 41,
             error_type: None,
-            signal: signal_class(
-                "SearchSQL",
-                &input,
-                &config::meta::oncall::confidence::ToolClassMap::default(),
-            ),
+            signal: signal_class("SearchSQL", &input),
             target: evidence_target("SearchSQL", &input),
             observed: None,
             result_summary,

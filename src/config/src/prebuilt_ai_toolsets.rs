@@ -22,10 +22,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use utoipa::ToSchema;
 
-use crate::meta::oncall::confidence::{ToolClassRule, validate_tool_classes};
+use crate::{
+    meta::oncall::confidence::{ToolClassRule, validate_tool_classes},
+    utils::ssrf_guard::is_always_blocked_host,
+};
 
 const PRESETS_JSON: &str = include_str!("../../../config/prebuilt-ai-toolsets.json");
-const KINDS: [&str; 2] = ["mcp", "cli"];
+const KIND: &str = "mcp";
 const MAX_GLOB_CHARS: usize = 128;
 
 static PRESETS: LazyLock<PrebuiltAiToolsets> = LazyLock::new(|| load(PRESETS_JSON));
@@ -50,7 +53,7 @@ pub struct PrebuiltAiToolset {
 
 impl PrebuiltAiToolset {
     fn validate(&self) -> Result<(), String> {
-        if !KINDS.contains(&self.kind.as_str()) {
+        if self.kind != KIND {
             return Err(format!("unknown kind '{}'", self.kind));
         }
         for key in ["allowed_tools", "blocked_tools", "write_tools"] {
@@ -69,6 +72,11 @@ impl PrebuiltAiToolset {
                 .map_err(|e| format!("`tool_classes`: {e}"))?;
             validate_tool_classes(&rules)?;
         }
+        if let Some(auth) = self.fields.get("auth") {
+            let auth: PresetAuth =
+                serde_json::from_value(auth.clone()).map_err(|e| format!("`auth`: {e}"))?;
+            auth.validate()?;
+        }
         Ok(())
     }
 
@@ -76,6 +84,28 @@ impl PrebuiltAiToolset {
         match self.fields.get(key) {
             None => Ok(Vec::new()),
             Some(v) => serde_json::from_value(v.clone()).map_err(|e| format!("`{key}`: {e}")),
+        }
+    }
+}
+
+/// The credential type a preset offers next to its `headers`; it carries no secret.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PresetAuth {
+    #[serde(rename = "type")]
+    kind: String,
+    token_url: String,
+}
+
+impl PresetAuth {
+    fn validate(&self) -> Result<(), String> {
+        if self.kind != "oauth_client_credentials" {
+            return Err(format!("`auth` has unknown type '{}'", self.kind));
+        }
+        let url = url::Url::parse(&self.token_url).map_err(|e| format!("`auth.token_url`: {e}"))?;
+        match url.host_str() {
+            Some(host) if url.scheme() == "https" && !is_always_blocked_host(host) => Ok(()),
+            _ => Err("`auth.token_url` must be an https URL of a public host".to_string()),
         }
     }
 }
@@ -146,7 +176,42 @@ mod tests {
         let loaded = prebuilt_ai_toolsets();
         assert_eq!(loaded.presets.len(), file.presets.len());
         let ids: Vec<&str> = loaded.presets.iter().map(|p| p.id.as_str()).collect();
-        assert_eq!(ids, ["datadog", "dynatrace", "grafana", "kubectl", "gh"]);
+        assert_eq!(ids, ["datadog", "dynatrace", "grafana"]);
+        let dynatrace = &loaded.presets[1];
+        assert_eq!(dynatrace.revision, 2);
+        assert_eq!(
+            dynatrace.fields["auth"],
+            serde_json::json!({
+                "type": "oauth_client_credentials",
+                "token_url": "https://sso.dynatrace.com/sso/oauth2/token"
+            })
+        );
+        assert!(dynatrace.fields.contains_key("headers"));
+        assert!(!loaded.presets[0].fields.contains_key("auth"));
+    }
+
+    #[test]
+    fn a_preset_s_auth_is_checked_and_never_carries_a_secret() {
+        let preset = |auth: &str| {
+            let file = load(&format!(
+                r#"{{"revision": 1, "presets": [
+                    {{"id": "a", "kind": "mcp", "label": "A", "revision": 1, "auth": {auth}}}
+                ]}}"#
+            ));
+            file.presets.len()
+        };
+        let ok =
+            r#"{"type": "oauth_client_credentials", "token_url": "https://sso.example.com/t"}"#;
+        assert_eq!(preset(ok), 1);
+        for auth in [
+            r#"{"type": "headers", "token_url": "https://sso.example.com/t"}"#,
+            r#"{"type": "oauth_client_credentials"}"#,
+            r#"{"type": "oauth_client_credentials", "token_url": "http://sso.example.com/t"}"#,
+            r#"{"type": "oauth_client_credentials", "token_url": "https://127.0.0.1/t"}"#,
+            r#"{"type": "oauth_client_credentials", "token_url": "https://a.example/t", "client_secret": "s"}"#,
+        ] {
+            assert_eq!(preset(auth), 0, "{auth}");
+        }
     }
 
     #[test]
@@ -162,14 +227,15 @@ mod tests {
                 {"id": "e", "kind": "mcp", "revision": 1},
                 {"id": "f", "kind": "mcp", "label": "F", "revision": "2"},
                 "not an object",
-                {"id": "g", "kind": "cli", "label": "G", "revision": 1}
+                {"id": "g", "kind": "cli", "label": "G", "revision": 1},
+                {"id": "h", "kind": "mcp", "label": "H", "revision": 1}
             ]}"#,
         );
         assert_eq!(file.revision, 2);
         let ids: Vec<&str> = file.presets.iter().map(|p| p.id.as_str()).collect();
         assert_eq!(
             ids,
-            ["a", "g"],
+            ["a", "h"],
             "malformed siblings don't take valid entries with them"
         );
         assert!(load("not json").presets.is_empty());

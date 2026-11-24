@@ -56,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="status === 'failed'"
       role="alert"
       class="text-status-negative mb-2 text-xs"
+      data-o2-privacy="mask"
       data-test="ai-toolset-tools-error"
     >
       {{ t("aiToolset.toolsFailed", { message: error }) }}
@@ -193,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aria-label="t('common.delete')"
             variant="ghost-destructive"
             size="icon-xs-sq"
-            @click="update(removeEntry(lists, other))"
+            @click="emit('remove', other)"
           >
             <OIcon name="close" size="xs" />
           </OButton>
@@ -219,12 +220,12 @@ import {
   allowReadOnly,
   mayWrite,
   otherEntries,
-  removeEntry,
   setByGlob,
   setToolState,
   toolState,
   typedToolError,
   type DiscoveredTool,
+  type OtherEntry,
   type ToolLists,
   type ToolState,
 } from "./toolPicker";
@@ -240,6 +241,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (_e: "update:lists", _lists: ToolLists): void;
+  (_e: "remove", _entry: OtherEntry): void;
   (_e: "refresh"): void;
 }>();
 
@@ -268,7 +270,7 @@ const setState = (tool: DiscoveredTool, state: ToolState | undefined) => {
   if (!state) return;
   const current = toolState(props.lists, tool);
   const next = current === "off" && state === "allowed" && mayWrite(tool) ? "write" : state;
-  update(setToolState(props.lists, tool.name, next));
+  update(setToolState(props.lists, tool.name, next, props.tools ?? []));
 };
 
 const addTyped = () => {
