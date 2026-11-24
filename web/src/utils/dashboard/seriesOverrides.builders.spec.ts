@@ -364,9 +364,10 @@ describe.each(["pie", "donut"])("SQL %s", (type) => {
     const [api, web] = options.series[0].data;
     expect(api.name).toBe("api");
     expect(api.itemStyle.color).toBe(OVERRIDE_COLOR);
-    expect(api.label.formatter({ name: "api" })).toBe("66.7%");
     expect(web.label).toBeUndefined();
-    expect(options.series[0].label.formatter({ name: "web", percent: 33 })).toBe("33%");
+    const label = options.series[0].label.formatter;
+    expect(label({ name: "api", value: 600, percent: 67 })).toBe("66.7%");
+    expect(label({ name: "web", value: 300, percent: 34 })).toBe("33%");
     const html = options.tooltip.formatter({ marker: "", name: "api", value: 600 });
     expect(html).toContain(`${DISPLAY} : <b>${fmt(600, "bytes", 1)}</b>`);
     expect(options.tooltip.formatter({ marker: "", name: "web", value: 300 })).toContain(
@@ -377,13 +378,14 @@ describe.each(["pie", "donut"])("SQL %s", (type) => {
 
   it("recomputes the override label over the slices the legend still shows", async () => {
     const options = await runSQL(piePanel(overrides), [rows]);
+    const label = options.series[0].label.formatter;
     const api = options.series[0].data[0];
     expect(options.legend.selected).toEqual({});
-    expect(api.label.formatter({ name: "api" })).toBe("66.7%");
+    expect(label(api)).toBe("66.7%");
     options.legend.selected = { api: true, web: false };
-    expect(api.label.formatter({ name: "api" })).toBe("100.0%");
+    expect(label(api)).toBe("100.0%");
     options.legend.selected = {};
-    expect(api.label.formatter({ name: "api" })).toBe("66.7%");
+    expect(label(api)).toBe("66.7%");
   });
 
   it("multi-query: applies to the merged slices", async () => {
@@ -744,15 +746,15 @@ describe.each(["pie", "donut"])("PromQL %s", (type) => {
     const options = await runPromQL(promPanel(type, promOverrides), two());
     const api = options.series[0].data.find((d: any) => d.name === "api");
     expect(api.itemStyle.color).toBe(OVERRIDE_COLOR);
+    const label = options.series[0].label.formatter;
     const params = { name: "api", value: 1200, percent: 57 };
-    expect(api.label.formatter(params)).toBe(`${DISPLAY}: ${apiValue(1200)} (57.14%)`);
+    expect(label(params)).toBe(`${DISPLAY}: ${apiValue(1200)} (57.14%)`);
     options.legend.selected = { api: true, web: false };
-    expect(api.label.formatter(params)).toBe(`${DISPLAY}: ${apiValue(1200)} (100.00%)`);
+    expect(label(params)).toBe(`${DISPLAY}: ${apiValue(1200)} (100.00%)`);
+    options.legend.selected = {};
     const web = options.series[0].data.find((d: any) => d.name === "web");
     expect(web.label).toBeUndefined();
-    expect(options.series[0].label.formatter({ name: "web", value: 900, percent: 43 })).toBe(
-      `web: ${panelValue(900)} (43%)`,
-    );
+    expect(label({ name: "web", value: 900, percent: 43 })).toBe(`web: ${panelValue(900)} (43%)`);
     const html = options.tooltip.formatter({
       seriesName: "s",
       name: "api",

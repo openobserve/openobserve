@@ -9789,6 +9789,7 @@
       "seriesCapChipFallback": "數列受限",
       "seriesCapTitle": "已達數列上限",
       "seriesCapBody": "顯示 {total} 個數列中的 {shown} 個。圖表最多繪製 {cap} 個數列。",
+      "seriesCapBodyPerQuery": "顯示 {total} 個數列中的 {shown} 個。每個查詢最多繪製 {cap} 個數列。",
       "seriesCapBodyCapped": "顯示至少 {total} 個數列中的 {shown} 個。結果已受限於列數上限。",
       "seriesCapBodyPartial": "顯示至少 {total} 個數列中的 {shown} 個。伺服器返回部分結果。",
       "unmatchedRegionsChip": "{count} 個不在地圖上 | {count} 個不在地圖上",

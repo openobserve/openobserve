@@ -9794,6 +9794,7 @@
       "seriesCapChipFallback": "Series bị giới hạn",
       "seriesCapTitle": "Đã đạt giới hạn series",
       "seriesCapBody": "Đang hiển thị {shown} trong {total} series. Biểu đồ chỉ vẽ tối đa {cap} series.",
+      "seriesCapBodyPerQuery": "Đang hiển thị {shown} trong {total} series. Mỗi truy vấn chỉ vẽ tối đa {cap} series.",
       "seriesCapBodyCapped": "Đang hiển thị {shown} trong ít nhất {total} series. Kết quả đã bị giới hạn ở mức giới hạn số hàng.",
       "seriesCapBodyPartial": "Đang hiển thị {shown} trong ít nhất {total} series. Máy chủ đã trả về kết quả một phần.",
       "unmatchedRegionsChip": "{count} không có trên bản đồ | {count} không có trên bản đồ",

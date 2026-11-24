@@ -1334,6 +1334,7 @@ export default defineComponent({
           panelData,
           route.query.folder ?? "default",
           route.query.tab ?? data.panels[0]?.tabId,
+          { variableNames: [], newPanelId: panelId, sourcePanelId: data.id },
         );
 
         // Show a success notification.

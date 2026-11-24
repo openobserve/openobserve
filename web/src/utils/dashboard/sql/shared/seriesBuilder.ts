@@ -16,6 +16,7 @@
 import { getDataValue } from "../../aliasUtils";
 import { getSeriesColor, getAreaStyleOverride } from "../../colorPalette";
 import { getFieldLabel } from "../../fieldLabel";
+import { breakdownValueLabel } from "../../sqlProcessData";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 import { ANNOTATION_MARK_AREA_Z } from "@/utils/dashboard/constants";
 import { type SeriesObject } from "@/ts/interfaces/dashboard";
@@ -241,9 +242,7 @@ export function createSeriesBuilders(deps: SeriesDeps) {
         panelSchema.type == "h-stacked") &&
       panelSchema.queries[0].fields.breakdown?.length
     ) {
-      // Display "(empty)" for empty breakdown values instead of falling
-      // through to the y-axis label, which produces misleading legends
-      const displayKey = xAXisKey === "" ? "(empty)" : xAXisKey;
+      const displayKey = breakdownValueLabel(xAXisKey);
       return yAxisKeys.length === 1 ? displayKey : `${displayKey} (${label})`;
     }
 

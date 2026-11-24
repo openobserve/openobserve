@@ -9794,6 +9794,7 @@
       "seriesCapChipFallback": "Séries limitadas",
       "seriesCapTitle": "Limite de séries atingido",
       "seriesCapBody": "A mostrar {shown} de {total} séries. Um gráfico desenha no máximo {cap} séries.",
+      "seriesCapBodyPerQuery": "A mostrar {shown} de {total} séries. Cada consulta desenha no máximo {cap} séries.",
       "seriesCapBodyCapped": "A mostrar {shown} de pelo menos {total} séries. Os resultados foram limitados ao limite de linhas.",
       "seriesCapBodyPartial": "A mostrar {shown} de pelo menos {total} séries. O servidor devolveu resultados parciais.",
       "unmatchedRegionsChip": "{count} fora do mapa | {count} fora do mapa",

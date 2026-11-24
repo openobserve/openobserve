@@ -20,7 +20,7 @@ import { buildPieChartConfig } from "./shared/gridBuilder";
 import { createDistinctSeriesColor, getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { createSeriesOverrideLookup } from "../seriesOverrides";
-import { pieLegendPercentDecimals, piePercentPrecision } from "../legendConfiguration";
+import { createPieSlicePercent, piePercentPrecision } from "../legendConfiguration";
 
 /**
  * Converter for pie and donut charts
@@ -40,6 +40,7 @@ export class PieConverter implements PromQLChartConverter {
     const config = panelSchema.config || {};
     const seriesOverrides = createSeriesOverrideLookup(config);
     const percentDecimals = piePercentPrecision(config);
+    const slicePercent = createPieSlicePercent(config);
     const data: any[] = [];
 
     // Calculate min/max for color scaling
@@ -118,72 +119,65 @@ export class PieConverter implements PromQLChartConverter {
       chartType === "donut",
     );
 
-    const series = [
-      {
-        type: "pie",
+    const pieSeries: any = {
+      type: "pie",
 
-        // Dynamic radius based on available space and chart type
-        radius,
+      // Dynamic radius based on available space and chart type
+      radius,
 
-        data,
+      data,
 
-        percentPrecision: percentDecimals,
+      percentPrecision: percentDecimals,
 
-        emphasis: {
-          itemStyle: {
-            shadowBlur: 10,
-            shadowOffsetX: 0,
-            shadowColor: "rgba(0, 0, 0, 0.5)",
-          },
+      emphasis: {
+        itemStyle: {
+          shadowBlur: 10,
+          shadowOffsetX: 0,
+          shadowColor: "rgba(0, 0, 0, 0.5)",
         },
-
-        label: {
-          show: config.show_label !== false,
-          formatter: (params: any) => {
-            const name = seriesOverrides.displayName(params.name);
-            const unit = seriesOverrides.unitArgs(params.name);
-            // A slice with its own decimals gets its exact share from applySeriesOverrides, not ECharts' rounding.
-            const overrideDecimals = seriesOverrides.get(params.name)?.decimals;
-            const percent = params.percent.toFixed(
-              overrideDecimals === undefined
-                ? percentDecimals
-                : pieLegendPercentDecimals(overrideDecimals),
-            );
-            // Custom formatter with unit support
-            if (config.label_format) {
-              // If custom format is provided, use it with unit formatting
-              return config.label_format
-                .replace("{b}", name)
-                .replace(
-                  "{c}",
-                  formatUnitValue(
-                    getUnitValue(params.value, unit.unit, unit.unitCustom, unit.decimals),
-                  ),
-                )
-                .replace("{d}", percent);
-            }
-            // Default format: name: value (percentage%)
-            const unitValue = getUnitValue(params.value, unit.unit, unit.unitCustom, unit.decimals);
-            return `${name}: ${formatUnitValue(unitValue)} (${percent}%)`;
-          },
-          fontSize: config.label_font_size || 12,
-        },
-
-        labelLine: {
-          show: config.show_label_line !== false,
-        },
-
-        // hide colliding labels and skip sliver slices (e.g. 0-value modes)
-        labelLayout: { hideOverlap: true },
-        minShowLabelAngle: 3,
-
-        // Dynamic center position based on chart alignment
-        center,
-
-        // Keep the pie's layout box (sectors + labels) above a bottom legend
-        ...(bottom > 0 && { bottom }),
       },
-    ];
+
+      label: {
+        show: config.show_label !== false,
+        formatter: (params: any) => {
+          const name = seriesOverrides.displayName(params.name);
+          const unit = seriesOverrides.unitArgs(params.name);
+          const percent = slicePercent(pieSeries, params);
+          // Custom formatter with unit support
+          if (config.label_format) {
+            // If custom format is provided, use it with unit formatting
+            return config.label_format
+              .replace("{b}", name)
+              .replace(
+                "{c}",
+                formatUnitValue(
+                  getUnitValue(params.value, unit.unit, unit.unitCustom, unit.decimals),
+                ),
+              )
+              .replace("{d}", percent);
+          }
+          // Default format: name: value (percentage%)
+          const unitValue = getUnitValue(params.value, unit.unit, unit.unitCustom, unit.decimals);
+          return `${name}: ${formatUnitValue(unitValue)} (${percent}%)`;
+        },
+        fontSize: config.label_font_size || 12,
+      },
+
+      labelLine: {
+        show: config.show_label_line !== false,
+      },
+
+      // hide colliding labels and skip sliver slices (e.g. 0-value modes)
+      labelLayout: { hideOverlap: true },
+      minShowLabelAngle: 3,
+
+      // Dynamic center position based on chart alignment
+      center,
+
+      // Keep the pie's layout box (sectors + labels) above a bottom legend
+      ...(bottom > 0 && { bottom }),
+    };
+    const series = [pieSeries];
 
     const result = {
       series,

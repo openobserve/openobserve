@@ -9794,6 +9794,7 @@
       "seriesCapChipFallback": "Seri sınırlandı",
       "seriesCapTitle": "Seri sınırına ulaşıldı",
       "seriesCapBody": "{total} serinin {shown} tanesi gösteriliyor. Bir grafik en fazla {cap} seri çizer.",
+      "seriesCapBodyPerQuery": "{total} serinin {shown} tanesi gösteriliyor. Her sorgu en fazla {cap} seri çizer.",
       "seriesCapBodyCapped": "En az {total} serinin {shown} tanesi gösteriliyor. Sonuçlar satır sınırında kesildi.",
       "seriesCapBodyPartial": "En az {total} serinin {shown} tanesi gösteriliyor. Sunucu kısmi sonuçlar döndürdü.",
       "unmatchedRegionsChip": "{count} haritada değil | {count} haritada değil",

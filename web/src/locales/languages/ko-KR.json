@@ -9794,6 +9794,7 @@
       "seriesCapChipFallback": "시리즈 제한됨",
       "seriesCapTitle": "시리즈 한도에 도달함",
       "seriesCapBody": "{total}개 시리즈 중 {shown}개를 표시합니다. 차트는 최대 {cap}개 시리즈를 그립니다.",
+      "seriesCapBodyPerQuery": "{total}개 시리즈 중 {shown}개를 표시합니다. 각 쿼리는 최대 {cap}개 시리즈를 그립니다.",
       "seriesCapBodyCapped": "최소 {total}개 시리즈 중 {shown}개를 표시합니다. 결과가 행 한도에서 잘렸습니다.",
       "seriesCapBodyPartial": "최소 {total}개 시리즈 중 {shown}개를 표시합니다. 서버가 부분 결과를 반환했습니다.",
       "unmatchedRegionsChip": "{count}개가 지도에 없음 | {count}개가 지도에 없음",

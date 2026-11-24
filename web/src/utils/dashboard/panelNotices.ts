@@ -81,7 +81,12 @@ export const describeSeriesLimit = (
   if (!bound) {
     return {
       chipLabel: t("dashboard.panelErrorButtons.seriesCapChip", params),
-      body: t("dashboard.panelErrorButtons.seriesCapBody", params),
+      body: t(
+        limit.perQuery
+          ? "dashboard.panelErrorButtons.seriesCapBodyPerQuery"
+          : "dashboard.panelErrorButtons.seriesCapBody",
+        params,
+      ),
     };
   }
   return {
