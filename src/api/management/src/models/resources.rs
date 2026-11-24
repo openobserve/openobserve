@@ -33,9 +33,6 @@ impl SearchParams {
     pub fn into_query(self) -> Result<SearchQuery, &'static str> {
         let q = self.q.unwrap_or_default();
         let normalized = openobserve_core::resources::normalize(&q);
-        if normalized.chars().count() > 256 {
-            return Err("query exceeds 256 characters");
-        }
         let explicit = self.types.is_some();
         let types = match self.types {
             None => ResourceKind::ALL.into(),

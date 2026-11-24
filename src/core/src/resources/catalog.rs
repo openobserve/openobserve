@@ -33,6 +33,8 @@ const BUILD_TIMEOUT: Duration = Duration::from_secs(30);
 const IDLE: Duration = Duration::from_secs(15 * 60);
 // Builds of one entry start at least this far apart, so a burst of events costs one rebuild.
 const REBUILD_INTERVAL: Duration = Duration::from_secs(60);
+// An entry that never loaded retries sooner, so one source error does not hide a kind for a minute.
+const COLD_RETRY: Duration = Duration::from_secs(5);
 // Bounds how stale an entry gets when an event is lost.
 const MAX_AGE: Duration = Duration::from_secs(5 * 60);
 
@@ -369,8 +371,13 @@ impl Entry {
 
     fn due(&self, now: Instant) -> bool {
         let since = self.started.map(|started| now.duration_since(started));
+        let interval = if self.rows.is_some() {
+            REBUILD_INTERVAL
+        } else {
+            COLD_RETRY
+        };
         !self.building
-            && since.is_none_or(|since| since >= REBUILD_INTERVAL)
+            && since.is_none_or(|since| since >= interval)
             && (self.rows.is_none() || self.stale || since.is_some_and(|since| since >= MAX_AGE))
     }
 }
@@ -606,6 +613,14 @@ mod tests {
         ensure(&x.catalog, "cold").await;
         let result = x.catalog.read("cold", &[ResourceKind::Function]);
         assert!(matches!(result[0].1, Err(SourceReason::SourceUnavailable)));
+
+        x.fail.store(false, Ordering::Relaxed);
+        ensure(&x.catalog, "cold").await;
+        assert!(x.names("cold").is_empty());
+        x.age("cold", COLD_RETRY);
+        ensure(&x.catalog, "cold").await;
+        x.catalog.wait_idle().await;
+        assert_eq!(x.names("cold"), ["Old"]);
     }
 
     #[tokio::test]
@@ -646,17 +661,18 @@ mod tests {
 
     #[tokio::test]
     async fn capped_or_cancelled_scans_never_claim_complete() {
-        let x = fixture(vec![row("f1", "Old")]);
+        let x = fixture(vec![row("f1", "Old"), row("f2", "Older")]);
         ensure(&x.catalog, "org").await;
-        let mut capped = work(&x.catalog, "Old", 20, 0);
+        let mut capped = work(&x.catalog, "Old", 1, 0);
         capped.access[0].partial = true;
+        let source = &capped.execute().sources[0];
+        assert_eq!(source.status, SourceStatus::Partial);
+        assert_eq!(source.has_more, Some(true));
         let cancelled = work(&x.catalog, "none", 20, 0);
         cancelled.cancelled.cancel();
-        for work in [capped, cancelled] {
-            let source = &work.execute().sources[0];
-            assert_eq!(source.status, SourceStatus::Partial);
-            assert_eq!(source.has_more, None);
-        }
+        let source = &cancelled.execute().sources[0];
+        assert_eq!(source.status, SourceStatus::Partial);
+        assert_eq!(source.has_more, Some(false));
     }
 
     #[tokio::test]

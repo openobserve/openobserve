@@ -448,16 +448,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn resource_search_query_and_cursor_never_enter_url_logs() {
+    fn resource_search_query_and_offset_never_enter_url_logs() {
         for url in [
-            "/api/acme/resources/_search?q=private-name&cursor=private-cursor",
+            "/api/acme/resources/_search?q=private-name&offset=40",
             "https://observe.invalid/o2/api/acme/resources/_search?%71=private-name&q=other-name",
             "https://observe.invalid/web/search/resources?type=dashboard&q=private-name",
         ] {
             let masked = mask_log_url(url);
             assert!(masked.ends_with("?…"));
             assert!(!masked.contains("private-name"));
-            assert!(!masked.contains("private-cursor"));
+            assert!(!masked.contains("offset"));
             assert!(!masked.contains("other-name"));
         }
         let unrelated = "/api/acme/dashboards?title=overview";

@@ -116,7 +116,7 @@ impl SearchWork {
             } else {
                 SourceStatus::Complete
             },
-            has_more: (!partial).then_some(has_more),
+            has_more: Some(has_more),
             reason: None,
         });
         response.hits.extend(

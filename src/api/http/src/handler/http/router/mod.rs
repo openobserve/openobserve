@@ -3319,8 +3319,8 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[test]
-    fn resource_search_audit_omits_query_text_and_cursors() {
-        let uri: Uri = "/acme/resources/_search?%71=private-name&cursor=private-cursor"
+    fn resource_search_audit_omits_query_text_and_offset() {
+        let uri: Uri = "/acme/resources/_search?%71=private-name&offset=40"
             .parse()
             .unwrap();
         assert_eq!(resource_search_audit_query(&uri), "…");

@@ -96,7 +96,7 @@ export function useResourceSearch(input: {
         resourcesQuery(
           input.org.value,
           input.subject.value,
-          { ...params.value, types: failed, offset: undefined },
+          { ...params.value, types: failed },
           scope,
         ),
       );
