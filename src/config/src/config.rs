@@ -158,7 +158,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 157: add alert_incident_alerts.labels and severity, create alert_pair_verdicts, and delete
 //      service_streams rows named by the metric-name label that list no trace stream.
 // 159: delete org_ai_toolsets rows of the removed cli kind.
-// 160: add (org, updated_at) indexes the AutoObserve listener polls by.
+// 160: add (org, updated_at) indexes the AutoObserve listener polls by, and
+//      oncall_response_events.updated_at, its incremental on-call ledger read.
 pub const DB_SCHEMA_VERSION: u64 = 160;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 

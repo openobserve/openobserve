@@ -378,7 +378,14 @@ pub mod ids {
 /// The partition an org belongs to; changing it moves orgs, so it is pinned by a test.
 pub fn partition_of(org_id: &str, partitions: u32) -> u32 {
     let n = u64::from(partitions.max(1));
-    u32::try_from(stable_hash64(org_id.as_bytes()) % n).unwrap_or_default()
+    // FNV-1a's low bits see only each byte's low bits, so mix (murmur3 fmix64) before the modulo.
+    let mut h = stable_hash64(org_id.as_bytes());
+    h ^= h >> 33;
+    h = h.wrapping_mul(0xff51_afd7_ed55_8ccd);
+    h ^= h >> 33;
+    h = h.wrapping_mul(0xc4ce_b9fe_1a85_ec53);
+    h ^= h >> 33;
+    u32::try_from(h % n).unwrap_or_default()
 }
 
 /// FNV-1a 64: the same value in every process and build, unlike the std or gx hashers.
@@ -588,7 +595,14 @@ mod tests {
             .iter()
             .map(|o| partition_of(o, 32))
             .collect();
-        assert_eq!(pinned, [30, 19, 25]);
+        assert_eq!(pinned, [13, 28, 12]);
         assert_eq!(partition_of("default", 0), 0);
+        // Ids that differ only in each byte's high bits (here, letter case) still spread.
+        let cased: std::collections::BTreeSet<u32> =
+            ["acme", "Acme", "aCme", "acMe", "acmE", "ACME", "AcMe"]
+                .iter()
+                .map(|o| partition_of(o, 32))
+                .collect();
+        assert!(cased.len() > 3, "{cased:?}");
     }
 }

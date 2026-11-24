@@ -24,8 +24,8 @@ use config::{
     utils::time::now_micros,
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect, Select, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, JoinType,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Select, Set,
     sea_query::{Expr, ExprTrait, SimpleExpr},
 };
 
@@ -1440,6 +1440,7 @@ pub(super) async fn add_event_in<C: ConnectionTrait>(
         channel: Set(event.channel.map(|c| c.to_i32())),
         delivered: Set(event.delivered),
         templates: Set(templates_json(event)),
+        updated_at: Set(now_micros()),
     };
     let Err(e) = model.insert(conn).await else {
         return Ok(());
@@ -1488,6 +1489,10 @@ pub(super) async fn add_event_in<C: ConnectionTrait>(
         .col_expr(
             oncall_response_events::Column::Templates,
             Expr::value(templates_json(event)),
+        )
+        .col_expr(
+            oncall_response_events::Column::UpdatedAt,
+            Expr::value(now_micros()),
         )
         .filter(oncall_response_events::Column::ResponseId.eq(response_id))
         .filter(oncall_response_events::Column::LadderRun.eq(event.ladder_run))
@@ -1588,6 +1593,35 @@ pub async fn list_events_of_in<C: ConnectionTrait>(
         }));
     }
     Ok(events)
+}
+
+/// Events of every record, open or closed, written or rewritten since `since_us`, as
+/// `(record, org, change time, event)`: one range read on the change-time index.
+pub async fn list_events_changed_since_in<C: ConnectionTrait>(
+    conn: &C,
+    since_us: i64,
+) -> Result<Vec<(String, String, i64, ResponseEvent)>, errors::Error> {
+    let rows = oncall_response_events::Entity::find()
+        .join(
+            JoinType::InnerJoin,
+            oncall_response_events::Entity::belongs_to(oncall_responses::Entity)
+                .from(oncall_response_events::Column::ResponseId)
+                .to(oncall_responses::Column::Id)
+                .into(),
+        )
+        .filter(oncall_response_events::Column::UpdatedAt.gte(since_us))
+        .select_also(oncall_responses::Entity)
+        .order_by_asc(oncall_response_events::Column::At)
+        .order_by_asc(oncall_response_events::Column::Id)
+        .all(conn)
+        .await?;
+    Ok(rows
+        .into_iter()
+        .filter_map(|(m, record)| {
+            let (response_id, org, at) = (m.response_id.clone(), record?.org_id, m.updated_at);
+            to_event(m).map(|event| (response_id, org, at, event))
+        })
+        .collect())
 }
 
 /// Every page this record actually attempted, per person and per channel.
@@ -2353,6 +2387,7 @@ mod tests {
             channel: None,
             delivered: None,
             templates: None,
+            updated_at: 0,
         }
     }
 
@@ -2566,6 +2601,46 @@ mod tests {
             events,
             [("new".to_string(), page), ("new".to_string(), note)],
             "the ledger row the timeline hides is read too"
+        );
+        let delivery_key = sea_orm::sea_query::Index::create()
+            .table(oncall_response_events::Entity)
+            .name("idx_oncall_response_events_delivery")
+            .col(oncall_response_events::Column::ResponseId)
+            .col(oncall_response_events::Column::LadderRun)
+            .col(oncall_response_events::Column::RungMicros)
+            .col(oncall_response_events::Column::Recipient)
+            .col(oncall_response_events::Column::Channel)
+            .unique()
+            .take();
+        db.execute(backend.build(&delivery_key)).await.unwrap();
+        let delivery =
+            |at, delivered| ResponseEvent {
+                rung_micros: Some(0),
+                ladder_run: Some(1),
+                ..ResponseEvent::new(ResponseEventKind::Delivery, at, "o2-engine", "sent")
+                    .delivered_to("bo@o2.ai", Channel::Email, delivered)
+            };
+        add_event_in(&db, "new", &delivery(30, false))
+            .await
+            .unwrap();
+        let since = now_micros();
+        add_event_in(&db, "new", &delivery(5, true)).await.unwrap();
+        add_event_in(&db, "elsewhere", &delivery(40, true))
+            .await
+            .unwrap();
+        let changed = list_events_changed_since_in(&db, since).await.unwrap();
+        assert!(changed.iter().all(|(_, _, at, _)| *at >= since));
+        let changed: Vec<_> = changed
+            .into_iter()
+            .map(|(record, org, _, event)| (record, org, event))
+            .collect();
+        assert_eq!(
+            changed,
+            [
+                ("new".to_string(), "a".to_string(), delivery(5, true)),
+                ("elsewhere".to_string(), "c".to_string(), delivery(40, true)),
+            ],
+            "a rewrite stamped with an older event time is changed, in every org; untouched rows are not"
         );
     }
 

@@ -579,6 +579,7 @@ async fn put_event_in<C: ConnectionTrait>(
         channel: Set(channel),
         delivered: Set(event.delivered),
         templates: Set(super::oncall_responses::templates_json(event)),
+        updated_at: Set(config::utils::time::now_micros()),
     }
     .insert(conn)
     .await?;

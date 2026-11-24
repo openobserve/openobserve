@@ -24,6 +24,9 @@ use crate::{
     errors,
 };
 
+/// Bound on one `IN` list, well under every backend's parameter limit.
+const ORGS_PER_QUERY: usize = 500;
+
 /// A lease row its holder's transaction must still own, by the database clock, when it commits.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LeaseFence {
@@ -216,6 +219,24 @@ pub async fn list(org_id: &str, prefix: &str) -> Result<Vec<String>, errors::Err
     Ok(keys)
 }
 
+/// The orgs among `orgs` that hold `key`, read from the replica in bounded batches.
+pub async fn orgs_holding(orgs: &[String], key: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    let mut found = Vec::new();
+    for chunk in orgs.chunks(ORGS_PER_QUERY) {
+        let rows = Entity::find()
+            .filter(Column::OrgId.is_in(chunk.iter().map(String::as_str)))
+            .filter(Column::Key.eq(key))
+            .select_only()
+            .column(Column::OrgId)
+            .into_tuple::<String>()
+            .all(client)
+            .await?;
+        found.extend(rows);
+    }
+    Ok(found)
+}
+
 /// Every key of the org.
 pub async fn list_keys_by_org(org_id: &str) -> Result<Vec<String>, errors::Error> {
     let client = get_orm_client_ro().await;
@@ -337,18 +358,14 @@ pub async fn lease_rows(org_id: &str, prefix: &str) -> Result<Vec<LeaseRow>, err
     let backend = client.get_database_backend();
     let sql = format!(
         "SELECT \"key\", value, updated_at, {} AS now_us FROM kv_store \
-         WHERE org_id = ? AND \"key\" LIKE ?",
+         WHERE org_id = ? AND \"key\" LIKE ? ESCAPE '!'",
         db_now_sql(backend)
     );
-    let values = vec![org_id.into(), format!("{prefix}%").into()];
+    let values = vec![org_id.into(), format!("{}%", like_literal(prefix)).into()];
     let rows = client.query_all(statement(backend, &sql, values)?).await?;
     let mut leases = Vec::with_capacity(rows.len());
     for row in rows {
         let key: String = row.try_get("", "key")?;
-        // LIKE reads `_` as a wildcard, and reserved keys are full of them.
-        if !key.starts_with(prefix) {
-            continue;
-        }
         leases.push(LeaseRow {
             key,
             value: row.try_get("", "value")?,
@@ -359,11 +376,24 @@ pub async fn lease_rows(org_id: &str, prefix: &str) -> Result<Vec<LeaseRow>, err
     Ok(leases)
 }
 
-fn db_now_sql(backend: DatabaseBackend) -> &'static str {
+/// The database's clock in microseconds as SQL, for statements judged by it.
+pub fn db_now_sql(backend: DatabaseBackend) -> &'static str {
     match backend {
         DatabaseBackend::Postgres => "(extract(epoch from clock_timestamp()) * 1000000)::bigint",
         _ => "CAST((julianday('now') - 2440587.5) * 86400000000.0 AS INTEGER)",
     }
+}
+
+/// `text` as a LIKE pattern that matches only itself, with `!` as the escape character.
+fn like_literal(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        if matches!(c, '%' | '_' | '!') {
+            out.push('!');
+        }
+        out.push(c);
+    }
+    out
 }
 
 fn statement(
@@ -460,6 +490,24 @@ mod tests {
         );
         assert!(get(&org, "gone").await.unwrap().is_none());
         delete_by_org(&org).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn orgs_holding_names_only_the_orgs_with_that_key() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let base = crate::table::testing::unique("t_kv_hold");
+        let orgs: Vec<String> = (0..3).map(|i| format!("{base}_{i}")).collect();
+        set(&orgs[0], "_o2_ao/gap/x", b"{}").await.unwrap();
+        set(&orgs[1], "_o2_ao/gap/y", b"{}").await.unwrap();
+        set(&orgs[2], "_o2_ao/gap/x", b"{}").await.unwrap();
+        let mut held = orgs_holding(&orgs[..2], "_o2_ao/gap/x").await.unwrap();
+        held.sort();
+        for org in &orgs {
+            delete_by_org(org).await.unwrap();
+        }
+        assert_eq!(held, [orgs[0].clone()]);
     }
 
     const TTL: i64 = 30_000_000;
