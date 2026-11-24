@@ -110,9 +110,7 @@ const SECTION_LABEL_KEYS = {
 } as const satisfies Record<OrgSection, string>;
 
 // ── Virtualization ──────────────────────────────────────────────
-// One line per org: the name, with the id inline beside it only when it
-// differs from the name (an id equal to the name is redundant). Rows are a
-// uniform single line, so a fixed height is enough.
+// Headings are shorter than org rows, so estimateSize switches on row kind.
 const ROW_HEIGHT = 36;
 const HEADING_HEIGHT = 28;
 const scrollRef = ref<HTMLElement | null>(null);
