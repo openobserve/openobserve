@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import hostMetrics from "@/assets/dashboards/host_metrics.dashboard.json";
 import bundled from "@/assets/dashboards/kubernetes_overview.dashboard.json";
 
 import {
@@ -129,5 +130,24 @@ describe("the bundled Kubernetes dashboard", () => {
     expect(bundled.owner).toBe("");
     expect(dashboardStreams(bundled)).toContain("kube_node_info");
     expect(bundled.tabs).toHaveLength(1);
+  });
+});
+
+describe("the bundled Host Metrics dashboard", () => {
+  it("keeps its CPU, network and disk panels when the memory streams are missing", () => {
+    const needs = dashboardPanelNeeds(hostMetrics);
+    const fields = new Set(needs.flatMap((need) => [...need.fields]));
+    for (const variable of hostMetrics.variables.list) fields.add(variable.query_data.field);
+    const present = dashboardStreams(hostMetrics).filter((name) => !name.includes("memory"));
+    const fit = fitDashboard(hostMetrics, new Map(present.map((name) => [name, new Set(fields)])));
+
+    const read = dashboardPanelNeeds(fit.doc).flatMap((need) => [...need.streams]);
+    expect(read).toEqual(
+      expect.arrayContaining(["system_cpu_time", "system_network_io", "system_disk_io"]),
+    );
+    expect(read.some((name) => name.includes("memory"))).toBe(false);
+    expect(fit.doc.variables.list.map((variable: { name: string }) => variable.name)).toContain(
+      "host_name",
+    );
   });
 });
