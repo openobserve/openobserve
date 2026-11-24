@@ -503,7 +503,7 @@ pub(crate) async fn apply_redaction(
     _stream_name: &str,
     _payload: &mut [json::Map<String, json::Value>],
 ) {
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     {
         if config::meta::self_reporting::redaction::is_self_reporting_stream(
             _org_id,

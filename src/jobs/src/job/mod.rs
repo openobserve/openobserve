@@ -1680,7 +1680,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     {
         tokio::task::spawn(db::re_pattern::watch_patterns());
         tokio::task::spawn(db::re_pattern::watch_pattern_associations());

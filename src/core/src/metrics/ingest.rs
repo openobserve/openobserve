@@ -19,7 +19,7 @@ use std::{
     time::Instant,
 };
 
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 use config::TIMESTAMP_COL_NAME;
 use config::{
     get_config,
@@ -307,7 +307,7 @@ pub(super) async fn resolve_batch_schema<T>(
 }
 
 /// Redacts one stream's records; callers must run this before the series hash is computed.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 pub(super) async fn apply_redaction<T>(
     org_id: &str,
     stream_name: &str,

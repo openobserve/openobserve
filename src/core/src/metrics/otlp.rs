@@ -635,7 +635,7 @@ pub async fn handle_otlp_request(
 
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     for (local_metric_name, json_data) in json_data_by_stream {
-        #[cfg(feature = "vectorscan")]
+        #[cfg(feature = "enterprise")]
         let json_data = {
             let mut json_data = json_data;
             ingest::apply_redaction(org_id, &local_metric_name, &mut json_data).await;

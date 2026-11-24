@@ -20,10 +20,10 @@ use std::{
     sync::Arc,
 };
 
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 use config::meta::{search::RawStreams, sql::TableReferenceExt, stream::StreamType};
 use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, meta::search::SDR_REDACT_UDF_NAME};
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 use datafusion::common::TableReference;
 use datafusion::{
     common::{
@@ -48,7 +48,7 @@ use datafusion::{
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
     },
 };
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
 
 use crate::datafusion::udf::fulltext::match_all::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME};
@@ -81,7 +81,7 @@ impl PhysicalOptimizerRule for LiftRedaction {
 
 /// Columns of a stream whose index terms or values hold raw protected data; empty when the
 /// stream is unprotected or the pattern manager is not ready, which the scanning node rechecks.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 pub fn protected_columns(
     org_id: &str,
     stream_type: StreamType,
@@ -102,7 +102,7 @@ pub fn protected_columns(
 
 /// Part of a cache key: results are stored redacted, so a pattern change must miss them. `None`
 /// when no stream read is redacted; a raw stream reads like an unprotected one and shares its key.
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 pub fn redaction_digest(
     org_id: &str,
     stream_type: StreamType,
@@ -607,7 +607,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_digest_separates_raw_and_redacted_readers() {
         use config::meta::{search::RawStreams, stream::StreamType};

@@ -25,7 +25,7 @@ pub mod utils;
 
 use std::{collections::HashMap, sync::Arc};
 
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 use config::meta::sql::TableReferenceExt;
 use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, datafusion::request::Request};
 use datafusion::{
@@ -78,7 +78,7 @@ use infra::schema::get_stream_setting_index_fields;
 
 #[cfg(feature = "enterprise")]
 use crate::datafusion::optimizer::cipher::{RewriteCipherCall, RewriteCipherKey};
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 use crate::datafusion::physical_optimizer::sdr_redact::protected_columns;
 use crate::{
     datafusion::{
@@ -329,7 +329,7 @@ fn stream_index_fields(sql: &Sql) -> HashMap<TableReference, HashSet<String>> {
             .filter(|index_field| schema.contains_field(index_field))
             .collect::<HashSet<_>>();
         // Keeps leader planning in line with the scan: the follower never indexes a redacted field.
-        #[cfg(feature = "vectorscan")]
+        #[cfg(feature = "enterprise")]
         let idx_fields = {
             let stream_type = stream_name.get_stream_type(sql.stream_type);
             let name = stream_name.stream_name();

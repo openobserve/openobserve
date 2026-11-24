@@ -16,11 +16,6 @@ enterprise = [
     "search/enterprise",
     "usage_reporting/enterprise",
 ]
-vectorscan = [
-    "dep:o2_enterprise",
-    "o2_enterprise/vectorscan",
-    "search/vectorscan",
-]
 
 [dependencies]
 anyhow.workspace = true
