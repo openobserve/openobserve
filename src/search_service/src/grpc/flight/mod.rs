@@ -24,7 +24,10 @@ use ::datafusion::{physical_plan::ExecutionPlan, prelude::SessionContext};
 use config::{
     cluster::LOCAL_NODE,
     datafusion::request::FlightSearchRequest,
-    meta::{search::ScanStats, sql::TableReferenceExt},
+    meta::{
+        search::{RawStreams, ScanStats},
+        sql::TableReferenceExt,
+    },
 };
 use infra::errors::Error;
 
@@ -46,11 +49,15 @@ pub async fn search(
 ) -> Result<(SessionContext, Arc<dyn ExecutionPlan>, ScanStats), Error> {
     log::info!("[trace_id {trace_id}] flight->search: start");
     let (ctx, physical_plan, source) = decode_plan(trace_id, req).await?;
+    let stream_name = source.stream.stream_name();
+    // A missing list, e.g. from an older leader, leaves the stream redacted.
+    let raw = RawStreams::from(req.raw_streams.clone()).contains(source.stream_type, &stream_name);
     let redaction = ScanRedaction::load(
         &req.query_identifier.org_id,
         source.stream_type,
-        &source.stream.stream_name(),
+        &stream_name,
         &source.schema,
+        raw,
     )
     .await?;
     let mut settings = StreamSearchSettings::load(req, &source).await;

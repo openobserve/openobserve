@@ -606,6 +606,7 @@ impl QueryConditionExt for QueryCondition {
                 clear_cache: false,
                 local_mode: None,
                 agent_options: None,
+                raw_streams: None,
             };
             log::debug!(
                 "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search, {req:?}"
@@ -924,6 +925,7 @@ async fn run_alert_count_query(
         clear_cache: false,
         local_mode: None,
         agent_options: None,
+        raw_streams: None,
     };
     let resp = SearchService::grpc_search::grpc_search(
         trace_id,
