@@ -165,7 +165,7 @@ describe("MetricsVisualize", () => {
     expect(panelData.current.layout.showQueryBar).toBe(true);
   });
 
-  it("does not restrict chart types — matches AddPanel (ChartSelection's PromQL rules govern)", async () => {
+  it("does not restrict chart types — matches AddPanel (the chart catalogue's PromQL rules govern)", async () => {
     // The pane used to pass a narrow allowedChartTypes list, disabling stacked,
     // gauge, pie, heatmap, etc. AddPanel passes none; the metrics pane must not
     // silently drop chart types the dashboard offers for the same PromQL panel.

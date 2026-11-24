@@ -21,7 +21,7 @@ import { getDefaultDashboardPanelData } from "@/composables/dashboard/useDashboa
 import { b64EncodeUnicode, b64DecodeUnicodeSafe } from "@/utils/zincutils";
 import type { ParamDescriptor } from "@/utils/url/deepLinkParams";
 
-// valid panel chart types (ChartSelection.vue ids); unknown -> ignored
+// valid panel chart types (chartTypeCatalog.ts ids); unknown -> ignored
 const VALID_CHART_TYPES = new Set<string>([
   "area",
   "area-stacked",

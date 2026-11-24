@@ -189,7 +189,7 @@ test.describe("VRL visualization support testcases", () => {
     await expect(tablePanel).toBeVisible({ timeout: 10000 });
 
     // Switch to line chart (now allowed with new behavior)
-    await pm.logsVisualise.getChartTypeItem("line").click();
+    await (await pm.logsVisualise.openChartTypeList("line")).click();
 
     // Wait for VRL warning banner to appear
     const vrlWarningBanner = pm.logsVisualise.getVrlWarningBanner();
@@ -227,7 +227,7 @@ test.describe("VRL visualization support testcases", () => {
     const chartTypes = ["line", "bar", "area", "scatter"];
 
     for (const chartType of chartTypes) {
-      await pm.logsVisualise.getChartTypeItem(chartType).click();
+      await (await pm.logsVisualise.openChartTypeList(chartType)).click();
 
       // Wait for VRL warning banner to appear
       const vrlWarningBanner = pm.logsVisualise.getVrlWarningBanner();
@@ -237,7 +237,7 @@ test.describe("VRL visualization support testcases", () => {
       await pm.logsVisualise.verifyChartTypeSelected(page, chartType, true);
 
       // Switch back to table for next iteration
-      await pm.logsVisualise.getChartTypeItem("table").click();
+      await (await pm.logsVisualise.openChartTypeList("table")).click();
       // Wait for table to be selected
       await pm.logsVisualise.verifyChartTypeSelected(page, "table", true);
     }
@@ -554,7 +554,7 @@ test.describe("VRL visualization support testcases", () => {
     await expect(tablePanel).toBeVisible({ timeout: 10000 });
 
     // Click table chart - should NOT show VRL warning
-    await pm.logsVisualise.getChartTypeItem("table").click();
+    await (await pm.logsVisualise.openChartTypeList("table")).click();
 
     // Wait for table to be selected
     await pm.logsVisualise.verifyChartTypeSelected(page, "table", true);
@@ -568,7 +568,7 @@ test.describe("VRL visualization support testcases", () => {
     await expect(tablePanel).toBeVisible({ timeout: 5000 });
 
     // NEW BEHAVIOR: Switch to line chart - should show VRL warning and allow switching
-    await pm.logsVisualise.getChartTypeItem("line").click();
+    await (await pm.logsVisualise.openChartTypeList("line")).click();
 
     // Wait for VRL warning banner to appear
     await expect(vrlWarningBanner).toBeVisible({ timeout: 5000 });
@@ -697,18 +697,16 @@ test.describe("VRL visualization support testcases", () => {
     // await waitForTableData(page);
 
     // Try to switch to h-bar chart
-    const hbarChart = pm.logsVisualise.getChartTypeItem("h-bar");
-    if (await hbarChart.isVisible().catch(() => false)) {
-      await hbarChart.click();
+    // h-bar is always listed, so the switch runs unconditionally instead of skipping on a closed list.
+    await (await pm.logsVisualise.openChartTypeList("h-bar")).click();
 
-      // Wait for VRL warning banner to appear
-      const vrlWarningBanner = pm.logsVisualise.getVrlWarningBanner();
-      const isWarningVisible = await vrlWarningBanner.isVisible({ timeout: 5000 }).catch(() => false);
-      expect(isWarningVisible).toBe(true);
+    // Wait for VRL warning banner to appear
+    const vrlWarningBanner = pm.logsVisualise.getVrlWarningBanner();
+    const isWarningVisible = await vrlWarningBanner.isVisible({ timeout: 5000 }).catch(() => false);
+    expect(isWarningVisible).toBe(true);
 
-      // NEW BEHAVIOR: Chart switching is allowed - h-bar should be selected
-      await pm.logsVisualise.verifyChartTypeSelected(page, "h-bar", true);
-    }
+    // NEW BEHAVIOR: Chart switching is allowed - h-bar should be selected
+    await pm.logsVisualise.verifyChartTypeSelected(page, "h-bar", true);
   });
 
   test("[P1] Should handle VRL with aggregation query and show warning when switching charts", async ({
@@ -745,7 +743,7 @@ test.describe("VRL visualization support testcases", () => {
     await expect(tableRows).not.toHaveCount(0, { timeout: 15000 });
 
     // NEW BEHAVIOR: Switch to bar chart - should show VRL warning and allow switching
-    await pm.logsVisualise.getChartTypeItem("bar").click();
+    await (await pm.logsVisualise.openChartTypeList("bar")).click();
 
     // Wait for VRL warning banner to appear
     const vrlWarningBanner = pm.logsVisualise.getVrlWarningBanner();
@@ -773,7 +771,7 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.verifyChartRenders(page);
 
     // Try to switch to bar chart - should NOT show VRL error
-    await pm.logsVisualise.getChartTypeItem("bar").click();
+    await (await pm.logsVisualise.openChartTypeList("bar")).click();
 
     // Wait for bar chart to be selected
     await pm.logsVisualise.verifyChartTypeSelected(page, "bar", true);

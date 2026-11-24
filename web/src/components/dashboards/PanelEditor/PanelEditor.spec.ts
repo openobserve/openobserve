@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { flushPromises, shallowMount } from "@vue/test-utils";
-import { ref, reactive, nextTick } from "vue";
+import { ref, reactive, nextTick, computed } from "vue";
 import { createI18n } from "vue-i18n";
 import PanelEditor from "./PanelEditor.vue";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
 import { resolveConfig } from "./types/panelEditor";
+import ChartTypePicker from "@/components/dashboards/addPanel/ChartTypePicker.vue";
+import ChartTypeSelect from "@/components/dashboards/addPanel/ChartTypeSelect.vue";
+import CollapsedChartTypeButton from "@/components/dashboards/addPanel/CollapsedChartTypeButton.vue";
 
 // Mock vuex store
 const mockStore = {
@@ -83,13 +86,14 @@ const mockDashboardPanelData = reactive({
 
 const mockMakeAutoSQLQuery = vi.fn(async () => undefined);
 const mockRegenerateOtherBuilderQueries = vi.fn();
+const mockResetAggregationFunction = vi.fn();
 
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
     dashboardPanelData: mockDashboardPanelData,
     makeAutoSQLQuery: mockMakeAutoSQLQuery,
     regenerateOtherBuilderQueries: mockRegenerateOtherBuilderQueries,
-    resetAggregationFunction: vi.fn(),
+    resetAggregationFunction: mockResetAggregationFunction,
     resetDashboardPanelData: vi.fn(),
     updateGroupedFields: vi.fn(),
   }),
@@ -101,6 +105,22 @@ const mockShowLegendsDialog = ref(false);
 const mockNoticeProps = ref<Record<string, unknown>>({});
 const mockRunQuery = vi.fn();
 const mockHandleChartApiError = vi.fn();
+// Mirrors the real toggle so the editor's own open/close paths can be followed.
+const mockCollapseFieldList = vi.fn(() => {
+  mockDashboardPanelData.layout.showFieldList = !mockDashboardPanelData.layout.showFieldList;
+  mockDashboardPanelData.layout.splitter = mockDashboardPanelData.layout.showFieldList ? 20 : 0;
+});
+const mockIsMobile = ref(false);
+
+vi.mock("@/composables/useBreakpoint", () => ({
+  default: () => ({
+    isMobile: computed(() => mockIsMobile.value),
+    isTablet: computed(() => false),
+    isDesktop: computed(() => !mockIsMobile.value),
+    mdUp: computed(() => !mockIsMobile.value),
+    lgUp: computed(() => !mockIsMobile.value),
+  }),
+}));
 
 // Mock usePanelEditor composable
 vi.mock("./composables/usePanelEditor", () => ({
@@ -140,7 +160,7 @@ vi.mock("./composables/usePanelEditor", () => ({
     handleResultMetadataUpdate: vi.fn(),
     metaDataValue: vi.fn(),
     seriesDataUpdate: vi.fn(),
-    collapseFieldList: vi.fn(),
+    collapseFieldList: mockCollapseFieldList,
     layoutSplitterUpdated: vi.fn(),
     updateVrlFunctionFieldList: vi.fn(),
     onDataZoom: vi.fn().mockReturnValue({ start: new Date(), end: new Date() }),
@@ -170,16 +190,11 @@ vi.mock("./types/panelEditor", async (importOriginal) => {
 });
 
 // Mock child components
-vi.mock("@/components/dashboards/addPanel/ChartSelection.vue", () => ({
-  default: {
-    name: "ChartSelection",
-    template: '<div class="chart-selection-mock">ChartSelection</div>',
-  },
-}));
-
 vi.mock("@/components/dashboards/addPanel/PanelFieldList.vue", () => ({
   default: {
     name: "PanelFieldList",
+    props: ["chartTypeListOpen", "allowedChartTypes", "editMode", "frameless"],
+    emits: ["collapse", "update:chartTypeListOpen", "selectChartType"],
     template: '<div class="field-list-mock">FieldList</div>',
   },
 }));
@@ -417,6 +432,119 @@ describe("PanelEditor.vue", () => {
       wrapper.unmount();
     }
     vi.clearAllMocks();
+  });
+
+  describe("chart type picker", () => {
+    const mountEditor = (
+      props: Record<string, unknown> = {},
+      global: Record<string, unknown> = {},
+    ) =>
+      shallowMount(PanelEditor, {
+        props: { pageType: "dashboard", ...props },
+        global: { ...mountGlobal, ...global },
+      });
+
+    afterEach(() => {
+      mockIsMobile.value = false;
+    });
+
+    it("has no chart-type rail; the Fields column carries the picker", () => {
+      wrapper = mountEditor({ allowedChartTypes: ["line", "bar"] });
+      expect(wrapper.find('[data-test="dashboard-addpanel-chart-selection-item"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="panel-editor-chart-type-column"]').exists()).toBe(false);
+      const fieldList = wrapper.findComponent({ name: "PanelFieldList" });
+      expect(fieldList.props("allowedChartTypes")).toEqual(["line", "bar"]);
+      expect(fieldList.props("chartTypeListOpen")).toBe(false);
+    });
+
+    it("sets the panel type and resets aggregations on a pick, then closes the list", async () => {
+      wrapper = mountEditor();
+      const fieldList = wrapper.findComponent({ name: "PanelFieldList" });
+      fieldList.vm.$emit("update:chartTypeListOpen", true);
+      await nextTick();
+      expect(fieldList.props("chartTypeListOpen")).toBe(true);
+
+      fieldList.vm.$emit("selectChartType", "pie");
+      await nextTick();
+      expect(mockDashboardPanelData.data.type).toBe("pie");
+      expect(mockResetAggregationFunction).toHaveBeenCalledTimes(1);
+      expect(wrapper.findComponent({ name: "PanelFieldList" }).props("chartTypeListOpen")).toBe(
+        false,
+      );
+    });
+
+    it.each(["html", "markdown", "alert-list"])(
+      "gives %s a slim column holding only the chart type picker",
+      async (type) => {
+        mockDashboardPanelData.data.type = type;
+        wrapper = mountEditor({ allowedChartTypes: ["html"] });
+        await nextTick();
+        const column = wrapper.find('[data-test="panel-editor-chart-type-column"]');
+        expect(column.exists()).toBe(true);
+        expect(column.classes()).toContain("w-1/5");
+        const picker = wrapper.findComponent(ChartTypePicker);
+        expect(picker.props("chartType")).toBe(type);
+        expect(picker.props("allowedChartTypes")).toEqual(["html"]);
+        expect(wrapper.findComponent({ name: "PanelFieldList" }).exists()).toBe(false);
+
+        picker.vm.$emit("update:open", true);
+        await nextTick();
+        expect(wrapper.findComponent(ChartTypePicker).props("open")).toBe(true);
+        picker.vm.$emit("select", "line");
+        await nextTick();
+        expect(mockDashboardPanelData.data.type).toBe("line");
+        expect(mockResetAggregationFunction).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it("puts the chart icon on the collapsed Fields bar; it opens Fields with the list showing", async () => {
+      mockDashboardPanelData.layout.showFieldList = false;
+      wrapper = mountEditor();
+      const icon = wrapper.findComponent(CollapsedChartTypeButton);
+      expect(icon.props("chartType")).toBe("line");
+
+      icon.vm.$emit("click", new MouseEvent("click"));
+      await nextTick();
+      expect(mockCollapseFieldList).toHaveBeenCalledTimes(1);
+      expect(mockDashboardPanelData.layout.showFieldList).toBe(true);
+      expect(wrapper.findComponent({ name: "PanelFieldList" }).props("chartTypeListOpen")).toBe(
+        true,
+      );
+    });
+
+    it("closes the list when Fields collapses, so reopening shows the fields", async () => {
+      wrapper = mountEditor();
+      wrapper.findComponent({ name: "PanelFieldList" }).vm.$emit("update:chartTypeListOpen", true);
+      await nextTick();
+      mockDashboardPanelData.layout.showFieldList = false;
+      await nextTick();
+      mockDashboardPanelData.layout.showFieldList = true;
+      await nextTick();
+      expect(wrapper.findComponent({ name: "PanelFieldList" }).props("chartTypeListOpen")).toBe(
+        false,
+      );
+    });
+
+    it("on a phone, puts the select beside Fields and opens the drawer on the list", async () => {
+      mockIsMobile.value = true;
+      wrapper = mountEditor({}, { renderStubDefaultSlot: true });
+      await nextTick();
+      const row = wrapper.find('[data-drawer-anchor="panel-editor-fields"]');
+      expect(row.find('[data-test="panel-editor-mobile-fields-btn"]').exists()).toBe(true);
+      const select = wrapper.findComponent(ChartTypeSelect);
+      expect(row.element.contains(select.element)).toBe(true);
+      expect(select.props("expanded")).toBe(false);
+
+      select.vm.$emit("toggle");
+      await nextTick();
+      expect(wrapper.findComponent({ name: "ODrawer" }).props("open")).toBe(true);
+      expect(wrapper.findComponent({ name: "PanelFieldList" }).props("chartTypeListOpen")).toBe(
+        true,
+      );
+      expect(wrapper.findComponent(ChartTypeSelect).props("expanded")).toBe(true);
+    });
   });
 
   describe("chart toolbar", () => {

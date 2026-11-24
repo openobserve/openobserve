@@ -17,389 +17,398 @@
         @click="emit('collapse')"
       />
     </div>
-    <OFieldList
-      ref="fieldListRef"
+    <ChartTypePicker
       class="min-h-0 flex-1"
-      :fields="flattenGroupedFields"
-      :loading="fieldsLoading"
-      :search="dashboardPanelData.meta.stream.filterField"
-      :search-placeholder="t('search.searchField')"
-      :page-size="250"
-      :page-size-options="[250]"
-      :show-pagination="true"
-      :current-page="currentPage"
-      row-key="_uid"
-      :draggable="!hideAllFieldsSelection && !promqlMode"
-      :drag-enabled-fn="isRowDragEnabled"
-      :sort-fn="sortFieldsFn"
-      @update:search="onSearchChange"
-      @update:current-page="currentPage = $event"
-      @drag-start="onDragStart"
-      @drag-end="onDragEnd"
+      :chart-type="dashboardPanelData.data.type"
+      :open="chartTypeListOpen"
+      :allowed-chart-types="allowedChartTypes"
+      @update:open="emit('update:chartTypeListOpen', $event)"
+      @select="emit('selectChartType', $event)"
     >
-      <!-- Stream selectors -->
-      <template #before-list>
-        <div class="px-page-edge">
-          <OSelect
-            v-if="dashboardPanelDataPageKey !== 'metrics'"
-            :model-value="currentStreamType"
-            :label="t('dashboard.selectStreamType')"
-            :options="streamTypeOptions"
-            data-test="index-dropdown-stream_type"
-            class="mb-1"
-            label-position="inside"
-            :disabled="dashboardPanelDataPageKey === 'logs'"
-            @update:model-value="onStreamTypeChange"
-          />
-          <!-- Metric type as a LETTER (C/G/H/S/O), not a glyph. The `badge`
+      <OFieldList
+        ref="fieldListRef"
+        class="min-h-0 flex-1"
+        :fields="flattenGroupedFields"
+        :loading="fieldsLoading"
+        :search="dashboardPanelData.meta.stream.filterField"
+        :search-placeholder="t('search.searchField')"
+        :page-size="250"
+        :page-size-options="[250]"
+        :show-pagination="true"
+        :current-page="currentPage"
+        row-key="_uid"
+        :draggable="!hideAllFieldsSelection && !promqlMode"
+        :drag-enabled-fn="isRowDragEnabled"
+        :sort-fn="sortFieldsFn"
+        @update:search="onSearchChange"
+        @update:current-page="currentPage = $event"
+        @drag-start="onDragStart"
+        @drag-end="onDragEnd"
+      >
+        <!-- Stream selectors -->
+        <template #before-list>
+          <div class="px-page-edge">
+            <OSelect
+              v-if="dashboardPanelDataPageKey !== 'metrics'"
+              :model-value="currentStreamType"
+              :label="t('dashboard.selectStreamType')"
+              :options="streamTypeOptions"
+              data-test="index-dropdown-stream_type"
+              class="mb-1"
+              label-position="inside"
+              :disabled="dashboardPanelDataPageKey === 'logs'"
+              @update:model-value="onStreamTypeChange"
+            />
+            <!-- Metric type as a LETTER (C/G/H/S/O), not a glyph. The `badge`
                renders inline beside the name and costs no row height. -->
-          <OSelect
-            :model-value="currentStream"
-            :label="t('dashboard.selectIndex')"
-            :options="streamOptions"
-            data-test="index-dropdown-stream"
-            :loading="streamListLoading"
-            label-key="name"
-            value-key="name"
-            searchable
-            label-position="inside"
-            :disabled="dashboardPanelDataPageKey === 'logs'"
-            option-tooltip
-            @search="onStreamSearch"
-            @update:model-value="onStreamChange"
-          />
-        </div>
-      </template>
-
-      <!-- Group header -->
-      <template #group-header="{ row }">
-        <div
-          class="-ms-page-edge px-page-edge bg-section-header-bg text-text-secondary flex h-7! w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-default items-center justify-between text-xs font-semibold select-none"
-        >
-          <OTruncatedText as="div" class="flex-1">{{ row.groupName }}</OTruncatedText>
-        </div>
-      </template>
-
-      <!-- Field row -->
-      <template #field-row="{ row, draggable, isDragEnabled, armDrag }">
-        <OFieldRow>
-          <OIcon
-            v-if="draggable"
-            name="drag-indicator"
-            size="sm"
-            @mousedown="armDrag()"
-            :class="[
-              'o-field-list__drag-icon text-field-list-drag-icon',
-              isDragEnabled
-                ? 'o-field-list__drag-icon--enabled cursor-grab'
-                : 'o-field-list__drag-icon--disabled cursor-not-allowed opacity-40',
-            ]"
-            data-test="o-field-list-drag-indicator"
-          />
-          <OFieldLabel :field="row" :show-type-icon="true" />
-
-          <!-- Field actions -->
-          <template #actions>
-            <!-- Standard chart actions -->
-            <div v-if="showStandardActions(row)" class="flex items-center gap-0.5">
-              <OButton
-                variant="ghost-neutral"
-                size="chip"
-                :disabled="isAddXAxisNotAllowed"
-                data-test="dashboard-add-x-data"
-                @click.stop="addXAxisItem(row)"
-              >
-                {{ dashboardPanelData.data.type != "h-bar" ? raw("+X") : raw("+Y") }}
-              </OButton>
-              <OButton
-                variant="ghost-neutral"
-                size="chip"
-                :disabled="isAddYAxisNotAllowed"
-                data-test="dashboard-add-y-data"
-                @click.stop="addYAxisItem(row)"
-              >
-                {{ dashboardPanelData.data.type != "h-bar" ? raw("+Y") : raw("+X") }}
-              </OButton>
-              <OButton
-                v-if="dashboardPanelData.data.type == 'table'"
-                variant="ghost-neutral"
-                size="chip"
-                :disabled="isAddBreakdownNotAllowed"
-                data-test="dashboard-add-p-data"
-                @click.stop="addBreakDownAxisItem(row)"
-              >
-                {{ t("panel.addPivotShort") }}
-              </OButton>
-              <OButton
-                v-if="
-                  dashboardPanelData.data.type == 'area' ||
-                  dashboardPanelData.data.type == 'bar' ||
-                  dashboardPanelData.data.type == 'line' ||
-                  dashboardPanelData.data.type == 'h-bar' ||
-                  dashboardPanelData.data.type == 'h-stacked' ||
-                  dashboardPanelData.data.type == 'scatter' ||
-                  dashboardPanelData.data.type == 'area-stacked' ||
-                  dashboardPanelData.data.type == 'stacked' ||
-                  dashboardPanelData.data.type == 'state-timeline' ||
-                  dashboardPanelData.data.type == 'distribution' ||
-                  dashboardPanelData.data.type == 'treemap' ||
-                  dashboardPanelData.data.type == 'sunburst' ||
-                  dashboardPanelData.data.type == 'hostmap'
-                "
-                variant="ghost-neutral"
-                size="chip"
-                :disabled="isAddBreakdownNotAllowed"
-                data-test="dashboard-add-b-data"
-                @click.stop="addBreakDownAxisItem(row)"
-              >
-                {{ t("panel.addBreakdownShort") }}
-              </OButton>
-              <OButton
-                v-if="dashboardPanelData.data.type == 'heatmap'"
-                variant="ghost-neutral"
-                size="chip"
-                :disabled="isAddZAxisNotAllowed"
-                data-test="dashboard-add-z-data"
-                @click.stop="addZAxisItem(row)"
-              >
-                {{ t("panel.addZAxisShort") }}
-              </OButton>
-              <OButton
-                v-if="
-                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                    .customQuery == false
-                "
-                variant="ghost-neutral"
-                size="chip"
-                :disabled="
-                  !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
-                    (vrlField: any) => vrlField.name == row.name,
-                  )
-                "
-                data-test="dashboard-add-filter-data"
-                @click.stop="addFilteredItem(row as { name: string; stream: string })"
-              >
-                {{ t("panel.addFilterShort") }}
-              </OButton>
-            </div>
-
-            <!-- Geomap actions -->
-            <div v-if="showGeomapActions(row)" class="flex items-center gap-0.5">
-              <OButton
-                variant="ghost-neutral"
-                size="chip"
-                :disabled="
-                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                    .fields?.latitude != null
-                "
-                data-test="dashboard-add-latitude-data"
-                @click.stop="addLatitude(row)"
-              >
-                {{ t("panel.addLatitudeShort") }}
-              </OButton>
-              <OButton
-                variant="ghost-neutral"
-                size="chip"
-                :disabled="
-                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                    .fields?.longitude != null
-                "
-                data-test="dashboard-add-longitude-data"
-                @click.stop="addLongitude(row)"
-              >
-                {{ t("panel.addLongitudeShort") }}
-              </OButton>
-              <OButton
-                variant="ghost-neutral"
-                size="chip"
-                :disabled="
-                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                    .fields?.weight != null
-                "
-                data-test="dashboard-add-weight-data"
-                @click.stop="addWeight(row)"
-              >
-                {{ t("panel.addWeightShort") }}
-              </OButton>
-              <OButton
-                v-if="
-                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                    .customQuery == false
-                "
-                variant="ghost-neutral"
-                size="chip"
-                :disabled="
-                  !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
-                    (vrlField: any) => vrlField.name == row.name,
-                  )
-                "
-                data-test="dashboard-add-filter-data"
-                @click.stop="addFilteredItem(row as { name: string; stream: string })"
-              >
-                {{ t("panel.addFilterShort") }}
-              </OButton>
-            </div>
-
-            <!-- Maps actions -->
-            <div v-if="showMapsActions(row)" class="flex items-center gap-0.5">
-              <OButton
-                variant="ghost-neutral"
-                size="chip"
-                :disabled="
-                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                    .fields?.name != null
-                "
-                data-test="dashboard-add-x-data"
-                @click.stop="addMapName(row)"
-              >
-                {{ t("panel.addNameShort") }}
-              </OButton>
-              <OButton
-                variant="ghost-neutral"
-                size="chip"
-                :disabled="
-                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                    .fields?.value_for_maps != null
-                "
-                data-test="dashboard-add-y-data"
-                @click.stop="addMapValue(row)"
-              >
-                {{ t("panel.addValueShort") }}
-              </OButton>
-              <OButton
-                variant="ghost-neutral"
-                size="chip"
-                data-test="dashboard-add-filter-data"
-                @click.stop="addFilteredItem(row as { name: string; stream: string })"
-              >
-                {{ t("panel.addFilterShort") }}
-              </OButton>
-            </div>
-
-            <!-- Sankey actions -->
-            <div v-if="showSankeyActions(row)" class="flex items-center gap-0.5">
-              <OButton
-                variant="ghost-neutral"
-                size="chip"
-                :disabled="
-                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                    .fields?.source != null
-                "
-                data-test="dashboard-add-source-data"
-                @click.stop="addSource(row)"
-              >
-                {{ t("panel.addSourceShort") }}
-              </OButton>
-              <OButton
-                variant="ghost-neutral"
-                size="chip"
-                :disabled="
-                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                    .fields?.target != null
-                "
-                data-test="dashboard-add-target-data"
-                @click.stop="addTarget(row)"
-              >
-                {{ t("panel.addTargetShort") }}
-              </OButton>
-              <OButton
-                variant="ghost-neutral"
-                size="chip"
-                :disabled="
-                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                    .fields?.value != null
-                "
-                data-test="dashboard-add-value-data"
-                @click.stop="addValue(row)"
-              >
-                {{ t("panel.addValueShort") }}
-              </OButton>
-              <OButton
-                v-if="
-                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                    .customQuery == false
-                "
-                variant="ghost-neutral"
-                size="chip"
-                :disabled="
-                  !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
-                    (vrlField: any) => vrlField.name == row.name,
-                  )
-                "
-                data-test="dashboard-add-filter-data"
-                @click.stop="addFilteredItem(row as { name: string; stream: string })"
-              >
-                {{ t("panel.addFilterShort") }}
-              </OButton>
-            </div>
-          </template>
-        </OFieldRow>
-      </template>
-
-      <!-- Loading state -->
-      <template #loading>
-        <div class="flex flex-col">
-          <div v-for="i in 6" :key="i" class="flex items-center gap-2 py-1">
-            <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 flex-shrink-0" />
-            <OSkeleton type="text" class="flex-1" />
+            <OSelect
+              :model-value="currentStream"
+              :label="t('dashboard.selectIndex')"
+              :options="streamOptions"
+              data-test="index-dropdown-stream"
+              :loading="streamListLoading"
+              label-key="name"
+              value-key="name"
+              searchable
+              label-position="inside"
+              :disabled="dashboardPanelDataPageKey === 'logs'"
+              option-tooltip
+              @search="onStreamSearch"
+              @update:model-value="onStreamChange"
+            />
           </div>
-        </div>
-      </template>
+        </template>
 
-      <!-- Empty state -->
-      <template #empty>
-        <div class="flex items-center justify-center py-[0.725rem] text-center">
-          <OIcon name="info" size="xs" />
-          <span class="ps-1.5">{{ t("search.noFieldFound") }}</span>
-        </div>
-      </template>
-
-      <!-- After list: pagination -->
-      <template #after-list="bottomProps">
-        <div
-          v-if="bottomProps.totalPages > 1"
-          class="field-list-pagination flex items-center justify-center gap-1 py-1"
-          data-test="field-list-pagination"
-        >
-          <OTooltip
-            side="left"
-            align="center"
-            max-width="18.75rem"
-            :content="t('common.totalFields', { count: bottomProps.totalRows })"
-          />
-          <OButton
-            :aria-label="t('search.firstPage')"
-            variant="ghost-primary"
-            size="icon-panel"
-            :disabled="bottomProps.isFirstPage"
-            data-test="field-list-pagination-first"
-            @click="bottomProps.firstPage"
+        <!-- Group header -->
+        <template #group-header="{ row }">
+          <div
+            class="-ms-page-edge px-page-edge bg-section-header-bg text-text-secondary flex h-7! w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-default items-center justify-between text-xs font-semibold select-none"
           >
-            <OIcon name="fast-rewind" size="sm" />
-          </OButton>
-          <template v-for="page in visiblePagesForTotal(bottomProps)" :key="page">
+            <OTruncatedText as="div" class="flex-1">{{ row.groupName }}</OTruncatedText>
+          </div>
+        </template>
+
+        <!-- Field row -->
+        <template #field-row="{ row, draggable, isDragEnabled, armDrag }">
+          <OFieldRow>
+            <OIcon
+              v-if="draggable"
+              name="drag-indicator"
+              size="sm"
+              @mousedown="armDrag()"
+              :class="[
+                'o-field-list__drag-icon text-field-list-drag-icon',
+                isDragEnabled
+                  ? 'o-field-list__drag-icon--enabled cursor-grab'
+                  : 'o-field-list__drag-icon--disabled cursor-not-allowed opacity-40',
+              ]"
+              data-test="o-field-list-drag-indicator"
+            />
+            <OFieldLabel :field="row" :show-type-icon="true" />
+
+            <!-- Field actions -->
+            <template #actions>
+              <!-- Standard chart actions -->
+              <div v-if="showStandardActions(row)" class="flex items-center gap-0.5">
+                <OButton
+                  variant="ghost-neutral"
+                  size="chip"
+                  :disabled="isAddXAxisNotAllowed"
+                  data-test="dashboard-add-x-data"
+                  @click.stop="addXAxisItem(row)"
+                >
+                  {{ dashboardPanelData.data.type != "h-bar" ? raw("+X") : raw("+Y") }}
+                </OButton>
+                <OButton
+                  variant="ghost-neutral"
+                  size="chip"
+                  :disabled="isAddYAxisNotAllowed"
+                  data-test="dashboard-add-y-data"
+                  @click.stop="addYAxisItem(row)"
+                >
+                  {{ dashboardPanelData.data.type != "h-bar" ? raw("+Y") : raw("+X") }}
+                </OButton>
+                <OButton
+                  v-if="dashboardPanelData.data.type == 'table'"
+                  variant="ghost-neutral"
+                  size="chip"
+                  :disabled="isAddBreakdownNotAllowed"
+                  data-test="dashboard-add-p-data"
+                  @click.stop="addBreakDownAxisItem(row)"
+                >
+                  {{ t("panel.addPivotShort") }}
+                </OButton>
+                <OButton
+                  v-if="
+                    dashboardPanelData.data.type == 'area' ||
+                    dashboardPanelData.data.type == 'bar' ||
+                    dashboardPanelData.data.type == 'line' ||
+                    dashboardPanelData.data.type == 'h-bar' ||
+                    dashboardPanelData.data.type == 'h-stacked' ||
+                    dashboardPanelData.data.type == 'scatter' ||
+                    dashboardPanelData.data.type == 'area-stacked' ||
+                    dashboardPanelData.data.type == 'stacked' ||
+                    dashboardPanelData.data.type == 'state-timeline' ||
+                    dashboardPanelData.data.type == 'distribution' ||
+                    dashboardPanelData.data.type == 'treemap' ||
+                    dashboardPanelData.data.type == 'sunburst' ||
+                    dashboardPanelData.data.type == 'hostmap'
+                  "
+                  variant="ghost-neutral"
+                  size="chip"
+                  :disabled="isAddBreakdownNotAllowed"
+                  data-test="dashboard-add-b-data"
+                  @click.stop="addBreakDownAxisItem(row)"
+                >
+                  {{ t("panel.addBreakdownShort") }}
+                </OButton>
+                <OButton
+                  v-if="dashboardPanelData.data.type == 'heatmap'"
+                  variant="ghost-neutral"
+                  size="chip"
+                  :disabled="isAddZAxisNotAllowed"
+                  data-test="dashboard-add-z-data"
+                  @click.stop="addZAxisItem(row)"
+                >
+                  {{ t("panel.addZAxisShort") }}
+                </OButton>
+                <OButton
+                  v-if="
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery == false
+                  "
+                  variant="ghost-neutral"
+                  size="chip"
+                  :disabled="
+                    !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
+                      (vrlField: any) => vrlField.name == row.name,
+                    )
+                  "
+                  data-test="dashboard-add-filter-data"
+                  @click.stop="addFilteredItem(row as { name: string; stream: string })"
+                >
+                  {{ t("panel.addFilterShort") }}
+                </OButton>
+              </div>
+
+              <!-- Geomap actions -->
+              <div v-if="showGeomapActions(row)" class="flex items-center gap-0.5">
+                <OButton
+                  variant="ghost-neutral"
+                  size="chip"
+                  :disabled="
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields?.latitude != null
+                  "
+                  data-test="dashboard-add-latitude-data"
+                  @click.stop="addLatitude(row)"
+                >
+                  {{ t("panel.addLatitudeShort") }}
+                </OButton>
+                <OButton
+                  variant="ghost-neutral"
+                  size="chip"
+                  :disabled="
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields?.longitude != null
+                  "
+                  data-test="dashboard-add-longitude-data"
+                  @click.stop="addLongitude(row)"
+                >
+                  {{ t("panel.addLongitudeShort") }}
+                </OButton>
+                <OButton
+                  variant="ghost-neutral"
+                  size="chip"
+                  :disabled="
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields?.weight != null
+                  "
+                  data-test="dashboard-add-weight-data"
+                  @click.stop="addWeight(row)"
+                >
+                  {{ t("panel.addWeightShort") }}
+                </OButton>
+                <OButton
+                  v-if="
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery == false
+                  "
+                  variant="ghost-neutral"
+                  size="chip"
+                  :disabled="
+                    !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
+                      (vrlField: any) => vrlField.name == row.name,
+                    )
+                  "
+                  data-test="dashboard-add-filter-data"
+                  @click.stop="addFilteredItem(row as { name: string; stream: string })"
+                >
+                  {{ t("panel.addFilterShort") }}
+                </OButton>
+              </div>
+
+              <!-- Maps actions -->
+              <div v-if="showMapsActions(row)" class="flex items-center gap-0.5">
+                <OButton
+                  variant="ghost-neutral"
+                  size="chip"
+                  :disabled="
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields?.name != null
+                  "
+                  data-test="dashboard-add-x-data"
+                  @click.stop="addMapName(row)"
+                >
+                  {{ t("panel.addNameShort") }}
+                </OButton>
+                <OButton
+                  variant="ghost-neutral"
+                  size="chip"
+                  :disabled="
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields?.value_for_maps != null
+                  "
+                  data-test="dashboard-add-y-data"
+                  @click.stop="addMapValue(row)"
+                >
+                  {{ t("panel.addValueShort") }}
+                </OButton>
+                <OButton
+                  variant="ghost-neutral"
+                  size="chip"
+                  data-test="dashboard-add-filter-data"
+                  @click.stop="addFilteredItem(row as { name: string; stream: string })"
+                >
+                  {{ t("panel.addFilterShort") }}
+                </OButton>
+              </div>
+
+              <!-- Sankey actions -->
+              <div v-if="showSankeyActions(row)" class="flex items-center gap-0.5">
+                <OButton
+                  variant="ghost-neutral"
+                  size="chip"
+                  :disabled="
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields?.source != null
+                  "
+                  data-test="dashboard-add-source-data"
+                  @click.stop="addSource(row)"
+                >
+                  {{ t("panel.addSourceShort") }}
+                </OButton>
+                <OButton
+                  variant="ghost-neutral"
+                  size="chip"
+                  :disabled="
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields?.target != null
+                  "
+                  data-test="dashboard-add-target-data"
+                  @click.stop="addTarget(row)"
+                >
+                  {{ t("panel.addTargetShort") }}
+                </OButton>
+                <OButton
+                  variant="ghost-neutral"
+                  size="chip"
+                  :disabled="
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields?.value != null
+                  "
+                  data-test="dashboard-add-value-data"
+                  @click.stop="addValue(row)"
+                >
+                  {{ t("panel.addValueShort") }}
+                </OButton>
+                <OButton
+                  v-if="
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery == false
+                  "
+                  variant="ghost-neutral"
+                  size="chip"
+                  :disabled="
+                    !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
+                      (vrlField: any) => vrlField.name == row.name,
+                    )
+                  "
+                  data-test="dashboard-add-filter-data"
+                  @click.stop="addFilteredItem(row as { name: string; stream: string })"
+                >
+                  {{ t("panel.addFilterShort") }}
+                </OButton>
+              </div>
+            </template>
+          </OFieldRow>
+        </template>
+
+        <!-- Loading state -->
+        <template #loading>
+          <div class="flex flex-col">
+            <div v-for="i in 6" :key="i" class="flex items-center gap-2 py-1">
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 flex-shrink-0" />
+              <OSkeleton type="text" class="flex-1" />
+            </div>
+          </div>
+        </template>
+
+        <!-- Empty state -->
+        <template #empty>
+          <div class="flex items-center justify-center py-[0.725rem] text-center">
+            <OIcon name="info" size="xs" />
+            <span class="ps-1.5">{{ t("search.noFieldFound") }}</span>
+          </div>
+        </template>
+
+        <!-- After list: pagination -->
+        <template #after-list="bottomProps">
+          <div
+            v-if="bottomProps.totalPages > 1"
+            class="field-list-pagination flex items-center justify-center gap-1 py-1"
+            data-test="field-list-pagination"
+          >
+            <OTooltip
+              side="left"
+              align="center"
+              max-width="18.75rem"
+              :content="t('common.totalFields', { count: bottomProps.totalRows })"
+            />
             <OButton
-              :variant="bottomProps.currentPage === page ? 'primary' : 'ghost'"
+              :aria-label="t('search.firstPage')"
+              variant="ghost-primary"
               size="icon-panel"
-              :data-test="`field-list-pagination-page-${page}`"
-              @click="setPage(page)"
+              :disabled="bottomProps.isFirstPage"
+              data-test="field-list-pagination-first"
+              @click="bottomProps.firstPage"
             >
-              {{ page }}
+              <OIcon name="fast-rewind" size="sm" />
             </OButton>
-          </template>
-          <OButton
-            :aria-label="t('search.lastPage')"
-            variant="ghost-primary"
-            size="icon-panel"
-            :disabled="bottomProps.isLastPage"
-            data-test="field-list-pagination-last"
-            @click="bottomProps.lastPage"
-          >
-            <OIcon name="fast-forward" size="sm" />
-          </OButton>
-        </div>
-      </template>
-    </OFieldList>
+            <template v-for="page in visiblePagesForTotal(bottomProps)" :key="page">
+              <OButton
+                :variant="bottomProps.currentPage === page ? 'primary' : 'ghost'"
+                size="icon-panel"
+                :data-test="`field-list-pagination-page-${page}`"
+                @click="setPage(page)"
+              >
+                {{ page }}
+              </OButton>
+            </template>
+            <OButton
+              :aria-label="t('search.lastPage')"
+              variant="ghost-primary"
+              size="icon-panel"
+              :disabled="bottomProps.isLastPage"
+              data-test="field-list-pagination-last"
+              @click="bottomProps.lastPage"
+            >
+              <OIcon name="fast-forward" size="sm" />
+            </OButton>
+          </div>
+        </template>
+      </OFieldList>
+    </ChartTypePicker>
   </div>
 </template>
 
@@ -429,12 +438,16 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
 import { isFlowChart, isHtmlPanel } from "@/utils/dashboard/chartTypeGroups";
+import ChartTypePicker from "./ChartTypePicker.vue";
 
 const props = defineProps<{
   editMode?: boolean;
   hideAllFieldsSelection?: boolean;
   /** Drop the pane's own title row + border when a host (drawer) provides them. */
   frameless?: boolean;
+  /** The chart-type list is showing in place of the stream selects and fields. */
+  chartTypeListOpen?: boolean;
+  allowedChartTypes?: readonly string[];
 }>();
 
 const dashboardPanelDataPageKey: string = inject("dashboardPanelDataPageKey", "dashboard");
@@ -444,7 +457,11 @@ const { t } = useI18nTyped();
 const { getStreams } = useStreams(t);
 const { showErrorNotification } = useNotifications();
 const { parsePromQlQuery } = usePromqlSuggestions();
-const emit = defineEmits<{ collapse: [] }>();
+const emit = defineEmits<{
+  collapse: [];
+  "update:chartTypeListOpen": [open: boolean];
+  selectChartType: [id: string];
+}>();
 
 const {
   dashboardPanelData,

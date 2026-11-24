@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   This is the SAME dashboard PanelEditor Add Panel mounts, run in-page with
   editMode and the metrics defaults (line + promql + query bar on). Chart types are NOT restricted — the
-  same full set AddPanel offers, gated only by ChartSelection's own PromQL rules.
+  same full set AddPanel offers, gated only by the chart catalogue's PromQL rules.
   So the chart the user builds here is exactly the one they get on a dashboard,
   and it inherits right-click → Create Alert for free.
 

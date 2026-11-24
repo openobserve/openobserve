@@ -1289,18 +1289,24 @@ export class MetricsBuilderPage {
      * @param {string} chartType - e.g., 'line', 'bar', 'table', 'area', 'scatter', 'h-bar', 'stacked', 'h-stacked', 'pie', 'donut', 'heatmap', 'gauge'
      */
     async selectChartType(chartType) {
-        const chartItem = this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
-        await chartItem.waitFor({ state: 'visible' });
+        const chartItem = await this.openChartTypeList(chartType);
         await chartItem.click();
-        await expect(chartItem).toHaveAttribute('data-selected', 'true');
+        await expect(this.getChartTypeSelect()).toHaveAttribute('data-test-selected-value', chartType);
     }
 
-    /**
-     * Check if a chart type item is visible
-     * @param {string} chartType
-     */
-    async isChartTypeVisible(chartType) {
-        return await this.page.locator(`[data-test="selected-chart-${chartType}-item"]`).isVisible({ timeout: 3000 }).catch(() => false);
+    // The Chart type select; its data-test-selected-value is the panel's chart type
+    getChartTypeSelect() {
+        return this.page.locator('[data-test="dashboard-addpanel-chart-type-select"]:visible, [data-test="panel-editor-collapsed-chart-type"]:visible').first();
+    }
+
+    // Opens the chart-type list from the Chart type select unless the row is already showing
+    async openChartTypeList(chartType) {
+        const chartItem = this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
+        if (!(await chartItem.isVisible().catch(() => false))) {
+            await this.getChartTypeSelect().click();
+        }
+        await chartItem.waitFor({ state: 'visible', timeout: 10000 });
+        return chartItem;
     }
 
     /**

@@ -103,7 +103,7 @@ const DASHBOARD = {
   CONFIG_DRILLDOWN_INFO: '[data-test="dashboard-addpanel-config-drilldown-info"]',
 
   // Chart type selection
-  CHART_LINE_ITEM: '[data-test="selected-chart-line-item"]',
+  CHART_TYPE_SELECT: '[data-test="dashboard-addpanel-chart-type-select"]',
   APPLY_BTN: '[data-test="dashboard-apply"]',
 
   // Date/Time
