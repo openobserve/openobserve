@@ -27827,8 +27827,8 @@
         "application": "Application",
         "state": "State",
         "waitEvent": "Waiting on",
-        "running": "Running for",
-        "lastQuery": "Last query",
+        "time": "Time",
+        "timeHint": "Running sessions show how long their current query has run. Idle sessions show how long their last query took.",
         "query": "Query",
         "blockedBy": "Blocked by"
       },
@@ -27845,7 +27845,12 @@
         "capped": "More sessions were sampled than we could read at once. These are the {count} we have.",
         "filtered": "Showing {count} of {total} sessions."
       },
-      "transactionOpen": "transaction open {age}",
+      "transactionAgeIdle": "· {age}",
+      "transactionAgeActive": "· open {age}",
+      "timeRunning": "Running for {duration}",
+      "timeSnapshot": "As of the latest sample{age}. Activity is a series of snapshots, so this does not count up live.",
+      "timeLast": "Idle · last took {duration}",
+      "allOnInstance": "All sessions here run on {instance}.",
       "healthy": {
         "title": "Nothing is running right now",
         "description": "We sampled your databases' session tables and found no active sessions. That is the healthy normal for an idle database, not a gap in what we collect.",
