@@ -74,4 +74,25 @@ describe("LogsNoEventsState", () => {
     });
     expect(wrapper.text()).toContain(copy);
   });
+
+  it("shows the server's error above the no-events copy", () => {
+    const wrapper = mount(LogsNoEventsState, {
+      props: {
+        sqlMode: true,
+        query: 'SELECT * FROM "app"',
+        relativeTimePeriod: "15m",
+        dateType: "relative",
+        aiEnabled: false,
+        functionError: "regex parse error: unclosed group",
+      },
+      global: { plugins: [i18n, store], stubs: { OEmptyState: OEmptyStateStub } },
+    });
+    const banner = wrapper.find('[data-test="logs-no-events-query-error"]');
+    expect(banner.text()).toContain("The query returned an error");
+    expect(banner.text()).toContain("regex parse error: unclosed group");
+  });
+
+  it("shows no error banner when the run had none", () => {
+    expect(mountState("15m").find('[data-test="logs-no-events-query-error"]').exists()).toBe(false);
+  });
 });
