@@ -411,10 +411,12 @@ export default defineComponent({
 
     // restore chart and select datazoom button
     const restoreChart = () => {
+      // Restore rebuilds from the last full option, which lacks the legend clicks merged in since.
+      const selected = chart?.getOption()?.legend?.[0]?.selected;
       chart?.dispatchAction({
         type: "restore",
       });
-      // Restore returns to the last full option, which may carry an isolated slice, not to all visible.
+      if (selected) chart?.setOption({ legend: [{ selected }] }, { lazyUpdate: true });
       syncPieLegendSelection({ ...(chart?.getOption()?.legend?.[0]?.selected ?? {}) });
       // we need that toolbox datazoom button initially selected
       chart?.dispatchAction({
