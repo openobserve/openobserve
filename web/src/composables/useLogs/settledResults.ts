@@ -55,6 +55,8 @@ export interface HistogramViewInput {
   loadingHistogram: boolean;
   histogramPoints: number;
   liveMode: boolean;
+  /** The run streaming now has a chart of its own on screen, or had no previous chart to replace. */
+  streamPainted: boolean;
 }
 
 export type HistogramPhase = "hidden" | "chart" | "placeholder" | "empty";
@@ -95,14 +97,16 @@ export const resolveSummary = (
   };
 };
 
-/** Picks one histogram state per run so partitions never repaint the chart or flash "No data". */
+/** Picks one histogram state per run so a run never flashes "No data" while it is busy. */
 export const resolveHistogramView = (input: HistogramViewInput): HistogramView => {
   if (!input.showHistogram) return { phase: "hidden", stale: false };
   const busy = input.loading || input.loadingHistogram;
   // A new run clears the histogram points, so an idle run without points has no chart of its own.
   const chartIsCurrent = input.hasChart && (busy || input.histogramPoints > 0);
   if (chartIsCurrent) {
-    const replacing = input.loadingHistogram || (input.loading && input.histogramPoints === 0);
+    const replacing =
+      (input.loadingHistogram && !input.streamPainted) ||
+      (input.loading && input.histogramPoints === 0);
     return { phase: "chart", stale: !input.liveMode && replacing };
   }
   return { phase: busy ? "placeholder" : "empty", stale: false };

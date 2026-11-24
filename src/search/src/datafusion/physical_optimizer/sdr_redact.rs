@@ -94,13 +94,14 @@ pub fn protected_columns(
     }
 }
 
-/// Part of a cache key: results are stored redacted, so a pattern change must miss them.
-/// `None` when no stream read is protected, which keeps the keys of other queries unchanged.
+/// Part of a cache key: results are stored redacted, so a pattern change must miss them. `None`
+/// when no stream read is redacted; a raw stream reads like an unprotected one and shares its key.
 #[cfg(feature = "vectorscan")]
 pub fn redaction_digest(
     org_id: &str,
     stream_type: config::meta::stream::StreamType,
     streams: &[datafusion::common::TableReference],
+    raw_streams: Option<&config::meta::search::RawStreams>,
 ) -> Option<String> {
     use config::meta::sql::TableReferenceExt;
 
@@ -112,6 +113,9 @@ pub fn redaction_digest(
         .filter_map(|stream| {
             let stype = stream.get_stream_type(stream_type);
             let name = stream.stream_name();
+            if raw_streams.is_some_and(|raw| raw.contains(stype, &name)) {
+                return None;
+            }
             match manager.search_protection(org_id, stype, &name) {
                 Ok(Some(protection)) => Some(format!("{stype}/{name}={}", protection.digest)),
                 Ok(None) => None,
@@ -595,5 +599,56 @@ mod tests {
             line_of(&plan, SDR_REDACT_UDF_NAME) > line_of(&plan, "AggregateExec"),
             "{plan}"
         );
+    }
+
+    #[cfg(feature = "vectorscan")]
+    #[test]
+    fn test_digest_separates_raw_and_redacted_readers() {
+        use config::meta::{search::RawStreams, stream::StreamType};
+        use o2_enterprise::enterprise::re_patterns::{PATTERN_MANAGER, PatternManager};
+
+        if PATTERN_MANAGER.get().is_none() {
+            let _ = PATTERN_MANAGER.set(PatternManager::empty());
+        }
+        let mgr = PATTERN_MANAGER.get().unwrap();
+        mgr.insert_pattern(infra::table::re_pattern::PatternEntry {
+            id: "digest_secret".to_string(),
+            org: "sdr_digest".to_string(),
+            name: "digest_secret".to_string(),
+            description: String::new(),
+            created_by: String::new(),
+            created_at: 0,
+            updated_at: 0,
+            pattern: r"SECRETVAL\d+".to_string(),
+        });
+        mgr.update_associations(
+            "sdr_digest",
+            StreamType::Logs,
+            "app",
+            vec![],
+            vec![config::meta::stream::PatternAssociation {
+                field: "msg".to_string(),
+                pattern_id: "digest_secret".to_string(),
+                policy: "Redact".to_string(),
+                apply_at: "AtSearch".to_string(),
+                ..Default::default()
+            }],
+        )
+        .unwrap();
+
+        let streams = [datafusion::common::TableReference::from("app")];
+        let digest = |raw: Option<&RawStreams>| {
+            redaction_digest("sdr_digest", StreamType::Logs, &streams, raw)
+        };
+        let mut raw = RawStreams::default();
+        raw.insert(StreamType::Logs, "app");
+        let redacted = digest(Some(&RawStreams::default()));
+        assert!(redacted.is_some());
+        assert_eq!(digest(None), redacted);
+
+        let unprotected = [datafusion::common::TableReference::from("plain")];
+        let plain = redaction_digest("sdr_digest", StreamType::Logs, &unprotected, None);
+        assert_eq!(plain, None);
+        assert_eq!(digest(Some(&raw)), plain);
     }
 }

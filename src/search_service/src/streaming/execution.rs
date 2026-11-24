@@ -553,6 +553,7 @@ pub async fn get_partitions(
         sampling_ratio: req.query.sampling_ratio,
         search_type: req.search_type,
         timezone: req.query.timezone.clone(),
+        raw_streams: req.raw_streams.clone(),
     };
 
     let res = SearchService::search_partition(
