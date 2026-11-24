@@ -2188,22 +2188,17 @@ export default defineComponent({
             this.downloadCustomRange,
             sqlLimit,
           );
-          if (hits.length > 0) {
-            this.downloadLogs(hits, this.downloadCustomFileType);
-            const partialReason = partialDownloadReason(res.data);
-            if (partialReason !== null) {
-              toast({
-                message: partialReason
-                  ? this.t("logs.searchBar.downloadMayBeIncompleteReason", {
-                      reason: partialReason,
-                    })
-                  : this.t("logs.searchBar.downloadMayBeIncomplete"),
-                variant: "warning",
-              });
-            }
-          } else {
+          const partialReason = partialDownloadReason(res.data);
+          const partialMessage =
+            partialReason === null
+              ? null
+              : partialReason
+                ? this.t("logs.searchBar.downloadMayBeIncompleteReason", { reason: partialReason })
+                : this.t("logs.searchBar.downloadMayBeIncomplete");
+          if (hits.length > 0) this.downloadLogs(hits, this.downloadCustomFileType);
+          if (partialMessage !== null || hits.length === 0) {
             toast({
-              message: this.t("logs.searchBar.noDataToDownload"),
+              message: partialMessage ?? this.t("logs.searchBar.noDataToDownload"),
               variant: "warning",
             });
           }

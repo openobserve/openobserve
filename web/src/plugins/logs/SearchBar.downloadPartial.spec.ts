@@ -90,6 +90,24 @@ describe("SearchBar custom range download with a partial response", () => {
     expect(warnings()[0].message).toContain("VRL failed");
   });
 
+  it("explains the range restriction instead of 'no data' when the slice is empty", async () => {
+    wrapper!.vm.downloadCustomInitialNumber = 1000;
+    vi.mocked(searchService.search).mockResolvedValue({
+      data: { hits: rows(999), is_partial: true, function_error: ["range restriction of 1 hours"] },
+    } as any);
+    wrapper!.vm.searchObj.data.customDownloadQueryObj = {
+      query: { sql: 'select * from "app" limit 5000', from: 0, size: 50 },
+    };
+    wrapper!.vm.downloadCustomRange = 1000;
+    wrapper!.vm.downloadCustomInitialNumber = 1000;
+    wrapper!.vm.downloadRangeData();
+    await vi.waitFor(() => expect(searchService.search).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 0));
+    expect(downloaded).toBeUndefined();
+    expect(warnings()).toHaveLength(1);
+    expect(warnings()[0].message).toContain("range restriction of 1 hours");
+  });
+
   it("shows no warning for a full response", async () => {
     await run({ hits: rows(12), is_partial: false, function_error: [] });
     expect(downloaded).toHaveLength(12);

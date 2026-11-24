@@ -1151,6 +1151,16 @@ describe("a half-built filter when focus leaves the bar (e.g. the Run query butt
     expect(sql(state)).toBe("level IN ('error', 'custom')");
   });
 
+  it("reverts a half-typed edit of an existing chip when focus leaves", async () => {
+    const state = mountBar({ modelValue: parseSqlFilter("level = 'error' AND status = 1")! });
+    await editPart("level", "value");
+    await type("warn");
+
+    await focusLeaves();
+
+    expect(sql(state)).toBe("level = 'error' AND status = 1");
+  });
+
   it("drops a draft that has no value to apply", async () => {
     const state = mountBar();
     await openBar();

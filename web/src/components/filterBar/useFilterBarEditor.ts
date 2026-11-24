@@ -672,7 +672,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
 
   /** Applies what a half-built chip already holds, so leaving the bar never drops a filter unseen. */
   function commitPending() {
-    if (!draft.value?.operator) return;
+    if (editingId.value || !draft.value?.operator) return;
     const typed = step.value === "value" ? text.value.trim() : "";
     if (typed && (!multiValue.value || !draft.value.values.includes(typed))) addValue(typed);
     if (draft.value) commitDraft();
