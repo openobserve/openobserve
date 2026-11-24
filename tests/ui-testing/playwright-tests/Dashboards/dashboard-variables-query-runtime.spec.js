@@ -66,7 +66,7 @@ test.describe("Query Values variables - dashboard runtime", { tag: ["@dashboards
     await qv.selectOption("svc", "checkout");
     await qv.refreshDashboard();
     await fx.waitForSearch(queries, "service_name = 'checkout'");
-    await expect(page.locator('[data-test="dashboard-panel-table"]').first()).toContainText("checkout", { timeout: 30000 });
+    await expect(fx.panelTable(page, "svc_panel")).toContainText("checkout", { timeout: 30000 });
 
     await qv.selectOption("svc", "frontend");
     await qv.refreshDashboard();
@@ -88,8 +88,8 @@ test.describe("Query Values variables - dashboard runtime", { tag: ["@dashboards
     const nsSql = await fx.waitForSearch(queries, /k8s_namespace IN \('[a-z]+', ?'[a-z]+', ?'[a-z]+'\) GROUP/);
     expect(sortedIn(nsSql, "k8s_namespace")).toEqual(["checkout", "monitoring", "payments"]);
     await fx.waitForSearch(queries, "_o2_all_");
-    await expect(page.locator('[data-test="dashboard-panel-table"]').nth(2)).toContainText("default", { timeout: 30000 });
-    await expect(page.locator('[data-test="dashboard-panel-table"]').nth(2)).toContainText("search");
+    await expect(fx.panelTable(page, "ans_panel")).toContainText("default", { timeout: 30000 });
+    await expect(fx.panelTable(page, "ans_panel")).toContainText("search");
   });
 
   test("F2: an Auto child of a custom parent set to All filters on the parent's listed options", async ({ page }) => {

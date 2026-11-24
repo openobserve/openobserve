@@ -256,9 +256,9 @@ test.describe("Query Values variables - metrics and PromQL", { tag: ["@dashboard
     await expect(qv.undefinedWarning).toContainText("$nothere");
   });
 
-  test("E2: $var inside a matcher follows the parent, and regex characters or quotes in it stay escaped", async ({ page }) => {
+  test("E2: $var inside a matcher follows the parent", async ({ page }) => {
     const qv = new PageManager(page).dashboardQueryVariable;
-    const id = await startCustomPromql(qv, { name: "pods" });
+    await startCustomPromql(qv, { name: "pods" });
     await qv.fillQuery(PODS_QUERY);
     await expect(page.locator('[data-test="dashboard-variable-query-parent-cl"]')).toHaveText("$cl = prod-eu");
     await qv.save();
@@ -267,14 +267,41 @@ test.describe("Query Values variables - metrics and PromQL", { tag: ["@dashboard
     await qv.expectOptionValues("pods", ["checkout-0", "payments-0"]);
     await qv.selectOption("cl", "prod-us");
     await qv.expectOptionValues("pods", ["payments-1", "search-0"]);
+  });
 
+  test("E2b: a typed regex reaches a child =~ matcher as written, as panels read it", async ({ page }) => {
+    const qv = new PageManager(page).dashboardQueryVariable;
+    const id = await fx.createDashboard(fx.dashboardBody(uniqueTitle("e2e_qv_promql_typed"), {
+      variables: [
+        { name: "tb", label: "tb", type: "textbox", value: "prod-.*" },
+        customPromql("pods", `label_values(${UP}{cluster=~"$tb"}, pod)`),
+      ],
+    }));
     const queries = fx.trackQueries(page);
-    const tricky = `pr"o'd.*\\+(eu)`;
-    await qv.openDashboard(fx.dashboardUrl(id, `&var-cl=${encodeURIComponent(tricky)}`));
-    await qv.expectNoData("pods");
+    await qv.openDashboard(fx.dashboardUrl(id));
+
+    await qv.expectOptionValues("pods", ["checkout-0", "payments-0", "payments-1", "search-0"]);
     const lookup = queries.promql().find((url) => url.includes("/label/pod/values"));
-    expect(lookup, queries.promql().join("\n")).toContain(`cluster="pr\\"o'd.*\\\\+(eu)"`);
-    await expect(page.locator('[data-test="variable-query-error-pods"]')).toHaveCount(0);
+    expect(lookup, queries.promql().join("\n")).toContain('cluster=~"prod-.*"');
+  });
+
+  test("E2c: a value a query loaded is escaped in a child matcher, regex characters and all", async ({ page }) => {
+    await fx.ingestRouteMetric();
+    const qv = new PageManager(page).dashboardQueryVariable;
+    const id = await fx.createDashboard(fx.dashboardBody(uniqueTitle("e2e_qv_promql_loaded"), {
+      variables: [
+        customPromql("route", `label_values(${fx.METRIC_ROUTES}, path)`),
+        customPromql("same", `label_values(${fx.METRIC_ROUTES}{path=~"$route"}, path)`),
+      ],
+    }));
+    const queries = fx.trackQueries(page);
+    await qv.openDashboard(fx.dashboardUrl(id));
+
+    await qv.selectOption("route", "GET /a(1)");
+    await qv.expectOptionValues("same", ["GET /a(1)"]);
+    const lookups = queries.promql().filter((url) => url.includes("/label/path/values"));
+    expect(lookups.join("\n")).toContain('path=~"GET /a\\\\(1\\\\)"');
+    await expect(page.locator('[data-test="variable-query-error-same"]')).toHaveCount(0);
   });
 
   test("All on a custom variable keeps values with regex characters in a PromQL panel", async ({ page }) => {

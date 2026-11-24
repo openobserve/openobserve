@@ -307,9 +307,18 @@ async function deleteCreatedDashboards() {
   while (createdDashboardIds.length) await deleteDashboard(createdDashboardIds.pop());
 }
 
+// Wide enough that rows a slow shard ingested long before a test still fall inside it. It stays relative,
+// because an absolute range stops a refresh from re-running searches and puts instant queries at its end.
+const DASHBOARD_WINDOW = '&period=6h';
+
 function dashboardUrl(dashboardId, extra = '') {
-  const period = extra.includes('period=') || extra.includes('from=') ? '' : '&period=30m';
-  return `/web/dashboards/view?org_identifier=${ORG()}&dashboard=${dashboardId}&folder=default&tab=default${period}${extra}`;
+  const window = extra.includes('period=') || extra.includes('from=') ? '' : DASHBOARD_WINDOW;
+  return `/web/dashboards/view?org_identifier=${ORG()}&dashboard=${dashboardId}&folder=default&tab=default${window}${extra}`;
+}
+
+/** The table of the panel with this id, wherever the grid places it. */
+function panelTable(page, panelId) {
+  return page.locator(`[data-test="dashboard-panel-container"][data-test-panel-id="${panelId}"] [data-test="dashboard-panel-table"]`);
 }
 
 // SQL is sent URL-safe base64 with "." padding when sql_base64_enabled is on.
@@ -393,6 +402,7 @@ module.exports = {
   trackDashboard,
   deleteCreatedDashboards,
   dashboardUrl,
+  panelTable,
   decodeSql,
   trackQueries,
 };

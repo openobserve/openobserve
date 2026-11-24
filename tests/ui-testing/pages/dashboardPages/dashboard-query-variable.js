@@ -44,7 +44,7 @@ export default class DashboardQueryVariable {
     this.functionsTrigger = page.locator(tid("dashboard-variable-query-functions-trigger"));
     this.functionsList = page.locator(tid("dashboard-variable-query-functions"));
     this.runPreviewBtn = page.locator(tid("dashboard-variable-query-run-preview"));
-    this.previewIdle = page.locator(tid("dashboard-variable-query-preview-idle"));
+    this.previewHelp = page.locator(tid("dashboard-variable-query-preview-help"));
     this.previewCount = page.locator(tid("dashboard-variable-query-preview-count"));
     this.previewCapped = page.locator(tid("dashboard-variable-query-preview-capped"));
     this.previewTable = page.locator(tid("dashboard-variable-query-preview-table"));
@@ -142,10 +142,8 @@ export default class DashboardQueryVariable {
     return values.filter((v) => !v.startsWith("$"));
   }
 
-  /**
-   * Adds `field operator value` to the variable filters. A plain value is picked once the value list settles:
-   * the "Use <typed>" row disappears when loaded values bring an exact match, so a single lookup can click a detached row.
-   */
+  // A plain value is picked only once the list settles: an exact loaded match removes the "Use <typed>" row,
+  // so a lookup made earlier can click a detached row.
   async addFilter(field, operator, value, options = {}) {
     const plain = typeof value === "string" && value !== "" && !value.startsWith("$") && !/^(IN|NOT IN|in|not_in)$/.test(operator);
     if (!plain) return this.filters.addCondition(field, operator, value, options);

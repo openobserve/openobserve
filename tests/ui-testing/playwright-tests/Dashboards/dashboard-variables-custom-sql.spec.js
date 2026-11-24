@@ -94,7 +94,8 @@ test.describe("Query Values variables - Custom SQL", { tag: ["@dashboards", "@da
     const id = await startCustomVariable(qv);
     const queries = fx.trackQueries(page);
 
-    await expect(qv.previewIdle).toBeVisible();
+    await expect(qv.previewHelp).toBeVisible();
+    await expect(qv.previewCount.or(qv.previewEmpty).or(qv.previewError)).toHaveCount(0);
     await qv.fillQuery(ERRORS_QUERY);
     await qv.runPreview();
     await expect(qv.previewCount).toHaveText("4 values");
