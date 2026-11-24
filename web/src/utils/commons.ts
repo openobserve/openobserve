@@ -19,6 +19,7 @@ import { dashboardsByFolderQuery } from "@/services/dashboards.queries";
 import { foldersQuery } from "@/services/common.queries";
 import { dashboardKeys } from "@/services/dashboards.querykeys";
 import { folderKeys } from "@/services/common.querykeys";
+import { reportKeys } from "@/services/reports.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { fetchInto } from "@/composables/query/fetchInto";
 import { dropDashboardPanelCache, dropPanelCache } from "@/composables/dashboard/usePanelCache";
@@ -867,6 +868,14 @@ const pruneDashboardQueryCache = (store: any, folderId: string, ids: string[]) =
   }
 };
 
+// A deleted dashboard deletes or changes the reports that include it.
+const invalidateReportsOfDeletedDashboards = (store: {
+  state: { selectedOrganization?: { identifier?: string } };
+}) => {
+  const org = store.state.selectedOrganization?.identifier;
+  if (org) void queryClient.invalidateQueries({ queryKey: reportKeys.all(org) });
+};
+
 // Fix duplicate panel layout ids (layout.i). layout.i is a numeric grid-slot
 // id scoped to a tab, so dedupe per-tab and continue from the tab's max i.
 const fixDuplicateLayoutIds = (dashboardJson: any): boolean => {
@@ -928,6 +937,7 @@ export const deleteDashboardById = async (store: any, dashboardId: any, folderId
   }
 
   pruneDashboardQueryCache(store, folderId, [dashboardId]);
+  invalidateReportsOfDeletedDashboards(store);
 
   await dropDashboardPanelCache(store.state.selectedOrganization.identifier, folderId, dashboardId);
   deletePanelDraftsFor({
@@ -973,6 +983,7 @@ export const evictDashboardsFromCache = (store: any, idsByFolder: Map<string, st
   const allDashboardList = store.state.organizationData?.allDashboardList ?? {};
   const next = { ...allDashboardList };
   let changed = false;
+  invalidateReportsOfDeletedDashboards(store);
 
   idsByFolder.forEach((ids, folderId) => {
     pruneDashboardQueryCache(store, folderId, ids);

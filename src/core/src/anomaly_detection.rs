@@ -3485,6 +3485,7 @@ fn anomaly_search_request(
         clear_cache: false,
         local_mode: None,
         agent_options: None,
+        raw_streams: None,
     }
 }
 

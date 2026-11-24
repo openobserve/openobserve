@@ -887,6 +887,7 @@ fn metadata_search_request(sql: String, start: i64, end: i64) -> config::meta::s
         clear_cache: false,
         local_mode: None,
         agent_options: None,
+        raw_streams: None,
     }
 }
 

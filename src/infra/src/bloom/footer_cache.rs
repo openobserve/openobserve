@@ -126,7 +126,7 @@ mod tests {
         let big = Bytes::from(vec![0u8; 100]);
         c.put("a".to_string(), 1, big.clone());
         c.put("b".to_string(), 2, big);
-        // BytesCache uses FIFO eviction; "a" should be gone.
+        // Neither entry was read, so the older insert "a" goes first.
         assert!(c.get("a").is_none());
         assert!(c.get("b").is_some());
     }
