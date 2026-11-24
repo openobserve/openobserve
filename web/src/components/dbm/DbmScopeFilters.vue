@@ -157,6 +157,9 @@ export interface DbmScopeFilter {
   placeholder: I18nText;
   options: { value: string; label: I18nText }[];
   onChange: (value: unknown) => void;
+  /** Display-only lock (Metrics tab); other tabs never set it. */
+  disabled?: boolean;
+  disabledReason?: I18nText;
 }
 
 /** The active insight filter, rendered as a chip in the same grammar. */

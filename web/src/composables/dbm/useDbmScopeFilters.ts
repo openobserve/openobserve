@@ -51,6 +51,7 @@ import { computed, onActivated, ref, type ComputedRef, type Ref } from "vue";
 import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
 import { createDbmFilterEntry, optionsFrom, type DbmFilterEntrySpec } from "@/utils/dbm/filters";
 import { useDbmFleetInstances } from "@/composables/dbm/useDbmFleetInstances";
+import type { DbmInstanceHit } from "@/services/db_monitoring";
 import { useI18nTyped } from "@/types/i18n";
 
 /**
@@ -141,6 +142,8 @@ export interface DbmScopeFiltersReturn {
   models: Record<DbmScopeDimension, Ref<string | null>>;
   /** Ready for `<DbmScopeFilters :filters>`. Only the accepted dimensions. */
   filters: ComputedRef<DbmScopeFilter[]>;
+  /** The fleet read the pickers already use, for display-only lookups (instance to engine). */
+  fleetHits: Ref<DbmInstanceHit[]>;
   /**
    * The scope as request params — `undefined` for an unset dimension, which is
    * what the service layer's `put` drops. Spread straight into the options
@@ -402,5 +405,5 @@ export function useDbmScopeFilters(options: DbmScopeFiltersOptions): DbmScopeFil
     models.namespace.value = null;
   };
 
-  return { models, filters, requestParams, queryParams, isScoped, clear };
+  return { models, filters, fleetHits: fleet.hits, requestParams, queryParams, isScoped, clear };
 }

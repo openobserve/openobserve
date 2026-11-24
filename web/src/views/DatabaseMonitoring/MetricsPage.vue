@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- Above the rail and the charts, so it stays put while they scroll, as on every other tab. -->
-      <DbmFilterBar :filters="dimensionFilters" />
+      <DbmFilterBar :filters="displayFilters" />
       <div class="flex min-h-0 flex-1 max-md:flex-col">
         <!-- The metrics-explorer geometry: a slim jump rail beside the page's own
            scroll column, so any section is one click away instead of a scroll. -->
@@ -79,34 +79,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :aria-label="t('panel.breakdown')"
                   data-test="dbm-metrics-load-breakdown"
                 />
-                <!-- How to read the chart is reference, so it opens on demand instead of truncating beside the title. -->
-                <OPopover
-                  v-model:open="loadHintOpen"
-                  side="bottom"
-                  align="start"
-                  :aria-label="t('dbm.metrics.load.about')"
-                >
-                  <template #trigger>
-                    <OButton
-                      variant="ghost"
-                      size="xs"
-                      icon-left="info-outline"
-                      data-test="dbm-metrics-load-hint-trigger"
-                    >
-                      <span class="max-md:sr-only">{{ t("dbm.metrics.load.about") }}</span>
-                    </OButton>
-                  </template>
-                  <p
-                    class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
-                    data-test="dbm-metrics-load-hint"
-                  >
-                    <OText variant="meta">{{ t("dbm.metrics.load.hint") }}</OText>
-                  </p>
-                </OPopover>
               </template>
               <template #actions>
                 <OButton
-                  variant="outline"
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="info-outline"
+                  class="ms-auto"
+                  :aria-label="t('dbm.metrics.load.about')"
+                  data-test="dbm-load-info"
+                >
+                  <OTooltip side="bottom" :content="t('dbm.metrics.load.hint')" />
+                </OButton>
+                <OButton
+                  variant="ghost"
                   size="sm"
                   icon-right="arrow-forward"
                   data-test="dbm-metrics-view-activity"
@@ -350,8 +336,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OPopover from "@/lib/overlay/Popover/OPopover.vue";
-import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
@@ -373,6 +358,7 @@ import {
   type DbmLoadBreakdown,
   type DbmMetricsScope,
 } from "@/utils/dbm/metricsPanels";
+import { applyInstanceEngine } from "@/utils/dbm/instanceEngine";
 import { DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { buildMetricsUrl } from "@/utils/metrics/buildMetricsUrl";
 import type { MetricStream } from "@/utils/metrics/metricFamily";
@@ -409,6 +395,7 @@ const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
 
 const {
   filters: dimensionFilters,
+  fleetHits,
   requestParams: scopeParams,
   queryParams: scopeQuery,
 } = useDbmScopeFilters({
@@ -430,6 +417,11 @@ const {
     syncUrl();
   },
 });
+
+// Display-only: the Engine select shows the selected instance's engine and locks; the model and URL are untouched.
+const displayFilters = computed(() =>
+  applyInstanceEngine(dimensionFilters.value, fleetHits.value, raw(t("dbm.filters.setByInstance"))),
+);
 
 const scope = computed<DbmMetricsScope>(() => ({
   system: scopeParams.value.system ?? null,
@@ -522,7 +514,6 @@ const hasMetricStreams = computed(
 
 /** Which dimension the load chart stacks by — the Datadog-style slicer. */
 const loadBreakdown = ref<DbmLoadBreakdown>("waitEvent");
-const loadHintOpen = ref(false);
 
 const breakdownOptions = computed<SelectOption[]>(() =>
   DBM_LOAD_BREAKDOWNS.map((dim) => ({

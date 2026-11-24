@@ -26788,6 +26788,7 @@
       "allServices": "All services",
       "scope": "Filters",
       "moreFilters": "More Filters",
+      "setByInstance": "Set by the selected instance",
       "clearScope": "Clear all",
       "removeScope": "Remove this filter",
       "popoverTitle": "Narrow this down",
@@ -27409,8 +27410,8 @@
       "triageOrder": "ordered by triage relevance",
       "sections": {
         "featured": "Key health metrics",
-        "postgresql": "PostgreSQL metrics",
-        "mysql": "MySQL and MariaDB metrics"
+        "postgresql": "PostgreSQL",
+        "mysql": "MySQL / MariaDB"
       },
       "roleTitle": "{role} · {engine}",
       "roles": {

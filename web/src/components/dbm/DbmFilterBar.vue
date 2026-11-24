@@ -35,9 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label-position="inside"
           :options="withAll(filter)"
           :searchable="false"
+          :disabled="filter.disabled"
           class="rounded-default w-full"
           :data-test="`dbm-filter-${filter.key}`"
           @update:model-value="(value: unknown) => onFilterChange(filter, value)"
+        />
+        <OTooltip
+          v-if="filter.disabled && filter.disabledReason"
+          side="bottom"
+          :content="filter.disabledReason"
         />
       </div>
       <!-- Filters first, then the search takes the rest of the row; the wrapper sets the width because OSearchInput's own w-full beats a class on it. -->
@@ -89,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import type { DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";

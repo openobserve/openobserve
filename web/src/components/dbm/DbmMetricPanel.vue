@@ -39,7 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-text-heading text-compact min-w-0 truncate font-medium"
         :class="identifier ? 'font-mono' : ''"
       >
-        <OTooltip v-if="helpText" side="bottom" :content="helpText" />
         {{ title }}
       </h4>
       <OSelect
@@ -54,13 +53,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`dbm-metric-panel-by-${panelKey}`"
         @update:model-value="emit('update:by', $event as string)"
       />
+      <OButton
+        v-if="helpText"
+        variant="ghost"
+        size="icon-sm"
+        icon-left="info-outline"
+        class="ms-auto shrink-0"
+        :aria-label="t('dbm.metrics.load.about')"
+        :data-test="`dbm-metric-panel-info-${panelKey}`"
+      >
+        <OTooltip side="bottom" :content="helpText" />
+      </OButton>
       <OTooltip
         v-if="exploreUrl && metricsLock.locked.value"
         side="bottom"
         :content="metricsLock.lockedReason.value"
       >
         <span
-          class="ms-auto inline-flex shrink-0"
+          class="inline-flex shrink-0"
           role="link"
           aria-disabled="true"
           :aria-label="t('dbm.metrics.explore')"
@@ -79,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :href="exploreUrl"
         target="_blank"
         rel="noopener"
-        class="text-text-label hover:text-accent relative ms-auto shrink-0"
+        class="text-text-label hover:text-accent relative shrink-0"
         :data-test="`dbm-metric-panel-explore-${panelKey}`"
       >
         <OIcon name="open-in-new" size="xs" />
@@ -136,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from "vue";
 
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
