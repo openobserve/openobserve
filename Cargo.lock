@@ -8112,6 +8112,7 @@ dependencies = [
  "log",
  "o2_dex",
  "o2_enterprise",
+ "o2_openfga",
  "o2_ratelimit",
  "openobserve-api-common",
  "openobserve-api-ingest",

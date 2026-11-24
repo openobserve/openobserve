@@ -14,13 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(feature = "enterprise")]
-use std::collections::HashMap;
+pub mod accounting;
 #[cfg(any(feature = "enterprise", test))]
-use std::collections::HashSet;
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
-use std::sync::RwLock;
+pub mod list;
+
+#[cfg(any(feature = "enterprise", test))]
+use std::collections::{HashMap, HashSet};
+#[cfg(any(feature = "enterprise", test))]
+use std::sync::Arc;
 #[cfg(feature = "enterprise")]
-use std::sync::{Arc, LazyLock};
+use std::sync::LazyLock;
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
+use std::sync::RwLock;
 
 #[cfg(feature = "enterprise")]
 use axum::response::Response;
@@ -38,11 +43,20 @@ use db::user::is_root_user;
 #[cfg(any(feature = "enterprise", test))]
 use infra::table::service_streams::ServiceRecord;
 
+#[cfg(any(feature = "enterprise", test))]
+pub use self::list::readable_streams;
+#[cfg(any(feature = "enterprise", test))]
+use self::list::{
+    AuthzUnavailable, ListSettings, ObjectRef, ObjectsQuery, OrgWideCheck, StreamShape,
+    TypeAccessKind, UnlistedKind,
+};
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
+use self::list::{ListPolicy, UnavailableReason};
 use crate::auth::AuthExtractor;
 
-/// The longest stream object id the org-wide shortcut accepts; OpenFGA refuses objects past 256.
-#[cfg(any(feature = "enterprise", test))]
-const MAX_SHORTCUT_ID_LEN: usize = 200;
+/// Longest object id the fake lets through, as OpenFGA's Check pattern does.
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
+const FAKE_MAX_ID_LEN: usize = 256;
 
 #[cfg(any(feature = "enterprise", test))]
 pub const STREAM_ACCESS_HINT: &str = "Ask an org admin for read access to the listed streams, or change the query to streams you can read.";
@@ -204,6 +218,45 @@ pub trait StreamAccessChecker: Send + Sync {
         folder: &str,
         dashboard_id: &str,
     ) -> bool;
+    /// The list authorization mode and limits; the default keeps the `origin/main` path.
+    fn list_settings(&self, _user_id: &str) -> ListSettings {
+        ListSettings::default()
+    }
+    /// Per-type answers for `types`; the default gives none, so every object takes `check_object`.
+    async fn types_access(
+        &self,
+        _user_id: &str,
+        _org_id: &str,
+        _shape: &StreamShape<'_>,
+        types: &[StreamType],
+    ) -> Result<HashMap<StreamType, TypeAccessKind>, AuthzUnavailable> {
+        let unlisted = TypeAccessKind::Unlisted(UnlistedKind::Disabled);
+        Ok(types.iter().map(|t| (*t, unlisted.clone())).collect())
+    }
+    /// The exact per-object Check of the site, fallible.
+    async fn check_object(
+        &self,
+        user_id: &str,
+        org_id: &str,
+        _query: &ObjectsQuery<'_>,
+        object: &ObjectRef<'_>,
+    ) -> Result<bool, AuthzUnavailable> {
+        let stream = TypedStream {
+            org_id: org_id.to_string(),
+            stream_type: object.stream_type,
+            name: object.id.to_string(),
+        };
+        Ok(self.can_read_stream(user_id, &stream).await)
+    }
+    /// A site prelude, sent verbatim; the default never confirms one.
+    async fn org_wide_check(
+        &self,
+        _user_id: &str,
+        _org_id: &str,
+        _check: &OrgWideCheck<'_>,
+    ) -> Result<bool, AuthzUnavailable> {
+        Ok(false)
+    }
 }
 
 /// A refusal a save's error can carry: errors must be `Sync`, and a response body is not.
@@ -231,7 +284,7 @@ pub trait WriteCheck<T: Sync>: Send + Sync {
     async fn check(&self, object: &T) -> Result<(), axum::response::Response>;
 }
 
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
 #[derive(Default)]
 pub struct FakeStreamChecker {
     roots: RwLock<HashSet<String>>,
@@ -239,10 +292,16 @@ pub struct FakeStreamChecker {
     grants: RwLock<HashSet<(String, String)>>,
     org_wide: RwLock<HashSet<(String, String, StreamType)>>,
     org_wide_failures: RwLock<HashSet<String>>,
+    every_stream: RwLock<HashSet<(String, String)>>,
+    org_wide_checks: RwLock<HashSet<(String, String, String)>>,
+    roles: RwLock<HashMap<(String, String), String>>,
+    role_answers: RwLock<HashMap<(String, String), bool>>,
+    users: RwLock<HashMap<String, FakeUser>>,
+    in_flight: RwLock<HashMap<String, usize>>,
     calls: RwLock<HashMap<String, CheckCalls>>,
 }
 
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
 impl FakeStreamChecker {
     pub fn grant_root(&self, user_id: &str) {
         write_set(&self.roots).insert(user_id.to_string());
@@ -269,13 +328,101 @@ impl FakeStreamChecker {
         ));
     }
 
+    /// A wide grant on one stream type: the B1/B2 probe of the type-level path.
     pub fn grant_read_all(&self, user_id: &str, org_id: &str, stream_type: StreamType) {
         write_set(&self.org_wide).insert((user_id.to_string(), org_id.to_string(), stream_type));
+    }
+
+    /// A grant on every stream type at once: the C probe of the type-level path.
+    pub fn grant_read_every_stream(&self, user_id: &str, org_id: &str) {
+        write_set(&self.every_stream).insert((user_id.to_string(), org_id.to_string()));
+    }
+
+    pub fn grant_org_wide_check(&self, user_id: &str, org_id: &str, resource: &str) {
+        write_set(&self.org_wide_checks).insert((
+            user_id.to_string(),
+            org_id.to_string(),
+            resource.to_string(),
+        ));
+    }
+
+    /// The user's role, for the offline rule; `admin` and `editor` are answered by their role.
+    pub fn set_role(&self, org_id: &str, user_id: &str, role: &str) {
+        let key = (org_id.to_string(), user_id.to_string());
+        write_map(&self.roles).insert(key, role.to_string());
+    }
+
+    /// Makes the user's role Check answer every stream with `allowed`.
+    pub fn set_role_answer(&self, org_id: &str, user_id: &str, allowed: bool) {
+        let key = (org_id.to_string(), user_id.to_string());
+        write_map(&self.role_answers).insert(key, allowed);
+    }
+
+    pub fn set_list_mode(&self, user_id: &str, mode: list::ListMode) {
+        self.user(user_id, |user| user.settings.mode = mode);
+    }
+
+    pub fn set_shadow_sample(&self, user_id: &str, sample: f64) {
+        self.user(user_id, |user| user.settings.shadow_sample = sample);
+    }
+
+    pub fn set_fallback_concurrency(&self, user_id: &str, concurrency: usize) {
+        self.user(user_id, |user| {
+            user.settings.fallback_concurrency = concurrency
+        });
+    }
+
+    /// Lists are enabled by default for a fake user, as a declared deadline enables them.
+    pub fn set_list_policy(&self, user_id: &str, policy: ListPolicy) {
+        self.user(user_id, |user| user.policy = policy);
+    }
+
+    pub fn set_offline_roles(&self, user_id: &str, roles: &[&str]) {
+        let roles = roles.iter().map(|r| r.to_string()).collect();
+        self.user(user_id, |user| user.offline_roles = roles);
     }
 
     /// Makes the next org-wide question of this user come back empty, as a failed Check does.
     pub fn fail_org_wide_once(&self, user_id: &str) {
         write_set(&self.org_wide_failures).insert(user_id.to_string());
+    }
+
+    pub fn fail_types_access_once(&self, user_id: &str, reason: UnavailableReason) {
+        self.user(user_id, |user| user.failures.probe = Some(reason));
+    }
+
+    pub fn fail_list_once(&self, user_id: &str, reason: UnavailableReason) {
+        self.user(user_id, |user| user.failures.list = Some(reason));
+    }
+
+    pub fn fail_list_incomplete_once(&self, user_id: &str, stream_type: StreamType) {
+        self.user(user_id, |user| user.failures.incomplete = Some(stream_type));
+    }
+
+    pub fn fail_org_wide_check_once(&self, user_id: &str, reason: UnavailableReason) {
+        self.user(user_id, |user| user.failures.org_wide_check = Some(reason));
+    }
+
+    pub fn fail_object_check_once(&self, user_id: &str, reason: UnavailableReason) {
+        self.user(user_id, |user| user.failures.object_check = Some(reason));
+    }
+
+    /// Fails every later call of this user, the per-stream Checks of the legacy path included.
+    pub fn fail_every_call(&self, user_id: &str, reason: UnavailableReason) {
+        self.user(user_id, |user| user.failures.every_call = Some(reason));
+    }
+
+    /// Makes the next legacy Check of `name` fail, which the legacy path reads as a deny.
+    pub fn fail_stream_read_once(&self, user_id: &str, name: &str) {
+        self.user(user_id, |user| {
+            user.failures.stream_read = Some(name.to_string())
+        });
+    }
+
+    /// Adds `name` to the next list of `stream_type`, so the two paths disagree once.
+    pub fn list_extra_once(&self, user_id: &str, stream_type: StreamType, name: &str) {
+        let extra = Some((stream_type, name.to_string()));
+        self.user(user_id, |user| user.failures.list_extra = extra);
     }
 
     pub fn calls(&self, user_id: &str) -> CheckCalls {
@@ -286,6 +433,11 @@ impl FakeStreamChecker {
     fn count(&self, user_id: &str, add: impl FnOnce(&mut CheckCalls)) {
         let mut calls = self.calls.write().unwrap_or_else(|e| e.into_inner());
         add(calls.entry(user_id.to_string()).or_default());
+    }
+
+    fn user<R>(&self, user_id: &str, f: impl FnOnce(&mut FakeUser) -> R) -> R {
+        let mut users = write_map(&self.users);
+        f(users.entry(user_id.to_string()).or_default())
     }
 
     fn granted(&self, user_id: &str, key: String) -> bool {
@@ -301,9 +453,118 @@ impl FakeStreamChecker {
             .unwrap_or_else(|e| e.into_inner())
             .contains(&(user_id.to_string(), org_id.to_string(), stream_type))
     }
+
+    fn reads_every_stream(&self, user_id: &str, org_id: &str) -> bool {
+        self.every_stream
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains(&(user_id.to_string(), org_id.to_string()))
+    }
+
+    fn role(&self, org_id: &str, user_id: &str) -> String {
+        let roles = self.roles.read().unwrap_or_else(|e| e.into_inner());
+        let key = (org_id.to_string(), user_id.to_string());
+        roles
+            .get(&key)
+            .cloned()
+            .unwrap_or_else(|| "user".to_string())
+    }
+
+    /// The answer of the user's role Check, for the users the role branch answers.
+    fn role_branch(&self, org_id: &str, user_id: &str) -> Option<bool> {
+        let key = (org_id.to_string(), user_id.to_string());
+        let answers = self.role_answers.read().unwrap_or_else(|e| e.into_inner());
+        if let Some(allowed) = answers.get(&key) {
+            return Some(*allowed);
+        }
+        let role = self.role(org_id, user_id);
+        (matches!(role.as_str(), "admin" | "editor") && user_id != org_id).then_some(true)
+    }
+
+    /// Takes the one-shot failure `pick` names, or the failure of every call.
+    fn failure(
+        &self,
+        user_id: &str,
+        pick: impl FnOnce(&mut FakeFailures) -> Option<UnavailableReason>,
+    ) -> Option<UnavailableReason> {
+        self.user(user_id, |user| {
+            pick(&mut user.failures).or(user.failures.every_call)
+        })
+    }
+
+    /// A failure answered as `is_allowed` answers it: `true` for an offline-access role.
+    fn offline(&self, org_id: &str, user_id: &str, reason: UnavailableReason) -> bool {
+        let role = self.role(org_id, user_id);
+        reason == UnavailableReason::Transport
+            && self.user(user_id, |user| user.offline_roles.contains(&role))
+    }
+
+    fn listed(&self, user_id: &str, org_id: &str, stream_type: StreamType) -> HashSet<String> {
+        let prefix = format!("{org_id}/{stream_type}/");
+        let grants = self.grants.read().unwrap_or_else(|e| e.into_inner());
+        let mut ids: HashSet<String> = grants
+            .iter()
+            .filter(|(user, _)| user == user_id)
+            .filter_map(|(_, key)| key.strip_prefix(&prefix))
+            .map(config::utils::str::into_ofga_supported_format)
+            .collect();
+        drop(grants);
+        let extra = self.user(user_id, |user| match &user.failures.list_extra {
+            Some((t, _)) if *t == stream_type => user.failures.list_extra.take(),
+            _ => None,
+        });
+        ids.extend(extra.map(|(_, name)| name));
+        ids
+    }
+
+    fn list_type(
+        &self,
+        user_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+    ) -> Result<TypeAccessKind, AuthzUnavailable> {
+        self.count(user_id, |calls| calls.lists += 1);
+        if let Some(reason) = self.failure(user_id, |f| f.list.take()) {
+            fake_record(true);
+            if self.offline(org_id, user_id, reason) {
+                return Ok(TypeAccessKind::Unlisted(UnlistedKind::OfflineRule));
+            }
+            return Err(reason.into());
+        }
+        fake_record(false);
+        let incomplete = self.user(user_id, |user| match user.failures.incomplete {
+            Some(t) if t == stream_type => user.failures.incomplete.take(),
+            _ => None,
+        });
+        if incomplete.is_some() {
+            return Ok(TypeAccessKind::Unlisted(UnlistedKind::Incomplete));
+        }
+        Ok(TypeAccessKind::Listed(self.listed(
+            user_id,
+            org_id,
+            stream_type,
+        )))
+    }
+
+    async fn enter_check(&self, user_id: &str) {
+        let now = {
+            let mut in_flight = write_map(&self.in_flight);
+            let n = in_flight.entry(user_id.to_string()).or_default();
+            *n += 1;
+            *n
+        };
+        self.count(user_id, |calls| {
+            calls.max_in_flight = calls.max_in_flight.max(now)
+        });
+        tokio::task::yield_now().await;
+        let mut in_flight = write_map(&self.in_flight);
+        if let Some(n) = in_flight.get_mut(user_id) {
+            *n -= 1;
+        }
+    }
 }
 
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
 #[async_trait::async_trait]
 impl StreamAccessChecker for FakeStreamChecker {
     async fn enforces_rbac(&self) -> bool {
@@ -327,6 +588,25 @@ impl StreamAccessChecker for FakeStreamChecker {
     async fn can_read_stream(&self, user_id: &str, stream: &TypedStream) -> bool {
         self.count(user_id, |calls| calls.streams += 1);
         tokio::task::yield_now().await;
+        let failed_once = self.user(user_id, |user| {
+            let hit = user.failures.stream_read.as_deref() == Some(stream.name.as_str());
+            if hit {
+                user.failures.stream_read = None;
+            }
+            hit
+        });
+        if failed_once {
+            fake_record(true);
+            return false;
+        }
+        if let Some(reason) = self.failure(user_id, |_| None) {
+            fake_record(true);
+            return self.offline(&stream.org_id, user_id, reason);
+        }
+        fake_record(false);
+        if let Some(allowed) = self.role_branch(&stream.org_id, user_id) {
+            return allowed;
+        }
         let key = format!("{}/{}/{}", stream.org_id, stream.stream_type, stream.name);
         self.granted(user_id, key) || self.reads_all(user_id, &stream.org_id, stream.stream_type)
     }
@@ -339,7 +619,10 @@ impl StreamAccessChecker for FakeStreamChecker {
     ) -> HashSet<StreamType> {
         self.count(user_id, |calls| calls.org_wide.push(wanted.to_vec()));
         tokio::task::yield_now().await;
-        if write_set(&self.org_wide_failures).remove(user_id) {
+        let failed = write_set(&self.org_wide_failures).remove(user_id)
+            || self.failure(user_id, |_| None).is_some();
+        fake_record(failed);
+        if failed {
             return HashSet::new();
         }
         wanted
@@ -365,14 +648,221 @@ impl StreamAccessChecker for FakeStreamChecker {
             format!("{org_id}/dashboards/{folder}/{dashboard_id}"),
         )
     }
+
+    fn list_settings(&self, user_id: &str) -> ListSettings {
+        self.user(user_id, |user| user.settings)
+    }
+
+    async fn types_access(
+        &self,
+        user_id: &str,
+        org_id: &str,
+        shape: &StreamShape<'_>,
+        types: &[StreamType],
+    ) -> Result<HashMap<StreamType, TypeAccessKind>, AuthzUnavailable> {
+        self.count(user_id, |calls| {
+            calls.types_access += 1;
+            if shape.identity == list::Identity::StoredEmail {
+                calls.stored_email_types += 1;
+            }
+        });
+        let every = |kind: TypeAccessKind| types.iter().map(|t| (*t, kind.clone())).collect();
+        if let Some(allowed) = self.role_branch(org_id, user_id) {
+            self.count(user_id, |calls| calls.role_checks += 1);
+            let failure = self.failure(user_id, |_| None);
+            fake_record(failure.is_some());
+            return match failure {
+                Some(reason) if self.offline(org_id, user_id, reason) => {
+                    Ok(every(TypeAccessKind::Role(true)))
+                }
+                Some(reason) => Err(reason.into()),
+                None => Ok(every(TypeAccessKind::Role(allowed))),
+            };
+        }
+        self.count(user_id, |calls| calls.probe_c += 1);
+        if let Some(reason) = self.failure(user_id, |f| f.probe.take()) {
+            fake_record(true);
+            if self.offline(org_id, user_id, reason) {
+                return Ok(every(TypeAccessKind::Unlisted(UnlistedKind::OfflineRule)));
+            }
+            return Err(reason.into());
+        }
+        fake_record(false);
+        if self.reads_every_stream(user_id, org_id) {
+            return Ok(every(TypeAccessKind::All));
+        }
+        let mut access = HashMap::new();
+        let mut open = Vec::new();
+        for stream_type in types {
+            if shape.self_parent_edge {
+                self.count(user_id, |calls| calls.probe_b += 2);
+                fake_record(false);
+                fake_record(false);
+                if self.reads_all(user_id, org_id, *stream_type) {
+                    access.insert(*stream_type, TypeAccessKind::All);
+                    continue;
+                }
+            }
+            open.push(*stream_type);
+        }
+        let policy = self.user(user_id, |user| user.policy);
+        for stream_type in open {
+            let kind = if policy == ListPolicy::Disabled {
+                TypeAccessKind::Unlisted(UnlistedKind::Disabled)
+            } else {
+                self.list_type(user_id, org_id, stream_type)?
+            };
+            access.insert(stream_type, kind);
+        }
+        Ok(access)
+    }
+
+    async fn check_object(
+        &self,
+        user_id: &str,
+        org_id: &str,
+        query: &ObjectsQuery<'_>,
+        object: &ObjectRef<'_>,
+    ) -> Result<bool, AuthzUnavailable> {
+        self.count(user_id, |calls| {
+            calls.object_checks += 1;
+            calls.object_check_args.push(ObjectCheckArgs {
+                permission: query.permission.to_string(),
+                use_all_org: query.use_all_org,
+                parent_id: query.parent_id.to_string(),
+                use_self_context: query.use_self_context,
+                use_self_parent: query.use_self_parent,
+                identity: query.identity,
+            });
+        });
+        self.enter_check(user_id).await;
+        if let Some(reason) = self.failure(user_id, |f| f.object_check.take()) {
+            fake_record(true);
+            if self.offline(org_id, user_id, reason) {
+                return Ok(true);
+            }
+            return Err(reason.into());
+        }
+        fake_record(false);
+        if let Some(allowed) = self.role_branch(org_id, user_id) {
+            return Ok(allowed);
+        }
+        let id = object.ofga_id.as_ref();
+        let refused = id.len() > FAKE_MAX_ID_LEN
+            || id
+                .chars()
+                .any(|c| c.is_ascii_whitespace() || c.is_control() || matches!(c, '#' | ':'));
+        if refused {
+            return Ok(false);
+        }
+        let key = format!("{org_id}/{}/{}", object.stream_type, object.id);
+        Ok(self.granted(user_id, key)
+            || (query.use_self_parent && self.reads_all(user_id, org_id, object.stream_type))
+            || self.reads_every_stream(user_id, org_id))
+    }
+
+    async fn org_wide_check(
+        &self,
+        user_id: &str,
+        org_id: &str,
+        check: &OrgWideCheck<'_>,
+    ) -> Result<bool, AuthzUnavailable> {
+        self.count(user_id, |calls| calls.org_wide_checks += 1);
+        if let Some(reason) = self.failure(user_id, |f| f.org_wide_check.take()) {
+            fake_record(true);
+            if self.offline(org_id, user_id, reason) {
+                return Ok(true);
+            }
+            return Err(reason.into());
+        }
+        fake_record(false);
+        let key = (
+            user_id.to_string(),
+            org_id.to_string(),
+            check.resource.to_string(),
+        );
+        Ok(self
+            .org_wide_checks
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains(&key))
+    }
 }
 
 /// What one user asked a [`FakeStreamChecker`], so a test can count the Checks a path costs.
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CheckCalls {
     pub streams: usize,
     pub org_wide: Vec<Vec<StreamType>>,
+    pub types_access: usize,
+    pub stored_email_types: usize,
+    pub role_checks: usize,
+    pub probe_c: usize,
+    pub probe_b: usize,
+    pub lists: usize,
+    pub object_checks: usize,
+    pub object_check_args: Vec<ObjectCheckArgs>,
+    pub org_wide_checks: usize,
+    pub max_in_flight: usize,
+}
+
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
+impl CheckCalls {
+    /// OpenFGA calls of the type-level path.
+    pub fn total(&self) -> usize {
+        self.role_checks
+            + self.probe_c
+            + self.probe_b
+            + self.lists
+            + self.object_checks
+            + self.org_wide_checks
+    }
+}
+
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ObjectCheckArgs {
+    pub permission: String,
+    pub use_all_org: bool,
+    pub parent_id: String,
+    pub use_self_context: bool,
+    pub use_self_parent: bool,
+    pub identity: list::Identity,
+}
+
+/// One fake user's settings and pending failures.
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
+struct FakeUser {
+    settings: ListSettings,
+    policy: ListPolicy,
+    offline_roles: Vec<String>,
+    failures: FakeFailures,
+}
+
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
+impl Default for FakeUser {
+    fn default() -> Self {
+        Self {
+            settings: ListSettings::default(),
+            policy: ListPolicy::Enabled,
+            offline_roles: ["admin", "editor", "root"].map(String::from).to_vec(),
+            failures: FakeFailures::default(),
+        }
+    }
+}
+
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
+#[derive(Default)]
+struct FakeFailures {
+    probe: Option<UnavailableReason>,
+    list: Option<UnavailableReason>,
+    incomplete: Option<StreamType>,
+    org_wide_check: Option<UnavailableReason>,
+    object_check: Option<UnavailableReason>,
+    every_call: Option<UnavailableReason>,
+    stream_read: Option<String>,
+    list_extra: Option<(StreamType, String)>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -497,24 +987,181 @@ impl StreamAccessChecker for OpenFgaStreamChecker {
         )
         .await
     }
+
+    fn list_settings(&self, _user_id: &str) -> ListSettings {
+        use o2_openfga::config::ListAuthzMode;
+
+        let cfg = o2_openfga::config::get_config();
+        let mode = match cfg.list_authz_mode() {
+            ListAuthzMode::Off => list::ListMode::Off,
+            ListAuthzMode::Shadow => list::ListMode::Shadow,
+            ListAuthzMode::On => list::ListMode::On,
+        };
+        ListSettings {
+            mode,
+            shadow_sample: cfg.list_authz_shadow_sample,
+            fallback_concurrency: cfg.list_fallback_concurrency,
+        }
+    }
+
+    async fn types_access(
+        &self,
+        user_id: &str,
+        org_id: &str,
+        shape: &StreamShape<'_>,
+        types: &[StreamType],
+    ) -> Result<HashMap<StreamType, TypeAccessKind>, AuthzUnavailable> {
+        use o2_openfga::authorizer::list::{ListPolicy, TypeAccess, TypesQuery, types_access};
+
+        let every = |kind: TypeAccessKind| types.iter().map(|t| (*t, kind.clone())).collect();
+        let Some(user) = crate::users::get_user(Some(org_id), user_id).await else {
+            // Missing membership denies without OpenFGA, so it cannot count as a list.
+            return Ok(every(TypeAccessKind::Role(false)));
+        };
+        if !o2_openfga::config::get_config().enabled || user.role == UserRole::Root {
+            return Ok(every(TypeAccessKind::All));
+        }
+        let sent = sent_user_id(shape.identity, user_id, &user.email);
+        let role = effective_role(org_id, sent, user.role.to_string());
+        let models: Vec<&str> = types.iter().map(|t| stream_model(*t)).collect();
+        let query = TypesQuery {
+            org: org_id,
+            user_id: sent,
+            role: &role,
+            obj_types: &models,
+            permission: shape.permission,
+            self_parent_edge: shape.self_parent_edge,
+        };
+        let (access, role_check_sent) =
+            accounting::track_role_check(types_access(&query, ListPolicy::configured())).await;
+        let mut access = access?;
+        let mut answers = HashMap::with_capacity(types.len());
+        // One Role call answers all listable types because stream models share role eligibility.
+        for (stream_type, model) in types.iter().zip(models) {
+            let kind = match access.remove(model) {
+                Some(TypeAccess::All) if role_check_sent => TypeAccessKind::Role(true),
+                Some(TypeAccess::Listed(ids)) if role_check_sent && ids.is_empty() => {
+                    TypeAccessKind::Role(false)
+                }
+                Some(kind) => kind.into(),
+                None => TypeAccessKind::Unlisted(UnlistedKind::Disabled),
+            };
+            answers.insert(*stream_type, kind);
+        }
+        Ok(answers)
+    }
+
+    async fn check_object(
+        &self,
+        user_id: &str,
+        org_id: &str,
+        query: &ObjectsQuery<'_>,
+        object: &ObjectRef<'_>,
+    ) -> Result<bool, AuthzUnavailable> {
+        let Some(user) = crate::users::get_user(Some(org_id), user_id).await else {
+            return Ok(false);
+        };
+        let sent = sent_user_id(query.identity, user_id, &user.email);
+        let object_id = format!("{}:{}", stream_model(object.stream_type), object.ofga_id);
+        let check = SentCheck {
+            org_id,
+            user_id: sent,
+            permission: query.permission,
+            object: &object_id,
+            parent_id: query.parent_id,
+            use_all_org: query.use_all_org,
+            use_self_context: query.use_self_context,
+            use_self_parent: query.use_self_parent,
+        };
+        check.send(&user).await
+    }
+
+    async fn org_wide_check(
+        &self,
+        user_id: &str,
+        org_id: &str,
+        check: &OrgWideCheck<'_>,
+    ) -> Result<bool, AuthzUnavailable> {
+        use o2_openfga::meta::mapping::OFGA_MODELS;
+
+        if is_root_user(user_id) {
+            return Ok(true);
+        }
+        let Some(user) = crate::users::get_user(Some(org_id), user_id).await else {
+            return Ok(false);
+        };
+        let model = OFGA_MODELS
+            .get(check.resource)
+            .map_or(check.resource, |model| model.key);
+        let object_id = format!("{model}:{org_id}");
+        let sent = SentCheck {
+            org_id,
+            user_id: &user.email,
+            permission: check.permission,
+            object: &object_id,
+            parent_id: "",
+            use_all_org: check.use_all_org,
+            use_self_context: check.use_self_context,
+            use_self_parent: check.use_self_parent,
+        };
+        sent.send(&user).await
+    }
 }
 
-/// One answer per key, shared by every reader of that key while it is still in flight.
+/// One Check as `check_permissions` sends it, but with the request timeout and a typed error.
 #[cfg(feature = "enterprise")]
-type SharedAnswers<K> = std::sync::Mutex<HashMap<K, Arc<tokio::sync::OnceCell<bool>>>>;
+struct SentCheck<'a> {
+    org_id: &'a str,
+    user_id: &'a str,
+    permission: &'a str,
+    object: &'a str,
+    parent_id: &'a str,
+    use_all_org: bool,
+    use_self_context: bool,
+    use_self_parent: bool,
+}
+
+#[cfg(feature = "enterprise")]
+impl SentCheck<'_> {
+    async fn send(&self, user: &config::meta::user::User) -> Result<bool, AuthzUnavailable> {
+        use o2_openfga::authorizer::decision::{CheckArgs, check_decision, offline_check_allows};
+
+        let cfg = o2_openfga::config::get_config();
+        if !cfg.enabled || user.role == UserRole::Root {
+            return Ok(true);
+        }
+        let role = effective_role(self.org_id, self.user_id, user.role.to_string());
+        let args = CheckArgs {
+            org: self.org_id,
+            user_id: self.user_id,
+            permission: self.permission,
+            object: self.object,
+            parent_id: self.parent_id,
+            role: &role,
+            use_all_org: self.use_all_org,
+            use_self_context: self.use_self_context,
+            use_self_parent: self.use_self_parent,
+        };
+        match check_decision(&args, Some(cfg.request_timeout())).await {
+            Ok(allowed) => Ok(allowed),
+            Err(err) if offline_check_allows(&args, err) => Ok(true),
+            Err(err) => Err(err.into()),
+        }
+    }
+}
 
 /// One request's stream reads for one user and org, so a stream named on many rows is checked once.
 #[cfg(feature = "enterprise")]
 #[derive(Default)]
 pub struct StreamReadMemo {
     unrestricted: tokio::sync::OnceCell<bool>,
-    org_wide: SharedAnswers<StreamType>,
-    streams: SharedAnswers<(StreamType, String)>,
+    org_wide: SharedAnswers<StreamType, StreamReadAnswer>,
+    streams: SharedAnswers<(StreamType, String), StreamReadAnswer>,
 }
 
 #[cfg(feature = "enterprise")]
 impl StreamReadMemo {
-    /// Answers as [`readable_streams`] does for one stream.
+    /// Shares checks across evidence rows using the rules of [`list::legacy_readable_streams`].
     pub async fn can_read(
         &self,
         checker: &dyn StreamAccessChecker,
@@ -523,6 +1170,19 @@ impl StreamReadMemo {
         stream_type: StreamType,
         name: &str,
     ) -> bool {
+        self.read(checker, user_id, org_id, stream_type, name)
+            .await
+            .allowed
+    }
+
+    pub(crate) async fn read(
+        &self,
+        checker: &dyn StreamAccessChecker,
+        user_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        name: &str,
+    ) -> StreamReadAnswer {
         let unrestricted = *self
             .unrestricted
             .get_or_init(|| async {
@@ -532,7 +1192,10 @@ impl StreamReadMemo {
             })
             .await;
         if unrestricted {
-            return true;
+            return StreamReadAnswer {
+                allowed: true,
+                had_error: false,
+            };
         }
         let shortcut = org_wide_shortcut_covers(stream_type, name);
         let (cell, first_of_type) = {
@@ -546,19 +1209,25 @@ impl StreamReadMemo {
         // A lone stream's own Check already counts the org-wide grants.
         *cell
             .get_or_init(|| async {
-                (!first_of_type
-                    && shortcut
-                    && self.org_wide(checker, user_id, org_id, stream_type).await)
-                    || checker
-                        .can_read_stream(
-                            user_id,
-                            &TypedStream {
-                                org_id: org_id.to_string(),
-                                stream_type,
-                                name: name.to_string(),
-                            },
-                        )
-                        .await
+                let wide = if !first_of_type && shortcut {
+                    self.org_wide(checker, user_id, org_id, stream_type).await
+                } else {
+                    StreamReadAnswer::default()
+                };
+                if wide.allowed {
+                    return wide;
+                }
+                let mut answer = StreamReadAnswer::counted(checker.can_read_stream(
+                    user_id,
+                    &TypedStream {
+                        org_id: org_id.to_string(),
+                        stream_type,
+                        name: name.to_string(),
+                    },
+                ))
+                .await;
+                answer.had_error |= wide.had_error;
+                answer
             })
             .await
     }
@@ -569,18 +1238,46 @@ impl StreamReadMemo {
         user_id: &str,
         org_id: &str,
         stream_type: StreamType,
-    ) -> bool {
+    ) -> StreamReadAnswer {
         let cell = shared_cell(&self.org_wide, stream_type);
         *cell
-            .get_or_init(|| async {
-                checker
-                    .org_wide_readable(user_id, org_id, &[stream_type])
-                    .await
-                    .contains(&stream_type)
+            .get_or_init(|| {
+                StreamReadAnswer::counted(async {
+                    checker
+                        .org_wide_readable(user_id, org_id, &[stream_type])
+                        .await
+                        .contains(&stream_type)
+                })
             })
             .await
     }
 }
+
+#[cfg(feature = "enterprise")]
+#[derive(Clone, Copy, Default)]
+pub(crate) struct StreamReadAnswer {
+    pub(crate) allowed: bool,
+    pub(crate) had_error: bool,
+}
+
+#[cfg(feature = "enterprise")]
+impl StreamReadAnswer {
+    async fn counted(fut: impl Future<Output = bool>) -> Self {
+        let (allowed, errors) = if accounting::REQUEST_CALLS.try_with(|_| ()).is_ok() {
+            accounting::in_own_scope(fut).await
+        } else {
+            (fut.await, 0)
+        };
+        Self {
+            allowed,
+            had_error: errors > 0,
+        }
+    }
+}
+
+/// One answer per key, shared by every reader of that key while it is still in flight.
+#[cfg(any(feature = "enterprise", test))]
+type SharedAnswers<K, V> = std::sync::Mutex<HashMap<K, Arc<tokio::sync::OnceCell<V>>>>;
 
 /// Checks stream permissions, returning `Some(forbidden response)` when the
 /// user is not permitted and `None` when access is allowed.
@@ -943,83 +1640,58 @@ pub async fn authorize_with(
     }
 }
 
-/// Keeps, in order, the streams of `org_id` the user can read; an errored check denies. [no-fail]
+/// Keeps, in order, the streams of `org_id` the user can read.
 #[cfg(any(feature = "enterprise", test))]
 pub async fn readable_related_streams(
+    checker: &dyn StreamAccessChecker,
+    site: list::Site,
+    user_id: &str,
+    org_id: &str,
+    streams: RelatedStreams,
+) -> Result<RelatedStreams, AuthzUnavailable> {
+    let wanted = related_stream_set(&streams);
+    let readable = readable_streams(checker, site, user_id, org_id, wanted).await?;
+    Ok(keep_related_streams(streams, readable))
+}
+
+/// The `origin/main` [`readable_related_streams`]: an errored check denies. [no-fail]
+#[cfg(any(feature = "enterprise", test))]
+pub async fn legacy_readable_related_streams(
     checker: &dyn StreamAccessChecker,
     user_id: &str,
     org_id: &str,
     streams: RelatedStreams,
 ) -> RelatedStreams {
-    let wanted = [
-        (StreamType::Logs, &streams.logs),
-        (StreamType::Traces, &streams.traces),
-        (StreamType::Metrics, &streams.metrics),
-        (StreamType::Profiles, &streams.profiles),
-    ]
-    .into_iter()
-    .flat_map(|(stream_type, list)| {
-        list.iter()
-            .map(move |info| (stream_type, info.stream_name.clone()))
-    })
-    .collect();
-    let Some(readable) = readable_streams(checker, user_id, org_id, wanted).await else {
-        return streams;
-    };
-    let keep = |stream_type: StreamType, list: Vec<StreamInfo>| -> Vec<StreamInfo> {
-        list.into_iter()
-            .filter(|info| readable.contains(&(stream_type, info.stream_name.clone())))
-            .collect()
-    };
-    let RelatedStreams {
-        logs,
-        traces,
-        metrics,
-        profiles,
-    } = streams;
-    RelatedStreams {
-        logs: keep(StreamType::Logs, logs),
-        traces: keep(StreamType::Traces, traces),
-        metrics: keep(StreamType::Metrics, metrics),
-        profiles: keep(StreamType::Profiles, profiles),
-    }
+    let wanted = related_stream_set(&streams);
+    let readable = list::legacy_readable_streams(checker, user_id, org_id, wanted).await;
+    keep_related_streams(streams, readable)
 }
 
-/// Keeps the services with a stream the user can read, each listing only those streams. [no-fail]
+/// Keeps the services with a stream the user can read, each listing only those streams.
 #[cfg(any(feature = "enterprise", test))]
 pub async fn readable_service_records(
+    checker: &dyn StreamAccessChecker,
+    site: list::Site,
+    user_id: &str,
+    org_id: &str,
+    mut records: Vec<ServiceRecord>,
+) -> Result<Vec<ServiceRecord>, AuthzUnavailable> {
+    let wanted = service_record_set(&mut records);
+    let readable = readable_streams(checker, site, user_id, org_id, wanted).await?;
+    Ok(keep_service_records(records, readable))
+}
+
+/// The `origin/main` [`readable_service_records`]: an errored check denies. [no-fail]
+#[cfg(any(feature = "enterprise", test))]
+pub async fn legacy_readable_service_records(
     checker: &dyn StreamAccessChecker,
     user_id: &str,
     org_id: &str,
     mut records: Vec<ServiceRecord>,
 ) -> Vec<ServiceRecord> {
-    let mut wanted = HashSet::new();
-    for record in &mut records {
-        for (stream_type, list) in service_record_streams(record) {
-            let names = list.as_array().into_iter().flatten();
-            wanted.extend(names.filter_map(|v| v.as_str().map(|n| (stream_type, n.to_string()))));
-        }
-    }
-    let Some(readable) = readable_streams(checker, user_id, org_id, wanted).await else {
-        return records;
-    };
-    records
-        .into_iter()
-        .filter_map(|mut record| {
-            let mut any_left = false;
-            for (stream_type, list) in service_record_streams(&mut record) {
-                let Some(items) = list.as_array_mut() else {
-                    continue;
-                };
-                items.retain(|v| {
-                    v.as_str()
-                        .is_some_and(|n| readable.contains(&(stream_type, n.to_string())))
-                });
-                any_left |= !items.is_empty();
-            }
-            any_left.then_some(record)
-        })
-        .collect()
+    let wanted = service_record_set(&mut records);
+    let readable = list::legacy_readable_streams(checker, user_id, org_id, wanted).await;
+    keep_service_records(records, readable)
 }
 
 #[cfg(feature = "enterprise")]
@@ -1059,6 +1731,19 @@ pub fn fake_checker() -> Arc<FakeStreamChecker> {
         checker
     })
     .clone()
+}
+
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
+pub async fn within_budget<F: Future>(budget: u32, fut: F) -> F::Output {
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    {
+        accounting::with_budget(budget, fut).await
+    }
+    #[cfg(not(all(feature = "enterprise", feature = "test-utils")))]
+    {
+        let _ = budget;
+        fut.await
+    }
 }
 
 #[cfg(any(feature = "enterprise", test))]
@@ -1105,7 +1790,7 @@ pub fn stream_access_forbidden(request_org: &str, denied: &StreamAccessDenied) -
     (StatusCode::FORBIDDEN, Json(body)).into_response()
 }
 
-/// [`readable_streams`] with the live checker, for callers outside this crate.
+/// [`list::legacy_readable_streams`] with the live checker, for callers outside this crate.
 #[cfg(feature = "enterprise")]
 pub async fn readable_org_streams(
     user_id: &str,
@@ -1113,54 +1798,7 @@ pub async fn readable_org_streams(
     streams: HashSet<(StreamType, String)>,
 ) -> Option<HashSet<(StreamType, String)>> {
     let checker = active_checker();
-    readable_streams(checker.as_ref(), user_id, org_id, streams).await
-}
-
-/// The streams of `org_id` the user can read, or `None` when RBAC lets them read every stream.
-#[cfg(any(feature = "enterprise", test))]
-pub(crate) async fn readable_streams(
-    checker: &dyn StreamAccessChecker,
-    user_id: &str,
-    org_id: &str,
-    streams: HashSet<(StreamType, String)>,
-) -> Option<HashSet<(StreamType, String)>> {
-    if !checker.enforces_rbac().await
-        || checker.is_root(user_id).await
-        || checker.is_root_or_admin(org_id, user_id).await
-    {
-        return None;
-    }
-    let mut per_type: std::collections::HashMap<StreamType, usize> = Default::default();
-    for (stream_type, name) in &streams {
-        if org_wide_shortcut_covers(*stream_type, name) {
-            *per_type.entry(*stream_type).or_default() += 1;
-        }
-    }
-    // A lone stream's own Check already counts the org-wide grants, so asking first costs more.
-    let (covered, mut to_check): (Vec<_>, Vec<_>) =
-        streams.into_iter().partition(|(stream_type, name)| {
-            org_wide_shortcut_covers(*stream_type, name)
-                && per_type.get(stream_type).is_some_and(|n| *n > 1)
-        });
-    let mut readable = HashSet::new();
-    if !covered.is_empty() {
-        let mut types: Vec<StreamType> = Vec::new();
-        for (stream_type, _) in &covered {
-            if !types.contains(stream_type) {
-                types.push(*stream_type);
-            }
-        }
-        let org_wide = checker.org_wide_readable(user_id, org_id, &types).await;
-        for stream in covered {
-            if org_wide.contains(&stream.0) {
-                readable.insert(stream);
-            } else {
-                to_check.push(stream);
-            }
-        }
-    }
-    readable.extend(check_each(checker, user_id, org_id, to_check).await);
-    Some(readable)
+    list::legacy_readable_streams(checker.as_ref(), user_id, org_id, streams).await
 }
 
 /// One Check per stream, 16 at a time; the streams that pass.
@@ -1187,6 +1825,14 @@ pub(crate) async fn check_each(
         .filter_map(std::future::ready)
         .collect()
         .await
+}
+
+#[cfg(feature = "enterprise")]
+fn sent_user_id<'a>(identity: list::Identity, user_id: &'a str, stored_email: &'a str) -> &'a str {
+    match identity {
+        list::Identity::GivenId => user_id,
+        list::Identity::StoredEmail => stored_email,
+    }
 }
 
 /// In `_meta` the cached membership names the role, whatever role the request carries.
@@ -1220,12 +1866,23 @@ fn stream_permission_models(
     }
 }
 
-/// The one cell of `key`, so concurrent readers of a key wait on a single Check.
+/// The OpenFGA type key of a stream type.
 #[cfg(feature = "enterprise")]
-fn shared_cell<K: Eq + std::hash::Hash>(
-    cells: &SharedAnswers<K>,
+fn stream_model(stream_type: StreamType) -> &'static str {
+    use o2_openfga::meta::mapping::OFGA_MODELS;
+
+    let type_str = stream_type.as_str();
+    OFGA_MODELS
+        .get(type_str)
+        .map_or(type_str, |model| model.key)
+}
+
+/// The one cell of `key`, so concurrent readers of a key wait on a single Check.
+#[cfg(any(feature = "enterprise", test))]
+fn shared_cell<K: Eq + std::hash::Hash, V>(
+    cells: &SharedAnswers<K, V>,
     key: K,
-) -> Arc<tokio::sync::OnceCell<bool>> {
+) -> Arc<tokio::sync::OnceCell<V>> {
     let mut cells = cells.lock().unwrap_or_else(|e| e.into_inner());
     cells.entry(key).or_default().clone()
 }
@@ -1262,15 +1919,86 @@ async fn cipher_key_allowed(
     .await
 }
 
-/// True when OpenFGA accepts the stream's own Check, so an org-wide grant is known to cover it.
-/// A name outside this strict form keeps its own Check, whose answer may be a refusal.
 #[cfg(any(feature = "enterprise", test))]
-fn org_wide_grant_covers(stream_name: &str) -> bool {
-    let id = config::utils::str::into_ofga_supported_format(stream_name);
-    (1..=MAX_SHORTCUT_ID_LEN).contains(&id.len())
-        && id
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'=' | b'-'))
+fn related_stream_set(streams: &RelatedStreams) -> HashSet<(StreamType, String)> {
+    [
+        (StreamType::Logs, &streams.logs),
+        (StreamType::Traces, &streams.traces),
+        (StreamType::Metrics, &streams.metrics),
+        (StreamType::Profiles, &streams.profiles),
+    ]
+    .into_iter()
+    .flat_map(|(stream_type, list)| {
+        list.iter()
+            .map(move |info| (stream_type, info.stream_name.clone()))
+    })
+    .collect()
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn keep_related_streams(
+    streams: RelatedStreams,
+    readable: Option<HashSet<(StreamType, String)>>,
+) -> RelatedStreams {
+    let Some(readable) = readable else {
+        return streams;
+    };
+    let keep = |stream_type: StreamType, list: Vec<StreamInfo>| -> Vec<StreamInfo> {
+        list.into_iter()
+            .filter(|info| readable.contains(&(stream_type, info.stream_name.clone())))
+            .collect()
+    };
+    let RelatedStreams {
+        logs,
+        traces,
+        metrics,
+        profiles,
+    } = streams;
+    RelatedStreams {
+        logs: keep(StreamType::Logs, logs),
+        traces: keep(StreamType::Traces, traces),
+        metrics: keep(StreamType::Metrics, metrics),
+        profiles: keep(StreamType::Profiles, profiles),
+    }
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn service_record_set(records: &mut [ServiceRecord]) -> HashSet<(StreamType, String)> {
+    let mut wanted = HashSet::new();
+    for record in records {
+        for (stream_type, list) in service_record_streams(record) {
+            let names = list.as_array().into_iter().flatten();
+            wanted.extend(names.filter_map(|v| v.as_str().map(|n| (stream_type, n.to_string()))));
+        }
+    }
+    wanted
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn keep_service_records(
+    records: Vec<ServiceRecord>,
+    readable: Option<HashSet<(StreamType, String)>>,
+) -> Vec<ServiceRecord> {
+    let Some(readable) = readable else {
+        return records;
+    };
+    records
+        .into_iter()
+        .filter_map(|mut record| {
+            let mut any_left = false;
+            for (stream_type, list) in service_record_streams(&mut record) {
+                let Some(items) = list.as_array_mut() else {
+                    continue;
+                };
+                items.retain(|v| {
+                    v.as_str()
+                        .is_some_and(|n| readable.contains(&(stream_type, n.to_string())))
+                });
+                any_left |= !items.is_empty();
+            }
+            any_left.then_some(record)
+        })
+        .collect()
 }
 
 /// True when an org-wide grant decides the stream; `stream:_all_` never reaches enrichment tables.
@@ -1284,7 +2012,7 @@ fn org_wide_shortcut_covers(stream_type: StreamType, name: &str) -> bool {
             | StreamType::Profiles
             | StreamType::Index
             | StreamType::Metadata
-    ) && org_wide_grant_covers(name)
+    ) && list::org_wide_grant_covers(name)
 }
 
 #[cfg(any(feature = "enterprise", test))]
@@ -1382,9 +2110,27 @@ fn search_rewritten_sql(sql: &str) -> String {
         .unwrap_or_else(|_| sql.to_string())
 }
 
-#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
 fn write_set<T>(set: &RwLock<HashSet<T>>) -> std::sync::RwLockWriteGuard<'_, HashSet<T>> {
     set.write().unwrap_or_else(|e| e.into_inner())
+}
+
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
+fn write_map<K, V>(map: &RwLock<HashMap<K, V>>) -> std::sync::RwLockWriteGuard<'_, HashMap<K, V>> {
+    map.write().unwrap_or_else(|e| e.into_inner())
+}
+
+/// Counts one fake call in the request's `REQUEST_CALLS`, as ENT counts a sent one.
+#[cfg(any(test, all(feature = "enterprise", feature = "test-utils")))]
+fn fake_record(failed: bool) {
+    #[cfg(feature = "enterprise")]
+    accounting::record_call(if failed {
+        accounting::CallOutcome::Error
+    } else {
+        accounting::CallOutcome::Allow
+    });
+    #[cfg(not(feature = "enterprise"))]
+    let _ = failed;
 }
 
 /// A denial names the query without echoing a whole program into the response.
@@ -1403,7 +2149,9 @@ fn source_label(source: &str) -> String {
 mod tests {
     use std::collections::HashSet;
 
-    use super::*;
+    use super::{list::MAX_COVERED_ID_LEN, *};
+
+    const SITE: list::Site = "authz_tests";
 
     #[derive(Default)]
     struct FakeChecker {
@@ -1930,7 +2678,9 @@ mod tests {
             ),
         ];
         for (case, checker, expected) in cases {
-            let kept = readable_related_streams(&checker, "u1", "o1", all()).await;
+            let kept = readable_related_streams(&checker, SITE, "u1", "o1", all())
+                .await
+                .unwrap();
             assert_eq!(related_names(&kept), expected, "{case}");
         }
     }
@@ -1955,7 +2705,9 @@ mod tests {
             metrics: vec![],
             profiles: vec![],
         };
-        let kept = readable_related_streams(&checker, "u1", "o1", streams).await;
+        let kept = readable_related_streams(&checker, SITE, "u1", "o1", streams)
+            .await
+            .unwrap();
         let expected: Vec<&str> = names
             .iter()
             .enumerate()
@@ -2071,7 +2823,7 @@ mod tests {
                 (StreamType::Logs, "a b/c".repeat(200)),
             ])
             .collect();
-        let kept = readable_streams(&checker, "u1", "o1", wanted).await;
+        let kept = list::legacy_readable_streams(&checker, "u1", "o1", wanted).await;
         assert_eq!(kept, Some(HashSet::new()));
         let calls = checker.calls("u1");
         assert!(calls.org_wide.is_empty(), "{:?}", calls.org_wide);
@@ -2166,7 +2918,9 @@ mod tests {
             ),
         ];
         for (case, checker, expected) in cases {
-            let kept = readable_service_records(&checker, "u1", "o1", all()).await;
+            let kept = readable_service_records(&checker, SITE, "u1", "o1", all())
+                .await
+                .unwrap();
             assert_eq!(service_names(&kept), expected, "{case}");
         }
     }
@@ -2178,7 +2932,9 @@ mod tests {
             service("a", &["shared"], &["shared"]),
             service("b", &["shared"], &[]),
         ];
-        let kept = readable_service_records(&checker, "u1", "o1", records).await;
+        let kept = readable_service_records(&checker, SITE, "u1", "o1", records)
+            .await
+            .unwrap();
         assert_eq!(kept.len(), 2);
         let checks = checker
             .stream_checks
@@ -2210,12 +2966,12 @@ mod tests {
         let checker = [Logs, Metrics, Traces, Profiles]
             .into_iter()
             .fold(FakeChecker::default(), |c, t| c.reads_all("u1", "o1", t));
-        let kept = readable_streams(&checker, "u1", "o1", all.clone()).await;
+        let kept = list::legacy_readable_streams(&checker, "u1", "o1", all.clone()).await;
         assert_eq!(kept, Some(all.clone()));
         assert_eq!(checker.stream_checks(), 0);
         assert_eq!(checker.org_wide_asked().len(), 1);
 
-        let other_org = readable_streams(&checker, "u1", "o2", all).await;
+        let other_org = list::legacy_readable_streams(&checker, "u1", "o2", all).await;
         assert_eq!(other_org, Some(HashSet::new()), "a grant opens one org");
     }
 
@@ -2230,7 +2986,7 @@ mod tests {
             .reads_all("u1", "o1", Logs)
             .reads("u1", "o1/metrics/m3")
             .reads("u1", "o1/metrics/m7");
-        let kept = readable_streams(&checker, "u1", "o1", all).await;
+        let kept = list::legacy_readable_streams(&checker, "u1", "o1", all).await;
         let expected = wanted(&[
             (Logs, "app"),
             (Logs, "audit"),
@@ -2254,7 +3010,7 @@ mod tests {
                 .reads_all("u1", "o1", Logs)
         };
         for (case, checker) in [("no org-wide grant", granted), ("failed question", failed)] {
-            let kept = readable_streams(&checker, "u1", "o1", all.clone()).await;
+            let kept = list::legacy_readable_streams(&checker, "u1", "o1", all.clone()).await;
             assert_eq!(kept, Some(wanted(&[(Logs, "audit")])), "{case}");
             assert_eq!(checker.stream_checks(), 3, "{case}");
             assert_eq!(checker.org_wide_asked().len(), 1, "{case}");
@@ -2270,7 +3026,7 @@ mod tests {
             .reads("u1", "o1/traces/default")
             .reads("u1", "o1/logs/app");
         let all = wanted(&[(Logs, "app"), (Logs, "audit"), (Traces, "default")]);
-        let kept = readable_streams(&checker, "u1", "o1", all).await;
+        let kept = list::legacy_readable_streams(&checker, "u1", "o1", all).await;
         assert_eq!(kept, Some(wanted(&[(Logs, "app"), (Traces, "default")])));
         assert_eq!(checker.org_wide_asked(), [vec![Logs]]);
         assert_eq!(checker.stream_checks(), 3);
@@ -2287,7 +3043,10 @@ mod tests {
         };
         let admin = FakeChecker::default().admin("u1", "o1");
         for checker in [root, rbac_off, admin] {
-            assert_eq!(readable_streams(&checker, "u1", "o1", all()).await, None);
+            assert_eq!(
+                list::legacy_readable_streams(&checker, "u1", "o1", all()).await,
+                None
+            );
             assert_eq!(checker.stream_checks(), 0);
             assert!(checker.org_wide_asked().is_empty());
         }
@@ -2297,11 +3056,11 @@ mod tests {
     async fn the_org_wide_question_names_only_the_wanted_types() {
         let logs_only = FakeChecker::default();
         let all = wanted(&[(StreamType::Logs, "app"), (StreamType::Logs, "audit")]);
-        readable_streams(&logs_only, "u1", "o1", all).await;
+        list::legacy_readable_streams(&logs_only, "u1", "o1", all).await;
         assert_eq!(logs_only.org_wide_asked(), [vec![StreamType::Logs]]);
 
         let nothing = FakeChecker::default();
-        let kept = readable_streams(&nothing, "u1", "o1", HashSet::new()).await;
+        let kept = list::legacy_readable_streams(&nothing, "u1", "o1", HashSet::new()).await;
         assert_eq!(kept, Some(HashSet::new()));
         assert_eq!(nothing.stream_checks(), 0);
         assert!(nothing.org_wide_asked().is_empty());
@@ -2311,19 +3070,19 @@ mod tests {
     async fn a_name_openfga_may_refuse_keeps_its_own_check() {
         use StreamType::Logs;
 
-        let longest = "a".repeat(MAX_SHORTCUT_ID_LEN);
-        let too_long = "a".repeat(MAX_SHORTCUT_ID_LEN + 1);
+        let longest = "a".repeat(MAX_COVERED_ID_LEN);
+        let too_long = "a".repeat(MAX_COVERED_ID_LEN + 1);
         let refused = [too_long.as_str(), "", "*", "a\u{1}b", "caf\u{e9}"];
         let shortcut = wanted(&[(Logs, longest.as_str()), (Logs, "app")]);
         let mut all = shortcut.clone();
         all.extend(wanted(&refused.map(|name| (Logs, name))));
         let checker = FakeChecker::default().reads_all("u1", "o1", Logs);
-        let kept = readable_streams(&checker, "u1", "o1", all).await;
+        let kept = list::legacy_readable_streams(&checker, "u1", "o1", all).await;
         assert_eq!(kept, Some(shortcut));
         assert_eq!(checker.stream_checks(), refused.len());
 
         let only_refused = FakeChecker::default().reads_all("u1", "o1", Logs);
-        readable_streams(&only_refused, "u1", "o1", wanted(&[(Logs, "*")])).await;
+        list::legacy_readable_streams(&only_refused, "u1", "o1", wanted(&[(Logs, "*")])).await;
         assert!(only_refused.org_wide_asked().is_empty());
         assert_eq!(only_refused.stream_checks(), 1);
     }
@@ -2332,7 +3091,7 @@ mod tests {
     async fn a_covered_stream_keeps_its_own_name() {
         let checker = FakeChecker::default().reads_all("u1", "o1", StreamType::Metrics);
         let all = wanted(&[(StreamType::Metrics, "a:b"), (StreamType::Metrics, "c")]);
-        let kept = readable_streams(&checker, "u1", "o1", all.clone()).await;
+        let kept = list::legacy_readable_streams(&checker, "u1", "o1", all.clone()).await;
         assert_eq!(kept, Some(all));
         assert_eq!(checker.stream_checks(), 0);
     }
@@ -2348,7 +3107,9 @@ mod tests {
             service("a", &["l1", "l2"], &["t1", "t2"]),
             service("b", &[], &["t2"]),
         ];
-        let kept = readable_service_records(&checker(), "u1", "o1", records).await;
+        let kept = readable_service_records(&checker(), SITE, "u1", "o1", records)
+            .await
+            .unwrap();
         let lists = serde_json::json!([["l1", "l2"], ["t1"], []]);
         assert_eq!(
             service_names(&kept),
@@ -2356,7 +3117,9 @@ mod tests {
         );
 
         let streams = related(&["l2", "l1"], &["t2", "t1"], &["cpu"]);
-        let kept = readable_related_streams(&checker(), "u1", "o1", streams).await;
+        let kept = readable_related_streams(&checker(), SITE, "u1", "o1", streams)
+            .await
+            .unwrap();
         let names = |list: &[StreamInfo]| -> Vec<String> {
             list.iter().map(|info| info.stream_name.clone()).collect()
         };
@@ -2392,6 +3155,37 @@ mod tests {
         let in_meta = effective_role(config::META_ORG_ID, user, asked.clone());
         assert_eq!(in_meta, UserRole::Editor.to_string());
         assert_eq!(effective_role("o1", user, asked.clone()), asked);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn the_meta_role_override_uses_the_sent_identity() {
+        use common::infra::config::ORG_USERS;
+
+        let org = config::META_ORG_ID;
+        let request_id = "meta.mixed@example.com";
+        let stored_email = "Meta.Mixed@Example.com";
+        let key = format!("{org}/{stored_email}");
+        ORG_USERS.insert(
+            key.clone(),
+            infra::table::org_users::OrgUserRecord::new(
+                org,
+                stored_email,
+                UserRole::Editor,
+                "",
+                None,
+            ),
+        );
+        let request_role = UserRole::Viewer.to_string();
+        let resolve = |identity| {
+            let sent = sent_user_id(identity, request_id, stored_email);
+            (sent, effective_role(org, sent, request_role.clone()))
+        };
+        let stored = resolve(list::Identity::StoredEmail);
+        let given = resolve(list::Identity::GivenId);
+        ORG_USERS.remove(&key);
+        assert_eq!(stored, (stored_email, UserRole::Editor.to_string()));
+        assert_eq!(given, (request_id, request_role));
     }
 
     #[cfg(feature = "enterprise")]
@@ -2436,5 +3230,63 @@ mod tests {
                 "rbac_on={rbac_on}"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn on_mode_service_lists_fail_whole_on_a_failed_answer_and_off_mode_drops_rows() {
+        use list::{ListMode, UnavailableReason};
+
+        let fake = FakeStreamChecker::default();
+        let records = || vec![service("checkout", &["l1"], &["t1"])];
+        let user = "u9-rows-1-10@example.com";
+        fake.grant_read(
+            user,
+            &TypedStream {
+                org_id: "o1".to_string(),
+                stream_type: StreamType::Logs,
+                name: "l1".to_string(),
+            },
+        );
+        fake.set_list_mode(user, ListMode::On);
+        fake.fail_types_access_once(user, UnavailableReason::Timeout);
+        let failed = within_budget(
+            1,
+            readable_service_records(&fake, SITE, user, "o1", records()),
+        )
+        .await;
+        assert_eq!(failed.unwrap_err().reason, UnavailableReason::Timeout);
+        fake.fail_list_once(user, UnavailableReason::Server(502));
+        let streams = related(&["l1"], &["t1"], &[]);
+        let failed = within_budget(
+            8,
+            readable_related_streams(&fake, SITE, user, "o1", streams),
+        )
+        .await;
+        assert_eq!(failed.unwrap_err().reason, UnavailableReason::Server(502));
+
+        let kept = within_budget(
+            10,
+            readable_service_records(&fake, SITE, user, "o1", records()),
+        )
+        .await
+        .unwrap();
+        let lists = serde_json::json!([["l1"], [], []]);
+        assert_eq!(
+            service_names(&kept),
+            [("checkout".to_string(), lists.as_array().unwrap().clone())]
+        );
+
+        fake.set_list_mode(user, ListMode::Off);
+        fake.fail_stream_read_once(user, "l1");
+        let dropped = within_budget(
+            3,
+            readable_service_records(&fake, SITE, user, "o1", records()),
+        )
+        .await
+        .unwrap();
+        assert!(
+            dropped.is_empty(),
+            "off keeps today's deny on a failed Check"
+        );
     }
 }

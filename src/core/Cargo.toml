@@ -39,7 +39,7 @@ cloud = [
     "stream/cloud",
 ]
 # Lets dependants' tests install a fake stream access checker; never enabled outside dev-dependencies.
-test-utils = []
+test-utils = ["o2_openfga?/test-utils"]
 cpu-profiling = ["dep:pprof"]
 profiling = [
     "cpu-profiling",
@@ -146,6 +146,7 @@ zstd.workspace = true
 infra = { workspace = true, features = ["test-utils"] }
 tokio = { workspace = true, features = ["test-util"] }
 o2_enterprise = { workspace = true, default-features = false, features = ["test-utils"] }
+o2_openfga = { workspace = true, features = ["test-utils"] }
 criterion = { version = "0.5", default-features = false, features = ["rayon"] }
 multer.workspace = true
 tower.workspace = true

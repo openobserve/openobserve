@@ -180,13 +180,18 @@ pub async fn list_services(
         };
         // after the merge, which needs every record's streams to spot a stream-name fallback
         let checker = openobserve_core::authz::active_checker();
-        let records = openobserve_core::authz::readable_service_records(
+        let records = match openobserve_core::authz::readable_service_records(
             checker.as_ref(),
+            openobserve_core::authz::list::SITE_SERVICE_STREAMS,
             &user_email.user_id,
             &org_id,
             records,
         )
-        .await;
+        .await
+        {
+            Ok(records) => records,
+            Err(e) => return openobserve_core::authz::list::authz_unavailable_response(e),
+        };
         openobserve_core::service_identity::display_feed::ensure(&org_id).await;
         // The ids ingest names a service from, set `distinguish_by` included.
         let tracked = &identity_config.naming_alias_ids();
@@ -362,6 +367,7 @@ pub async fn correlate_streams(
                 let readable = move |streams: config::meta::service_streams::RelatedStreams| async move {
                     openobserve_core::authz::readable_related_streams(
                         checker.as_ref(),
+                        openobserve_core::authz::list::SITE_SERVICE_STREAMS_CORRELATE,
                         user,
                         org,
                         streams,
@@ -372,7 +378,7 @@ pub async fn correlate_streams(
                     org_id: org,
                     user_id: user,
                 };
-                has_data::filter_then_annotate(
+                if let Err(e) = has_data::filter_then_annotate(
                     &req,
                     &mut response,
                     &semantic_groups,
@@ -381,7 +387,10 @@ pub async fn correlate_streams(
                     config::utils::time::now_micros(),
                     has_data::BUDGET,
                 )
-                .await;
+                .await
+                {
+                    return openobserve_core::authz::list::authz_unavailable_response(e);
+                }
                 // all_streams is a flattened copy, so it would still list the dropped streams
                 response.build_all_streams();
                 MetaHttpResponse::json(response)

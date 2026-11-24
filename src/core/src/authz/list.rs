@@ -1,0 +1,2123 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use std::{
+    borrow::Cow,
+    collections::{BTreeSet, HashMap, HashSet},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
+
+use axum::{
+    Json,
+    http::{HeaderName, HeaderValue, StatusCode, header},
+    response::{IntoResponse, Response},
+};
+use config::{meta::stream::StreamType, metrics::authz as metrics};
+use futures::stream::StreamExt;
+
+use super::{
+    SharedAnswers, StreamAccessChecker, check_each, org_wide_shortcut_covers, shared_cell,
+};
+
+pub const SITE_SERVICE_STREAMS: Site = "service_streams";
+pub const SITE_SERVICE_STREAMS_CORRELATE: Site = "service_streams_correlate";
+pub const SITE_SERVICE_IDENTITY: Site = "service_identity";
+pub const SITE_SERVICE_EVIDENCE: Site = "service_evidence";
+
+/// OpenFGA accepts every id of this length in the covered alphabet, so a type answer decides it.
+pub(super) const MAX_COVERED_ID_LEN: usize = 200;
+
+/// Lists stop at the 2.9 s guard; past this a sampled request would only wait on fallback Checks.
+const SHADOW_NEW_PATH_BUDGET: Duration = Duration::from_secs(3);
+
+/// At most one shadow comparison runs per node, so the per-stream Checks never run twice at once.
+static SHADOW_BUSY: AtomicBool = AtomicBool::new(false);
+
+// The node-wide shadow slot and metrics are shared, so shadow tests run one at a time.
+#[cfg(test)]
+pub(crate) static SHADOW_TESTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// Static site name; it becomes a metric label, so it must come from a fixed set.
+pub type Site = &'static str;
+
+/// `(type, name)` pairs of one org's streams.
+pub type StreamSet = HashSet<(StreamType, String)>;
+
+/// The type-level answer for a stream set: the readable streams (`None` is all) and the answers.
+pub type StreamAnswer = Result<(Option<StreamSet>, TypeAnswers), AuthzUnavailable>;
+
+/// A yes/no answer; `Err` names the refused stream's type, or `None` when no stream was asked.
+pub type Verdict = Result<(), Option<StreamType>>;
+
+#[derive(Clone, Copy)]
+pub struct Decision {
+    pub verdict: Verdict,
+    /// Length of the deciding prefix, or zero for a denial without a valid object.
+    pub decided: usize,
+}
+
+/// Type answers kept by `answer_in_mode`, served in `on`, compared only in a sampled `shadow` call.
+#[derive(Clone, Debug)]
+pub enum ModeAnswers {
+    Legacy,
+    Serve(TypeAnswers),
+    Shadow(TypeAnswers),
+}
+
+/// Which path answers a converted site (`O2_OPENFGA_LIST_AUTHZ_MODE`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ListMode {
+    #[default]
+    Off,
+    Shadow,
+    On,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ListSettings {
+    pub mode: ListMode,
+    pub shadow_sample: f64,
+    pub fallback_concurrency: usize,
+}
+
+impl Default for ListSettings {
+    fn default() -> Self {
+        Self {
+            mode: ListMode::Off,
+            shadow_sample: 0.0,
+            fallback_concurrency: 16,
+        }
+    }
+}
+
+/// Whether the type-level path may send a streamed list; `Enabled` needs a declared deadline.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ListPolicy {
+    #[default]
+    Disabled,
+    Enabled,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct ObjectsQuery<'a> {
+    pub site: Site,
+    pub org_id: &'a str,
+    pub user_id: &'a str,
+    pub stream_types: &'a [StreamType],
+    pub permission: &'a str,
+    /// Flags exactly as the site's per-object Check passes them.
+    pub use_all_org: bool,
+    pub use_self_parent: bool,
+    pub use_self_context: bool,
+    /// The site's per-object Check parent id, empty when absent.
+    pub parent_id: &'a str,
+    pub bypass: Bypass,
+    pub identity: Identity,
+    /// The site's own org-wide Check, sent unchanged; `None` when the site has none.
+    pub prelude: Option<OrgWideCheck<'a>>,
+}
+
+impl ObjectsQuery<'_> {
+    pub fn type_level_supported(&self) -> bool {
+        !self.use_all_org && (!self.use_self_context || self.parent_id.is_empty())
+    }
+}
+
+/// Only what the site's code skips today; admins otherwise go through the role branch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Bypass {
+    RbacOffOrRoot,
+    RbacOffRootOrOrgAdmin,
+    OpenFgaOffOrRoot,
+}
+
+/// The user string the site's helper sends today.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Identity {
+    GivenId,
+    StoredEmail,
+}
+
+/// Arguments of `check_permissions(org, org, user, resource, perm, None, use_all_org, sc, sp)`.
+#[derive(Clone, Copy, Debug)]
+pub struct OrgWideCheck<'a> {
+    pub resource: &'a str,
+    pub permission: &'a str,
+    pub use_all_org: bool,
+    pub use_self_context: bool,
+    pub use_self_parent: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct ObjectRef<'a> {
+    /// Returned in `Readable` as given.
+    pub id: &'a str,
+    pub stream_type: StreamType,
+    /// The id exactly as the site's current Check composes it after `type:`.
+    pub ofga_id: Cow<'a, str>,
+}
+
+impl<'a> ObjectRef<'a> {
+    /// A stream as the sanitizing sites name it in their Check.
+    pub fn stream(stream_type: StreamType, name: &'a str) -> Self {
+        Self {
+            id: name,
+            stream_type,
+            ofga_id: Cow::Owned(config::utils::str::into_ofga_supported_format(name)),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Readable {
+    /// Only from the bypass or a `true` prelude.
+    All,
+    /// The requested `(type, id)` pairs the user may access.
+    Only(HashSet<(StreamType, String)>),
+}
+
+impl Readable {
+    /// `None` means every stream, as `readable_streams` answers.
+    pub fn into_streams(self) -> Option<StreamSet> {
+        match self {
+            Self::All => None,
+            Self::Only(streams) => Some(streams),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnavailableReason {
+    NotInitialized,
+    Timeout,
+    Transport,
+    Server(u16),
+    MissingAnswer,
+}
+
+impl UnavailableReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::NotInitialized => "not_initialized",
+            Self::Timeout => "timeout",
+            Self::Transport => "transport",
+            Self::Server(_) => "server",
+            Self::MissingAnswer => "missing_answer",
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+impl From<o2_openfga::authorizer::decision::Unavailable> for UnavailableReason {
+    fn from(err: o2_openfga::authorizer::decision::Unavailable) -> Self {
+        use o2_openfga::authorizer::decision::Unavailable;
+
+        match err {
+            Unavailable::NotInitialized => Self::NotInitialized,
+            Unavailable::Timeout => Self::Timeout,
+            Unavailable::Transport => Self::Transport,
+            Unavailable::Server(status) => Self::Server(status),
+            Unavailable::MissingAnswer => Self::MissingAnswer,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AuthzUnavailable {
+    pub reason: UnavailableReason,
+}
+
+impl From<UnavailableReason> for AuthzUnavailable {
+    fn from(reason: UnavailableReason) -> Self {
+        Self { reason }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+impl From<o2_openfga::authorizer::decision::Unavailable> for AuthzUnavailable {
+    fn from(err: o2_openfga::authorizer::decision::Unavailable) -> Self {
+        Self { reason: err.into() }
+    }
+}
+
+impl std::fmt::Display for AuthzUnavailable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "permission service unavailable: {:?}", self.reason)
+    }
+}
+
+impl std::error::Error for AuthzUnavailable {}
+
+/// OSS form of the effective shape, so the trait needs no enterprise type.
+#[derive(Clone, Copy, Debug)]
+pub struct StreamShape<'a> {
+    pub permission: &'a str,
+    pub self_parent_edge: bool,
+    pub identity: Identity,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TypeAccessKind {
+    All,
+    Role(bool),
+    Listed(HashSet<String>),
+    Unlisted(UnlistedKind),
+}
+
+impl TypeAccessKind {
+    fn strategy(&self) -> &'static str {
+        match self {
+            Self::All => "probe_all",
+            Self::Role(_) => "role",
+            Self::Listed(_) => "list",
+            Self::Unlisted(kind) => kind.as_str(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnlistedKind {
+    Disabled,
+    Rejected,
+    Incomplete,
+    OfflineRule,
+}
+
+impl UnlistedKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Disabled => "unlisted",
+            Self::Rejected => "list_rejected",
+            Self::Incomplete => "list_incomplete",
+            Self::OfflineRule => "offline_rule",
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+impl From<o2_openfga::authorizer::list::TypeAccess> for TypeAccessKind {
+    fn from(access: o2_openfga::authorizer::list::TypeAccess) -> Self {
+        use o2_openfga::authorizer::list::{TypeAccess, UnlistedReason};
+
+        match access {
+            TypeAccess::All => Self::All,
+            TypeAccess::Listed(ids) => Self::Listed(ids),
+            TypeAccess::Unlisted(reason) => Self::Unlisted(match reason {
+                UnlistedReason::Disabled => UnlistedKind::Disabled,
+                UnlistedReason::Rejected => UnlistedKind::Rejected,
+                UnlistedReason::Incomplete => UnlistedKind::Incomplete,
+                UnlistedReason::OfflineRule => UnlistedKind::OfflineRule,
+            }),
+        }
+    }
+}
+
+/// Steps 0-3 for a type set, kept by the caller for one request only.
+#[derive(Clone, Debug)]
+pub struct TypeAnswers {
+    query: OwnedQuery,
+    answer: Answer,
+    fallback_concurrency: usize,
+    fallback_checks: Arc<SharedAnswers<FallbackKey, bool>>,
+}
+
+impl TypeAnswers {
+    /// Covered ids from the type answers, every other id by `check_object`.
+    pub async fn decide(
+        &self,
+        checker: &dyn StreamAccessChecker,
+        site: Site,
+        objects: &[ObjectRef<'_>],
+    ) -> Result<Readable, AuthzUnavailable> {
+        metrics::AUTHZ_OBJECTS_AUTHORIZED
+            .with_label_values(&[site])
+            .observe(objects.len() as f64);
+        let per_type = match &self.answer {
+            Answer::Every(_) => return Ok(Readable::All),
+            Answer::PerType(per_type) => per_type,
+        };
+        let mut readable = HashSet::new();
+        let mut fallback = Vec::new();
+        let mut seen = HashSet::new();
+        for (i, object) in objects.iter().enumerate() {
+            match covered_answer(per_type, object) {
+                Some(true) => {
+                    readable.insert((object.stream_type, object.id.to_string()));
+                }
+                None if seen.insert((object.stream_type, object.id, object.ofga_id.as_ref())) => {
+                    fallback.push(i);
+                }
+                Some(false) | None => {}
+            }
+        }
+        let query = self.query.borrowed(site);
+        let query = &query;
+        // indices, not references: a closure over `&ObjectRef` makes the future fail the Send proof
+        let mut checks = futures::stream::iter(fallback)
+            .map(|i| async move {
+                let object = &objects[i];
+                let key = (object.stream_type, object.id.to_string());
+                let sent_id = object.ofga_id.as_ref();
+                let check_id = (sent_id != object.id).then(|| sent_id.to_string());
+                let fallback_key = (key.clone(), check_id);
+                let cell = shared_cell(&self.fallback_checks, fallback_key);
+                let allowed = *cell
+                    .get_or_try_init(|| async {
+                        metrics::AUTHZ_FALLBACK_CHECKS_TOTAL
+                            .with_label_values(&[site])
+                            .inc();
+                        checker
+                            .check_object(query.user_id, query.org_id, query, object)
+                            .await
+                    })
+                    .await?;
+                Ok::<_, AuthzUnavailable>(allowed.then_some(key))
+            })
+            .buffer_unordered(self.fallback_concurrency.max(1));
+        while let Some(answer) = checks.next().await {
+            if let Some(stream) = answer? {
+                readable.insert(stream);
+            }
+        }
+        Ok(Readable::Only(readable))
+    }
+
+    fn strategies(&self) -> Vec<&'static str> {
+        match &self.answer {
+            Answer::Every(strategy) => vec![strategy],
+            Answer::PerType(per_type) => per_type.values().map(|a| a.strategy()).collect(),
+        }
+    }
+
+    fn decided_strategies(&self, objects: &[ObjectRef<'_>]) -> BTreeSet<&'static str> {
+        let per_type = match &self.answer {
+            Answer::Every(strategy) => return BTreeSet::from([*strategy]),
+            Answer::PerType(per_type) => per_type,
+        };
+        let mut strategies = BTreeSet::new();
+        for object in objects {
+            match per_type.get(&object.stream_type) {
+                Some(TypeAccessKind::Unlisted(kind)) => {
+                    strategies.insert(kind.as_str());
+                }
+                Some(kind) if probe_covers(&object.ofga_id) => {
+                    strategies.insert(kind.strategy());
+                }
+                _ => {}
+            }
+        }
+        strategies
+    }
+}
+
+// The same returned id can name different OpenFGA objects at raw and sanitizing sites.
+type FallbackKey = ((StreamType, String), Option<String>);
+
+/// The parts of an `ObjectsQuery` that `check_object` reads, owned so the answers can be kept.
+#[derive(Clone, Debug)]
+struct OwnedQuery {
+    org_id: String,
+    user_id: String,
+    permission: String,
+    use_all_org: bool,
+    use_self_parent: bool,
+    use_self_context: bool,
+    parent_id: String,
+    bypass: Bypass,
+    identity: Identity,
+}
+
+impl OwnedQuery {
+    fn new(query: &ObjectsQuery<'_>) -> Self {
+        Self {
+            org_id: query.org_id.to_string(),
+            user_id: query.user_id.to_string(),
+            permission: query.permission.to_string(),
+            use_all_org: query.use_all_org,
+            use_self_parent: query.use_self_parent,
+            use_self_context: query.use_self_context,
+            parent_id: query.parent_id.to_string(),
+            bypass: query.bypass,
+            identity: query.identity,
+        }
+    }
+
+    fn borrowed(&self, site: Site) -> ObjectsQuery<'_> {
+        ObjectsQuery {
+            site,
+            org_id: &self.org_id,
+            user_id: &self.user_id,
+            stream_types: &[],
+            permission: &self.permission,
+            use_all_org: self.use_all_org,
+            use_self_parent: self.use_self_parent,
+            use_self_context: self.use_self_context,
+            parent_id: &self.parent_id,
+            bypass: self.bypass,
+            identity: self.identity,
+            prelude: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum Answer {
+    /// Every object, from the bypass or a `true` prelude; holds the strategy label.
+    Every(&'static str),
+    PerType(HashMap<StreamType, TypeAccessKind>),
+}
+
+/// Releases the node's shadow slot when the comparison ends or is dropped.
+struct ShadowSlot;
+
+impl ShadowSlot {
+    fn claim() -> Option<Self> {
+        SHADOW_BUSY
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .ok()
+            .map(|_| Self)
+    }
+}
+
+impl Drop for ShadowSlot {
+    fn drop(&mut self) {
+        SHADOW_BUSY.store(false, Ordering::Release);
+    }
+}
+
+pub async fn authorize_objects(
+    checker: &dyn StreamAccessChecker,
+    query: &ObjectsQuery<'_>,
+    objects: &[ObjectRef<'_>],
+) -> Result<Readable, AuthzUnavailable> {
+    let mut types: Vec<StreamType> = Vec::new();
+    for object in objects {
+        if !types.contains(&object.stream_type) {
+            types.push(object.stream_type);
+        }
+    }
+    let answers = type_answers(checker, query, &types).await?;
+    answers.decide(checker, query.site, objects).await
+}
+
+pub async fn type_answers(
+    checker: &dyn StreamAccessChecker,
+    query: &ObjectsQuery<'_>,
+    types: &[StreamType],
+) -> Result<TypeAnswers, AuthzUnavailable> {
+    let answer = if bypassed(checker, query).await {
+        Answer::Every("bypass")
+    } else if let Some(prelude) = &query.prelude
+        && checker
+            .org_wide_check(query.user_id, query.org_id, prelude)
+            .await?
+    {
+        Answer::Every("prelude")
+    } else if types.is_empty() {
+        Answer::PerType(HashMap::new())
+    } else if !query.type_level_supported() {
+        let unlisted = TypeAccessKind::Unlisted(UnlistedKind::Disabled);
+        Answer::PerType(types.iter().map(|t| (*t, unlisted.clone())).collect())
+    } else {
+        let shape = StreamShape {
+            permission: query.permission,
+            self_parent_edge: query.use_self_parent,
+            identity: query.identity,
+        };
+        let per_type = checker
+            .types_access(query.user_id, query.org_id, &shape, types)
+            .await?;
+        Answer::PerType(per_type)
+    };
+    let answers = TypeAnswers {
+        query: OwnedQuery::new(query),
+        answer,
+        fallback_concurrency: checker.list_settings(query.user_id).fallback_concurrency,
+        fallback_checks: Default::default(),
+    };
+    for strategy in answers.strategies() {
+        metrics::AUTHZ_STRATEGY_TOTAL
+            .with_label_values(&[query.site, strategy])
+            .inc();
+    }
+    Ok(answers)
+}
+
+/// The streams of `org_id` the user can read, or `None` when RBAC lets them read every stream.
+pub async fn readable_streams(
+    checker: &dyn StreamAccessChecker,
+    site: Site,
+    user_id: &str,
+    org_id: &str,
+    streams: HashSet<(StreamType, String)>,
+) -> Result<Option<StreamSet>, AuthzUnavailable> {
+    let mut types: Vec<StreamType> = streams.iter().map(|(t, _)| *t).collect();
+    types.sort_unstable_by_key(|t| t.as_str());
+    types.dedup();
+    let (readable, _) = answer_in_mode(
+        checker,
+        site,
+        user_id,
+        &streams,
+        || legacy_readable_streams(checker, user_id, org_id, streams.clone()),
+        || stream_answers(checker, site, user_id, org_id, &streams, &types),
+    )
+    .await?;
+    Ok(readable)
+}
+
+/// Type answers for `types`, then the streams of `streams` they allow; `None` reads every stream.
+pub async fn stream_answers(
+    checker: &dyn StreamAccessChecker,
+    site: Site,
+    user_id: &str,
+    org_id: &str,
+    streams: &StreamSet,
+    types: &[StreamType],
+) -> StreamAnswer {
+    let query = stream_read_query(site, org_id, user_id, types);
+    let answers = type_answers(checker, &query, types).await?;
+    let objects: Vec<ObjectRef<'_>> = streams
+        .iter()
+        .map(|(stream_type, name)| ObjectRef::stream(*stream_type, name))
+        .collect();
+    let readable = answers.decide(checker, site, &objects).await?;
+    Ok((readable.into_streams(), answers))
+}
+
+/// The query of the sites that call today's `readable_streams`: GET with the selfParent edge.
+/// Its helpers send the stored email, and OpenFGA ids are case-sensitive.
+pub fn stream_read_query<'a>(
+    site: Site,
+    org_id: &'a str,
+    user_id: &'a str,
+    stream_types: &'a [StreamType],
+) -> ObjectsQuery<'a> {
+    ObjectsQuery {
+        site,
+        org_id,
+        user_id,
+        stream_types,
+        permission: "GET",
+        use_all_org: false,
+        use_self_parent: true,
+        use_self_context: false,
+        parent_id: "",
+        bypass: Bypass::RbacOffRootOrOrgAdmin,
+        identity: Identity::StoredEmail,
+        prelude: None,
+    }
+}
+
+/// Runs the path the mode names; `shadow` returns the legacy answer and compares the new one.
+pub async fn answer_in_mode<
+    LF: Future<Output = Option<StreamSet>>,
+    NF: Future<Output = StreamAnswer>,
+>(
+    checker: &dyn StreamAccessChecker,
+    site: Site,
+    user_id: &str,
+    requested: &StreamSet,
+    legacy: impl FnOnce() -> LF,
+    new: impl FnOnce() -> NF,
+) -> Result<(Option<StreamSet>, ModeAnswers), AuthzUnavailable> {
+    let settings = checker.list_settings(user_id);
+    match settings.mode {
+        ListMode::Off => Ok((legacy().await, ModeAnswers::Legacy)),
+        ListMode::On => match new().await {
+            Ok((readable, answers)) => Ok((readable, ModeAnswers::Serve(answers))),
+            Err(err) => Err(unavailable(site, err)),
+        },
+        ListMode::Shadow => {
+            if settings.shadow_sample <= 0.0 || rand::random::<f64>() >= settings.shadow_sample {
+                return Ok((legacy().await, ModeAnswers::Legacy));
+            }
+            let Some(_slot) = ShadowSlot::claim() else {
+                shadow_skipped(site, "busy");
+                return Ok((legacy().await, ModeAnswers::Legacy));
+            };
+            let ((legacy_answer, legacy_errors), new_answer) = futures::join!(
+                counted(legacy()),
+                tokio::time::timeout(SHADOW_NEW_PATH_BUDGET, counted(new())),
+            );
+            let Ok((new_answer, _)) = new_answer else {
+                shadow_skipped(site, "new_timeout");
+                return Ok((legacy_answer, ModeAnswers::Legacy));
+            };
+            compare_shadow(site, requested, &legacy_answer, legacy_errors, &new_answer);
+            let answers = match new_answer {
+                Ok((_, answers)) => ModeAnswers::Shadow(answers),
+                Err(_) => ModeAnswers::Legacy,
+            };
+            Ok((legacy_answer, answers))
+        }
+    }
+}
+
+pub async fn shadow_verdict<
+    LF: Future<Output = (Decision, bool)>,
+    NF: Future<Output = Result<Decision, AuthzUnavailable>>,
+>(
+    site: Site,
+    answers: &TypeAnswers,
+    objects: &[ObjectRef<'_>],
+    legacy: impl FnOnce() -> LF,
+    new: impl FnOnce() -> NF,
+) -> Verdict {
+    let Some(_slot) = ShadowSlot::claim() else {
+        shadow_skipped(site, "busy");
+        return legacy().await.0.verdict;
+    };
+    let (((legacy, memo_had_error), legacy_errors), new) = futures::join!(
+        counted(legacy()),
+        tokio::time::timeout(SHADOW_NEW_PATH_BUDGET, counted(new())),
+    );
+    match new {
+        Ok((new, _)) => compare_verdict(
+            site,
+            answers,
+            objects,
+            legacy,
+            memo_had_error || legacy_errors > 0,
+            new,
+        ),
+        Err(_) => shadow_skipped(site, "new_timeout"),
+    }
+    legacy.verdict
+}
+
+/// Logs and counts an unavailable answer that the site turns into a 503.
+pub fn unavailable(site: Site, err: AuthzUnavailable) -> AuthzUnavailable {
+    log::warn!(
+        "[authz] {site}: permission service unavailable ({:?})",
+        err.reason
+    );
+    metrics::AUTHZ_UNAVAILABLE_TOTAL
+        .with_label_values(&[site, err.reason.as_str()])
+        .inc();
+    err
+}
+
+pub fn authz_unavailable_response(err: AuthzUnavailable) -> Response {
+    log::debug!("[authz] answering 503: {err}");
+    let body = serde_json::json!({
+        "code": 503,
+        "error_code": "authz_unavailable",
+        "message": "Permission service unavailable, try again",
+    });
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        [
+            (header::RETRY_AFTER, HeaderValue::from_static("3")),
+            (
+                HeaderName::from_static("x-o2-authz"),
+                HeaderValue::from_static("unavailable"),
+            ),
+        ],
+        Json(body),
+    )
+        .into_response()
+}
+
+/// True for an id OpenFGA accepts as composed: 1-200 bytes of `[A-Za-z0-9_.=-]`.
+pub fn probe_covers(ofga_id: &str) -> bool {
+    (1..=MAX_COVERED_ID_LEN).contains(&ofga_id.len())
+        && ofga_id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'=' | b'-'))
+}
+
+/// The `origin/main` answer, kept for `off` and `shadow`; an errored check denies. [no-fail]
+pub async fn legacy_readable_streams(
+    checker: &dyn StreamAccessChecker,
+    user_id: &str,
+    org_id: &str,
+    streams: HashSet<(StreamType, String)>,
+) -> Option<StreamSet> {
+    if !checker.enforces_rbac().await
+        || checker.is_root(user_id).await
+        || checker.is_root_or_admin(org_id, user_id).await
+    {
+        return None;
+    }
+    let mut per_type: std::collections::HashMap<StreamType, usize> = Default::default();
+    for (stream_type, name) in &streams {
+        if org_wide_shortcut_covers(*stream_type, name) {
+            *per_type.entry(*stream_type).or_default() += 1;
+        }
+    }
+    // A lone stream's own Check already counts the org-wide grants, so asking first costs more.
+    let (covered, mut to_check): (Vec<_>, Vec<_>) =
+        streams.into_iter().partition(|(stream_type, name)| {
+            org_wide_shortcut_covers(*stream_type, name)
+                && per_type.get(stream_type).is_some_and(|n| *n > 1)
+        });
+    let mut readable = HashSet::new();
+    if !covered.is_empty() {
+        let mut types: Vec<StreamType> = Vec::new();
+        for (stream_type, _) in &covered {
+            if !types.contains(stream_type) {
+                types.push(*stream_type);
+            }
+        }
+        let org_wide = checker.org_wide_readable(user_id, org_id, &types).await;
+        for stream in covered {
+            if org_wide.contains(&stream.0) {
+                readable.insert(stream);
+            } else {
+                to_check.push(stream);
+            }
+        }
+    }
+    readable.extend(check_each(checker, user_id, org_id, to_check).await);
+    Some(readable)
+}
+
+/// True when OpenFGA accepts the stream's own Check, so an org-wide grant is known to cover it.
+pub(crate) fn org_wide_grant_covers(stream_name: &str) -> bool {
+    probe_covers(&config::utils::str::into_ofga_supported_format(stream_name))
+}
+
+async fn bypassed(checker: &dyn StreamAccessChecker, query: &ObjectsQuery<'_>) -> bool {
+    if !checker.enforces_rbac().await || checker.is_root(query.user_id).await {
+        return true;
+    }
+    query.bypass == Bypass::RbacOffRootOrOrgAdmin
+        && checker.is_root_or_admin(query.org_id, query.user_id).await
+}
+
+fn covered_answer(
+    per_type: &HashMap<StreamType, TypeAccessKind>,
+    object: &ObjectRef<'_>,
+) -> Option<bool> {
+    if !probe_covers(&object.ofga_id) {
+        return None;
+    }
+    match per_type.get(&object.stream_type)? {
+        TypeAccessKind::All => Some(true),
+        TypeAccessKind::Role(allowed) => Some(*allowed),
+        TypeAccessKind::Listed(ids) => Some(ids.contains(object.ofga_id.as_ref())),
+        TypeAccessKind::Unlisted(_) => None,
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn counted<F: Future>(fut: F) -> (F::Output, u32) {
+    super::accounting::in_own_scope(fut).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn counted<F: Future>(fut: F) -> (F::Output, u32) {
+    (fut.await, 0)
+}
+
+fn compare_shadow(
+    site: Site,
+    requested: &StreamSet,
+    legacy: &Option<StreamSet>,
+    legacy_errors: u32,
+    new: &StreamAnswer,
+) {
+    if legacy_errors > 0 {
+        shadow_skipped(site, "legacy_error");
+        return;
+    }
+    let Ok((new, answers)) = new else {
+        shadow_skipped(site, "new_error");
+        return;
+    };
+    let objects: Vec<_> = requested
+        .iter()
+        .map(|(stream_type, name)| ObjectRef::stream(*stream_type, name))
+        .collect();
+    for strategy in answers.decided_strategies(&objects) {
+        metrics::AUTHZ_LIST_SHADOW_COMPARED_TOTAL
+            .with_label_values(&[site, strategy])
+            .inc();
+    }
+    let legacy = legacy.as_ref().unwrap_or(requested);
+    let new = new.as_ref().unwrap_or(requested);
+    let mut differences: HashMap<(StreamType, &'static str), usize> = HashMap::new();
+    for (stream, direction) in new
+        .difference(legacy)
+        .map(|s| (s, "new_allows_more"))
+        .chain(legacy.difference(new).map(|s| (s, "new_allows_less")))
+    {
+        *differences.entry((stream.0, direction)).or_default() += 1;
+    }
+    for ((stream_type, direction), count) in differences {
+        log::warn!(
+            "[authz] {site}: shadow mismatch on {stream_type} ({direction}, {count} of {} streams)",
+            requested.len()
+        );
+        metrics::AUTHZ_LIST_SHADOW_MISMATCH_TOTAL
+            .with_label_values(&[site, stream_type.as_str(), direction])
+            .inc();
+    }
+}
+
+fn compare_verdict(
+    site: Site,
+    answers: &TypeAnswers,
+    objects: &[ObjectRef<'_>],
+    legacy: Decision,
+    legacy_had_error: bool,
+    new: Result<Decision, AuthzUnavailable>,
+) {
+    if legacy_had_error {
+        shadow_skipped(site, "legacy_error");
+        return;
+    }
+    let Ok(new) = new else {
+        shadow_skipped(site, "new_error");
+        return;
+    };
+    let (stream_type, direction) = match (legacy.verdict, new.verdict) {
+        (Ok(()), Err(stream_type)) => (stream_type, "new_allows_less"),
+        (Err(stream_type), Ok(())) => (stream_type, "new_allows_more"),
+        // An untyped denial follows the valid prefix, even though it earns no credit.
+        (Err(Some(stream_type)), Err(None)) => (Some(stream_type), "new_allows_more"),
+        (Err(None), Err(Some(stream_type))) => (Some(stream_type), "new_allows_less"),
+        (Err(stream_type), Err(_)) if legacy.decided < new.decided => {
+            (stream_type, "new_allows_more")
+        }
+        (Err(_), Err(stream_type)) if new.decided < legacy.decided => {
+            (stream_type, "new_allows_less")
+        }
+        _ if legacy.decided == new.decided => {
+            for strategy in answers.decided_strategies(&objects[..legacy.decided]) {
+                metrics::AUTHZ_LIST_SHADOW_COMPARED_TOTAL
+                    .with_label_values(&[site, strategy])
+                    .inc();
+            }
+            return;
+        }
+        _ => return,
+    };
+    let stream_type = stream_type.map_or("unknown", |t| t.as_str());
+    log::warn!("[authz] {site}: shadow mismatch on {stream_type} ({direction})");
+    metrics::AUTHZ_LIST_SHADOW_MISMATCH_TOTAL
+        .with_label_values(&[site, stream_type, direction])
+        .inc();
+}
+
+fn shadow_skipped(site: Site, reason: &str) {
+    metrics::AUTHZ_LIST_SHADOW_SKIPPED_TOTAL
+        .with_label_values(&[site, reason])
+        .inc();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::authz::{FakeStreamChecker, ObjectCheckArgs, TypedStream, within_budget};
+
+    const ORG: &str = "list_org";
+
+    fn names(prefix: &str, n: usize) -> Vec<String> {
+        (0..n).map(|i| format!("{prefix}{i}")).collect()
+    }
+
+    fn typed(stream_type: StreamType, names: &[String]) -> HashSet<(StreamType, String)> {
+        names.iter().map(|n| (stream_type, n.clone())).collect()
+    }
+
+    fn grant(fake: &FakeStreamChecker, user: &str, stream_type: StreamType, name: &str) {
+        fake.grant_read(
+            user,
+            &TypedStream {
+                org_id: ORG.to_string(),
+                stream_type,
+                name: name.to_string(),
+            },
+        );
+    }
+
+    fn on(fake: &FakeStreamChecker, user: &str) {
+        fake.set_list_mode(user, ListMode::On);
+    }
+
+    /// 4,000 streams: logs 400, metrics 3,500, traces 100; every tenth one granted.
+    fn big_inventory(fake: &FakeStreamChecker, user: &str) -> HashSet<(StreamType, String)> {
+        let mut all = HashSet::new();
+        for (stream_type, n) in [
+            (StreamType::Logs, 400),
+            (StreamType::Metrics, 3500),
+            (StreamType::Traces, 100),
+        ] {
+            let list = names(&format!("{stream_type}_"), n);
+            for name in list.iter().step_by(10) {
+                grant(fake, user, stream_type, name);
+            }
+            all.extend(typed(stream_type, &list));
+        }
+        all
+    }
+
+    fn granted_tenth(all: &HashSet<(StreamType, String)>) -> HashSet<(StreamType, String)> {
+        all.iter()
+            .filter(|(_, n)| {
+                n.rsplit('_')
+                    .next()
+                    .and_then(|i| i.parse::<usize>().ok())
+                    .is_some_and(|i| i % 10 == 0)
+            })
+            .cloned()
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn a_plain_user_with_stream_grants_costs_one_probe_six_wide_grants_and_three_lists() {
+        let fake = FakeStreamChecker::default();
+        let user = "u7-plain@example.com";
+        on(&fake, user);
+        let all = big_inventory(&fake, user);
+        let kept = readable_streams(&fake, SITE_SERVICE_STREAMS, user, ORG, all.clone())
+            .await
+            .unwrap();
+        assert_eq!(kept, Some(granted_tenth(&all)));
+        let calls = fake.calls(user);
+        assert_eq!(
+            (
+                calls.probe_c,
+                calls.probe_b,
+                calls.lists,
+                calls.object_checks
+            ),
+            (1, 6, 3, 0)
+        );
+        assert!(calls.total() <= 10, "{calls:?}");
+        assert_eq!(calls.streams, 0, "no per-stream Check");
+    }
+
+    #[tokio::test]
+    async fn unsupported_shapes_send_only_the_original_object_checks() {
+        let user = "c7-unsupported-shape@example.com";
+        let types = [StreamType::Logs, StreamType::Metrics];
+        let objects = [
+            ObjectRef::stream(StreamType::Logs, "allowed"),
+            ObjectRef::stream(StreamType::Logs, "denied"),
+            ObjectRef::stream(StreamType::Metrics, "allowed"),
+            ObjectRef::stream(StreamType::Metrics, "denied"),
+        ];
+        for args in [
+            ObjectCheckArgs {
+                permission: "LIST".into(),
+                use_all_org: true,
+                parent_id: String::new(),
+                use_self_context: false,
+                use_self_parent: true,
+                identity: Identity::StoredEmail,
+            },
+            ObjectCheckArgs {
+                permission: "PUT".into(),
+                use_all_org: false,
+                parent_id: "folder1".into(),
+                use_self_context: true,
+                use_self_parent: false,
+                identity: Identity::GivenId,
+            },
+        ] {
+            let fake = FakeStreamChecker::default();
+            on(&fake, user);
+            for stream_type in types {
+                grant(&fake, user, stream_type, "allowed");
+            }
+            let query = ObjectsQuery {
+                permission: &args.permission,
+                use_all_org: args.use_all_org,
+                parent_id: &args.parent_id,
+                use_self_context: args.use_self_context,
+                use_self_parent: args.use_self_parent,
+                identity: args.identity,
+                ..stream_read_query("c7_unsupported_shape", ORG, user, &types)
+            };
+            let actual = authorize_objects(&fake, &query, &objects).await.unwrap();
+            let calls = fake.calls(user);
+            assert_eq!(
+                (
+                    calls.types_access,
+                    calls.probe_c,
+                    calls.probe_b,
+                    calls.lists,
+                    calls.role_checks,
+                    calls.object_checks,
+                ),
+                (0, 0, 0, 0, 0, objects.len()),
+                "{query:?}"
+            );
+            assert_eq!(calls.object_check_args, vec![args.clone(); objects.len()]);
+
+            let mut legacy = HashSet::new();
+            for object in &objects {
+                let stream = TypedStream {
+                    org_id: ORG.to_string(),
+                    stream_type: object.stream_type,
+                    name: object.id.to_string(),
+                };
+                if fake.can_read_stream(user, &stream).await {
+                    legacy.insert((stream.stream_type, stream.name));
+                }
+            }
+            assert_eq!(actual, Readable::Only(legacy), "{query:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn self_context_with_an_empty_parent_still_uses_a_list() {
+        let fake = FakeStreamChecker::default();
+        let user = "c7-empty-parent@example.com";
+        on(&fake, user);
+        grant(&fake, user, StreamType::Logs, "allowed");
+        let query = ObjectsQuery {
+            use_self_context: true,
+            ..stream_read_query("c7_empty_parent", ORG, user, &[StreamType::Logs])
+        };
+        let objects = [ObjectRef::stream(StreamType::Logs, "allowed")];
+        let actual = authorize_objects(&fake, &query, &objects).await.unwrap();
+
+        assert_eq!(
+            actual,
+            Readable::Only(HashSet::from([(StreamType::Logs, "allowed".into())]))
+        );
+        let calls = fake.calls(user);
+        assert_eq!(
+            (calls.types_access, calls.lists, calls.object_checks),
+            (1, 1, 0)
+        );
+    }
+
+    #[tokio::test]
+    async fn the_service_streams_request_stays_within_twelve_calls_with_its_route_checks() {
+        let fake = FakeStreamChecker::default();
+        let user = "f6-service-streams-budget@example.com";
+        on(&fake, user);
+        fake.set_role(ORG, user, "user");
+        let mut all = StreamSet::new();
+        for (stream_type, count) in [
+            (StreamType::Logs, 400),
+            (StreamType::Metrics, 2358),
+            (StreamType::Traces, 100),
+        ] {
+            let list = names(&format!("{stream_type}_"), count);
+            for name in list.iter().step_by(10) {
+                grant(&fake, user, stream_type, name);
+            }
+            all.extend(typed(stream_type, &list));
+        }
+        assert_eq!(all.len(), 2858);
+        let kept = within_budget(12, async {
+            let query = stream_read_query(SITE_SERVICE_STREAMS, ORG, user, &[]);
+            let route = ObjectRef::stream(StreamType::Logs, "logs_0");
+            let endpoint = ObjectRef::stream(StreamType::Metrics, "metrics_0");
+            assert!(fake.check_object(user, ORG, &query, &route).await.unwrap());
+            assert!(
+                fake.check_object(user, ORG, &query, &endpoint)
+                    .await
+                    .unwrap()
+            );
+            readable_streams(&fake, SITE_SERVICE_STREAMS, user, ORG, all.clone())
+                .await
+                .unwrap()
+        })
+        .await;
+        assert_eq!(kept, Some(granted_tenth(&all)));
+        let calls = fake.calls(user);
+        assert_eq!(
+            (
+                calls.probe_c,
+                calls.probe_b,
+                calls.lists,
+                calls.object_checks
+            ),
+            (1, 6, 3, 2)
+        );
+        assert!(calls.total() <= 12, "{calls:?}");
+        assert_eq!(calls.streams, 0, "no per-stream Check");
+    }
+
+    #[tokio::test]
+    async fn a_probe_error_fails_the_call_and_sends_nothing_more() {
+        let fake = FakeStreamChecker::default();
+        let user = "u7-probe-err@example.com";
+        on(&fake, user);
+        let all = big_inventory(&fake, user);
+        fake.fail_types_access_once(user, UnavailableReason::Server(500));
+        let err = readable_streams(&fake, SITE_SERVICE_STREAMS, user, ORG, all)
+            .await
+            .unwrap_err();
+        assert_eq!(err.reason, UnavailableReason::Server(500));
+        let calls = fake.calls(user);
+        assert_eq!((calls.probe_c, calls.lists, calls.object_checks), (1, 0, 0));
+    }
+
+    #[tokio::test]
+    async fn a_list_error_fails_the_call() {
+        let fake = FakeStreamChecker::default();
+        let user = "u7-list-err@example.com";
+        on(&fake, user);
+        let all = big_inventory(&fake, user);
+        fake.fail_list_once(user, UnavailableReason::Timeout);
+        let err = readable_streams(&fake, SITE_SERVICE_STREAMS, user, ORG, all)
+            .await
+            .unwrap_err();
+        assert_eq!(err.reason, UnavailableReason::Timeout);
+        assert_eq!(fake.calls(user).object_checks, 0);
+    }
+
+    #[tokio::test]
+    async fn a_fallback_error_ends_the_call_and_starts_no_later_check() {
+        let fake = FakeStreamChecker::default();
+        let user = "u7-fallback-err@example.com";
+        on(&fake, user);
+        fake.set_list_policy(user, ListPolicy::Disabled);
+        fake.set_fallback_concurrency(user, 1);
+        let list = names("s", 300);
+        for name in &list {
+            grant(&fake, user, StreamType::Logs, name);
+        }
+        fake.fail_object_check_once(user, UnavailableReason::Server(503));
+        let site = "u7_fallback_error";
+        let checks = metrics::AUTHZ_FALLBACK_CHECKS_TOTAL.with_label_values(&[site]);
+        let before = checks.get();
+        let err = readable_streams(&fake, site, user, ORG, typed(StreamType::Logs, &list))
+            .await
+            .unwrap_err();
+        assert_eq!(err.reason, UnavailableReason::Server(503));
+        let started = fake.calls(user).object_checks;
+        assert_eq!(started, 1, "no Check after the error");
+        assert_eq!(checks.get() - before, started as u64);
+    }
+
+    #[tokio::test]
+    async fn concrete_streams_named_like_org_wide_markers_are_returned_when_granted() {
+        let fake = FakeStreamChecker::default();
+        let user = "u7-all-names@example.com";
+        on(&fake, user);
+        let own = format!("_all_{ORG}");
+        for name in [own.as_str(), "_all_foo"] {
+            grant(&fake, user, StreamType::Logs, name);
+        }
+        let all = typed(
+            StreamType::Logs,
+            &[own.clone(), "_all_foo".to_string(), "other".to_string()],
+        );
+        let kept = readable_streams(&fake, SITE_SERVICE_STREAMS, user, ORG, all)
+            .await
+            .unwrap();
+        let expected = typed(StreamType::Logs, &[own, "_all_foo".to_string()]);
+        assert_eq!(kept, Some(expected));
+    }
+
+    #[tokio::test]
+    async fn an_uncovered_id_takes_exactly_one_check_under_every_type_answer() {
+        let long = "a".repeat(300);
+        let odd = [long.as_str(), "a/b", "caf\u{a0}e"];
+        for (case, setup, slash_allowed) in [
+            ("probe all", 0_u8, true),
+            ("listed", 1, true),
+            ("role branch denies", 2, false),
+        ] {
+            let fake = FakeStreamChecker::default();
+            let user = format!("u7-uncovered-{setup}@example.com");
+            let user = user.as_str();
+            on(&fake, user);
+            match setup {
+                0 => fake.grant_read_all(user, ORG, StreamType::Logs),
+                1 => grant(&fake, user, StreamType::Logs, "plain"),
+                _ => fake.set_role_answer(ORG, user, false),
+            }
+            grant(&fake, user, StreamType::Logs, "a/b");
+            let mut objects: Vec<ObjectRef<'_>> = odd
+                .iter()
+                .map(|name| ObjectRef {
+                    id: name,
+                    stream_type: StreamType::Logs,
+                    ofga_id: Cow::Borrowed(name),
+                })
+                .collect();
+            objects.push(ObjectRef::stream(StreamType::Logs, "plain"));
+            let query = stream_read_query(SITE_SERVICE_STREAMS, ORG, user, &[StreamType::Logs]);
+            let readable = authorize_objects(&fake, &query, &objects).await.unwrap();
+            assert_eq!(fake.calls(user).object_checks, odd.len(), "{case}");
+            let Readable::Only(set) = readable else {
+                panic!("{case}: no bypass expected");
+            };
+            let slash = (StreamType::Logs, "a/b".to_string());
+            assert_eq!(set.contains(&slash), slash_allowed, "{case}");
+            assert!(!set.contains(&(StreamType::Logs, long.clone())), "{case}");
+        }
+    }
+
+    #[test]
+    fn probe_covers_takes_the_id_as_composed() {
+        assert!(!probe_covers("foo:bar"));
+        assert!(probe_covers("foo.bar"));
+        assert!(probe_covers(&"a".repeat(200)));
+        assert!(!probe_covers(&"a".repeat(201)));
+        assert!(!probe_covers(""));
+        assert!(!probe_covers("caf\u{a0}e"));
+    }
+
+    #[tokio::test]
+    async fn decide_on_a_second_set_sends_no_type_level_call() {
+        let fake = FakeStreamChecker::default();
+        let user = "u7-decide@example.com";
+        on(&fake, user);
+        grant(&fake, user, StreamType::Traces, "t1");
+        let types = [StreamType::Traces, StreamType::Logs];
+        let query = stream_read_query(SITE_SERVICE_IDENTITY, ORG, user, &types);
+        let answers = type_answers(&fake, &query, &types).await.unwrap();
+        let before = fake.calls(user);
+        let objects = [
+            ObjectRef::stream(StreamType::Traces, "t1"),
+            ObjectRef::stream(StreamType::Traces, "t2"),
+        ];
+        let second = answers.decide(&fake, query.site, &objects).await.unwrap();
+        assert_eq!(fake.calls(user), before);
+        let once = authorize_objects(&fake, &query, &objects).await.unwrap();
+        assert_eq!(second, once);
+    }
+
+    #[tokio::test]
+    async fn only_an_org_admin_bypass_skips_the_role_branch() {
+        let fake = FakeStreamChecker::default();
+        let user = "u7b-admin@example.com";
+        on(&fake, user);
+        fake.grant_admin(ORG, user);
+        fake.set_role(ORG, user, "admin");
+        let objects = [ObjectRef::stream(StreamType::Logs, "app")];
+        let mut query = stream_read_query(SITE_SERVICE_STREAMS, ORG, user, &[StreamType::Logs]);
+        assert_eq!(
+            authorize_objects(&fake, &query, &objects).await.unwrap(),
+            Readable::All
+        );
+        assert_eq!(fake.calls(user).total(), 0);
+        query.bypass = Bypass::RbacOffOrRoot;
+        let readable = authorize_objects(&fake, &query, &objects).await.unwrap();
+        assert_eq!(fake.calls(user).role_checks, 1);
+        assert_eq!(
+            readable,
+            Readable::Only(typed(StreamType::Logs, &["app".to_string()]))
+        );
+    }
+
+    #[tokio::test]
+    async fn role_and_probe_answers_carry_their_own_strategy() {
+        const CHILD: &str = "O2_AUTHZ_ROLE_STRATEGY_METRICS_CHILD";
+        // Other tests write to these process-wide counters.
+        if std::env::var_os(CHILD).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "authz::list::tests::role_and_probe_answers_carry_their_own_strategy",
+                ])
+                .env(CHILD, "1")
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(
+                output.status.success() && stdout.contains("1 passed"),
+                "{stdout}\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+
+        let fake = FakeStreamChecker::default();
+        let role_allowed = "role-allowed@example.com";
+        let role_denied = "role-denied@example.com";
+        let probe = "probe-all@example.com";
+        fake.set_role(ORG, role_allowed, "editor");
+        fake.set_role_answer(ORG, role_denied, false);
+        fake.grant_read_every_stream(probe, ORG);
+
+        let site = SITE_SERVICE_STREAMS;
+        let role_count = metrics::AUTHZ_STRATEGY_TOTAL.with_label_values(&[site, "role"]);
+        let probe_count = metrics::AUTHZ_STRATEGY_TOTAL.with_label_values(&[site, "probe_all"]);
+        let types = [StreamType::Logs];
+        let objects = [ObjectRef::stream(StreamType::Logs, "app")];
+        for (user, allowed, expected_delta) in [
+            (role_allowed, true, (1, 0)),
+            (probe, true, (0, 1)),
+            (role_denied, false, (1, 0)),
+        ] {
+            on(&fake, user);
+            let query = stream_read_query(site, ORG, user, &types);
+            let before = (role_count.get(), probe_count.get());
+            let actual = authorize_objects(&fake, &query, &objects).await.unwrap();
+            let expected = if allowed {
+                HashSet::from([(StreamType::Logs, "app".to_string())])
+            } else {
+                HashSet::new()
+            };
+            assert_eq!(actual, Readable::Only(expected), "{user}");
+            assert_eq!(
+                (role_count.get() - before.0, probe_count.get() - before.1),
+                expected_delta,
+                "{user}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_true_prelude_answers_every_id_and_a_false_one_continues_to_the_probe() {
+        let fake = FakeStreamChecker::default();
+        let user = "u7b-prelude@example.com";
+        on(&fake, user);
+        let objects = [
+            ObjectRef::stream(StreamType::Traces, "t1"),
+            ObjectRef {
+                id: "a:b",
+                stream_type: StreamType::Traces,
+                ofga_id: Cow::Borrowed("a:b"),
+            },
+        ];
+        let prelude = OrgWideCheck {
+            resource: "traces",
+            permission: "GET",
+            use_all_org: true,
+            use_self_context: false,
+            use_self_parent: false,
+        };
+        let mut query = stream_read_query(SITE_SERVICE_STREAMS, ORG, user, &[StreamType::Traces]);
+        query.bypass = Bypass::RbacOffOrRoot;
+        query.prelude = Some(prelude);
+        let denied = authorize_objects(&fake, &query, &objects).await.unwrap();
+        assert_eq!(denied, Readable::Only(HashSet::new()));
+        assert_eq!(fake.calls(user).probe_c, 1, "C after a false prelude");
+        fake.grant_org_wide_check(user, ORG, "traces");
+        let all = authorize_objects(&fake, &query, &objects).await.unwrap();
+        assert_eq!(all, Readable::All);
+        assert_eq!(fake.calls(user).probe_c, 1, "nothing after a true prelude");
+    }
+
+    #[tokio::test]
+    async fn a_raw_id_with_a_colon_takes_its_own_check_and_a_role_answers_its_own() {
+        let custom = "u7e-custom@example.com";
+        let editor = "u7e-editor@example.com";
+        let fake = FakeStreamChecker::default();
+        for user in [custom, editor] {
+            on(&fake, user);
+        }
+        fake.grant_read_all(custom, ORG, StreamType::Logs);
+        fake.set_role(ORG, editor, "editor");
+        let raw = [ObjectRef {
+            id: "foo:bar",
+            stream_type: StreamType::Logs,
+            ofga_id: Cow::Borrowed("foo:bar"),
+        }];
+        let sanitized = [ObjectRef::stream(StreamType::Logs, "foo:bar")];
+        let query = |user| {
+            let mut q = stream_read_query(SITE_SERVICE_STREAMS, ORG, user, &[StreamType::Logs]);
+            q.bypass = Bypass::RbacOffOrRoot;
+            q
+        };
+        let only = |set: &[&str]| {
+            Readable::Only(
+                set.iter()
+                    .map(|n| (StreamType::Logs, n.to_string()))
+                    .collect(),
+            )
+        };
+        let q = query(custom);
+        assert_eq!(authorize_objects(&fake, &q, &raw).await.unwrap(), only(&[]));
+        assert_eq!(fake.calls(custom).object_checks, 1);
+        assert_eq!(
+            authorize_objects(&fake, &q, &sanitized).await.unwrap(),
+            only(&["foo:bar"])
+        );
+        let q = query(editor);
+        assert_eq!(
+            authorize_objects(&fake, &q, &raw).await.unwrap(),
+            only(&["foo:bar"])
+        );
+    }
+
+    #[tokio::test]
+    async fn fallback_distinguishes_raw_and_sanitized_ids() {
+        let fake = FakeStreamChecker::default();
+        let user = "c8-fallback-id@example.com";
+        let name = format!("{}:suffix", "x".repeat(201));
+        grant(&fake, user, StreamType::Logs, &name);
+        let types = [StreamType::Logs];
+        let query = stream_read_query(SITE_SERVICE_STREAMS, ORG, user, &types);
+        let answers = type_answers(&fake, &query, &types).await.unwrap();
+        let objects = [
+            ObjectRef {
+                id: &name,
+                stream_type: StreamType::Logs,
+                ofga_id: Cow::Borrowed(&name),
+            },
+            ObjectRef::stream(StreamType::Logs, &name),
+        ];
+        assert_eq!(
+            answers.decide(&fake, query.site, &objects).await.unwrap(),
+            Readable::Only(HashSet::from([(StreamType::Logs, name.clone())]))
+        );
+        assert_eq!(
+            answers
+                .clone()
+                .decide(&fake, query.site, &objects[..1])
+                .await
+                .unwrap(),
+            Readable::Only(HashSet::new())
+        );
+        assert_eq!(fake.calls(user).object_checks, 2);
+    }
+
+    #[test]
+    fn stream_read_sites_send_the_stored_email_like_their_helpers() {
+        let query = stream_read_query(SITE_SERVICE_STREAMS, ORG, "upper@example.com", &[]);
+        assert_eq!(query.identity, Identity::StoredEmail);
+    }
+
+    #[tokio::test]
+    async fn a_stored_email_query_asks_the_type_question_with_the_stored_email() {
+        let fake = FakeStreamChecker::default();
+        let user = "u7e-stored-email@example.com";
+        on(&fake, user);
+        let objects = [ObjectRef::stream(StreamType::Logs, "s1")];
+        let mut query = stream_read_query(SITE_SERVICE_STREAMS, ORG, user, &[StreamType::Logs]);
+        authorize_objects(&fake, &query, &objects).await.unwrap();
+        assert_eq!(fake.calls(user).stored_email_types, 1);
+
+        query.identity = Identity::GivenId;
+        authorize_objects(&fake, &query, &objects).await.unwrap();
+        assert_eq!(fake.calls(user).stored_email_types, 1);
+    }
+
+    #[tokio::test]
+    async fn an_undeclared_deadline_checks_every_stream_sixteen_at_a_time() {
+        let fake = FakeStreamChecker::default();
+        let user = "u7f-undeclared@example.com";
+        on(&fake, user);
+        fake.set_list_policy(user, ListPolicy::Disabled);
+        let list = names("s", 2858);
+        for name in list.iter().take(315) {
+            grant(&fake, user, StreamType::Metrics, name);
+        }
+        let kept = readable_streams(
+            &fake,
+            SITE_SERVICE_STREAMS,
+            user,
+            ORG,
+            typed(StreamType::Metrics, &list),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(kept.len(), 315);
+        let calls = fake.calls(user);
+        assert_eq!((calls.object_checks, calls.lists), (2858, 0));
+        assert_eq!(calls.max_in_flight, 16);
+    }
+
+    #[tokio::test]
+    async fn an_incomplete_list_falls_back_to_checks_for_that_type_only() {
+        let fake = FakeStreamChecker::default();
+        let user = "u7f-incomplete@example.com";
+        on(&fake, user);
+        let metrics = names("m", 200);
+        for name in metrics.iter().take(15) {
+            grant(&fake, user, StreamType::Metrics, name);
+        }
+        grant(&fake, user, StreamType::Logs, "l1");
+        let mut all = typed(StreamType::Metrics, &metrics);
+        all.extend(typed(StreamType::Logs, &names("l", 3)));
+        fake.fail_list_incomplete_once(user, StreamType::Metrics);
+        let before = metrics::AUTHZ_STRATEGY_TOTAL
+            .with_label_values(&["u7f_incomplete", "list_incomplete"])
+            .get();
+        let kept = readable_streams(&fake, "u7f_incomplete", user, ORG, all)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(kept.len(), 16);
+        assert_eq!(fake.calls(user).object_checks, 200, "metrics only");
+        let after = metrics::AUTHZ_STRATEGY_TOTAL
+            .with_label_values(&["u7f_incomplete", "list_incomplete"])
+            .get();
+        assert_eq!(after - before, 1);
+    }
+
+    #[tokio::test]
+    async fn the_offline_rule_gives_the_answers_of_the_legacy_path() {
+        let streams = typed(StreamType::Logs, &["a".to_string(), "b".to_string()]);
+        for (user, role, offline, expect) in [
+            ("u7g-editor@example.com", "editor", true, Ok(2)),
+            (
+                "u7g-user@example.com",
+                "user",
+                true,
+                Err(UnavailableReason::Transport),
+            ),
+            (
+                "u7g-custom@example.com",
+                "auditor",
+                true,
+                Err(UnavailableReason::Transport),
+            ),
+            (
+                "u7g-editor-no-list@example.com",
+                "editor",
+                false,
+                Err(UnavailableReason::Transport),
+            ),
+        ] {
+            let fake = FakeStreamChecker::default();
+            fake.set_role(ORG, user, role);
+            if !offline {
+                fake.set_offline_roles(user, &[]);
+            }
+            fake.fail_every_call(user, UnavailableReason::Transport);
+            let legacy = legacy_readable_streams(&fake, user, ORG, streams.clone()).await;
+            on(&fake, user);
+            let new = readable_streams(&fake, SITE_SERVICE_STREAMS, user, ORG, streams.clone())
+                .await
+                .map(|kept| kept.map_or(0, |s| s.len()))
+                .map_err(|e| e.reason);
+            assert_eq!(new, expect, "{user}");
+            if let Ok(n) = new {
+                assert_eq!(legacy.map(|s| s.len()), Some(n), "{user}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn an_admin_named_like_the_org_reads_through_the_offline_rule_per_stream() {
+        let fake = FakeStreamChecker::default();
+        let user = ORG;
+        fake.set_role(ORG, user, "admin");
+        fake.fail_every_call(user, UnavailableReason::Transport);
+        on(&fake, user);
+        let streams = typed(StreamType::Logs, &["a".to_string(), "b".to_string()]);
+        let kept = readable_streams(&fake, SITE_SERVICE_STREAMS, user, ORG, streams.clone())
+            .await
+            .unwrap();
+        assert_eq!(kept, Some(streams));
+        assert_eq!(fake.calls(user).object_checks, 2);
+    }
+
+    #[tokio::test]
+    async fn a_timeout_is_unavailable_for_every_role() {
+        for (user, role) in [
+            ("u7g-timeout-editor@example.com", "editor"),
+            ("u7g-timeout-user@example.com", "user"),
+        ] {
+            let fake = FakeStreamChecker::default();
+            fake.set_role(ORG, user, role);
+            fake.fail_every_call(user, UnavailableReason::Timeout);
+            on(&fake, user);
+            let err = readable_streams(
+                &fake,
+                SITE_SERVICE_STREAMS,
+                user,
+                ORG,
+                typed(StreamType::Logs, &["a".to_string()]),
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(err.reason, UnavailableReason::Timeout, "{role}");
+        }
+    }
+
+    #[tokio::test]
+    async fn off_mode_returns_the_legacy_answers_including_the_probe_fallback_and_dropped_rows() {
+        let fake = FakeStreamChecker::default();
+        let user = "u11-off@example.com";
+        fake.grant_read_all(user, ORG, StreamType::Logs);
+        grant(&fake, user, StreamType::Logs, "b");
+        fake.fail_org_wide_once(user);
+        fake.fail_stream_read_once(user, "b");
+        let streams = typed(StreamType::Logs, &["a".to_string(), "b".to_string()]);
+        let kept = readable_streams(&fake, SITE_SERVICE_STREAMS, user, ORG, streams)
+            .await
+            .unwrap();
+        assert_eq!(
+            kept,
+            Some(typed(StreamType::Logs, &["a".to_string()])),
+            "the failed probe falls back to stream Checks; the failed Check drops b"
+        );
+        let calls = fake.calls(user);
+        assert_eq!((calls.streams, calls.org_wide.len()), (2, 1));
+        assert_eq!((calls.types_access, calls.object_checks), (0, 0));
+    }
+
+    #[test]
+    fn compared_strategies_only_count_answers_used_by_the_objects() {
+        let empty = TypeAccessKind::Listed(HashSet::new());
+        assert_eq!(empty.strategy(), "list");
+        let answers = TypeAnswers {
+            query: OwnedQuery::new(&stream_read_query("compared_strategies", ORG, "user", &[])),
+            answer: Answer::PerType(HashMap::from([
+                (
+                    StreamType::Logs,
+                    TypeAccessKind::Listed(HashSet::from(["a".into()])),
+                ),
+                (StreamType::Metrics, empty),
+                (StreamType::Traces, TypeAccessKind::All),
+                (StreamType::Profiles, TypeAccessKind::Role(false)),
+            ])),
+            fallback_concurrency: 1,
+            fallback_checks: Default::default(),
+        };
+        let long_name = "x".repeat(300);
+        let uncovered = ObjectRef::stream(StreamType::Logs, &long_name);
+        assert!(
+            answers
+                .decided_strategies(std::slice::from_ref(&uncovered))
+                .is_empty()
+        );
+        assert_eq!(
+            answers.decided_strategies(&[ObjectRef::stream(StreamType::Logs, "a"), uncovered]),
+            BTreeSet::from(["list"])
+        );
+        assert_eq!(
+            answers.decided_strategies(&[ObjectRef::stream(StreamType::Metrics, "m1")]),
+            BTreeSet::from(["list"])
+        );
+        assert_eq!(
+            answers.decided_strategies(&[ObjectRef::stream(StreamType::Profiles, "p1")]),
+            BTreeSet::from(["role"])
+        );
+    }
+
+    #[tokio::test]
+    async fn shadow_credits_a_complete_empty_list() {
+        let _serial = SHADOW_TESTS.lock().await;
+        let fake = FakeStreamChecker::default();
+        let user = "c7-empty-list@example.com";
+        let site = "c7_empty_list";
+        fake.set_list_mode(user, ListMode::Shadow);
+        fake.set_shadow_sample(user, 1.0);
+        fake.set_list_policy(user, ListPolicy::Enabled);
+        let strategy = metrics::AUTHZ_STRATEGY_TOTAL.with_label_values(&[site, "list"]);
+        let compared = metrics::AUTHZ_LIST_SHADOW_COMPARED_TOTAL.with_label_values(&[site, "list"]);
+        let before = (strategy.get(), compared.get());
+        let streams = HashSet::from([(StreamType::Logs, "denied".into())]);
+        let kept = readable_streams(&fake, site, user, ORG, streams)
+            .await
+            .unwrap();
+
+        assert_eq!(kept, Some(HashSet::new()));
+        let calls = fake.calls(user);
+        assert_eq!((calls.lists, calls.object_checks), (1, 0));
+        assert_eq!(
+            (strategy.get() - before.0, compared.get() - before.1),
+            (1, 1)
+        );
+    }
+
+    #[tokio::test]
+    async fn shadow_mode_answers_with_legacy_and_records_comparisons_and_mismatches() {
+        let _serial = SHADOW_TESTS.lock().await;
+        let fake = FakeStreamChecker::default();
+        let user = "u11-shadow@example.com";
+        fake.set_list_mode(user, ListMode::Shadow);
+        fake.set_shadow_sample(user, 1.0);
+        grant(&fake, user, StreamType::Logs, "a");
+        fake.list_extra_once(user, StreamType::Logs, "b");
+        let site = "u11_shadow";
+        let streams = typed(StreamType::Logs, &["a".to_string(), "b".to_string()]);
+        let mismatch = || {
+            metrics::AUTHZ_LIST_SHADOW_MISMATCH_TOTAL
+                .with_label_values(&[site, "logs", "new_allows_more"])
+                .get()
+        };
+        let compared = || {
+            metrics::AUTHZ_LIST_SHADOW_COMPARED_TOTAL
+                .with_label_values(&[site, "list"])
+                .get()
+        };
+        let kept = readable_streams(&fake, site, user, ORG, streams.clone())
+            .await
+            .unwrap();
+        assert_eq!(kept, Some(typed(StreamType::Logs, &["a".to_string()])));
+        assert_eq!((mismatch(), compared()), (1, 1));
+        readable_streams(&fake, site, user, ORG, streams)
+            .await
+            .unwrap();
+        assert_eq!(
+            (mismatch(), compared()),
+            (1, 2),
+            "equal answers, no mismatch"
+        );
+    }
+
+    #[tokio::test]
+    async fn shadow_mode_runs_the_new_path_beside_the_legacy_one() {
+        let _serial = SHADOW_TESTS.lock().await;
+        let fake = FakeStreamChecker::default();
+        let user = "f5-shadow-concurrent@example.com";
+        let site = "f5_shadow_concurrent";
+        fake.set_list_mode(user, ListMode::Shadow);
+        fake.set_shadow_sample(user, 1.0);
+        let requested = typed(StreamType::Logs, &names("concurrent_", 1));
+        grant(&fake, user, StreamType::Logs, "concurrent_0");
+        let started = tokio::sync::Notify::new();
+        let (kept, answers) = tokio::time::timeout(
+            Duration::from_secs(5),
+            answer_in_mode(
+                &fake,
+                site,
+                user,
+                &requested,
+                || async {
+                    started.notified().await;
+                    Some(requested.clone())
+                },
+                || async {
+                    started.notify_one();
+                    stream_answers(&fake, site, user, ORG, &requested, &[StreamType::Logs]).await
+                },
+            ),
+        )
+        .await
+        .expect("shadow paths must run concurrently")
+        .unwrap();
+        assert_eq!(kept, Some(requested));
+        assert!(matches!(answers, ModeAnswers::Shadow(_)));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn shadow_mode_answers_without_waiting_for_a_slow_new_path() {
+        let _serial = SHADOW_TESTS.lock().await;
+        let fake = FakeStreamChecker::default();
+        let user = "f5-shadow-timeout@example.com";
+        let site = "f5_shadow_timeout";
+        fake.set_list_mode(user, ListMode::Shadow);
+        fake.set_shadow_sample(user, 1.0);
+        let requested = typed(StreamType::Logs, &names("timeout_", 1));
+        grant(&fake, user, StreamType::Logs, "timeout_0");
+        let skipped =
+            metrics::AUTHZ_LIST_SHADOW_SKIPPED_TOTAL.with_label_values(&[site, "new_timeout"]);
+        let before = skipped.get();
+        let started = tokio::time::Instant::now();
+        let (kept, answers) = answer_in_mode(
+            &fake,
+            site,
+            user,
+            &requested,
+            || async { Some(requested.clone()) },
+            || async {
+                tokio::time::sleep(Duration::from_secs(60)).await;
+                stream_answers(&fake, site, user, ORG, &requested, &[StreamType::Logs]).await
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(kept, Some(requested));
+        assert!(matches!(answers, ModeAnswers::Legacy));
+        assert_eq!(skipped.get(), before + 1);
+        assert!(started.elapsed() < Duration::from_secs(4));
+    }
+
+    #[tokio::test]
+    async fn shadow_mode_skips_a_legacy_run_with_a_failed_check_and_a_busy_node() {
+        let _serial = SHADOW_TESTS.lock().await;
+        let fake = FakeStreamChecker::default();
+        let user = "u11-shadow-skip@example.com";
+        fake.set_list_mode(user, ListMode::Shadow);
+        fake.set_shadow_sample(user, 1.0);
+        grant(&fake, user, StreamType::Logs, "a");
+        let site = "u11_shadow_skip";
+        let skipped = |reason| {
+            metrics::AUTHZ_LIST_SHADOW_SKIPPED_TOTAL
+                .with_label_values(&[site, reason])
+                .get()
+        };
+        let streams = typed(StreamType::Logs, &["a".to_string()]);
+        fake.fail_stream_read_once(user, "a");
+        let kept = readable_streams(&fake, site, user, ORG, streams.clone())
+            .await
+            .unwrap();
+        assert_eq!(kept, Some(HashSet::new()), "legacy drops the failed row");
+        #[cfg(feature = "enterprise")]
+        assert_eq!(skipped("legacy_error"), 1);
+        let held = ShadowSlot::claim().expect("slot free");
+        readable_streams(&fake, site, user, ORG, streams)
+            .await
+            .unwrap();
+        drop(held);
+        assert_eq!(skipped("busy"), 1);
+        assert_eq!(
+            metrics::AUTHZ_LIST_SHADOW_MISMATCH_TOTAL
+                .with_label_values(&[site, "logs", "new_allows_less"])
+                .get(),
+            0
+        );
+    }
+
+    #[tokio::test]
+    async fn shadow_verdict_records_directions_and_keeps_legacy_verdicts() {
+        let _serial = SHADOW_TESTS.lock().await;
+        let fake = FakeStreamChecker::default();
+        let site = "c3_shadow_verdict_directions";
+        let (_, answers) = stream_answers(
+            &fake,
+            site,
+            "c3-verdict-directions@example.com",
+            ORG,
+            &HashSet::new(),
+            &[StreamType::Logs],
+        )
+        .await
+        .unwrap();
+        let compared = metrics::AUTHZ_LIST_SHADOW_COMPARED_TOTAL.with_label_values(&[site, "list"]);
+        let compared_before = compared.get();
+        let objects = [ObjectRef::stream(StreamType::Logs, "a")];
+        let decision = |verdict| Decision {
+            verdict,
+            decided: if verdict == Err(None) {
+                0
+            } else {
+                objects.len()
+            },
+        };
+        for (legacy, new, kind, direction) in [
+            (
+                Ok(()),
+                Err(Some(StreamType::Logs)),
+                "logs",
+                "new_allows_less",
+            ),
+            (
+                Err(Some(StreamType::Traces)),
+                Ok(()),
+                "traces",
+                "new_allows_more",
+            ),
+            (Ok(()), Err(None), "unknown", "new_allows_less"),
+            (Err(None), Ok(()), "unknown", "new_allows_more"),
+        ] {
+            let mismatch = metrics::AUTHZ_LIST_SHADOW_MISMATCH_TOTAL
+                .with_label_values(&[site, kind, direction]);
+            let before = mismatch.get();
+            assert_eq!(
+                shadow_verdict(
+                    site,
+                    &answers,
+                    &objects,
+                    || async { (decision(legacy), false) },
+                    || async { Ok(decision(new)) },
+                )
+                .await,
+                legacy
+            );
+            assert_eq!(mismatch.get(), before + 1);
+        }
+        assert_eq!(compared.get(), compared_before);
+    }
+
+    #[tokio::test]
+    async fn shadow_verdict_skips_busy_and_failed_new_paths() {
+        let _serial = SHADOW_TESTS.lock().await;
+        let fake = FakeStreamChecker::default();
+        let site = "c3_shadow_verdict_skipped";
+        let (_, answers) = stream_answers(
+            &fake,
+            site,
+            "c3-verdict-skipped@example.com",
+            ORG,
+            &HashSet::new(),
+            &[StreamType::Logs],
+        )
+        .await
+        .unwrap();
+        let busy = metrics::AUTHZ_LIST_SHADOW_SKIPPED_TOTAL.with_label_values(&[site, "busy"]);
+        let busy_before = busy.get();
+        let held = ShadowSlot::claim().expect("slot free");
+        let objects = [ObjectRef::stream(StreamType::Logs, "a")];
+        assert_eq!(
+            shadow_verdict(
+                site,
+                &answers,
+                &objects,
+                || async {
+                    (
+                        Decision {
+                            verdict: Err(Some(StreamType::Logs)),
+                            decided: 1,
+                        },
+                        false,
+                    )
+                },
+                || async { panic!("a busy shadow slot must not run the new path") },
+            )
+            .await,
+            Err(Some(StreamType::Logs))
+        );
+        drop(held);
+        assert_eq!(busy.get(), busy_before + 1);
+        let new_error =
+            metrics::AUTHZ_LIST_SHADOW_SKIPPED_TOTAL.with_label_values(&[site, "new_error"]);
+        let error_before = new_error.get();
+        let compared = metrics::AUTHZ_LIST_SHADOW_COMPARED_TOTAL.with_label_values(&[site, "list"]);
+        let compared_before = compared.get();
+        assert_eq!(
+            shadow_verdict(
+                site,
+                &answers,
+                &objects,
+                || async {
+                    (
+                        Decision {
+                            verdict: Ok(()),
+                            decided: objects.len(),
+                        },
+                        false,
+                    )
+                },
+                || async { Err(UnavailableReason::Transport.into()) },
+            )
+            .await,
+            Ok(())
+        );
+        assert_eq!(new_error.get(), error_before + 1);
+        assert_eq!(compared.get(), compared_before);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn shadow_verdict_times_out_the_new_path_and_keeps_legacy() {
+        let _serial = SHADOW_TESTS.lock().await;
+        let fake = FakeStreamChecker::default();
+        let site = "c3_shadow_verdict_timeout";
+        let (_, answers) = stream_answers(
+            &fake,
+            site,
+            "c3-verdict-timeout@example.com",
+            ORG,
+            &HashSet::new(),
+            &[StreamType::Logs],
+        )
+        .await
+        .unwrap();
+        let skipped =
+            metrics::AUTHZ_LIST_SHADOW_SKIPPED_TOTAL.with_label_values(&[site, "new_timeout"]);
+        let before = skipped.get();
+        let started = tokio::time::Instant::now();
+        let objects = [ObjectRef::stream(StreamType::Logs, "a")];
+        assert_eq!(
+            shadow_verdict(
+                site,
+                &answers,
+                &objects,
+                || async {
+                    (
+                        Decision {
+                            verdict: Err(Some(StreamType::Logs)),
+                            decided: 1,
+                        },
+                        false,
+                    )
+                },
+                std::future::pending::<Result<Decision, AuthzUnavailable>>,
+            )
+            .await,
+            Err(Some(StreamType::Logs))
+        );
+        assert_eq!(skipped.get(), before + 1);
+        assert!(started.elapsed() < Duration::from_secs(4));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn shadow_verdict_skips_legacy_errors_and_counts_both_paths() {
+        use std::sync::Arc;
+
+        use super::super::accounting::{CallCounts, CallOutcome, REQUEST_CALLS, record_call};
+
+        let _serial = SHADOW_TESTS.lock().await;
+        let fake = FakeStreamChecker::default();
+        let site = "c3_shadow_verdict_legacy_error";
+        let (_, answers) = stream_answers(
+            &fake,
+            site,
+            "c3-verdict-legacy-error@example.com",
+            ORG,
+            &HashSet::new(),
+            &[StreamType::Logs],
+        )
+        .await
+        .unwrap();
+        let skipped =
+            metrics::AUTHZ_LIST_SHADOW_SKIPPED_TOTAL.with_label_values(&[site, "legacy_error"]);
+        let skipped_before = skipped.get();
+        let compared = metrics::AUTHZ_LIST_SHADOW_COMPARED_TOTAL.with_label_values(&[site, "list"]);
+        let compared_before = compared.get();
+        let objects = [ObjectRef::stream(StreamType::Logs, "a")];
+        let outer = Arc::new(CallCounts::default());
+        assert_eq!(
+            REQUEST_CALLS
+                .scope(
+                    outer.clone(),
+                    shadow_verdict(
+                        site,
+                        &answers,
+                        &objects,
+                        || async {
+                            record_call(CallOutcome::Error);
+                            (
+                                Decision {
+                                    verdict: Err(Some(StreamType::Logs)),
+                                    decided: 1,
+                                },
+                                false,
+                            )
+                        },
+                        || async {
+                            record_call(CallOutcome::Allow);
+                            Ok(Decision {
+                                verdict: Ok(()),
+                                decided: objects.len(),
+                            })
+                        },
+                    ),
+                )
+                .await,
+            Err(Some(StreamType::Logs))
+        );
+        assert_eq!(skipped.get(), skipped_before + 1);
+        assert_eq!(compared.get(), compared_before);
+        assert_eq!((outer.calls(), outer.errors()), (2, 1));
+    }
+
+    #[tokio::test]
+    async fn the_unavailable_response_carries_the_status_headers_and_body() {
+        let response = authz_unavailable_response(AuthzUnavailable {
+            reason: UnavailableReason::Timeout,
+        });
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.headers()[header::RETRY_AFTER], "3");
+        assert_eq!(response.headers()["x-o2-authz"], "unavailable");
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            body,
+            serde_json::json!({
+                "code": 503,
+                "error_code": "authz_unavailable",
+                "message": "Permission service unavailable, try again",
+            })
+        );
+    }
+}
