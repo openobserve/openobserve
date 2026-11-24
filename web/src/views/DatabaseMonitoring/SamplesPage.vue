@@ -542,7 +542,7 @@ const isFiltered = computed(
 const rowActions: OTableRowAction[] = [
   {
     id: "trace",
-    icon: "open-in-new",
+    icon: "account-tree",
     label: t("dbm.samples.viewTrace"),
     visible: (row) => !!sampleTraceFilter(row),
     disabled: () => (tracesLock.locked.value ? tracesLock.lockedReason.value : false),
