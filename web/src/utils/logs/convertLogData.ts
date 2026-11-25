@@ -329,7 +329,7 @@ export const convertStackedLogData = (
         left: "20",
         right: "20",
         // A breakdown's legend sits on one line at the top right, so the axis keeps the bottom.
-        top: series.length > 1 ? "22" : "6",
+        top: series.length > 1 ? "30" : "6",
         bottom: "5",
       },
       tooltip: {
@@ -375,7 +375,7 @@ export const convertStackedLogData = (
       },
       legend: {
         show: series.length > 1,
-        top: 0,
+        top: 8,
         right: 16,
         padding: [0, 5],
         // Small square swatches and quiet axis-coloured labels, so the key reads as a caption, not a row of bars.
