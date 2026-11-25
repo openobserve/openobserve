@@ -690,6 +690,47 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
           expect(wrapper.vm.searchObj.meta.executedPanel).toBeNull();
         });
 
+        it("cancels a Run's chart load that finds no query to run, so the grid lane goes idle", async () => {
+          const setExecutors = vi.spyOn(useLogsAutoRun(), "setExecutors");
+          try {
+            const toggle = await mountChart();
+            const engine = wrapper.vm.autoRun.engine;
+            // ready() stubs the visualize executor, so the Run needs Index's real one back.
+            const executePanelRun = setExecutors.mock.calls.find(
+              (c) => c[0].logs && c[0].visualize,
+            )?.[0].visualize;
+            expect(executePanelRun).toBeTypeOf("function");
+            wrapper.vm.autoRun.setExecutors({ visualize: executePanelRun });
+            const toggleChart = wrapper.vm.visualizeChartData;
+
+            wrapper.vm.searchBarRef.handleRunQueryFn();
+            await vi.waitFor(() => expect(engine.currentGeneration("grid").id).not.toBe(toggle.id));
+            const run = engine.currentGeneration("grid");
+            expect(run).toMatchObject({ op: "visualize", reason: "run" });
+            await vi.waitFor(() => {
+              expect(wrapper.vm.visualizeChartData).not.toBe(toggleChart);
+              expect(wrapper.vm.visualizeChartData.queries?.[0]?.query).toBeTruthy();
+            });
+            await flushPromises();
+            expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(true);
+            expect(run.settled).toBe(false);
+
+            wrapper.vm.visualizeChartData.queries[0].query = "";
+            await vi.waitFor(() => expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(false));
+
+            // These are the terms of the engine's private isBusy(), which defers auto-refresh while true.
+            expect(run.settled).toBe(true);
+            expect(engine.currentGeneration("grid").id).toBe(run.id);
+            const patterns = engine.currentGeneration("patterns");
+            expect(!patterns || patterns.settled || patterns.cancelled).toBe(true);
+            expect(engine.hasPendingRequest()).toBe(false);
+            expect(wrapper.vm.searchObj.meta.runOutcome.visualize).toBe("cancelled");
+            expect(wrapper.vm.searchObj.meta.executedPanel).toBeNull();
+          } finally {
+            setExecutors.mockRestore();
+          }
+        });
+
         it("records the handed config when the chart shows a result it already had", async () => {
           const run = await mountChart();
           const handed = wrapper.vm.autoRun.panelSignature("visualize");
