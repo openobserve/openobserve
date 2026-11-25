@@ -233,6 +233,8 @@ pub(crate) async fn around(
     resp.size = around_size;
     resp.scan_size = resp_forward.scan_size + resp_backward.scan_size;
     resp.took = resp_forward.took + resp_backward.took;
+    resp.took_detail = resp_forward.took_detail.clone();
+    resp.took_detail.add(&resp_backward.took_detail);
     resp.cached_ratio = (resp_forward.cached_ratio + resp_backward.cached_ratio) / 2;
 
     let time = start.elapsed().as_secs_f64();
@@ -274,7 +276,7 @@ pub(crate) async fn around(
         req_stats,
         org_id,
         stream_name,
-        StreamType::Logs,
+        stream_type,
         UsageType::SearchAround,
         num_fn,
         started_at,

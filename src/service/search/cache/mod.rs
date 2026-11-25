@@ -248,15 +248,37 @@ pub async fn search(
                         );
                     }
 
-                    SearchService::search(&trace_id, &org_id, stream_type, user_id, &req).await
+                    // The merged response below writes the one Search usage row.
+                    SearchService::search_with_usage(
+                        &trace_id,
+                        &org_id,
+                        stream_type,
+                        user_id,
+                        &req,
+                        SearchService::UsageReport::Never,
+                    )
+                    .await
                 })
                 .instrument(enter_span),
             );
             tasks.push(task);
         }
 
-        for task in tasks {
-            results.push(task.await.map_err(|e| Error::Message(e.to_string()))??);
+        if let Err(e) = join_deltas(tasks, &mut results).await {
+            let took_time = start.elapsed().as_secs_f64();
+            report_failed_deltas_usage(
+                &results,
+                trace_id,
+                org_id,
+                stream_type,
+                user_id.clone(),
+                &req,
+                &all_streams,
+                started_at,
+                took_time,
+            )
+            .await;
+            return Err(e);
         }
         for res in &results {
             work_group_set.push(res.work_group.clone());
@@ -331,7 +353,7 @@ pub async fn search(
     );
 
     res.set_trace_id(trace_id.to_string());
-    res.set_took(took_time as usize);
+    res.set_took(start.elapsed().as_millis() as usize);
     res.set_cache_took(cache_took);
 
     if is_aggregate
@@ -663,11 +685,22 @@ pub fn merge_response(
     cache_took: usize,
     order_by: Vec<(String, OrderBy)>,
 ) -> config::meta::search::Response {
+    // Deltas with no hits are dropped below, but their scan and queue wait still count.
+    let delta_scan_size: usize = search_responses.iter().map(|res| res.scan_size).sum();
+    let delta_scan_files: usize = search_responses.iter().map(|res| res.scan_files).sum();
+    let delta_peak = peak_memory_of(search_responses);
+    let delta_took = parallel_took_detail(search_responses);
     cached_responses.retain(|res| !res.hits.is_empty());
     search_responses.retain(|res| !res.hits.is_empty());
 
     if cached_responses.is_empty() && search_responses.is_empty() {
-        return config::meta::search::Response::default();
+        return config::meta::search::Response {
+            scan_size: delta_scan_size,
+            scan_files: delta_scan_files,
+            peak_memory_usage: delta_peak,
+            took_detail: delta_took,
+            ..Default::default()
+        };
     }
     let mut fn_error = vec![];
 
@@ -711,20 +744,22 @@ pub fn merge_response(
             }
         }
         cache_response.function_error = fn_error;
+        cache_response.scan_files = delta_scan_files;
+        cache_response.peak_memory_usage = delta_peak;
+        cache_response.took_detail = delta_took;
         return cache_response;
     }
     let cached_hits_len = cache_response.hits.len();
 
-    cache_response.scan_size = 0;
+    cache_response.scan_size = delta_scan_size;
+    cache_response.scan_files = delta_scan_files;
+    cache_response.peak_memory_usage = delta_peak;
 
     let mut files_cache_ratio = 0;
     let mut result_cache_len = 0;
 
-    let mut res_took = ResponseTook::default();
-
     for res in search_responses.clone() {
         cache_response.total += res.total;
-        cache_response.scan_size += res.scan_size;
         cache_response.took += res.took;
         files_cache_ratio += res.cached_ratio;
         cache_response.histogram_interval = res.histogram_interval;
@@ -734,23 +769,9 @@ pub fn merge_response(
         if res.hits.is_empty() {
             continue;
         }
-        // here the searches in paralles, so we use the max value of the took_detail
-        res_took.idx_took = std::cmp::max(res_took.idx_took, res.took_detail.idx_took);
-        res_took.wait_in_queue =
-            std::cmp::max(res_took.wait_in_queue, res.took_detail.wait_in_queue);
-        res_took.search_took = std::cmp::max(res_took.search_took, res.took_detail.search_took);
-        res_took.file_list_took =
-            std::cmp::max(res_took.file_list_took, res.took_detail.file_list_took);
         if !res.function_error.is_empty() {
             fn_error.extend(res.function_error.clone());
         }
-
-        cache_response.peak_memory_usage = Some(
-            cache_response
-                .peak_memory_usage
-                .unwrap_or(0.0)
-                .max(res.peak_memory_usage.unwrap_or(0.0)),
-        );
 
         cache_response.hits.extend(res.hits.clone());
     }
@@ -772,7 +793,7 @@ pub fn merge_response(
         cached_hits_len,
         result_cache_len
     );
-    cache_response.took_detail = res_took;
+    cache_response.took_detail = delta_took;
     cache_response.order_by = search_responses
         .first()
         .map(|res| res.order_by)
@@ -793,6 +814,104 @@ pub fn merge_response(
         .map(|res| res.is_histogram_eligible)
         .unwrap_or_default();
     cache_response
+}
+
+/// The peak memory of parallel deltas is the max of their peaks.
+fn peak_memory_of(responses: &[config::meta::search::Response]) -> Option<f64> {
+    responses
+        .iter()
+        .filter_map(|res| res.peak_memory_usage)
+        .reduce(f64::max)
+}
+
+/// The deltas run in parallel, so each part of the merged took detail is the max.
+fn parallel_took_detail(responses: &[config::meta::search::Response]) -> ResponseTook {
+    let mut took = ResponseTook::default();
+    for res in responses {
+        let d = &res.took_detail;
+        took.idx_took = took.idx_took.max(d.idx_took);
+        took.wait_in_queue = took.wait_in_queue.max(d.wait_in_queue);
+        took.search_took = took.search_took.max(d.search_took);
+        took.file_list_took = took.file_list_took.max(d.file_list_took);
+    }
+    took
+}
+
+/// Awaits the deltas in order; on an error, `results` keeps the deltas that finished.
+async fn join_deltas(
+    tasks: Vec<tokio::task::JoinHandle<Result<config::meta::search::Response, Error>>>,
+    results: &mut Vec<config::meta::search::Response>,
+) -> Result<(), Error> {
+    let mut tasks = tasks.into_iter();
+    while let Some(task) = tasks.next() {
+        match task.await.map_err(|e| Error::Message(e.to_string())) {
+            Ok(Ok(res)) => results.push(res),
+            Ok(Err(e)) | Err(e) => {
+                for task in tasks.filter(|t| t.is_finished()) {
+                    results.extend(task.await.ok().and_then(Result::ok));
+                }
+                return Err(e);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// A failed request still bills the data that its finished deltas scanned.
+#[allow(clippy::too_many_arguments)]
+async fn report_failed_deltas_usage(
+    done: &[config::meta::search::Response],
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    user_id: Option<String>,
+    req: &config::meta::search::Request,
+    all_streams: &str,
+    started_at: i64,
+    took_time: f64,
+) {
+    if done.is_empty() {
+        return;
+    }
+    let req_stats = failed_deltas_stats(done, trace_id, user_id, req, took_time);
+    report_request_usage_stats(
+        req_stats,
+        org_id,
+        all_streams,
+        stream_type,
+        UsageType::Search,
+        req.query.query_fn.is_some() as u16,
+        started_at,
+    )
+    .await;
+}
+
+fn failed_deltas_stats(
+    done: &[config::meta::search::Response],
+    trace_id: &str,
+    user_id: Option<String>,
+    req: &config::meta::search::Request,
+    took_time: f64,
+) -> RequestStats {
+    let scan_files: usize = done.iter().map(|res| res.scan_files).sum();
+    RequestStats {
+        records: done.iter().map(|res| res.hits.len() as i64).sum(),
+        response_time: took_time,
+        size: done.iter().map(|res| res.scan_size).sum::<usize>() as f64,
+        scan_files: (scan_files > 0).then_some(scan_files as i64),
+        request_body: Some(req.query.sql.clone()),
+        function: req.query.query_fn.clone(),
+        user_email: user_id,
+        min_ts: Some(req.query.start_time),
+        max_ts: Some(req.query.end_time),
+        search_type: req.search_type,
+        search_event_context: req.search_event_context.clone(),
+        trace_id: Some(trace_id.to_string()),
+        took_wait_in_queue: Some(parallel_took_detail(done).wait_in_queue),
+        work_group: get_work_group(done.iter().map(|res| res.work_group.clone()).collect()),
+        peak_memory_usage: peak_memory_of(done),
+        ..Default::default()
+    }
 }
 
 fn sort_response(
@@ -1234,5 +1353,90 @@ mod tests {
         }
         . = arr1_final"#;
         assert!(is_result_array_skip_vrl(query_fn));
+    }
+
+    fn response_with_ts(ts: &[i64]) -> config::meta::search::Response {
+        let hits = ts
+            .iter()
+            .map(|t| config::utils::json::json!({"_timestamp": t}))
+            .collect::<Vec<_>>();
+        config::meta::search::Response {
+            total: hits.len(),
+            scan_size: hits.len(),
+            hits,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_merge_response_keeps_scan_and_queue_wait_of_empty_delta() {
+        let mut empty_delta = response_with_ts(&[]);
+        empty_delta.scan_size = 100;
+        empty_delta.scan_files = 3;
+        empty_delta.peak_memory_usage = Some(9.0);
+        empty_delta.took_detail.wait_in_queue = 2000;
+        let mut delta = response_with_ts(&[30]);
+        delta.scan_files = 2;
+        delta.took_detail.wait_in_queue = 5;
+        let merged = merge_response(
+            "t",
+            &mut vec![response_with_ts(&[10, 20])],
+            &mut vec![empty_delta.clone(), delta],
+            "_timestamp",
+            10,
+            true,
+            0,
+            vec![],
+        );
+        assert_eq!(merged.scan_size, 101);
+        assert_eq!(merged.scan_files, 5);
+        assert_eq!(merged.peak_memory_usage, Some(9.0));
+        assert_eq!(merged.took_detail.wait_in_queue, 2000);
+
+        let only_empty = merge_response(
+            "t",
+            &mut vec![],
+            &mut vec![empty_delta],
+            "_timestamp",
+            10,
+            true,
+            0,
+            vec![],
+        );
+        assert_eq!(only_empty.scan_size, 100);
+        assert_eq!(only_empty.scan_files, 3);
+        assert_eq!(only_empty.peak_memory_usage, Some(9.0));
+        assert_eq!(only_empty.took_detail.wait_in_queue, 2000);
+    }
+
+    #[test]
+    fn test_failed_deltas_stats_bill_the_finished_deltas() {
+        let mut a = response_with_ts(&[10]);
+        a.scan_size = 40;
+        a.scan_files = 2;
+        a.took_detail.wait_in_queue = 7;
+        let mut b = response_with_ts(&[20, 30]);
+        b.scan_size = 60;
+        b.took_detail.wait_in_queue = 3;
+        b.peak_memory_usage = Some(4.0);
+        let req = config::meta::search::Request::default();
+        let stats = failed_deltas_stats(&[a, b], "t", None, &req, 1.5);
+        assert_eq!(stats.size, 100.0);
+        assert_eq!(stats.records, 3);
+        assert_eq!(stats.scan_files, Some(2));
+        assert_eq!(stats.took_wait_in_queue, Some(7));
+        assert_eq!(stats.response_time, 1.5);
+        assert_eq!(stats.peak_memory_usage, Some(4.0));
+    }
+
+    #[tokio::test]
+    async fn test_join_deltas_keeps_finished_deltas_on_error() {
+        let tasks = vec![
+            tokio::spawn(async { Ok(response_with_ts(&[1])) }),
+            tokio::spawn(async { Err(Error::Message("early".into())) }),
+        ];
+        let mut done = vec![];
+        assert!(join_deltas(tasks, &mut done).await.is_err());
+        assert_eq!(done.len(), 1);
     }
 }
