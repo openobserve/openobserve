@@ -445,21 +445,21 @@ const useLogs = (t: TranslateFn) => {
       return;
     }
 
-    const date = {
-      startTime: Number(queryParams.from),
-      endTime: Number(queryParams.to),
-      relativeTimePeriod: queryParams.period || null,
-      type: queryParams.period ? "relative" : "absolute",
-    };
+    // A link that names only a stream (Command K) keeps the range in force instead of a NaN one.
+    if (queryParams.period || (queryParams.from && queryParams.to)) {
+      const date = {
+        startTime: Number(queryParams.from),
+        endTime: Number(queryParams.to),
+        relativeTimePeriod: queryParams.period || null,
+        type: queryParams.period ? "relative" : "absolute",
+      };
 
-    if (date.type === "relative") {
-      queryParams.period = date.relativeTimePeriod;
-    } else {
-      queryParams.from = date.startTime;
-      queryParams.to = date.endTime;
-    }
-
-    if (date) {
+      if (date.type === "relative") {
+        queryParams.period = date.relativeTimePeriod;
+      } else {
+        queryParams.from = date.startTime;
+        queryParams.to = date.endTime;
+      }
       searchObj.data.datetime = date;
     }
 

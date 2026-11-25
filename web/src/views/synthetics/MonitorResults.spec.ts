@@ -97,6 +97,12 @@ vi.mock("@/composables/useSyntheticResults", async () => {
   };
 });
 
+const mockRecordResourceVisit = vi.hoisted(() => vi.fn());
+vi.mock("@/components/commandPalette/useRecentlyViewed", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  recordResourceVisit: mockRecordResourceVisit,
+}));
+
 // Mock syntheticsService.get — called via bootstrap() when MonitorRuns emits
 // need-check-data (only when there are zero runs and no lastTriggeredAt).
 const mockSyntheticsServiceGet = vi.fn().mockResolvedValue({
@@ -361,6 +367,18 @@ describe("MonitorResults", () => {
       expect(mockFetchAll.mock.calls.filter(([id]) => id === "second-monitor")).toHaveLength(1);
     },
   );
+
+  it("records a recent visit under the check's own folder when the URL names none", async () => {
+    mockSyntheticsServiceGet.mockResolvedValueOnce({
+      data: { name: "Foldered", folder_id: "folder-7", last_triggered_at: 0 },
+    });
+    wrapper = makeWrapper();
+    await flushPromises();
+    expect(mockRecordResourceVisit.mock.lastCall?.[1].route_ref).toEqual({
+      check_id: "mon-1",
+      folder_id: "folder-7",
+    });
+  });
 
   it("still loads the runs when the check itself fails to load", async () => {
     mockSyntheticsServiceGet.mockRejectedValueOnce({ response: { status: 500 } });

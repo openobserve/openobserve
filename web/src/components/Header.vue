@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -151,8 +151,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
     </div>
 
-    <!-- CENTER: elastic spacer so the right-side controls stay right-aligned. -->
-    <div class="min-w-0 flex-1" />
+    <div class="flex min-w-0 flex-1 justify-center px-3 max-md:px-1">
+      <OButton
+        variant="outline"
+        size="xs"
+        class="w-full max-w-112 justify-start max-md:w-auto"
+        data-test="header-command-palette"
+        :aria-label="t('commandPalette.title')"
+        @click="$emit('open-command-palette')"
+      >
+        <OIcon name="search" size="sm" />
+        <span class="min-w-0 flex-1 text-start max-md:hidden">{{ t("commandPalette.title") }}</span>
+        <OShortcut id="commandPalette" class="max-md:hidden" />
+      </OButton>
+    </div>
 
     <!-- RIGHT SIDE: Controls -->
     <div
@@ -513,6 +525,7 @@ import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import LinkedAccountsDialog from "./settings/LinkedAccountsDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -540,6 +553,7 @@ export default defineComponent({
     SampleDataHeaderChip,
     LinkedAccountsDialog,
     OButton,
+    OShortcut,
     OIcon,
     OLockBadge,
     OTooltip,
@@ -628,6 +642,7 @@ export default defineComponent({
     "changeLanguage",
     "openPredefinedThemes",
     "openShortcuts",
+    "open-command-palette",
     "toggle-mobile-nav",
     "signout",
   ],
