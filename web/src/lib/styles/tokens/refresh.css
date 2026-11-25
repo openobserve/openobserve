@@ -468,9 +468,9 @@
   border-color: var(--header-quiet-edge);
 }
 
-/* Header controls: no fill, same edge as the page toolbar buttons, so both read as one set. */
+/* Header controls are borderless ghosts on the shell: no fill and no edge until hover. */
 :root {
-  --header-quiet-edge: var(--toolbar-btn-rest-edge);
+  --header-quiet-edge: transparent;
 }
 :root
   :is(
@@ -667,7 +667,7 @@
   height: 0.875rem;
 }
 
-/* Toolbar and header secondary buttons: a raised fill plus a 1px control edge, so they read as outlined buttons, not floating text; hover and open keep the ghost fills. */
+/* Toolbar secondary buttons: a borderless tonal fill, so a dense row reads as one set instead of a run of outlines; hover and open keep the ghost fills. */
 :root
   .toolbar-btn-rest:not(:hover):not([aria-expanded="true"]):not([data-state="open"]):not(
     [aria-pressed="true"]
@@ -678,27 +678,25 @@
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline ring width */
   box-shadow: inset 0 0 0 1px var(--toolbar-btn-rest-edge);
 }
-:root:not(.dark) {
-  --toolbar-btn-rest-bg: var(--color-surface-raised);
-  --toolbar-btn-rest-edge: var(--color-border-button);
-}
-/* Raised, never sunken: the fill sits a step above the near-black bar and the edge is near the control border. */
-:root.dark {
-  --toolbar-btn-rest-bg: var(--color-surface-raised);
-  --toolbar-btn-rest-edge: color-mix(
-    in srgb,
-    var(--color-border-button) 75%,
-    var(--color-border-control)
-  );
-}
-/* Logs packs about fifteen controls in one row, so edges there read as noise: a borderless tonal fill instead. */
-:root .logs-search-bar-component {
+:root {
   --toolbar-btn-rest-bg: var(--color-surface-band);
   --toolbar-btn-rest-edge: transparent;
 }
+/* Toolbar time pickers (not the full-width form field) and outlined actions in page headers and table toolbars join the same tonal set. */
 :root
-  .logs-search-bar-component
-  #date-time-button:not(:hover):not([aria-expanded="true"]):not([data-state="open"]) {
+  :is(
+    #date-time-button:not(.w-full),
+    :is([data-o-page-actions], [data-test="o2-table-toolbar"])
+      [data-o2-btn]:is([class*="bg-button-outline-bg"], [class*="bg-button-secondary "])
+  ) {
+  border-color: transparent !important;
+}
+:root
+  :is(
+    #date-time-button:not(.w-full),
+    :is([data-o-page-actions], [data-test="o2-table-toolbar"])
+      [data-o2-btn]:is([class*="bg-button-outline-bg"], [class*="bg-button-secondary "])
+  ):not(:hover):not([aria-expanded="true"]):not([data-state="open"]):not([aria-pressed="true"]) {
   background-color: var(--toolbar-btn-rest-bg);
 }
 /* Their icons stay secondary grey (as in the reference apps) but get a thin currentColor stroke, lifting the 300-weight outlines to about the 400 weight (≈1.3px at 16px). */
@@ -708,12 +706,7 @@
   stroke-width: 0.75px;
   stroke-linejoin: round;
 }
-/* The results bar keeps the boxed shape but a step quieter than the query toolbar, so the eye lands on the results: structural edge, no raised fill, secondary text. */
-:root .results-bar-quiet,
-:root [data-test="logs-search-field-list-collapse-btn"] {
-  --toolbar-btn-rest-bg: transparent;
-  --toolbar-btn-rest-edge: var(--color-border-subtle);
-}
+/* The results bar is a step quieter than the query toolbar, so the eye lands on the results: secondary text. */
 :root :is(.results-bar-quiet .toolbar-btn-rest, [data-test="logs-search-field-list-collapse-btn"]) {
   color: var(--color-text-secondary) !important;
 }
