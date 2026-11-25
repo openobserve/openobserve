@@ -236,27 +236,31 @@ test.describe('Traces search window and error state (#15130, ENT#2805, ENT#2806)
     await pm.tracesPage.expectQueryErrorCleared();
   });
 
-  test('the Services Catalog side panel resolves a relative range when it opens', {
-    tag: ['@bug-ent2805', '@P2', '@regression', '@tracesRegression'],
-  }, async ({ page }) => {
+  test('the Services Catalog side panel keeps the window its rows were loaded with, and a refresh moves both', {
+    tag: ['@bug-ent2805', '@bug-16961', '@P2', '@regression', '@tracesRegression'],
+  }, async () => {
     await pm.tracesPage.searchUntilResultCount('Spans Found');
+    const capture = pm.tracesPage.captureSearchRequests();
     await pm.tracesPage.navigateToServicesViaTab();
     await pm.tracesPage.expectServicesCatalogServiceVisible(SERVICE);
-    await page.waitForTimeout(20000);
-
-    const capture = pm.tracesPage.captureSearchRequests();
-    const openedAt = nowUs();
+    // A panel that resolved "now" when it opened would end at least this much later than the rows.
+    await expect.poll(() => nowUs() - pm.tracesPage.servicesCatalogWindow(capture, SERVICE).endTime, { timeout: 15000, message: 'the rows window must age before the panel opens' })
+      .toBeGreaterThan(SAME_WINDOW_US);
+    const rowsWindow = pm.tracesPage.servicesCatalogWindow(capture, SERVICE);
     await pm.tracesPage.clickServicesCatalogService(SERVICE);
     await pm.tracesPage.expectServiceSidePanelVisible();
-    // Only the side panel's own queries filter on the clicked service.
-    const panelRequests = () => capture.requests.filter((r) => r.endTime && r.sql.includes(`'${SERVICE}'`));
-    await expect.poll(() => panelRequests().length, { timeout: 20000, message: 'the side panel must query the clicked service' }).toBeGreaterThan(0);
-    const settledAt = nowUs();
+    await pm.tracesPage.expectServiceSidePanelWindow(capture, SERVICE, rowsWindow, 'every side panel query must use the window the rows were loaded with');
+    expect(pm.tracesPage.servicesCatalogWindow(capture, SERVICE), 'opening the panel must not reload the rows').toEqual(rowsWindow);
+
+    const refreshedAt = nowUs();
+    await pm.tracesPage.refreshServicesCatalog();
+    await expect.poll(() => pm.tracesPage.servicesCatalogWindow(capture, SERVICE).endTime, { timeout: 20000, message: 'a refresh must load the rows for a window ending now' })
+      .toBeGreaterThanOrEqual(refreshedAt);
+    const refreshedWindow = pm.tracesPage.servicesCatalogWindow(capture, SERVICE);
+    await pm.tracesPage.expectServiceSidePanelWindow(capture, SERVICE, refreshedWindow, 'every side panel query must follow the refreshed rows window');
     capture.stop();
 
-    for (const request of panelRequests()) {
-      expect(request.endTime, `side panel ${request.panel} query must not end before the panel opened`).toBeGreaterThanOrEqual(openedAt - 5_000_000);
-      expect(request.endTime, `side panel ${request.panel} query must not end in the future`).toBeLessThanOrEqual(settledAt);
-    }
+    expect(pm.tracesPage.serviceSidePanelWindows(capture, SERVICE), 'the panel must never query a window the rows were not loaded with')
+      .toEqual([rowsWindow, refreshedWindow]);
   });
 });

@@ -286,7 +286,8 @@ describe("operator names", () => {
     for (const id of exclusion.operators.string) {
       expect(operatorName(id, exclusion.dialect, tr, exclusion.operatorNames)).not.toMatch(/_/);
     }
-    expect(operatorName("regex", "sql", tr)).toBe("re_match");
+    expect(operatorName("regex", "sql", tr)).toBe("Matches Regex");
+    expect(operatorName("regex", "promql", tr)).toBe("=~");
   });
 });
 

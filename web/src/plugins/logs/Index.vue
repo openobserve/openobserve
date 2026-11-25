@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="logPage"
     data-test="logs-page-container"
   >
+    <h1 class="sr-only">{{ t("menu.search") }}</h1>
     <FirstDataPanel
       v-if="firstDataArrival"
       signal="logs"
@@ -333,6 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :stream-doc-time-range="streamDocTimeRange"
                         :query-window-us="queryWindowUs"
                         :timezone="store.state.timezone"
+                        :function-error="searchObj.data.functionError"
                         @jump-to-stream-data="onJumpToStreamData"
                         @open-history="openSearchHistory"
                         @ask-ai="onAskAiFixQuery"
@@ -477,6 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :is_ui_histogram="shouldUseHistogramQuery"
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
               :histogramQuery="storedHistogramQuery"
+              @loadEndedWithoutFetch="onVisualizeLoadEndedWithoutFetch"
             >
             </VisualizeLogsQuery>
           </div>
@@ -609,6 +612,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :stream-doc-time-range="streamDocTimeRange"
                 :query-window-us="queryWindowUs"
                 :timezone="store.state.timezone"
+                :function-error="searchObj.data.functionError"
                 @jump-to-stream-data="onJumpToStreamData"
                 @open-history="openSearchHistory"
                 @ask-ai="onAskAiFixQuery"
@@ -2728,7 +2732,9 @@ export default defineComponent({
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
       async () => {
+        let togglePanelRun: number | null = null;
         try {
+          if (searchObj.meta.logsVisualizeToggle !== "visualize") autoRun.cancelUnstartedPanelRun();
           // Reset buildModeQueryEditorDisabled when not in build mode
           if (searchObj.meta.logsVisualizeToggle !== "build") {
             searchObj.meta.buildModeQueryEditorDisabled = false;
@@ -3021,9 +3027,13 @@ export default defineComponent({
               dashboardPanelData.data.config.table_dynamic_columns = true;
             }
 
+            // A chart load outside a panel run is never recorded, so the URL keeps the last shown query.
+            togglePanelRun = autoRun.openToggleChartRun(hasReusableData, () =>
+              searchBarRef.value?.cancelVisualizeQueries?.(),
+            );
             autoRun.notePanelScopeApplied();
             // run query
-            await copyDashboardDataToVisualize();
+            await copyDashboardDataToVisualize(togglePanelRun);
 
             // Clear the restoration flag after all operations are complete
             await nextTick();
@@ -3051,6 +3061,8 @@ export default defineComponent({
             resetDashboardPanelData();
           }
         } catch (err: any) {
+          if (togglePanelRun !== null && autoRun.hasPanelRun(togglePanelRun))
+            autoRun.endPanelRun(false);
           // this will clear dummy trace id
           cancelFieldExtraction();
 
@@ -3414,9 +3426,7 @@ export default defineComponent({
           end_time: new Date(dateTime.endTime),
         };
 
-        await copyDashboardDataToVisualize();
-        if (generationId !== null && generationId !== undefined)
-          autoRun.markPanelDispatched(generationId);
+        await copyDashboardDataToVisualize(generationId ?? null);
 
         // Sync visualization config to URL parameters
         patchUrlViewState(dashboardPanelData);
@@ -3647,7 +3657,7 @@ export default defineComponent({
     };
 
     // Helper function to copy dashboardPanelData while preserving stream info
-    const copyDashboardDataToVisualize = async () => {
+    const copyDashboardDataToVisualize = async (panelRunId: number | null = null) => {
       // Extract and assign stream info BEFORE copying
       const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
       const currentQuery = dashboardPanelData.data.queries[currentQueryIndex];
@@ -3673,6 +3683,8 @@ export default defineComponent({
 
       // Now copy dashboardPanelData with updated stream info
       visualizeChartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      // The chart reacts on the next flush, before an awaiting caller resumes, so the run must hold this config now.
+      if (panelRunId !== null) autoRun.markPanelDispatched(panelRunId);
     };
 
     const extractVisualizationFields = async (autoSelectChartType: boolean = true) => {
@@ -3880,6 +3892,12 @@ export default defineComponent({
 
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState);
+
+    // The Visualize chart stays mounted while hidden, so its loads must not end another surface's run.
+    const onVisualizeLoadEndedWithoutFetch = (shown: boolean) => {
+      if (searchObj.meta.logsVisualizeToggle === "visualize")
+        autoRun.panelLoadEndedWithoutFetch(shown);
+    };
 
     const panelsLoading = computed(() =>
       Object.values(variablesAndPanelsDataLoadingState.panels ?? {}).some(Boolean),
@@ -4402,6 +4420,7 @@ export default defineComponent({
       handleRunQueryFn,
       visualizeChartData,
       handleChartApiError,
+      onVisualizeLoadEndedWithoutFetch,
       visualizeErrorData,
       resetHistogramWithError,
       fnParsedSQL,

@@ -125,6 +125,12 @@ async fn register() -> Result<()> {
     // 4. calculate node_id
     let mut node_ids = Vec::new();
     for node in node_list {
+        // a stopping node may still mint snowflake ids, so its id stays taken until its key expires
+        node_ids.push(node.id);
+        if !cache_on_register(&node, &LOCAL_NODE.uuid, &cfg.common.instance_name) {
+            log::info!("[CLUSTER] register: skip stale node {node:?}");
+            continue;
+        }
         if node.is_interactive_querier() {
             add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
         }
@@ -137,7 +143,6 @@ async fn register() -> Result<()> {
         if node.is_flatten_compactor() {
             add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
         }
-        node_ids.push(node.id);
         add_node_to_cache(node).await;
     }
 
@@ -200,6 +205,12 @@ async fn register() -> Result<()> {
 
     log::info!("[CLUSTER] Register to cluster ok");
     Ok(())
+}
+
+/// A listed record of a stopped node, or of an earlier incarnation of this pod, would never get an
+/// event that removes it: its Offline put predates our watch and key expiry emits nothing.
+fn cache_on_register(node: &Node, local_uuid: &str, local_name: &str) -> bool {
+    node.status != NodeStatus::Offline && (node.uuid == local_uuid || node.name != local_name)
 }
 
 pub(crate) async fn set_online() -> Result<()> {
@@ -299,6 +310,30 @@ mod tests {
         let key = format!("/nodes/{}", LOCAL_NODE.uuid);
         let stored = get_coordinator().await.get(&key).await.unwrap();
         json::from_slice(&stored).unwrap()
+    }
+
+    #[test]
+    fn test_register_skips_offline_nodes_and_previous_incarnations() {
+        let node = |uuid: &str, name: &str, status: NodeStatus| Node {
+            uuid: uuid.into(),
+            name: name.into(),
+            status,
+            ..Default::default()
+        };
+        let listed = [
+            node("self", "pod-0", NodeStatus::Prepare),
+            node("previous-self", "pod-0", NodeStatus::Offline),
+            node("previous-self-online", "pod-0", NodeStatus::Online),
+            node("stopped-peer", "pod-1", NodeStatus::Offline),
+            node("peer", "pod-2", NodeStatus::Online),
+            node("starting-peer", "pod-3", NodeStatus::Prepare),
+        ];
+        let cached: Vec<&str> = listed
+            .iter()
+            .filter(|n| cache_on_register(n, "self", "pod-0"))
+            .map(|n| n.uuid.as_str())
+            .collect();
+        assert_eq!(cached, ["self", "peer", "starting-peer"]);
     }
 
     #[tokio::test]

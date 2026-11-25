@@ -354,6 +354,136 @@ describe("replaceQueryValue", () => {
     expect(run('x{h=~"${host_name:pipe}"}')).toBe('x{h=~"web-01|web-02"}');
   });
 
+  describe("promql string escaping", () => {
+    const run = (
+      vars: {
+        name: string;
+        value: string | (string | null)[];
+        type?: string;
+        customMultiSelectValue?: string[];
+      }[],
+      query: string,
+    ) =>
+      makeComposable({
+        variablesValues: vars.map(
+          ({ name, value, type = "query_values", customMultiSelectValue }) => ({
+            name,
+            type,
+            value,
+            customMultiSelectValue,
+            multiSelect: Array.isArray(value),
+            isVariablePartialLoaded: true,
+          }),
+        ),
+        schemaQueries: [{ query }],
+      }).replaceQueryValue(query, 0, 300_000_000, "promql");
+    const promql = (value: string | (string | null)[], query: string, type?: string) =>
+      run([{ name: "v", value, type }], query).query;
+
+    it.each([
+      ["o'neil", "o'neil"],
+      ['a"b', 'a\\"b'],
+      ["a\\b", "a\\\\b"],
+      ["a\nb", "a\\nb"],
+    ])("escapes scalar %s as %s inside a double-quoted matcher", (value, expected) => {
+      expect(promql(value, 'm{l="$v"}')).toBe(`m{l="${expected}"}`);
+    });
+
+    it.each([
+      [["a.b"], "a\\\\.b"],
+      [["a|b"], "a\\\\|b"],
+      [["f(x)"], "f\\\\(x\\\\)"],
+      [["a.b", "c"], "a\\\\.b|c"],
+    ])("regex-escapes multi-select %j as %s", (value, expected) => {
+      expect(promql(value, 'm{l=~"$v"}')).toBe(`m{l=~"${expected}"}`);
+    });
+
+    it("regex-escapes a multi-select after !~ and spaced =~ matchers", () => {
+      expect(promql(["a.b"], 'm{l!~"$v"}')).toBe('m{l!~"a\\\\.b"}');
+      expect(promql(["a.b"], 'm{l =~ "${v}"}')).toBe('m{l =~ "a\\\\.b"}');
+    });
+
+    it("regex-escapes a variable that is not first in the alternation", () => {
+      expect(promql(["a.b"], 'm{l=~"x|$v"}')).toBe('m{l=~"x|a\\\\.b"}');
+      const both = [
+        { name: "a", value: ["a.b"] },
+        { name: "b", value: ["c(d)"] },
+      ];
+      expect(run(both, 'm{l=~"$a|$b"}').query).toBe('m{l=~"a\\\\.b|c\\\\(d\\\\)"}');
+    });
+
+    it("regex-escapes a single-select data value like a multi-select one", () => {
+      expect(promql("a.b", 'm{l=~"$v"}')).toBe('m{l=~"a\\\\.b"}');
+    });
+
+    it.each(["custom", "constant", "textbox"])(
+      "keeps %s values as regex in a regex matcher",
+      (type) => {
+        expect(promql([".*", "api-.*"], 'm{l=~"$v"}', type)).toBe('m{l=~".*|api-.*"}');
+        expect(promql("api-.*", 'm{l=~"$v"}', type)).toBe('m{l=~"api-.*"}');
+      },
+    );
+
+    it("only string-escapes a multi-select in an = matcher so IP values keep matching", () => {
+      expect(promql(["10.0.0.1:9100", 'a"b'], 'm{instance="$v"}')).toBe(
+        'm{instance="10.0.0.1:9100|a\\"b"}',
+      );
+    });
+
+    it("escapes a single-quoted string for its own quote", () => {
+      expect(promql(["o'neil", 'a"b', "c.d"], "m{l=~'$v'}")).toBe("m{l=~'o\\'neil|a\"b|c\\\\.d'}");
+      expect(promql("o'neil", "m{l='$v'}")).toBe("m{l='o\\'neil'}");
+    });
+
+    it("skips string escapes in a backtick string and outside any string", () => {
+      expect(promql(['a"b', "c.d"], "m{l=~`$v`}")).toBe('m{l=~`a"b|c\\.d`}');
+      expect(promql(["c.d"], "m{l=`$v`}")).toBe("m{l=`c.d`}");
+      expect(promql("5", "topk($v, m)")).toBe("topk(5, m)");
+    });
+
+    it("keeps a data variable's custom defaults as regex", () => {
+      const vars = [
+        { name: "v", value: [".*", "prod-.*", "a.b"], customMultiSelectValue: [".*", "prod-.*"] },
+      ];
+      expect(run(vars, 'm{l=~"$v"}').query).toBe('m{l=~".*|prod-.*|a\\\\.b"}');
+    });
+
+    it("ignores quotes inside a # comment", () => {
+      expect(promql('a"b', '# don\'t\nm{l="$v"}')).toBe('# don\'t\nm{l="a\\"b"}');
+    });
+
+    it("joins a null multi-select entry as an empty string", () => {
+      expect(promql(["a", null], 'm{l=~"$v"}')).toBe('m{l=~"a|"}');
+    });
+
+    it("leaves the select-all sentinel untouched in a multi-select", () => {
+      expect(promql([SELECT_ALL_VALUE], 'm{l=~"$v"}')).toBe(`m{l=~"${SELECT_ALL_VALUE}"}`);
+    });
+
+    it("escapes each value of the doublequote format", () => {
+      expect(promql(['a"b', "o'neil"], "m{l=~${v:doublequote}}")).toBe('m{l=~"a\\"b","o\'neil"}');
+    });
+
+    it("reports the raw joined values in the variable metadata", () => {
+      const { metadata } = run([{ name: "v", value: ["a.b", 'c"d'] }], 'm{l=~"$v"}');
+      expect(metadata.find((m: { name: string }) => m.name === "v").value).toBe('a.b|c"d');
+    });
+
+    it("keeps sql single-quote doubling for a scalar", () => {
+      const inst = makeInstWithVar("v", "o'neil");
+      expect(inst.replaceQueryValue("SELECT * WHERE l='$v'", 0, 300_000_000, "sql").query).toBe(
+        "SELECT * WHERE l='o''neil'",
+      );
+    });
+
+    it("keeps sql multi-select values unescaped for regex", () => {
+      const inst = makeInstWithVar("v", ["a.b"], true);
+      expect(inst.replaceQueryValue("SELECT * WHERE l IN ($v)", 0, 300_000_000, "sql").query).toBe(
+        "SELECT * WHERE l IN ('a.b')",
+      );
+    });
+  });
+
   it("uses SELECT_ALL_VALUE (*) for null scalar variable value", () => {
     const varValues = [
       {
@@ -741,5 +871,125 @@ describe("$__percentile_interval", () => {
     for (const q of ["up[${__percentile_interval}]", "up[{{__percentile_interval}}]"]) {
       expect(substitute(q)).not.toContain("__percentile_interval");
     }
+  });
+});
+
+describe("query variable 'All'", () => {
+  const makeWithVariable = (variable: any, query = "SELECT * FROM t WHERE svc IN ($svc)") => {
+    const variablesData = makeVariablesData([
+      { name: "svc", multiSelect: true, isVariablePartialLoaded: true, ...variable },
+    ]);
+    const inst = usePanelVariableSubstitution({
+      panelSchema: makePanelSchema([{ query }]),
+      variablesData,
+      chartPanelRef: makeChartPanelRef(),
+      store: makeStore(),
+      log,
+    });
+    return { inst, variablesData };
+  };
+  const options = [
+    { label: "Checkout", value: "checkout" },
+    { label: "Payments", value: "payments" },
+  ];
+  const customQuery = { type: "query_values", query_data: { query: "SELECT 1" } };
+
+  it("sends the listed option values instead of the placeholder", () => {
+    const { inst } = makeWithVariable({ ...customQuery, value: ["_o2_all_"], options });
+    expect(inst.replaceQueryValue("SELECT * FROM t WHERE svc IN ($svc)", 0, 1, "sql").query).toBe(
+      "SELECT * FROM t WHERE svc IN ('checkout','payments')",
+    );
+    expect(inst.replaceQueryValue('up{svc=~"$svc"}', 0, 1, "promql").query).toBe(
+      'up{svc=~"checkout|payments"}',
+    );
+  });
+
+  it("matches values with regex characters literally in a PromQL regex matcher", () => {
+    const paths = [
+      { label: "GET /a(1)", value: "GET /a(1)" },
+      { label: "/b", value: "/b" },
+    ];
+    const { inst } = makeWithVariable({ ...customQuery, value: ["_o2_all_"], options: paths });
+    expect(inst.replaceQueryValue('up{path=~"$svc"}', 0, 1, "promql").query).toBe(
+      String.raw`up{path=~"GET /a\\(1\\)|/b"}`,
+    );
+    expect(inst.replaceQueryValue("SELECT * FROM t WHERE p IN ($svc)", 0, 1, "sql").query).toBe(
+      "SELECT * FROM t WHERE p IN ('GET /a(1)','/b')",
+    );
+  });
+
+  it("escapes a picked query value only as far as its PromQL position needs", () => {
+    const { inst } = makeWithVariable({
+      ...customQuery,
+      multiSelect: false,
+      value: 'a.b"c',
+      options: [{ label: 'a.b"c', value: 'a.b"c' }],
+    });
+    const run = (q: string) => inst.replaceQueryValue(q, 0, 1, "promql").query;
+    expect(run('up{p=~"$svc"}')).toBe(String.raw`up{p=~"a\\.b\"c"}`);
+    expect(run('up{p="$svc"}')).toBe(String.raw`up{p="a.b\"c"}`);
+  });
+
+  it("leaves other variables' PromQL values as written, so a regex value still works", () => {
+    const { inst } = makeWithVariable({
+      type: "custom",
+      value: ["api-.*", "web"],
+      options: [],
+    });
+    expect(inst.replaceQueryValue('up{svc=~"$svc"}', 0, 1, "promql").query).toBe(
+      'up{svc=~"api-.*|web"}',
+    );
+  });
+
+  it("filters to nothing, never to everything, when the loaded list is empty", () => {
+    const { inst } = makeWithVariable({ ...customQuery, value: ["_o2_all_"], options: [] });
+    expect(inst.replaceQueryValue("SELECT * FROM t WHERE svc IN ($svc)", 0, 1, "sql").query).toBe(
+      "SELECT * FROM t WHERE svc IN ('_o2_no_values_')",
+    );
+    expect(inst.replaceQueryValue('up{svc=~"$svc"}', 0, 1, "promql").query).toBe(
+      'up{svc=~"_o2_no_values_"}',
+    );
+  });
+
+  it("re-runs the panel when an empty list behind 'All' fills in", () => {
+    const { inst, variablesData } = makeWithVariable({
+      ...customQuery,
+      value: ["_o2_all_"],
+      options: [],
+    });
+    expect(inst.variablesDataUpdated()).toBe(false);
+    variablesData.value.values[0].options = options;
+    expect(inst.variablesDataUpdated()).toBe(true);
+  });
+
+  it("keeps the placeholder for query_values variables", () => {
+    const { inst } = makeWithVariable({ type: "query_values", value: ["_o2_all_"], options });
+    expect(inst.replaceQueryValue("SELECT * FROM t WHERE svc IN ($svc)", 0, 1, "sql").query).toBe(
+      "SELECT * FROM t WHERE svc IN ('_o2_all_')",
+    );
+  });
+
+  it("holds the panel until the options behind 'All' have loaded", () => {
+    const { inst, variablesData } = makeWithVariable({
+      ...customQuery,
+      value: ["_o2_all_"],
+      options: [],
+      isVariablePartialLoaded: false,
+    });
+    expect(inst.ifPanelVariablesCompletedLoading()).toBe(false);
+    variablesData.value.values[0].isVariablePartialLoaded = true;
+    variablesData.value.values[0].options = options;
+    expect(inst.ifPanelVariablesCompletedLoading()).toBe(true);
+  });
+
+  it("re-runs the panel when the options behind 'All' change", () => {
+    const { inst, variablesData } = makeWithVariable({
+      ...customQuery,
+      value: ["_o2_all_"],
+      options,
+    });
+    expect(inst.variablesDataUpdated()).toBe(false);
+    variablesData.value.values[0].options = [options[0]];
+    expect(inst.variablesDataUpdated()).toBe(true);
   });
 });

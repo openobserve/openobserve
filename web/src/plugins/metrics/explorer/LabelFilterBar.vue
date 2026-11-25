@@ -28,13 +28,13 @@ import { useFilterHint } from "@/composables/metrics/useFilterHint";
 import { labelFilterKey, type LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
 import {
   emptyFilterGroup,
-  escapePromRegexLiteral,
   splitPromRegexLiterals,
   type FilterCondition,
   type FilterField,
   type FilterGroup,
   type FilterOperatorId,
 } from "@/utils/query/filterBar";
+import { escapeRegExp } from "@/utils/query/promQLUtils";
 
 defineOptions({ name: "LabelFilterBar" });
 
@@ -165,7 +165,7 @@ const toLabelFilter = (condition: FilterCondition): LabelFilter | null => {
       return {
         label,
         operator: condition.operator === "in" ? "=~" : "!~",
-        value: condition.values.map(escapePromRegexLiteral).join("|"),
+        value: condition.values.map(escapeRegExp).join("|"),
       };
     default:
       return { label, operator: "=", value: first };

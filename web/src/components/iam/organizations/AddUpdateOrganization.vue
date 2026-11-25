@@ -206,7 +206,9 @@ export default defineComponent({
         const res: any = await callOrganization;
         const data = res.data;
         if (res?.status == 200) {
-          this.$emit("updated");
+          // The create response flattens the new org into the top level (serde flatten); a rename has none.
+          if (organizationId) this.$emit("updated");
+          else this.$emit("updated", data?.identifier, data?.name);
           this.$emit("update:open", false);
         } else {
           this.proPlanRequired = true;

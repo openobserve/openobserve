@@ -219,10 +219,13 @@ describe("ConfigPanel funnel settings", { timeout: 30_000 }, () => {
     expect(labels).toEqual(["Default (Vertical)", "Vertical", "Horizontal"]);
   });
 
-  it("funnel: explains what the percent is measured against", async () => {
+  it("funnel: names the largest stage as the percent base and explains it", async () => {
     mountPanel("funnel");
     await flushPromises();
     expect(has("dashboard-config-funnel_show_percent-info")).toBe(true);
+    expect(wrapper!.find('[data-test="dashboard-config-funnel_show_percent"]').text()).toContain(
+      "Show percent of largest stage",
+    );
   });
 
   it("pie: shows none of the funnel controls", async () => {

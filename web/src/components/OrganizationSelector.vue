@@ -29,22 +29,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   matches the rest of the app. No SCSS, no scoped classes.
 -->
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } from "vue";
+import { isNavigationFailure, useRouter } from "vue-router";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useVirtualizer } from "@tanstack/vue-virtual";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { copyToClipboard } from "@/utils/clipboard";
+import { orgCreatePending } from "@/utils/orgScopedRoutes";
+import { ORG_SWITCHER_MAX_FAVORITES, useOrgSwitcherPrefs } from "@/composables/useOrgSwitcherPrefs";
+import {
+  buildSections,
+  rankSearch,
+  type OrgSection,
+  type SwitcherRow,
+} from "@/utils/orgSwitcherList";
 
 interface OrgOption {
   label: I18nText;
   identifier: string;
   [key: string]: any;
 }
+
+type GridCell = "name" | "star" | "copy";
 
 const props = defineProps<{
   /** Full list of organizations to choose from. */
@@ -58,53 +71,119 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const router = useRouter();
+const { isFavorite, canAddFavorite, canStore, favorites, recents, toggleFavorite } =
+  useOrgSwitcherPrefs();
 
 const open = ref(false);
 const searchQuery = ref("");
+const gridId = `org-switcher-grid-${useId()}`;
+const searchWrapRef = ref<HTMLElement | null>(null);
 
-// Matches both the display name and the identifier.
-const filtered = computed<OrgOption[]>(() => {
-  if (!searchQuery.value) return props.organizations;
-  const q = searchQuery.value.toLowerCase();
-  return props.organizations.filter(
-    (o) => o.label?.toLowerCase().includes(q) || o.identifier?.toLowerCase().includes(q),
-  );
-});
+// Sections are computed from this snapshot so an open menu never regroups under the pointer.
+const openSnapshot = shallowRef<{
+  favorites: readonly string[];
+  recents: readonly string[];
+  currentId: string | undefined;
+}>({ favorites: [], recents: [], currentId: undefined });
+
+const takeSnapshot = () => {
+  openSnapshot.value = {
+    favorites: [...favorites.value],
+    recents: [...recents.value],
+    currentId: props.current?.identifier,
+  };
+};
+
+const listRows = computed<SwitcherRow<OrgOption>[]>(() =>
+  searchQuery.value.trim()
+    ? rankSearch(props.organizations, openSnapshot.value, searchQuery.value)
+    : buildSections(props.organizations, openSnapshot.value, openSnapshot.value.currentId),
+);
+
+const orgRowCount = computed(() => listRows.value.filter((r) => r.kind === "row").length);
+
+const SECTION_LABEL_KEYS = {
+  favorites: "organization.favorites",
+  recent: "organization.recent",
+  all: "organization.allOrganizations",
+} as const satisfies Record<OrgSection, string>;
 
 // ── Virtualization ──────────────────────────────────────────────
-// One line per org: the name, with the id inline beside it only when it
-// differs from the name (an id equal to the name is redundant). Rows are a
-// uniform single line, so a fixed height is enough.
+// Headings are shorter than org rows, so estimateSize switches on row kind.
 const ROW_HEIGHT = 36;
+const HEADING_HEIGHT = 28;
 const scrollRef = ref<HTMLElement | null>(null);
 
 const virtualizer = useVirtualizer(
   computed(() => ({
-    count: filtered.value.length,
+    count: listRows.value.length,
     getScrollElement: () => scrollRef.value,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: (i: number) =>
+      listRows.value[i]?.kind === "heading" ? HEADING_HEIGHT : ROW_HEIGHT,
+    getItemKey: (i: number) => listRows.value[i]?.key ?? i,
     overscan: 8,
   })),
 );
 
 const totalSize = computed(() => virtualizer.value.getTotalSize());
 
-const rows = computed(() =>
+const virtualRows = computed(() =>
   virtualizer.value.getVirtualItems().map((v) => ({
     index: v.index,
     start: v.start,
     size: v.size,
-    org: filtered.value[v.index],
+    row: listRows.value[v.index],
   })),
 );
 
-// ── Keyboard navigation (mirrors OSelect) ───────────────────────
-const highlightedIndex = ref(0);
+// ── Active cell (combobox + grid; DOM focus stays in the search input) ──
+// Without a storage key there is nowhere to keep a favorite, so the star cell is not rendered.
+const cellOrder = computed<GridCell[]>(() =>
+  canStore.value ? ["name", "star", "copy"] : ["name", "copy"],
+);
+const activeIndex = ref(-1);
+const activeCol = ref<GridCell>("name");
 
-const scrollHighlightedIntoView = (align: "auto" | "center" = "auto") => {
-  if (highlightedIndex.value >= 0) {
-    virtualizer.value.scrollToIndex(highlightedIndex.value, { align });
+const cellId = (index: number, col: GridCell) => `${gridId}-${index}-${col}`;
+const activeRendered = computed(
+  () => activeIndex.value >= 0 && virtualRows.value.some((v) => v.index === activeIndex.value),
+);
+const activeDescendant = computed(() =>
+  activeRendered.value ? cellId(activeIndex.value, activeCol.value) : undefined,
+);
+const isActiveCell = (index: number, col: GridCell) =>
+  activeIndex.value === index && activeCol.value === col;
+
+const firstOrgRowIndex = () => listRows.value.findIndex((r) => r.kind === "row");
+
+const scrollActiveIntoView = () => {
+  if (activeIndex.value >= 0) virtualizer.value.scrollToIndex(activeIndex.value);
+};
+
+// A wheel scroll can unmount the active row; a grid key brings it back so its cell id resolves again.
+const revealActiveRow = () => {
+  if (activeIndex.value >= 0 && !activeRendered.value) scrollActiveIntoView();
+};
+
+const moveRow = (step: 1 | -1) => {
+  const list = listRows.value;
+  const len = list.length;
+  let i = activeIndex.value < 0 ? (step === 1 ? -1 : len) : activeIndex.value;
+  for (let n = 0; n < len; n++) {
+    i = (i + step + len) % len;
+    if (list[i].kind === "row") {
+      activeIndex.value = i;
+      activeCol.value = "name";
+      return;
+    }
   }
+};
+
+const moveCol = (step: 1 | -1) => {
+  const order = cellOrder.value;
+  const next = order.indexOf(activeCol.value) + step;
+  if (next >= 0 && next < order.length) activeCol.value = order[next];
 };
 
 const select = (org: OrgOption) => {
@@ -130,27 +209,92 @@ onBeforeUnmount(() => {
   if (copyTimer) clearTimeout(copyTimer);
 });
 
+const starBlocked = (org: OrgOption) => !isFavorite(org.identifier) && !canAddFavorite.value;
+const starLabel = (org: OrgOption) =>
+  isFavorite(org.identifier)
+    ? t("organization.removeNamedFromFavorites", { name: org.label })
+    : t("organization.addNamedToFavorites", { name: org.label });
+const starTooltip = (org: OrgOption) => {
+  if (starBlocked(org)) {
+    return t("organization.favoritesLimitReached", { max: ORG_SWITCHER_MAX_FAVORITES });
+  }
+  return isFavorite(org.identifier)
+    ? t("organization.removeFromFavorites")
+    : t("organization.addToFavorites");
+};
+
+const actOnActiveCell = () => {
+  const row = listRows.value[activeIndex.value];
+  if (!row || row.kind !== "row") return;
+  const org = row.org;
+  if (activeCol.value === "star") toggleFavorite(org.identifier);
+  else if (activeCol.value === "copy") void copyId(org);
+  else select(org);
+};
+
+const caretAtEnd = (e: KeyboardEvent) => {
+  const input = e.target instanceof HTMLInputElement ? e.target : null;
+  return !input || input.selectionStart === input.value.length;
+};
+
 const onSearchKeydown = (e: KeyboardEvent) => {
-  const len = filtered.value.length;
   if (e.key === "Escape") {
     open.value = false;
     return;
   }
-  if (!len) return;
-  if (e.key === "ArrowDown") {
+  if (e.isComposing) return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    if (!orgRowCount.value) return;
     e.preventDefault();
-    highlightedIndex.value = highlightedIndex.value < len - 1 ? highlightedIndex.value + 1 : 0;
-    nextTick(scrollHighlightedIntoView);
-  } else if (e.key === "ArrowUp") {
+    moveRow(e.key === "ArrowDown" ? 1 : -1);
+    nextTick(scrollActiveIntoView);
+  } else if (e.key === "ArrowRight") {
+    if (activeIndex.value < 0 || activeCol.value === "copy" || !caretAtEnd(e)) return;
     e.preventDefault();
-    highlightedIndex.value = highlightedIndex.value > 0 ? highlightedIndex.value - 1 : len - 1;
-    nextTick(scrollHighlightedIntoView);
+    moveCol(1);
+    revealActiveRow();
+  } else if (e.key === "ArrowLeft") {
+    if (activeIndex.value < 0 || activeCol.value === "name") return;
+    e.preventDefault();
+    moveCol(-1);
+    revealActiveRow();
   } else if (e.key === "Enter") {
     e.preventDefault();
-    const org = filtered.value[Math.max(0, highlightedIndex.value)];
-    if (org) select(org);
+    revealActiveRow();
+    actOnActiveCell();
+  } else if (e.key === " " && activeIndex.value >= 0 && activeCol.value === "star") {
+    e.preventDefault();
+    revealActiveRow();
+    actOnActiveCell();
   }
 };
+
+const onRowHover = (index: number) => {
+  if (activeIndex.value === index) return;
+  activeIndex.value = index;
+  activeCol.value = "name";
+};
+
+const focusSearch = () => {
+  searchWrapRef.value?.querySelector("input")?.focus();
+};
+
+// The first tabbable in the panel is "+", so focus is sent to the search instead.
+const onOpenAutoFocus = (e: Event) => {
+  e.preventDefault();
+  focusSearch();
+};
+
+watch(
+  open,
+  (isOpen) => {
+    if (!isOpen) return;
+    takeSnapshot();
+    activeIndex.value = -1;
+    activeCol.value = "name";
+  },
+  { flush: "sync" },
+);
 
 watch(open, async (isOpen) => {
   if (!isOpen) {
@@ -158,30 +302,24 @@ watch(open, async (isOpen) => {
     return;
   }
   await nextTick();
-  // Dropdown content (and the scroll element) mounts fresh on every open.
+  // Popover content (and the scroll element) mounts fresh on every open.
   virtualizer.value.measure();
-  // Highlight the current org (fallback to first) and center it in view so it
-  // never lands stuck at the bottom edge.
-  const activeIdx = filtered.value.findIndex((o) => o.identifier === props.current?.identifier);
-  highlightedIndex.value = activeIdx >= 0 ? activeIdx : 0;
-  nextTick(() => scrollHighlightedIntoView("center"));
-  const input = document.querySelector(
-    '[data-test="organization-search-input"] input',
-  ) as HTMLInputElement | null;
-  input?.focus();
+  if (scrollRef.value) scrollRef.value.scrollTop = 0;
+  focusSearch();
 });
 
-// Keep the virtual window in sync, re-aim the highlight at the first match so
-// Enter selects the obvious result, and snap the scroll back to the top —
-// otherwise a prior scroll offset would hide the first results after a search.
-//
-// Reset and re-measure synchronously rather than in nextTick: the scroll
-// element already exists here (unlike on open), and deferring means rows paint
-// at stale offsets for one tick, then shift. A click landing in that window
-// hits a row that is about to move out from under the pointer.
-watch(filtered, (list) => {
-  highlightedIndex.value = list.length ? 0 : -1;
-  if (scrollRef.value) scrollRef.value.scrollTop = 0;
+// The active row follows its key across list changes; a new query makes Enter pick the top
+// result, and an empty one keeps nothing active.
+let rowsQuery = "";
+watch(listRows, (rows, previous) => {
+  const query = searchQuery.value.trim();
+  const previousQuery = rowsQuery;
+  const activeKey = query === previousQuery ? previous?.[activeIndex.value]?.key : undefined;
+  rowsQuery = query;
+  const kept = activeKey ? rows.findIndex((r) => r.key === activeKey) : -1;
+  if (kept < 0) activeCol.value = "name";
+  if (query !== previousQuery && scrollRef.value) scrollRef.value.scrollTop = 0;
+  activeIndex.value = kept >= 0 ? kept : query ? firstOrgRowIndex() : -1;
   virtualizer.value.measure();
 });
 
@@ -189,26 +327,73 @@ const isSelected = (org: OrgOption) => org.identifier === props.current?.identif
 
 // Selection reuses the same tokens OSelect uses, so the menu is visually
 // consistent with every other dropdown in the app.
-const rowStateClass = (row: { org: OrgOption; index: number }) => {
-  if (isSelected(row.org)) {
+const rowStateClass = (org: OrgOption, index: number) => {
+  if (isSelected(org)) {
     return "bg-select-item-selected-bg text-select-item-selected-text";
   }
-  if (row.index === highlightedIndex.value) {
+  if (index === activeIndex.value) {
     return "bg-select-item-hover-bg text-select-item-text";
   }
   return "text-select-item-text";
 };
+
+// Reserved slots: `invisible` keeps the box, so the name never shifts when the buttons appear.
+const slotVisibility = (index: number, alwaysShown: boolean) =>
+  alwaysShown || index === activeIndex.value
+    ? "visible"
+    : "invisible group-hover:visible max-md:visible";
+
+const openCreate = async () => {
+  open.value = false;
+  orgCreatePending.value = true;
+  if (router.currentRoute.value.name === "organizations") return;
+  try {
+    const failure = await router.push({
+      name: "organizations",
+      query: { org_identifier: props.current?.identifier, action: "add" },
+    });
+    if (isNavigationFailure(failure)) orgCreatePending.value = false;
+  } catch {
+    orgCreatePending.value = false;
+  }
+};
+
+const openManage = () => {
+  open.value = false;
+  void router.push({
+    name: "organizations",
+    query: { org_identifier: props.current?.identifier },
+  });
+};
+
+useShortcuts([
+  {
+    id: "openOrgSwitcher",
+    handler: () => {
+      open.value = true;
+    },
+  },
+]);
 </script>
 
 <template>
-  <div data-test="navbar-organizations-select" class="md:max-xl:w-56 md:max-xl:min-w-20">
-    <ODropdown v-model:open="open" side="bottom" align="end">
+  <div
+    data-test="navbar-organizations-select"
+    class="max-md:min-w-10 md:max-xl:w-56 md:max-xl:min-w-20"
+  >
+    <OPopover
+      v-model:open="open"
+      side="bottom"
+      align="end"
+      content-class="min-w-40 p-1 text-sm text-dropdown-item-text"
+      @open-auto-focus="onOpenAutoFocus"
+    >
       <template #trigger>
         <OButton
           variant="outline-primary"
           size="xs"
           data-test="navbar-organizations-select-trigger"
-          class="text-text-body! w-56 max-md:w-28 md:max-xl:w-full"
+          class="text-text-body! w-56 max-md:w-full max-md:max-w-28 md:max-xl:w-full"
           :class="open ? 'ring-focus-ring-accent ring-2 ring-inset' : ''"
         >
           <template #icon-left>
@@ -235,9 +420,8 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
       </template>
 
       <div data-test="organization-menu-list" class="flex w-94 max-w-[98vw] flex-col">
-        <!-- Header: title + count -->
-        <div class="flex items-center justify-between gap-2 px-3 pt-2 pb-1.5">
-          <span class="text-compact text-text-heading font-semibold">
+        <div class="flex items-center gap-2 px-3 pt-2 pb-1.5">
+          <span class="text-compact text-text-heading flex-1 font-semibold">
             {{ t("organization.header") }}
           </span>
           <span
@@ -246,92 +430,155 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           >
             {{
               searchQuery
-                ? t("common.countOfTotal", { count: filtered.length, total: organizations.length })
+                ? t("common.countOfTotal", { count: orgRowCount, total: organizations.length })
                 : organizations.length
             }}
           </span>
+          <OButton
+            variant="ghost"
+            size="icon-xs-sq"
+            icon-left="add"
+            :aria-label="t('organization.add')"
+            data-test="organization-menu-create-btn"
+            @click="openCreate"
+          >
+            <OTooltip :content="t('organization.add')" />
+          </OButton>
         </div>
 
-        <!-- Search: ↑/↓ move highlight, Enter selects, Esc closes -->
-        <div class="px-3 pb-3">
+        <div ref="searchWrapRef" class="px-3 pb-3">
           <OSearchInput
             data-test="organization-search-input"
             v-model="searchQuery"
             clearable
             :debounce="1"
             :placeholder="t('organization.searchByNameOrId')"
+            role="combobox"
+            :aria-expanded="orgRowCount > 0"
+            aria-haspopup="grid"
+            aria-autocomplete="list"
+            :aria-controls="orgRowCount ? gridId : undefined"
+            :aria-activedescendant="activeDescendant"
             @keydown="onSearchKeydown"
           />
         </div>
 
-        <div v-if="filtered.length" class="bg-select-content-border mx-3 h-px" aria-hidden="true" />
+        <div v-if="orgRowCount" class="bg-select-content-border mx-3 h-px" aria-hidden="true" />
 
-        <!-- Virtualized list -->
         <div
-          v-if="filtered.length"
+          v-if="orgRowCount"
+          :id="gridId"
           ref="scrollRef"
+          role="grid"
+          :aria-rowcount="listRows.length"
+          :aria-label="t('organization.header')"
           data-test="organization-menu-table"
-          class="relative max-h-80 overflow-x-hidden overflow-y-auto pt-2 pb-1"
+          class="relative max-h-96 overflow-x-hidden overflow-y-auto pt-2 pb-1"
         >
           <div class="relative w-full" :style="{ height: `${totalSize}px` }">
-            <div
-              v-for="row in rows"
-              :key="row.org.identifier"
-              data-test="organization-menu-item-label-item-label"
-              :data-test-org-identifier="row.org.identifier"
-              class="group rounded-default absolute top-0 right-0 left-0 box-border flex cursor-pointer items-center gap-2 px-3 transition-colors"
-              :class="rowStateClass(row)"
-              :style="{
-                transform: `translateY(${row.start}px)`,
-                height: `${row.size}px`,
-              }"
-              @click="select(row.org)"
-              @mousemove="highlightedIndex = row.index"
-            >
-              <!-- Name with the id inline beside it. The id shows only when it
-                   differs from the name (an equal id is just a redundant echo).
-                   The name takes priority and is never truncated (it only clips
-                   if it alone exceeds the whole row); the id yields, truncating
-                   to whatever space is left. -->
-              <div class="flex min-w-0 flex-1 items-baseline gap-2">
-                <OTruncatedText class="text-compact max-w-full flex-none leading-tight font-medium">
-                  {{ row.org.label }}
-                </OTruncatedText>
-                <OTruncatedText
-                  v-if="row.org.identifier && row.org.identifier !== row.org.label"
-                  class="text-2xs text-text-secondary shrink font-mono leading-tight"
-                >
-                  {{ row.org.identifier }}
-                </OTruncatedText>
-              </div>
-
-              <!-- Copy identifier without selecting the row. Feedback is the
-                   tick on the button itself (kept visible during the flash),
-                   no toast. -->
-              <button
-                type="button"
-                data-test="organization-menu-item-copy-id"
-                :aria-label="t('common.copyOrganizationId', { id: row.org.identifier })"
-                class="rounded-default hover:bg-select-item-selected-bg hover:text-select-item-selected-text inline-flex size-6 shrink-0 items-center justify-center transition"
-                :class="
-                  copiedId === row.org.identifier
-                    ? 'text-accent opacity-100'
-                    : row.index === highlightedIndex
-                      ? 'text-text-secondary opacity-100'
-                      : 'text-text-secondary opacity-0 focus-visible:opacity-100'
-                "
-                @click.stop="copyId(row.org)"
+            <template v-for="v in virtualRows" :key="v.row.key">
+              <div
+                v-if="v.row.kind === 'heading'"
+                role="row"
+                :aria-rowindex="v.index + 1"
+                :data-test="`organization-menu-section-${v.row.section}`"
+                class="absolute top-0 right-0 left-0 box-border flex h-7 items-end px-3 pb-1"
+                :style="{ transform: `translateY(${v.start}px)` }"
               >
-                <OIcon
-                  :name="copiedId === row.org.identifier ? 'check' : 'content-copy'"
-                  size="xs"
-                />
-              </button>
-            </div>
+                <span role="columnheader" class="text-2xs text-text-secondary font-medium">
+                  {{ t(SECTION_LABEL_KEYS[v.row.section]) }}
+                </span>
+              </div>
+              <div
+                v-else
+                role="row"
+                :aria-rowindex="v.index + 1"
+                :aria-selected="isSelected(v.row.org)"
+                data-test="organization-menu-item-label-item-label"
+                :data-test-org-identifier="v.row.org.identifier"
+                class="group rounded-default absolute top-0 right-0 left-0 box-border flex cursor-pointer items-center gap-1 px-3 transition-colors"
+                :class="rowStateClass(v.row.org, v.index)"
+                :style="{
+                  transform: `translateY(${v.start}px)`,
+                  height: `${v.size}px`,
+                }"
+                @click="select(v.row.org)"
+                @mousemove="onRowHover(v.index)"
+              >
+                <!-- The ID appears only when it adds information and yields to keep the name readable. -->
+                <div
+                  :id="cellId(v.index, 'name')"
+                  role="gridcell"
+                  class="flex min-w-0 flex-1 items-baseline gap-2"
+                >
+                  <OTruncatedText
+                    class="text-compact max-w-full flex-none leading-tight font-medium"
+                  >
+                    {{ v.row.org.label }}
+                  </OTruncatedText>
+                  <OTruncatedText
+                    v-if="v.row.org.identifier && v.row.org.identifier !== v.row.org.label"
+                    class="text-2xs text-text-secondary shrink font-mono leading-tight"
+                  >
+                    {{ v.row.org.identifier }}
+                  </OTruncatedText>
+                </div>
+
+                <div
+                  v-if="canStore"
+                  :id="cellId(v.index, 'star')"
+                  role="gridcell"
+                  class="shrink-0"
+                  :class="slotVisibility(v.index, isFavorite(v.row.org.identifier))"
+                >
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    tabindex="-1"
+                    :icon-left="isFavorite(v.row.org.identifier) ? 'star' : 'star-outline'"
+                    :class="[
+                      isFavorite(v.row.org.identifier) ? 'text-favorite' : 'text-text-secondary',
+                      isActiveCell(v.index, 'star') ? 'ring-focus-ring-accent ring-2' : '',
+                    ]"
+                    :aria-pressed="isFavorite(v.row.org.identifier)"
+                    :aria-label="starLabel(v.row.org)"
+                    :disabled="starBlocked(v.row.org)"
+                    focusable-unavailable
+                    data-test="organization-menu-item-favorite"
+                    :data-test-org-identifier="v.row.org.identifier"
+                    @click.stop="toggleFavorite(v.row.org.identifier)"
+                  >
+                    <OTooltip side="bottom" :content="starTooltip(v.row.org)" />
+                    <template #unavailable-reason>{{ starTooltip(v.row.org) }}</template>
+                  </OButton>
+                </div>
+
+                <!-- Copying leaves the selection in place, so the button tick is the only confirmation. -->
+                <div
+                  :id="cellId(v.index, 'copy')"
+                  role="gridcell"
+                  class="shrink-0"
+                  :class="slotVisibility(v.index, copiedId === v.row.org.identifier)"
+                >
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    tabindex="-1"
+                    :icon-left="copiedId === v.row.org.identifier ? 'check' : 'content-copy'"
+                    :class="[
+                      copiedId === v.row.org.identifier ? 'text-accent' : 'text-text-secondary',
+                      isActiveCell(v.index, 'copy') ? 'ring-focus-ring-accent ring-2' : '',
+                    ]"
+                    :aria-label="t('common.copyOrganizationId', { id: v.row.org.identifier })"
+                    data-test="organization-menu-item-copy-id"
+                    @click.stop="copyId(v.row.org)"
+                  />
+                </div>
+              </div>
+            </template>
           </div>
         </div>
 
-        <!-- Empty state -->
         <div
           v-else
           data-test="organization-menu-no-data"
@@ -339,8 +586,19 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
         >
           {{ t("organization.noOrganizationsFound") }}
         </div>
+
+        <div class="border-select-content-border flex border-t px-3 py-2">
+          <OButton
+            variant="link"
+            size="xs"
+            data-test="organization-menu-manage-link"
+            @click="openManage"
+          >
+            {{ t("organization.manageOrganizations") }}
+          </OButton>
+        </div>
       </div>
-    </ODropdown>
+    </OPopover>
   </div>
 </template>
 
