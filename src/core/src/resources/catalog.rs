@@ -63,7 +63,7 @@ pub(super) struct Limits {
 impl Default for Limits {
     fn default() -> Self {
         Self {
-            max_bytes: 512 * 1024 * 1024,
+            max_bytes: 100 * 1024 * 1024,
             max_pending: 32,
             max_scans: scan_permits(config::get_config().limit.cpu_num),
         }
@@ -191,7 +191,11 @@ impl Catalog {
             // Stale snapshots still answer and kinds with none report busy, so other kinds stay
             // usable.
             for key in &due {
-                if let Some(entry) = state.entries.get_mut(key).filter(|e| e.rows.is_none()) {
+                if let Some(entry) = state
+                    .entries
+                    .get_mut(key)
+                    .filter(|e| e.rows.is_none() && e.failure.is_none())
+                {
                     entry.failure = Some(SourceReason::ResourceExhausted);
                 }
             }
@@ -382,11 +386,13 @@ impl Entry {
 
     fn due(&self, now: Instant) -> bool {
         let since = self.started.map(|started| now.duration_since(started));
-        let interval = if self.rows.is_some() {
-            REBUILD_INTERVAL
-        } else {
-            COLD_RETRY
-        };
+        // A kind over the budget would read the whole source again only to fail the same way.
+        let interval =
+            if self.rows.is_some() || self.failure == Some(SourceReason::ResourceExhausted) {
+                REBUILD_INTERVAL
+            } else {
+                COLD_RETRY
+            };
         !self.building
             && since.is_none_or(|since| since >= interval)
             && (self.rows.is_none() || self.stale || since.is_some_and(|since| since >= MAX_AGE))
@@ -723,6 +729,28 @@ mod tests {
             search(&full.catalog, "Old").sources[0].reason,
             Some(SourceReason::ResourceExhausted)
         );
+    }
+
+    #[tokio::test]
+    async fn a_kind_over_the_budget_waits_the_rebuild_interval_before_reading_again() {
+        let x = fixture_with(
+            vec![row("f1", "Old")],
+            Limits {
+                max_bytes: 1,
+                ..Limits::default()
+            },
+        );
+        ensure(&x.catalog, "org").await;
+        x.catalog.wait_idle().await;
+        assert_eq!(x.reads(), 1);
+        x.age("org", COLD_RETRY);
+        ensure(&x.catalog, "org").await;
+        x.catalog.wait_idle().await;
+        assert_eq!(x.reads(), 1);
+        x.age("org", REBUILD_INTERVAL);
+        ensure(&x.catalog, "org").await;
+        x.catalog.wait_idle().await;
+        assert_eq!(x.reads(), 2);
     }
 
     #[tokio::test(start_paused = true)]
