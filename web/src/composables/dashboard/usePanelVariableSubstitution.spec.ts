@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { ref } from "vue";
-import { usePanelVariableSubstitution } from "./usePanelVariableSubstitution";
+import { SQL_PANEL_ROW_LIMIT, usePanelVariableSubstitution } from "./usePanelVariableSubstitution";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { computePercentileWindow } from "@/utils/metrics/metricDefaults";
 
@@ -991,5 +991,79 @@ describe("query variable 'All'", () => {
     expect(inst.variablesDataUpdated()).toBe(false);
     variablesData.value.values[0].options = [options[0]];
     expect(inst.variablesDataUpdated()).toBe(true);
+  });
+});
+
+describe("$__interval row cap", () => {
+  const SIX_HOURS_US = 6 * 60 * 60 * 1_000_000;
+
+  const intervalFor = (width: number, rangeUs: number, queryType = "sql") => {
+    const inst = usePanelVariableSubstitution({
+      panelSchema: makePanelSchema(),
+      variablesData: makeVariablesData(),
+      chartPanelRef: makeChartPanelRef(width),
+      store: makeStore(),
+      log,
+    });
+    const { query } = inst.replaceQueryValue(
+      "$__interval|$__interval_ms|$__rate_interval",
+      0,
+      rangeUs,
+      queryType,
+    );
+    const [interval, intervalMs, rateInterval] = String(query).split("|");
+    return { interval, intervalMs, rateInterval };
+  };
+
+  it("keeps a 6h range on a 1500px panel within the row cap", () => {
+    const { interval, intervalMs } = intervalFor(1500, SIX_HOURS_US);
+    const ms = Number(intervalMs.replace("ms", ""));
+    expect(ms).toBeGreaterThanOrEqual(22_000);
+    expect(Math.ceil(SIX_HOURS_US / 1000 / ms) + 1).toBeLessThanOrEqual(SQL_PANEL_ROW_LIMIT);
+    expect(interval).toBe("30s");
+  });
+
+  it("derives $__interval_ms and $__rate_interval from the capped interval", () => {
+    const { intervalMs, rateInterval } = intervalFor(1500, SIX_HOURS_US);
+    expect(intervalMs).toBe("30000ms");
+    expect(rateInterval).toBe("1m");
+  });
+
+  it("does not round a 1000px panel down past the cap", () => {
+    // 6h / 1000 px = 21.6s, which nearest-rounds down to 20s and 1080 buckets
+    const { interval } = intervalFor(1000, SIX_HOURS_US);
+    expect(interval).toBe("30s");
+  });
+
+  it("uses the server row cap from the config when it is set", () => {
+    const inst = usePanelVariableSubstitution({
+      panelSchema: makePanelSchema(),
+      variablesData: makeVariablesData(),
+      chartPanelRef: makeChartPanelRef(1500),
+      store: { state: { ...makeStore().state, zoConfig: { query_default_limit: 500 } } },
+      log,
+    });
+    const { query } = inst.replaceQueryValue("$__interval_ms", 0, SIX_HOURS_US, "sql");
+    const ms = Number(String(query).replace("ms", ""));
+    expect(Math.ceil(SIX_HOURS_US / 1000 / ms) + 1).toBeLessThanOrEqual(500);
+  });
+
+  it("leaves small panels unchanged", () => {
+    expect(intervalFor(400, SIX_HOURS_US).interval).toBe("1m");
+    expect(intervalFor(300, 300_000_000).interval).toBe("1s");
+  });
+
+  it("caps across very wide panels and long ranges", () => {
+    for (const width of [1200, 2000, 4000, 8000]) {
+      for (const hours of [1, 6, 24, 24 * 7, 24 * 30]) {
+        const rangeUs = hours * 60 * 60 * 1_000_000;
+        const ms = Number(intervalFor(width, rangeUs).intervalMs.replace("ms", ""));
+        expect(Math.ceil(rangeUs / 1000 / ms) + 1).toBeLessThanOrEqual(SQL_PANEL_ROW_LIMIT);
+      }
+    }
+  });
+
+  it("leaves PromQL intervals sized to the panel width", () => {
+    expect(intervalFor(1500, SIX_HOURS_US, "promql").interval).toBe("15s");
   });
 });

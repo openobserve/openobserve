@@ -20,7 +20,10 @@ import i18n from "@/locales";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
-import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+import {
+  useVariablesManager,
+  type VariableConfig,
+} from "@/composables/dashboard/useVariablesManager";
 import {
   QUERY_VARIABLE_NO_VALUES,
   resolveQueryVariableValue,
@@ -757,5 +760,39 @@ describe("VariablesValueSelector — custom and PromQL query_values variables", 
       expect(manager.isLoading.value).toBe(false);
       wrapper.unmount();
     });
+  });
+});
+
+describe("VariablesValueSelector — variables in a dependency loop", () => {
+  const loopVariable = (name: string, query: string): VariableConfig => ({
+    name,
+    type: "query_values",
+    scope: "global",
+    value: null,
+    query_data: { stream_type: "logs", stream: "app", field: "", query, filter: [] },
+  });
+
+  it("shows the loop under each variable in it, naming both", async () => {
+    const manager = useVariablesManager(i18n.global.t);
+    await manager
+      .initialize(
+        [
+          loopVariable("a", "SELECT x FROM app WHERE y = '$b'"),
+          loopVariable("b", "SELECT y FROM app WHERE x = '$a'"),
+          { ...regionVariable, type: "custom", scope: "global", value: "eu" },
+        ],
+        { tabs: [] },
+      )
+      .catch(() => undefined);
+    const wrapper = mountSelector({ variablesManager: manager, scope: "global" });
+    await flushPromises();
+
+    for (const name of ["a", "b"]) {
+      const message = wrapper.find(`[data-test="variable-cycle-error-${name}"]`);
+      expect(message.isVisible()).toBe(true);
+      expect(message.text()).toBe("a and b depend on each other.");
+    }
+    expect(wrapper.find('[data-test="variable-cycle-error-region"]').exists()).toBe(false);
+    wrapper.unmount();
   });
 });

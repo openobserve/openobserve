@@ -18,7 +18,8 @@ import { getFieldLabel } from "./fieldLabel";
 import {
   buildValueMappingCache,
   lookupValueMapping,
-  missingCellText,
+  isMissingCell,
+  tableMissingCellText,
   parseOverrideConfigs,
   parseTimestampValue,
   detectTimestampFields,
@@ -64,6 +65,8 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
 
   // Value to display when a cell is null/undefined/empty (configured per panel)
   const missingValue = String(panelSchema.config?.no_value_replacement ?? "");
+  const missingText = (val: unknown): string =>
+    tableMissingCellText(val, valueMappingCache, missingValue);
 
   try {
     // Pre-build case-insensitive field name cache
@@ -150,8 +153,7 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
       }
 
       obj["format"] = (val: any) => {
-        if (val === null || val === undefined || val === "")
-          return missingCellText(val, valueMappingCache, missingValue);
+        if (isMissingCell(val)) return missingText(val);
         // value mapping - use cached lookup
         const valueMapping = lookupValueMapping(val, valueMappingCache);
         if (valueMapping != null) {
@@ -178,22 +180,16 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
         const decimals = panelSchema.config?.decimals ?? 2;
 
         obj["format"] = (val: any) =>
-          formatNumericValue(
-            val,
-            valueMappingCache,
-            unitToUse,
-            customUnitToUse,
-            decimals,
-            missingValue,
-          );
+          isMissingCell(val)
+            ? missingText(val)
+            : formatNumericValue(val, valueMappingCache, unitToUse, customUnitToUse, decimals);
       }
 
       // if current field is histogram field, timestamps are pre-formatted in rows
       // Just apply value mapping if needed
       if (histogramFields.includes(it.alias)) {
         obj["format"] = (val: any) => {
-          if (val === null || val === undefined || val === "")
-            return missingCellText(val, valueMappingCache, missingValue);
+          if (isMissingCell(val)) return missingText(val);
           // value mapping - use cached lookup
           const valueMapping = lookupValueMapping(val, valueMappingCache);
           if (valueMapping != null) {
@@ -275,11 +271,12 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
         );
 
         // String(null) = "null", String(undefined) = "undefined" — always non-empty,
-        // so the TanStack filter never strips this column. The label is blank for
-        // null/undefined values so the header renders as empty visually.
+        // so the TanStack filter never strips this column.
         obj["name"] = String(it);
         obj["field"] = String(it);
-        obj["label"] = it != null && it !== "" ? String(it) : "";
+        obj["label"] = isMissingCell(it)
+          ? tableMissingCellText(it, null, missingValue)
+          : String(it);
         obj["sortable"] = true;
         obj["mono"] = isNumber || histogramFields.includes(it);
         // Overrides keyed by the lower-cased transposed value (transpose path).
@@ -291,8 +288,7 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
         );
 
         obj["format"] = (val: any) => {
-          if (val === null || val === undefined || val === "")
-            return missingCellText(val, valueMappingCache, missingValue);
+          if (isMissingCell(val)) return missingText(val);
           // value mapping - use cached lookup
           const valueMapping = lookupValueMapping(val, valueMappingCache);
           if (valueMapping != null) {
@@ -310,14 +306,15 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
           const decimals = panelSchema.config?.decimals ?? 2;
 
           obj["format"] = (val: any) =>
-            formatNumericValue(val, valueMappingCache, unit, unitCustom, decimals, missingValue);
+            isMissingCell(val)
+              ? missingText(val)
+              : formatNumericValue(val, valueMappingCache, unit, unitCustom, decimals);
         }
 
         // Check if it's a histogram field
         if (histogramFields.includes(it)) {
           obj["format"] = (val: any) => {
-            if (val === null || val === undefined || val === "")
-              return missingCellText(val, valueMappingCache, missingValue);
+            if (isMissingCell(val)) return missingText(val);
             // value mapping - use cached lookup
             const valueMapping = lookupValueMapping(val, valueMappingCache);
             if (valueMapping != null) {
@@ -336,7 +333,8 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
 
     tableRows = columnData.map((it: any) => {
       let obj = uniqueTransposeColumns.reduce((acc: any, curr: any, reduceIndex: any) => {
-        const value = getDataValue(searchQueryData[0][reduceIndex], it.alias) ?? "";
+        // Kept as null so the cell formatter can tell a NULL apart from "".
+        const value = getDataValue(searchQueryData[0][reduceIndex], it.alias) ?? null;
         acc[curr] = value;
         return acc;
       }, {});

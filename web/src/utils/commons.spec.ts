@@ -53,6 +53,7 @@ import {
   getLoadedDashboardVersion,
   hasUnsavedDashboardEdits,
   isDashboardStoredAtOldVersion,
+  findDashboardFolderId,
 } from "./commons";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 import { gt } from "@/types/i18n";
@@ -2372,5 +2373,42 @@ describe("Commons Utility Functions", () => {
         expect((Object.prototype.toString as any).variables).toBeUndefined();
       },
     );
+  });
+
+  describe("findDashboardFolderId", () => {
+    it("finds the folder of the dashboard among same-titled dashboards in every folder", async () => {
+      vi.mocked(dashboardService.get_Dashboard).mockResolvedValue({
+        data: { version: 8, v8: { title: "Folder Lookup" }, hash: 1 },
+      } as unknown as AxiosResponse);
+      vi.mocked(dashboardService.list).mockResolvedValue({
+        data: {
+          dashboards: [
+            { dashboard_id: "other", folder_id: "f1", title: "Folder Lookup" },
+            { dashboard_id: "d1", folder_id: "f2", title: "Folder Lookup" },
+          ],
+        },
+      } as never);
+
+      await expect(findDashboardFolderId("test-org", "d1")).resolves.toBe("f2");
+      expect(dashboardService.list).toHaveBeenCalledWith(
+        0,
+        100,
+        "name",
+        false,
+        "",
+        "test-org",
+        "",
+        "Folder Lookup",
+      );
+    });
+
+    it("gives null when no folder holds the dashboard", async () => {
+      vi.mocked(dashboardService.get_Dashboard).mockResolvedValue({
+        data: { version: 8, v8: { title: "Folder Lookup Missing" }, hash: 1 },
+      } as unknown as AxiosResponse);
+      vi.mocked(dashboardService.list).mockResolvedValue({ data: { dashboards: [] } } as never);
+
+      await expect(findDashboardFolderId("test-org", "d1")).resolves.toBeNull();
+    });
   });
 });

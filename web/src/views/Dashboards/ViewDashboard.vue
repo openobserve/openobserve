@@ -737,7 +737,12 @@ import {
   useRouter,
   type RouteLocationNormalized,
 } from "vue-router";
-import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
+import {
+  getDashboard,
+  movePanelToAnotherTab,
+  getFoldersList,
+  findDashboardFolderId,
+} from "../../utils/commons.ts";
 import { generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
 import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 import { useRoute } from "vue-router";
@@ -1290,6 +1295,9 @@ export default defineComponent({
     // variable params to the URL (e.g., after a normal dropdown change).
     const isInternalUrlUpdate = ref(false);
 
+    // A query-only replace resolves against this view and would cancel a pending redirect to the list.
+    let isLeavingForList = false;
+
     const loadDashboard = async (onlyIfRequired = false) => {
       zonePendingPanels.value = {};
       // check if drilldown or soft-refresh request
@@ -1325,15 +1333,28 @@ export default defineComponent({
         }
       }
 
-      // Saves are scoped to the folder in the URL, so a link without one could open but never save.
-      if (!route.query.folder) {
-        if (playlistReporters.missing("notFound")) return;
-        showErrorNotification(t("dashboard.viewDashboard.failedToLoadDashboard"));
-        router.replace({
-          path: "/dashboards",
-          query: { folder: "default", org_identifier: store.state.selectedOrganization.identifier },
-        });
-        return;
+      let folderId = route.query.folder;
+      // Saves are scoped to the folder in the URL, so a link without one gets its folder added before it opens.
+      if (!folderId) {
+        const org = store.state.selectedOrganization.identifier;
+        folderId = await findDashboardFolderId(org, String(route.query.dashboard ?? "")).catch(
+          () => null,
+        );
+        if (!folderId) {
+          if (playlistReporters.missing("notFound")) return;
+          isLeavingForList = true;
+          showErrorNotification(t("dashboard.viewDashboard.failedToLoadDashboard"));
+          router
+            .replace({
+              path: "/dashboards",
+              query: { folder: "default", org_identifier: org },
+            })
+            .then((failure) => {
+              if (failure) isLeavingForList = false;
+            });
+          return;
+        }
+        await router.replace({ query: { ...route.query, folder: folderId } });
       }
 
       const recentScope = captureRecentVisitScope();
@@ -1341,7 +1362,7 @@ export default defineComponent({
       const recentFolder = String(route.query.folder);
       let dashboard;
       try {
-        dashboard = await getDashboard(store, route.query.dashboard, route.query.folder);
+        dashboard = await getDashboard(store, route.query.dashboard, folderId);
 
         if (!dashboard || typeof dashboard !== "object" || !Object.keys(dashboard).length) {
           if (playlistReporters.missing("notFound")) return;
@@ -2265,6 +2286,7 @@ export default defineComponent({
 
     // Helper function to update URL with current state
     const updateUrlWithCurrentState = () => {
+      if (isLeavingForList) return;
       isInternalUrlUpdate.value = true;
       try {
         // Build variable params - prefer manager if available, otherwise use route.query

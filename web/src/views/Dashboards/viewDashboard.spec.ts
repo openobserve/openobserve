@@ -88,6 +88,7 @@ vi.mock("@/utils/commons.ts", async (importOriginal) => {
     deletePanel: vi.fn().mockResolvedValue({}),
     movePanelToAnotherTab: vi.fn().mockResolvedValue({}),
     getFoldersList: vi.fn().mockReturnValue([]),
+    findDashboardFolderId: vi.fn().mockResolvedValue(null),
     generateDurationLabel: vi.fn().mockReturnValue("15m"),
     getQueryParamsForDuration: vi.fn().mockReturnValue({ period: "15m" }),
     copyToClipboard: vi.fn().mockResolvedValue({}),
@@ -290,7 +291,7 @@ import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { gt } from "@/types/i18n";
 import ShareButton from "@/components/common/ShareButton.vue";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
-import { getDashboard } from "@/utils/commons.ts";
+import { getDashboard, findDashboardFolderId } from "@/utils/commons.ts";
 import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
 import { getManager } from "@/lib/vue-shortcut-manager";
 import { DASHBOARD_FRESH_PANEL_TIME } from "@/composables/dashboard/dashboardFreshPanelTime";
@@ -744,8 +745,29 @@ describe("ViewDashboard", () => {
   });
 
   describe("Navigation Functionality", () => {
-    it("sends a link without a folder to the default folder's dashboard list", async () => {
+    it("adds the dashboard's folder to a link without one and opens it", async () => {
       mockRouteFolder.value = undefined;
+      vi.mocked(findDashboardFolderId).mockResolvedValueOnce("default");
+      try {
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(findDashboardFolderId).toHaveBeenCalledWith("test-org", "test-dashboard-1");
+        expect(global.mockRouterReplace).toHaveBeenCalledWith({
+          query: expect.objectContaining({ dashboard: "test-dashboard-1", folder: "default" }),
+        });
+        expect(getDashboard).toHaveBeenCalledWith(expect.anything(), "test-dashboard-1", "default");
+        expect(global.mockShowErrorNotification).not.toHaveBeenCalledWith(
+          "dashboard.viewDashboard.failedToLoadDashboard",
+        );
+      } finally {
+        mockRouteFolder.value = "default";
+      }
+    });
+
+    it("sends a link whose folder cannot be found to the list, as the last navigation", async () => {
+      mockRouteFolder.value = undefined;
+      vi.mocked(findDashboardFolderId).mockRejectedValueOnce(new Error("404"));
       try {
         wrapper = createWrapper();
         await flushPromises();
@@ -754,7 +776,7 @@ describe("ViewDashboard", () => {
         expect(global.mockShowErrorNotification).toHaveBeenCalledWith(
           "dashboard.viewDashboard.failedToLoadDashboard",
         );
-        expect(global.mockRouterReplace).toHaveBeenCalledWith({
+        expect(global.mockRouterReplace).toHaveBeenLastCalledWith({
           path: "/dashboards",
           query: { folder: "default", org_identifier: "test-org" },
         });

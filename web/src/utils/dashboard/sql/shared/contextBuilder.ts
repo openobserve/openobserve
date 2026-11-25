@@ -38,7 +38,8 @@ import {
   dataZoomBrushStyle,
 } from "@/utils/chartTheme";
 import { getPropsByChartTypeForSeries } from "../../sqlChartSeriesProps";
-import { breakdownValueLabel, processData } from "../../sqlProcessData";
+import { NULL_BREAKDOWN_VALUE, breakdownValueLabel, processData } from "../../sqlProcessData";
+import { isTimeSeries, isTimeStamp } from "../../dateTimeUtils";
 import { fillMissingValues } from "../../sqlMissingValueFiller";
 import { buildDataLookupMap, createSeriesBuilders } from "./seriesBuilder";
 import { createTrellisHelpers } from "./trellisConfig";
@@ -180,30 +181,47 @@ export function buildSQLContext(
     loading,
   );
 
+  const hasTimestampField = panelSchema.queries[0].fields?.x?.some(
+    (it: { args?: { value?: { field?: string } }[]; aggregationFunction?: string }) =>
+      it?.args?.[0]?.value?.field === store.state?.zoConfig?.timestamp_column ||
+      ["histogram", "date_bin"].includes(it.aggregationFunction),
+  );
+
+  const isMissing = (value: unknown) => value === null || value === undefined;
+
+  const timeLikeXSample = (missingValueData ?? [])
+    .map((item: Record<string, unknown>) => getDataValue(item, xAxisKeys[0]))
+    .filter((value: unknown) => !isMissing(value))
+    .slice(0, 20);
+
+  // A time axis has no place for a NULL bucket, so only a category x axis keeps those rows.
+  const keepNullXRows =
+    !hasTimestampField &&
+    !(
+      timeLikeXSample.length &&
+      (isTimeSeries(timeLikeXSample) || isTimeStamp(timeLikeXSample, null))
+    );
+
+  const xAxisCategory = (value: unknown) =>
+    breakdownValueLabel(isMissing(value) ? NULL_BREAKDOWN_VALUE : (value as string));
+
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
     const data =
       missingValueData?.filter((item: any) => {
         return (
-          xAxisKeys.every((key: any) => getDataValue(item, key) != null) &&
+          (keepNullXRows ||
+            xAxisKeys.every((key: string) => !isMissing(getDataValue(item, key)))) &&
           // some, not every: one null y must not erase the row, its x category and the other series
           (!yAxisKeys.length || yAxisKeys.some((key: any) => getDataValue(item, key) != null)) &&
           breakDownKeys.every((key: any) => getDataValue(item, key) != null)
         );
       }) || [];
 
-    // if data is not there use {} as a default value
-    const keys = Object.keys((data.length && data[0]) || {}); // Assuming there's at least one object
+    // Read every row, since a row with a NULL x value may omit the key that the first row is read for.
+    const result = data.map((obj: Record<string, unknown>) => getDataValue(obj, key));
 
-    const keyArrays: any = {};
-
-    for (const key of keys) {
-      keyArrays[key] = data.map((obj: any) => getDataValue(obj, key));
-    }
-
-    const result = getDataValue(keyArrays, key) || [];
-
-    return result;
+    return xAxisKeys.includes(key) ? result.map(xAxisCategory) : result;
   };
 
   const convertedTimeStampToDataFormat = new Date(
@@ -363,13 +381,6 @@ export function buildSQLContext(
     yAxisNameFits &&
     panelSchema?.queries?.[0]?.fields?.y?.length == 1 &&
     axisLabelOf(panelSchema?.queries?.[0]?.fields?.y?.[0]);
-
-  // Check if x-axis will be time-based by looking for timestamp fields
-  const hasTimestampField = panelSchema.queries[0].fields?.x?.some(
-    (it: any) =>
-      it?.args?.[0]?.value?.field == store.state?.zoConfig?.timestamp_column ||
-      ["histogram", "date_bin"].includes(it.aggregationFunction),
-  );
 
   // Calculate additional spacing needed for rotated labels
   // Skip rotation for time-based x-axis and horizontal chart types (h-bar, h-stacked)

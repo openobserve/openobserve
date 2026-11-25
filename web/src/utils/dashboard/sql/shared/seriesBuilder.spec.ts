@@ -19,13 +19,15 @@ import {
   createSeriesBuilders,
   type SeriesDeps,
 } from "@/utils/dashboard/sql/shared/seriesBuilder";
+import { NULL_BREAKDOWN_VALUE } from "@/utils/dashboard/sqlProcessData";
 
 // Mock heavy dependencies
 vi.mock("@/utils/dashboard/aliasUtils", () => ({
   getDataValue: vi.fn((obj: any, key: any) => obj?.[key]),
 }));
 
-vi.mock("@/utils/dashboard/colorPalette", () => ({
+vi.mock("@/utils/dashboard/colorPalette", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/dashboard/colorPalette")>()),
   getSeriesColor: vi.fn(() => "#FF5733"),
   getAreaStyleOverride: vi.fn(() => ({})),
 }));
@@ -98,6 +100,14 @@ describe("seriesBuilder", () => {
       const data = [{ category: null, time: "2024-01", value: 10 }];
       const result = buildDataLookupMap(data, ["category"], ["time"]);
       expect(result.has("null||2024-01")).toBe(true);
+    });
+
+    it("keys a NULL or empty x value by the label the x axis shows for it", () => {
+      const nullRow = { category: "A", time: null, value: 10 };
+      const emptyRow = { category: "A", time: "", value: 20 };
+      const result = buildDataLookupMap([nullRow, emptyRow], ["category"], ["time"]);
+      expect(result.get("A||(null)")).toBe(nullRow);
+      expect(result.get("A||(empty)")).toBe(emptyRow);
     });
 
     it("uses only first breakdown key", () => {
@@ -203,6 +213,46 @@ describe("seriesBuilder", () => {
       expect(labelled.map((series) => series.originalSeriesName)).toEqual(["api", "web"]);
       expect(labelled.every((series) => series.large === false)).toBe(true);
       expect(build({}).every((series) => series.large === true)).toBe(true);
+    });
+  });
+
+  describe("breakdown series colours", () => {
+    const rows = [
+      { x: "/a", service: NULL_BREAKDOWN_VALUE, y: 1 },
+      { x: "/a", service: "alpha", y: 2 },
+    ];
+    const seriesFor = (color: Record<string, unknown> | null) =>
+      createSeriesBuilders({
+        options: { xAxis: [{ data: ["/a"] }] },
+        panelSchema: {
+          type: "bar",
+          config: { color },
+          queries: [{ fields: { y: [{ alias: "y" }], breakdown: [{ alias: "service" }] } }],
+        },
+        store: { state: { theme: "light", timezone: "UTC" } },
+        missingValueData: rows,
+        xAxisKeys: ["x"],
+        yAxisKeys: ["y"],
+        breakDownKeys: ["service"],
+        defaultSeriesProps: { type: "bar" },
+        chartMin: 0,
+        chartMax: 1,
+        dataLookupMap: buildDataLookupMap(rows, ["service"], ["x"]),
+        annotations: [],
+        getMarkLineData: () => [],
+        getAxisDataFromKey: () => [],
+      }).getSeries();
+
+    it("gives the (null) series and a real series different colours", () => {
+      const series = seriesFor(null);
+      expect(series.map((it) => it.name)).toEqual(["(null)", "alpha"]);
+      expect(series[0].color).toBeTruthy();
+      expect(series[0].color).not.toBe(series[1].color);
+    });
+
+    it("leaves a non-hash colour mode to getSeriesColor", () => {
+      const series = seriesFor({ mode: "fixed" });
+      expect(series.map((it) => it.color)).toEqual(["#FF5733", "#FF5733"]);
     });
   });
 });

@@ -566,6 +566,77 @@ describe("convertTableData", () => {
     expect(result.columns).toHaveLength(2);
   });
 
+  describe("NULL vs empty-string cells", () => {
+    const rowsWithMissing = [
+      [
+        { timestamp: "alpha", value: 1 },
+        { timestamp: null, value: null },
+        { timestamp: "", value: 3 },
+        { value: 4 },
+      ],
+    ];
+
+    it("formats NULL and empty-string cells to two different labels", () => {
+      const result = convertTableData(mockPanelSchema, rowsWithMissing, mockStore);
+      const format = result.columns[0].format;
+
+      expect(format(null)).toBe("(null)");
+      expect(format(undefined)).toBe("(null)");
+      expect(format("")).toBe("(empty)");
+      expect(format("alpha")).toBe("alpha");
+    });
+
+    it("labels a NULL numeric cell (null)", () => {
+      const result = convertTableData(mockPanelSchema, rowsWithMissing, mockStore);
+
+      expect(result.columns[1].align).toBe("right");
+      expect(result.columns[1].format(null)).toBe("(null)");
+    });
+
+    it("lets the panel's no-value replacement win over the default labels", () => {
+      mockPanelSchema.config.no_value_replacement = "N/A";
+      const result = convertTableData(mockPanelSchema, rowsWithMissing, mockStore);
+
+      expect(result.columns[0].format(null)).toBe("N/A");
+      expect(result.columns[0].format("")).toBe("N/A");
+      expect(result.columns[1].format(null)).toBe("N/A");
+    });
+
+    it("lets a special null mapping win over the default label", () => {
+      mockPanelSchema.config.mappings = [{ type: "special", match: "null", text: "missing" }];
+      const result = convertTableData(mockPanelSchema, rowsWithMissing, mockStore);
+
+      expect(result.columns[0].format(null)).toBe("missing");
+      expect(result.columns[0].format("")).toBe("(empty)");
+    });
+
+    it("keeps NULL distinct from empty string in transposed tables", () => {
+      mockPanelSchema.config.table_transpose = true;
+      const result = convertTableData(
+        mockPanelSchema,
+        [
+          [
+            { timestamp: "a", value: null },
+            { timestamp: "b", value: "" },
+            { timestamp: null, value: 5 },
+            { timestamp: "", value: 6 },
+          ],
+        ],
+        mockStore,
+      );
+      const colA = result.columns.find((c: { field: string }) => c.field === "a");
+      const colB = result.columns.find((c: { field: string }) => c.field === "b");
+      const row = result.rows[0];
+
+      expect(colA.format(row.a)).toBe("(null)");
+      expect(colB.format(row.b)).toBe("(empty)");
+      expect(result.columns.find((c: { field: string }) => c.field === "null").label).toBe(
+        "(null)",
+      );
+      expect(result.columns.find((c: { field: string }) => c.field === "").label).toBe("(empty)");
+    });
+  });
+
   // Test 10: Complex edge case scenarios
   it("should handle data with no x or y fields", () => {
     const schemaWithoutFields = {

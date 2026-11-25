@@ -14,9 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { getDataValue } from "../../aliasUtils";
-import { getSeriesColor, getAreaStyleOverride } from "../../colorPalette";
+import {
+  createDistinctSeriesColor,
+  getSeriesColor,
+  getAreaStyleOverride,
+} from "../../colorPalette";
 import { getFieldLabel } from "../../fieldLabel";
-import { breakdownValueLabel } from "../../sqlProcessData";
+import { NULL_BREAKDOWN_VALUE, breakdownValueLabel } from "../../sqlProcessData";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 import { ANNOTATION_MARK_AREA_Z } from "@/utils/dashboard/constants";
 import { type SeriesObject } from "@/ts/interfaces/dashboard";
@@ -61,7 +65,11 @@ export function buildDataLookupMap(
   for (const item of missingValueData) {
     const breakdownValue = getDataValue(item, breakdownKey);
     const xValue = getDataValue(item, xAxisKey);
-    const key = `${breakdownValue}||${xValue}`;
+    // The x axis names a NULL or empty category by its label, so the lookup must key it the same way.
+    const xCategory = breakdownValueLabel(
+      xValue === null || xValue === undefined ? NULL_BREAKDOWN_VALUE : xValue,
+    );
+    const key = `${breakdownValue}||${xCategory}`;
 
     // Only set if NOT already present (keeps FIRST occurrence)
     if (!dataMap.has(key)) {
@@ -178,8 +186,10 @@ export function createSeriesBuilders(deps: SeriesDeps) {
     seriesData: Array<number> = [],
     seriesConfig: Record<string, any>,
     seriesName: string,
+    distinctColor?: string,
   ): SeriesObject => {
     const seriesColor =
+      distinctColor ??
       getSeriesColor(
         panelSchema.config.color,
         yAxisName,
@@ -189,7 +199,8 @@ export function createSeriesBuilders(deps: SeriesDeps) {
         store.state.theme,
         panelSchema?.config?.color?.colorBySeries,
         panelSchema?.config,
-      ) ?? null;
+      ) ??
+      null;
 
     const areaStyle = getAreaStyleOverride(
       panelSchema.type,
@@ -260,6 +271,17 @@ export function createSeriesBuilders(deps: SeriesDeps) {
       stackedXAxisUniqueValue = getUniqueStackedXAxisValues(breakdownKey);
     }
 
+    // Name hashes can collide, so breakdown series in one chart get palette colours set apart.
+    const distinctColor = createDistinctSeriesColor(
+      breakDownKeys.length
+        ? yAxisKeys.flatMap((yAxis: string) =>
+            stackedXAxisUniqueValue.map((key: string) => String(getYAxisLabel(yAxis, key))),
+          )
+        : [],
+      panelSchema?.config?.color,
+      store.state.theme,
+    );
+
     return (
       yAxisKeys
         .map((yAxis: any, index: number) => {
@@ -281,7 +303,13 @@ export function createSeriesBuilders(deps: SeriesDeps) {
                 yAxisGroup: index,
               };
               // Can create different method to get series
-              return getSeriesObj(yAxisName, seriesData, updatedSeriesConfig, key);
+              return getSeriesObj(
+                yAxisName,
+                seriesData,
+                updatedSeriesConfig,
+                key,
+                distinctColor(String(yAxisName)),
+              );
             });
           } else {
             const seriesData = getAxisDataFromKey(yAxis);

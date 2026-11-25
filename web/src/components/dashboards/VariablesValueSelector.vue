@@ -45,6 +45,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </div>
         <div
+          v-else-if="
+            usesQueryVariableLoader(item) && item.queryMetricsTruncated && !item.queryError
+          "
+          class="text-text-secondary text-xs"
+          :data-test="`variable-query-metrics-truncated-${item.name}`"
+        >
+          {{ t("dashboard.queryVariable.metricsTruncatedHint") }}
+        </div>
+        <div
           v-else-if="isQueryVariableAllCapped(item) && !item.queryError"
           class="text-text-secondary text-xs"
           :data-test="`variable-query-all-capped-${item.name}`"
@@ -59,7 +68,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("dashboard.queryVariable.cappedHint", { count: getQueryVariableMaxRecords(item) }) }}
         </div>
         <div
-          v-if="usesQueryVariableLoader(item) && item.queryError"
+          v-if="item.cycleError"
+          class="text-status-error-text me-4 flex w-0 min-w-full items-center gap-1 text-xs"
+          :data-test="`variable-cycle-error-${item.name}`"
+        >
+          <OIcon name="error-outline" size="xs" class="shrink-0" />
+          <OTruncatedText class="min-w-0 flex-1">{{ item.cycleError }}</OTruncatedText>
+        </div>
+        <div
+          v-else-if="usesQueryVariableLoader(item) && item.queryError"
           class="text-status-error-text me-4 flex w-0 min-w-full items-center gap-1 text-xs"
           :data-test="`variable-query-error-${item.name}`"
         >
@@ -211,6 +228,7 @@ interface QueryVariableRuntime extends Omit<VariableRuntimeState, "options"> {
   options?: QueryVariableOption[];
   queryError?: string;
   queryCapped?: boolean;
+  queryMetricsTruncated?: boolean;
   querySearchColumn?: string;
   querySearch?: { text: string; options: QueryVariableOption[] };
 }
@@ -1035,6 +1053,7 @@ export default defineComponent({
         timeRangeReloads.delete(name);
         variableObject.queryError = undefined;
         variableObject.queryCapped = result.capped;
+        variableObject.queryMetricsTruncated = result.metricsTruncated;
         variableObject.querySearchColumn = resolveSqlOptionColumns(
           result.columns,
           params.valueField,

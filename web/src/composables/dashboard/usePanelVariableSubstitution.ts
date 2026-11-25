@@ -39,6 +39,23 @@ import {
   resolveQueryVariableValue,
 } from "@/utils/dashboard/variables/queryVariableUtils";
 
+/** Fallback for the server row cap (`ZO_QUERY_DEFAULT_LIMIT`) applied to dashboard SQL sent with `size: -1`. */
+export const SQL_PANEL_ROW_LIMIT = 1000;
+
+const formattedIntervalMs = (interval: { value: number; unit: string }): number =>
+  getTimeInSecondsBasedOnUnit(interval.value, interval.unit) * 1000;
+
+/** Rounds to a nice interval that is never below `floorMs`, since formatInterval rounds to the nearest step. */
+const formatIntervalAtLeast = (rawMs: number, floorMs: number) => {
+  let input = Math.max(rawMs, floorMs);
+  let formatted = formatInterval(input);
+  for (let step = 0; step < 200 && formattedIntervalMs(formatted) < floorMs; step++) {
+    input *= 1.1;
+    formatted = formatInterval(input);
+  }
+  return formatted;
+};
+
 /** A null context formats the raw values, as the variable metadata reports them. */
 const formatPanelVariableValue = (
   variable: any,
@@ -450,8 +467,14 @@ export const usePanelVariableSubstitution = ({
     // minimum will be 15000 millisecond
     // __interval = Math.max(15000, __interval);
 
-    // round interval
-    const formattedInterval = formatInterval(__interval);
+    // One under the cap because a histogram's first bucket starts before the range start.
+    const rangeMs = (endISOTimestamp - startISOTimestamp) / 1000;
+    const minIntervalMs =
+      queryType !== "promql" && Number.isFinite(rangeMs) && rangeMs > 0
+        ? rangeMs / ((Number(store.state.zoConfig?.query_default_limit) || SQL_PANEL_ROW_LIMIT) - 1)
+        : 0;
+
+    const formattedInterval = formatIntervalAtLeast(__interval, minIntervalMs);
 
     // calculate rate interval in seconds
     // we need formatted interval value in seconds

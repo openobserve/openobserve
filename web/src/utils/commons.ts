@@ -15,7 +15,7 @@
 
 //Dashboard Manipulation Functions
 
-import { dashboardsByFolderQuery } from "@/services/dashboards.queries";
+import { dashboardsByFolderQuery, dashboardsSearchQuery } from "@/services/dashboards.queries";
 import { foldersQuery } from "@/services/common.queries";
 import { dashboardKeys } from "@/services/dashboards.querykeys";
 import { folderKeys } from "@/services/common.querykeys";
@@ -850,6 +850,20 @@ const ensureVariablesStructure = (dashboard: any): void => {
       dashboard.variables.list = [];
     }
   }
+};
+
+/** The folder a dashboard lives in, for links that name only the dashboard; null when it cannot be found. */
+export const findDashboardFolderId = async (
+  org: string,
+  dashboardId: string,
+): Promise<string | null> => {
+  // The dashboard GET finds it by id alone, and the title search without a folder spans every folder.
+  const response = await dashboardService.get_Dashboard(org, dashboardId);
+  const body = response?.data?.[`v${response?.data?.version}`];
+  const title = typeof body?.title === "string" ? body.title : "";
+  if (!title) return null;
+  const hits = await queryClient.fetchQuery(dashboardsSearchQuery(org, title));
+  return hits.find((hit) => hit.dashboardId === dashboardId)?.folderId ?? null;
 };
 
 export const getDashboard = async (store: any, dashboardId: any, folderId: any) => {

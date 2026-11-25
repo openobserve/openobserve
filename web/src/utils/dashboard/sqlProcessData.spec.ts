@@ -489,6 +489,24 @@ describe("sqlProcessData - processData", () => {
       ]);
     });
 
+    it("folds a NULL x value into the others bucket under the NULL stand-in, not the text null", () => {
+      const rows = [
+        { svc: "a", k: "x", cnt: 9 },
+        { svc: "b", k: null, cnt: 3 },
+      ];
+      const result = processData(
+        [rows],
+        makeSchema(1, true),
+        makeStore(),
+        ["cnt"],
+        ["svc"],
+        ["k"],
+        {},
+      );
+      const others = result.find((row: Row) => row.svc === OTHERS_BREAKDOWN_VALUE);
+      expect(others).toMatchObject({ k: NULL_BREAKDOWN_VALUE, cnt: 3 });
+    });
+
     it("labels the NULL and empty series apart from real values", () => {
       expect(breakdownValueLabel(NULL_BREAKDOWN_VALUE)).toBe("(null)");
       expect(breakdownValueLabel("")).toBe("(empty)");
