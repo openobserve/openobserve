@@ -314,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="menu-link-help-item"
                 :aria-label="t('menu.help')"
               >
-                <OIcon name="help-outline" size="sm" />
+                <OIcon name="sb-help" size="sm" />
                 <OTooltip side="top" align="center" :content="t('menu.help')" />
               </OButton>
             </template>

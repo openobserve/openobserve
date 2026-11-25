@@ -26,6 +26,7 @@ import SidebarIntel from "~icons/material-symbols-light/neurology-outline";
 import SidebarChevronRight from "~icons/material-symbols-light/chevron-right-outline";
 // Sidebar rail: regular weight (400) so 16px menu icons render about 1.3px lines, not a faint 0.75px haze.
 import SbHome from "~icons/mdi/home-outline";
+import SbHelp from "~icons/material-symbols/help-outline-rounded";
 import SbSearch from "~icons/material-symbols/search-outline";
 import SbBarChart from "~icons/material-symbols/bar-chart-4-bars-outline";
 import SbAccountTree from "~icons/material-symbols/account-tree-outline";
@@ -435,6 +436,7 @@ export const iconRegistry = {
   "sidebar-intel": SidebarIntel,
   "sidebar-chevron-right": SidebarChevronRight,
   "sb-home": SbHome,
+  "sb-help": SbHelp,
   "sb-search": SbSearch,
   "sb-bar-chart": SbBarChart,
   "sb-account-tree": SbAccountTree,

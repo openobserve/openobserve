@@ -710,7 +710,11 @@
   :is(
     .toolbar-btn-rest,
     .header-utility-icons
-      button:not([data-test="menu-link-slack-item"], [data-test="header-my-account-profile-icon"]),
+      button:not(
+        [data-test="menu-link-slack-item"],
+        [data-test="header-my-account-profile-icon"],
+        [data-test="menu-link-help-item"]
+      ),
     #date-time-button
   ):not(:hover):not([aria-expanded="true"])
   :is(span.inline-flex.shrink-0.align-middle, svg.text-text-secondary) {
