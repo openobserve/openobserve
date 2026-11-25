@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach, Mock } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 
 import { initializeLogsIndexDom } from "@/test/unit/helpers/logsIndex";
 import Index from "@/plugins/logs/Index.vue";
@@ -33,11 +34,12 @@ const router = createRouter({
     { path: "/logs", name: "logs", component: { template: "<div />" } },
   ],
 });
-import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
+import { getFieldsFromQuery, getStreamFromQuery } from "@/utils/query/sqlUtils";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import { REFRESH_QUERY_ORIGIN } from "@/composables/useLogs/logsRowNav";
 import { urlWriteMode } from "@/composables/useLogs/useLogsUrl";
 import { saveLogsStreamType } from "@/utils/streamPersist";
+import searchService from "@/services/search";
 
 initializeLogsIndexDom();
 
@@ -578,6 +580,77 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
       expect(visualize.mock.calls[0][0]).toMatchObject({
         reason: "visualize-restore",
         kind: "entry",
+      });
+    });
+
+    describe("toggling to Visualize with no reusable Logs results (o2-enterprise#3701)", () => {
+      const toggleToVisualize = async () => {
+        await ready();
+        vi.spyOn(searchService, "result_schema").mockResolvedValue({
+          data: { group_by: [], projections: ["_timestamp"], timeseries_field: null },
+        } as any);
+        const engine = wrapper.vm.autoRun.engine;
+        const landed = engine.currentGeneration("grid");
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "visualize";
+        await vi.waitFor(() => expect(engine.currentGeneration("grid").id).not.toBe(landed.id));
+        return engine.currentGeneration("grid");
+      };
+
+      afterEach(() => {
+        (getStreamFromQuery as Mock).mockReset();
+      });
+
+      it("records the chart load the toggle starts once it ends", async () => {
+        (getStreamFromQuery as Mock).mockResolvedValue("k8s_json");
+        const run = await toggleToVisualize();
+        expect(run.op).toBe("visualize");
+        expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(true);
+        await vi.waitFor(() => expect(getStreamFromQuery).toHaveBeenCalledTimes(2));
+        await flushPromises();
+
+        const loading = wrapper.vm.$.provides.variablesAndPanelsDataLoadingState;
+        loading.panels = { ...loading.panels, chart: true };
+        await nextTick();
+        expect(wrapper.vm.searchObj.meta.runOutcome.visualize).toBe("running");
+        loading.panels = { ...loading.panels, chart: false };
+        await nextTick();
+
+        expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(false);
+        expect(wrapper.vm.searchObj.meta.runOutcome.visualize).toBe("complete");
+        expect(wrapper.vm.searchObj.meta.executedPanel).toMatchObject({
+          surface: "visualize",
+          generation: run.id,
+          complete: true,
+        });
+      });
+
+      it("closes the run as failed when the toggle flow throws after opening it", async () => {
+        (getStreamFromQuery as Mock)
+          .mockResolvedValueOnce("k8s_json")
+          .mockRejectedValueOnce(new Error("stream lookup failed"));
+        const run = await toggleToVisualize();
+        expect(run.op).toBe("visualize");
+        await vi.waitFor(() =>
+          expect(wrapper.vm.searchObj.meta.runOutcome.visualize).toBe("failed"),
+        );
+        expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(false);
+        expect(run.settled).toBe(true);
+        expect(wrapper.vm.searchObj.meta.executedPanel).toBeNull();
+      });
+
+      it("cancels the run when the user leaves Visualize before the chart starts loading", async () => {
+        (getStreamFromQuery as Mock).mockResolvedValue("k8s_json");
+        const run = await toggleToVisualize();
+        await vi.waitFor(() => expect(getStreamFromQuery).toHaveBeenCalledTimes(2));
+        await flushPromises();
+        expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(true);
+
+        wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+        await nextTick();
+
+        expect(wrapper.vm.autoRun.hasPanelRun(run.id)).toBe(false);
+        expect(run.settled).toBe(true);
+        expect(wrapper.vm.searchObj.meta.runOutcome.visualize).toBe("cancelled");
       });
     });
 

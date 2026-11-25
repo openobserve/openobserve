@@ -992,6 +992,29 @@ describe("panel records for Visualize and Build (J7)", () => {
     expect(reopened).not.toBe(open);
     expect(run().hasPanelRun(reopened as number)).toBe(true);
   });
+
+  it("leaving the chart cancels a panel run whose load never started, but not one in flight", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    const parked = run().openToggleChartRun(false) as number;
+    run().cancelUnstartedPanelRun();
+    expect(run().hasPanelRun(parked)).toBe(false);
+    expect(run().engine.currentGeneration("grid")?.settled).toBe(true);
+    expect(fakeSearchObj.value.meta.runOutcome?.visualize).toBe("cancelled");
+
+    const loading = run().openPanelRun();
+    run().panelLoadingChanged(true, false);
+    run().cancelUnstartedPanelRun();
+    expect(run().hasPanelRun(loading)).toBe(true);
+    expect(fakeSearchObj.value.meta.runOutcome?.visualize).toBe("running");
+  });
+
+  it("a Visualize toggle that resolves after the user left Visualize opens no panel run", () => {
+    fakeSearchObj.value.meta.logsVisualizeToggle = "logs";
+    const before = run().engine.currentGeneration("grid")?.id;
+    expect(run().openToggleChartRun(false)).toBeNull();
+    expect(run().engine.currentGeneration("grid")?.id).toBe(before);
+  });
 });
 
 describe("item 1: scan consent in the signature, the Stop guard and G1 inputs", () => {

@@ -691,6 +691,15 @@ function createLogsAutoRun() {
     endPanelRun(!panelRun.failed && !hasErrors);
   }
 
+  // A hidden chart parks its load until shown, so an unstarted run would hold the engine busy.
+  function cancelUnstartedPanelRun(): void {
+    const run = panelRun;
+    if (!run || run.started) return;
+    panelRun = null;
+    engine.recordPanelFailure(run.generationId, true);
+    engine.settleGeneration(run.generationId);
+  }
+
   function cancelPanelLoad(): void {
     outsideRunLoad = null;
     if (panelRun) panelRun.scope = null;
@@ -702,7 +711,7 @@ function createLogsAutoRun() {
 
   // A chart load outside a panel run is never recorded, so the URL keeps the last shown query.
   function openToggleChartRun(reusesLogsResults: boolean, abort?: () => void): number | null {
-    if (reusesLogsResults) return null;
+    if (reusesLogsResults || searchObj().meta.logsVisualizeToggle !== "visualize") return null;
     const live = engine.currentGeneration("grid");
     if (live && !live.cancelled && !live.settled && hasPanelRun(live.id)) return null;
     return openPanelRun(abort);
@@ -744,6 +753,7 @@ function createLogsAutoRun() {
     openPanelRun,
     markPanelFailed,
     endPanelRun,
+    cancelUnstartedPanelRun,
     panelLoadingChanged,
     cancelPanelLoad,
     notePanelScopeApplied,

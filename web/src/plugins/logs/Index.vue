@@ -2733,6 +2733,7 @@ export default defineComponent({
       async () => {
         let togglePanelRun: number | null = null;
         try {
+          if (searchObj.meta.logsVisualizeToggle !== "visualize") autoRun.cancelUnstartedPanelRun();
           // Reset buildModeQueryEditorDisabled when not in build mode
           if (searchObj.meta.logsVisualizeToggle !== "build") {
             searchObj.meta.buildModeQueryEditorDisabled = false;
