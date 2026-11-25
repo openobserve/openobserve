@@ -149,6 +149,15 @@ pub async fn extract_patterns(
         if let Some(res) = check_cipher_key_permissions(&org_id, &user_id, &req.query.sql).await {
             return res;
         }
+        if let Some(res) = crate::search::check_query_fn_permissions(
+            &org_id,
+            &user_id,
+            req.query.query_fn.as_deref().as_slice(),
+        )
+        .await
+        {
+            return res;
+        }
 
         // Size limit for pattern extraction (max logs to analyze). This bounds the
         // sample the clustering runs on. NOTE: per-pattern volume sparklines are

@@ -28,6 +28,8 @@ use openobserve_core::auth::check_permissions;
 #[cfg(feature = "enterprise")]
 use openobserve_core::background_access::StreamReadCheck;
 
+#[cfg(feature = "enterprise")]
+use crate::request::{Target, allowed};
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     models::pipelines::{PipelineBulkEnableRequest, PipelineBulkEnableResponse, PipelineList},
@@ -129,6 +131,23 @@ pub async fn save_pipeline(
     }
     let pipeline_id = pipeline.id.to_string();
     let pipeline_name = pipeline.name.clone();
+    // The route checks create only, so overwriting a stored pipeline also needs its edit right.
+    #[cfg(feature = "enterprise")]
+    if overwrite
+        && pipeline::get_user_pipeline(&pipeline.org, &pipeline_id)
+            .await
+            .is_ok()
+        && !allowed(
+            &pipeline.org,
+            &user_email.user_id,
+            "pipelines",
+            Target::One(&pipeline_id),
+            "PUT",
+        )
+        .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
     #[cfg(feature = "enterprise")]
     let saved = {
         let org_id = pipeline.org.clone();
@@ -493,6 +512,19 @@ pub async fn update_pipeline(
 ) -> Response {
     pipeline.org = org_id;
     let org_id = pipeline.org.clone();
+    // The route is bypassed, so a per-pipeline edit grant is honoured here.
+    #[cfg(feature = "enterprise")]
+    if !allowed(
+        &org_id,
+        &user_email.user_id,
+        "pipelines",
+        Target::One(&pipeline.id),
+        "PUT",
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
     #[cfg(feature = "enterprise")]
     let check = StreamReadCheck {
         org_id: &org_id,
@@ -902,9 +934,11 @@ mod tests {
                     .unwrap_err(),
             )
             .status();
+            let caller = user();
+            crate::request::tests::grant(&caller, &[("pipelines", Target::One("p1_id"), "PUT")]);
             let resp = update_pipeline(
                 Path("sp_org1".to_string()),
-                Headers(UserEmail { user_id: user() }),
+                Headers(UserEmail { user_id: caller }),
                 Json(body),
             )
             .await;
@@ -996,6 +1030,157 @@ mod tests {
                 message(resp).await,
                 "Unauthorized Access: no read permission on logs/fp_secret"
             );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    mod edit_rights {
+        use axum::{Json, extract::Query, http::StatusCode};
+        use config::meta::{pipeline::Pipeline, stream::StreamType};
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::{
+            auth::UserEmail,
+            authz::{TypedStream, fake_checker},
+        };
+        use serde_json::json;
+
+        use super::super::*;
+        use crate::request::tests::grant;
+
+        /// The meta store CI configures through `ZO_META_STORE`, migrated once per binary.
+        async fn meta_store() -> bool {
+            static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+            if std::env::var("ZO_META_STORE").is_err() {
+                eprintln!("skipped: needs ZO_META_STORE");
+                return false;
+            }
+            ONCE.get_or_init(|| async {
+                infra::db_init().await.unwrap();
+                infra::table::migrate().await.unwrap();
+            })
+            .await;
+            true
+        }
+
+        /// A caller who may read both streams of [`stream_pipeline`].
+        fn reader(org: &str, id: &str) -> String {
+            let caller = format!("{}@example.com", config::ider::uuid());
+            for name in [format!("{id}_in"), format!("{id}_out")] {
+                fake_checker().grant_read(
+                    &caller,
+                    &TypedStream {
+                        org_id: org.to_string(),
+                        stream_type: StreamType::Logs,
+                        name,
+                    },
+                );
+            }
+            caller
+        }
+
+        fn stream_pipeline(org: &str, id: &str) -> Pipeline {
+            let node = |node_id: &str, stream: String, io_type: &str| {
+                json!({
+                    "id": node_id,
+                    "data": {"node_type": "stream", "org_id": org, "stream_name": stream, "stream_type": "logs"},
+                    "position": {"x": 0.0, "y": 0.0},
+                    "io_type": io_type
+                })
+            };
+            let mut pipeline: Pipeline = serde_json::from_value(json!({
+                "pipeline_id": id,
+                "name": id,
+                "nodes": [node("n1", format!("{id}_in"), "input"), node("n2", format!("{id}_out"), "output")],
+                "edges": [{"id": "e1", "source": "n1", "target": "n2"}]
+            }))
+            .unwrap();
+            pipeline.org = org.to_string();
+            pipeline
+        }
+
+        async fn post(caller: &str, body: Pipeline, overwrite: bool) -> StatusCode {
+            let query = [("overwrite".to_string(), overwrite.to_string())];
+            save_pipeline(
+                Path(body.org.clone()),
+                Query(query.into_iter().collect()),
+                Headers(UserEmail {
+                    user_id: caller.to_string(),
+                }),
+                Json(body),
+            )
+            .await
+            .status()
+        }
+
+        #[tokio::test]
+        async fn update_needs_the_edit_right_on_that_pipeline() {
+            let body = stream_pipeline("er_org1", "er_update");
+            let denied = reader("er_org1", "er_update");
+            grant(&denied, &[("pipelines", Target::All, "POST")]);
+            let resp = update_pipeline(
+                Path("er_org1".to_string()),
+                Headers(UserEmail { user_id: denied }),
+                Json(body.clone()),
+            )
+            .await;
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+            let editor = reader("er_org1", "er_update");
+            grant(&editor, &[("pipelines", Target::One("er_update"), "PUT")]);
+            let resp = update_pipeline(
+                Path("er_org1".to_string()),
+                Headers(UserEmail { user_id: editor }),
+                Json(body),
+            )
+            .await;
+            assert_ne!(resp.status(), StatusCode::FORBIDDEN);
+        }
+
+        #[tokio::test]
+        async fn overwriting_a_stored_pipeline_needs_its_edit_right() {
+            if !meta_store().await {
+                return;
+            }
+            let id = format!("er_{}", config::ider::generate().to_lowercase());
+            let stored = stream_pipeline("er_org2", &id);
+            openobserve_core::pipeline::db::set(&stored).await.unwrap();
+            assert!(
+                pipeline::get_user_pipeline("er_org2", &id).await.is_ok(),
+                "the stored pipeline must read back before the overwrite"
+            );
+
+            let creator = reader("er_org2", &id);
+            grant(&creator, &[("pipelines", Target::All, "POST")]);
+            assert_eq!(
+                post(&creator, stored.clone(), true).await,
+                StatusCode::FORBIDDEN
+            );
+
+            let editor = reader("er_org2", &id);
+            grant(&editor, &[("pipelines", Target::One(&id), "PUT")]);
+            assert_eq!(post(&editor, stored, true).await, StatusCode::OK);
+            openobserve_core::pipeline::delete_pipeline(&id)
+                .await
+                .unwrap();
+        }
+
+        #[tokio::test]
+        async fn an_overwrite_import_of_a_new_id_needs_no_edit_right() {
+            if !meta_store().await {
+                return;
+            }
+            let id = format!("er_{}", config::ider::generate().to_lowercase());
+            let creator = reader("er_org3", &id);
+            grant(&creator, &[("pipelines", Target::All, "POST")]);
+            assert_eq!(
+                post(&creator, stream_pipeline("er_org3", &id), true).await,
+                StatusCode::OK
+            );
+            let saved = pipeline::get_user_pipeline("er_org3", &id).await.unwrap();
+            assert_eq!(saved.id, id);
+            openobserve_core::pipeline::delete_pipeline(&id)
+                .await
+                .unwrap();
         }
     }
 }
