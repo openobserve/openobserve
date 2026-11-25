@@ -132,6 +132,16 @@ macro_rules! enterprise_value {
 const LOGIN_STATE_COOKIE: &str = "o2_login_state";
 #[cfg(feature = "enterprise")]
 const LOGIN_STATE_MAX_AGE_SECS: i64 = 600;
+/// How long a refreshed login's old session stays valid, so a sign-out racing the new cookie finds
+/// it.
+#[cfg(feature = "enterprise")]
+const ROTATED_SESSION_GRACE_MICROS: i64 = 60 * 1_000_000;
+
+/// This node's lock per login; an entry lives only while someone holds or waits on it.
+#[cfg(feature = "enterprise")]
+static LOGIN_LOCKS: std::sync::LazyLock<
+    std::sync::Mutex<HashMap<String, std::sync::Weak<tokio::sync::Mutex<()>>>>,
+> = std::sync::LazyLock::new(Default::default);
 
 #[cfg(feature = "enterprise")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -143,6 +153,47 @@ enum LoginStateFailure {
 #[derive(Serialize, serde::Deserialize, ToSchema)]
 pub struct HealthzResponse {
     status: String,
+}
+
+/// A login's node-local lock; dropping the last holder removes its entry from `LOGIN_LOCKS`.
+#[cfg(feature = "enterprise")]
+struct LoginMutex {
+    login: String,
+    mutex: Arc<tokio::sync::Mutex<()>>,
+}
+
+#[cfg(feature = "enterprise")]
+impl LoginMutex {
+    fn of(login: &str) -> Self {
+        let mut locks = LOGIN_LOCKS
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mutex = match locks.get(login).and_then(std::sync::Weak::upgrade) {
+            Some(mutex) => mutex,
+            None => {
+                let mutex = Arc::new(tokio::sync::Mutex::new(()));
+                locks.insert(login.to_string(), Arc::downgrade(&mutex));
+                mutex
+            }
+        };
+        Self {
+            login: login.to_string(),
+            mutex,
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+impl Drop for LoginMutex {
+    fn drop(&mut self) {
+        let mut locks = LOGIN_LOCKS
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // Clones are only made under the map lock, so a count of one here means no other holder.
+        if Arc::strong_count(&self.mutex) == 1 {
+            locks.remove(&self.login);
+        }
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -1699,8 +1750,7 @@ pub async fn refresh_token_with_dex(
             None => false,
         };
         let login = crate::request::ai::chats::cookie_login(&auth_tokens, live);
-        // The old session stays until the new one is stored, so a racing sign-out can still find
-        // it.
+        // The old session stays until the refresh settles, so a racing sign-out can still find it.
         let old_session = auth_tokens.session_id().map(|id| (id.to_string(), live));
 
         (auth_tokens.refresh_token, login, old_session)
@@ -1718,6 +1768,7 @@ pub async fn refresh_token_with_dex(
             let session_id = ider::uuid();
 
             if access_token.is_empty() {
+                drop_refreshed_session(old_session.as_ref()).await;
                 audit_message.response_meta.http_response_code = 400;
                 audit_message._timestamp = now_micros();
                 audit(audit_message).await;
@@ -1753,6 +1804,7 @@ pub async fn refresh_token_with_dex(
                 if blocked {
                     let email = refreshed_email.unwrap_or_default();
                     log::warn!("Blocked external identity denied at token refresh: {email}");
+                    drop_refreshed_session(old_session.as_ref()).await;
                     audit_message.response_meta.http_response_code = 401;
                     audit_message._timestamp = now_micros();
                     audit(audit_message).await;
@@ -1763,7 +1815,8 @@ pub async fn refresh_token_with_dex(
             let login = login.unwrap_or_else(ider::uuid);
             let old = old_session.as_ref().map(|(id, live)| (id.as_str(), *live));
             if !rotate_session(&login, old, &session_id, &access_token).await {
-                log::warn!("Session refresh refused: the login signed out while it refreshed");
+                log::warn!("Session refresh refused: the login signed out or could not be locked");
+                drop_refreshed_session(old_session.as_ref()).await;
                 audit_message.response_meta.http_response_code = 401;
                 audit_message._timestamp = now_micros();
                 audit(audit_message).await;
@@ -1803,6 +1856,7 @@ pub async fn refresh_token_with_dex(
                 .unwrap()
         }
         Err(_) => {
+            drop_refreshed_session(old_session.as_ref()).await;
             let conf = get_config();
             let tokens = json::to_string(&AuthTokens::default()).unwrap();
             let tokens = base64::encode(&tokens);
@@ -1831,13 +1885,8 @@ pub async fn refresh_token_with_dex(
     }
 }
 
-/// How long a refreshed login's old session stays valid, so a sign-out racing the new cookie finds
-/// it.
-#[cfg(feature = "enterprise")]
-const ROTATED_SESSION_GRACE_MICROS: i64 = 60 * 1_000_000;
-
 /// Stores the refreshed session; false, minting nothing, when a sign-out took the old one
-/// meanwhile.
+/// meanwhile or the login's lock cannot be taken.
 #[cfg(feature = "enterprise")]
 async fn rotate_session(
     login: &str,
@@ -1845,7 +1894,7 @@ async fn rotate_session(
     new_session: &str,
     access_token: &str,
 ) -> bool {
-    under_login_lock(login, async {
+    let rotated = under_login_lock(login, async {
         let current = match old {
             Some((id, _)) => openobserve_core::session::get_session(id).await,
             None => None,
@@ -1860,12 +1909,18 @@ async fn rotate_session(
             log::error!("Failed to store session {new_session} in cluster coordinator");
         }
         if let (Some((id, _)), Some(token)) = (old, current) {
-            openobserve_core::session::retire_session(id, &token, ROTATED_SESSION_GRACE_MICROS)
-                .await;
+            openobserve_core::session::retire_session(
+                id,
+                &token,
+                new_session,
+                ROTATED_SESSION_GRACE_MICROS,
+            )
+            .await;
         }
         true
     })
-    .await
+    .await;
+    rotated == Some(true)
 }
 
 /// A refresh whose old session was live when it began may only mint while that session still is.
@@ -1874,22 +1929,33 @@ fn refresh_may_mint(old_was_live: Option<bool>, old_is_live: bool) -> bool {
     old_was_live != Some(true) || old_is_live
 }
 
-/// Runs `work` while holding the login's lock, so a refresh and a sign-out of it never interleave.
+/// Runs `work` while holding the login's lock, so a refresh and a sign-out of it never interleave;
+/// None, running nothing, when the cluster lock cannot be taken.
 #[cfg(feature = "enterprise")]
-async fn under_login_lock<T>(login: &str, work: impl std::future::Future<Output = T>) -> T {
-    static NODE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
-    let _node = NODE_LOCK.lock().await;
+async fn under_login_lock<T>(login: &str, work: impl std::future::Future<Output = T>) -> Option<T> {
+    let node = LoginMutex::of(login);
+    let _held = node.mutex.lock().await;
     let key = format!("/auth/login/{login}");
-    // Without the cluster lock the login still works; only the race this lock closes reopens.
-    let locker = infra::dist_lock::lock(&key, 0).await.unwrap_or_else(|e| {
-        log::warn!("[AUTH] cannot lock a login for its session refresh or sign-out: {e}");
-        None
-    });
+    let locker = match infra::dist_lock::lock(&key, 0).await {
+        Ok(locker) => locker,
+        Err(e) => {
+            log::warn!("[AUTH] cannot lock a login for its session refresh or sign-out: {e}");
+            return None;
+        }
+    };
     let out = work.await;
     if let Err(e) = infra::dist_lock::unlock(&locker).await {
         log::warn!("[AUTH] cannot unlock a login after its session refresh or sign-out: {e}");
     }
-    out
+    Some(out)
+}
+
+/// Ends the session a failed refresh came with, as a refresh that succeeds retires it.
+#[cfg(feature = "enterprise")]
+async fn drop_refreshed_session(old_session: Option<&(String, bool)>) {
+    if let Some((id, _)) = old_session {
+        openobserve_core::session::remove_session(id).await;
+    }
 }
 
 /// A 401 that clears the auth cookie, so the refresh-and-retry loop ends at the login page.
@@ -1917,26 +1983,32 @@ async fn signed_out_refresh_response() -> Response {
         .unwrap()
 }
 
-/// Removes a signed-out session; a live one first signs its login out, under the login's lock so a
-/// racing refresh cannot revive it. A stale or edited cookie signs nothing out.
+/// Removes a signed-out session and the sessions refreshed from it; a live one first signs its
+/// login out, under the login's lock so a racing refresh cannot revive it.
 async fn sign_out_session(tokens: &AuthTokens, session_id: &str) {
     #[cfg(feature = "enterprise")]
     if let Some(login) = crate::request::ai::chats::cookie_login(tokens, true) {
-        under_login_lock(&login, async {
-            if openobserve_core::session::get_session(session_id)
-                .await
-                .is_some()
-            {
-                o2_enterprise::enterprise::ai::chat::lease::cancel_auth_session(&login).await;
-            }
-            openobserve_core::session::remove_session(session_id).await;
-        })
-        .await;
+        let locked = under_login_lock(&login, end_signed_out_session(&login, session_id)).await;
+        // A sign-out never fails; without the lock it still ends what it can find.
+        if locked.is_none() {
+            end_signed_out_session(&login, session_id).await;
+        }
         return;
     }
     #[cfg(not(feature = "enterprise"))]
     let _ = tokens;
     openobserve_core::session::remove_session(session_id).await;
+}
+
+#[cfg(feature = "enterprise")]
+async fn end_signed_out_session(login: &str, session_id: &str) {
+    if openobserve_core::session::get_session(session_id)
+        .await
+        .is_some()
+    {
+        o2_enterprise::enterprise::ai::chat::lease::cancel_auth_session(login).await;
+    }
+    openobserve_core::session::remove_session_and_successors(session_id).await;
 }
 
 /// `max_age_secs` is passed in rather than read here: the policy read is async and this is not, and
@@ -2451,7 +2523,108 @@ mod tests {
         let overlapped =
             under_login_lock("login-a", async { rotating.load(Ordering::SeqCst) }).await;
         refresh.await.unwrap();
-        assert!(!overlapped, "a sign-out ran inside a refresh of its login");
+        assert_eq!(
+            overlapped,
+            Some(false),
+            "a sign-out ran inside a refresh of its login"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_slow_login_does_not_hold_up_another_login() {
+        let (a, b) = (
+            format!("login-{}", ider::uuid()),
+            format!("login-{}", ider::uuid()),
+        );
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+        let (release_tx, release_rx) = tokio::sync::oneshot::channel::<()>();
+        let slow = {
+            let a = a.clone();
+            tokio::spawn(async move {
+                under_login_lock(&a, async {
+                    let _ = started_tx.send(());
+                    let _ = release_rx.await;
+                })
+                .await
+            })
+        };
+        started_rx.await.unwrap();
+        let other = under_login_lock(&b, async {});
+        let ran = tokio::time::timeout(std::time::Duration::from_secs(2), other).await;
+        assert_eq!(ran, Ok(Some(())), "a login waited on another login's lock");
+        release_tx.send(()).unwrap();
+        slow.await.unwrap();
+        let locks = LOGIN_LOCKS.lock().unwrap();
+        assert!(!locks.contains_key(&a) && !locks.contains_key(&b));
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn session_store() -> bool {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return false;
+        }
+        ONCE.get_or_init(|| async {
+            std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+        true
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn signed_in(session_id: &str, login: &str) -> AuthTokens {
+        AuthTokens {
+            access_token: format!("session {session_id}"),
+            refresh_token: "refresh-1".to_string(),
+            login_id: Some(crate::request::ai::chats::bound_login_id(
+                login,
+                session_id,
+                "refresh-1",
+            )),
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_sign_out_with_the_old_cookie_after_a_refresh_ends_the_new_session() {
+        use openobserve_core::session::{get_session, set_session};
+        if !session_store().await {
+            return;
+        }
+        let (login, old, new) = (ider::uuid(), ider::uuid(), ider::uuid());
+        set_session(&old, "token-old").await.unwrap();
+        assert!(rotate_session(&login, Some((old.as_str(), true)), &new, "token-new").await);
+        assert!(
+            get_session(&old).await.is_some(),
+            "the old session lost its grace"
+        );
+        sign_out_session(&signed_in(&old, &login), &old).await;
+        assert!(get_session(&old).await.is_none());
+        assert!(
+            get_session(&new).await.is_none(),
+            "the refreshed session outlived the sign-out"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_refresh_after_a_sign_out_mints_no_session() {
+        use openobserve_core::session::{get_session, set_session};
+        if !session_store().await {
+            return;
+        }
+        let (login, old, new) = (ider::uuid(), ider::uuid(), ider::uuid());
+        set_session(&old, "token-old").await.unwrap();
+        sign_out_session(&signed_in(&old, &login), &old).await;
+        assert!(!rotate_session(&login, Some((old.as_str(), true)), &new, "token-new").await);
+        assert!(
+            get_session(&new).await.is_none(),
+            "a signed-out login was refreshed"
+        );
     }
 
     #[cfg(not(feature = "enterprise"))]

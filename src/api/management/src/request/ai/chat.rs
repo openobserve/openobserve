@@ -2197,11 +2197,17 @@ async fn cancel_turn(
     } else {
         let turns = o2_enterprise::enterprise::ai::chat::registry::turns(&org_id, &session_id);
         // An ephemeral turn is held by the member id the caps count, a direct one by the email.
-        let principal = turn_principal(
-            openobserve_core::ai_chat::admission::resolve_owner(&caller).await,
-            &caller,
-        )
-        .unwrap_or_else(|_| caller.clone());
+        let principal = if turns.iter().all(|t| t.user_id == caller) {
+            caller.clone()
+        } else {
+            match turn_principal(
+                openobserve_core::ai_chat::admission::resolve_owner(&caller).await,
+                &caller,
+            ) {
+                Ok(principal) => principal,
+                Err(refusal) => return refusal,
+            }
+        };
         let running: Vec<(&str, &str)> = turns
             .iter()
             .map(|t| {
@@ -4040,6 +4046,11 @@ async fn direct_turn(turn: StreamTurn) -> Response {
         }
     };
     let ephemeral = query.ephemeral;
+    let forward_headers = if ephemeral {
+        Some(with_turn_session(forward_headers))
+    } else {
+        forward_headers
+    };
     // Without the browser's turn id the trace id keys the refund; both are unique per request.
     let charge_key = turn_id
         .as_deref()
@@ -4261,6 +4272,18 @@ fn turn_principal(
         Err(AdmitError::NotRegistered) => Ok(user_email.to_string()),
         Err(e) => Err(super::chats::admit_error_response(e)),
     }
+}
+
+/// o2-ai names a session-less turn itself; naming it here lets a sign-out cancel it upstream.
+#[cfg(feature = "enterprise")]
+fn with_turn_session(
+    headers: Option<std::collections::HashMap<String, String>>,
+) -> std::collections::HashMap<String, String> {
+    let mut headers = headers.unwrap_or_default();
+    headers
+        .entry(X_O2_ASSISTANT_SESSION_ID.as_str().to_string())
+        .or_insert_with(|| uuid::Uuid::now_v7().to_string());
+    headers
 }
 
 /// A turn of a login that already signed out never reaches o2-ai.
@@ -6787,6 +6810,18 @@ mod tests {
         );
         let refusal = turn_principal(Err(AdmitError::Unavailable("down")), "a@x").unwrap_err();
         assert_eq!(refusal.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_session_less_ephemeral_turn_gets_a_session_a_sign_out_can_cancel() {
+        let header = X_O2_ASSISTANT_SESSION_ID;
+        let key = header.as_str();
+        let named = with_turn_session(None);
+        assert!(is_valid_session_id(&named[key]));
+        let mut given = std::collections::HashMap::new();
+        given.insert(key.to_string(), "kept".to_string());
+        assert_eq!(with_turn_session(Some(given))[key], "kept");
     }
 
     #[cfg(feature = "enterprise")]

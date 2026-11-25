@@ -14,8 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use base64::Engine;
+use sha2::{Digest, Sha256};
 
 use super::db;
+
+/// A sign-out follows at most this many refreshes made from one session during its grace.
+const MAX_SUCCESSOR_HOPS: usize = 16;
 
 pub async fn get_session(session_id: &str) -> Option<String> {
     db::session::get(session_id).await.ok()
@@ -91,16 +95,54 @@ pub async fn remove_session(session_id: &str) {
 }
 
 /// Keeps a rotated session valid for at most `grace_micros` more, never past its own token's
-/// expiry.
-pub async fn retire_session(session_id: &str, val: &str, grace_micros: i64) {
+/// expiry, and records `successor` so a sign-out with the old cookie also ends the new session.
+pub async fn retire_session(session_id: &str, val: &str, successor: &str, grace_micros: i64) {
     let expires_at = retired_expiry(val, chrono::Utc::now().timestamp_micros(), grace_micros);
+    let key = successors_key(session_id);
+    let known = db::session::get(&key).await.ok();
+    let successors = with_successor(known.as_deref(), successor);
+    if let Err(e) = db::session::set_with_expiry(&key, &successors, expires_at).await {
+        log::error!("Failed to record the successor of rotated session {session_id}: {e}");
+    }
     if let Err(e) = db::session::set_with_expiry(session_id, val, expires_at).await {
         log::error!("Failed to shorten rotated session {session_id}: {e}");
     }
 }
 
+/// Removes a signed-out session and every session refreshed from it while it was in its grace.
+pub async fn remove_session_and_successors(session_id: &str) {
+    let mut pending = vec![session_id.to_string()];
+    let mut hops = 0;
+    while let Some(id) = pending.pop() {
+        let key = successors_key(&id);
+        if let Ok(successors) = db::session::get(&key).await {
+            let _ = db::session::delete(&key).await;
+            hops += 1;
+            if hops <= MAX_SUCCESSOR_HOPS {
+                pending.extend(successors.split_whitespace().map(str::to_string));
+            }
+        }
+        remove_session(&id).await;
+    }
+}
+
 fn retired_expiry(val: &str, now: i64, grace_micros: i64) -> i64 {
     extract_jwt_expiry(val).min(now + grace_micros)
+}
+
+/// The sessions table keys rows by 36 characters, and a token can never resolve from this one.
+fn successors_key(session_id: &str) -> String {
+    let digest = Sha256::digest(format!("session-successors:{session_id}").as_bytes());
+    let hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
+    hex[..36].to_string()
+}
+
+fn with_successor(known: Option<&str>, successor: &str) -> String {
+    let mut ids: Vec<&str> = known.unwrap_or_default().split_whitespace().collect();
+    if !ids.contains(&successor) {
+        ids.push(successor);
+    }
+    ids.join(" ")
 }
 
 #[cfg(test)]
@@ -118,6 +160,16 @@ mod tests {
         let payload_b64 = base64::engine::general_purpose::URL_SAFE.encode(payload);
 
         format!("{}.{}.fake_signature", header_b64, payload_b64)
+    }
+
+    #[test]
+    fn test_a_retired_session_keeps_every_successor_once() {
+        assert_eq!(with_successor(None, "b"), "b");
+        assert_eq!(with_successor(Some("b"), "c"), "b c");
+        assert_eq!(with_successor(Some("b c"), "b"), "b c");
+        let key = successors_key("0199e7b2-6f0c-7a3e-a1b2-c3d4e5f6aaaa");
+        assert_eq!(key.len(), 36);
+        assert_ne!(key, successors_key("0199e7b2-6f0c-7a3e-a1b2-c3d4e5f6bbbb"));
     }
 
     #[test]
