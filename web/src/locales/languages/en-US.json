@@ -18412,6 +18412,7 @@
     "clientSecretRequired": "Client secret is required with a client ID",
     "scope": "Scope",
     "authorizationWithOauth": "Remove the Authorization header; the client credentials set it",
+    "reenterSecretForUrl": "Enter this again: a URL it is sent to has changed",
     "skillContentRequired": "Skill content is required",
     "regionOnly": "This region only",
     "regionOnlyHint": "Don't copy this toolset to other regions or take their changes to it",

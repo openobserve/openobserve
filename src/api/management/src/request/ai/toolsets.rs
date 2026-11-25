@@ -636,7 +636,9 @@ pub async fn list_for_agent(
     description = "Updates the description and/or data of an existing AI toolset. \
                    `data` is merged over the stored config, keeping top-level keys it omits, \
                    unless it carries `\"schema\": 2`, which replaces the config wholesale. \
-                   A secret value sent back as `***` keeps its stored value. `auth` is replaced whole when sent. A merge update that omits the MCP \
+                   A secret value of `***` keeps the stored value; when the MCP URL \
+                   changes every secret must be sent again, and so must `auth`'s when \
+                   `auth.token_url` does. `auth` is replaced whole when sent. A merge update that omits the MCP \
                    limits (`allowed_tools`, `blocked_tools`, `write_tools`) keeps the stored ones; \
                    send `null` to clear one. A `\"schema\": 2` replacement drops every limit it omits, so it must \
                    resend any it wants to keep. A dropped `allowed_tools` means `[\"*\"]`, and \
@@ -721,7 +723,7 @@ pub async fn prebuilt(Path(_org_id): Path<String>) -> Response {
                    without saving anything. The body is either an unsaved config \
                    (`name`, `url`, `headers`, `auth`, `timeout_seconds`; no secret may be `***`) or a \
                    saved toolset's `id` with optional `overrides`, merged as a `PUT` would: \
-                   `***` keeps a stored secret. With OAuth \
+                   `***` keeps a stored secret unless a URL it is sent to changes. With OAuth \
                    client credentials a token is requested first; `token_request_failed` carries the \
                    token endpoint's `error` and `error_description`. A tool with \
                    `name_too_long` has a full name `<toolset>_<tool>` no model is offered. \
@@ -1436,17 +1438,20 @@ mod tests {
     }
 
     #[test]
-    fn update_keeps_redacted_secrets_for_a_new_url() {
-        let data = updated_data(
+    fn update_refuses_redacted_secrets_for_a_new_url() {
+        let err = updated_data(
             "mcp",
             Some(&stored_mcp()),
             Some(json!({
-                "url": "https://mcp.datadoghq.eu/api/mcp",
+                "url": "https://attacker.example/api/mcp",
                 "headers": {"DD-API-KEY": "***"}
             })),
         )
-        .unwrap();
-        assert_eq!(parsed(data)["headers"]["DD-API-KEY"], "api-secret");
+        .unwrap_err();
+        assert!(
+            err.contains("re-enter secrets when the URL changes"),
+            "{err}"
+        );
     }
 
     #[test]
@@ -1914,23 +1919,24 @@ mod tests {
         assert_eq!(entry.url, "https://mcp.datadoghq.com/api/mcp");
         assert_eq!(entry.headers["DD-API-KEY"], "api-secret");
 
-        let overrides = json!({"url": "https://mcp.datadoghq.com/v2/mcp", "headers": {"DD-API-KEY": "***"}, "timeout_seconds": 50});
+        let overrides = json!({"url": "https://mcp.datadoghq.com/api/mcp", "headers": {"DD-API-KEY": "***"}, "timeout_seconds": 50});
         let (entry, _) = discover_entry(Some(&stored), by_id(Some(overrides))).unwrap();
-        assert_eq!(entry.url, "https://mcp.datadoghq.com/v2/mcp");
+        assert_eq!(entry.url, "https://mcp.datadoghq.com/api/mcp");
         assert_eq!(entry.headers["DD-API-KEY"], "api-secret");
         assert_eq!(entry.timeout_seconds, 50);
     }
 
     #[test]
-    fn discovery_keeps_stored_secrets_for_a_new_url_as_a_put_does() {
+    fn discovery_refuses_stored_secrets_for_a_new_url() {
         let stored = row("mcp", serde_json::from_str(&stored_mcp()).unwrap());
         for overrides in [
-            json!({"url": "https://mcp.datadoghq.eu/mcp", "headers": {"DD-API-KEY": "***"}}),
-            json!({"url": "https://mcp.datadoghq.eu/mcp"}),
+            json!({"url": "https://mcp.datadoghq.com/v2/mcp", "headers": {"DD-API-KEY": "***"}}),
+            json!({"url": "https://attacker.example/mcp", "headers": {"DD-API-KEY": "***"}}),
+            json!({"url": "https://attacker.example/mcp"}),
         ] {
-            let (entry, _) = discover_entry(Some(&stored), by_id(Some(overrides))).unwrap();
-            assert_eq!(entry.url, "https://mcp.datadoghq.eu/mcp");
-            assert_eq!(entry.headers["DD-API-KEY"], "api-secret");
+            let err = discover_entry(Some(&stored), by_id(Some(overrides))).unwrap_err();
+            assert_eq!(err.status, StatusCode::BAD_REQUEST);
+            assert!(err.message.contains("re-enter secrets"), "{}", err.message);
         }
     }
 
@@ -2029,7 +2035,7 @@ mod tests {
 
         let mut auth = json!({
             "type": "oauth_client_credentials",
-            "token_url": "https://sso.example.com/v2/token",
+            "token_url": "https://SSO.example.com:443/token",
             "client_id": "id-2",
             "client_secret": "***"
         });
@@ -2037,13 +2043,17 @@ mod tests {
         let (_, kept) = discover_entry(Some(&stored), by_id(Some(overrides))).unwrap();
         assert_eq!(client_of(kept).client_secret, "stored-secret");
 
-        auth["token_url"] = json!("https://new.example/token");
+        let mut other_path = auth.clone();
+        other_path["token_url"] = json!("https://sso.example.com/v2/token");
+        auth["token_url"] = json!("https://attacker.example/token");
         for overrides in [
             json!({"auth": auth}),
-            json!({"url": "https://new.example/mcp"}),
+            json!({"auth": other_path}),
+            json!({"url": "https://attacker.example/mcp"}),
         ] {
-            let (_, kept) = discover_entry(Some(&stored), by_id(Some(overrides))).unwrap();
-            assert_eq!(client_of(kept).client_secret, "stored-secret");
+            let err = discover_entry(Some(&stored), by_id(Some(overrides))).unwrap_err();
+            assert_eq!(err.status, StatusCode::BAD_REQUEST);
+            assert!(err.message.contains("re-enter secrets"), "{}", err.message);
         }
 
         auth["client_secret"] = json!("typed");

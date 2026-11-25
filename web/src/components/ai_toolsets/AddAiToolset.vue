@@ -351,7 +351,7 @@ import {
   CLIENT_CREDENTIALS,
   emptyAuth,
   isAuthorizationHeader,
-  sameOrigin,
+  sameUrl,
   sentHeaderRows,
   usesClientCredentials,
   type ToolsetAuth,
@@ -411,8 +411,9 @@ export default defineComponent({
       () => isEditing.value,
       (mcp) =>
         !!loadedMcp &&
-        sameOrigin(mcp.url, loadedMcp.url) &&
+        sameUrl(mcp.url, loadedMcp.url) &&
         JSON.stringify(authPayload(mcp.auth)) === JSON.stringify(authPayload(loadedMcp.auth)),
+      () => loadedMcp,
     );
 
     const kindOptions = [

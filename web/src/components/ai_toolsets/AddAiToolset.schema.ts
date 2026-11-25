@@ -16,6 +16,8 @@ import {
   emptyAuth,
   isAuthorizationHeader,
   isHttpsUrl,
+  REDACTED,
+  sameUrl,
   usesClientCredentials,
   type ToolsetAuth,
 } from "./toolsetAuth";
@@ -40,6 +42,8 @@ export const makeAddAiToolsetSchema = (
   isEditing: () => boolean = () => false,
   // A row replicated without this region's secret takes edits that leave its credentials alone.
   missingSecretOk: (_mcp: { url?: string; auth: ToolsetAuth }) => boolean = () => false,
+  // What an edit started from; a stored secret is kept only for the URLs it was entered for.
+  loaded: () => { url?: string; auth: ToolsetAuth } | null = () => null,
 ) =>
   z
     .object({
@@ -117,6 +121,13 @@ export const makeAddAiToolsetSchema = (
             path: ["mcp", ...path],
             message: t(message),
           });
+        const stored = loaded();
+        const urlChanged = !!stored && !sameUrl(val.mcp.url, stored.url);
+        val.mcp.headers.forEach((row, index) => {
+          if (urlChanged && row.value === REDACTED) {
+            refuse(["headers", index, "value"], "aiToolset.reenterSecretForUrl");
+          }
+        });
         for (const [param, value] of Object.entries(val.mcp.preset_params)) {
           if (!value.trim()) refuse(["preset_params", param], "aiToolset.presetParamRequired");
         }
@@ -128,6 +139,12 @@ export const makeAddAiToolsetSchema = (
           }
           if (!auth.client_secret?.trim() && !missingSecretOk(val.mcp)) {
             refuse(["auth", "client_secret"], "aiToolset.clientSecretRequired");
+          } else if (
+            auth.client_secret === REDACTED &&
+            stored &&
+            (urlChanged || !sameUrl(auth.token_url, stored.auth.token_url))
+          ) {
+            refuse(["auth", "client_secret"], "aiToolset.reenterSecretForUrl");
           }
           val.mcp.headers.forEach((row, index) => {
             if (isAuthorizationHeader(row) && row.value) {

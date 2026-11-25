@@ -89,9 +89,13 @@ export function isHttpsUrl(url: string | undefined): boolean {
   }
 }
 
-export function sameOrigin(a: string | undefined, b: string | undefined): boolean {
+/** What the API shows for a stored secret; sent back, it keeps the stored value. */
+export const REDACTED = "***";
+
+/** The server's rule for keeping a stored secret: the whole URL, not just its host. */
+export function sameUrl(a: string | undefined, b: string | undefined): boolean {
   try {
-    return new URL(a ?? "").origin === new URL(b ?? "").origin;
+    return new URL(a ?? "").href === new URL(b ?? "").href;
   } catch {
     return false;
   }
