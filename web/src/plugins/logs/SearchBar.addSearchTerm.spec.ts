@@ -286,6 +286,15 @@ describe("SearchBar — adding a filter term to the query", () => {
       expect(query).toBe("(\nmatch_all('timeout') OR match_all('refused')\n) AND level='error'");
     });
 
+    it("adds the facet without brackets when the filter has no top-level OR", async () => {
+      select(stream("fts_a", true));
+      wrapper.vm.searchObj.data.query = "match_all('x')";
+
+      const query = await addFilterTerm("activity_name = 'Update'");
+
+      expect(query).toBe("match_all('x') AND activity_name = 'Update'");
+    });
+
     it("keeps today's plain append when a selected stream cannot search text", async () => {
       select(stream("fts_a", true), stream("nofts_b", false));
       wrapper.vm.searchObj.data.query = "timeout";

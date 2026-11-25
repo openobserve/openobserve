@@ -2239,6 +2239,21 @@ export class LogsPage {
             .toContainText(`1 to ${size}`, { timeout: 30000 });
     }
 
+    /** Run the query and return its histogram's total event count; needs captureHistogramFrames() before the page loads. */
+    async runQueryAndSumHistogram() {
+        await this.page.evaluate(() => { /** @type {any} */ (window).__histFrames = []; });
+        await this.clickRefreshButton();
+        let totals = [];
+        await expect.poll(async () => {
+            totals = (await this.getHistogramFrames())
+                .map((frame) => frame.hits ?? frame.results?.hits ?? [])
+                .filter((hits) => hits.some((hit) => hit.zo_sql_num !== undefined))
+                .map((hits) => hits.reduce((sum, hit) => sum + Number(hit.zo_sql_num || 0), 0));
+            return totals.length;
+        }, { timeout: 30000, message: 'the histogram must return its buckets' }).toBeGreaterThan(0);
+        return totals[totals.length - 1];
+    }
+
     /**
      * Wait until the banner reports the expected total.
      *

@@ -20,12 +20,40 @@
 
 import { isUnaryOperator, unaryOperatorText } from "@/utils/alerts/conditionsFormatter";
 
+const READABLE_OPERATORS: Record<string, string> = {
+  re_match: "matches regex",
+  re_not_match: "does not match regex",
+};
+
+// Every spelling the backend reads as an extended operator, lower-cased with `_` for spaces.
+const EXTENDED_OPERATORS = new Set([
+  "in",
+  "not_in",
+  "starts_with",
+  "ends_with",
+  "re_match",
+  "regex",
+  "re_not_match",
+  "not_regex",
+]);
+
+// The backend honours `case_insensitive` on every operator but legacy `ignore_case` only off the extended ones.
+const ignoresCase = (item: any, spelled: string): boolean =>
+  item.case_insensitive === true ||
+  (item.ignore_case === true && !EXTENDED_OPERATORS.has(spelled.toLowerCase().replace(/ /g, "_")));
+
+const operatorText = (item: any): string => {
+  const spelled = String(item.operator || "=");
+  const operator = READABLE_OPERATORS[spelled.toLowerCase()] ?? spelled;
+  return ignoresCase(item, spelled) ? `${operator} (ignore case)` : operator;
+};
+
 const leafPreview = (item: any): string => {
   const column = item.column || "field";
-  const operator = item.operator || "=";
-  if (isUnaryOperator(operator)) {
-    return `${column} ${unaryOperatorText(operator)}`;
+  if (isUnaryOperator(item.operator)) {
+    return `${column} ${unaryOperatorText(item.operator)}`;
   }
+  const operator = operatorText(item);
   if (Array.isArray(item.value)) {
     return `${column} ${operator} (${item.value.map((v: unknown) => `'${v}'`).join(", ")})`;
   }

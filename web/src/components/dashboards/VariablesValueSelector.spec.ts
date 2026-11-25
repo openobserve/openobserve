@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
 import VariablesValueSelector from "./VariablesValueSelector.vue";
 import ODate from "@/lib/forms/Date/ODate.vue";
@@ -81,11 +81,14 @@ vi.mock("@/utils/date", () => ({
   isInvalidDate: vi.fn((date: any) => !date || isNaN(date.getTime())),
 }));
 
-vi.mock("@/utils/query/sqlUtils", () => ({
+vi.mock("@/utils/query/sqlUtils", async (importOriginal) => ({
   addLabelsToSQlQuery: vi.fn((query: string) => Promise.resolve(query)),
+  addLabelGroupToSQlQuery: (await importOriginal<typeof import("@/utils/query/sqlUtils")>())
+    .addLabelGroupToSQlQuery,
 }));
 
-vi.mock("@/utils/zincutils", () => ({
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  splitQuotedString: (await importOriginal<typeof import("@/utils/zincutils")>()).splitQuotedString,
   b64EncodeUnicode: vi.fn((str: string) => btoa(str)),
   escapeSingleQuotes: vi.fn((str: string) => str.replace(/'/g, "''")),
   generateTraceContext: vi.fn(() => ({ traceId: "test-trace-id" })),
@@ -2878,6 +2881,83 @@ describe("VariablesValueSelector", () => {
       await vm.loadVariableOptions(spans);
 
       expect(capturedSql).toContain("WHERE a = 'xyz789' AND b = 'abc123' AND c = 'api', 'web'");
+    });
+
+    it("runs an OR filter_group as a parenthesised WHERE with multi-value IN", async () => {
+      const { addLabelsToSQlQuery, addLabelGroupToSQlQuery } =
+        await import("@/utils/query/sqlUtils");
+      // Loads the SQL parser first, so the mount-time load settles before the one under test.
+      await addLabelGroupToSQlQuery("SELECT a FROM b", { conditions: [] });
+      const condition = (field: string, value: string, logicalOperator = "AND") => ({
+        filterType: "condition",
+        type: "condition",
+        column: { field },
+        operator: "=",
+        value,
+        values: [],
+        logicalOperator,
+      });
+      wrapper = createWrapper({
+        variablesConfig: {
+          list: [
+            { name: "env", type: "constant", label: "env", value: "prod" },
+            { name: "svc", type: "constant", label: "svc", value: "api" },
+            {
+              name: "spans",
+              type: "query_values",
+              label: "spans",
+              multiSelect: false,
+              query_data: {
+                field: "span_id",
+                stream: "default",
+                stream_type: "logs",
+                max_record_size: 10,
+                filter_group: {
+                  filterType: "group",
+                  logicalOperator: "AND",
+                  conditions: [
+                    condition("env", "$env"),
+                    {
+                      filterType: "group",
+                      logicalOperator: "AND",
+                      conditions: [condition("svc", "$svc"), condition("svc", "web", "OR")],
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+        initialVariableValues: { value: {} },
+      });
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      const byName = (name: string) => vm.variablesData.values.find((v: any) => v.name === name);
+      ["env", "svc"].forEach((name) => {
+        byName(name).isVariablePartialLoaded = true;
+      });
+      byName("svc").value = ["api", "_o2_all_"];
+
+      let capturedSql = "";
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          capturedSql = atob(payload.queryReq.sql);
+          handlers.complete(payload, { type: "end" });
+        },
+      );
+      vi.mocked(addLabelsToSQlQuery).mockClear();
+
+      const spans = byName("spans");
+      spans.isLoading = false;
+      spans.isVariablePartialLoaded = true;
+      spans.isVariableLoadingPending = false;
+      await vm.loadVariableOptions(spans);
+
+      expect(addLabelsToSQlQuery).not.toHaveBeenCalled();
+      expect(capturedSql).toContain(
+        `WHERE "env" = 'prod' AND ("svc" IN ('api', '_o2_all_') OR "svc" = 'web')`,
+      );
     });
   });
 
