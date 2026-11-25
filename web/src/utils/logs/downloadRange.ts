@@ -44,3 +44,13 @@ export function applyDownloadRange<T>(
   const start = Math.max(initialNumber - 1, 0);
   return hits.slice(start, start + range);
 }
+
+/** Returns the server's reason when a download response is partial or carries a function error, else null. */
+export function partialDownloadReason(data: {
+  is_partial?: boolean;
+  function_error?: string | string[];
+}): string | null {
+  const raw = data?.function_error;
+  const reason = (Array.isArray(raw) ? raw : [raw]).filter(Boolean).join(" ");
+  return data?.is_partial === true || reason ? reason : null;
+}
