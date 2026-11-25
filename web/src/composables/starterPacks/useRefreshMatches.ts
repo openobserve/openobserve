@@ -60,19 +60,16 @@ export function useRefreshMatches(org: string) {
     const live = await Promise.all(
       packs().map(async (pack) => ({
         pack,
-        rows: (await records.list(pack.id)).filter(({ status }) => status !== "removed"),
+        rows: await records.list(pack.id),
       })),
     );
     const installedPackIds = live
       .filter(({ rows }) => rows.some(({ status }) => status === "complete"))
       .map(({ pack }) => pack.id);
-    let interrupted: BrowserInterrupted | null = null;
-    for (const { pack, rows } of live) {
+    const interrupted = live.flatMap(({ pack, rows }): BrowserInterrupted[] => {
       const stopped = rows.find(({ status }) => status !== "complete");
-      if (stopped && !interrupted) {
-        interrupted = { packId: pack.id, label: packTitle(pack), ...progressOf(stopped) };
-      }
-    }
+      return stopped ? [{ packId: pack.id, label: packTitle(pack), ...progressOf(stopped) }] : [];
+    });
     return { installedPackIds, interrupted };
   };
 

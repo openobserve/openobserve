@@ -88,6 +88,10 @@ const rowChecks = (wrapper: Wrapper, id: string) =>
   group(wrapper, id).findAll('[data-test="starter-pack-drawer-row-check"] [role="checkbox"]');
 const box = (wrapper: Wrapper, id: string) =>
   wrapper.get(`[data-test="starter-pack-alert-setup-${id}"] [role="checkbox"]`);
+const expectNoUndo = (wrapper: Wrapper) => {
+  expect(wrapper.text()).not.toMatch(/undo|remove pack/i);
+  expect(wrapper.find('[data-test$="-undo-btn"], [data-test$="-remove-btn"]').exists()).toBe(false);
+};
 const shown = async (flow = ready(), props: Record<string, unknown> = {}) => {
   const wrapper = render(flow, props);
   await flushPromises();
@@ -154,11 +158,13 @@ describe("StarterPackDrawer", () => {
       "Kubernetes starter pack · built for staging-eu-1",
     );
     expect(submit(wrapper).text()).toBe("Set up 4 items");
-    expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
-      "You can undo this for 24 hours",
+    const summary = wrapper.get('[data-test="starter-pack-drawer-summary"]');
+    expect(summary.text()).toBe(
+      "Adds ordinary dashboards, alerts and views, listed on the pack's page. Edit or delete them on their own pages.",
     );
+    expect(summary.find(".truncate").exists()).toBe(false);
     expect(wrapper.get('[data-test="starter-pack-drawer-back-btn"]').text()).toBe("Back");
-    expect(wrapper.text().match(/24 hours/g)).toHaveLength(1);
+    expectNoUndo(wrapper);
     expect(wrapper.text()).toContain("Kubernetes pack");
     expect(has(wrapper, "starter-pack-drawer-stepper")).toBe(true);
     expect(wrapper.get('[data-test="starter-pack-drawer-reach-line"]').text()).toContain(
@@ -728,7 +734,6 @@ describe("StarterPackDrawer", () => {
     const setUp = (over: Record<string, unknown> = {}) =>
       fakeFlow({
         installed: ref(true),
-        canUndo: ref(false),
         items: ref(ITEMS),
         made: ref(ITEMS),
         toCreate: ref(ITEMS),
@@ -850,12 +855,11 @@ describe("StarterPackDrawer", () => {
       expect(rows()).toHaveLength(7);
     });
 
-    it("offers Back, Open dashboard and Remove after the undo window", async () => {
+    it("offers Back and Open dashboard, and no Undo or Remove", async () => {
       const flow = setUp();
       const wrapper = render(flow);
       expect(wrapper.get('[data-test="starter-pack-drawer-back-btn"]').text()).toBe("Back");
-      expect(has(wrapper, "starter-pack-page-remove-btn")).toBe(true);
-      expect(has(wrapper, "starter-pack-progress-undo-btn")).toBe(false);
+      expectNoUndo(wrapper);
       await wrapper.get('[data-test="starter-pack-drawer-open-btn"]').trigger("click");
       await flushPromises();
       expect(flow.land).toHaveBeenCalled();
@@ -889,6 +893,81 @@ describe("StarterPackDrawer", () => {
     expect(wrapper.emitted("close")).toBeUndefined();
   });
 
+  describe("until a setup holds its claim", () => {
+    const element = (wrapper: Wrapper, id: string) =>
+      wrapper.find<HTMLButtonElement>(`[data-test="${id}"]`);
+    // A refused write ends the run without its claim, as the flow reports it.
+    const refusable = (over: Record<string, unknown>) => {
+      let refuse!: () => void;
+      const flow = ready({ claimed: ref(false), ...over });
+      const run = vi.fn(async () => {
+        flow.running.value = true;
+        await new Promise<void>((done) => (refuse = done));
+        flow.running.value = false;
+        return false;
+      });
+      flow.install = run as never;
+      flow.retry = run as never;
+      return { flow, refuse: () => refuse() };
+    };
+
+    it("keeps the pressed Set up button, loading, and offers it again after a refusal", async () => {
+      const { flow, refuse } = refusable({});
+      const wrapper = await shown(flow);
+      const pressed = submit(wrapper).element;
+      await submit(wrapper).trigger("click");
+      await flushPromises();
+      expect(submit(wrapper).element).toBe(pressed);
+      expect(submit(wrapper).attributes("aria-busy")).toBe("true");
+      expect(has(wrapper, "starter-pack-progress-running-btn")).toBe(false);
+      refuse();
+      await flushPromises();
+      expect(submit(wrapper).element).toBe(pressed);
+      expect(submit(wrapper).attributes("aria-busy")).not.toBe("true");
+      expect(submit(wrapper).attributes("disabled")).toBeUndefined();
+      expect(has(wrapper, "starter-pack-ready")).toBe(false);
+      expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toContain(
+        "Adds ordinary dashboards, alerts and views",
+      );
+    });
+
+    it("moves to Setting up once the claim is held", async () => {
+      const { flow } = refusable({});
+      const wrapper = await shown(flow);
+      await submit(wrapper).trigger("click");
+      await flushPromises();
+      flow.claimed.value = true;
+      await nextTick();
+      expect(has(wrapper, "starter-pack-progress-running-btn")).toBe(true);
+    });
+
+    it.each([
+      [
+        "Retry",
+        "starter-pack-progress-retry-btn",
+        [{ kind: "alert", itemId: "a2", status: "failed" }],
+      ],
+      ["Finish", "starter-pack-progress-finish-btn", []],
+    ])(
+      "keeps the pressed %s button and stays on the stopped setup after a refusal",
+      async (_name, id, failed) => {
+        const { flow, refuse } = refusable({ interrupted: ref(true), failed: ref(failed) });
+        const wrapper = await shown(flow);
+        const pressed = element(wrapper, id).element;
+        await element(wrapper, id).trigger("click");
+        await flushPromises();
+        expect(element(wrapper, id).element).toBe(pressed);
+        expect(element(wrapper, id).attributes("aria-busy")).toBe("true");
+        expect(has(wrapper, "starter-pack-progress-running-btn")).toBe(false);
+        refuse();
+        await flushPromises();
+        expect(element(wrapper, id).element).toBe(pressed);
+        expect(element(wrapper, id).attributes("aria-busy")).not.toBe("true");
+        expect(has(wrapper, "starter-pack-ready")).toBe(false);
+      },
+    );
+  });
+
   it("drops the installed pack from this browser's header matches", async () => {
     window.localStorage.clear();
     resetBrowserMatches();
@@ -903,7 +982,6 @@ describe("StarterPackDrawer", () => {
     const wrapper = await shown();
     await submit(wrapper).trigger("click");
     await flushPromises();
-    expect(useBrowserMatches("org").visible.value).toEqual([]);
     expect(useBrowserMatches("org").copy.value?.installedPackIds).toEqual(["kubernetes"]);
   });
 
@@ -929,7 +1007,7 @@ describe("StarterPackDrawer", () => {
     expect(flow.land).not.toHaveBeenCalled();
   });
 
-  it("shows an interrupted setup as step 2 with Retry, Undo and Back", async () => {
+  it("shows an interrupted setup as step 2 with Retry and Back, and no Undo", async () => {
     const failedItem = { kind: "alert", itemId: "a2", status: "failed" };
     const flow = fakeFlow({
       interrupted: ref(true),
@@ -952,8 +1030,7 @@ describe("StarterPackDrawer", () => {
     expect(wrapper.get('[data-test="starter-pack-progress-failed-row"]').text()).toContain(
       "Failed · name-a2",
     );
-    expect(has(wrapper, "starter-pack-progress-undo-btn")).toBe(false);
-    expect(has(wrapper, "starter-pack-setup-undo-btn")).toBe(true);
+    expectNoUndo(wrapper);
     expect(has(wrapper, "starter-pack-drawer-back-btn")).toBe(true);
     expect(wrapper.get('[data-test="starter-pack-progress-retry-btn"]').text()).toBe(
       "Retry 1 item",
@@ -1023,7 +1100,6 @@ describe("StarterPackDrawer", () => {
     const flow = fakeFlow({
       interrupted: ref(true),
       interruptedBy: ref("other@example.com"),
-      canManage: ref(false),
       failed: ref([failedItem]),
       toCreate: ref([{ kind: "alert", itemId: "a1", status: "created" }, failedItem]),
       made: ref([{ kind: "alert", itemId: "a1", status: "created" }]),
@@ -1031,7 +1107,7 @@ describe("StarterPackDrawer", () => {
     const wrapper = render(flow);
     await flushPromises();
     expect(has(wrapper, "starter-pack-progress-retry-btn")).toBe(true);
-    expect(has(wrapper, "starter-pack-setup-undo-btn")).toBe(false);
+    expectNoUndo(wrapper);
     expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
       "other@example.com started setting up this pack.",
     );
@@ -1046,55 +1122,12 @@ describe("StarterPackDrawer", () => {
     );
   });
 
-  it("offers an admin Finish and Undo on another user's stopped setup", async () => {
-    const flow = fakeFlow({
-      interrupted: ref(true),
-      interruptedBy: ref("other@example.com"),
-      canManage: ref(true),
-      toCreate: ref([
-        { kind: "alert", itemId: "a0", status: "created" },
-        { kind: "alert", itemId: "a1", status: "pending" },
-      ]),
-      made: ref([{ kind: "alert", itemId: "a0", status: "created" }]),
-    });
-    const wrapper = render(flow);
-    await flushPromises();
-    expect(has(wrapper, "starter-pack-progress-finish-btn")).toBe(true);
-    await wrapper.get('[data-test="starter-pack-setup-undo-btn"]').trigger("click");
-    await wrapper.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
-    await flushPromises();
-    expect(flow.undo).toHaveBeenCalled();
-  });
-
-  it("closes an open Undo confirm when the install record changes under it", async () => {
-    const flow = fakeFlow({
-      interrupted: ref(true),
-      record: shallowRef({ installId: "i1", status: "incomplete", runId: "r1" }),
-      toCreate: ref([
-        { kind: "alert", itemId: "a0", status: "created" },
-        { kind: "alert", itemId: "a1", status: "pending" },
-      ]),
-      made: ref([{ kind: "alert", itemId: "a0", status: "created" }]),
-    });
-    const wrapper = render(flow);
-    await flushPromises();
-    await wrapper.get('[data-test="starter-pack-setup-undo-btn"]').trigger("click");
-    expect(has(wrapper, "starter-pack-drawer-confirm")).toBe(true);
-    flow.record.value = { installId: "i1", status: "incomplete", runId: "r1" } as never;
-    await flushPromises();
-    expect(has(wrapper, "starter-pack-drawer-confirm")).toBe(true);
-    flow.record.value = { installId: "i1", status: "complete", runId: "r2" } as never;
-    await flushPromises();
-    expect(has(wrapper, "starter-pack-drawer-confirm")).toBe(false);
-  });
-
   it("offers no Finish when the stopped setup is one this user may not set up, and says so", () => {
     const wrapper = render(
       fakeFlow({
         interrupted: ref(true),
         interruptedBy: ref("other@example.com"),
         forbidden: ref(true),
-        canManage: ref(false),
       }),
     );
     expect(has(wrapper, "starter-pack-progress-finish-btn")).toBe(false);
@@ -1103,11 +1136,10 @@ describe("StarterPackDrawer", () => {
     );
   });
 
-  it("shows a setup running elsewhere with no Set up, Finish or Undo", async () => {
+  it("shows a setup running elsewhere with no Set up or Finish", async () => {
     const flow = fakeFlow({
       preview: shallowRef(PREVIEW),
       runningBy: ref("other@example.com"),
-      canManage: ref(true),
       toCreate: ref([{ kind: "alert", itemId: "a1", status: "pending" }]),
     });
     const wrapper = render(flow);
@@ -1116,7 +1148,6 @@ describe("StarterPackDrawer", () => {
       "starter-pack-drawer-submit-btn",
       "starter-pack-progress-finish-btn",
       "starter-pack-progress-retry-btn",
-      "starter-pack-setup-undo-btn",
       "starter-pack-progress-running-btn",
     ]) {
       expect(has(wrapper, id)).toBe(false);
@@ -1147,7 +1178,7 @@ describe("StarterPackDrawer", () => {
       }),
     );
     expect(has(wrapper, "starter-pack-progress-finish-btn")).toBe(true);
-    expect(has(wrapper, "starter-pack-progress-undo-btn")).toBe(false);
+    expectNoUndo(wrapper);
   });
 
   it("shows progress while running, closable, pointing back at the header chip", async () => {
@@ -1192,7 +1223,7 @@ describe("StarterPackDrawer", () => {
     expect(has(wrapper, "starter-pack-drawer-submit-btn")).toBe(false);
     await wrapper.get('[data-test="starter-pack-drawer-continue-btn"]').trigger("click");
     expect(has(wrapper, "starter-pack-ready")).toBe(true);
-    expect(has(wrapper, "starter-pack-ready-undo-btn")).toBe(false);
+    expectNoUndo(wrapper);
   });
 
   describe("Ready", () => {
@@ -1245,11 +1276,9 @@ describe("StarterPackDrawer", () => {
       expect(wrapper.get('[data-test="starter-pack-view-ordinary"]').exists()).toBe(true);
     });
 
-    it("offers Undo with the time left and Back to Packs, and no primary", async () => {
+    it("offers Back to Packs, no Undo and no primary", async () => {
       const { wrapper } = await finish();
-      expect(wrapper.get('[data-test="starter-pack-ready-undo-left"]').text()).toBe(
-        "available for 5 h",
-      );
+      expectNoUndo(wrapper);
       expect(wrapper.get('[data-test="starter-pack-drawer-back-btn"]').text()).toBe(
         "Back to Packs",
       );
@@ -1417,85 +1446,6 @@ describe("StarterPackDrawer", () => {
       expect(has(wrapper, "starter-pack-view-row-retry")).toBe(false);
       expect(has(wrapper, "starter-pack-progress-retry-btn")).toBe(false);
     });
-
-    it("undoes in place from the footer and goes back to the list", async () => {
-      const { wrapper, flow } = await finish();
-      await wrapper.get('[data-test="starter-pack-ready-undo-btn"]').trigger("click");
-      await wrapper.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
-      await flushPromises();
-      expect(flow.undo).toHaveBeenCalled();
-      expect(wrapper.emitted("back")).toHaveLength(1);
-      expect(mocks.push).not.toHaveBeenCalled();
-    });
-  });
-
-  it("confirms Remove in place in the footer, never in a second dialog", async () => {
-    const items = [{ kind: "alert", itemId: "a1", status: "created", id: "al1" }];
-    const flow = fakeFlow({
-      installed: ref(true),
-      canUndo: ref(false),
-      items: ref(items),
-      made: ref(items),
-      toCreate: ref(items),
-      alertsOn: ref(1),
-      itemRoute: () => ({ name: "alert" }),
-    });
-    const wrapper = render(flow);
-    await wrapper.get('[data-test="starter-pack-page-remove-btn"]').trigger("click");
-    expect(has(wrapper, "starter-pack-undo-dialog")).toBe(false);
-    const confirm = wrapper.get('[data-test="starter-pack-drawer-confirm"]');
-    expect(confirm.text()).toContain("Remove pack?");
-    expect(confirm.text()).toContain("Removes 1 item · 1 live alert loses cover");
-    expect(flow.countAlertsOn).toHaveBeenCalledWith("remove");
-    expect(has(wrapper, "starter-pack-drawer-open-btn")).toBe(false);
-    await wrapper.get('[data-test="starter-pack-drawer-confirm-cancel-btn"]').trigger("click");
-    expect(has(wrapper, "starter-pack-drawer-confirm")).toBe(false);
-    await wrapper.get('[data-test="starter-pack-page-remove-btn"]').trigger("click");
-    await wrapper.get('[data-test="starter-pack-remove-confirm-btn"]').trigger("click");
-    await flushPromises();
-    expect(flow.remove).toHaveBeenCalled();
-    expect(wrapper.emitted("back")).toHaveLength(1);
-  });
-
-  it("confirms Undo setup in place with the time left", async () => {
-    const flow = fakeFlow({ installed: ref(true), canUndo: ref(true) });
-    const wrapper = render(flow);
-    await wrapper.get('[data-test="starter-pack-progress-undo-btn"]').trigger("click");
-    const confirm = wrapper.get('[data-test="starter-pack-drawer-confirm"]');
-    expect(confirm.text()).toContain("Undo setup?");
-    expect(confirm.text()).toContain("5 h left to undo");
-    await wrapper.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
-    await flushPromises();
-    expect(flow.undo).toHaveBeenCalled();
-  });
-
-  it("keeps the confirm open with the failure when Undo setup fails", async () => {
-    const flow = fakeFlow({
-      installed: ref(true),
-      canUndo: ref(true),
-      undo: vi.fn(async () => false),
-    });
-    const wrapper = render(flow);
-    await wrapper.get('[data-test="starter-pack-progress-undo-btn"]').trigger("click");
-    await wrapper.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
-    await flushPromises();
-    expect(flow.undo).toHaveBeenCalledTimes(1);
-    expect(has(wrapper, "starter-pack-confirm-failed")).toBe(true);
-    expect(has(wrapper, "starter-pack-drawer-confirm")).toBe(true);
-    expect(wrapper.emitted("back")).toBeUndefined();
-  });
-
-  it("runs Remove once and locks the confirm while it works", async () => {
-    const flow = fakeFlow({ installed: ref(true), canUndo: ref(false), busy: ref(false) });
-    const wrapper = render(flow);
-    await wrapper.get('[data-test="starter-pack-page-remove-btn"]').trigger("click");
-    flow.busy.value = true;
-    await nextTick();
-    expect(
-      wrapper.get('[data-test="starter-pack-drawer-confirm-cancel-btn"]').attributes("disabled"),
-    ).toBeDefined();
-    await wrapper.get('[data-test="starter-pack-remove-confirm-btn"]').trigger("click");
-    expect(flow.remove).not.toHaveBeenCalled();
   });
 
   it("says a setup that failed before anything was recorded in the footer, never a banner", () => {
@@ -1531,69 +1481,13 @@ describe("StarterPackDrawer", () => {
     expect(has(wrapper, "starter-pack-alert-setup")).toBe(true);
   });
 
-  it("goes back after an inline Remove or Undo succeeds, and not when it fails", async () => {
-    const removed = render(fakeFlow({ installed: ref(true), canUndo: ref(false) }));
-    await removed.get('[data-test="starter-pack-page-remove-btn"]').trigger("click");
-    await removed.get('[data-test="starter-pack-remove-confirm-btn"]').trigger("click");
-    await flushPromises();
-    expect(removed.emitted("back")).toHaveLength(1);
-    const failed = render(
-      fakeFlow({ installed: ref(true), canUndo: ref(true), undo: vi.fn(async () => false) }),
-    );
-    await failed.get('[data-test="starter-pack-progress-undo-btn"]').trigger("click");
-    await failed.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
-    await flushPromises();
-    expect(failed.emitted("back")).toBeUndefined();
-  });
-
-  it("stays and says how many items it kept after an Undo or Remove", async () => {
-    const removal = shallowRef<unknown>(null);
-    const kept = {
-      removed: [],
-      kept: [
-        { kind: "alert", itemId: "a1", reason: "changed" },
-        { kind: "folder", itemId: "alerts", reason: "not_empty" },
-      ],
-    };
-    const flow = fakeFlow({
-      installed: ref(true),
-      canUndo: ref(true),
-      removal,
-      undo: vi.fn(async () => {
-        removal.value = kept;
-        flow.installed.value = false;
-        return true;
-      }),
-    });
-    const wrapper = render(flow);
-    await wrapper.get('[data-test="starter-pack-progress-undo-btn"]').trigger("click");
-    await wrapper.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
-    await flushPromises();
-    expect(wrapper.emitted("back")).toBeUndefined();
-    expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
-      "Kept 2 items that were changed or are still in use. Delete them on their own pages.",
-    );
-  });
-
-  it("loads the destinations after Undo, so the pack can be set up again at once", async () => {
+  it("loads the destinations once a reload finds the pack is not set up after all", async () => {
     const reads = vi.fn(async () => [SLACK]);
     mocks.read = reads;
-    const flow = ready({
-      installed: ref(true),
-      canUndo: ref(true),
-      removal: shallowRef({
-        removed: [],
-        kept: [{ kind: "alert", itemId: "a1", reason: "changed" }],
-      }),
-      undo: vi.fn(async () => {
-        flow.installed.value = false;
-        return true;
-      }),
-    });
+    const flow = ready({ installed: ref(true) });
     const wrapper = await shown(flow);
     expect(reads).not.toHaveBeenCalled();
-    await wrapper.get('[data-test="starter-pack-progress-undo-btn"]').trigger("click");
-    await wrapper.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
+    flow.installed.value = false;
     await flushPromises();
     expect(reads).toHaveBeenCalledTimes(1);
     expect(has(wrapper, "starter-pack-alert-setup-dest-loading")).toBe(false);

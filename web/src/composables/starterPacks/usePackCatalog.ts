@@ -127,6 +127,26 @@ const state = ref<PackCatalogState>("idle");
 // (a test fixture) has no org and serves any.
 let loadedFor: string | null = null;
 let pending: { org: string; done: Promise<boolean> } | null = null;
+const askedFor = ref<string | null>(null);
+
+const sessionKey = (org: string) => `o2.starterPacks.catalog.${org}`;
+
+const keepForSession = (org: string, raw: RawCatalog) => {
+  try {
+    window.sessionStorage.setItem(sessionKey(org), JSON.stringify(raw));
+  } catch {
+    // Storage can be missing or full; the next page load then asks the server again.
+  }
+};
+
+/** Drops the session's copy, so the next page load reads the catalog from the server. */
+export const forgetPackCatalog = (org: string) => {
+  try {
+    window.sessionStorage.removeItem(sessionKey(org));
+  } catch {
+    // Storage that cannot be reached holds no copy either.
+  }
+};
 
 const known = <T>(map: Record<string, T>, key: string, what: string): T => {
   if (!Object.prototype.hasOwnProperty.call(map, key)) {
@@ -244,6 +264,9 @@ export const toStarterPack = (raw: RawPack): StarterPack => {
   };
 };
 
+/** The org a surface last asked the catalog for. */
+export const packCatalogOrg = readonly(askedFor);
+
 /** Where the one catalog load stands; readers return nothing until it is `ready`. */
 export const packCatalogState = readonly(state);
 
@@ -256,10 +279,25 @@ export const setPackCatalog = (raw: RawCatalog) => {
   state.value = "ready";
 };
 
-/** Loads the catalog once per org; concurrent callers share one request and a failure can be retried. */
+const restoreFromSession = (org: string): boolean => {
+  try {
+    setPackCatalog(JSON.parse(window.sessionStorage.getItem(sessionKey(org)) ?? "null"));
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** Loads the catalog once per org and session; concurrent callers share one request and a failure can be retried. */
 export const loadPackCatalog = (org: string): Promise<boolean> => {
+  askedFor.value = org;
   if (loaded.value && (loadedFor === null || loadedFor === org)) return Promise.resolve(true);
   if (pending?.org === org) return pending.done;
+  if (restoreFromSession(org)) {
+    pending = null;
+    loadedFor = org;
+    return Promise.resolve(true);
+  }
   loaded.value = null;
   loadedFor = null;
   state.value = "loading";
@@ -271,6 +309,7 @@ export const loadPackCatalog = (org: string): Promise<boolean> => {
         if (pending !== run) return false;
         setPackCatalog(response.data);
         loadedFor = org;
+        keepForSession(org, response.data);
         return true;
       })
       .catch(() => {

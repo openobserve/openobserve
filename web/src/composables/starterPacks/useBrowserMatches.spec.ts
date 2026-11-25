@@ -17,7 +17,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 
 import type { FindMoreSource } from "./findMore";
-import { matchesKey, resetBrowserMatches, useBrowserMatches } from "./useBrowserMatches";
+import {
+  hasSavedMatches,
+  matchesKey,
+  resetBrowserMatches,
+  useBrowserMatches,
+} from "./useBrowserMatches";
+import { setPackCatalog } from "./usePackCatalog";
 import store from "@/stores";
 import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
 
@@ -37,6 +43,9 @@ const DOCKER = source("docker", "docker");
 const LIBRARY = source("library-k8s");
 
 const ME = "me@x.io";
+
+const stoppedIds = () =>
+  useBrowserMatches("org").copy.value?.interrupted.map(({ packId }) => packId);
 
 const result = (sources: FindMoreSource[]) => ({ checkedAt: 1, sources, dismissed: 0 });
 
@@ -67,7 +76,7 @@ describe("useBrowserMatches", () => {
   });
 
   it("neither reads nor stores a copy while no signed-in user is known", () => {
-    const saved = { checkedAt: 1, sources: [NGINX], installedPackIds: [], interrupted: null };
+    const saved = { checkedAt: 1, sources: [NGINX], installedPackIds: [], interrupted: [] };
     window.localStorage.setItem(matchesKey("a", ""), JSON.stringify(saved));
     store.commit("setUserInfo", {});
     const matches = useBrowserMatches("a");
@@ -84,15 +93,15 @@ describe("useBrowserMatches", () => {
     const org = ref("a");
     useBrowserMatches("a").saveFull(result([NGINX]), ["hosts"]);
     const matches = useBrowserMatches(org);
-    expect(matches.count.value).toBe(1);
+    expect(matches.show.value).toBe(true);
     org.value = "b";
-    expect(matches.count.value).toBe(0);
+    expect(matches.show.value).toBe(false);
   });
 
   it("shares one copy across callers, so a save updates every reader", () => {
     const header = useBrowserMatches("org");
     useBrowserMatches("org").saveFull(result([NGINX]), ["hosts"]);
-    expect(header.count.value).toBe(1);
+    expect(header.copy.value?.sources).toEqual([NGINX]);
   });
 
   it("works in memory when storage throws", () => {
@@ -105,7 +114,7 @@ describe("useBrowserMatches", () => {
     const matches = useBrowserMatches("org");
     expect(matches.copy.value).toBeNull();
     matches.saveFull(result([NGINX]), ["hosts"]);
-    expect(matches.count.value).toBe(1);
+    expect(matches.copy.value?.sources).toEqual([NGINX]);
   });
 
   it("reads invalid JSON as nothing saved", () => {
@@ -121,23 +130,22 @@ describe("useBrowserMatches", () => {
   it("replaces every source on a Home save, keeping only a set-up pack's last source", () => {
     const matches = useBrowserMatches("org");
     matches.saveFull(result([source("kubernetes", "kubernetes"), NGINX]), ["hosts"]);
-    matches.saveBuiltIn([HOSTS], ["kubernetes"], { packId: "kubernetes", label: "Kubernetes" });
+    matches.saveBuiltIn([HOSTS], ["kubernetes"], [{ packId: "kubernetes", label: "Kubernetes" }]);
     expect(matches.copy.value?.sources.map(({ id }) => id)).toEqual(["hosts", "kubernetes"]);
-    expect(matches.visible.value.map(({ id }) => id)).toEqual(["hosts"]);
     expect(matches.copy.value?.installedPackIds).toEqual(["kubernetes"]);
-    expect(matches.copy.value?.interrupted?.packId).toBe("kubernetes");
+    expect(stoppedIds()).toEqual(["kubernetes"]);
   });
 
   it("stamps Home's check as the latest check time", () => {
     const now = vi.spyOn(Date, "now").mockReturnValue(1000);
     const matches = useBrowserMatches("org");
-    matches.saveBuiltIn([HOSTS], [], null);
+    matches.saveBuiltIn([HOSTS], [], []);
     expect(matches.copy.value?.checkedAt).toBe(1000);
     now.mockReturnValue(2000);
     matches.saveFull(result([NGINX]), ["hosts"]);
     expect(matches.copy.value?.checkedAt).toBe(2000);
     now.mockReturnValue(3000);
-    matches.saveBuiltIn([HOSTS], ["kubernetes"], null);
+    matches.saveBuiltIn([HOSTS], ["kubernetes"], []);
     expect(matches.copy.value?.checkedAt).toBe(3000);
     expect(JSON.parse(window.localStorage.getItem(matchesKey("org", ME))!).checkedAt).toBe(3000);
   });
@@ -149,7 +157,7 @@ describe("useBrowserMatches", () => {
         checkedAt: 1,
         sources: [NGINX, { ...DOCKER, streams: undefined }, { ...HOSTS, streams: "x" }],
         installedPackIds: ["hosts"],
-        interrupted: null,
+        interrupted: [],
       }),
     );
     expect(useBrowserMatches("org").copy.value?.sources).toEqual([NGINX]);
@@ -158,7 +166,7 @@ describe("useBrowserMatches", () => {
   it("keeps only built-in packs, so the header lists what Home offers", () => {
     const matches = useBrowserMatches("org");
     matches.saveFull(result([HOSTS, LIBRARY]), []);
-    expect(matches.visible.value).toEqual([HOSTS]);
+    expect(matches.copy.value?.sources).toEqual([HOSTS]);
     expect(JSON.parse(window.localStorage.getItem(matchesKey("org", ME))!).sources).toEqual([
       HOSTS,
     ]);
@@ -169,40 +177,17 @@ describe("useBrowserMatches", () => {
       matchesKey("org", ME),
       JSON.stringify({ checkedAt: 1, sources: [LIBRARY, HOSTS], installedPackIds: [] }),
     );
-    expect(useBrowserMatches("org").visible.value).toEqual([HOSTS]);
+    expect(useBrowserMatches("org").copy.value?.sources).toEqual([HOSTS]);
   });
 
-  it("records a built-in pack as installed and hides its source, keeping it for an undo", () => {
+  it("records a built-in pack as installed, keeping its source for the popup", () => {
     const matches = useBrowserMatches("org");
     matches.saveFull(result([HOSTS, NGINX]), ["kubernetes"]);
     matches.markInstalled("hosts", "hosts");
-    expect(matches.visible.value).toEqual([NGINX]);
+    expect(matches.copy.value?.sources).toEqual([HOSTS, NGINX]);
     expect(matches.copy.value?.installedPackIds).toEqual(["kubernetes", "hosts"]);
     matches.markInstalled("library-k8s");
     expect(matches.copy.value?.installedPackIds).toEqual(["kubernetes", "hosts"]);
-  });
-
-  it("lists a pack again after its setup is undone, and keeps that across a reload", () => {
-    const matches = useBrowserMatches("org");
-    matches.saveFull(result([HOSTS, NGINX]), []);
-    matches.markInstalled("hosts", "hosts");
-    expect(matches.count.value).toBe(1);
-    matches.markRemoved("hosts");
-    expect(matches.count.value).toBe(2);
-    expect(matches.copy.value?.installedPackIds).toEqual([]);
-    resetBrowserMatches();
-    expect(useBrowserMatches("org").visible.value).toEqual([HOSTS, NGINX]);
-  });
-
-  it("lists a pack again after an undo that follows a check run while it was set up", () => {
-    const matches = useBrowserMatches("org");
-    matches.saveFull(result([HOSTS, NGINX]), []);
-    matches.markInstalled("hosts", "hosts");
-    matches.saveFull(result([NGINX]), ["hosts"]);
-    expect(matches.count.value).toBe(1);
-    matches.markRemoved("hosts");
-    expect(matches.visible.value).toEqual([NGINX, HOSTS]);
-    expect(matches.count.value).toBe(2);
   });
 
   it("drops a set-up pack's old source once a check finds it no longer set up", () => {
@@ -213,11 +198,32 @@ describe("useBrowserMatches", () => {
     expect(matches.copy.value?.sources).toEqual([NGINX]);
   });
 
-  it("clears an interrupted setup of the pack that was undone", () => {
+  it.each([
+    ["a value that is not a list", { packId: "hosts", label: "Hosts" }, []],
+    ["no value", null, []],
+    ["a copy with no such field", undefined, []],
+    ["every entry of a list", [{ packId: "hosts" }, { packId: "docker" }], ["hosts", "docker"]],
+    ["only entries that name a pack", [null, "x", { packId: 1 }, { packId: "docker" }], ["docker"]],
+  ])("reads the unfinished setups from %s", (_what, interrupted, ids) => {
+    window.localStorage.setItem(
+      matchesKey("org", ME),
+      JSON.stringify({ checkedAt: 1, sources: [], installedPackIds: [], interrupted }),
+    );
+    expect(stoppedIds()).toEqual(ids);
+  });
+
+  it("forgets a pack's unfinished setup once it is set up, and keeps the others'", () => {
     const matches = useBrowserMatches("org");
-    matches.saveFull(result([HOSTS]), [], { packId: "hosts", label: "Hosts" });
-    matches.markRemoved("hosts");
-    expect(matches.copy.value?.interrupted).toBeNull();
+    matches.saveBuiltIn(
+      [HOSTS],
+      [],
+      [
+        { packId: "hosts", label: "Hosts" },
+        { packId: "docker", label: "Docker" },
+      ],
+    );
+    matches.markInstalled("hosts", "hosts");
+    expect(stoppedIds()).toEqual(["docker"]);
   });
 
   it("shows once a check has run, even with every match set up or none found", () => {
@@ -226,27 +232,29 @@ describe("useBrowserMatches", () => {
     matches.saveFull(result([NGINX]), []);
     expect(matches.show.value).toBe(true);
     matches.saveFull(result([HOSTS]), ["hosts"]);
-    expect(matches.count.value).toBe(0);
     expect(matches.show.value).toBe(true);
     matches.saveFull(result([]), []);
     expect(matches.show.value).toBe(true);
-  });
-
-  it("leaves out built-in packs that are already installed", () => {
-    const matches = useBrowserMatches("org");
-    matches.saveFull(result([HOSTS, NGINX]), ["hosts"]);
-    expect(matches.visible.value).toEqual([NGINX]);
-    expect(matches.count.value).toBe(1);
-    matches.saveFull(result([HOSTS]), ["hosts"]);
-    expect(matches.count.value).toBe(0);
   });
 
   it("keeps every match listed until it is set up, with no way to hide one (D2)", () => {
     const matches = useBrowserMatches("org");
     window.localStorage.setItem("o2.starterPacks.notNow.org", JSON.stringify(["postgresql"]));
     matches.saveFull(result([NGINX, DOCKER]), []);
-    expect(matches.visible.value).toEqual([NGINX, DOCKER]);
+    expect(matches.copy.value?.sources).toEqual([NGINX, DOCKER]);
     expect("notNowOne" in matches).toBe(false);
+  });
+
+  it("sees a saved copy with no catalog loaded, without reading it as a copy of no packs", () => {
+    useBrowserMatches("org").saveFull(result([HOSTS]), []);
+    resetBrowserMatches();
+    setPackCatalog({ catalog_version: "", packs: [] });
+    expect(hasSavedMatches("org")).toBe(true);
+    expect(hasSavedMatches("other")).toBe(false);
+    loadCatalogFixture();
+    expect(useBrowserMatches("org").copy.value?.sources).toEqual([HOSTS]);
+    store.commit("setUserInfo", {});
+    expect(hasSavedMatches("org")).toBe(false);
   });
 
   it("forgets an org's copy in memory and in storage, leaving other orgs alone", () => {

@@ -15,7 +15,11 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const fake = vi.hoisted(() => ({ get: vi.fn(async () => ({ data: [] })) }));
+const fake = vi.hoisted(() => ({
+  get: vi.fn(async () => ({ data: [] })),
+  post: vi.fn(async () => ({ data: "OK" })),
+  delete: vi.fn(async () => ({ data: "OK" })),
+}));
 vi.mock("./http", () => ({ default: () => fake }));
 
 import kv from "./kv";
@@ -35,6 +39,22 @@ describe("kv", () => {
     await kv.get("org", "a/b");
     expect(fake.get).toHaveBeenCalledWith("/api/org/kv/a%2Fb", {
       responseType: "text",
+      silentForbidden: true,
+    });
+  });
+
+  it("deletes a value without raising the page's access notice on a 403", async () => {
+    await kv.delete("org", "a/b");
+    expect(fake.delete).toHaveBeenCalledWith("/api/org/kv/a%2Fb", { silentForbidden: true });
+  });
+
+  it("raises the access notice for a refused write, unless the caller handles the refusal", async () => {
+    const headers = { "Content-Type": "text/plain" };
+    await kv.set("org", "a", "1");
+    expect(fake.post).toHaveBeenLastCalledWith("/api/org/kv/a", "1", { headers });
+    await kv.set("org", "a", "1", { silentForbidden: true });
+    expect(fake.post).toHaveBeenLastCalledWith("/api/org/kv/a", "1", {
+      headers,
       silentForbidden: true,
     });
   });

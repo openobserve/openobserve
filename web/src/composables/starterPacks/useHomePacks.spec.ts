@@ -28,24 +28,36 @@ loadCatalogFixture();
 
 const fake = vi.hoisted(() => ({
   flow: null as any,
+  flows: {} as Record<string, any>,
+  saveBuiltIn: vi.fn(),
+  hasUserData: null as any,
+  isFetching: null as any,
+  noResources: null as any,
   matcher: null as any,
 }));
-vi.mock("./useStarterPackFlow", () => ({ useStarterPackFlow: () => fake.flow }));
+vi.mock("./useStarterPackFlow", () => ({
+  useStarterPackFlow: (_org: string, pack: { id: string }) => fake.flows[pack.id] ?? fake.flow,
+}));
 vi.mock("./useStarterPackMatcher", () => ({ useStarterPackMatcher: () => fake.matcher }));
 vi.mock("@/composables/useOrgHasUserData", () => ({
-  useOrgHasUserData: () => ({ hasUserData: ref(true) }),
+  useOrgHasUserData: () => ({ hasUserData: fake.hasUserData, isFetching: fake.isFetching }),
 }));
 vi.mock("@/composables/useOrgResources", () => ({
-  useOrgHasNoResources: () => ({ noResources: ref(true) }),
+  useOrgHasNoResources: () => ({ noResources: fake.noResources }),
 }));
-vi.mock("./useBrowserMatches", () => ({ useBrowserMatches: () => ({ saveBuiltIn: vi.fn() }) }));
+vi.mock("./useBrowserMatches", () => ({
+  useBrowserMatches: () => ({ saveBuiltIn: fake.saveBuiltIn }),
+}));
 
-const home = () => {
+const home = (ids = ["kubernetes"]) => {
   let api!: HomePacks;
   mount(
     defineComponent({
       setup() {
-        api = useHomePacks("org", [packById("kubernetes")!]);
+        api = useHomePacks(
+          "org",
+          ids.map((id) => packById(id)!),
+        );
         return () => null;
       },
     }),
@@ -57,6 +69,11 @@ describe("useHomePacks", () => {
   beforeEach(() => {
     resetStarterPackPopups();
     fake.flow = fakeFlow();
+    fake.flows = {};
+    fake.hasUserData = ref<boolean | undefined>(true);
+    fake.isFetching = ref(false);
+    fake.noResources = ref(true);
+    fake.saveBuiltIn.mockClear();
     fake.matcher = {
       state: ref("matched"),
       forbidden: ref(false),
@@ -84,5 +101,66 @@ describe("useHomePacks", () => {
   it("still says error when a read fails for another reason", () => {
     fake.matcher.state.value = "error";
     expect(home().items[0].view.value).toBe("error");
+  });
+
+  it("saves every unfinished setup, one running elsewhere included", () => {
+    fake.flows.kubernetes = fakeFlow({ interrupted: ref(true) });
+    fake.flows.hosts = fakeFlow({ runningBy: ref("o@x") });
+    home(["kubernetes", "hosts", "docker"]);
+    const [, installed, interrupted] = fake.saveBuiltIn.mock.lastCall!;
+    expect(installed).toEqual([]);
+    expect(interrupted.map(({ packId }: { packId: string }) => packId)).toEqual([
+      "kubernetes",
+      "hosts",
+    ]);
+  });
+
+  describe("a member refused every pack read", () => {
+    beforeEach(() => {
+      fake.flow.forbidden.value = true;
+      fake.noResources.value = false;
+    });
+
+    it("is told to ask an admin while the org's data cannot be read", () => {
+      fake.hasUserData.value = undefined;
+      const packs = home();
+      expect(packs.askAdmin.value).toBe(true);
+      expect(packs.noAccess.value).toBe(true);
+      expect(packs.labelShown.value).toBe(true);
+      expect(packs.offerShown.value).toBe(false);
+    });
+
+    it.each([
+      ["have data and resources", true],
+      ["be empty", false],
+    ])("is told nothing in an org known to %s", (_what, known) => {
+      fake.hasUserData.value = known;
+      const packs = home();
+      expect(packs.askAdmin.value).toBe(false);
+      expect(packs.labelShown.value).toBe(false);
+    });
+
+    it("keeps the fits-your-data case apart", () => {
+      fake.noResources.value = true;
+      const packs = home();
+      expect(packs.askAdmin.value).toBe(true);
+      expect(packs.noAccess.value).toBe(false);
+    });
+
+    it("waits for the data check to finish", () => {
+      fake.hasUserData.value = undefined;
+      fake.isFetching.value = true;
+      const packs = home();
+      expect(packs.askAdmin.value).toBe(false);
+      fake.isFetching.value = false;
+      expect(packs.askAdmin.value).toBe(true);
+    });
+
+    it("is told nothing while any pack is readable", () => {
+      fake.hasUserData.value = undefined;
+      fake.flows.hosts = fakeFlow();
+      const packs = home(["kubernetes", "hosts"]);
+      expect(packs.askAdmin.value).toBe(false);
+    });
   });
 });

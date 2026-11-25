@@ -700,6 +700,7 @@
       "cipherKeys": "Cipher keys",
       "announcementBanners": "Announcement banners",
       "regexPatterns": "Regex patterns",
+      "keyValues": "Key values",
       "evalJobs": "Online eval jobs",
       "billingGroup": "Billing group",
       "syntheticChecks": "Synthetic checks",
@@ -757,6 +758,7 @@
       "cipherKeys": "cipher keys",
       "announcementBanners": "announcement banners",
       "regexPatterns": "regex patterns",
+      "keyValues": "key values",
       "unnamed": "this resource",
       "onCall": "On-Call",
       "incidentIntegrations": "incident integrations",
@@ -15210,6 +15212,7 @@
       "busySomeone": "Someone else is setting up {title} right now.",
       "busyYou": "You are setting up {title} in another tab.",
       "askAdminLine": "Starter packs fit your data. Ask an admin to add them.",
+      "noAccessLine": "You don't have access to starter packs in this org. Ask an admin.",
       "heroTitle": "Data is live. Set up ready-made dashboards and alerts in about a minute",
       "heroLead": "from {count} pack that fits your data | from {count} packs that fit your data",
       "readyToAdd": "Ready to add",
@@ -15316,7 +15319,7 @@
       "allExist": "You already have all {count} items in this pack. Existing alerts keep their settings.",
       "continue": "Continue",
       "setUpCount": "Set up {count} item | Set up {count} items",
-      "undoNote": "You can undo this for 24 hours",
+      "ordinaryNote": "Adds ordinary dashboards, alerts and views, listed on the pack's page. Edit or delete them on their own pages.",
       "alertsMetaLine": "{count} · {severity}"
     },
     "progress": {
@@ -15336,23 +15339,6 @@
       "alertsOnTo": "Creating · on, sending to {destination}",
       "emailMe": "Email me ({email})",
       "creatingOn": "Creating · on"
-    },
-    "landing": {
-      "undo": "Undo setup",
-      "remove": "Remove pack",
-      "available": "available for {hours} h",
-      "availableSoon": "available for under 1 h"
-    },
-    "undo": {
-      "title": "Undo setup?",
-      "removeTitle": "Remove pack?",
-      "left": "{hours} h left to undo",
-      "leftSoon": "Under 1 h left to undo",
-      "allOff": "All alerts are off, so nothing stops and no alert loses cover.",
-      "loseCover": "{count} live alert loses cover | {count} live alerts lose cover",
-      "removes": "Removes {count} item | Removes {count} items",
-      "failed": "Couldn't remove everything. Try again.",
-      "kept": "Kept {count} item that was changed or is still in use. Delete it on its own page. | Kept {count} items that were changed or are still in use. Delete them on their own pages."
     },
     "severity": {
       "critical": "Critical",
@@ -15464,7 +15450,6 @@
       "sevWarning": "{count} warning",
       "sevInfo": "{count} info",
       "chooseNext": "Choose which items to create on the next step",
-      "undoWindow": "Undo any setup for 24 hours",
       "reviewSetUp": "Review Pack",
       "viewPack": "View Pack",
       "checkAgain": "Check Again",

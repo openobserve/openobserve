@@ -53,7 +53,7 @@ vi.mock("@/composables/starterPacks/useStarterPackMatcher", () => ({
     fake.matchers[pack.id],
 }));
 vi.mock("@/composables/useOrgHasUserData", () => ({
-  useOrgHasUserData: () => ({ hasUserData: fake.hasUserData }),
+  useOrgHasUserData: () => ({ hasUserData: fake.hasUserData, isFetching: ref(false) }),
 }));
 vi.mock("@/composables/useOrgResources", () => ({
   useOrgHasNoResources: () => ({ noResources: fake.noResources }),
@@ -251,7 +251,7 @@ describe("StarterPackHomeSection", () => {
     const kinds = sources[0].items.map((item: { kind: string }) => item.kind);
     expect(kinds).toEqual(expect.arrayContaining(["alert", "savedView"]));
     expect(installed).toEqual([]);
-    expect(interrupted).toBeNull();
+    expect(interrupted).toEqual([]);
     wrapper.unmount();
   });
 
@@ -265,7 +265,7 @@ describe("StarterPackHomeSection", () => {
     const [sources, installed, interrupted] = fake.browser.saveBuiltIn.mock.calls.at(-1)!;
     expect(sources).toEqual([]);
     expect(installed).toEqual(["kubernetes"]);
-    expect(interrupted).toEqual({ packId: "hosts", label: "Hosts", done: 1, total: 3 });
+    expect(interrupted).toEqual([{ packId: "hosts", label: "Hosts", done: 1, total: 3 }]);
   });
 
   it("lists connected sources: two cluster names then +N clusters", async () => {
@@ -554,6 +554,18 @@ describe("StarterPackHomeSection", () => {
       "Starter packs fit your data. Ask an admin to add them.",
     );
     expect(homeOf(wrapper).offerShown.value).toBe(false);
+  });
+
+  it("says only that access is missing to a member refused every read of the org", async () => {
+    fake.hasUserData = ref(undefined);
+    fake.noResources = ref(false);
+    fake.flows.kubernetes.forbidden.value = true;
+    const wrapper = await render();
+    expect(has(wrapper, "home-pack-label")).toBe(true);
+    expect(wrapper.get('[data-test="home-pack-ask-admin"]').text()).toContain(
+      "You don't have access to starter packs in this org. Ask an admin.",
+    );
+    expect(has(wrapper, "home-pack-offer")).toBe(false);
   });
 
   it("puts the label inside the hero over the skeleton, and keeps it out of a banner-only view", async () => {

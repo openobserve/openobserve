@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { queryClient } from "@/composables/query/queryClient";
 import { organizationKeys } from "./organizations.querykeys";
-import { refreshOrgSummarySoon } from "./orgSummaryRefresh";
+import { createdOrgs, refreshOrgSummarySoon } from "./orgSummaryRefresh";
 
 describe("refreshOrgSummarySoon", () => {
   let invalidate: ReturnType<typeof vi.spyOn>;
@@ -50,6 +50,14 @@ describe("refreshOrgSummarySoon", () => {
       queryKey: organizationKeys.summary("burst"),
       exact: true,
     });
+  });
+
+  it("remembers the org once its summary is marked stale", () => {
+    refreshOrgSummarySoon("made");
+    expect(createdOrgs.has("made")).toBe(false);
+    vi.advanceTimersByTime(1_000);
+    expect(createdOrgs.has("made")).toBe(true);
+    expect(createdOrgs.has("other")).toBe(false);
   });
 
   it("keeps orgs apart", () => {

@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent } from "vue";
 import { createStore } from "vuex";
 
+import appStore from "@/stores";
+
 import type { PackInstallRecord, StarterPack } from "./types";
-import { StarterPackBusyError, StarterPackPermissionError, StarterPackStaleError } from "./types";
+import { StarterPackBusyError, StarterPackStaleError } from "./types";
 import { RUN_STALE_US } from "./useInstallRecords";
-import { UNDO_WINDOW_US, useStarterPackFlow } from "./useStarterPackFlow";
+import { useStarterPackFlow } from "./useStarterPackFlow";
 
 const fake = vi.hoisted(() => ({
   installs: [] as PackInstallRecord[],
@@ -14,30 +16,18 @@ const fake = vi.hoisted(() => ({
   onList: null as null | (() => void),
   installPack: vi.fn(),
   previewPack: vi.fn(),
-  undoPack: vi.fn(),
-  removePack: vi.fn(),
   refreshResources: vi.fn(),
-  markRemoved: vi.fn(),
   push: vi.fn(async () => undefined),
   alerts: [] as Array<{ enabled: boolean }>,
   holdAlerts: null as Promise<void> | null,
   holdDashboards: null as Promise<void> | null,
   deletedDashboards: [] as string[],
-  countLiveAlerts: vi.fn(
-    async (_pack: unknown, shown: PackInstallRecord, enabled: ReadonlySet<string>) =>
-      shown.items.filter(
-        ({ kind, status, id }) => kind === "alert" && status === "created" && enabled.has(id ?? ""),
-      ).length,
-  ),
 }));
 
 vi.mock("./useStarterPacks", () => ({
   useStarterPacks: () => ({
     installPack: fake.installPack,
     previewPack: fake.previewPack,
-    undoPack: fake.undoPack,
-    removePack: fake.removePack,
-    countLiveAlerts: fake.countLiveAlerts,
     listInstalls: async () => {
       if (fake.listError) throw fake.listError;
       fake.onList?.();
@@ -62,9 +52,6 @@ vi.mock("@/composables/query/readQuery", () => ({
   },
 }));
 vi.mock("@/composables/useOrgResources", () => ({ refreshOrgResources: fake.refreshResources }));
-vi.mock("./useBrowserMatches", () => ({
-  useBrowserMatches: () => ({ markRemoved: fake.markRemoved }),
-}));
 
 const PACK = {
   id: "kubernetes",
@@ -171,73 +158,6 @@ describe("useStarterPackFlow", () => {
     fake.previewPack.mockResolvedValue({ items: [], names: {}, notIncluded: [] });
   });
 
-  it("counts as live only the alerts the record says an Undo would delete", async () => {
-    fake.installs = [record()];
-    fake.alerts = [
-      { alert_id: "al1", enabled: true },
-      { alert_id: "pre", enabled: true },
-    ] as any;
-    fake.countLiveAlerts.mockResolvedValueOnce(0);
-    const flow = setup();
-    await flow.load();
-    expect(fake.countLiveAlerts).not.toHaveBeenCalled();
-    expect(flow.alertsOn.value).toBeNull();
-    await flow.countAlertsOn();
-    expect(fake.countLiveAlerts).toHaveBeenCalledWith(
-      PACK,
-      fake.installs[0],
-      new Set(["al1", "pre"]),
-    );
-    expect(flow.alertsOn.value).toBe(0);
-    expect(flow.enabledAlertIds.value.has("pre")).toBe(true);
-  });
-
-  it("shows the count of the latest confirmation when an older count lands last", async () => {
-    fake.installs = [record(), record({ installId: "i2" })];
-    fake.alerts = [{ alert_id: "al1", enabled: true }] as any;
-    const flow = setup();
-    await flow.load();
-    let finishUndo!: (count: number) => void;
-    fake.countLiveAlerts.mockImplementationOnce(
-      () => new Promise<number>((done) => (finishUndo = done)),
-    );
-    const undoCount = flow.countAlertsOn("undo");
-    await flow.countAlertsOn("remove");
-    expect(flow.alertsOn.value).toBe(2);
-    finishUndo(1);
-    await undoCount;
-    expect(flow.alertsOn.value).toBe(2);
-  });
-
-  it("counts the enabled alerts when the confirmation opens before the load read them", async () => {
-    fake.installs = [record()];
-    fake.alerts = [{ alert_id: "al1", enabled: true }] as any;
-    let release!: () => void;
-    fake.holdAlerts = new Promise<void>((done) => (release = done));
-    const flow = setup();
-    const loading = flow.load();
-    await flushPromises();
-    expect(flow.record.value).not.toBeNull();
-    fake.holdAlerts = null;
-    await flow.countAlertsOn();
-    expect(flow.alertsOn.value).toBe(1);
-    release();
-    await loading;
-  });
-
-  it("counts Remove's live alerts across every install of the pack", async () => {
-    const second = record({ installId: "i2" });
-    fake.installs = [record(), second];
-    fake.alerts = [{ alert_id: "al1", enabled: true }] as any;
-    const flow = setup();
-    await flow.load();
-    await flow.countAlertsOn("undo");
-    expect(flow.alertsOn.value).toBe(1);
-    await flow.countAlertsOn("remove");
-    expect(flow.alertsOn.value).toBe(2);
-    expect(fake.countLiveAlerts).toHaveBeenLastCalledWith(PACK, second, new Set(["al1"]));
-  });
-
   it("hides a dashboard deleted by hand from the pack's items and its Open link", async () => {
     fake.installs = [record()];
     fake.deletedDashboards = ["d1"];
@@ -269,14 +189,6 @@ describe("useStarterPackFlow", () => {
     await flow.load();
     expect(flow.items.value.map(({ itemId }) => itemId)).toEqual(["overview", "a1"]);
     expect(flow.dashboardItem.value?.id).toBe("d1");
-  });
-
-  it("calls an Undo with no setup to undo a failure", async () => {
-    const flow = setup();
-    await flow.load();
-    expect(await flow.undo()).toBe(false);
-    expect(flow.removalFailed.value).toBe(true);
-    expect(fake.undoPack).not.toHaveBeenCalled();
   });
 
   it("has no counts before the preview, then counts what the popup would create", async () => {
@@ -411,8 +323,6 @@ describe("useStarterPackFlow", () => {
     const flow = setup();
     await flow.install(undefined, { enableAlerts: true });
     expect(fake.installPack.mock.calls[0][1].enableAlerts).toBe(true);
-    await flow.countAlertsOn();
-    expect(flow.alertsOn.value).toBe(1);
     expect(flow.enabledAlertIds.value.has("al1")).toBe(true);
   });
 
@@ -497,8 +407,7 @@ describe("useStarterPackFlow", () => {
     const flow = setup();
     await flow.install();
     expect(fake.installPack.mock.calls[0][1].enableAlerts).toBe(false);
-    await flow.countAlertsOn();
-    expect(flow.alertsOn.value).toBe(0);
+    expect(flow.enabledAlertIds.value.size).toBe(0);
   });
 
   it("counts only the alerts the install created", async () => {
@@ -570,7 +479,14 @@ describe("useStarterPackFlow", () => {
     expect(flow.nameOf("lib/cpu@edge")).toBe("High CPU (edge)");
   });
 
-  const refused = Object.assign(new Error("http"), { response: { status: 403 } });
+  const refused = Object.assign(new Error("http"), {
+    response: { status: 403 },
+    config: { method: "post" },
+  });
+  const refusedRead = Object.assign(new Error("http"), {
+    response: { status: 403 },
+    config: { method: "get" },
+  });
 
   it("calls a refused preview forbidden, not a load error to retry", async () => {
     fake.previewPack.mockRejectedValueOnce(refused);
@@ -594,16 +510,169 @@ describe("useStarterPackFlow", () => {
     expect(flow.loadFailed.value).toBe(true);
   });
 
-  it("names a refused setup separately from a failed one", async () => {
-    fake.installPack.mockRejectedValueOnce(new StarterPackPermissionError());
+  it("goes back to the review after a refused setup, and says only a failed one", async () => {
+    fake.installPack.mockRejectedValueOnce(refused);
     const flow = setup();
     expect(await flow.install()).toBe(false);
-    expect(flow.forbidden.value).toBe(true);
+    expect(flow.forbidden.value).toBe(false);
+    expect(flow.installFailed.value).toBe(false);
+    expect(flow.record.value).toBeNull();
+    expect(flow.running.value).toBe(false);
+    expect(flow.interrupted.value).toBe(false);
     fake.installPack.mockRejectedValueOnce(new Error("down"));
     await flow.install();
-    expect(flow.forbidden.value).toBe(false);
     expect(flow.installFailed.value).toBe(true);
-    expect(flow.running.value).toBe(false);
+  });
+
+  it("locks the setup when a read it needs is refused, though the records still load", async () => {
+    fake.installPack.mockRejectedValueOnce(refusedRead);
+    const flow = setup();
+    await flow.install();
+    expect(flow.forbidden.value).toBe(true);
+    expect(flow.installFailed.value).toBe(false);
+  });
+
+  it("locks the setup when its planning read is refused after the claim", async () => {
+    fake.installPack.mockImplementationOnce(async (_pack, { onProgress }) => {
+      onProgress(record({ status: "installing", items: [], updatedAt: Date.now() * 1000 }));
+      throw refusedRead;
+    });
+    const flow = setup();
+    await flow.install();
+    expect(flow.forbidden.value).toBe(true);
+    expect(flow.record.value).toBeNull();
+  });
+
+  describe("a run whose claim is held but not planned", () => {
+    const pending = { kind: "alert", itemId: "a1", status: "pending" } as const;
+    const unplanned = () =>
+      record({ status: "installing", items: [], updatedAt: Date.now() * 1000 });
+
+    it("is setting up at once, with the counts of the plan it started from", async () => {
+      fake.previewPack.mockResolvedValue({ items: [pending], names: {}, notIncluded: [] });
+      let finish!: () => void;
+      fake.installPack.mockImplementationOnce(async (_pack, { onProgress }) => {
+        onProgress(unplanned());
+        await new Promise<void>((done) => (finish = done));
+        return record();
+      });
+      const flow = setup();
+      const run = flow.install();
+      await flushPromises();
+      expect([flow.running.value, flow.claimed.value]).toEqual([true, true]);
+      expect([flow.made.value.length, flow.toCreate.value.length]).toEqual([0, 1]);
+      finish();
+      await run;
+    });
+
+    it("goes back to the review when its plan fails, for its claim was withdrawn", async () => {
+      fake.installPack.mockImplementationOnce(async (_pack, { onProgress }) => {
+        onProgress(unplanned());
+        throw new Error("down");
+      });
+      const flow = setup();
+      expect(await flow.install()).toBe(false);
+      expect(flow.record.value).toBeNull();
+      expect(flow.interrupted.value).toBe(false);
+      expect(flow.installFailed.value).toBe(true);
+    });
+
+    it("stays a stopped setup that can be continued when a resume's plan fails", async () => {
+      fake.installs = [record({ status: "incomplete", runId: "r1", items: [pending] })];
+      const flow = setup();
+      await flow.load();
+      fake.installPack.mockImplementationOnce(async (_pack, { onProgress }) => {
+        onProgress(unplanned());
+        fake.installs = [record({ status: "incomplete", runId: "r2", items: [pending] })];
+        throw new Error("down");
+      });
+      expect(await flow.retry()).toBe(false);
+      expect(flow.interrupted.value).toBe(true);
+      expect(flow.installFailed.value).toBe(true);
+      fake.installPack.mockResolvedValueOnce(record());
+      expect(await flow.retry()).toBe(true);
+    });
+  });
+
+  it("never calls another user's running setup stopped after its own refused start", async () => {
+    const flow = setup();
+    fake.installs = [
+      record({ installedBy: "other@x", status: "installing", updatedAt: Date.now() * 1000 }),
+    ];
+    fake.installPack.mockRejectedValueOnce(refused);
+    await flow.install();
+    expect(flow.interrupted.value).toBe(false);
+    expect(flow.runningBy.value).toBe("other@x");
+  });
+
+  it("reads a setup refused partway as stopped, with no second message", async () => {
+    fake.installPack.mockImplementationOnce(async (_pack, { onProgress }) => {
+      onProgress(record({ status: "installing", updatedAt: Date.now() * 1000 }));
+      throw refused;
+    });
+    const flow = setup();
+    expect(await flow.install()).toBe(false);
+    expect(flow.interrupted.value).toBe(true);
+    expect(flow.installFailed.value).toBe(false);
+    expect(flow.forbidden.value).toBe(false);
+  });
+
+  it("holds its claim from the first progress, and keeps a stopped setup stopped until then", async () => {
+    fake.installs = [record({ status: "incomplete" })];
+    const flow = setup();
+    await flow.load();
+    expect(flow.claimed.value).toBe(false);
+    let claim!: () => void;
+    let finish!: () => void;
+    fake.installPack.mockImplementationOnce(async (_pack, { onProgress }) => {
+      await new Promise<void>((done) => (claim = done));
+      onProgress(record({ status: "installing" }));
+      await new Promise<void>((done) => (finish = done));
+      return record();
+    });
+    const run = flow.retry();
+    await flushPromises();
+    expect([flow.running.value, flow.claimed.value, flow.interrupted.value]).toEqual([
+      true,
+      false,
+      true,
+    ]);
+    claim();
+    await flushPromises();
+    expect([flow.running.value, flow.claimed.value, flow.interrupted.value]).toEqual([
+      true,
+      true,
+      false,
+    ]);
+    finish();
+    expect(await run).toBe(true);
+  });
+
+  it("keeps what a failed folder blocked as failed until a retry holds its claim", async () => {
+    fake.installs = [
+      record({
+        status: "incomplete",
+        items: [
+          { kind: "folder", itemId: "alerts", status: "failed" },
+          { kind: "alert", itemId: "a1", status: "pending" },
+        ],
+      }),
+    ];
+    const flow = setup();
+    await flow.load();
+    expect(flow.failed.value).toHaveLength(1);
+    let refuse!: () => void;
+    fake.installPack.mockImplementationOnce(async () => {
+      await new Promise<void>((done) => (refuse = done));
+      throw refused;
+    });
+    const run = flow.retry();
+    await flushPromises();
+    expect(flow.failed.value).toHaveLength(1);
+    refuse();
+    expect(await run).toBe(false);
+    expect(flow.interrupted.value).toBe(true);
+    expect(flow.failed.value).toHaveLength(1);
   });
 
   it("names who is already setting the pack up, and clears it on the next setup", async () => {
@@ -711,105 +780,6 @@ describe("useStarterPackFlow", () => {
     expect(flow.interruptedBy.value).toBeNull();
   });
 
-  it("offers Undo to the installer or an admin for 24 hours only", async () => {
-    fake.installs = [record({ installedBy: "other@x" })];
-    const other = setup();
-    await other.load();
-    expect(other.canUndo.value).toBe(false);
-    const admin = setup({ userInfo: { email: "me@x", role: "admin" } });
-    await admin.load();
-    expect(admin.canUndo.value).toBe(true);
-
-    fake.installs = [record({ installedAt: Date.now() * 1000 - UNDO_WINDOW_US - 1 })];
-    const late = setup();
-    await late.load();
-    expect(late.canUndo.value).toBe(false);
-    expect(late.canManage.value).toBe(true);
-  });
-
-  it("clears the install after Undo and keeps failures retryable", async () => {
-    fake.installs = [record()];
-    const flow = setup();
-    await flow.load();
-    fake.undoPack.mockResolvedValueOnce({
-      removed: [],
-      kept: [{ kind: "alert", itemId: "a1", reason: "delete_failed" }],
-    });
-    expect(await flow.undo()).toBe(false);
-    expect(flow.removalFailed.value).toBe(true);
-
-    fake.undoPack.mockImplementationOnce(async () => {
-      fake.installs = [];
-      return { removed: [{}], kept: [] };
-    });
-    expect(await flow.undo()).toBe(true);
-    expect(flow.record.value).toBeNull();
-  });
-
-  it("reads the plan again after an Undo that kept an edited item", async () => {
-    fake.installs = [record()];
-    fake.previewPack.mockResolvedValueOnce({
-      items: [
-        { kind: "dashboard", itemId: "overview", status: "existing", id: "d1" },
-        { kind: "alert", itemId: "a1", status: "existing", id: "al1" },
-      ],
-      names: {},
-      notIncluded: [],
-    });
-    const flow = setup();
-    await flow.load();
-    await flow.loadPreview();
-    const after = {
-      items: [
-        { kind: "dashboard", itemId: "overview", status: "existing", id: "d1" },
-        { kind: "alert", itemId: "a1", status: "pending" },
-      ],
-      names: {},
-      notIncluded: [],
-    };
-    fake.previewPack.mockResolvedValueOnce(after);
-    fake.undoPack.mockImplementationOnce(async () => {
-      fake.installs = [];
-      return {
-        removed: [{ kind: "alert", itemId: "a1" }],
-        kept: [{ kind: "dashboard", itemId: "overview", reason: "changed" }],
-      };
-    });
-    expect(await flow.undo()).toBe(true);
-    expect(flow.preview.value).toEqual(after);
-    expect(flow.previewState.value).toBe("ready");
-    expect(flow.alertCount.value).toBe(1);
-  });
-
-  it("gives the header chip the pack back only once Undo cleared the install", async () => {
-    fake.markRemoved.mockClear();
-    fake.installs = [record()];
-    const flow = setup();
-    await flow.load();
-    fake.undoPack.mockResolvedValueOnce({
-      removed: [],
-      kept: [{ kind: "alert", itemId: "a1", reason: "delete_failed" }],
-    });
-    await flow.undo();
-    expect(fake.markRemoved).not.toHaveBeenCalled();
-
-    fake.undoPack.mockImplementationOnce(async () => {
-      fake.installs = [];
-      return { removed: [{}], kept: [] };
-    });
-    await flow.undo();
-    expect(fake.markRemoved).toHaveBeenCalledWith("kubernetes");
-  });
-
-  it("asks for no plan after an Undo on a surface that never showed one", async () => {
-    fake.installs = [record()];
-    const flow = setup();
-    await flow.load();
-    fake.undoPack.mockResolvedValueOnce({ removed: [{}], kept: [] });
-    await flow.undo();
-    expect(fake.previewPack).not.toHaveBeenCalled();
-  });
-
   it("counts the items a failed folder left unmade as failed, so they can be retried", async () => {
     const stopped = record({
       status: "incomplete",
@@ -849,7 +819,7 @@ describe("useStarterPackFlow", () => {
     expect(flow.items.value.some(({ kind }) => kind === "folder")).toBe(false);
   });
 
-  it("refreshes the org's resources check after every install, undo and remove", async () => {
+  it("refreshes the org's resources check after every install", async () => {
     fake.installs = [record()];
     const flow = setup();
     fake.installPack.mockResolvedValueOnce(record());
@@ -858,14 +828,26 @@ describe("useStarterPackFlow", () => {
     fake.installPack.mockRejectedValueOnce(new Error("down"));
     await flow.install();
     expect(fake.refreshResources).toHaveBeenCalledTimes(2);
-    fake.undoPack.mockResolvedValueOnce({ removed: [{}], kept: [] });
-    await flow.undo();
-    expect(fake.refreshResources).toHaveBeenCalledTimes(3);
-    fake.removePack.mockResolvedValueOnce({ removed: [{}], kept: [] });
-    await flow.remove();
-    expect(fake.refreshResources).toHaveBeenCalledTimes(4);
     expect(fake.refreshResources.mock.calls.every(([org]) => org === "org")).toBe(true);
   });
+
+  it.each([
+    ["success", () => fake.installPack.mockResolvedValueOnce(record())],
+    ["failure", () => fake.installPack.mockRejectedValueOnce(new Error("down"))],
+  ])(
+    "drops the session's catalog and gate answer once a setup ends in %s",
+    async (_how, arrange) => {
+      window.sessionStorage.setItem("o2.starterPacks.catalog.org", "{}");
+      window.sessionStorage.setItem("o2.starterPacks.catalog.other", "{}");
+      appStore.commit("setUserInfo", { email: "me@x" });
+      window.sessionStorage.setItem("o2.starterPacks.gate.org.me@x", "open");
+      arrange();
+      await setup().install();
+      expect(Object.keys(window.sessionStorage)).toEqual(["o2.starterPacks.catalog.other"]);
+      window.sessionStorage.clear();
+      appStore.commit("setUserInfo", {});
+    },
+  );
 
   it("lands an unlicensed org on the dashboard it already has when nothing is left to create", async () => {
     fake.previewPack.mockResolvedValue({
@@ -888,25 +870,6 @@ describe("useStarterPackFlow", () => {
     const flow = setup({ zoConfig: { features: { kubernetes_monitoring: "locked" } } });
     await flow.land();
     expect(fake.push).not.toHaveBeenCalled();
-  });
-
-  it("leaves a record without an installer to admins", async () => {
-    fake.installs = [record({ installedBy: undefined })];
-    const flow = setup({ userInfo: {} });
-    await flow.load();
-    expect(flow.canManage.value).toBe(false);
-  });
-
-  it("removes through removePack after the window", async () => {
-    fake.installs = [record({ installedAt: 1 })];
-    fake.removePack.mockResolvedValueOnce({ removed: [], kept: [] });
-    const flow = setup();
-    await flow.load();
-    fake.installs = [];
-    expect(await flow.remove()).toBe(true);
-    expect(fake.removePack).toHaveBeenCalledWith(PACK);
-    await flushPromises();
-    expect(flow.installed.value).toBe(false);
   });
 });
 
@@ -933,29 +896,12 @@ describe("a setup that is running or stopped", () => {
     fake.previewPack.mockResolvedValue({ items: [], names: {}, notIncluded: [] });
   });
 
-  it("lets an org admin finish and undo another user's setup that stopped", async () => {
-    fake.installs = [theirs()];
-    const flow = setup({ userInfo: { email: "me@x", role: "admin" } });
-    await flow.load();
-    expect(flow.interrupted.value).toBe(true);
-    expect(flow.runningBy.value).toBeNull();
-    expect(flow.canManage.value).toBe(true);
-
-    fake.undoPack.mockImplementationOnce(async () => {
-      fake.installs = [];
-      return { removed: [{ kind: "alert", itemId: "a1" }], kept: [] };
-    });
-    expect(await flow.undo()).toBe(true);
-    expect(fake.undoPack).toHaveBeenCalledWith(PACK, "i1");
-    expect(flow.record.value).toBeNull();
-  });
-
-  it("lets a member who can set up finish it, but not undo it", async () => {
+  it("lets a member who can set up finish another user's stopped setup", async () => {
     fake.installs = [theirs()];
     const flow = setup();
     await flow.load();
     expect(flow.interrupted.value).toBe(true);
-    expect(flow.canManage.value).toBe(false);
+    expect(flow.runningBy.value).toBeNull();
 
     fake.installPack.mockResolvedValueOnce(theirs({ status: "complete" }));
     expect(await flow.retry()).toBe(true);
@@ -988,6 +934,18 @@ describe("a setup that is running or stopped", () => {
     expect(flow.interrupted.value).toBe(true);
   });
 
+  it("reads a run by the time of the load, not by the last clock tick", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const flow = setup();
+    // A background tab's clock stops ticking, so the next load is an hour on.
+    vi.setSystemTime(Date.now() + 3_600_000);
+    fake.installs = [theirs({ status: "installing", updatedAt: ago(5e6) })];
+    await flow.load();
+    vi.useRealTimers();
+    expect(flow.runningBy.value).toBe("other@x");
+    expect(flow.interrupted.value).toBe(false);
+  });
+
   it("turns a running setup into a stopped one once a re-read confirms it, without a reload", async () => {
     vi.useFakeTimers();
     fake.installs = [theirs({ status: "installing", updatedAt: ago(5e6) })];
@@ -996,10 +954,11 @@ describe("a setup that is running or stopped", () => {
     expect(flow.runningBy.value).toBe("other@x");
     vi.advanceTimersByTime(RUN_STALE_US / 1000);
     expect(flow.runningBy.value).toBe("other@x");
-    vi.useRealTimers();
-    await flushPromises();
+    // The re-read judges by the clock of its own moment, so the clock stays moved until it lands.
+    await vi.runOnlyPendingTimersAsync();
     expect(flow.runningBy.value).toBeNull();
     expect(flow.interrupted.value).toBe(true);
+    vi.useRealTimers();
   });
 
   it("re-reads the record when a Finish finds the setup still running", async () => {
@@ -1101,35 +1060,6 @@ describe("a setup that is running or stopped", () => {
       expect(await flow.retry()).toBe(false);
       expect(flow.busyBy.value).toBeNull();
       expect(flow.installFailed.value).toBe(false);
-    });
-
-    it("refreshes instead of undoing a setup another user has since finished", async () => {
-      fake.installs = [theirs()];
-      const flow = setup({ userInfo: { email: "me@x", role: "admin" } });
-      await flow.load();
-      fake.installs = [theirs({ status: "complete" })];
-      expect(await flow.undo()).toBe(false);
-      expect(fake.undoPack).not.toHaveBeenCalled();
-      expect(flow.installed.value).toBe(true);
-    });
-
-    it("refreshes instead of undoing a setup someone is running again", async () => {
-      fake.installs = [theirs()];
-      const flow = setup({ userInfo: { email: "me@x", role: "admin" } });
-      await flow.load();
-      fake.installs = [theirs({ status: "installing", updatedAt: ago(5e6), runId: "r2" })];
-      expect(await flow.undo()).toBe(false);
-      expect(fake.undoPack).not.toHaveBeenCalled();
-      expect(flow.runningBy.value).toBe("other@x");
-    });
-
-    it("refreshes when Undo is refused because the setup started running", async () => {
-      fake.installs = [theirs()];
-      const flow = setup({ userInfo: { email: "me@x", role: "admin" } });
-      await flow.load();
-      fake.undoPack.mockRejectedValueOnce(new StarterPackBusyError("other@x"));
-      expect(await flow.undo()).toBe(false);
-      expect(flow.removalFailed.value).toBe(false);
     });
   });
 });

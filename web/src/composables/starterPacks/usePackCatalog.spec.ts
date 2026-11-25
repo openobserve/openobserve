@@ -333,7 +333,10 @@ describe("usePackCatalog", () => {
     };
     const served = { catalog_version: "2026.11.18", source: "remote", packs: catalog.packs };
 
-    beforeEach(() => service.catalog.mockReset());
+    beforeEach(() => {
+      service.catalog.mockReset();
+      window.sessionStorage.clear();
+    });
 
     it("reads nothing before the load and every pack after it", async () => {
       service.catalog.mockResolvedValue({ data: served });
@@ -450,6 +453,109 @@ describe("usePackCatalog", () => {
       service.catalog.mockResolvedValue({ data: served });
       expect(await fresh.loadPackCatalog("default")).toBe(true);
       expect(fresh.packs()).toHaveLength(9);
+    });
+
+    describe("the session copy", () => {
+      const other = { ...served, catalog_version: "other", packs: catalog.packs.slice(0, 1) };
+
+      it("serves a reload of the page with no second request", async () => {
+        service.catalog.mockResolvedValue({ data: served });
+        await (await freshCatalog()).loadPackCatalog("default");
+        const reloaded = await freshCatalog();
+        expect(await reloaded.loadPackCatalog("default")).toBe(true);
+        expect(service.catalog).toHaveBeenCalledTimes(1);
+        expect(reloaded.packCatalogState.value).toBe("ready");
+        expect(reloaded.packs()).toHaveLength(9);
+        expect(reloaded.catalogVersion()).toBe("2026.11.18");
+      });
+
+      it("serves a switch to another org and back with no third request", async () => {
+        service.catalog.mockResolvedValueOnce({ data: served });
+        service.catalog.mockResolvedValueOnce({ data: other });
+        const fresh = await freshCatalog();
+        await fresh.loadPackCatalog("a");
+        await fresh.loadPackCatalog("b");
+        expect(fresh.catalogVersion()).toBe("other");
+        await fresh.loadPackCatalog("a");
+        expect(fresh.catalogVersion()).toBe("2026.11.18");
+        expect(service.catalog).toHaveBeenCalledTimes(2);
+      });
+
+      it("keeps its org's catalog when another org's answer lands after it", async () => {
+        service.catalog.mockResolvedValueOnce({ data: served });
+        const fresh = await freshCatalog();
+        await fresh.loadPackCatalog("a");
+        let answer: (value: unknown) => void = () => {};
+        service.catalog.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+        const late = fresh.loadPackCatalog("b");
+        await fresh.loadPackCatalog("a");
+        answer({ data: other });
+        expect(await late).toBe(false);
+        expect(fresh.catalogVersion()).toBe("2026.11.18");
+        expect(fresh.packCatalogState.value).toBe("ready");
+      });
+
+      it.each([
+        ["is not JSON", "{nope"],
+        ["is no catalog", JSON.stringify({ packs: "x" })],
+        ["builds no pack", JSON.stringify({ catalog_version: "x", packs: [{ id: "broken" }] })],
+      ])("is ignored when it %s", async (_what, value) => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        service.catalog.mockResolvedValue({ data: served });
+        await (await freshCatalog()).loadPackCatalog("default");
+        for (const key of Object.keys(window.sessionStorage)) {
+          expect(key.startsWith("o2.starterPacks.")).toBe(true);
+          window.sessionStorage.setItem(key, value);
+        }
+        const reloaded = await freshCatalog();
+        expect(await reloaded.loadPackCatalog("default")).toBe(true);
+        expect(service.catalog).toHaveBeenCalledTimes(2);
+        expect(reloaded.packs()).toHaveLength(9);
+        warn.mockRestore();
+      });
+
+      it("is not kept for a refused or unusable answer", async () => {
+        service.catalog.mockRejectedValueOnce({ response: { status: 403 } });
+        service.catalog.mockResolvedValueOnce({ data: { catalog_version: "v1" } });
+        const fresh = await freshCatalog();
+        await fresh.loadPackCatalog("default");
+        await fresh.loadPackCatalog("default");
+        expect(window.sessionStorage).toHaveLength(0);
+      });
+
+      it("leaves the load working when storage throws", async () => {
+        const blocked = () => {
+          throw new Error("blocked");
+        };
+        const get = vi.spyOn(Storage.prototype, "getItem").mockImplementation(blocked);
+        const set = vi.spyOn(Storage.prototype, "setItem").mockImplementation(blocked);
+        service.catalog.mockResolvedValue({ data: served });
+        const fresh = await freshCatalog();
+        expect(await fresh.loadPackCatalog("default")).toBe(true);
+        expect(() => fresh.forgetPackCatalog("default")).not.toThrow();
+        get.mockRestore();
+        set.mockRestore();
+      });
+
+      it("is read again from the server after it is dropped, without unloading this page's", async () => {
+        service.catalog.mockResolvedValue({ data: served });
+        const fresh = await freshCatalog();
+        await fresh.loadPackCatalog("default");
+        fresh.forgetPackCatalog("default");
+        expect(fresh.packs()).toHaveLength(9);
+        await (await freshCatalog()).loadPackCatalog("default");
+        expect(service.catalog).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it("names the org a surface last asked for", async () => {
+      service.catalog.mockResolvedValue({ data: served });
+      const fresh = await freshCatalog();
+      expect(fresh.packCatalogOrg.value).toBeNull();
+      await fresh.loadPackCatalog("a");
+      expect(fresh.packCatalogOrg.value).toBe("a");
+      await fresh.loadPackCatalog("b");
+      expect(fresh.packCatalogOrg.value).toBe("b");
     });
   });
 });

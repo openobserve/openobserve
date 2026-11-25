@@ -47,7 +47,6 @@ import type { PackReviewChoices } from "@/composables/starterPacks/useStarterPac
 import { useEmailMeDestination } from "@/composables/starterPacks/useEmailMeDestination";
 import StarterPackAdaptedRows from "./StarterPackAdaptedRows.vue";
 import StarterPackAlertStep, { type AlertStepDestination } from "./StarterPackAlertStep.vue";
-import StarterPackInlineConfirm from "./StarterPackInlineConfirm.vue";
 import { KIND_CHIPS } from "./packKindChips";
 import StarterPackProgress from "./StarterPackProgress.vue";
 import StarterPackReady, { type ReadyAlerts } from "./StarterPackReady.vue";
@@ -147,7 +146,6 @@ const SEVERITY: Record<
 };
 const SEVERITY_ORDER: LibrarySeverity[] = ["critical", "warning", "info"];
 const KINDS: ShownKind[] = ["dashboard", "alert", "savedView"];
-const HOUR_US = 60 * 60 * 1_000_000;
 const STEP_NUMBER: Record<Step, number> = { content: 1, setup: 2, ready: 3, installed: 1 };
 const SPINNER = markRaw(StarterPackStepSpinner);
 
@@ -155,15 +153,12 @@ const flow = props.flow;
 const pack = flow.pack;
 const choices = props.choices;
 const title = packTitle(pack);
-const inlineConfirm = ref<"undo" | "remove" | null>(null);
 const destinations = ref<AlertStepDestination[] | null>(null);
 const destinationsFailed = ref(false);
 let ownRun = false;
 const preparing = ref(false);
 const readyShown = ref(false);
 const installedHere = ref(false);
-// Items Undo or Remove left in place; a failed delete never reaches here, so all were kept on purpose.
-const keptCount = ref(0);
 const outcome = ref<ReadyAlerts>({ turnOn: false, sendTo: false });
 const adapted = useAdaptedData(flow);
 const userEmail = computed<string>(() => store.state.userInfo?.email ?? "");
@@ -423,9 +418,11 @@ const toggleOpen = (group: PackGroup) => {
   if (expandable(group)) choices.expanded = { ...choices.expanded, [group.id]: !isOpen(group) };
 };
 
+// Until the run holds its claim, the pressed button stays, for a refusal's notice to point at.
+const settingUp = computed(() => flow.running.value && flow.claimed.value);
 const step = computed<Step>(() => {
   if (readyShown.value) return "ready";
-  if (flow.running.value || flow.interrupted.value || flow.runningBy.value !== null) {
+  if (settingUp.value || flow.interrupted.value || flow.runningBy.value !== null) {
     return "setup";
   }
   return installed.value ? "installed" : "content";
@@ -451,13 +448,6 @@ const alertsMade = computed(() => flow.made.value.filter(({ kind }) => kind === 
 const alreadyHere = computed(
   () => flow.items.value.filter(({ status }) => status === "existing").length,
 );
-const undoLabel = computed(() => {
-  const hours = Math.floor(flow.undoLeftUs.value / HOUR_US);
-  return hours > 0
-    ? t("starterPacks.landing.available", { hours })
-    : t("starterPacks.landing.availableSoon");
-});
-
 /** "Set up by you 2 h ago": who set the pack up, and how long ago. */
 const installedLine = computed((): I18nText | null => {
   const record = flow.record.value;
@@ -478,8 +468,7 @@ const defaultNote = computed(() =>
 );
 const setupNote = (): { icon?: IconName; spin?: boolean; text: I18nText } => {
   const counts = { made: made.value, total: total.value };
-  if (flow.running.value)
-    return { spin: true, text: t("starterPacks.stepper.noteRunning", counts) };
+  if (settingUp.value) return { spin: true, text: t("starterPacks.stepper.noteRunning", counts) };
   const summary = t("starterPacks.progress.summary", counts);
   return {
     icon: "warning",
@@ -545,9 +534,14 @@ const note = computed<{ icon?: IconName; spin?: boolean; text: I18nText }>(() =>
 const busyText = (who: string): I18nText => packBusyText(t, who, flow.isMe(who));
 
 /** The status line beside the footer buttons; failures live here, never in a banner. */
-const footerNote = computed<{ icon?: IconName; error?: boolean; text: I18nText } | null>(() => {
+const footerNote = computed<{
+  icon?: IconName;
+  error?: boolean;
+  wrap?: boolean;
+  text: I18nText;
+} | null>(() => {
   if (step.value === "setup") {
-    if (flow.running.value) return { text: t("starterPacks.popup.keepsGoing") };
+    if (settingUp.value) return { text: t("starterPacks.popup.keepsGoing") };
     const runningBy = flow.runningBy.value;
     if (runningBy !== null) return { icon: "schedule", text: busyText(runningBy) };
     if (flow.forbidden.value) return { icon: "lock", text: t("starterPacks.noPermission") };
@@ -567,10 +561,6 @@ const footerNote = computed<{ icon?: IconName; error?: boolean; text: I18nText }
     };
   }
   if (step.value !== "content") return null;
-  if (keptCount.value) {
-    const count = keptCount.value;
-    return { icon: "info", text: t("starterPacks.undo.kept", { count }, count) };
-  }
   const busyBy = flow.busyBy.value;
   if (busyBy !== null) return { icon: "schedule", text: busyText(busyBy) };
   if (flow.forbidden.value) return { icon: "lock", text: t("starterPacks.noPermission") };
@@ -581,7 +571,7 @@ const footerNote = computed<{ icon?: IconName; error?: boolean; text: I18nText }
     return { icon: "info", text: t("starterPacks.alertStep.pickDestination") };
   }
   return canPick.value && preview.value && !nothingToCreate.value
-    ? { text: t("starterPacks.drawer.undoNote") }
+    ? { wrap: true, text: t("starterPacks.drawer.ordinaryNote") }
     : null;
 });
 
@@ -659,7 +649,7 @@ onMounted(() => {
   if (!installed.value && !flow.forbidden.value) void loadDestinations();
   ensurePreview();
 });
-// Undo or Remove turns a pack opened as set up back into a Review, which needs the destinations.
+// A reload can find a pack shown as set up is no longer so; its Review needs the destinations.
 watch(installed, (now) => {
   if (!now && destinations.value === null && !flow.forbidden.value) void loadDestinations();
 });
@@ -670,20 +660,11 @@ watch(
     if (!before || now) return;
     if (!ownRun) outcome.value = storedOutcome();
     ownRun = false;
+    if (!flow.claimed.value) return;
     if (flow.installed.value || flow.failed.value.length) {
       readyShown.value = true;
       installedHere.value = true;
     }
-  },
-);
-// A confirm opened on one install must not act on the record that replaced it.
-watch(
-  () => {
-    const r = flow.record.value;
-    return r ? `${r.installId}|${r.status}|${r.runId}` : null;
-  },
-  () => {
-    inlineConfirm.value = null;
   },
 );
 // Answering the last open question must not collapse the card the user is working in.
@@ -728,7 +709,6 @@ const resolveSendTo = async (): Promise<{ alerts: ReadyAlerts; name?: string }> 
   };
 };
 const startSetup = async () => {
-  keptCount.value = 0;
   preparing.value = true;
   const { alerts, name } = await resolveSendTo().finally(() => (preparing.value = false));
   outcome.value = alerts;
@@ -750,18 +730,11 @@ const retry = async () => {
 const showReady = () => {
   readyShown.value = true;
 };
-// Undo and Remove take the pack away, so the popup goes back to the list unless items stayed.
-const confirmDone = () => {
-  inlineConfirm.value = null;
-  readyShown.value = false;
-  keptCount.value = flow.removal.value?.kept.length ?? 0;
-  if (!keptCount.value) emit("back");
-};
 </script>
 
 <template>
   <div
-    class="grid h-full min-h-0 grid-rows-[3.75rem_minmax(0,1fr)_3.625rem]"
+    class="grid h-full min-h-0 grid-rows-[3.75rem_minmax(0,1fr)_minmax(3.625rem,auto)]"
     data-test="starter-pack-drawer"
   >
     <header class="border-border-default flex min-w-0 items-center gap-3 border-b px-4">
@@ -1048,12 +1021,8 @@ const confirmDone = () => {
         </OStep>
         <OStep
           :name="2"
-          :title="
-            flow.running.value
-              ? t('starterPacks.stepper.settingUp')
-              : t('starterPacks.stepper.setup')
-          "
-          :icon="flow.running.value ? SPINNER : undefined"
+          :title="settingUp ? t('starterPacks.stepper.settingUp') : t('starterPacks.stepper.setup')"
+          :icon="settingUp ? SPINNER : undefined"
           :description="flow.interrupted.value ? t('starterPacks.stepper.interrupted') : undefined"
           :done="step === 'ready'"
           data-test="starter-pack-drawer-step-setup"
@@ -1082,162 +1051,109 @@ const confirmDone = () => {
       </OStepper>
     </div>
 
-    <footer class="border-border-default flex min-w-0 items-center gap-2 border-t px-4">
-      <StarterPackInlineConfirm
-        v-if="inlineConfirm"
-        :flow="flow"
-        :mode="inlineConfirm"
-        data-test="starter-pack-drawer-confirm"
-        @cancel="inlineConfirm = null"
-        @done="confirmDone"
-      />
-      <template v-else>
-        <template v-if="step === 'ready' && installedHere && flow.canUndo.value">
-          <OButton
-            variant="ghost"
-            size="sm-action"
-            data-test="starter-pack-ready-undo-btn"
-            @click="inlineConfirm = 'undo'"
-          >
-            {{ t("starterPacks.landing.undo") }}
-          </OButton>
-          <OText variant="meta" data-test="starter-pack-ready-undo-left">{{ undoLabel }}</OText>
+    <footer class="border-border-default flex min-w-0 items-center gap-2 border-t px-4 py-2">
+      <span
+        :class="[
+          'flex min-w-0 flex-1 items-center gap-1.5 text-xs',
+          footerNote?.error ? 'text-status-error-text' : 'text-text-secondary',
+        ]"
+        data-test="starter-pack-drawer-summary"
+      >
+        <template v-if="footerNote">
+          <OIcon v-if="footerNote.icon" :name="footerNote.icon" size="sm" class="shrink-0" />
+          <span :class="!footerNote.wrap && 'truncate'">{{ footerNote.text }}</span>
         </template>
+      </span>
+      <OButton
+        v-if="showBack && (step !== 'setup' || !settingUp)"
+        variant="outline"
+        size="sm-action"
+        data-test="starter-pack-drawer-back-btn"
+        @click="emit('back')"
+      >
+        {{ step === "ready" ? t("starterPacks.popup.backToPacks") : t("starterPacks.popup.back") }}
+      </OButton>
+      <OButton
+        v-if="step === 'setup' && settingUp"
+        variant="primary"
+        size="sm-action"
+        class="min-w-35"
+        disabled
+        loading
+        :spinner="false"
+        data-test="starter-pack-progress-running-btn"
+      >
+        <template #icon-left><StarterPackStepSpinner /></template>
+        {{ t("starterPacks.stepper.settingUp") }}
+      </OButton>
+      <OButton
+        v-else-if="
+          (step === 'setup' || step === 'ready') &&
+          failedCount &&
+          !flow.forbidden.value &&
+          flow.runningBy.value === null
+        "
+        variant="primary"
+        size="sm-action"
+        class="min-w-35"
+        icon-left="refresh"
+        :loading="flow.running.value"
+        data-test="starter-pack-progress-retry-btn"
+        @click="retry"
+      >
+        {{ t("starterPacks.progress.retry", { count: failedCount }, failedCount) }}
+      </OButton>
+      <OButton
+        v-else-if="
+          step === 'setup' && !failedCount && !flow.forbidden.value && flow.runningBy.value === null
+        "
+        variant="primary"
+        size="sm-action"
+        class="min-w-35"
+        :loading="flow.running.value"
+        data-test="starter-pack-progress-finish-btn"
+        @click="retry"
+      >
+        {{ t("starterPacks.progress.finish") }}
+      </OButton>
+      <OButton
+        v-else-if="step === 'installed' && flow.dashboardItem.value?.id"
+        variant="primary"
+        size="sm-action"
+        class="min-w-35"
+        data-test="starter-pack-drawer-open-btn"
+        @click="finishLanding"
+      >
+        {{ t("starterPacks.drawer.openDashboard") }}
+      </OButton>
+      <template v-else-if="step === 'content' && !flow.forbidden.value">
         <OButton
-          v-else-if="step === 'setup' && flow.interrupted.value && flow.canManage.value"
-          variant="ghost-destructive"
-          size="sm-action"
-          data-test="starter-pack-setup-undo-btn"
-          @click="inlineConfirm = 'undo'"
-        >
-          {{ t("starterPacks.landing.undo") }}
-        </OButton>
-        <template v-else-if="step === 'installed'">
-          <OButton
-            v-if="flow.canUndo.value"
-            variant="ghost-destructive"
-            size="sm-action"
-            data-test="starter-pack-progress-undo-btn"
-            @click="inlineConfirm = 'undo'"
-          >
-            {{ t("starterPacks.landing.undo") }}
-          </OButton>
-          <OButton
-            v-else-if="flow.canManage.value"
-            variant="ghost-destructive"
-            size="sm-action"
-            data-test="starter-pack-page-remove-btn"
-            @click="inlineConfirm = 'remove'"
-          >
-            {{ t("starterPacks.landing.remove") }}
-          </OButton>
-        </template>
-        <span
-          :class="[
-            'flex min-w-0 flex-1 items-center gap-1.5 text-xs',
-            footerNote?.error ? 'text-status-error-text' : 'text-text-secondary',
-          ]"
-          data-test="starter-pack-drawer-summary"
-        >
-          <template v-if="footerNote">
-            <OIcon v-if="footerNote.icon" :name="footerNote.icon" size="sm" class="shrink-0" />
-            <span class="truncate">{{ footerNote.text }}</span>
-          </template>
-        </span>
-        <OButton
-          v-if="showBack && (step !== 'setup' || !flow.running.value)"
-          variant="outline"
-          size="sm-action"
-          data-test="starter-pack-drawer-back-btn"
-          @click="emit('back')"
-        >
-          {{
-            step === "ready" ? t("starterPacks.popup.backToPacks") : t("starterPacks.popup.back")
-          }}
-        </OButton>
-        <OButton
-          v-if="step === 'setup' && flow.running.value"
+          v-if="nothingToCreate"
           variant="primary"
           size="sm-action"
           class="min-w-35"
-          disabled
-          loading
-          :spinner="false"
-          data-test="starter-pack-progress-running-btn"
+          data-test="starter-pack-drawer-continue-btn"
+          @click="showReady"
         >
-          <template #icon-left><StarterPackStepSpinner /></template>
-          {{ t("starterPacks.stepper.settingUp") }}
+          {{ t("starterPacks.drawer.continue") }}
         </OButton>
         <OButton
-          v-else-if="
-            (step === 'setup' || step === 'ready') &&
-            failedCount &&
-            !flow.forbidden.value &&
-            flow.runningBy.value === null
+          v-else
+          variant="primary"
+          size="sm-action"
+          class="min-w-35"
+          :loading="preparing || flow.running.value"
+          :disabled="
+            flow.previewState.value !== 'ready' ||
+            picked === 0 ||
+            waitingForDestinations ||
+            destinationMissing
           "
-          variant="primary"
-          size="sm-action"
-          class="min-w-35"
-          icon-left="refresh"
-          data-test="starter-pack-progress-retry-btn"
-          @click="retry"
+          data-test="starter-pack-drawer-submit-btn"
+          @click="startSetup"
         >
-          {{ t("starterPacks.progress.retry", { count: failedCount }, failedCount) }}
+          {{ setUpLabel }}
         </OButton>
-        <OButton
-          v-else-if="
-            step === 'setup' &&
-            !failedCount &&
-            !flow.forbidden.value &&
-            flow.runningBy.value === null
-          "
-          variant="primary"
-          size="sm-action"
-          class="min-w-35"
-          data-test="starter-pack-progress-finish-btn"
-          @click="retry"
-        >
-          {{ t("starterPacks.progress.finish") }}
-        </OButton>
-        <OButton
-          v-else-if="step === 'installed' && flow.dashboardItem.value?.id"
-          variant="primary"
-          size="sm-action"
-          class="min-w-35"
-          data-test="starter-pack-drawer-open-btn"
-          @click="finishLanding"
-        >
-          {{ t("starterPacks.drawer.openDashboard") }}
-        </OButton>
-        <template v-else-if="step === 'content' && !flow.forbidden.value">
-          <OButton
-            v-if="nothingToCreate"
-            variant="primary"
-            size="sm-action"
-            class="min-w-35"
-            data-test="starter-pack-drawer-continue-btn"
-            @click="showReady"
-          >
-            {{ t("starterPacks.drawer.continue") }}
-          </OButton>
-          <OButton
-            v-else
-            variant="primary"
-            size="sm-action"
-            class="min-w-35"
-            :loading="preparing"
-            :disabled="
-              flow.previewState.value !== 'ready' ||
-              picked === 0 ||
-              waitingForDestinations ||
-              destinationMissing
-            "
-            data-test="starter-pack-drawer-submit-btn"
-            @click="startSetup"
-          >
-            {{ setUpLabel }}
-          </OButton>
-        </template>
       </template>
     </footer>
   </div>

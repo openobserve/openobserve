@@ -70,8 +70,10 @@ export const clearLocalStorageKeepingDrafts = (): void => {
 
 /** Removes every starter pack key, since its matches and choices describe this user's data. */
 export const clearStarterPackKeys = (): void => {
-  for (const key of Object.keys(localStorage)) {
-    if (key.startsWith("o2.starterPacks.")) localStorage.removeItem(key);
+  for (const storage of [localStorage, sessionStorage]) {
+    for (const key of Object.keys(storage)) {
+      if (key.startsWith("o2.starterPacks.")) storage.removeItem(key);
+    }
   }
 };
 

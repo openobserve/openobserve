@@ -16,7 +16,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { effectScope } from "vue";
 
-const finder = vi.hoisted(() => ({ ok: false }));
+const finder = vi.hoisted(() => ({
+  ok: false,
+  records: {} as Record<string, Array<{ status: string; items: unknown[] }>>,
+}));
 vi.mock("./useFindMore", async () => {
   const { ref } = await import("vue");
   return {
@@ -31,7 +34,9 @@ vi.mock("./useFindMore", async () => {
     },
   };
 });
-vi.mock("./useInstallRecords", () => ({ useInstallRecords: () => ({ list: async () => [] }) }));
+vi.mock("./useInstallRecords", () => ({
+  useInstallRecords: () => ({ list: async (id: string) => finder.records[id] ?? [] }),
+}));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 vi.mock("@/types/i18n", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/types/i18n")>()),
@@ -40,8 +45,11 @@ vi.mock("@/types/i18n", async (importOriginal) => ({
 
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-import { resetBrowserMatches } from "./useBrowserMatches";
+import { resetBrowserMatches, useBrowserMatches } from "./useBrowserMatches";
 import { useRefreshMatches } from "./useRefreshMatches";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 describe("useRefreshMatches", () => {
   beforeEach(() => {
@@ -71,6 +79,22 @@ describe("useRefreshMatches", () => {
     finder.ok = true;
     expect(await checker.refresh()).toBe(true);
     expect(checker.failed.value).toBe(false);
+    scope.stop();
+  });
+
+  it("saves every stopped setup", async () => {
+    finder.ok = true;
+    const stopped = [{ status: "incomplete", items: [] }];
+    finder.records = {
+      kubernetes: stopped,
+      hosts: [{ status: "complete", items: [] }],
+      docker: stopped,
+    };
+    const scope = effectScope();
+    await scope.run(() => useRefreshMatches("org"))!.refresh();
+    const copy = useBrowserMatches("org").copy.value!;
+    expect(copy.installedPackIds).toEqual(["hosts"]);
+    expect(copy.interrupted.map(({ packId }) => packId)).toEqual(["kubernetes", "docker"]);
     scope.stop();
   });
 });

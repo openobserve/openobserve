@@ -55,13 +55,11 @@ interface FindMoreInputs {
 
 const installedIds = (records: PackInstallRecord[]) =>
   new Set(
-    records
-      .filter(({ status }) => status !== "removed")
-      .flatMap(({ items }) =>
-        items
-          .filter(({ status }) => status === "created" || status === "existing")
-          .map((item) => item.copyOf ?? item.itemId),
-      ),
+    records.flatMap(({ items }) =>
+      items
+        .filter(({ status }) => status === "created" || status === "existing")
+        .map((item) => item.copyOf ?? item.itemId),
+    ),
   );
 
 const packSource = (

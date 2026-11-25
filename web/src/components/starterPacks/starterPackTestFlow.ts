@@ -35,8 +35,6 @@ export const PACK = {
 export const fakeFlow = (over: Record<string, unknown> = {}) =>
   ({
     alertCount: ref(2),
-    alertsOn: ref(0),
-    countAlertsOn: vi.fn(async () => {}),
     alertsRoute: computed(() => ({ name: "alertList", query: { org_identifier: "org" } })),
     dashboardsRoute: computed(() => ({ name: "dashboards", query: { org_identifier: "org" } })),
     itemRoute: (item: { kind: string; id?: string }) => ({
@@ -44,13 +42,11 @@ export const fakeFlow = (over: Record<string, unknown> = {}) =>
       query: { id: item.id },
     }),
     alertsTotal: ref(2),
-    busy: ref(false),
     busyBy: ref(null),
+    claimed: ref(true),
     dashboardCount: ref(1),
     dashboardItem: shallowRef(undefined),
     enabledAlertIds: shallowRef(new Set<string>()),
-    canManage: ref(true),
-    canUndo: ref(true),
     failed: ref([]),
     forbidden: ref(false),
     install: vi.fn(async () => true),
@@ -75,14 +71,9 @@ export const fakeFlow = (over: Record<string, unknown> = {}) =>
     preview: shallowRef(null),
     previewState: ref("ready"),
     record: shallowRef(null),
-    remove: vi.fn(async () => true),
-    removal: shallowRef(null),
-    removalFailed: ref(false),
     running: ref(false),
     runningBy: ref(null),
     toCreate: ref([]),
-    undo: vi.fn(async () => true),
-    undoLeftUs: ref(5 * 60 * 60 * 1_000_000),
     viewCount: ref(1),
     ...over,
   }) as unknown as StarterPackFlow;

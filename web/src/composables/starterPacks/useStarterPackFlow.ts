@@ -26,7 +26,6 @@ import { featureState } from "@/utils/featureGate";
 
 import {
   StarterPackBusyError,
-  StarterPackPermissionError,
   StarterPackStaleError,
   copyName,
   copyParts,
@@ -36,16 +35,14 @@ import {
   type PackInstallRecord,
   type PackPreview,
   type PackRecordItem,
-  type PackRemovalResult,
   type StarterPack,
 } from "./types";
 import { adaptSavedView } from "./packAdapt";
 import { RESERVED_FIELD } from "./packBinding";
-import { useBrowserMatches } from "./useBrowserMatches";
 import { isRunning } from "./useInstallRecords";
+import { forgetPackCatalog } from "./usePackCatalog";
+import { forgetPackGate } from "./usePackGate";
 import { useStarterPacks } from "./useStarterPacks";
-
-export const UNDO_WINDOW_US = 24 * 60 * 60 * 1_000_000;
 
 const CLOCK_TICK_MS = 60_000;
 
@@ -64,35 +61,26 @@ export interface PackInstallChoice {
 }
 
 const isForbidden = (error: any): boolean => error?.response?.status === 403;
+const isRefusedRead = (error: any): boolean =>
+  isForbidden(error) && error?.config?.method === "get";
 
 const countsAsItem = (item: PackRecordItem) => item.kind !== "folder";
 const notSkipped = (item: PackRecordItem) => item.status !== "skipped";
 
-export const isOrgAdmin = (state: Record<string, any>): boolean => {
-  const role = String(state.userInfo?.role ?? state.currentuser?.role ?? "").toLowerCase();
-  return state.zoConfig?.is_org_admin === true || role === "admin" || role === "root";
-};
-
-/** Admins and whoever set the pack up may change what it installed. */
-export const canManageInstall = (state: Record<string, any>, record: PackInstallRecord | null) =>
-  isOrgAdmin(state) || (!!record?.installedBy && record.installedBy === state.userInfo?.email);
-
 // Anyone who can set up may finish a stopped setup; the user's own unfinished one shows first.
 const newestRecord = (rows: PackInstallRecord[], me: string): PackInstallRecord | null => {
-  const live = rows.filter((row) => row.status !== "removed");
-  const unfinished = live.filter((row) => row.status !== "complete");
+  const unfinished = rows.filter((row) => row.status !== "complete");
   const resumable =
     unfinished.find(({ installedBy }) => (installedBy ?? "") === me) ?? unfinished[0];
   if (resumable) return resumable;
-  return [...live].sort((a, b) => (b.installedAt ?? 0) - (a.installedAt ?? 0))[0] ?? null;
+  return [...rows].sort((a, b) => (b.installedAt ?? 0) - (a.installedAt ?? 0))[0] ?? null;
 };
 
 /** One surface's view of a pack: its install, its preview, and the actions on both. */
 export function useStarterPackFlow(org: string, pack: StarterPack) {
   const store = useStore();
   const router = useRouter();
-  const { installPack, previewPack, undoPack, removePack, countLiveAlerts, listInstalls } =
-    useStarterPacks(org);
+  const { installPack, previewPack, listInstalls } = useStarterPacks(org);
   const { manifest: libraryManifest } = useAlertLibrary();
 
   const myEmail = (): string => store.state.userInfo?.email ?? "";
@@ -101,7 +89,9 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const loaded = ref(false);
   const loadFailed = ref(false);
   const running = ref(false);
-  const busy = ref(false);
+  /** The last run got its claim; a run still without one shows nothing as started. */
+  const claimed = ref(false);
+  const started = computed(() => running.value && claimed.value);
   const installFailed = ref(false);
   const forbidden = ref(false);
   /** Who started the setup that is already running, or "" when its record names no one. */
@@ -109,16 +99,11 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const preview = shallowRef<PackPreview | null>(null);
   const startPlan = shallowRef<PackRecordItem[]>([]);
   const previewState = ref<PackPreviewState>("idle");
-  const removal = shallowRef<PackRemovalResult | null>(null);
-  const removalFailed = ref(false);
-  /** Live alerts the open confirmation's Undo or Remove deletes; null until counted. */
-  const alertsOn = ref<number | null>(null);
   const enabledAlertIds = shallowRef<Set<string>>(new Set());
   const goneDashboards = shallowRef<Set<string>>(new Set());
   const isGone = ({ kind, id }: PackRecordItem) =>
     kind === "dashboard" && !!id && goneDashboards.value.has(id);
   let previewRun = 0;
-  let countRun = 0;
   const choices = ref<PackChoices>({ streams: {}, fields: {} });
   const nowUs = ref(Date.now() * 1000);
   const clock = setInterval(() => (nowUs.value = Date.now() * 1000), CLOCK_TICK_MS);
@@ -136,7 +121,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     const fresh = running.value && !record.value?.items.length;
     const all = fresh ? startPlan.value : (record.value?.items ?? []);
     const blocked =
-      !running.value && all.some((item) => !countsAsItem(item) && item.status === "failed");
+      !started.value && all.some((item) => !countsAsItem(item) && item.status === "failed");
     return all
       .filter((item) => countsAsItem(item) && !isGone(item))
       .map((item) =>
@@ -147,7 +132,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   // A folder that blocked no item is the only failure left to show and retry.
   const failed = computed(() => {
     const rows = items.value.filter(({ status }) => status === "failed");
-    if (rows.length || running.value) return rows;
+    if (rows.length || started.value) return rows;
     return (record.value?.items ?? []).filter(
       (item) => !countsAsItem(item) && item.status === "failed",
     );
@@ -164,7 +149,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const runningElsewhere = computed(() => liveByClock.value || recheck.value);
   const interrupted = computed(
     () =>
-      !running.value &&
+      !started.value &&
       !!record.value &&
       record.value.status !== "complete" &&
       !runningElsewhere.value,
@@ -182,34 +167,9 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const alertsTotal = computed(
     () => items.value.filter(({ kind, status }) => kind === "alert" && status === "created").length,
   );
-  const undoLeftUs = computed(() => {
-    const at = record.value?.installedAt;
-    return at ? Math.max(0, at + UNDO_WINDOW_US - nowUs.value) : 0;
-  });
-  const canManage = computed(() => canManageInstall(store.state, record.value));
-  const canUndo = computed(() => canManage.value && undoLeftUs.value > 0);
-
   const readAlertsOn = async () => {
     const rows = await readQuery(alertsByTagsQuery(org, [`pack:${pack.id}`]), true);
     enabledAlertIds.value = new Set(rows.filter((row) => row.enabled).map((row) => row.alert_id));
-  };
-
-  // Each alert is read back, so only an open confirmation counts, never a load on Home.
-  const countAlertsOn = async (mode: "undo" | "remove" = "undo") => {
-    countRun += 1;
-    const run = countRun;
-    alertsOn.value = null;
-    // A confirmation can open before the load's read lands; the tag search trails this run's creates.
-    const tracked = enabledAlertIds.value;
-    await readAlertsOn();
-    const enabled = new Set([...enabledAlertIds.value, ...tracked]);
-    enabledAlertIds.value = enabled;
-    const shown = record.value ? [record.value] : [];
-    // Remove walks every install of the pack, so its count does too.
-    const rows = mode === "remove" ? await listInstalls(pack.id) : shown;
-    const counts = await Promise.all(rows.map((row) => countLiveAlerts(pack, row, enabled)));
-    // A confirmation reopened in the other mode must not show this older count.
-    if (run === countRun) alertsOn.value = counts.reduce((sum, count) => sum + count, 0);
   };
 
   // A dashboard deleted by hand stays in the record, so each folder is listed to drop it.
@@ -242,6 +202,8 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     loadFailed.value = false;
     try {
       const rows = await listInstalls(pack.id);
+      // A background tab's clock barely ticks, so a late one would misread these stamps.
+      nowUs.value = Date.now() * 1000;
       record.value = newestRecord(rows, myEmail());
       forbidden.value = false;
       if (!rows.some(({ status }) => status === "installing" || status === "incomplete")) {
@@ -404,7 +366,9 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       emailFailure,
       resumeOf,
     } = choice;
+    const shown = record.value;
     running.value = true;
+    claimed.value = false;
     installFailed.value = false;
     forbidden.value = false;
     busyBy.value = null;
@@ -426,6 +390,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
         emailFailure,
         resumeOf,
         onProgress: (next) => {
+          claimed.value = true;
           record.value = { ...next, items: [...next.items] };
           if (enableAlerts) trackEnabled(next);
         },
@@ -449,15 +414,22 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
         busyBy.value = error.installedBy;
         return false;
       }
-      if (error instanceof StarterPackPermissionError) forbidden.value = true;
-      else installFailed.value = true;
-      // This tab's run has ended, so its last progress must not read as a live run.
-      if (record.value?.status === "installing") {
+      installFailed.value = !isForbidden(error);
+      if (!claimed.value || !record.value?.items.length) {
+        // A run with no plan may have withdrawn its claim, so only a reload says where it stands.
+        record.value = shown;
+        await load();
+      } else if (record.value.status === "installing") {
+        // This tab's run has ended, so its last progress must not read as a live run.
         record.value = { ...record.value, status: "incomplete" };
       }
+      // The access notice says a refused write; nothing else says a refused read.
+      if (isRefusedRead(error)) forbidden.value = true;
       return false;
     } finally {
       running.value = false;
+      forgetPackCatalog(org);
+      forgetPackGate(org);
       void refreshOrgResources(org);
     }
   };
@@ -481,53 +453,14 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     return install(undefined, { enableAlerts, destination, emailFailure, resumeOf: installId });
   };
 
-  const applyRemoval = async (work: () => Promise<PackRemovalResult>) => {
-    busy.value = true;
-    removalFailed.value = false;
-    try {
-      const result = await work();
-      removal.value = result;
-      removalFailed.value = result.kept.some(({ reason }) => reason === "delete_failed");
-      await load();
-      if (!installed.value) useBrowserMatches(org).markRemoved(pack.id);
-      // A plan read before the removal still counts the removed items as existing.
-      if (previewState.value !== "idle") await loadPreview();
-      return !removalFailed.value;
-    } catch (error) {
-      // A setup that started running again is not this removal's to touch.
-      if (error instanceof StarterPackBusyError) await load();
-      else removalFailed.value = true;
-      return false;
-    } finally {
-      busy.value = false;
-      void refreshOrgResources(org);
-    }
-  };
-
-  const undo = async () => {
-    if (!(await stillAsShown())) return false;
-    const installId = record.value?.installId;
-    if (!installId) {
-      removalFailed.value = true;
-      return false;
-    }
-    return applyRemoval(() => undoPack(pack, installId));
-  };
-
-  const remove = () => applyRemoval(() => removePack(pack));
-
   return {
     alertCount,
-    alertsOn,
     alertsRoute,
     alertsTotal,
-    busy,
     busyBy,
-    canManage,
-    canUndo,
+    claimed,
     chooseField,
     chooseStream,
-    countAlertsOn,
     dashboardCount,
     dashboardItem,
     dashboardsRoute,
@@ -555,16 +488,11 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     preview,
     previewState,
     record,
-    remove,
-    removal,
-    removalFailed,
     retry,
     running,
     runningBy,
     skipped,
     toCreate,
-    undo,
-    undoLeftUs,
     viewCount,
   };
 }

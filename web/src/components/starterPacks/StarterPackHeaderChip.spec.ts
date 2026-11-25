@@ -13,12 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { nextTick, ref } from "vue";
 import { createStore } from "vuex";
 
 import i18n from "@/locales";
+import appStore from "@/stores";
 import type { FindMoreSource } from "@/composables/starterPacks/findMore";
 import {
   resetBrowserMatches,
@@ -34,9 +35,10 @@ const ORG = "org";
 const fake = vi.hoisted(() => ({
   checkResult: null as null | { checkedAt: number; sources: unknown[]; dismissed: number },
   checkState: "ready" as "ready" | "error",
-  gateVisible: true,
+  gate: null as any,
   gateRetired: null as any,
   gateEnabled: null as null | (() => boolean),
+  gateAskAgain: null as null | (() => boolean),
   flows: {} as Record<string, Record<string, any>>,
   records: {} as Record<string, Record<string, any>>,
   matchers: [] as Array<Record<string, any>>,
@@ -49,10 +51,11 @@ vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/composables/starterPacks/usePackGate", async () => {
   const { computed } = await import("vue");
   return {
-    usePackGate: (_org: string, enabled: () => boolean) => {
+    usePackGate: (_org: string, enabled: () => boolean, askAgain: () => boolean) => {
       fake.gateEnabled = enabled;
+      fake.gateAskAgain = askAgain;
       return {
-        visible: computed(() => fake.gateVisible),
+        visible: computed(() => fake.gate.value),
         retired: computed(() => fake.gateRetired.value),
       };
     },
@@ -90,6 +93,7 @@ vi.mock("@/composables/starterPacks/useStarterPackFlow", async () => {
       const flow = {
         pack,
         running,
+        claimed: ref(true),
         runningBy,
         forbidden: ref(false),
         record,
@@ -180,11 +184,16 @@ const HOSTS = source("hosts", [{ kind: "dashboard", id: "host_metrics", name: "H
 const DOCKER = source("docker", [{ kind: "dashboard", id: "overview", name: "Docker Overview" }]);
 
 // The browser copy and the install records agree, as they do after a check.
-const save = (sources: FindMoreSource[], installed: string[] = []) => {
+const save = (sources: FindMoreSource[], installed: string[] = [], interrupted: string[] = []) => {
   for (const id of installed) {
     fake.records[id] = { status: "complete", installedAt: (Date.now() - 2 * 3_600_000) * 1000 };
   }
-  useBrowserMatches(ORG).saveFull({ checkedAt: Date.now(), sources, dismissed: 0 }, installed);
+  for (const id of interrupted) fake.records[id] = { status: "incomplete", items: [] };
+  useBrowserMatches(ORG).saveFull(
+    { checkedAt: Date.now(), sources, dismissed: 0 },
+    installed,
+    interrupted.map((packId) => ({ packId, label: packId })),
+  );
 };
 
 const render = (state: Record<string, unknown> = {}) =>
@@ -222,7 +231,7 @@ describe("StarterPackHeaderChip", () => {
     window.localStorage.clear();
     resetBrowserMatches();
     resetStarterPackPopups();
-    fake.gateVisible = true;
+    fake.gate = ref(true);
     fake.gateRetired = ref(false);
     fake.gateEnabled = null;
     fake.checkResult = null;
@@ -299,16 +308,58 @@ describe("StarterPackHeaderChip", () => {
     expect(find(wrapper, "header-starter-packs-count").text()).toBe("0");
   });
 
+  describe("counts what the popup counts", () => {
+    const count = (wrapper: VueWrapper) => find(wrapper, "header-starter-packs-count").text();
+    // Storage keeps a copy only for a known user.
+    beforeEach(() => appStore.commit("setUserInfo", { email: "me@x.io" }));
+    afterEach(() => appStore.commit("setUserInfo", {}));
+    const subtitle = (wrapper: VueWrapper) => find(wrapper, "starter-pack-list-subtitle").text();
+
+    it("counts a stopped setup beside a finished one, before any record is read", async () => {
+      save([], ["kubernetes"], ["hosts"]);
+      // A page load knows only what storage kept.
+      resetBrowserMatches();
+      const wrapper = render();
+      expect(fake.flows.hosts.load).not.toHaveBeenCalled();
+      expect(count(wrapper)).toBe("1");
+      expect(chip(wrapper).attributes("aria-label")).toBe("Starter packs, 1 fits your data");
+      await open(wrapper);
+      expect(subtitle(wrapper)).toBe("1 pack fits data you already send");
+      expect(count(wrapper)).toBe("1");
+    });
+
+    it("counts every stopped setup, not only the first", async () => {
+      save([K8S], [], ["hosts", "docker"]);
+      resetBrowserMatches();
+      const wrapper = render();
+      expect(count(wrapper)).toBe("3");
+      await open(wrapper);
+      expect(subtitle(wrapper)).toBe("3 packs fit data you already send");
+      expect(railIds(wrapper)).toEqual(["kubernetes", "hosts", "docker"]);
+    });
+
+    it("counts a pack set up once and stopped again the same before and after its record loads", async () => {
+      save([], ["kubernetes", "hosts"], ["hosts"]);
+      resetBrowserMatches();
+      const wrapper = render();
+      expect(count(wrapper)).toBe("1");
+      await open(wrapper);
+      expect(count(wrapper)).toBe("1");
+      expect(subtitle(wrapper)).toBe("1 pack fits data you already send");
+    });
+  });
+
   it("is hidden in kiosk mode and for an org past onboarding (D10)", () => {
     save([K8S]);
     expect(find(render({ kioskMode: true }), "header-starter-packs-btn").exists()).toBe(false);
-    fake.gateVisible = false;
+    fake.gateRetired.value = true;
+    fake.gate.value = false;
     expect(find(render(), "header-starter-packs-btn").exists()).toBe(false);
   });
 
   it("reads no pack record or plan for an org past onboarding, even with the popup open", async () => {
     save([K8S, HOSTS]);
-    fake.gateVisible = false;
+    fake.gate.value = false;
     const wrapper = render();
     useStarterPackPopup(ORG).openList();
     await flushPromises();
@@ -475,23 +526,6 @@ describe("StarterPackHeaderChip", () => {
     expect(find(wrapper, "pane-kubernetes").exists()).toBe(true);
   });
 
-  it("offers a pack again after setup, a full check and an undo", async () => {
-    save([K8S]);
-    const matches = useBrowserMatches(ORG);
-    matches.markInstalled("kubernetes", "kubernetes");
-    // A full check drops the set-up pack, as groupFindMore leaves out owned items.
-    save([], ["kubernetes"]);
-    const wrapper = render();
-    expect(find(wrapper, "header-starter-packs-count").text()).toBe("0");
-    delete fake.records.kubernetes;
-    matches.markRemoved("kubernetes");
-    await flushPromises();
-    expect(find(wrapper, "header-starter-packs-count").text()).toBe("1");
-    await open(wrapper);
-    expect(railIds(wrapper)).toEqual(["kubernetes"]);
-    wrapper.unmount();
-  });
-
   it("says when nothing matches, keeping Check Again (M7)", async () => {
     save([]);
     const wrapper = render();
@@ -593,19 +627,90 @@ describe("StarterPackHeaderChip", () => {
   });
 
   describe("asks the gate only when it could show", () => {
-    it("asks nothing with no saved copy, and asks once a copy is saved", async () => {
+    it("asks with a saved copy, and again once the popup opens", async () => {
       const wrapper = render();
       expect(fake.gateEnabled!()).toBe(false);
       save([K8S]);
       await flushPromises();
-      expect(fake.gateEnabled!()).toBe(true);
+      expect([fake.gateEnabled!(), fake.gateAskAgain!()]).toEqual([true, false]);
+      await open(wrapper);
+      expect(fake.gateAskAgain!()).toBe(true);
+      wrapper.unmount();
+    });
+
+    it("stays hidden while the gate has no answer", async () => {
+      fake.gate.value = false;
+      save([K8S, HOSTS]);
+      const wrapper = render();
+      await flushPromises();
+      expect(find(wrapper, "header-starter-packs-btn").exists()).toBe(false);
+      fake.gate.value = true;
+      await flushPromises();
+      expect(find(wrapper, "header-starter-packs-count").text()).toBe("2");
+      wrapper.unmount();
+    });
+
+    const retire = async () => {
+      fake.gateRetired.value = true;
+      fake.gate.value = false;
+      await flushPromises();
+    };
+
+    it("leaves no setup to start in an org that turns out retired while the popup is open", async () => {
+      save([K8S]);
+      const wrapper = render();
+      const popup = useStarterPackPopup(ORG);
+      await open(wrapper);
+      await find(wrapper, "starter-pack-list-primary-btn").trigger("click");
+      expect(popup.opening.value).toBe("kubernetes");
+      await retire();
+      expect(popup.open.value).toBe(false);
+      // The plan the click waited for must not open the review afterwards.
+      fake.flows.kubernetes.previewState.value = "ready";
+      await flushPromises();
+      expect(popup.open.value).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("closes a review in a retired org, but not a pack that was set up", async () => {
+      save([K8S]);
+      const wrapper = render();
+      const popup = useStarterPackPopup(ORG);
+      popup.openPack("kubernetes");
+      await retire();
+      expect(popup.open.value).toBe(false);
+      fake.gateRetired.value = false;
+      await flushPromises();
+      fake.flows.kubernetes.record.value = { status: "complete" };
+      popup.openPack("kubernetes");
+      await retire();
+      expect(popup.open.value).toBe(true);
+      wrapper.unmount();
+    });
+
+    it("neither shows progress nor closes a setup that does not hold its claim yet", async () => {
+      save([K8S]);
+      const wrapper = render();
+      const popup = useStarterPackPopup(ORG);
+      popup.openPack("kubernetes");
+      const flow = fake.flows.kubernetes;
+      flow.claimed.value = false;
+      flow.running.value = true;
+      await flushPromises();
+      expect(find(wrapper, "header-starter-packs-progress").exists()).toBe(false);
+      expect(find(wrapper, "header-starter-packs-count").exists()).toBe(true);
+      await retire();
+      expect(popup.open.value).toBe(true);
+      flow.claimed.value = true;
+      await flushPromises();
+      expect(find(wrapper, "header-starter-packs-progress").exists()).toBe(true);
       wrapper.unmount();
     });
 
     it("asks while a setup runs, even with no saved copy", async () => {
       const wrapper = render();
       fake.flows.kubernetes.running.value = true;
-      expect(fake.gateEnabled!()).toBe(true);
+      expect(fake.gateAskAgain!()).toBe(true);
       wrapper.unmount();
     });
 
@@ -625,7 +730,7 @@ describe("StarterPackHeaderChip", () => {
       fake.flows.kubernetes.running.value = true;
       await flushPromises();
       fake.gateRetired.value = true;
-      fake.gateVisible = false;
+      fake.gate.value = false;
       await flushPromises();
       expect(find(wrapper, "header-starter-packs-btn").exists()).toBe(true);
       expect(useBrowserMatches(ORG).copy.value).not.toBeNull();
@@ -638,7 +743,7 @@ describe("StarterPackHeaderChip", () => {
 
     it("keeps the saved copy while the gate does not answer retired", async () => {
       save([K8S]);
-      fake.gateVisible = false;
+      fake.gate.value = false;
       const wrapper = render();
       await flushPromises();
       expect(useBrowserMatches(ORG).copy.value).not.toBeNull();

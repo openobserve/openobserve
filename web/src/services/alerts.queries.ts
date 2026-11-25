@@ -238,13 +238,6 @@ export const saveAlertMutation = (org: string, isUpdate: () => boolean) =>
     meta: { invalidates: [alertKeys.all(org)], silentError: true },
   });
 
-export const deleteAlertMutation = (org: string) =>
-  mutationOptions({
-    mutationFn: (vars: { alertId: string; folderId?: string }) =>
-      alerts.delete_by_alert_id(org, vars.alertId, vars.folderId),
-    meta: { invalidates: [alertKeys.all(org)], silentError: true },
-  });
-
 /** An anomaly clone also lands in the anomaly configs Overview reads from its own scope. */
 export const cloneAnomalyAlertMutation = (org: string) =>
   mutationOptions({

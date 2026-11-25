@@ -185,6 +185,7 @@ const FRIENDLY_NAME_KEYS: Record<string, I18nKey> = {
   service_accounts: "accessBoundary.resources.serviceAccounts",
   cipher_keys: "accessBoundary.resources.cipherKeys",
   re_patterns: "accessBoundary.resources.regexPatterns",
+  kv: "accessBoundary.resources.keyValues",
 };
 
 // Resources no path word names on its own; only a route override or a nested-path alias reaches them.

@@ -17,7 +17,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { openobserveRum } from "@openobserve/browser-rum";
 import { closeSearchSocket } from "@/composables/useSearchWebSocket";
 import { dismissAll } from "@/lib/feedback/Toast/useToast";
-import { expireSession, stopSessionServices } from "./sessionServices";
+import { clearStarterPackKeys, expireSession, stopSessionServices } from "./sessionServices";
 
 vi.mock("@openobserve/browser-rum", () => ({
   openobserveRum: {
@@ -28,6 +28,22 @@ vi.mock("@openobserve/browser-rum", () => ({
 }));
 vi.mock("@/composables/useSearchWebSocket", () => ({ closeSearchSocket: vi.fn() }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ dismissAll: vi.fn() }));
+
+describe("clearStarterPackKeys", () => {
+  it("removes the starter pack keys of both storages, and nothing else", () => {
+    for (const storage of [localStorage, sessionStorage]) {
+      storage.setItem("o2.starterPacks.gate.org.me@x.io", "open");
+      storage.setItem("o2.unrelated", "1");
+    }
+
+    clearStarterPackKeys();
+
+    for (const storage of [localStorage, sessionStorage]) {
+      expect(Object.keys(storage)).toEqual(["o2.unrelated"]);
+      storage.clear();
+    }
+  });
+});
 
 describe("stopSessionServices", () => {
   afterEach(() => vi.clearAllMocks());
