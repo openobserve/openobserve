@@ -3781,7 +3781,7 @@ pub struct Nats {
     #[env_config(
         name = "ZO_NATS_KV_WATCH_MODULES",
         help = "Set the modules which need to use kv watcher",
-        default = ""
+        default = "/nodes/,/user_sessions/"
     )]
     pub kv_watch_modules: String,
 }
