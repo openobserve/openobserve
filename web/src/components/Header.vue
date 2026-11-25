@@ -53,8 +53,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :href="homeUrl"
           @click.prevent="goToHome"
-          class="me-2 flex cursor-pointer items-center p-0 text-xl font-bold font-semibold text-inherit no-underline"
-          >{{ store.state.zoConfig.custom_logo_text }}</a
+          class="me-2 flex min-w-0 cursor-pointer items-center p-0 text-xl font-semibold text-inherit no-underline"
+          ><OTruncatedText class="max-w-37.5 max-xl:max-w-24">{{
+            store.state.zoConfig.custom_logo_text
+          }}</OTruncatedText></a
         >
 
         <!-- Custom logo image - shows appropriate logo based on current theme -->
@@ -68,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_dark_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img"
-            style="max-width: 9.375rem; max-height: 2rem"
+            class="max-h-8 max-w-37.5 object-contain max-xl:max-w-24 max-md:max-h-6"
           />
           <!-- Light mode: Show light logo, fallback to dark logo -->
           <img
@@ -79,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
-            style="max-width: 9.375rem; max-height: 2rem"
+            class="max-h-8 max-w-37.5 object-contain max-xl:max-w-24 max-md:max-h-6"
           />
           <!-- Fallback: Show whichever logo exists (dark or light) -->
           <img
@@ -89,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_dark_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img"
-            style="max-width: 9.375rem; max-height: 2rem"
+            class="max-h-8 max-w-37.5 object-contain max-xl:max-w-24 max-md:max-h-6"
           />
           <img
             :alt="t('common.customLogoAlt')"
@@ -98,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
-            style="max-width: 9.375rem; max-height: 2rem"
+            class="max-h-8 max-w-37.5 object-contain max-xl:max-w-24 max-md:max-h-6"
           />
         </a>
 
@@ -151,18 +153,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
     </div>
 
-    <div class="flex min-w-0 flex-1 justify-center px-3 max-md:min-w-auto max-md:px-1">
+    <!-- A crowded header (wide custom logo, solution switcher) sheds the label, then the keycap, never the button. -->
+    <div
+      class="@container/search flex min-w-14 flex-1 justify-center px-3 max-md:px-1"
+    >
+      <!-- Icon and keycap sit inset like an input's, each as close to its end as to the top and bottom. -->
       <OButton
-        variant="outline"
+        variant="field"
         size="xs"
-        class="w-full max-w-112 justify-start max-md:w-auto"
+        class="w-full max-w-60 justify-start ps-1.5! pe-0.75! max-md:w-auto max-md:px-3! @max-[10rem]/search:w-auto @max-[6rem]/search:px-3!"
         data-test="header-command-palette"
         :aria-label="t('commandPalette.title')"
         @click="$emit('open-command-palette')"
       >
         <OIcon name="search" size="sm" />
-        <span class="min-w-0 flex-1 text-start max-md:hidden">{{ t("commandPalette.title") }}</span>
-        <OShortcut id="commandPalette" class="max-md:hidden" />
+        <OTruncatedText
+          class="text-text-secondary min-w-0 flex-1 text-start max-md:hidden @max-[10rem]/search:hidden"
+          >{{ t("commandPalette.trigger") }}</OTruncatedText
+        >
+        <OShortcut id="commandPalette" class="max-md:hidden @max-[6rem]/search:hidden" />
       </OButton>
     </div>
 
@@ -507,6 +516,7 @@ import LinkedAccountsDialog from "./settings/LinkedAccountsDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
@@ -540,6 +550,7 @@ export default defineComponent({
     LinkedAccountsDialog,
     OButton,
     OShortcut,
+    OTruncatedText,
     OIcon,
     AssistantSpark,
     OLockBadge,
