@@ -382,6 +382,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { isStreamPick } from "@/components/commandPalette/resourceRoutes";
 import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
@@ -2418,12 +2419,26 @@ const onOpenGroup = (term: string) => {
 };
 
 watch(
-  () => [router.currentRoute.value.name, router.currentRoute.value.query.tab] as const,
-  ([routeName, tab]) => {
+  () =>
+    [
+      router.currentRoute.value.name,
+      router.currentRoute.value.query.tab,
+      router.currentRoute.value.query.stream,
+    ] as const,
+  ([routeName, tab, stream], [, , previousStream]) => {
     // A cached page applies the URL it returns to on activation, not while it sits in the cache.
     if (routeName !== "traces" || !pageActive.value) return;
     const mode = supportedTraceSearchMode(tab);
     if (mode !== searchObj.meta.searchMode) {
+      // The stream watcher loads a stream the URL moved to; only then does it own the reload.
+      if (
+        typeof stream === "string" &&
+        (stream !== previousStream || isStreamPick("traces", stream)) &&
+        stream !== searchObj.data.stream.selectedStream.value
+      ) {
+        searchObj.meta.searchMode = mode;
+        return;
+      }
       const query = router.currentRoute.value.query;
       const entrySql =
         query.sql_mode === "true" && typeof query.query === "string"
@@ -3063,22 +3078,37 @@ const applyStreamChange = async (newStream: string) => {
   await onChangeStream();
 };
 
-// Back and Forward across a catalog stream switch move the shared stream, so the Traces and Spans tabs agree.
 watch(
   () => [router.currentRoute.value.name, router.currentRoute.value.query.stream] as const,
-  ([routeName, stream]) => {
+  async ([routeName, stream], [, previousStream]) => {
     if (routeName !== "traces" || !pageActive.value || !pageLoaded) return;
-    if (activeTab.value !== "services-catalog" || typeof stream !== "string") return;
+    // With auto-run off the picked stream is not in the URL yet, so an unchanged URL must not undo it.
+    if (typeof stream !== "string") return;
+    if (stream === previousStream && !isStreamPick("traces", stream)) return;
     if (stream === searchObj.data.stream.selectedStream.value) return;
     if (!searchObj.data.stream.streamLists.some((s: any) => s.value === stream)) return;
+    const org = store.state.selectedOrganization.identifier;
     searchObj.data.stream.selectedStream = { label: stream, value: stream };
-    // A stream switch clears the query, so undoing it brings back the query its entry was left with.
     const query = router.currentRoute.value.query.query;
     searchObj.data.editorValue = typeof query === "string" ? b64DecodeUnicode(query) || "" : "";
-    void extractFields().then(() => {
-      if (searchObj.data.editorValue && searchObj.data.stream.selectedStreamFields.length)
-        restoreFilters(searchObj.data.editorValue);
-    });
+    await extractFields();
+    if (
+      !pageActive.value ||
+      store.state.selectedOrganization.identifier !== org ||
+      router.currentRoute.value.query.stream !== stream ||
+      searchObj.data.stream.selectedStream.value !== stream
+    )
+      return;
+    if (searchObj.data.editorValue && searchObj.data.stream.selectedStreamFields.length)
+      restoreFilters(searchObj.data.editorValue);
+    loadLocalLogFilterField(searchObj.meta.searchMode);
+    rebuildColumns();
+    if (
+      activeTab.value !== "services-catalog" &&
+      activeTab.value !== "service-graph" &&
+      !isAutoRunOff()
+    )
+      runQueryFn(false);
   },
 );
 

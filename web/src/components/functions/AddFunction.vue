@@ -462,6 +462,12 @@ export default defineComponent({
 
     const functionDraft = useEditorDraft<FunctionDraftData>({
       kind: "function",
+      leaveOnRouteUpdate: (to, from) =>
+        to.path !== from.path ||
+        (typeof to.query.palette_intent === "string" &&
+          to.query.palette_intent !== from.query.palette_intent) ||
+        (to.query.action === "update" && to.query.name !== from.query.name) ||
+        (to.query.action === "add" && from.query.action === "update"),
       entityLabel: () => t("common.editorDraft.entities.function"),
       entityId: () => serverFunction?.name ?? null,
       snapshot: () => ({

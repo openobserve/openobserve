@@ -35,14 +35,6 @@ cloud = [
     "openobserve-core/cloud",
     "stream/cloud",
 ]
-vectorscan = [
-    "openobserve-api-ingest/vectorscan",
-    "openobserve-api-management/vectorscan",
-    "openobserve-api-pipelines/vectorscan",
-    "openobserve-api-search/vectorscan",
-    "openobserve-core/vectorscan",
-    "stream/vectorscan",
-]
 cpu-profiling = ["openobserve-api-management/cpu-profiling"]
 profiling = ["cpu-profiling", "openobserve-api-management/profiling"]
 

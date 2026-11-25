@@ -297,10 +297,10 @@
       "importDesc": "Bir işlem hattı tanımı yükleyin"
     },
     "noQueues": {
-      "title": "İlk kuyruğunuzu oluşturun",
-      "description": "Kuyruklar, durum bilgisi tutan inceleme yapılacaklar listeleridir — Score Config'lerini, hedef veri kümesini ve öğeleri insan incelemesi için besleyen bir filtreyi bağlayın.",
-      "action": "Yeni kuyruk",
-      "actionDesc": "Boş bir kuyruk başlat"
+      "title": "İlk açıklama kuyruğunuzu oluşturun",
+      "description": "Açıklama kuyrukları, inceleme yapılacaklar listeleridir — Puan Yapılandırmalarını, bir hedef veri kümesini ve insan incelemesi için öğeleri içeri besleyen bir filtreyi bağlayın.",
+      "action": "Yeni açıklama kuyruğu",
+      "actionDesc": "Boş bir açıklama kuyruğu başlatın"
     },
     "noPrompts": {
       "title": "İlk isteminizi oluşturun",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Burada Sağlıksız Bir Şey Yok",
-      "description": "Bu pencerede sağlıksız öğe yok. Zaman aralığını genişletin veya daha önce incelediğiniz öğeleri görmek için kuyruk filtresini değiştirin."
+      "description": "Bu pencerede sağlıksız öğe yok. Zaman aralığını genişletin veya ön incelemesini zaten yaptığınız öğeleri görmek için açıklama kuyruğu filtresini değiştirin."
     },
     "noTraces": {
       "title": "İz bulunamadı",
@@ -9987,6 +9987,10 @@
     },
     "browserDeniedFileDownload": "Tarayıcı dosya indirmeyi reddetti...",
     "chartDataDownloadedCsv": "Grafik verileri CSV dosyası olarak indirildi",
+    "tableDownloadPartial": "Sonucun yalnızca ilk {count} satırı alındı, bu nedenle dosya eksik.",
+    "tableDownloadServerPartial": "Sunucu kısmi veri döndürdü, bu nedenle dosya eksik olabilir.",
+    "tableDownloadWaitForLoad": "Panel hâlâ yükleniyor. Bittiğinde yeniden indirin.",
+    "preparingTableDownload": "İndirme için tüm satırlar alınıyor…",
     "chartDataDownloadedJson": "Grafik verileri JSON dosyası olarak indirildi",
     "dynamicFilters": "Dinamik filtreler",
     "failedToCancelRunningQuery": "Çalışan sorgu iptal edilemedi",
@@ -16092,8 +16096,10 @@
         "searchSuffixesAria": "Sonek filtrelerini ara",
         "searchTypesAria": "Tür filtrelerinde ara",
         "facetAria": "{label}, {count} metrik",
+        "facetAriaUnchecked": "{label}, {count} verili, {unchecked} henüz işaretlenmedi",
         "noPrefixMatch": "Eşleşen önek yok.",
         "noSuffixMatch": "Eşleşen sonek yok.",
+        "uncheckedTooltip": "{count} verili · {unchecked} henüz işaretlenmedi",
         "noTypeMatch": "Eşleşen tür yok."
       },
       "views": {
@@ -17763,13 +17769,9 @@
       "noAgentsDescription": "Seçilen zaman aralığında GenAI ajanı tespit edilmedi. Daha geniş bir aralık deneyin veya akış görünümüne geri dönün.",
       "viewByStream": "Akışa Göre Görüntüle",
       "search": {
-        "placeholder": "Kullanıcı veya mesaja göre ara",
-        "title": "Kullanıcı kimliği veya konuşma metni, arama metnini içeren oturumları eşleştir",
         "noResultsTitle": "Aramanızla eşleşen oturum yok",
-        "noResultsDescription": "Farklı bir terim, başka bir alan veya daha geniş bir zaman aralığı deneyin.",
-        "clear": "Aramayı temizle",
-        "user": "Kullanıcı: {user}",
-        "clearUser": "Tüm kullanıcıları göster"
+        "noResultsDescription": "Farklı bir filtre veya daha geniş bir zaman aralığı deneyin.",
+        "clear": "Filtreyi temizle"
       }
     },
     "sessionDetail": {
@@ -19080,7 +19082,7 @@
       "users": "Kullanıcılar",
       "budgets": "Bütçeler",
       "discovery": "Keşif",
-      "queues": "Kuyruklar",
+      "queues": "Açıklama Kuyrukları",
       "datasets": "Veri Kümeleri",
       "experiments": "Deneyler",
       "quality": "KALİTE",
@@ -19365,15 +19367,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "İnceleme Kuyruğuna Ekle",
-        "title": "İnceleme Kuyruğuna Ekle",
-        "hint": "{ref} öğesini insan incelemesi için kuyruğa ekleyin. Olduğu yerde kalır — inceleme durumu kuyrukta bulunur.",
-        "queueLabel": "Kuyruk",
-        "queuePlaceholder": "Bir Kuyruk Seçin...",
-        "noQueues": "Hiçbir kuyruk {scope} kabul etmiyor — önce Kuyruklar sayfasından bir tane oluşturun.",
-        "confirm": "Kuyruğa Ekle",
+        "button": "Açıklama kuyruğuna ekle",
+        "title": "Açıklama kuyruğuna ekle",
+        "hint": "{ref} öğesini insan incelemesi için ekleyin. Olduğu yerde kalır — açıklama kuyruğu inceleme durumunu izler.",
+        "queueLabel": "Açıklama Kuyruğu",
+        "queuePlaceholder": "Bir açıklama kuyruğu seçin...",
+        "noQueues": "Hiçbir açıklama kuyruğu {scope} kabul etmiyor — önce Açıklama Kuyrukları sayfasından bir tane oluşturun.",
+        "confirm": "Açıklama kuyruğuna ekle",
         "success": "{queue} kuyruğuna eklendi",
-        "error": "Bu öğe kuyruğa eklenemedi"
+        "error": "Bu öğe açıklama kuyruğuna eklenemedi"
       },
       "dataset": {
         "button": "Veri Kümesine Ekle",
@@ -19410,12 +19412,12 @@
         "session": "Oturumlar"
       },
       "inQueueFilter": {
-        "label": "Kuyrukta",
-        "notEnqueued": "Kuyrukta: Sıraya Alınmadı",
-        "enqueued": "Kuyrukta: Herhangi Bir Kuyruk",
-        "pending": "Kuyrukta: Beklemede",
-        "reviewed": "Kuyrukta: İncelendi",
-        "all": "Kuyrukta: Tümü"
+        "label": "Açıklama kuyruğu durumu",
+        "notEnqueued": "Kuyruğa alınmadı",
+        "enqueued": "Bir açıklama kuyruğunda",
+        "pending": "İnceleme bekliyor",
+        "reviewed": "İncelendi",
+        "all": "Tüm öğeler"
       },
       "columns": {
         "timestamp": "Zaman Damgası",
@@ -19431,7 +19433,7 @@
         "service": "Hizmet",
         "input": "Girdi",
         "quality": "Kalite",
-        "inQueue": "Kuyrukta mı?",
+        "inQueue": "Açıklama kuyruğunda mı?",
         "actions": "Eylemler"
       },
       "spanParent": "İçinde {trace}",
@@ -19443,26 +19445,26 @@
       "inQueue": {
         "none": "Sıraya Alınmadı",
         "reviewed": "Zaten İncelendi",
-        "multiple": "{count} Kuyrukta"
+        "multiple": "{count} açıklama kuyruğunda"
       },
-      "addToQueue": "Kuyruğa Ekle",
+      "addToQueue": "Açıklama kuyruğuna ekle",
       "addToQueueMenu": {
-        "loading": "Kuyruklar yükleniyor...",
-        "noQueues": "Henüz kuyruk yok — önce Kuyruklar sayfasından bir tane oluşturun.",
+        "loading": "Açıklama kuyrukları yükleniyor...",
+        "noQueues": "Henüz açıklama kuyruğu yok — önce Açıklama Kuyrukları sayfasından bir tane oluşturun.",
         "dimensions": "{count} boyut | {count} boyut",
         "accepts": "Yalnızca {types} kabul eder",
-        "sectionTitle": "Kuyruğa Ekle",
-        "manageQueues": "Kuyrukları Yönet"
+        "sectionTitle": "Açıklama kuyruğuna ekle",
+        "manageQueues": "Açıklama kuyruklarını yönet"
       },
-      "addSuccess": "{queue} kuyruğuna eklendi — satır Discovery'de kalır, durumu kuyrukta tutulur.",
-      "addError": "Öğeler kuyruğa eklenemedi",
-      "openQueue": "Kuyruğu Aç",
-      "queuesError": "Kuyruklar yüklenemedi"
+      "addSuccess": "{queue} kuyruğuna eklendi — satır Discovery'de kalır ve açıklama kuyruğu inceleme durumunu izler.",
+      "addError": "Öğeler açıklama kuyruğuna eklenemedi",
+      "openQueue": "Açıklama kuyruğunu aç",
+      "queuesError": "Açıklama kuyrukları yüklenemedi"
     },
     "queues": {
-      "searchPlaceholder": "Kuyrukları Ara...",
-      "newButton": "Yeni Kuyruk",
-      "loadError": "Kuyruklar yüklenemedi",
+      "searchPlaceholder": "Açıklama kuyruklarında ara...",
+      "newButton": "Yeni açıklama kuyruğu",
+      "loadError": "Açıklama kuyrukları yüklenemedi",
       "optionsLoadError": "Puan yapılandırmaları yüklenemedi",
       "review": "İncele",
       "cleared": "Temizlendi",
@@ -19477,7 +19479,7 @@
         "actions": "Eylemler"
       },
       "create": {
-        "title": "Yeni Kuyruk",
+        "title": "Yeni açıklama kuyruğu",
         "errors": {
           "name": "Ad zorunludur",
           "scoreConfigs": "En az bir Puan Yapılandırması bağlayın"
@@ -19485,9 +19487,9 @@
         "nameLabel": "Ad",
         "namePlaceholder": "ör. hallucination_review",
         "descriptionLabel": "Açıklama",
-        "descriptionPlaceholder": "Bu kuyruğun ne için olduğu ve kimin incelediği...",
+        "descriptionPlaceholder": "Bu açıklama kuyruğunun ne için olduğu ve kimin inceleyeceği...",
         "scoreConfigsLabel": "Puan Yapılandırmaları",
-        "scoreConfigsHint": "Bir kuyruk, öğeleri bir veya daha fazla boyutta puanlar. Her Puan Yapılandırması tek bir boyuttur — bağlanacak yapılandırmaları seçin ve her birini bir sürüme sabitleyin.",
+        "scoreConfigsHint": "Bir açıklama kuyruğu öğeleri bir veya daha fazla boyutta puanlar. Her Puan Yapılandırması tek bir boyuttur — bağlanacak yapılandırmaları seçin ve her birini bir sürüme sabitleyin.",
         "scoreConfigsEmpty": "Bağlanacak Puan Yapılandırmalarını seçin.",
         "addScoreConfig": "Puan Yapılandırması Ekle",
         "allScoreConfigsAdded": "Tüm puan yapılandırmaları eklendi.",
@@ -19495,10 +19497,10 @@
         "noScoreConfigs": "Henüz puan yapılandırması yok — önce Puan Yapılandırmaları bölümünde bir tane oluşturun.",
         "targetDatasetLabel": "Hedef Veri Seti",
         "targetDatasetNone": "Yok (yalnızca inceleme)",
-        "targetDatasetHint": "Yalnızca inceleme kuyruğu — incelenen öğeler bir veri setine dahil edilmeyecek.",
+        "targetDatasetHint": "Hedef veri kümesi olmadan, bu açıklama kuyruğundaki öğeler yalnızca incelenir.",
         "autoRoutingLabel": "Otomatik Yönlendirme",
-        "autoRoutingHint": "Puanları bir koşula uyan nesneleri otomatik olarak kuyruğa ekleyin. Bu kuyruğu Discovery'den manuel olarak beslemek için boş bırakın.",
-        "autoRoutingEmpty": "Otomatik yönlendirme yok — bu kuyruk manuel olarak beslenir.",
+        "autoRoutingHint": "Puanları bir koşulla eşleşen nesneleri otomatik olarak kuyruğa alın. Bu açıklama kuyruğuna öğeleri Discovery'den eklemek için boş bırakın.",
+        "autoRoutingEmpty": "Öğeler bu açıklama kuyruğuna elle eklenir.",
         "addCondition": "Koşul Ekle",
         "conditionAnd": "VE",
         "operatorIs": "eşittir",
@@ -19507,12 +19509,12 @@
         "conditionValuePlaceholder": "Değer",
         "pin": "Sürümü Sabitle",
         "versionLatest": "v{version} (en son)",
-        "success": "Kuyruk oluşturuldu",
-        "error": "Kuyruk oluşturulamadı"
+        "success": "Açıklama kuyruğu oluşturuldu",
+        "error": "Açıklama kuyruğu oluşturulamadı"
       },
       "detail": {
-        "fallbackTitle": "Kuyruk",
-        "loadError": "Kuyruk öğeleri yüklenemedi",
+        "fallbackTitle": "Açıklama Kuyruğu",
+        "loadError": "Açıklama kuyruğu öğeleri yüklenemedi",
         "startReviewing": "İncelemeye Başla",
         "scoreConfigs": "Puan Yapılandırmaları ({count})",
         "targetDataset": "Hedef Veri Seti",
@@ -19522,7 +19524,7 @@
         "inTrace": "İz içinde {traceId}",
         "reviewAgain": "Tekrar İncele",
         "emptyTitle": "İncelenecek Bir Şey Yok",
-        "emptyBody": "Discovery veya bir iz görünümünden bu kuyruğa izler, span'ler veya oturumlar ekleyin.",
+        "emptyBody": "İzleri, span'leri veya oturumları Discovery'den ya da bir iz görünümünden bu açıklama kuyruğuna ekleyin.",
         "columns": {
           "refType": "Ref",
           "refId": "Referans",
@@ -19593,7 +19595,7 @@
         "true": "Doğru",
         "false": "Yanlış",
         "allReviewedTitle": "Tüm öğeler incelendi",
-        "allReviewedBody": "Bu kuyruktaki her öğenin incelemesi tamamlandı."
+        "allReviewedBody": "Bu açıklama kuyruğundaki her öğenin incelemesi tamamlandı."
       }
     },
     "experiments": {
@@ -25749,8 +25751,8 @@
     "sloDetail": "SLO Detayı",
     "alertDetail": "Uyarı Detayı",
     "editAlert": "Uyarıyı Düzenle",
-    "aiQueueDetail": "Kuyruk",
-    "aiQueueReview": "Kuyruk İncelemesi",
+    "aiQueueDetail": "Etiketleme Kuyruğu",
+    "aiQueueReview": "Etiketleme Kuyruğu İncelemesi",
     "aiDatasetDetail": "Veri Seti",
     "aiPromptCreate": "Yeni Prompt",
     "aiPromptVersionCreate": "Yeni Prompt Sürümü",
@@ -28137,7 +28139,7 @@
     "teamChannelSilent": "Bu ekibin kanalı bilerek boş bırakılmıştır — çağrılar hiçbir yerde duyurulmayacaktır.",
     "slackChannelTitle": "Slack kanalı",
     "slackChannelSetWith": "Bir Slack kanalını {command} ile ayarlayın",
-    "slackChannelLinkHint": "Bunu o Slack kanalında yazın. Slack hesabınızın bağlı olması gerekir: Slack'te /o2 link yazın.",
+    "slackChannelLinkHint": "Bunu o Slack kanalında yazın. Slack hesabınızın bağlı olması gerekir: Slack'te {command} link yazın.",
     "slackChannelSendTest": "Test mesajı gönder",
     "slackChannelClear": "Temizle",
     "slackChannelBackup": "{webhook} yalnızca yedek olarak kullanılsın",
@@ -30893,6 +30895,13 @@
         "http": "HTTP",
         "httpDescription": "Slack, genel URL'nizi çağırır. Slack'te bir kez Doğrula tıklaması gerekir",
         "channelHistory": "Botun başlattığı konulardaki yanıtları okumasına izin ver",
+        "appName": "Uygulama adı",
+        "appNameHelp": "Kişilerin Slack'te gördüğü ad. Her OpenObserve sunucusuna kendi adını verin, örneğin OpenObserve Staging.",
+        "appNameTooLong": "Uygulama adı en fazla {max} karakter olmalıdır",
+        "appNameMarkup": "Uygulama adı <, > veya & içermemelidir",
+        "command": "Eğik çizgi komutu",
+        "commandInvalid": "/ ile başlayın ve en fazla {max} karakter kullanın: küçük harfler, rakamlar, - ve _",
+        "commandWarning": "Slack bir çalışma alanında bir eğik çizgi komutunu yalnızca tek bir uygulama için çalıştırır. Bu çalışma alanındaki başka bir uygulama {command} komutunu zaten kullanıyorsa, siz bunu yükledikten sonra {command} o uygulama için çalışmayı durdurur.",
         "tokenLabel": "Uygulama yapılandırma yenileme token'ı (xoxe-…)",
         "tokenHelp": "Slack'in Your Apps sayfasında, Your App Configuration Tokens › Generate Token bir erişim token'ı ve bir yenileme token'ı gösterir: yenileme token'ını yapıştırın. OpenObserve bu token'ı döndürerek yeniler ve uygulamayı daha sonra güncellemek üzere en yenisini şifreli olarak saklar.",
         "generateToken": "Token oluştur",
@@ -34703,6 +34712,25 @@
       },
       "noHighConfidence": "Yüksek güvenilirlikli ad yok"
     }
+  },
+  "commandPalette": {
+    "title": "Sayfa, kaynak ve eylem ara",
+    "placeholder": "Ad ve kimlik ara",
+    "moreTypes": "Diğer türler",
+    "pages": "Sayfalar",
+    "actions": "Oluştur",
+    "recent": "Son ziyaretler",
+    "localHistory": "Yerel geçmiş",
+    "clearRecent": "Son ziyaretleri temizle",
+    "historyStorageUnavailable": "Ziyaretler kaydedilemiyor",
+    "recentUnavailable": "Bu öğe şu anda kullanılamıyor",
+    "loading": "Aranıyor…",
+    "partial": "Bazı sonuçlar kullanılamıyor",
+    "failed": "Arama tamamlanamadı",
+    "offline": "Çevrimdışısınız. Son ziyaretler kullanılabilir.",
+    "sourceUnavailable": "Bu kaynak türü şu anda kullanılamıyor",
+    "emptyHelp": "Kaynak aramak için ad veya kimlik girin",
+    "globalShortcut": "Genel aramayı aç"
   },
   "timeRangeInput": {
     "label": "Bir zaman aralığı yazın",

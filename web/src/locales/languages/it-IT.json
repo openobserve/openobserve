@@ -297,10 +297,10 @@
       "importDesc": "Carica una definizione di pipeline"
     },
     "noQueues": {
-      "title": "Crea la tua prima coda",
-      "description": "Le code sono elenchi di attività di revisione con stato — associano Score Config, un dataset di destinazione e un filtro che alimenta gli elementi per la revisione umana.",
-      "action": "Nuova coda",
-      "actionDesc": "Avvia una coda vuota"
+      "title": "Crea la tua prima coda di annotazione",
+      "description": "Le code di annotazione sono elenchi di attività di revisione: collega Score Config, un dataset di destinazione e un filtro che inserisce gli elementi per la revisione umana.",
+      "action": "Nuova coda di annotazione",
+      "actionDesc": "Inizia con una coda di annotazione vuota"
     },
     "noPrompts": {
       "title": "Crea il tuo primo prompt",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Nessun elemento non sano qui",
-      "description": "Nessun elemento non sano in questa finestra. Amplia l'intervallo di tempo o cambia il filtro della coda per vedere gli elementi già classificati."
+      "description": "Nessun elemento non integro in questa finestra. Amplia l'intervallo di tempo o cambia il filtro della coda di annotazione per vedere gli elementi che hai già valutato."
     },
     "noTraces": {
       "title": "Nessuna traccia trovata",
@@ -9987,6 +9987,10 @@
     },
     "browserDeniedFileDownload": "Il browser ha negato il download del file...",
     "chartDataDownloadedCsv": "Dati del grafico scaricati come file CSV",
+    "tableDownloadPartial": "Sono state recuperate solo le prime {count} righe del risultato, quindi il file è parziale.",
+    "tableDownloadServerPartial": "Il server ha restituito dati parziali, quindi il file potrebbe essere incompleto.",
+    "tableDownloadWaitForLoad": "Il pannello è ancora in caricamento. Scarica di nuovo al termine.",
+    "preparingTableDownload": "Recupero di tutte le righe per il download…",
     "chartDataDownloadedJson": "Dati del grafico scaricati come file JSON",
     "dynamicFilters": "Filtri dinamici",
     "failedToCancelRunningQuery": "Impossibile annullare la query in esecuzione",
@@ -16092,8 +16096,10 @@
         "searchSuffixesAria": "Cerca filtri suffisso",
         "searchTypesAria": "Filtri per tipo di ricerca",
         "facetAria": "{label}, {count} metriche",
+        "facetAriaUnchecked": "{label}, {count} con dati, {unchecked} non ancora spuntati",
         "noPrefixMatch": "Nessun prefisso corrisponde.",
         "noSuffixMatch": "Nessun suffisso corrisponde.",
+        "uncheckedTooltip": "{count} con dati · {unchecked} non ancora spuntati",
         "noTypeMatch": "Nessun tipo corrisponde."
       },
       "views": {
@@ -17763,13 +17769,9 @@
       "noAgentsDescription": "Nessun agente GenAI rilevato per l'intervallo di tempo selezionato. Prova un intervallo più ampio o torna alla vista stream.",
       "viewByStream": "Visualizza per stream",
       "search": {
-        "placeholder": "Cerca per utente o messaggio",
-        "title": "Trova le sessioni il cui ID utente o testo della conversazione contiene il testo",
         "noResultsTitle": "Nessuna sessione corrisponde alla ricerca",
-        "noResultsDescription": "Prova un altro termine, un altro campo o un intervallo di tempo più ampio.",
-        "clear": "Cancella ricerca",
-        "user": "Utente: {user}",
-        "clearUser": "Mostra tutti gli utenti"
+        "noResultsDescription": "Prova un filtro diverso o un intervallo di tempo più ampio.",
+        "clear": "Cancella filtro"
       }
     },
     "sessionDetail": {
@@ -19080,7 +19082,7 @@
       "users": "Utenti",
       "budgets": "Budget",
       "discovery": "Scoperta",
-      "queues": "Code",
+      "queues": "Code di annotazione",
       "datasets": "Dataset",
       "experiments": "Esperimenti",
       "quality": "Qualità",
@@ -19365,15 +19367,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "Aggiungi alla coda di revisione",
-        "title": "Aggiungi alla coda di revisione",
-        "hint": "Metti {ref} in coda per la revisione umana. Rimane dov'è — lo stato della revisione vive nella coda.",
-        "queueLabel": "Coda",
-        "queuePlaceholder": "Seleziona una coda...",
-        "noQueues": "Nessuna coda accetta un {scope} — creane una dalla pagina Code.",
-        "confirm": "Aggiungi alla coda",
+        "button": "Aggiungi alla coda di annotazione",
+        "title": "Aggiungi alla coda di annotazione",
+        "hint": "Aggiungi {ref} per la revisione umana. Resta dov'è: la coda di annotazione ne tiene traccia dello stato di revisione.",
+        "queueLabel": "Coda di annotazione",
+        "queuePlaceholder": "Seleziona una coda di annotazione...",
+        "noQueues": "Nessuna coda di annotazione accetta un {scope}: creane prima una dalla pagina Code di annotazione.",
+        "confirm": "Aggiungi alla coda di annotazione",
         "success": "Aggiunto a {queue}",
-        "error": "Impossibile aggiungere questo elemento alla coda"
+        "error": "Impossibile aggiungere questo elemento alla coda di annotazione"
       },
       "dataset": {
         "button": "Aggiungi al dataset",
@@ -19410,12 +19412,12 @@
         "session": "Sessioni"
       },
       "inQueueFilter": {
-        "label": "In coda",
-        "notEnqueued": "In coda: Non in coda",
-        "enqueued": "In coda: Qualsiasi coda",
-        "pending": "In coda: In attesa",
-        "reviewed": "In coda: Revisionato",
-        "all": "In coda: Tutti"
+        "label": "Stato della coda di annotazione",
+        "notEnqueued": "Non in coda",
+        "enqueued": "In una coda di annotazione",
+        "pending": "In attesa di revisione",
+        "reviewed": "Revisionato",
+        "all": "Tutti gli elementi"
       },
       "columns": {
         "timestamp": "Data e ora",
@@ -19431,7 +19433,7 @@
         "service": "Servizio",
         "input": "Input",
         "quality": "Qualità",
-        "inQueue": "In coda?",
+        "inQueue": "Nella coda di annotazione?",
         "actions": "Azioni"
       },
       "spanParent": "In {trace}",
@@ -19443,26 +19445,26 @@
       "inQueue": {
         "none": "Non in coda",
         "reviewed": "Già revisionato",
-        "multiple": "In {count} code"
+        "multiple": "In {count} code di annotazione"
       },
-      "addToQueue": "Aggiungi alla coda",
+      "addToQueue": "Aggiungi alla coda di annotazione",
       "addToQueueMenu": {
-        "loading": "Caricamento code...",
-        "noQueues": "Nessuna coda ancora — creane una dalla pagina Code.",
+        "loading": "Caricamento delle code di annotazione...",
+        "noQueues": "Nessuna coda di annotazione: creane prima una dalla pagina Code di annotazione.",
         "dimensions": "{count} dimensione | {count} dimensioni",
         "accepts": "Accetta {types} soltanto",
-        "sectionTitle": "Aggiungi alla coda",
-        "manageQueues": "Gestisci code"
+        "sectionTitle": "Aggiungi alla coda di annotazione",
+        "manageQueues": "Gestisci le code di annotazione"
       },
-      "addSuccess": "Aggiunto a {queue} — la riga rimane in Discovery, il suo stato vive nella coda.",
-      "addError": "Impossibile aggiungere elementi alla coda",
-      "openQueue": "Apri coda",
-      "queuesError": "Impossibile caricare le code"
+      "addSuccess": "Aggiunto a {queue}: la riga resta in Discovery e la coda di annotazione ne tiene traccia dello stato di revisione.",
+      "addError": "Impossibile aggiungere gli elementi alla coda di annotazione",
+      "openQueue": "Apri coda di annotazione",
+      "queuesError": "Impossibile caricare le code di annotazione"
     },
     "queues": {
-      "searchPlaceholder": "Cerca code...",
-      "newButton": "Nuova coda",
-      "loadError": "Impossibile caricare le code",
+      "searchPlaceholder": "Cerca code di annotazione...",
+      "newButton": "Nuova coda di annotazione",
+      "loadError": "Impossibile caricare le code di annotazione",
       "optionsLoadError": "Impossibile caricare le configurazioni di punteggio",
       "review": "Revisiona",
       "cleared": "Cancellato",
@@ -19477,7 +19479,7 @@
         "actions": "Azioni"
       },
       "create": {
-        "title": "Nuova coda",
+        "title": "Nuova coda di annotazione",
         "errors": {
           "name": "Il nome è obbligatorio",
           "scoreConfigs": "Associa almeno una configurazione punteggio"
@@ -19485,9 +19487,9 @@
         "nameLabel": "Nome",
         "namePlaceholder": "es. hallucination_review",
         "descriptionLabel": "Descrizione",
-        "descriptionPlaceholder": "A cosa serve questa coda e chi la revisiona...",
+        "descriptionPlaceholder": "A cosa serve questa coda di annotazione e chi la revisiona...",
         "scoreConfigsLabel": "Configurazioni punteggio",
-        "scoreConfigsHint": "Una coda assegna punteggi agli elementi su una o più dimensioni. Ogni configurazione punteggio è una singola dimensione — scegli le configurazioni da associare e fissa ciascuna a una versione.",
+        "scoreConfigsHint": "Una coda di annotazione assegna un punteggio agli elementi su una o più dimensioni. Ogni Score Config è una singola dimensione: scegli le configurazioni da collegare e fissa ciascuna a una versione.",
         "scoreConfigsEmpty": "Scegli le configurazioni punteggio da associare.",
         "addScoreConfig": "Aggiungi configurazione punteggio",
         "allScoreConfigsAdded": "Tutte le configurazioni punteggio sono state aggiunte.",
@@ -19495,10 +19497,10 @@
         "noScoreConfigs": "Nessuna configurazione punteggio ancora — creane prima una in Configurazioni punteggio.",
         "targetDatasetLabel": "Dataset di destinazione",
         "targetDatasetNone": "Nessuno (sola revisione)",
-        "targetDatasetHint": "Coda di sola revisione — gli elementi revisionati non verranno distillati in un dataset.",
+        "targetDatasetHint": "Senza un dataset di destinazione, gli elementi di questa coda di annotazione vengono solo revisionati.",
         "autoRoutingLabel": "Instradamento automatico",
-        "autoRoutingHint": "Accoda automaticamente gli oggetti i cui punteggi corrispondono a una condizione. Lascia vuoto per alimentare questa coda manualmente da Discovery.",
-        "autoRoutingEmpty": "Nessun instradamento automatico — questa coda viene alimentata manualmente.",
+        "autoRoutingHint": "Accoda automaticamente gli oggetti i cui punteggi soddisfano una condizione. Lascia vuoto per aggiungere elementi a questa coda di annotazione da Discovery.",
+        "autoRoutingEmpty": "Gli elementi vengono aggiunti manualmente a questa coda di annotazione.",
         "addCondition": "Aggiungi condizione",
         "conditionAnd": "E",
         "operatorIs": "è",
@@ -19507,12 +19509,12 @@
         "conditionValuePlaceholder": "Valore",
         "pin": "Fissa versione",
         "versionLatest": "v{version} (ultima)",
-        "success": "Coda creata",
-        "error": "Impossibile creare la coda"
+        "success": "Coda di annotazione creata",
+        "error": "Impossibile creare la coda di annotazione"
       },
       "detail": {
-        "fallbackTitle": "Coda",
-        "loadError": "Impossibile caricare gli elementi della coda",
+        "fallbackTitle": "Coda di annotazione",
+        "loadError": "Impossibile caricare gli elementi della coda di annotazione",
         "startReviewing": "Inizia la revisione",
         "scoreConfigs": "Configurazioni punteggio ({count})",
         "targetDataset": "Dataset di destinazione",
@@ -19522,7 +19524,7 @@
         "inTrace": "Nella traccia {traceId}",
         "reviewAgain": "Rivedi",
         "emptyTitle": "Niente da revisionare",
-        "emptyBody": "Aggiungi tracce, span o sessioni a questa coda da Discovery o da una vista delle tracce.",
+        "emptyBody": "Aggiungi tracce, span o sessioni a questa coda di annotazione da Discovery o dalla vista di una traccia.",
         "columns": {
           "refType": "Rif.",
           "refId": "Riferimento",
@@ -19593,7 +19595,7 @@
         "true": "Vero",
         "false": "Falso",
         "allReviewedTitle": "Tutti gli elementi revisionati",
-        "allReviewedBody": "Ogni elemento in questa coda ha una revisione completata."
+        "allReviewedBody": "Ogni elemento di questa coda di annotazione ha una revisione completata."
       }
     },
     "experiments": {
@@ -25749,8 +25751,8 @@
     "sloDetail": "Dettaglio SLO",
     "alertDetail": "Dettaglio avviso",
     "editAlert": "Modifica avviso",
-    "aiQueueDetail": "Coda",
-    "aiQueueReview": "Revisione Coda",
+    "aiQueueDetail": "Coda di annotazione",
+    "aiQueueReview": "Revisione coda di annotazione",
     "aiDatasetDetail": "Dataset",
     "aiPromptCreate": "Nuovo prompt",
     "aiPromptVersionCreate": "Nuova versione del prompt",
@@ -28137,7 +28139,7 @@
     "teamChannelSilent": "Il canale di questo team è vuoto di proposito: le notifiche non verranno annunciate da nessuna parte.",
     "slackChannelTitle": "Canale Slack",
     "slackChannelSetWith": "Imposta un canale Slack con {command}",
-    "slackChannelLinkHint": "Scrivilo in quel canale Slack. Richiede che il tuo account Slack sia collegato: digita /o2 link in Slack.",
+    "slackChannelLinkHint": "Scrivilo in quel canale Slack. È necessario collegare il tuo account Slack: digita {command} link in Slack.",
     "slackChannelSendTest": "Invia messaggio di prova",
     "slackChannelClear": "Rimuovi",
     "slackChannelBackup": "Usa {webhook} solo come backup",
@@ -30893,6 +30895,13 @@
         "http": "HTTP",
         "httpDescription": "Slack chiama il tuo URL pubblico. Richiede un clic su Verifica in Slack",
         "channelHistory": "Consenti al bot di leggere le risposte nei thread che ha avviato",
+        "appName": "Nome dell'app",
+        "appNameHelp": "Il nome che le persone vedono in Slack. Assegna a ogni server OpenObserve un nome proprio, ad esempio OpenObserve Staging.",
+        "appNameTooLong": "Il nome dell'app può contenere al massimo {max} caratteri",
+        "appNameMarkup": "Il nome dell'app non può contenere <, > o &",
+        "command": "Comando slash",
+        "commandInvalid": "Inizia con / e usa al massimo {max} caratteri: lettere minuscole, cifre, - e _",
+        "commandWarning": "Slack esegue un comando slash per una sola app in un workspace. Se un'altra app in questo workspace usa già {command}, {command} smette di funzionare per quell'app dopo che installi questa.",
         "tokenLabel": "Token di aggiornamento della configurazione dell'app (xoxe-…)",
         "tokenHelp": "Nella pagina Le tue app di Slack, Token di configurazione della tua app › Genera token mostra un token di accesso e un token di aggiornamento: incolla il token di aggiornamento. OpenObserve ne esegue la rotazione e conserva crittografato quello più recente per aggiornare l'app in seguito.",
         "generateToken": "Genera un token",
@@ -34703,6 +34712,25 @@
       },
       "noHighConfidence": "Nessun nome ad alta confidenza"
     }
+  },
+  "commandPalette": {
+    "title": "Cerca pagine, risorse e azioni",
+    "placeholder": "Cerca nomi e ID",
+    "moreTypes": "Altri tipi",
+    "pages": "Pagine",
+    "actions": "Crea",
+    "recent": "Visite recenti",
+    "localHistory": "Cronologia locale",
+    "clearRecent": "Cancella visite recenti",
+    "historyStorageUnavailable": "Impossibile salvare le visite",
+    "recentUnavailable": "Questo elemento non è disponibile",
+    "loading": "Ricerca…",
+    "partial": "Alcuni risultati non sono disponibili",
+    "failed": "Impossibile completare la ricerca",
+    "offline": "Offline. Le visite recenti restano disponibili.",
+    "sourceUnavailable": "Questo tipo di risorsa non è disponibile",
+    "emptyHelp": "Inserisci un nome o ID per cercare",
+    "globalShortcut": "Apri ricerca globale"
   },
   "timeRangeInput": {
     "label": "Digita un intervallo di tempo",

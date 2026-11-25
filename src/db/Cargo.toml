@@ -16,7 +16,6 @@ enterprise = [
     "config/enterprise",
 ]
 cloud = ["enterprise", "o2_enterprise/cloud"]
-vectorscan = ["dep:o2_enterprise", "o2_enterprise/vectorscan"]
 
 [dependencies]
 anyhow.workspace = true

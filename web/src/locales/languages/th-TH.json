@@ -297,10 +297,10 @@
       "importDesc": "Upload a pipeline definition"
     },
     "noQueues": {
-      "title": "Create your first queue",
-      "description": "Queues are stateful review to-do lists — bind Score Configs, a target dataset, and a filter that feeds items in for human review.",
-      "action": "New queue",
-      "actionDesc": "Start an empty queue"
+      "title": "สร้างคิวแอนโนเทชันแรกของคุณ",
+      "description": "คิวแอนโนเทชันคือรายการสิ่งที่ต้องตรวจทาน — ผูก Score Configs ชุดข้อมูลเป้าหมาย และตัวกรองที่ป้อนรายการเข้ามาเพื่อการตรวจทานโดยมนุษย์",
+      "action": "สร้างคิวแอนโนเทชันใหม่",
+      "actionDesc": "เริ่มคิวแอนโนเทชันเปล่า"
     },
     "noPrompts": {
       "title": "Create your first prompt",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Nothing Unhealthy Here",
-      "description": "No unhealthy items in this window. Widen the time range, or switch the queue filter to see items you already triaged."
+      "description": "ไม่มีรายการที่ผิดปกติในช่วงเวลานี้ ขยายช่วงเวลา หรือสลับตัวกรองคิวแอนโนเทชันเพื่อดูรายการที่คุณคัดกรองแล้ว"
     },
     "noTraces": {
       "title": "No traces found",
@@ -9985,6 +9985,10 @@
     },
     "browserDeniedFileDownload": "Browser denied file download...",
     "chartDataDownloadedCsv": "Chart data downloaded as a CSV file",
+    "tableDownloadPartial": "ดึงผลลัพธ์มาเพียง {count} แถวแรก ไฟล์จึงไม่ครบถ้วน",
+    "tableDownloadServerPartial": "เซิร์ฟเวอร์ส่งข้อมูลกลับมาไม่ครบ ไฟล์จึงอาจไม่สมบูรณ์",
+    "tableDownloadWaitForLoad": "แผงยังโหลดอยู่ ดาวน์โหลดอีกครั้งเมื่อโหลดเสร็จ",
+    "preparingTableDownload": "กำลังดึงทุกแถวสำหรับการดาวน์โหลด…",
     "chartDataDownloadedJson": "Chart data downloaded as a JSON file",
     "dynamicFilters": "Dynamic filters",
     "failedToCancelRunningQuery": "Failed to cancel running query",
@@ -16090,8 +16094,10 @@
         "searchSuffixesAria": "Search suffix filters",
         "searchTypesAria": "Search type filters",
         "facetAria": "{label}, {count} metrics",
+        "facetAriaUnchecked": "{label}, {count} ที่มีข้อมูล, {unchecked} ที่ยังไม่ได้เลือก",
         "noPrefixMatch": "No prefixes match.",
         "noSuffixMatch": "No suffixes match.",
+        "uncheckedTooltip": "{count} ที่มีข้อมูล · {unchecked} ที่ยังไม่ได้เลือก",
         "noTypeMatch": "No types match."
       },
       "views": {
@@ -17762,8 +17768,8 @@
       "viewByStream": "View by Stream",
       "search": {
         "noResultsTitle": "No sessions match your search",
-        "noResultsDescription": "Try a different filter or a wider time range.",
-        "clear": "Clear filter"
+        "noResultsDescription": "ลองใช้ตัวกรองอื่นหรือช่วงเวลาที่กว้างขึ้น",
+        "clear": "ล้างตัวกรอง"
       }
     },
     "sessionDetail": {
@@ -19074,7 +19080,7 @@
       "users": "ผู้ใช้",
       "budgets": "งบประมาณ",
       "discovery": "Discovery",
-      "queues": "Queues",
+      "queues": "คิวแอนโนเทชัน",
       "datasets": "Datasets",
       "experiments": "Experiments",
       "quality": "Quality",
@@ -19359,15 +19365,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "Add To Review Queue",
-        "title": "Add To Review Queue",
-        "hint": "Queue {ref} for human review. It stays where it is — the review state lives in the queue.",
-        "queueLabel": "Queue",
-        "queuePlaceholder": "Select A Queue...",
-        "noQueues": "No queue accepts a {scope} — create one from the Queues page first.",
-        "confirm": "Add To Queue",
+        "button": "เพิ่มลงในคิวแอนโนเทชัน",
+        "title": "เพิ่มลงในคิวแอนโนเทชัน",
+        "hint": "เพิ่ม {ref} เพื่อการตรวจทานโดยมนุษย์ รายการนั้นจะอยู่ที่เดิม — คิวแอนโนเทชันจะติดตามสถานะการตรวจทาน",
+        "queueLabel": "คิวแอนโนเทชัน",
+        "queuePlaceholder": "เลือกคิวแอนโนเทชัน...",
+        "noQueues": "ไม่มีคิวแอนโนเทชันที่รองรับ {scope} — สร้างคิวก่อนจากหน้าคิวแอนโนเทชัน",
+        "confirm": "เพิ่มลงในคิวแอนโนเทชัน",
         "success": "Added to {queue}",
-        "error": "Failed to add this item to the queue"
+        "error": "ไม่สามารถเพิ่มรายการนี้ลงในคิวแอนโนเทชัน"
       },
       "dataset": {
         "button": "Add To Dataset",
@@ -19404,12 +19410,12 @@
         "session": "Sessions"
       },
       "inQueueFilter": {
-        "label": "In Queue",
-        "notEnqueued": "In Queue: Not Enqueued",
-        "enqueued": "In Queue: Any Queue",
-        "pending": "In Queue: Pending",
-        "reviewed": "In Queue: Reviewed",
-        "all": "In Queue: All"
+        "label": "สถานะคิวแอนโนเทชัน",
+        "notEnqueued": "ยังไม่อยู่ในคิว",
+        "enqueued": "อยู่ในคิวแอนโนเทชัน",
+        "pending": "รอตรวจทาน",
+        "reviewed": "ตรวจทานแล้ว",
+        "all": "รายการทั้งหมด"
       },
       "columns": {
         "timestamp": "Timestamp",
@@ -19425,7 +19431,7 @@
         "service": "Service",
         "input": "Input",
         "quality": "Quality",
-        "inQueue": "In Queue?",
+        "inQueue": "อยู่ในคิวแอนโนเทชันหรือไม่",
         "actions": "การดำเนินการ"
       },
       "spanParent": "In {trace}",
@@ -19437,26 +19443,26 @@
       "inQueue": {
         "none": "Not Enqueued",
         "reviewed": "Already Reviewed",
-        "multiple": "In {count} Queues"
+        "multiple": "อยู่ใน {count} คิวแอนโนเทชัน"
       },
-      "addToQueue": "Add To Queue",
+      "addToQueue": "เพิ่มลงในคิวแอนโนเทชัน",
       "addToQueueMenu": {
-        "loading": "Loading queues...",
-        "noQueues": "No queues yet — create one from the Queues page first.",
+        "loading": "กำลังโหลดคิวแอนโนเทชัน...",
+        "noQueues": "ยังไม่มีคิวแอนโนเทชัน — สร้างคิวก่อนจากหน้าคิวแอนโนเทชัน",
         "dimensions": "{count} dimension | {count} dimensions",
         "accepts": "Accepts {types} only",
-        "sectionTitle": "Add To Queue",
-        "manageQueues": "Manage Queues"
+        "sectionTitle": "เพิ่มลงในคิวแอนโนเทชัน",
+        "manageQueues": "จัดการคิวแอนโนเทชัน"
       },
-      "addSuccess": "Added to {queue} — the row stays in Discovery, its state lives in the queue.",
-      "addError": "Failed to add items to the queue",
-      "openQueue": "Open Queue",
-      "queuesError": "Failed to load queues"
+      "addSuccess": "เพิ่มลงใน {queue} แล้ว — แถวยังคงอยู่ใน Discovery และคิวแอนโนเทชันจะติดตามสถานะการตรวจทาน",
+      "addError": "ไม่สามารถเพิ่มรายการลงในคิวแอนโนเทชัน",
+      "openQueue": "เปิดคิวแอนโนเทชัน",
+      "queuesError": "ไม่สามารถโหลดคิวแอนโนเทชัน"
     },
     "queues": {
-      "searchPlaceholder": "Search Queues...",
-      "newButton": "New Queue",
-      "loadError": "Failed to load queues",
+      "searchPlaceholder": "ค้นหาคิวแอนโนเทชัน...",
+      "newButton": "สร้างคิวแอนโนเทชันใหม่",
+      "loadError": "ไม่สามารถโหลดคิวแอนโนเทชัน",
       "optionsLoadError": "Failed to load score configs",
       "review": "Review",
       "cleared": "Cleared",
@@ -19471,7 +19477,7 @@
         "actions": "การดำเนินการ"
       },
       "create": {
-        "title": "New Queue",
+        "title": "สร้างคิวแอนโนเทชันใหม่",
         "errors": {
           "name": "Name is required",
           "scoreConfigs": "Bind at least one Score Config"
@@ -19479,9 +19485,9 @@
         "nameLabel": "ชื่อ",
         "namePlaceholder": "e.g. hallucination_review",
         "descriptionLabel": "คำอธิบาย",
-        "descriptionPlaceholder": "What this queue is for and who reviews it...",
+        "descriptionPlaceholder": "คิวแอนโนเทชันนี้มีไว้เพื่ออะไร และใครเป็นผู้ตรวจทาน...",
         "scoreConfigsLabel": "Score Configs",
-        "scoreConfigsHint": "A queue scores items on one or more dimensions. Each Score Config is a single dimension — pick the configs to bind, and pin each to a version.",
+        "scoreConfigsHint": "คิวแอนโนเทชันให้คะแนนรายการในหนึ่งมิติหรือมากกว่า Score Config แต่ละรายการคือหนึ่งมิติ — เลือก Score Config ที่จะผูก และปักหมุดแต่ละรายการกับเวอร์ชัน",
         "scoreConfigsEmpty": "Pick the Score Configs to bind.",
         "addScoreConfig": "Add Score Config",
         "allScoreConfigsAdded": "All score configs are added.",
@@ -19489,10 +19495,10 @@
         "noScoreConfigs": "No score configs yet — create one in Score Configs first.",
         "targetDatasetLabel": "Target Dataset",
         "targetDatasetNone": "None (review-only)",
-        "targetDatasetHint": "Review-only queue — reviewed items won't be distilled to a dataset.",
+        "targetDatasetHint": "หากไม่มีชุดข้อมูลเป้าหมาย รายการในคิวแอนโนเทชันนี้จะถูกตรวจทานเท่านั้น",
         "autoRoutingLabel": "Auto-routing",
-        "autoRoutingHint": "Automatically enqueue objects whose scores match a condition. Leave empty to feed this queue manually from Discovery.",
-        "autoRoutingEmpty": "No auto-routing — this queue is fed manually.",
+        "autoRoutingHint": "เพิ่มออบเจกต์ที่คะแนนตรงตามเงื่อนไขเข้าคิวโดยอัตโนมัติ เว้นว่างไว้เพื่อเพิ่มรายการลงในคิวแอนโนเทชันนี้จาก Discovery",
+        "autoRoutingEmpty": "รายการจะถูกเพิ่มลงในคิวแอนโนเทชันนี้ด้วยตนเอง",
         "addCondition": "Add Condition",
         "conditionAnd": "AND",
         "operatorIs": "is",
@@ -19501,12 +19507,12 @@
         "conditionValuePlaceholder": "ค่า",
         "pin": "Pin Version",
         "versionLatest": "v{version} (latest)",
-        "success": "Queue created",
-        "error": "Failed to create queue"
+        "success": "สร้างคิวแอนโนเทชันแล้ว",
+        "error": "ไม่สามารถสร้างคิวแอนโนเทชัน"
       },
       "detail": {
-        "fallbackTitle": "Queue",
-        "loadError": "Failed to load queue items",
+        "fallbackTitle": "คิวแอนโนเทชัน",
+        "loadError": "ไม่สามารถโหลดรายการในคิวแอนโนเทชัน",
         "startReviewing": "Start Reviewing",
         "scoreConfigs": "Score Configs ({count})",
         "targetDataset": "Target Dataset",
@@ -19516,7 +19522,7 @@
         "inTrace": "In Trace {traceId}",
         "reviewAgain": "Review Again",
         "emptyTitle": "Nothing To Review",
-        "emptyBody": "Add traces, spans or sessions to this queue from Discovery or a trace view.",
+        "emptyBody": "เพิ่มเทรซ สแปน หรือเซสชันลงในคิวแอนโนเทชันนี้จาก Discovery หรือมุมมองเทรซ",
         "columns": {
           "refType": "Ref",
           "refId": "Reference",
@@ -19587,7 +19593,7 @@
         "true": "True",
         "false": "False",
         "allReviewedTitle": "All items reviewed",
-        "allReviewedBody": "Every item in this queue has a completed review."
+        "allReviewedBody": "ทุกรายการในคิวแอนโนเทชันนี้ได้รับการตรวจทานเสร็จสิ้นแล้ว"
       }
     },
     "experiments": {
@@ -25743,8 +25749,8 @@
     "sloDetail": "SLO Detail",
     "alertDetail": "Alert Detail",
     "editAlert": "Edit Alert",
-    "aiQueueDetail": "Queue",
-    "aiQueueReview": "Queue Review",
+    "aiQueueDetail": "คิวการกำกับข้อมูล",
+    "aiQueueReview": "การตรวจทานคิวการกำกับข้อมูล",
     "aiDatasetDetail": "Dataset",
     "aiPromptCreate": "New Prompt",
     "aiPromptVersionCreate": "New Prompt Version",
@@ -28131,7 +28137,7 @@
     "teamChannelSilent": "This team's channel is empty on purpose — pages will not be announced anywhere.",
     "slackChannelTitle": "ช่อง Slack",
     "slackChannelSetWith": "ตั้งค่าช่อง Slack ด้วย {command}",
-    "slackChannelLinkHint": "พิมพ์ในช่อง Slack นั้น ต้องเชื่อมโยงบัญชี Slack ของคุณ: พิมพ์ /o2 link ใน Slack",
+    "slackChannelLinkHint": "พิมพ์ในแชนเนล Slack นั้น จำเป็นต้องเชื่อมโยงบัญชี Slack ของคุณ: พิมพ์ {command} link ใน Slack",
     "slackChannelSendTest": "ส่งข้อความทดสอบ",
     "slackChannelClear": "ล้าง",
     "slackChannelBackup": "ใช้ {webhook} เป็นตัวสำรองเท่านั้น",
@@ -30887,6 +30893,13 @@
         "http": "HTTP",
         "httpDescription": "Slack calls your public URL. Needs one Verify click in Slack",
         "channelHistory": "Let the bot read replies in threads it started",
+        "appName": "ชื่อแอป",
+        "appNameHelp": "ชื่อที่ผู้คนเห็นใน Slack ตั้งชื่อให้แต่ละเซิร์ฟเวอร์ OpenObserve แยกกัน เช่น OpenObserve Staging",
+        "appNameTooLong": "ชื่อแอปต้องมีความยาวไม่เกิน {max} อักขระ",
+        "appNameMarkup": "ชื่อแอปต้องไม่มี <, > หรือ &",
+        "command": "คำสั่งสแลช",
+        "commandInvalid": "เริ่มต้นด้วย / และใช้ไม่เกิน {max} อักขระ: ตัวอักษรพิมพ์เล็ก ตัวเลข - และ _",
+        "commandWarning": "Slack เรียกใช้คำสั่งสแลชได้เพียงแอปเดียวต่อเวิร์กสเปซ หากแอปอื่นในเวิร์กสเปซนี้ใช้ {command} อยู่แล้ว {command} จะหยุดทำงานสำหรับแอปนั้นหลังจากคุณติดตั้งแอปนี้",
         "tokenLabel": "App configuration refresh token (xoxe-…)",
         "tokenHelp": "On Slack's Your Apps page, Your App Configuration Tokens › Generate Token shows an access token and a refresh token: paste the refresh token. OpenObserve rotates it and keeps the newest one encrypted to update the app later.",
         "generateToken": "Generate a token",
@@ -34697,6 +34710,25 @@
       },
       "noHighConfidence": "ไม่มีชื่อที่มีความมั่นใจสูง"
     }
+  },
+  "commandPalette": {
+    "title": "ค้นหาหน้า ทรัพยากร และการดำเนินการ",
+    "placeholder": "ค้นหาชื่อและ ID",
+    "moreTypes": "ประเภทเพิ่มเติม",
+    "pages": "หน้า",
+    "actions": "สร้าง",
+    "recent": "การเข้าชมล่าสุด",
+    "localHistory": "ประวัติในเครื่อง",
+    "clearRecent": "ล้างการเข้าชมล่าสุด",
+    "historyStorageUnavailable": "ไม่สามารถบันทึกการเข้าชมได้",
+    "recentUnavailable": "รายการนี้ไม่พร้อมใช้งาน",
+    "loading": "กำลังค้นหา…",
+    "partial": "ผลลัพธ์บางส่วนไม่พร้อมใช้งาน",
+    "failed": "ไม่สามารถค้นหาให้เสร็จได้",
+    "offline": "ออฟไลน์ ยังดูการเข้าชมล่าสุดได้",
+    "sourceUnavailable": "ทรัพยากรประเภทนี้ไม่พร้อมใช้งาน",
+    "emptyHelp": "ป้อนชื่อหรือ ID เพื่อค้นหา",
+    "globalShortcut": "เปิดการค้นหาทั่วระบบ"
   },
   "timeRangeInput": {
     "label": "พิมพ์ช่วงเวลา",

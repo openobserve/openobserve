@@ -3483,10 +3483,33 @@ export default defineComponent({
         showImportAlertDialog.value = true;
       }
     };
+    let consumedAlertIntent = "";
+    let consumingAlertIntent = false;
     watch(
-      () => router.currentRoute.value.query.action,
-      handleActionQuery,
-      { immediate: true }, // Run immediately to handle direct navigation
+      [
+        () => router.currentRoute.value.query.action,
+        () => router.currentRoute.value.query.palette_intent,
+      ],
+      async ([action, intent]) => {
+        if (consumingAlertIntent) return;
+        if (typeof intent !== "string" || action !== "add") {
+          await handleActionQuery(action);
+          return;
+        }
+        if (intent === consumedAlertIntent || showAddAlertDialog.value) return;
+        consumedAlertIntent = intent;
+        await handleActionQuery(action);
+        consumingAlertIntent = true;
+        try {
+          // `action` stays: a list response that lands later closes the form when it is missing.
+          const query = { ...router.currentRoute.value.query };
+          delete query.palette_intent;
+          await router.replace({ query });
+        } finally {
+          consumingAlertIntent = false;
+        }
+      },
+      { immediate: true },
     );
     const getDestinations = async (force = false) => {
       const options = destinationsQuery(store.state.selectedOrganization.identifier, "alert");

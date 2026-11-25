@@ -14,9 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 50] = [
+const QUERIER_ROUTES: [(&str, usize); 51] = [
     ("config", 0),               // /config (unauthenticated bootstrap)
     ("config", 2),               // /api/{org_id}/config (authenticated full)
+    ("resources/_search", 2),    // /api/{org_id}/resources/_search
     ("summary", 2),              // /api/{org_id}/summary
     ("overview", 2),             // /api/{org_id}/overview
     ("organizations", 1),        // /api/organizations
@@ -71,7 +72,7 @@ const QUERIER_ROUTES: [(&str, usize); 50] = [
     ("llm/models/refresh-built-in", 2), // /api/{org_id}/llm/models/refresh-built-in
 ];
 /// Entries that match their whole remaining path, so `overview_x/...` stays unrouted.
-const EXACT_QUERIER_ROUTES: [&str; 1] = ["overview"];
+const EXACT_QUERIER_ROUTES: [&str; 2] = ["overview", "resources/_search"];
 const QUERIER_ROUTES_BY_BODY: [&str; 9] = [
     "/_search",
     "/_search_partition",

@@ -297,10 +297,10 @@
       "importDesc": "パイプライン定義をアップロードする"
     },
     "noQueues": {
-      "title": "最初のキューを作成",
-      "description": "キューはステートフルなレビュー用TODOリストです。スコア設定、ターゲットデータセット、および人間のレビュー用にアイテムを供給するフィルターをバインドします。",
-      "action": "新しいキュー",
-      "actionDesc": "空のキューを開始"
+      "title": "最初のアノテーションキューを作成",
+      "description": "アノテーションキューはレビュー用の ToDo リストです。スコア設定、対象データセット、および人によるレビューにアイテムを送り込むフィルターを関連付けます。",
+      "action": "新規アノテーションキュー",
+      "actionDesc": "空のアノテーションキューを作成"
     },
     "noPrompts": {
       "title": "最初のプロンプトを作成",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "問題のあるアイテムはありません",
-      "description": "このウィンドウには問題のあるアイテムはありません。時間範囲を広げるか、キュー フィルターを切り替えて、すでにトリアージしたアイテムを確認してください。"
+      "description": "この期間に異常なアイテムはありません。時間範囲を広げるか、アノテーションキューのフィルターを切り替えて、トリアージ済みのアイテムを確認してください。"
     },
     "noTraces": {
       "title": "トレースが見つかりません",
@@ -9987,6 +9987,10 @@
     },
     "browserDeniedFileDownload": "ブラウザがファイルのダウンロードを拒否しました...",
     "chartDataDownloadedCsv": "チャートデータをCSVファイルとしてダウンロードしました",
+    "tableDownloadPartial": "結果の最初の {count} 行のみを取得したため、ファイルは一部のデータです。",
+    "tableDownloadServerPartial": "サーバーが部分的なデータを返したため、ファイルが不完全な可能性があります。",
+    "tableDownloadWaitForLoad": "パネルはまだ読み込み中です。完了後にもう一度ダウンロードしてください。",
+    "preparingTableDownload": "ダウンロード用にすべての行を取得しています…",
     "chartDataDownloadedJson": "チャートデータをJSONファイルとしてダウンロードしました",
     "dynamicFilters": "動的フィルター",
     "failedToCancelRunningQuery": "実行中のクエリをキャンセルできませんでした",
@@ -16092,8 +16096,10 @@
         "searchSuffixesAria": "サフィックスフィルターを検索",
         "searchTypesAria": "タイプフィルターを検索",
         "facetAria": "{label}、{count} メトリクス",
+        "facetAriaUnchecked": "{label}、データあり {count} 件、未チェック {unchecked} 件",
         "noPrefixMatch": "一致するプレフィックスがありません。",
         "noSuffixMatch": "一致するサフィックスがありません。",
+        "uncheckedTooltip": "データあり {count} 件 · 未チェック {unchecked} 件",
         "noTypeMatch": "該当するタイプはありません。"
       },
       "views": {
@@ -17763,13 +17769,9 @@
       "noAgentsDescription": "選択した時間枠ではGenAIエージェントは検出されませんでした。範囲を広げるか、ストリームビューに切り替えてください。",
       "viewByStream": "ストリームで表示",
       "search": {
-        "placeholder": "ユーザーまたはメッセージで検索",
-        "title": "ユーザー ID または会話テキストにこのテキストを含むセッションを照合します",
         "noResultsTitle": "検索に一致するセッションはありません",
-        "noResultsDescription": "別の語句、別のフィールド、またはより広い時間範囲をお試しください。",
-        "clear": "検索をクリア",
-        "user": "ユーザー: {user}",
-        "clearUser": "すべてのユーザーを表示"
+        "noResultsDescription": "別のフィルターを試すか、時間範囲を広げてください。",
+        "clear": "フィルターをクリア"
       }
     },
     "sessionDetail": {
@@ -19080,7 +19082,7 @@
       "users": "ユーザー",
       "budgets": "予算",
       "discovery": "ディスカバリー",
-      "queues": "キュー",
+      "queues": "アノテーションキュー",
       "datasets": "データセット",
       "experiments": "実験",
       "quality": "クオリティ",
@@ -19365,15 +19367,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "レビューキューに追加",
-        "title": "レビューキューに追加",
-        "hint": "{ref} を人間によるレビュー用にキューに入れます。アイテムはその場に残ります — レビュー状態はキューに保存されます。",
-        "queueLabel": "キュー",
-        "queuePlaceholder": "キューを選択...",
-        "noQueues": "{scope} を受け入れるキューがありません — 先にキュー ページから作成してください。",
-        "confirm": "キューに追加",
+        "button": "アノテーションキューに追加",
+        "title": "アノテーションキューに追加",
+        "hint": "人によるレビューのために {ref} を追加します。アイテムは現在の場所に残り、アノテーションキューがレビューステータスを追跡します。",
+        "queueLabel": "アノテーションキュー",
+        "queuePlaceholder": "アノテーションキューを選択...",
+        "noQueues": "この {scope} を対象とするアノテーションキューがありません。先にアノテーションキューページで作成してください。",
+        "confirm": "アノテーションキューに追加",
         "success": "{queue} に追加しました",
-        "error": "このアイテムをキューに追加できませんでした"
+        "error": "このアイテムのアノテーションキューへの追加に失敗しました"
       },
       "dataset": {
         "button": "データセットに追加",
@@ -19410,12 +19412,12 @@
         "session": "セッション"
       },
       "inQueueFilter": {
-        "label": "キュー内",
-        "notEnqueued": "キュー内: 未エンキュー",
-        "enqueued": "キュー内: 任意のキュー",
-        "pending": "キュー内: 保留中",
-        "reviewed": "キュー内: レビュー済み",
-        "all": "キュー内: すべて"
+        "label": "アノテーションキューのステータス",
+        "notEnqueued": "キュー未追加",
+        "enqueued": "アノテーションキューに追加済み",
+        "pending": "レビュー待ち",
+        "reviewed": "レビュー済み",
+        "all": "すべてのアイテム"
       },
       "columns": {
         "timestamp": "タイムスタンプ",
@@ -19431,7 +19433,7 @@
         "service": "サービス",
         "input": "入力",
         "quality": "品質",
-        "inQueue": "キュー内？",
+        "inQueue": "アノテーションキュー内?",
         "actions": "アクション"
       },
       "spanParent": "{trace} 内",
@@ -19443,26 +19445,26 @@
       "inQueue": {
         "none": "未エンキュー",
         "reviewed": "レビュー済み",
-        "multiple": "{count} キュー内"
+        "multiple": "{count} 件のアノテーションキューに追加済み"
       },
-      "addToQueue": "キューに追加",
+      "addToQueue": "アノテーションキューに追加",
       "addToQueueMenu": {
-        "loading": "キューを読み込み中...",
-        "noQueues": "キューがまだありません — 先にキューページから作成してください。",
+        "loading": "アノテーションキューを読み込み中...",
+        "noQueues": "アノテーションキューがまだありません。先にアノテーションキューページで作成してください。",
         "dimensions": "{count} ディメンション | {count} ディメンション",
         "accepts": "{types} のみ受け入れ",
-        "sectionTitle": "キューに追加",
-        "manageQueues": "キューの管理"
+        "sectionTitle": "アノテーションキューに追加",
+        "manageQueues": "アノテーションキューを管理"
       },
-      "addSuccess": "{queue} に追加されました — 行は Discovery に残り、その状態はキューに保持されます。",
-      "addError": "キューへのアイテムの追加に失敗しました",
-      "openQueue": "キューを開く",
-      "queuesError": "キューの読み込みに失敗しました"
+      "addSuccess": "{queue} に追加しました。行は Discovery に残り、アノテーションキューがレビューステータスを追跡します。",
+      "addError": "アノテーションキューへのアイテムの追加に失敗しました",
+      "openQueue": "アノテーションキューを開く",
+      "queuesError": "アノテーションキューの読み込みに失敗しました"
     },
     "queues": {
-      "searchPlaceholder": "キューを検索...",
-      "newButton": "新規キュー",
-      "loadError": "キューの読み込みに失敗しました",
+      "searchPlaceholder": "アノテーションキューを検索...",
+      "newButton": "新規アノテーションキュー",
+      "loadError": "アノテーションキューの読み込みに失敗しました",
       "optionsLoadError": "スコア設定の読み込みに失敗しました",
       "review": "レビュー",
       "cleared": "クリア済み",
@@ -19477,7 +19479,7 @@
         "actions": "操作"
       },
       "create": {
-        "title": "新規キュー",
+        "title": "新規アノテーションキュー",
         "errors": {
           "name": "名前は必須です",
           "scoreConfigs": "スコア設定を1つ以上バインドしてください"
@@ -19485,9 +19487,9 @@
         "nameLabel": "名前",
         "namePlaceholder": "例: hallucination_review",
         "descriptionLabel": "説明",
-        "descriptionPlaceholder": "このキューの目的と、誰がレビューするか...",
+        "descriptionPlaceholder": "このアノテーションキューの用途とレビュー担当者...",
         "scoreConfigsLabel": "スコア設定",
-        "scoreConfigsHint": "キューは、1つ以上の次元でアイテムをスコアリングします。各スコア設定は単一次元です。バインドする設定を選び、それぞれをバージョンに固定します。",
+        "scoreConfigsHint": "アノテーションキューは 1 つ以上のディメンションでアイテムをスコアリングします。各スコア設定は 1 つのディメンションです。関連付ける設定を選択し、それぞれをバージョンに固定してください。",
         "scoreConfigsEmpty": "バインドするスコア設定を選択してください。",
         "addScoreConfig": "スコア設定を追加",
         "allScoreConfigsAdded": "すべてのスコア設定が追加されました。",
@@ -19495,10 +19497,10 @@
         "noScoreConfigs": "スコア設定がまだありません。先にスコア設定で作成してください。",
         "targetDatasetLabel": "ターゲットデータセット",
         "targetDatasetNone": "なし（レビューのみ）",
-        "targetDatasetHint": "レビューのみのキュー。レビューされたアイテムはデータセットに蒸留されません。",
+        "targetDatasetHint": "対象データセットがない場合、このアノテーションキューのアイテムはレビューのみ行われます。",
         "autoRoutingLabel": "自動ルーティング",
-        "autoRoutingHint": "スコアが条件に一致するオブジェクトを自動的にキューに追加します。空欄の場合は、Discoveryから手動でこのキューに追加します。",
-        "autoRoutingEmpty": "自動ルーティングはありません。このキューは手動で追加されます。",
+        "autoRoutingHint": "スコアが条件に一致するオブジェクトを自動的にキューに追加します。空のままにすると、Discovery からこのアノテーションキューにアイテムを追加できます。",
+        "autoRoutingEmpty": "アイテムはこのアノテーションキューに手動で追加されます。",
         "addCondition": "条件を追加",
         "conditionAnd": "AND",
         "operatorIs": "等しい",
@@ -19507,12 +19509,12 @@
         "conditionValuePlaceholder": "値",
         "pin": "バージョンを固定",
         "versionLatest": "v{version}（最新）",
-        "success": "キューが作成されました",
-        "error": "キューの作成に失敗しました"
+        "success": "アノテーションキューを作成しました",
+        "error": "アノテーションキューの作成に失敗しました"
       },
       "detail": {
-        "fallbackTitle": "キュー",
-        "loadError": "キューアイテムの読み込みに失敗しました",
+        "fallbackTitle": "アノテーションキュー",
+        "loadError": "アノテーションキューのアイテムの読み込みに失敗しました",
         "startReviewing": "レビューを開始",
         "scoreConfigs": "スコア設定（{count}）",
         "targetDataset": "ターゲットデータセット",
@@ -19522,7 +19524,7 @@
         "inTrace": "トレース {traceId} 内",
         "reviewAgain": "再レビュー",
         "emptyTitle": "レビュー対象がありません",
-        "emptyBody": "Discovery またはトレースビューから、このキューにトレース、スパン、セッションを追加します。",
+        "emptyBody": "Discovery またはトレースビューから、トレース、スパン、セッションをこのアノテーションキューに追加します。",
         "columns": {
           "refType": "参照",
           "refId": "参照",
@@ -19593,7 +19595,7 @@
         "true": "真",
         "false": "偽",
         "allReviewedTitle": "すべての項目がレビュー済みです",
-        "allReviewedBody": "このキューのすべての項目でレビューが完了しています。"
+        "allReviewedBody": "このアノテーションキューのすべてのアイテムはレビューが完了しています。"
       }
     },
     "experiments": {
@@ -25749,8 +25751,8 @@
     "sloDetail": "SLO詳細",
     "alertDetail": "アラート詳細",
     "editAlert": "アラートを編集",
-    "aiQueueDetail": "キュー",
-    "aiQueueReview": "キューレビュー",
+    "aiQueueDetail": "アノテーションキュー",
+    "aiQueueReview": "アノテーションキューレビュー",
     "aiDatasetDetail": "データセット",
     "aiPromptCreate": "新規プロンプト",
     "aiPromptVersionCreate": "新規プロンプトバージョン",
@@ -28137,7 +28139,7 @@
     "teamChannelSilent": "このチームのチャンネルは意図的に未設定です。呼び出しはどこにも通知されません。",
     "slackChannelTitle": "Slack チャンネル",
     "slackChannelSetWith": "{command} で Slack チャンネルを設定",
-    "slackChannelLinkHint": "そのコマンドをその Slack チャンネルで入力してください。Slack アカウントの連携が必要です。Slack で /o2 link と入力してください。",
+    "slackChannelLinkHint": "その Slack チャンネルで入力してください。Slack アカウントの連携が必要です。Slack で {command} link と入力してください。",
     "slackChannelSendTest": "テストメッセージを送信",
     "slackChannelClear": "クリア",
     "slackChannelBackup": "バックアップとしてのみ {webhook} を使用",
@@ -30893,6 +30895,13 @@
         "http": "HTTP",
         "httpDescription": "Slack が公開 URL を呼び出します。Slack 側で 1 回確認をクリックする必要があります",
         "channelHistory": "ボットが開始したスレッド内の返信を読み取れるようにする",
+        "appName": "アプリ名",
+        "appNameHelp": "Slack で表示される名前です。OpenObserve Staging のように、OpenObserve サーバーごとに固有の名前を付けてください。",
+        "appNameTooLong": "アプリ名は {max} 文字以内で指定してください",
+        "appNameMarkup": "アプリ名に <、>、& を含めることはできません",
+        "command": "スラッシュコマンド",
+        "commandInvalid": "/ で始まり、{max} 文字以内で指定してください: 小文字、数字、-、_",
+        "commandWarning": "Slack ではワークスペース内の 1 つのアプリのみがスラッシュコマンドを実行できます。このワークスペースの別のアプリがすでに {command} を使用している場合、このアプリをインストールすると、そのアプリの {command} は動作しなくなります。",
         "tokenLabel": "アプリ設定リフレッシュトークン (xoxe-…)",
         "tokenHelp": "Slack の Your Apps ページで、Your App Configuration Tokens › Generate Token を開くとアクセストークンとリフレッシュトークンが表示されます。リフレッシュトークンを貼り付けてください。OpenObserve はこれをローテーションし、最新のものを暗号化して保持して、後でアプリを更新できるようにします。",
         "generateToken": "トークンを生成",
@@ -34703,6 +34712,25 @@
       },
       "noHighConfidence": "信頼度の高い名前はありません"
     }
+  },
+  "commandPalette": {
+    "title": "ページ、リソース、操作を検索",
+    "placeholder": "名前と ID を検索",
+    "moreTypes": "その他の種類",
+    "pages": "ページ",
+    "actions": "作成",
+    "recent": "最近のアクセス",
+    "localHistory": "ローカル履歴",
+    "clearRecent": "履歴を消去",
+    "historyStorageUnavailable": "履歴を保存できません",
+    "recentUnavailable": "この項目は現在利用できません",
+    "loading": "検索中…",
+    "partial": "一部の結果は利用できません",
+    "failed": "検索を完了できませんでした",
+    "offline": "オフラインです。最近のアクセスは表示できます。",
+    "sourceUnavailable": "この種類は現在利用できません",
+    "emptyHelp": "名前または ID でリソースを検索",
+    "globalShortcut": "グローバル検索を開く"
   },
   "timeRangeInput": {
     "label": "時間範囲を入力",
