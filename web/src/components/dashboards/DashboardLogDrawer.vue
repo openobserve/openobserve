@@ -26,7 +26,11 @@ const ChartRenderer = defineAsyncComponent(
 );
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { b64EncodeUnicode } from "@/utils/formatters";
-import { buildPatternLogsSql } from "@/plugins/logs/patterns/patternUtils";
+import {
+  buildPatternLogsSql,
+  FILTER_BLOCKED_MESSAGE,
+  patternFilterBlockedReason,
+} from "@/plugins/logs/patterns/patternUtils";
 import searchService from "@/services/search";
 import patternsService from "@/services/patterns";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
@@ -752,7 +756,8 @@ function patternToSql(template: string): string | null {
 function openPatternInLogs(template: string) {
   const sql = patternToSql(template);
   if (!sql) {
-    toast({ variant: "warning", message: t("logs.patternList.noDistinctTextTooltip") });
+    const reason = patternFilterBlockedReason(template, allPatternTemplates.value) ?? "shared";
+    toast({ variant: "warning", message: t(FILTER_BLOCKED_MESSAGE[reason]) });
     return;
   }
   const pos = window.location.pathname.indexOf("/web/");

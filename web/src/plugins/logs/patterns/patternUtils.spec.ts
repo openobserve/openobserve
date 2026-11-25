@@ -460,21 +460,13 @@ describe("resolvePatternMatchTerms", () => {
     expect(resolvePatternMatchTerms("GET <*>", ["GET <*>", "GET <*> 200"])).toBeNull();
   });
 
-  it("treats `_` in a term as a one-character wildcard, as the backend ILIKE does", () => {
+  it("matches `_` and `%` in a term as literal text, as the backend now does", () => {
     const a = "foo_bar <*>";
     const b = "fooxbar <*>";
-    expect(resolvePatternMatchTerms(a, [a, b])).toBeNull();
-    expect(patternFilterBlockedReason(a, [a, b])).toBe("shared");
+    expect(resolvePatternMatchTerms(a, [a, b])).toEqual(["foo_bar"]);
     expect(resolvePatternMatchTerms(b, [a, b])).toEqual(["fooxbar"]);
-  });
-
-  it("treats `%` in a term as a run wildcard, also across a placeholder", () => {
-    const a = "50%off <*>";
-    const b = "50 big sale off <*>";
-    const c = "50 <*> off sale";
-    expect(resolvePatternMatchTerms(a, [a, b])).toBeNull();
-    expect(resolvePatternMatchTerms(a, [a, c])).toBeNull();
-    expect(resolvePatternMatchTerms(a, [a, "plain <*> text"])).toEqual(["50%off"]);
+    const c = "50%off <*>";
+    expect(resolvePatternMatchTerms(c, [c, "50 big sale off <*>"])).toEqual(["50%off"]);
   });
 
   it("matches case-insensitively and ignores a leading re: or surrounding stars", () => {

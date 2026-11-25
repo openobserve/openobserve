@@ -48,16 +48,14 @@ const splitConstants = (template: string): string[] =>
 
 const GAP = "\u0001";
 
-// The backend runs match_all(t) as a case-insensitive ILIKE '%t%' with the term unescaped, after
-// dropping a leading `re:` and edge `*`; so `_` and `%` in a term are wildcards, not literals.
+// The backend runs match_all(t) as a case-insensitive ILIKE '%t%' with `%`, `_` and `\` escaped,
+// after dropping a leading `re:` and edge `*`; so the term matches as literal text.
 const termMatcher = (term: string): RegExp => {
   const core = term
     .replace(/^(re:)+/, "")
     .replace(/^\*+/, "")
     .replace(/\*+$/, "");
-  const source = [...core]
-    .map((ch) => (ch === "_" ? "." : ch === "%" ? ".*" : ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
-    .join("");
+  const source = [...core].map((ch) => ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("");
   return new RegExp(source, "isu");
 };
 
@@ -394,8 +392,7 @@ export const buildPatternSqlQuery = (template: string, streamName: string): stri
 
 /**
  * Rows of one pattern, newest first, for opening it in Logs. Null when no
- * constant text separates it from the other templates, since an unfiltered
- * query would silently return every row.
+ * constant text separates it from the other templates.
  */
 export const buildPatternLogsSql = (
   template: string,
