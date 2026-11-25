@@ -14,9 +14,9 @@ const ROWS = [
 const INCLUDE_CASES = [
   {
     name: 'add no brackets to a simple filter',
-    filter: "svc = 'alpha'",
-    rowsBefore: 2,
-    shape: /^svc = 'alpha' AND ns = 'ns-a' AND host = 'host-a' AND pod = 'pod-a'$/,
+    filter: "level = 'info'",
+    rowsBefore: 3,
+    shape: /^level = 'info' AND ns = 'ns-a' AND host = 'host-a' AND pod = 'pod-a'$/,
   },
   {
     // Beta comes first so that losing the bracket would let the beta rows past the includes.
@@ -63,7 +63,6 @@ test.describe('Logs Include Search Term query shape (ENT#3086, OSS#11220)', () =
 
       const query = (await pm.logsPage.getQueryEditorText()).replace(/\s+/g, ' ').trim();
       testLogger.info(`Query after three includes: ${query}`);
-      // Pre-fix every include re-wrapped the whole query: "( ( ( svc = 'alpha' ) AND ns ... ) AND host ... ) AND pod ...".
       expect(query).toMatch(shape);
 
       await pm.logsPage.clickRefreshButton();
