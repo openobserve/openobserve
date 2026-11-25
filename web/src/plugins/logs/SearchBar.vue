@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
           >
             <OSwitch
-              class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
+              class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
               v-model="searchObj.meta.showHistogram"
               :aria-label="t('search.showHistogramLabel')"
               size="sm"
@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
           >
             <OSwitch
-              class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
+              class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
               :model-value="searchObj.meta.sqlMode"
               :aria-label="t('search.sqlModeLabel')"
               :disabled="isSqlModeDisabled"
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleQuickMode"
           >
             <OSwitch
-              class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
+              class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
               :model-value="searchObj.meta.quickMode"
               :aria-label="t('search.quickModeLabel')"
               size="sm"
@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-right>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
-                    class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
+                    class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
                     :model-value="searchObj.meta.sqlMode"
                     :disabled="isSqlModeDisabled"
                     size="sm"
@@ -417,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-right>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
-                    class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
+                    class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
                     v-model="searchObj.meta.showHistogram"
                     size="sm"
                     data-test="logs-search-bar-show-histogram-toggle-btn"
@@ -457,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-right>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
-                    class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
+                    class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
                     :model-value="searchObj.meta.quickMode"
                     size="sm"
                     data-test="logs-search-bar-quick-mode-switch"
@@ -495,7 +495,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-right>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
-                    class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
+                    class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
                     data-test="logs-search-bar-show-query-toggle-btn"
                     v-model="searchObj.meta.showTransformEditor"
                     size="sm"
@@ -607,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
         >
           <OSwitch
-            class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
+            class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
             v-model="searchObj.meta.showTransformEditor"
             :aria-label="t('search.functionEditorLabel')"
             size="sm"

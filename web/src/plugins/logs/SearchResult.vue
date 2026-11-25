@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
               >
                 <OSwitch
-                  class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
+                  class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
                   v-model="searchObj.meta.toggleSourceWrap"
                   :aria-label="t('search.messageWrapContent')"
                   size="sm"

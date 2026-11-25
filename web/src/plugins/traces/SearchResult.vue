@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="toggleWrapCells"
         >
           <OSwitch
-            class="[&_[role=switch][data-state=checked]]:bg-accent/55! [&_[role=switch]>span]:shadow-none!"
+            class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
             :model-value="searchObj.meta.resultGrid.wrapCells"
             :aria-label="t('search.messageWrapContent')"
             size="sm"
