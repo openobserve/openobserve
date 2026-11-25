@@ -63,11 +63,11 @@ pub static QUERY_FUNCTIONS: LazyLock<RwHashMap<String, Transform>> =
 static GLOBAL_ENRICHMENT_TABLES: LazyLock<RwHashMap<String, Box<dyn Table + Send + Sync>>> =
     LazyLock::new(Default::default);
 
-/// VRL functions that reach the network; allowed only when `ZO_SKIP_SSRF_CHECKS` is set.
-const NETWORK_VRL_FUNCTIONS: &[&str] = &["http_request", "dns_lookup", "reverse_dns"];
-
-/// VRL functions that reach the environment or host files; denied regardless of SSRF settings.
+/// VRL functions that reach the network, environment or host files; denied whatever the flags.
 const DENIED_VRL_FUNCTIONS: &[&str] = &[
+    "http_request",
+    "dns_lookup",
+    "reverse_dns",
     "get_env_var",
     "get_hostname",
     "parse_proto",
@@ -466,16 +466,9 @@ fn org_enrichment_tables(org_id: &str) -> HashMap<String, enrichment::StreamTabl
 }
 
 fn vrl_stdlib_functions() -> Vec<Box<dyn Function>> {
-    vrl_stdlib_functions_inner(config::get_config().common.skip_ssrf_checks)
-}
-
-fn vrl_stdlib_functions_inner(skip_ssrf: bool) -> Vec<Box<dyn Function>> {
     vrl::stdlib::all()
         .into_iter()
-        .filter(|f| {
-            !DENIED_VRL_FUNCTIONS.contains(&f.identifier())
-                && (skip_ssrf || !NETWORK_VRL_FUNCTIONS.contains(&f.identifier()))
-        })
+        .filter(|f| !DENIED_VRL_FUNCTIONS.contains(&f.identifier()))
         .map(|f| {
             match DENIED_VRL_FILE_ARGUMENTS
                 .iter()
@@ -700,19 +693,16 @@ mod tests {
     }
 
     #[test]
-    fn default_config_rejects_network_functions() {
-        if config::get_config().common.skip_ssrf_checks {
-            return;
-        }
+    fn rejects_network_functions_whatever_the_ssrf_flag() {
         for source in NETWORK_SOURCES {
             let error = compile_error(source);
             assert!(error.contains("call to undefined function"), "{error}");
         }
     }
 
-    fn is_undefined_function(source: &str, skip_ssrf: bool) -> bool {
+    fn is_undefined_function(source: &str) -> bool {
         let external = vrl::prelude::state::ExternalEnv::default();
-        let functions = vrl_stdlib_functions_inner(skip_ssrf);
+        let functions = vrl_stdlib_functions();
         let config = vrl::compiler::CompileConfig::default();
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             vrl::compiler::compile_with_external(source, &functions, &external, config)
@@ -731,21 +721,7 @@ mod tests {
         let allowed: Vec<&str> = NETWORK_SOURCES
             .into_iter()
             .chain(HOST_SOURCES)
-            .filter(|source| !is_undefined_function(source, false))
-            .collect();
-        assert!(allowed.is_empty(), "still callable: {allowed:?}");
-    }
-
-    #[test]
-    fn skip_ssrf_checks_allows_only_network_functions() {
-        let denied: Vec<&str> = NETWORK_SOURCES
-            .into_iter()
-            .filter(|source| is_undefined_function(source, true))
-            .collect();
-        assert!(denied.is_empty(), "still denied: {denied:?}");
-        let allowed: Vec<&str> = HOST_SOURCES
-            .into_iter()
-            .filter(|source| !is_undefined_function(source, true))
+            .filter(|source| !is_undefined_function(source))
             .collect();
         assert!(allowed.is_empty(), "still callable: {allowed:?}");
     }
