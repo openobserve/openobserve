@@ -389,7 +389,8 @@ pub async fn list(
                    When `data` is provided it replaces the existing config, except that a \
                    secret (MCP `headers` values) sent as `***` keeps its stored value; a \
                    secret key left out is removed. Keeping any `***` requires the MCP `url` \
-                   and every entry of `headers` to stay unchanged, except removals; otherwise the save is refused with 400 \
+                   and every entry of `headers` to stay unchanged, and removing another entry \
+                   counts as a change; otherwise the save is refused with 400 \
                    `invalid_request` naming the changed `fields`, and nothing is saved. \
                    Rotating one secret therefore means re-entering all of them. \
                    Only available in enterprise deployments.",
@@ -405,7 +406,7 @@ pub async fn list(
     security(("Authorization" = [])),
     responses(
         (status = 200, description = "Toolset updated", content_type = "application/json", body = ToolsetResponse),
-        (status = 400, description = "Invalid request, or a `***` secret kept while a destination field or another secret entry changed (`invalid_request`, `error_code: destination_changed`, `fields`)", content_type = "application/json"),
+        (status = 400, description = "Invalid request, or a `***` secret kept while a destination field or another secret entry changed or was removed (`invalid_request`, `error_code: destination_changed`, `fields`)", content_type = "application/json"),
         (status = 404, description = "Toolset not found", content_type = "application/json"),
     ),
     extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "update"})), ("x-o2-mcp" = json!({"enabled": false})))
