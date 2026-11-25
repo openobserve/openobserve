@@ -1176,7 +1176,7 @@ describe("AnalyticsFunnels", () => {
     }
     expect(wrapper!.find('[data-test="rum-analytics-funnel-alert-btn"]').text()).toBe("Alert");
     expect(wrapper!.find('[data-test="rum-analytics-funnel-add-dashboard-btn"]').text()).toBe(
-      "Add to dashboard",
+      "Add to Dashboard",
     );
   });
 

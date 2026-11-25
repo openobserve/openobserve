@@ -217,7 +217,6 @@
             :label="t('dashboard.passAllCurrentVariables')"
             labelPosition="left"
             data-test="dashboard-drilldown-pass-all-variables"
-            size="lg"
           />
         </div>
       </div>
@@ -229,7 +228,6 @@
           :label="t('dashboard.openInNewTab')"
           labelPosition="left"
           data-test="dashboard-drilldown-open-in-new-tab"
-          size="lg"
         />
       </div>
     </OForm>

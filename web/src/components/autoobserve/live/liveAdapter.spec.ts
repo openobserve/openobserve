@@ -302,7 +302,7 @@ describe("toCoverageSource", () => {
     const [api, web] = source.rows;
     expect(api.status).toMatchObject({ state: "watched", label: "Watched" });
     expect(api.identity?.trafficPerHour).toBe(1500);
-    expect(web.status).toEqual({ state: "gap", label: "Coverage gap" });
+    expect(web.status).toEqual({ state: "gap", label: "Coverage Gap" });
     expect(source.totals).toMatchObject({ total: 2, gaps: 1, fullyWatched: 1, learning: 0 });
   });
 
@@ -330,9 +330,9 @@ describe("toCoverageSource", () => {
     );
     expect(source.rows.map((r) => r.status)).toEqual([
       { state: "watched", label: "Watched" },
-      { state: "partial", label: "Partly watched" },
-      { state: "partial", label: "Partly watched" },
-      { state: "gap", label: "Coverage gap" },
+      { state: "partial", label: "Partly Watched" },
+      { state: "partial", label: "Partly Watched" },
+      { state: "gap", label: "Coverage Gap" },
     ]);
     expect(source.totals).toMatchObject({
       total: 4,
@@ -369,10 +369,10 @@ describe("toCoverageSource", () => {
       now,
     );
     expect(source.rows.map((r) => r.status)).toEqual([
-      { state: "gap", label: "Coverage gap" },
-      { state: "partial", label: "Partly watched" },
+      { state: "gap", label: "Coverage Gap" },
+      { state: "partial", label: "Partly Watched" },
       { state: "watched", label: "Watched" },
-      { state: "gap", label: "Coverage gap" },
+      { state: "gap", label: "Coverage Gap" },
     ]);
     expect(source.rows[0].identity?.streams).toEqual([
       expect.objectContaining({ name: "young", learning_until: later }),

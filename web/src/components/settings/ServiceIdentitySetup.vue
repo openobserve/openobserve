@@ -753,7 +753,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #header>
               <div class="min-w-0 flex-1">
                 <div
-                  class="flex items-center text-base"
+                  class="text-compact flex items-center"
                   data-test="service-identity-setup-insight-header"
                 >
                   {{ insightData.subtitle }}

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OCardSection class="flex-1 p-4 pb-2">
       <div class="mb-2 flex items-start justify-between">
-        <div class="text-text-heading text-base leading-snug font-semibold">
+        <div class="text-text-heading text-compact leading-snug font-semibold">
           {{ integration.displayName }}
         </div>
         <OButton
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('ingestion.awsSetup.viewDocumentation')" />
         </OButton>
       </div>
-      <div class="text-text-secondary mb-3 min-h-[3em] text-sm leading-normal">
+      <div class="text-text-secondary text-compact mb-3 min-h-[3em] leading-normal">
         {{ t(integration.descriptionKey) }}
       </div>
     </OCardSection>
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :secondary-button-label="t('common.cancel')"
       @click:secondary="showTemplateDialog = false"
     >
-      <div class="mb-3 text-sm font-medium">
+      <div class="text-compact mb-3 font-medium">
         {{
           t("ingestion.awsSetup.chooseMethodPrompt", {
             service: integration.displayName,
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`aws-${integration.id}-template-option-${index}`"
         >
           <div class="flex min-w-0 flex-1 flex-col">
-            <span class="text-sm font-medium">
+            <span class="text-compact font-medium">
               {{ template.name }}
             </span>
             <span class="text-muted-foreground mt-1 block text-xs">
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`aws-${integration.id}-component-option-${index}`"
         >
           <div class="flex min-w-0 flex-1 flex-col">
-            <span class="text-sm font-medium">
+            <span class="text-compact font-medium">
               {{ option.name }}
             </span>
             <span class="text-muted-foreground mt-1 block text-xs">

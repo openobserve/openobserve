@@ -97,7 +97,7 @@ export interface InputProps {
   width?: FieldWidth;
   /**
    * Position of the label: 'outside' renders above the field (default),
-   * 'inside' renders as a compact floating mini-label inside the field border.
+   * 'inside' renders as an inline prefix inside the field border, one row tall.
    */
   labelPosition?: "inside" | "outside";
 }

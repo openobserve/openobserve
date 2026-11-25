@@ -148,7 +148,7 @@ describe("RcaThreadColumn", () => {
     it("has the title, the Live pill and the step count", () => {
       const wrapper = mountColumn();
 
-      expect(wrapper.find("h2").text()).toBe("Investigation thread");
+      expect(wrapper.find("h2").text()).toBe("Investigation Thread");
       expect(byTest(wrapper, "rca-thread-live-pill").text()).toBe("Live");
       expect(byTest(wrapper, "rca-thread-saved-pill").exists()).toBe(false);
       expect(byTest(wrapper, "rca-thread-step-count").text()).toBe("2 steps");

@@ -164,7 +164,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSelect
                 v-model="selectedAttemptValue"
                 :options="attemptOptions"
-                size="md"
                 class="w-42!"
                 data-test="synthetics-run-detail-attempt-dropdown"
               />

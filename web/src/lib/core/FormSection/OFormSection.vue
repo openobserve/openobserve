@@ -40,13 +40,13 @@
     :data-test="dataTest"
   >
     <div
-      class="rounded-t-surface bg-surface-subtle border-border-default flex items-center gap-3 border-b px-4 py-3"
+      class="rounded-t-surface bg-surface-subtle border-border-default flex items-center gap-3 border-b px-3 py-2"
     >
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2">
           <OIcon v-if="isDanger" name="warning" size="sm" class="text-status-error-text shrink-0" />
           <h2
-            class="text-base font-semibold"
+            class="text-sm font-semibold"
             :class="isDanger ? 'text-status-error-text' : 'text-text-heading'"
           >
             {{ title }}<span v-if="required" class="text-text-body"> *</span>
@@ -76,7 +76,7 @@
       </div>
     </div>
     <!-- Rows carry the inset so their rules reach the card edge; other content keeps the body's. -->
-    <div class="px-4 py-3 has-[[data-o-setting-row]]:p-0 [&_[data-o-setting-row]]:px-4">
+    <div class="p-3 has-[[data-o-setting-row]]:p-0 [&_[data-o-setting-row]]:px-3">
       <slot />
     </div>
   </div>
@@ -90,7 +90,7 @@
         <!-- The accent bar. A 3px rule rather than an icon: it marks the header
              as a section boundary without competing with the controls below. -->
         <div class="rounded-default bg-theme-accent h-4 w-0.75 shrink-0" />
-        <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
+        <span class="text-text-heading text-sm font-semibold tracking-[0.01em]">
           {{ title }}<span v-if="required" class="text-text-body"> *</span>
         </span>
         <span
@@ -116,7 +116,7 @@
         <slot name="description">{{ description }}</slot>
       </p>
     </div>
-    <div class="px-3 py-2">
+    <div class="p-3">
       <slot />
     </div>
   </div>

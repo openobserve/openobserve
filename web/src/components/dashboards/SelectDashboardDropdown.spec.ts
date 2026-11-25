@@ -227,10 +227,10 @@ describe("SelectDashboardDropdown", () => {
       expect(drawer.props("size")).toBe("sm");
     });
 
-    it("should pass 'New dashboard' title to ODrawer", () => {
+    it("should pass 'New Dashboard' title to ODrawer", () => {
       const wrapper = mountComponent({}, store);
       const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("title")).toBe("New dashboard");
+      expect(drawer.props("title")).toBe("New Dashboard");
     });
 
     it("should render i18n label on secondary (cancel) button", () => {

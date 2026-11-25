@@ -1755,7 +1755,7 @@ describe("ClickHeatmap", () => {
       const canvas = () => wrapper.find('[data-test="rum-heatmap-canvas"]');
       const slider = () => wrapper.findComponent(OSlider);
       expect(slider().props("modelValue")).toBe(100);
-      expect(slider().find("input").attributes("aria-label")).toBe("Heat opacity");
+      expect(slider().find("input").attributes("aria-label")).toBe("Heat Opacity");
       expect(canvas().attributes("style")).toContain("opacity: 1");
 
       slider().vm.$emit("update:modelValue", 40);
@@ -2150,12 +2150,12 @@ describe("ClickHeatmap", () => {
     wrapper.unmount();
   });
 
-  it("labels the device group 'Device type', keeps 'All', and reloads when returning to All", async () => {
+  it("labels the device group 'Device Type', keeps 'All', and reloads when returning to All", async () => {
     answer();
     const wrapper = await mountPage({ OTable: true });
 
     expect(wrapper.find('[data-test="rum-heatmap-device-select"]').attributes("aria-label")).toBe(
-      "Device type",
+      "Device Type",
     );
     expect(wrapper.find('[data-test="rum-heatmap-device-all"]').text()).toBe("All");
     const device = wrapper.findComponent(OToggleGroup);

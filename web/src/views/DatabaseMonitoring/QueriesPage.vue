@@ -203,11 +203,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!serverListShown"
         ref="tableRef"
         :data="tableRows"
+        :pagination="loading || tableRows.length ? 'client' : 'none'"
         :columns="columns"
         row-key="rowKey"
         :loading="loading"
         :frame="false"
         :toolbar-bordered="false"
+        dense
         :error="error"
         :forbidden="forbidden"
         sorting="server"

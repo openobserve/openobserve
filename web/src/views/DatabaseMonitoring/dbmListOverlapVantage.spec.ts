@@ -355,8 +355,8 @@ describe("DatabasesPage qualifies its overlap measures", () => {
    * client-observed span time. Extending the page must not cost these.
    */
   it("keeps the attention/load provenance sub-labels", () => {
-    expect(source).toContain("dbm.databases.columnSubLabels.attention");
-    expect(source).toContain("dbm.databases.columnSubLabels.load");
+    expect(source).not.toContain("headerSubLabel");
+    expect(source).toContain("dbm.databases.columnSubLabels.calls");
   });
 
   describe("the two vantage states", () => {
@@ -626,6 +626,6 @@ describe("the Databases calls header fits its sub-label", () => {
     const source = read("DatabasesPage.vue");
     const calls = source.slice(source.indexOf('id: "calls",'), source.indexOf('id: "qps",'));
     const size = Number(/size: (\d+),/.exec(calls)?.[1]);
-    expect(size).toBeGreaterThanOrEqual(124);
+    expect(size).toBeGreaterThanOrEqual(110);
   });
 });

@@ -57,7 +57,7 @@ export interface ComboboxProps {
   /**
    * Controls where the label is rendered.
    * - `"outside"` (default): label renders above the input as a block element.
-   * - `"inside"`: label renders as a small floating label pinned inside the top of the input.
+   * - `"inside"`: same as outside, so the input keeps its 28px size height.
    */
   labelPosition?: "inside" | "outside";
 }

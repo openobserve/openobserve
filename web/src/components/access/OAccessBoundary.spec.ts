@@ -95,13 +95,13 @@ describe("OAccessBoundary table no-access state", () => {
       viewDenial("destinations", "list"),
     ]);
     expect(forbidden.find('[data-test="access-lock-icon"]').exists()).toBe(true);
-    expect(forbidden.text()).toContain("You don't have access");
+    expect(forbidden.text()).toContain("You Don't Have Access");
     expect(forbidden.text()).not.toContain("Copy details");
   });
 
   it("does not name the page's only refused list on a table that names no resource", async () => {
     const forbidden = await mountTable([viewDenial("templates", "list")]);
-    expect(forbidden.text()).toContain("You don't have access");
+    expect(forbidden.text()).toContain("You Don't Have Access");
     expect(forbidden.text()).not.toContain("templates");
   });
 });

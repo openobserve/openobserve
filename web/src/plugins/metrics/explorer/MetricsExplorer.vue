@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="dateTimePickerRef"
           v-model="selectedDate"
           data-test="metrics-date-picker"
-          class="h-8.5!"
+          class="h-7!"
           :auto-apply-dashboard="mode === 'visualize'"
           calendar-presets
           @on:date-change="onDateChange"
@@ -560,7 +560,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="inline-flex">
               <OButton
                 variant="outline"
-                size="sm-action"
+                size="sm"
                 disabled
                 data-test="metrics-explorer-convert-dashboard"
               >
@@ -579,7 +579,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-else-if="isWorkspace && grid.favorites.value.length"
             variant="outline"
-            size="sm-action"
+            size="sm"
             icon-left="dashboard-customize"
             data-test="metrics-explorer-convert-dashboard"
             @click="openConvertToDashboard"

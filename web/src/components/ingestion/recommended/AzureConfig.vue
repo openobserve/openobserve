@@ -22,11 +22,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <div
           data-test="azure-config-page-title"
-          class="text-text-heading m-0 mb-1 text-sm font-medium"
+          class="text-text-heading text-compact m-0 mb-1 font-medium"
         >
           {{ t("ingestion.azureSetup.activityLogsTitle") }}
         </div>
-        <div class="text-text-secondary m-0 text-sm">
+        <div class="text-text-secondary text-compact m-0">
           {{ t("ingestion.azureSetup.activityLogsDescription", { product: raw("Event Hub") }) }}
         </div>
       </div>
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-text-heading mb-1 font-semibold">
             {{ t("ingestion.azureSetup.step1Title") }}
           </div>
-          <div class="text-text-secondary m-0 mb-3 text-sm">
+          <div class="text-text-secondary text-compact m-0 mb-3">
             {{ t("ingestion.azureSetup.step1Description") }}
           </div>
           <OButton
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-text-heading mb-1 font-semibold">
             {{ t("ingestion.azureSetup.step2Title") }}
           </div>
-          <div class="text-text-secondary mb-3 text-sm">
+          <div class="text-text-secondary text-compact mb-3">
             {{ t("ingestion.azureSetup.step2Description") }}
           </div>
 
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Portal instructions -->
           <div v-if="step2Mode === 'portal'">
-            <ol class="text-text-secondary space-y-1 ps-4 text-sm">
+            <ol class="text-text-secondary text-compact space-y-1 ps-4">
               <li>
                 {{ t("ingestion.azureSetup.goTo") }}
                 <strong>{{ t("ingestion.azureSetup.portalSubscriptionPath") }}</strong>
@@ -183,7 +183,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div v-if="enabledCategories.length === 0" class="text-status-error-text mb-3 text-sm">
+            <div
+              v-if="enabledCategories.length === 0"
+              class="text-status-error-text text-compact mb-3"
+            >
               {{ t("ingestion.azureSetup.selectAtLeastOneCategory") }}
             </div>
             <div v-else>
@@ -203,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Manual Configuration -->
     <div class="mt-6">
-      <div class="text-text-heading mb-2 text-sm font-semibold">
+      <div class="text-text-heading text-compact mb-2 font-semibold">
         {{ t("ingestion.azureSetup.manualTitle") }}
       </div>
       <CredentialCodeBlock slug="azure-manual" :content="manualContent" />

@@ -144,13 +144,13 @@ describe("FleetEditorCanvas", () => {
     height.mockRestore();
   });
 
-  it("offers Clear canvas as a quiet icon button that still emits clear", async () => {
+  it("offers Clear Canvas as a quiet icon button that still emits clear", async () => {
     const clear = wrapper.find('[data-test="fleet-editor-canvas-clear"]');
     const button = wrapper
       .findAllComponents({ name: "OButton" })
       .find((b) => b.attributes("data-test") === "fleet-editor-canvas-clear")!;
     expect(button.props()).toMatchObject({ variant: "outline", size: "icon-sm" });
-    expect(clear.attributes("aria-label")).toBe("Clear canvas");
+    expect(clear.attributes("aria-label")).toBe("Clear Canvas");
     expect(clear.text()).toBe("");
     await clear.trigger("click");
     expect(wrapper.emitted("clear")).toHaveLength(1);

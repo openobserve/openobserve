@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             data-test="slo-import-url-input"
             :model-value="url"
-            size="md"
             :label="t('dashboard.addURL')"
             @update:model-value="updateUrl"
           />

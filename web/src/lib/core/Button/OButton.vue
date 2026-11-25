@@ -470,8 +470,8 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
     "h-6.5 ps-2.5 pe-2.5 max-[85.5rem]:ps-2 max-[85.5rem]:pe-2 text-xs gap-1.5 rounded-default",
   chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded-default leading-none",
   "chip-12": "h-6 ps-2 pe-1.5 !text-xs gap-1 rounded-default leading-none",
-  // Dialog and form footers sit on the md box.
-  "sm-action": "h-8 ps-3 pe-3 min-w-20 text-compact gap-2 rounded-default",
+  // Footer actions share the 28px sm height so dialogs match page toolbars.
+  "sm-action": "h-7 ps-3 pe-3 min-w-20 text-compact gap-1.5 rounded-default",
   md: "h-8 ps-3 pe-3 text-compact gap-2 rounded-default",
   cta: "h-9 ps-4 pe-4 text-compact gap-2 rounded-default",
   lg: "h-9 ps-3.5 pe-3.5 text-compact gap-2 rounded-default",

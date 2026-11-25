@@ -38,10 +38,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        action button. Title overflow is handled by truncate + min-w-0 on the
        title block instead. h-14 gives the header a touch more breathing room. -->
   <!-- The header ALWAYS owns its own bottom divider (border-b, inside its own
-       h-15 box so the header is exactly 60px whether it's used directly or via
+       h-12 box so the header is exactly 48px whether it's used directly or via
        OPageLayout). Never wrap it in a bordered div and never hand-draw a
        border-b on a wrapper — that adds a second 1px line and makes the header
-       61px on some pages and 60px on others. -->
+       49px on some pages and 48px on others. -->
   <header
     ref="headerEl"
     class="app-page-header px-page-edge border-border-default shrink-0 border-b"
@@ -288,10 +288,10 @@ const SIZE_CLASS = {
   xl: "max-w-7xl",
 } as const;
 const ownRow = computed(() => !!props.contentSize);
-// Fixed h-15 so h-full slot content (inline tabs, dividers) spans the row; < lg it may wrap.
+// Fixed h-12 so h-full slot content (inline tabs, dividers) spans the row; < lg it may wrap.
 // The @page half repeats the max-lg half against the page container: a wide viewport whose content column is narrow collapses the same way.
 const ROW_CLASS =
-  "flex h-15 items-center justify-between gap-4 max-lg:h-auto max-lg:min-h-15 max-lg:flex-wrap max-lg:gap-y-1 max-lg:py-1.5 @max-4xl/page:h-auto @max-4xl/page:min-h-15 @max-4xl/page:flex-wrap @max-4xl/page:gap-y-1 @max-4xl/page:py-1.5";
+  "flex h-12 items-center justify-between gap-4 max-lg:h-auto max-lg:min-h-12 max-lg:flex-wrap max-lg:gap-y-1 max-lg:py-1.5 @max-4xl/page:h-auto @max-4xl/page:min-h-12 @max-4xl/page:flex-wrap @max-4xl/page:gap-y-1 @max-4xl/page:py-1.5";
 // Tailwind's `4xl` container width, the `@max-4xl/page` threshold above.
 const PAGE_WRAP_REM = 56;
 

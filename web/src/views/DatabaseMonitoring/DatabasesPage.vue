@@ -55,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex min-h-0 flex-1 flex-col">
       <OTable
         :data="treeRows"
+        :pagination="loading || treeRows.length ? 'client' : 'none'"
         :columns="columns"
         row-key="rowKey"
         :loading="loading"
@@ -70,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         table-id="dbm-databases"
         :enable-column-resize="true"
         :toolbar-bordered="false"
+        dense
         :get-row-style="rowStyle"
         tree
         :get-row-warning="hasShortfall"
@@ -139,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <template #subheader>
+        <template v-if="rows.length > 0 || loading" #subheader>
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
           <div data-test="dbm-databases-summary">
@@ -435,6 +437,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty>
           <DbmEmptyState
             v-if="!loading"
+            size="block"
             :permission-ok="permissionOk"
             :enabled="dbmEnabled"
             :trace-count="traceCount"
@@ -1511,11 +1514,10 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     header: t("dbm.databases.columns.calls"),
     accessorKey: "calls",
     // At 96 the "from your apps" sub-label ellipsised beside the sort chevron.
-    size: 124,
+    size: 110,
     sortable: true,
     meta: {
-      align: "right",
-      headerSubLabel: t("dbm.databases.columnSubLabels.calls"),
+      headerTooltip: t("dbm.databases.columnSubLabels.calls"),
     },
   },
   {
@@ -1524,7 +1526,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     header: t("dbm.databases.columns.qps"),
     // "Per second" plus the sort icon needs ~100; at 84 it ellipsised to
     // "Per se…".
-    size: 100,
+    size: 120,
     sortable: true,
     meta: {
       align: "right",
@@ -1552,7 +1554,6 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("p50"),
       headerTooltip: t("dbm.databases.columnHints.p50"),
     },
   },
@@ -1565,7 +1566,6 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("p95"),
       headerTooltip: t("dbm.databases.columnHints.p95"),
     },
   },
@@ -1579,7 +1579,6 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("p99"),
       headerTooltip: t("dbm.databases.columnHints.p99"),
     },
   },
@@ -1623,11 +1622,10 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     id: "attention",
     hideable: true,
     header: t("dbm.databases.columns.attention"),
-    size: 130,
+    size: 150,
     sortable: true,
     meta: {
       align: "right" as const,
-      headerSubLabel: t("dbm.databases.columnSubLabels.attention"),
       headerTooltip: t("dbm.databases.columnHints.attention"),
     },
   },
@@ -1640,7 +1638,6 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: t("dbm.databases.columnSubLabels.load"),
       headerTooltip: t("dbm.databases.columnHints.load"),
     },
   },

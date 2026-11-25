@@ -280,7 +280,7 @@ const namespaceOf = (row: any): string =>
     :columns="columns"
     row-key="key"
     dense
-    :row-height="hasSub ? 44 : 32"
+    :row-height="hasSub ? 44 : 28"
     sticky-header
     virtual-scroll
     :overscan="10"
@@ -295,7 +295,7 @@ const namespaceOf = (row: any): string =>
     :table-id="tableId"
     :column-visibility="defaultVisibility"
     :forbidden="forbidden"
-    :loading="loading"
+    :loading="loading && (rows.length > 0 || lastUpdatedAt == null)"
     fill-height
     :data-test="`k8s2-table-${view}`"
     @sort-change="onSort"
@@ -325,6 +325,7 @@ const namespaceOf = (row: any): string =>
     </template>
     <template #toolbar-trailing>
       <ORefreshButton
+        v-if="lastUpdatedAt != null"
         :last-run-at="lastUpdatedAt"
         :loading="loading"
         data-test="k8s2-refresh"

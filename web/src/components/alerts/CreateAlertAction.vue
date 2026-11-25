@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OButton
     v-else-if="variant === 'button'"
     :variant="buttonVariant"
-    size="sm-action"
+    size="sm"
     :disabled="!!blockedReason"
     focusable-unavailable
     :icon-left="icon"

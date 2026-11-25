@@ -145,6 +145,8 @@ export function useKubernetesInventory(
   const pageError = ref<string | null>(null);
   const loading = ref(false);
   const loaded = ref(false);
+  // The cluster list settles before the slower row queries, so the picker stops loading first.
+  const clustersLoaded = ref(false);
   const detailLoading = ref(false);
   const lastUpdatedAt = ref<number | null>(null);
   const refreshNonce = ref(0);
@@ -278,6 +280,7 @@ export function useKubernetesInventory(
     pageError.value = null;
     loading.value = false;
     loaded.value = false;
+    clustersLoaded.value = false;
     detailLoading.value = false;
     loadedFor.value = null;
   };
@@ -589,6 +592,7 @@ export function useKubernetesInventory(
         ...new Set((fb.sql.get("CLF") ?? []).map((h: any) => String(h.c ?? "")).filter(Boolean)),
       ].sort((a, b) => a.localeCompare(b));
     }
+    clustersLoaded.value = true;
     const cluster = s.cluster ?? clusters.value[0] ?? null;
     const requests = planned ?? sqlRequests(s, t, cluster);
     const blocking = requests.filter(notCounts);
@@ -829,6 +833,7 @@ export function useKubernetesInventory(
     eventLinksEnabled,
     loading,
     loaded,
+    clustersLoaded,
     detailLoading,
     pageError,
     lastUpdatedAt,

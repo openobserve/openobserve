@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OButton
     v-if="showAcknowledge"
     variant="primary"
-    size="sm-action"
+    size="sm"
     icon-left="check"
     :disabled="actions.pending.value"
     data-test="alerts-alertdetail-ack"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #trigger>
           <OButton
             variant="outline"
-            size="sm-action"
+            size="sm"
             icon-left="hourglass-empty"
             data-test="alerts-alertdetail-extend"
           >
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </ODropdown>
       <OButton
         variant="outline"
-        size="sm-action"
+        size="sm"
         :disabled="actions.pending.value"
         data-test="alerts-alertdetail-end-mute"
         @click="onEndMute"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OButton
       v-else-if="downtime"
       variant="outline"
-      size="sm-action"
+      size="sm"
       icon-left="open-in-new"
       data-test="alerts-alertdetail-muted-by"
       @click="openDowntime"
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #trigger>
         <OButton
           variant="outline"
-          size="sm-action"
+          size="sm"
           icon-left="notifications-paused"
           icon-right="arrow-drop-down"
           data-test="alerts-alertdetail-mute"

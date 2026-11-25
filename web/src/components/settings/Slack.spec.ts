@@ -532,7 +532,7 @@ describe("Slack settings: General and AutoObserve sections (S7)", () => {
     await flushPromises();
     const { bar, autoobserve, insights } = sections(w);
     expect(bar.exists()).toBe(true);
-    expect(bar.text()).toContain("On this page");
+    expect(bar.text()).toContain("On This Page");
     expect(bar.findAll("button").map((b) => b.text())).toEqual(["General", "AutoObserve"]);
     expect(autoobserve.text()).toContain("AutoObserve");
     expect(insights.exists()).toBe(true);

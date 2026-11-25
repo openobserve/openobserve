@@ -316,7 +316,7 @@ describe("LiveIssues", () => {
     expect(w.find(sel("error")).exists()).toBe(false);
   });
 
-  it("search filters to the matching stream, round-trips q, and offers Clear search", async () => {
+  it("search filters to the matching stream, round-trips q, and offers Clear Search", async () => {
     api.mockResolvedValue(page([at(0, 1), at(3, 2), at(4, 3)]));
     const w = mountTable();
     await loaded();
@@ -332,7 +332,7 @@ describe("LiveIssues", () => {
     await flushPromises();
     const none = w.find(sel("no-match"));
     expect(none.text()).toContain("No issues match");
-    expect(none.text()).toContain("Clear search");
+    expect(none.text()).toContain("Clear Search");
   });
 
   it("a q in the URL filters on first paint", async () => {

@@ -32,7 +32,6 @@ describe("ODate", () => {
     expect(wrapper.find(".o-input-label").exists()).toBe(false);
     const inside = wrapper.find('[role="group"] label');
     expect(inside.text()).toBe("From");
-    expect(wrapper.find('[role="group"]').classes()).toContain("relative");
   });
 
   it("should render label slot content", () => {

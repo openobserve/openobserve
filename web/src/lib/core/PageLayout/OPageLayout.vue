@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="@container/page flex h-full flex-col overflow-y-clip">
     <!-- ── Header (props → OPageHeader, or #header escape hatch) ── -->
     <!-- Just a shrink-0 slot: OPageHeader draws its OWN border-b (so the header
-         is a consistent 60px). Don't add a border here — it would double the
+         is a consistent 48px). Don't add a border here — it would double the
          divider and add 1px. -->
     <div v-if="hasHeader" :class="headerClass ?? 'shrink-0'">
       <slot name="header">

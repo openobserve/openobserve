@@ -128,7 +128,7 @@
       />
       <OTooltip v-if="!unavailable && editAnomalyLocked" :content="anomalyLockedReason">
         <span class="inline-flex">
-          <OButton variant="outline" size="sm-action" disabled data-test="alerts-alertdetail-edit">
+          <OButton variant="outline" size="sm" disabled data-test="alerts-alertdetail-edit">
             <template #icon-left>
               <OIcon
                 name="lock"
@@ -144,7 +144,7 @@
       <OButton
         v-else-if="!unavailable"
         variant="outline"
-        size="sm-action"
+        size="sm"
         icon-left="edit"
         data-test="alerts-alertdetail-edit"
         @click="editAlert"

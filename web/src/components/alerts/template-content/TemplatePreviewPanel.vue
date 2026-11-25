@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OButton
             variant="outline"
-            size="sm-action"
+            size="sm"
             :disabled="!selectedDestination"
             :loading="isTestSending"
             data-test="template-preview-panel-test-send-btn"
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }}</span>
       <OButton
         variant="outline"
-        size="sm-action"
+        size="sm"
         data-test="template-preview-panel-retry-btn"
         @click="fetchPreview"
         >{{ t("common.retry") }}</OButton

@@ -212,7 +212,7 @@ describe("AddTemplate - rendering (create mode)", () => {
     const w = await mountComp();
     const titleEl = w.find('[data-test="add-template-title"]');
     expect(titleEl.exists()).toBe(true);
-    expect(titleEl.text()).toContain("New template");
+    expect(titleEl.text()).toContain("New Template");
   });
 
   it("limits the name input to the 256-character server limit", async () => {
@@ -1016,7 +1016,7 @@ describe("AddTemplate - applies to", () => {
     getForm(w).setFieldValue("name", "ops-card");
     await w.findComponent({ name: "QueryEditor" }).vm.$emit("update:query", '{"text":"x"}');
     expect((appliesTo(w).props("options") as any[])[0]).toEqual({
-      label: "All kinds",
+      label: "All Kinds",
       value: "all_kinds",
     });
     expect(appliesTo(w).props("modelValue")).toEqual(["all_kinds"]);

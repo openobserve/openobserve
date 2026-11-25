@@ -91,13 +91,13 @@ describe("nextStepLine", () => {
       {
         note: null,
         notHelpful: null,
-        link: { to: PIPELINE, label: "Open pipeline", primary: true },
+        link: { to: PIPELINE, label: "Open Pipeline", primary: true },
       },
     ],
     [
       "engine step with no cause: outlined Open logs",
       step({}, [], LOGS),
-      { link: { to: LOGS, label: "Open logs", primary: false } },
+      { link: { to: LOGS, label: "Open Logs", primary: false } },
     ],
     [
       "working: the AI note, still the engine text",
@@ -119,7 +119,7 @@ describe("nextStepLine", () => {
     [
       "AI step citing a pipeline and a deploy that opens the deploy: the button names versions",
       ai(["c1", "c3"], null, VERSIONS),
-      { link: { to: VERSIONS, label: "Open versions", primary: false } },
+      { link: { to: VERSIONS, label: "Open Versions", primary: false } },
     ],
     [
       "AI check-only step: no button, still judged",

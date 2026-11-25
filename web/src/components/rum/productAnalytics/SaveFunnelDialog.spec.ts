@@ -69,7 +69,7 @@ describe("SaveFunnelDialog (AC-67)", () => {
   it("titles each mode, pre-fills the name and states that the SQL is a snapshot", () => {
     mountDialog({ mode: "rename", initialName: "Old name" });
     expect(wrapper!.find('[data-test-stub="o-dialog"]').attributes("data-title")).toBe(
-      "Rename saved funnel",
+      "Rename Saved Funnel",
     );
     expect(
       wrapper!.find<HTMLInputElement>('[data-test="rum-analytics-save-funnel-name"] input').element
@@ -78,13 +78,13 @@ describe("SaveFunnelDialog (AC-67)", () => {
     wrapper!.unmount();
     mountDialog({ mode: "save-as" });
     expect(wrapper!.find('[data-test-stub="o-dialog"]').attributes("data-title")).toBe(
-      "Save funnel as",
+      "Save Funnel As",
     );
     expect(wrapper!.text()).toContain("as a snapshot");
     wrapper!.unmount();
     mountDialog({ mode: "duplicate", initialName: "Copy of Signup" });
     expect(wrapper!.find('[data-test-stub="o-dialog"]').attributes("data-title")).toBe(
-      "Duplicate funnel",
+      "Duplicate Funnel",
     );
     expect(
       wrapper!.find<HTMLInputElement>('[data-test="rum-analytics-save-funnel-name"] input').element

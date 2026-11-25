@@ -499,7 +499,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
 <template>
   <div
     v-if="deciding && display === 'pill'"
-    class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+    class="text-compact flex flex-wrap items-center gap-x-3 gap-y-1"
     data-test="first-event-status"
     data-state="deciding"
     data-display="pill"
@@ -507,7 +507,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
     <OSkeleton class="h-5 w-28" />
     <OSkeleton class="h-3.5 w-48" />
   </div>
-  <div v-else-if="deciding" class="flex flex-col gap-2 text-sm">
+  <div v-else-if="deciding" class="text-compact flex flex-col gap-2">
     <OBanner
       variant="default"
       inline-actions
@@ -526,7 +526,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
   </div>
   <div
     v-else-if="display === 'pill'"
-    class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+    class="text-compact flex flex-wrap items-center gap-x-3 gap-y-1"
     data-test="first-event-status"
     :data-state="state"
     data-display="pill"
@@ -577,7 +577,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
       })
     }}</OText>
   </div>
-  <div v-else class="flex flex-col gap-2 text-sm">
+  <div v-else class="text-compact flex flex-col gap-2">
     <OBanner
       :variant="bannerVariant"
       :inline-actions="state !== 'rejected'"

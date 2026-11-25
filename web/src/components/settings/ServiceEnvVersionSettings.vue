@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-tabs-active-bg text-tabs-active-text rounded-surface flex h-12 w-12 items-center justify-center"
         ><OIcon name="check" size="md"
       /></span>
-      <div class="text-text-heading text-base font-semibold">
+      <div class="text-text-heading text-sm font-semibold">
         {{ t("serviceVersions.settings.emptyTitle") }}
       </div>
       <div class="text-text-secondary max-w-[34rem] text-[0.8125rem]">

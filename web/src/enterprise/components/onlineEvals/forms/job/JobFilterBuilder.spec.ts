@@ -33,7 +33,7 @@ describe("JobFilterBuilder", () => {
   it("says what a matching trace goes on to enter", () => {
     const wrapper = mountBuilder();
     expect(wrapper.get('[data-test="job-condition-builder-title"]').text()).toBe(
-      "Filter condition",
+      "Filter Condition",
     );
 
     const hint = wrapper.get('[data-test="job-condition-builder-hint"]').text();
@@ -44,7 +44,7 @@ describe("JobFilterBuilder", () => {
   it("shows End Signal copy when used by completion settings", () => {
     const wrapper = mountBuilder("endSignal");
     expect(wrapper.get('[data-test="job-condition-builder-title"]').text()).toBe(
-      "End signal (optional)",
+      "End Signal (optional)",
     );
     expect(wrapper.get('[data-test="job-condition-builder-hint"]').text()).toContain(
       "closes the trace immediately",

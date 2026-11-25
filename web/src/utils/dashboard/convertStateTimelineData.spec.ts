@@ -651,7 +651,7 @@ describe("convertStateTimelineData", () => {
     expect(noData.state).toBeNull();
     expect(noData.itemStyle.color).toBe("--color-surface-subtle");
     expect(noData.itemStyle.color).not.toBe(up.itemStyle.color);
-    expect(legendNames(result)).toContain("No data");
+    expect(legendNames(result)).toContain("No Data");
   });
 
   it("takes colour and display text from value mappings", () => {
@@ -762,7 +762,7 @@ describe("convertStateTimelineData", () => {
     expect(text).toContain("Start: 1970-01-01 00:00:00");
     expect(text).toContain("End: 1970-01-01 00:00:20");
     expect(text).toContain("Duration: 20s");
-    expect(format({ seriesIndex: 0, marker: "", data: gap })).toContain("No data");
+    expect(format({ seriesIndex: 0, marker: "", data: gap })).toContain("No Data");
   });
 
   it("caps rows and reports how many are shown", () => {
@@ -1014,7 +1014,7 @@ describe("allRowsTooltip", () => {
     expect(html).toContain("a: Up");
     expect(html).toContain("&lt;b&gt;x&lt;/b&gt;: &lt;img src=x&gt;");
     expect(html).not.toContain("<img");
-    expect(html).toContain("c: No data");
+    expect(html).toContain("c: No Data");
     expect(html).not.toContain("d: ");
   });
 
@@ -1073,7 +1073,7 @@ describe("all rows tooltip mode", () => {
     const nearestSample = [{ seriesIndex: 1, dataIndex: 0 }];
     expect(format(nearestSample)).toContain("p1: up");
     result.extras.setPointerTime(toZonedTime(50 * S, "UTC").getTime());
-    expect(format(nearestSample)).toContain("p1: No data");
+    expect(format(nearestSample)).toContain("p1: No Data");
     expect(format(nearestSample)).toContain("<strong>1970-01-01 00:00:50</strong>");
   });
 
@@ -1573,7 +1573,7 @@ describe("state timeline cells display", () => {
       ["5", 10 * S, 20 * S],
       ["7", 30 * S, 40 * S],
     ]);
-    expect(legendNames(result)).not.toContain("No data");
+    expect(legendNames(result)).not.toContain("No Data");
     expect(result.extras).toMatchObject({ isTimeSeries: true, rowEntities: ["p1"] });
   });
 

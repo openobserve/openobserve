@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="bg-card-glass-bg h-full">
         <OTable
           :frame="false"
+          :row-height="28"
           :data="serviceAccountsState.service_accounts_users"
           :columns="columns"
           row-key="email"
@@ -176,9 +177,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #row-actions>
             <span
               data-test="service-accounts-system-managed-badge"
-              class="inline-flex items-center gap-1"
+              class="inline-flex items-center gap-1 pe-3"
             >
-              <OTag type="serviceAccountKind" value="managed" />
+              <OBadge variant="default-soft" size="sm">{{
+                t("serviceAccounts.row.managedBy")
+              }}</OBadge>
               <OTooltip :content="t('serviceAccounts.row.managedByTooltip')" />
             </span>
           </template>

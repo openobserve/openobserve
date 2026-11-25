@@ -564,7 +564,7 @@ const nextBlocked = computed(() => {
 <template>
   <div class="flex flex-col gap-4" data-test="slack-wizard" :data-step="step">
     <div class="flex flex-col gap-0.5">
-      <h2 class="text-text-heading m-0 text-base font-semibold">
+      <h2 class="text-text-heading m-0 text-sm font-semibold">
         {{ t("slackApp.wizard.title") }}
       </h2>
       <p class="text-text-secondary m-0 text-sm">{{ t("slackApp.wizard.subtitle") }}</p>
@@ -617,7 +617,7 @@ const nextBlocked = computed(() => {
     <OStepper :model-value="step" :animated="false" orientation="horizontal">
       <OStep :name="0" :title="t('slackApp.wizard.steps.prerequisites')" :done="step > 0">
         <div class="flex flex-col gap-3 pt-3">
-          <h3 class="text-text-heading m-0 text-base font-semibold">
+          <h3 class="text-text-heading m-0 text-sm font-semibold">
             {{ t("slackApp.prereq.title") }}
           </h3>
           <p class="text-text-secondary m-0 text-sm">{{ t("slackApp.prereq.subtitle") }}</p>
@@ -642,7 +642,7 @@ const nextBlocked = computed(() => {
 
       <OStep :name="1" :title="t('slackApp.wizard.steps.connection')" :done="step > 1">
         <div class="flex flex-col gap-3 pt-3" data-test="slack-wizard-connectivity">
-          <h3 class="text-text-heading m-0 text-base font-semibold">
+          <h3 class="text-text-heading m-0 text-sm font-semibold">
             {{ t("slackApp.wizard.connection.title") }}
           </h3>
           <p class="text-text-secondary m-0 text-sm">
@@ -704,7 +704,7 @@ const nextBlocked = computed(() => {
           class="flex flex-col gap-5 pt-3"
           data-test="slack-wizard-create-form"
         >
-          <h3 class="text-text-heading m-0 text-base font-semibold">
+          <h3 class="text-text-heading m-0 text-sm font-semibold">
             {{ t("slackApp.wizard.create.title") }}
           </h3>
           <OBanner
@@ -972,7 +972,7 @@ const nextBlocked = computed(() => {
         :error="!!installRefusal"
       >
         <div class="flex flex-col gap-4 pt-3">
-          <h3 class="text-text-heading m-0 text-base font-semibold">
+          <h3 class="text-text-heading m-0 text-sm font-semibold">
             {{ t("slackApp.wizard.install.title") }}
           </h3>
           <template v-if="installRefusal">
@@ -1163,7 +1163,7 @@ const nextBlocked = computed(() => {
 
       <OStep :name="4" :title="t('slackApp.wizard.steps.test')">
         <div class="flex flex-col gap-4 pt-3">
-          <h3 class="text-text-heading m-0 text-base font-semibold">
+          <h3 class="text-text-heading m-0 text-sm font-semibold">
             {{ t("slackApp.wizard.test.title") }}
           </h3>
           <div class="flex flex-wrap gap-2">

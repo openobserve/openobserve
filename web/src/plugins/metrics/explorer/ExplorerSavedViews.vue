@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #trigger>
       <OButton
         variant="outline"
-        size="sm-action"
+        size="sm"
         icon-left="bookmark"
         icon-right="arrow-drop-down"
         data-test="metrics-explorer-views-btn"

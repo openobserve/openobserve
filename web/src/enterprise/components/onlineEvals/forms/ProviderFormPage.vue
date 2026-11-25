@@ -49,7 +49,6 @@
                   name="providerType"
                   :label="t('onlineEvals.provider.typeLabel')"
                   :options="providerTypeOptions"
-                  size="md"
                   required
                   :disabled="mode === 'edit'"
                   data-test="provider-form-type-select"

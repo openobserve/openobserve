@@ -83,7 +83,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormSwitch
                 data-test="report-cached-toggle-btn"
                 name="isCachedReport"
-                size="lg"
                 :label="t('reports.cachedReport')"
               />
               <OIcon name="info-outline" class="ms-2 cursor-pointer" size="sm">
@@ -578,7 +577,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OFormSwitch
                       name="imagePreview"
-                      size="lg"
                       :label="t('reports.imagePreview')"
                       data-test="add-report-image-preview-toggle"
                     />

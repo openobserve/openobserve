@@ -311,7 +311,7 @@ describe("SavedFunnelBar, the builder header (AC-67, AC-68, AC-70)", () => {
     expect(confirmMock.mock.calls[0][0].message).toBe(
       "This saved funnel was deleted. Save as a new one?",
     );
-    expect(q("rum-analytics-save-funnel-dialog").attributes("data-title")).toBe("Save funnel as");
+    expect(q("rum-analytics-save-funnel-dialog").attributes("data-title")).toBe("Save Funnel As");
     await fillAndSubmit();
     expect(api.bodies("createFunnel")).toEqual([
       {
@@ -337,7 +337,7 @@ describe("SavedFunnelBar, the builder header (AC-67, AC-68, AC-70)", () => {
     await settle();
     await menu("duplicate").trigger("click");
     await settle();
-    expect(q("rum-analytics-save-funnel-dialog").attributes("data-title")).toBe("Duplicate funnel");
+    expect(q("rum-analytics-save-funnel-dialog").attributes("data-title")).toBe("Duplicate Funnel");
     expect(
       (
         wrapper!.find('[data-test="rum-analytics-save-funnel-name"] input')
@@ -360,7 +360,7 @@ describe("SavedFunnelBar, the builder header (AC-67, AC-68, AC-70)", () => {
     await menu("rename").trigger("click");
     await settle();
     expect(q("rum-analytics-save-funnel-dialog").attributes("data-title")).toBe(
-      "Rename saved funnel",
+      "Rename Saved Funnel",
     );
     await fillAndSubmit("Signup v2");
     expect(api.bodies("updateFunnel").at(-1)).toMatchObject({ name: "Signup v2", version: 1 });
@@ -368,7 +368,7 @@ describe("SavedFunnelBar, the builder header (AC-67, AC-68, AC-70)", () => {
     expect(menu("save-as").text()).toBe("Save as new");
     await menu("save-as").trigger("click");
     await settle();
-    expect(q("rum-analytics-save-funnel-dialog").attributes("data-title")).toBe("Save funnel as");
+    expect(q("rum-analytics-save-funnel-dialog").attributes("data-title")).toBe("Save Funnel As");
     await fillAndSubmit("Signup v3");
     expect(api.bodies("createFunnel").at(-1)).toMatchObject({ name: "Signup v3" });
     expect(pa.openedFunnel.value?.name).toBe("Signup v3");
@@ -477,7 +477,7 @@ describe("SavedFunnelBar, the builder header (AC-67, AC-68, AC-70)", () => {
     expect(confirmMock.mock.calls.at(-1)![0].message).toBe(
       "This saved funnel was deleted. Save as a new one?",
     );
-    expect(q("rum-analytics-save-funnel-dialog").attributes("data-title")).toBe("Save funnel as");
+    expect(q("rum-analytics-save-funnel-dialog").attributes("data-title")).toBe("Save Funnel As");
   });
 
   it("Reload in a rename conflict asks before it drops unsaved step edits", async () => {

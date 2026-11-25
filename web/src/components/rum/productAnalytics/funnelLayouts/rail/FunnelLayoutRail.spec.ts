@@ -132,7 +132,7 @@ describe("FunnelLayoutRail", () => {
     const w = mountRail();
     expect(w.find("aside").text()).not.toContain("/web");
     expect(w.find('[data-test="rum-analytics-funnel-exclusions"]').text()).toContain(
-      "Exclusion steps",
+      "Exclusion Steps",
     );
     expect(w.find('[data-test="rum-analytics-funnel-rail-app-filters"]').text()).toContain(
       "App filters for web",
@@ -294,7 +294,7 @@ describe("FunnelLayoutRail", () => {
     const w = mountRail({ def });
     const aside = w.find("aside");
     const section = aside.find('[data-test="rum-analytics-funnel-filter-all"]');
-    expect(section.text()).toContain("Filter all steps");
+    expect(section.text()).toContain("Filter All Steps");
     await section
       .find('[data-test="rum-analytics-funnel-filter-builder-chip-geo_info_country-remove"]')
       .trigger("click");
@@ -599,7 +599,7 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
   it("the exclusion steps sit in their own rail section, not in the add-step row", () => {
     const w = mountLayout(defWith([]));
     const section = w.find('[data-test="rum-analytics-funnel-exclusions"]');
-    expect(section.text()).toContain("Exclusion steps");
+    expect(section.text()).toContain("Exclusion Steps");
     expect(section.find('[data-test="rum-analytics-funnel-add-exclusion-btn"]').exists()).toBe(
       true,
     );

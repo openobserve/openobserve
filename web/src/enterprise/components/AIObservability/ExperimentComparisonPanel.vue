@@ -54,7 +54,6 @@
                       multiple
                       select-all
                       option-tooltip
-                      size="md"
                       width="sm"
                       data-test="ai-experiment-comparison-outcome-dimensions"
                       @update:model-value="selectOutcomeDimensions"
@@ -73,7 +72,6 @@
                       :options="thresholdOptions"
                       :searchable="false"
                       :disabled="loading"
-                      size="md"
                       width="xs"
                       data-test="ai-experiment-comparison-threshold"
                       @update:model-value="selectThreshold"

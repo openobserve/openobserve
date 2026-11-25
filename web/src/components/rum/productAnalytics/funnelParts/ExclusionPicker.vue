@@ -174,14 +174,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OButton
           variant="ghost"
-          size="sm"
+          size="sm-action"
           data-test="rum-analytics-funnel-exclusion-picker-cancel"
           @click="emit('cancel')"
           >{{ t("common.cancel") }}</OButton
         >
         <OButton
           variant="primary"
-          size="sm"
+          size="sm-action"
           :disabled="problem !== null || secondsInvalid"
           data-test="rum-analytics-funnel-exclusion-picker-apply"
           @click="apply"

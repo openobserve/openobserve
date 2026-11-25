@@ -267,7 +267,7 @@ describe("MetricCard (ported to @/lib)", () => {
       expect(button.attributes("aria-label")).toBeTruthy();
       const words = button
         .findAll("span")
-        .filter((s) => s.text() === "Drill down")
+        .filter((s) => s.text() === "Drill Down")
         .at(-1)!;
       expect(words.classes()).toContain("@max-md/panelbar:hidden");
     });
@@ -326,7 +326,7 @@ describe("MetricCard (ported to @/lib)", () => {
         '[data-test="metrics-explorer-card-details-node_cpu_seconds_total"]',
       );
       expect(drill.element.tagName).toBe("BUTTON");
-      expect(drill.text()).toBe("Drill down");
+      expect(drill.text()).toBe("Drill Down");
       expect(drill.find("svg").exists()).toBe(true);
       expect(drill.attributes("aria-label")).toBe("Drill down into node_cpu_seconds_total");
       await drill.trigger("click");
@@ -702,7 +702,7 @@ describe("MetricCard (ported to @/lib)", () => {
       // Header bar (the shared PanelBar's box — tinted and bordered), footer,
       // and the badge in the footer where it cannot truncate the name it
       // describes.
-      expect(wrapper.find(".min-h-7.border-b.border-panel-bar-border").exists()).toBe(true);
+      expect(wrapper.find(".min-h-8.border-b.border-panel-bar-border").exists()).toBe(true);
       expect(
         wrapper.find('[data-test="metrics-explorer-card-badge-node_cpu_seconds_total"]').exists(),
       ).toBe(true);

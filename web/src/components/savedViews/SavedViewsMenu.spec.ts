@@ -103,7 +103,7 @@ describe("SavedViewsMenu", () => {
   it("uses a generic search placeholder while loading and a counted one after", async () => {
     await mountMenu({ views: [], loading: true });
     expect(el("sv-search")?.querySelector("input")?.getAttribute("placeholder")).toBe(
-      "Search saved views",
+      "Search Saved Views",
     );
     wrapper!.unmount();
     await mountMenu();

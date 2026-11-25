@@ -387,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             calendar-presets
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
-            class="h-8.5! max-lg:me-auto max-md:[&_.date-time-label]:hidden"
+            class="h-7! max-lg:me-auto max-md:[&_.date-time-label]:hidden"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
           />
@@ -449,7 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OSeparator
                 v-if="!showRunQueryPending && store.state.zoConfig.auto_query_enabled"
-                class="h-8.5! w-px"
+                class="h-7! w-px"
                 vertical
               />
               <ODropdown v-if="store.state.zoConfig.auto_query_enabled" side="bottom" align="end">
@@ -639,7 +639,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="searchObj.meta.serviceGraphLayoutType"
               :options="serviceGraphLayoutOptions"
               :searchable="false"
-              class="h-[2.125rem]! min-h-[2.125rem]! w-[7.5rem] max-lg:w-24!"
+              class="h-7! min-h-7! w-[7.5rem] max-lg:w-24!"
               :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
               @update:model-value="onServiceGraphLayoutChange"
             />
@@ -662,7 +662,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="services-catalog-date-time-picker"
               calendar-presets
-              class="h-8.5!"
+              class="h-7!"
               @on:date-change="updateDateTime"
             />
             <ORefreshButton

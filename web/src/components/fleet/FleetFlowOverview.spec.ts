@@ -509,17 +509,17 @@ describe("FleetFlowOverview expand", () => {
   it("flips the button label and grows the phone map pane", async () => {
     serve(basePipelines());
     await mountBound(false);
-    expect(button().attributes("aria-label")).toBe("Expand map");
+    expect(button().attributes("aria-label")).toBe("Expand Map");
     expect(mapPane().classes()).not.toContain("max-lg:h-dvh");
     await button().trigger("click");
     await flushPromises();
     expect(wrapper.emitted("update:expanded")).toEqual([[true]]);
-    expect(button().attributes("aria-label")).toBe("Collapse map");
+    expect(button().attributes("aria-label")).toBe("Collapse Map");
     expect(mapPane().classes()).toContain("max-lg:h-dvh");
     await button().trigger("click");
     await flushPromises();
     expect(wrapper.emitted("update:expanded")?.at(-1)).toEqual([false]);
-    expect(button().attributes("aria-label")).toBe("Expand map");
+    expect(button().attributes("aria-label")).toBe("Expand Map");
   });
 
   it("collapses on Escape, and Escape does nothing more once collapsed", async () => {

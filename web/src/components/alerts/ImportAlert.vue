@@ -32,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             data-test="alert-import-url-input"
             :model-value="url"
-            size="md"
             @update:model-value="updateUrl"
             :label="t('dashboard.addURL')"
           />

@@ -205,10 +205,10 @@ describe("ConfigPanel alert list settings", { timeout: 30_000 }, () => {
       "Default (State)",
     );
     expect(select("dashboard-config-alert_list_folder").props("options")[0].label).toBe(
-      "Default (All folders)",
+      "Default (All Folders)",
     );
     expect(select("dashboard-config-alert_list_state").props("placeholder")).toBe(
-      "Default (All states)",
+      "Default (All States)",
     );
     const max = wrapper!
       .findAllComponents({ name: "OInput" })

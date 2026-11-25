@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       atEnd
         ? '@container flex flex-wrap items-center gap-x-6 gap-y-2'
         : 'flex items-center gap-6 max-md:flex-col max-md:items-stretch max-md:gap-2',
-      'border-border-default border-b px-3 py-3 last:border-b-0',
+      'border-border-default border-b px-3 py-2 last:border-b-0',
       disabled && 'opacity-60',
     ]"
     data-o-setting-row
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="min-w-0"
       :class="atEnd ? 'flex-1 @max-2xl:basis-full' : 'w-[22.5%] shrink-0 max-md:w-full'"
     >
-      <div class="text-text-heading text-sm font-medium">{{ label }}</div>
+      <div class="text-text-heading text-compact font-medium">{{ label }}</div>
       <div
         v-if="shownError"
         :id="errorId"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="loading"
         animation="none"
         aria-hidden="true"
-        class="h-8.5"
+        class="h-7"
         :class="atEnd ? 'w-full' : 'w-40'"
       />
       <ControlSlot v-else :render="$slots.default" :described-by="describedBy" />

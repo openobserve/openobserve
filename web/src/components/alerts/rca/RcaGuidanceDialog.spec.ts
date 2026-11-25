@@ -43,9 +43,9 @@ describe("RcaGuidanceDialog (04 §3 frame I, SG33, SG40)", () => {
 
     expect(dialog(wrapper).props("title")).toBe("Re-analyze");
     expect(dialog(wrapper).props("primaryButtonLabel")).toBe("Start re-analysis");
-    expect(wrapper.text()).toContain("Fresh analysis");
+    expect(wrapper.text()).toContain("Fresh Analysis");
     expect(wrapper.text()).toContain("Start from scratch, ignoring this report");
-    expect(wrapper.text()).toContain("Build on previous");
+    expect(wrapper.text()).toContain("Build on Previous");
     expect(wrapper.text()).toContain("Send this report so the agent extends it");
     expect(wrapper.text()).toContain("Guidance (optional)");
     expect(wrapper.find('[data-test="rca-guidance-note"]').text()).toBe(

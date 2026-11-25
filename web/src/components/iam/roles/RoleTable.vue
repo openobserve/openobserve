@@ -82,7 +82,7 @@ const userCountColumn: OTableColumnDef = {
   resizable: true,
   hideable: true,
   size: COL.count,
-  meta: { align: "right" },
+  meta: { align: "left" },
 };
 const serviceAccountColumn: OTableColumnDef = {
   id: "service_account_count",
@@ -93,7 +93,7 @@ const serviceAccountColumn: OTableColumnDef = {
   hideable: true,
   size: 150,
   minSize: 150,
-  meta: { align: "right" },
+  meta: { align: "left" },
 };
 
 const columns = computed<OTableColumnDef[]>(() => {
@@ -155,6 +155,7 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
   <OTable
     ref="oTableRef"
     :frame="false"
+    :row-height="28"
     :data="data"
     :columns="columns"
     :loading="loading"

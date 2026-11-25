@@ -128,7 +128,7 @@ describe("ColorBySeries", () => {
   });
 
   it("should render color by series section", () => {
-    expect(wrapper.text()).toContain("Color by series");
+    expect(wrapper.text()).toContain("Color by Series");
   });
 
   it("should show info tooltip button", () => {
@@ -375,7 +375,7 @@ describe("ColorBySeries", () => {
     await flushPromises();
 
     expect(darkWrapper.exists()).toBe(true);
-    expect(darkWrapper.text()).toContain("Color by series");
+    expect(darkWrapper.text()).toContain("Color by Series");
 
     darkWrapper.unmount();
   });

@@ -1643,7 +1643,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(wrapper.vm.selectedWorkloadFields[0]).toBe("service-version");
     });
 
-    it("keeps one tab per meaning: Version traffic replaces the generic version breakdown", async () => {
+    it("keeps one tab per meaning: Version Traffic replaces the generic version breakdown", async () => {
       givenGroups("service_service_version", "o2_service_version");
       wrapper = mountPanel();
       await flushPromises();
@@ -1659,7 +1659,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       await flushPromises();
       await flushPromises();
       const tab = wrapper.vm.availableResourceTabConfigs[0];
-      expect(String(tab.label)).toBe("Version traffic");
+      expect(String(tab.label)).toBe("Version Traffic");
       expect(String(tab.colLabel)).toBe("Version");
     });
 

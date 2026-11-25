@@ -92,7 +92,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   showSelectAll: true,
   expansion: "none",
   virtualScroll: false,
-  virtualScrollItemSize: 48,
+  virtualScrollItemSize: 38,
   enableColumnResize: false,
   enableColumnReorder: false,
   enableColumnPin: false,
@@ -982,9 +982,9 @@ const {
   // rebind once either resolves after mount.
   scrollEl: () => props.scrollEl ?? scrollContainerRef.value ?? null,
   scrollMargin: props.scrollMargin ?? 0,
-  // Keep this in sync with the --table-row-height-* tokens (dense = 38px) so the
+  // Keep this in sync with the --table-row-height-* tokens (dense 28px, normal 44px) so the
   // virtualizer's measured height matches the actual rendered row height.
-  rowHeight: props.rowHeight ?? (props.compact ? 25 : props.dense ? 38 : 54),
+  rowHeight: props.rowHeight ?? (props.compact ? 25 : props.dense ? 28 : 44),
   overscan: props.overscan ?? 100,
   dynamicRowHeight: () => useDynamicRowHeight.value,
   includeExpansionRow: () => measuresExpandedRows.value,
@@ -1760,7 +1760,7 @@ defineExpose({
                 : props.compact
                   ? 'var(--table-row-height-compact, 1.5625rem)'
                   : props.dense
-                    ? 'var(--table-row-height-dense, 2.25rem)'
+                    ? 'var(--table-row-height-dense, 1.75rem)'
                     : 'var(--table-row-height-normal, 2.75rem)',
           }"
           data-test="o2-table"

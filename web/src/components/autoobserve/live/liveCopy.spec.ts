@@ -191,7 +191,7 @@ describe("the 'and N more' line", () => {
     expect(moreCount(12, 5)).toBe(7);
     expect(moreText(gt, "en-US", 12, 5)).toBe("and 7 more");
     expect(moreText(gt, "en-US", 6, 5)).toBe("and 1 more");
-    expect(seeAllText(gt, "en-US", 3000)).toBe("See all");
+    expect(seeAllText(gt, "en-US", 3000)).toBe("See All");
   });
 
   it("shows no line when everything fits", () => {
@@ -262,14 +262,14 @@ describe("durations and the empty coverage notice", () => {
       "No check has finished in the last day",
     );
     const found = emptyCoverageNotice(gt, "en-US", 1439);
-    expect(found.title).toBe("No services found yet");
+    expect(found.title).toBe("No Services Found Yet");
     expect(found.description).toContain("My last check, 23 hours ago, found no services.");
     expect(found).toMatchObject({ severity: "neutral", retry: false });
   });
 
   it("names the two live states with the approved words", () => {
     expect(coverageWord(gt, "watched")).toBe("Watched");
-    expect(coverageWord(gt, "gap")).toBe("Coverage gap");
+    expect(coverageWord(gt, "gap")).toBe("Coverage Gap");
   });
 });
 
@@ -462,26 +462,26 @@ describe("liveGapLines (the drawer's line for a gap)", () => {
 
   it("names the key's dots with the page's two state words", () => {
     expect(liveLookWord(gt, "covered")).toBe("Watched");
-    expect(liveLookWord(gt, "gap")).toBe("Coverage gap");
+    expect(liveLookWord(gt, "gap")).toBe("Coverage Gap");
   });
 
-  it("uses only Watched and Coverage gap for a service or check state, never older words", () => {
+  it("uses only Watched and Coverage Gap for a service or check state, never older words", () => {
     const words = [
       gt("autoobserveLive.states.covered"),
       gt("autoobserveLive.suggestions.kinds.coverage_gap"),
       gt("insight.kind.chip.notWatched"),
       gt("autoobserve.coverage.badgeNotWatched"),
     ];
-    expect(words).toEqual(["Watched", "Coverage gap", "Coverage gap", "Coverage gap"]);
+    expect(words).toEqual(["Watched", "Coverage Gap", "Coverage gap", "Coverage Gap"]);
   });
 });
 
 describe("liveCellWord / liveCellLook (the coverage table's cells)", () => {
-  it("says Watched, or Coverage gap whether no alert matches or an alert falls short", () => {
+  it("says Watched, or Coverage Gap whether no alert matches or an alert falls short", () => {
     expect(liveCellWord(gt, "covered")).toBe("Watched");
-    expect(liveCellWord(gt, "none")).toBe("Coverage gap");
-    expect(liveCellWord(gt, "silent")).toBe("Coverage gap");
-    expect(liveCellWord(gt, "blind")).toBe("Coverage gap");
+    expect(liveCellWord(gt, "none")).toBe("Coverage Gap");
+    expect(liveCellWord(gt, "silent")).toBe("Coverage Gap");
+    expect(liveCellWord(gt, "blind")).toBe("Coverage Gap");
     expect(liveCellWord(gt, "none", true)).toBe("Added");
   });
 
@@ -550,8 +550,8 @@ describe("whereText (a service's Kubernetes location)", () => {
       seen.add(String(notice.title));
     }
     expect(seen.size).toBe(3);
-    expect(String(liveSurfaceEmpty(gt, "changes").action)).toBe("Review suggestions");
-    expect(String(liveSurfaceEmpty(gt, "history").action)).toBe("Open issues");
-    expect(String(liveSurfaceEmpty(gt, "settings").action)).toBe("How it works");
+    expect(String(liveSurfaceEmpty(gt, "changes").action)).toBe("Review Suggestions");
+    expect(String(liveSurfaceEmpty(gt, "history").action)).toBe("Open Issues");
+    expect(String(liveSurfaceEmpty(gt, "settings").action)).toBe("How It Works");
   });
 });

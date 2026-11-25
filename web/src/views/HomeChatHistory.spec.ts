@@ -198,7 +198,7 @@ describe("HomeChatHistory", () => {
     history.loadHistory.mockReturnValue(new Promise(() => {}));
     const { wrapper } = mountList();
     await flushPromises();
-    expect(wrapper.text()).not.toContain("No chat history");
+    expect(wrapper.text()).not.toContain("No Chat History");
     expect(wrapper.find('[data-test="home-chat-history-loading"]').exists()).toBe(true);
   });
 
@@ -207,7 +207,7 @@ describe("HomeChatHistory", () => {
     const { wrapper } = mountList();
     await flushPromises();
     expect(wrapper.find('[data-test="home-chat-history-loading"]').exists()).toBe(false);
-    expect(wrapper.text()).toContain("No chat history");
+    expect(wrapper.text()).toContain("No Chat History");
   });
 
   it("settles to the empty message when reading the history fails", async () => {
@@ -215,6 +215,6 @@ describe("HomeChatHistory", () => {
     const { wrapper } = mountList();
     await flushPromises();
     expect(wrapper.find('[data-test="home-chat-history-loading"]').exists()).toBe(false);
-    expect(wrapper.text()).toContain("No chat history");
+    expect(wrapper.text()).toContain("No Chat History");
   });
 });

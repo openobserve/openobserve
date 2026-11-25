@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col gap-2.5">
     <OSwitch
       :model-value="model.enabled"
-      size="lg"
       data-test="dashboard-config-sparkline-enable"
       @update:model-value="(v) => patch({ enabled: !!v })"
     >

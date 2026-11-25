@@ -84,14 +84,14 @@ describe("Alert List", async () => {
   });
 
   // B27: other kinds skip a prebuilt channel template, so its row says Alert; prebuilt_default serves all.
-  it("names Alert for a prebuilt channel row and All kinds for prebuilt_default", () => {
+  it("names Alert for a prebuilt channel row and All Kinds for prebuilt_default", () => {
     const vm = wrapper.vm as any;
     expect(
       String(vm.appliesToText({ name: "prebuilt_slack", isPrebuilt: true, applies_to: [] })),
     ).toBe("Alert");
     expect(
       String(vm.appliesToText({ name: "prebuilt_default", isPrebuilt: true, applies_to: [] })),
-    ).toBe("All kinds");
+    ).toBe("All Kinds");
   });
 
   it("shows each template's kinds and counts the user templates that apply to every kind", async () => {
@@ -101,7 +101,7 @@ describe("Alert List", async () => {
     );
     expect(userAllKinds.length).toBeGreaterThan(0);
     expect(wrapper.find('[data-test="alert-template-list-Template2-applies-to"]').text()).toBe(
-      "All kinds",
+      "All Kinds",
     );
     const notice = wrapper.find('[data-test="template-list-all-kinds-notice"]');
     expect(notice.text()).toContain(`Templates that apply to every kind: ${userAllKinds.length}.`);
@@ -779,7 +779,7 @@ describe("TemplateList drafts", () => {
     const trigger = triggers.find((t: DOMWrapper<Element>) =>
       t.find('[data-test="alert-template-list-Template2-more-actions-draft-dot"]').exists(),
     );
-    expect(trigger?.attributes("aria-label")).toMatch(/^More actions · unsaved draft · .*\d/);
+    expect(trigger?.attributes("aria-label")).toMatch(/^More Actions · unsaved draft · .*\d/);
     expect(trigger?.attributes("title")).toBeUndefined();
     expect(wrapper.findAll('[data-test$="-more-actions-draft-dot"]').length).toBe(1);
 

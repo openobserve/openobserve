@@ -251,7 +251,7 @@ describe("HostsPage", () => {
       expect(wrapper.find('[data-test="setup-card-stub"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="hosts-table-stub"]').exists()).toBe(false);
       // RBAC-honest copy: detection is permission-filtered (§7 risk 15).
-      expect(wrapper.text()).toContain("No host telemetry visible to you yet");
+      expect(wrapper.text()).toContain("No Host Telemetry Visible to You Yet");
       expect(wrapper.text()).toContain("ask your admin");
     });
 

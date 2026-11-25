@@ -83,7 +83,9 @@ const caretPlaceholder = computed(() =>
 );
 
 const fieldClasses = computed(() => [
-  "rounded-default border px-1.5 py-0.75 transition-[border-color,box-shadow] duration-150",
+  "rounded-default border px-1.5 transition-[border-color,box-shadow] duration-150",
+  // sm fits a 22px token in a 28px box.
+  props.size === "sm" ? "py-0.5" : "py-0.75",
   props.disabled
     ? "bg-input-bg border-input-border opacity-50 cursor-not-allowed"
     : "bg-input-bg border-input-border hover:border-input-border-hover",
@@ -93,7 +95,7 @@ const fieldClasses = computed(() => [
 const sizeClasses = computed(() => {
   const text = props.size === "sm" ? "text-xs" : "text-sm";
   if (props.appearance === "plain") return `${text} min-h-7.5`;
-  return `${text} ${props.size === "sm" ? "min-h-8" : "min-h-9"}`;
+  return `${text} ${props.size === "sm" ? "min-h-7" : "min-h-9"}`;
 });
 
 const testId = (suffix: string) => (props.dataTest ? `${props.dataTest}-${suffix}` : undefined);

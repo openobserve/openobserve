@@ -17,24 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <!-- ── Header ──────────────────────────────────────────────────────── -->
-    <div class="mb-2 flex items-start gap-3">
+    <div class="mb-2 flex items-center gap-2">
       <div
         data-test="feature-comparison-table-icon-wrapper"
-        class="rounded-default text-accent bg-card-glass-tint-medium flex h-12 w-12 shrink-0 items-center justify-center"
+        class="rounded-default text-text-muted bg-surface-base border-border-default flex h-6 w-6 shrink-0 items-center justify-center border"
       >
-        <OIcon name="compare-arrows" size="md" />
+        <OIcon name="compare-arrows" size="sm" />
       </div>
-      <div>
-        <div
-          class="text-accent m-0 mb-0.5 text-[length:var(--text-xs)] font-semibold tracking-[0.1em] uppercase"
-        >
-          {{ t("about.editionsLabel") }}
-        </div>
-        <div
-          class="text-text-heading m-0 text-[length:var(--text-xl)] font-semibold tracking-[-0.015em]"
-        >
-          {{ t("about.feature_comparison_lbl") }}
-        </div>
+      <div class="text-text-heading m-0 text-sm font-semibold">
+        {{ t("about.feature_comparison_lbl") }}
       </div>
     </div>
     <div class="text-typography-body mt-2 text-sm leading-relaxed font-normal">
@@ -65,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="buildType === ed.id"
           data-test="feature-comparison-table-your-plan-badge"
-          class="bg-button-primary text-button-primary-foreground absolute top-[-0.875rem] left-1/2 inline-flex -translate-x-1/2 items-center rounded-full px-3.5 py-1 text-xs font-semibold tracking-[0.08em] whitespace-nowrap uppercase"
+          class="bg-button-primary text-button-primary-foreground absolute top-[-0.875rem] left-1/2 inline-flex -translate-x-1/2 items-center rounded-full px-3.5 py-1 text-xs font-semibold whitespace-nowrap"
         >
           <OIcon name="arrow-upward" size="sm" class="me-1" />
           {{ t("about.yourPlan") }}
@@ -73,9 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Edition name + hosting + price ────────────────────────────── -->
         <div class="mb-5">
-          <div class="text-text-heading m-0 mb-0.5 text-base font-bold">{{ ed.shortName }}</div>
+          <div class="text-text-heading m-0 mb-0.5 text-sm font-semibold">{{ ed.shortName }}</div>
           <div class="text-compact text-text-secondary m-0 mb-3.5">{{ ed.hosting }}</div>
-          <div class="text-accent m-0 mb-1 text-3xl leading-[1.1] font-bold tracking-[-0.03em]">
+          <div class="text-accent m-0 mb-1 text-lg leading-tight font-semibold">
             {{ ed.price }}
           </div>
           <div class="text-compact text-text-secondary m-0 leading-[1.4]">{{ ed.priceSub }}</div>
@@ -83,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- All Five Pillars chips ────────────────────────────────────── -->
         <div class="rounded-default border-accent/15 bg-card-glass-tint-subtle mb-4 border p-3">
-          <div class="text-3xs text-text-label m-0 mb-2 font-bold tracking-[0.12em] uppercase">
+          <div class="text-text-label m-0 mb-2 text-xs font-semibold">
             {{ t("about.allFivePillars") }}
           </div>
           <div class="mb-1.5 flex flex-wrap gap-1.5">

@@ -3878,7 +3878,7 @@ describe("AlertList - editor drafts", () => {
     await flushPromises();
 
     const addButton = wrapper.find('[data-test="alert-list-add-alert-btn"]');
-    expect(addButton.attributes("aria-label")).toBe("New alert · unsaved draft");
+    expect(addButton.attributes("aria-label")).toBe("New Alert · unsaved draft");
     expect(wrapper.find('[data-test="alert-list-add-alert-draft-dot"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="alert-list-Scheduled Alert C-draft-dot"]').exists()).toBe(
       true,
@@ -4498,7 +4498,7 @@ describe("AlertList - first run and the alert library", () => {
     const wrapper = await mountEmpty();
     const state = emptyState(wrapper);
     expect(state.props("size")).toBe("block");
-    expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').text()).toContain("New alert");
+    expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').text()).toContain("New Alert");
     expect(wrapper.find('[data-test="alert-list-empty-alert-library"]').text()).toContain(
       "Alert library",
     );
@@ -4576,7 +4576,7 @@ describe("AlertList - first run and the alert library", () => {
     expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="alert-list-empty-alert-library"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="alert-list-empty-import"]').exists()).toBe(false);
-    expect(emptyState(wrapper).text()).toContain("Clear filters");
+    expect(emptyState(wrapper).text()).toContain("Clear Filters");
 
     emptyState(wrapper).vm.$emit("action", "clear-filters");
     await flushPromises();

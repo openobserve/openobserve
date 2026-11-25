@@ -94,15 +94,11 @@ const onNamespaces = (value: unknown) =>
 <template>
   <div
     ref="rowRef"
-    class="flex w-full min-w-0 flex-wrap items-center gap-2"
+    class="flex min-w-0 flex-1 flex-wrap items-center gap-2 md:flex-nowrap"
     data-test="k8s2-list-header"
   >
     <div class="flex min-w-0 shrink items-center gap-2 max-md:w-full" data-test="k8s2-list-heading">
-      <OText
-        tag="h2"
-        class="min-w-0 shrink truncate text-lg font-semibold"
-        data-test="k8s2-list-title"
-      >
+      <OText tag="h2" class="shrink-0 text-base font-semibold" data-test="k8s2-list-title">
         {{ title }}
       </OText>
       <span class="text-text-secondary min-w-0 shrink truncate text-xs" data-test="k8s2-list-count">
@@ -131,10 +127,11 @@ const onNamespaces = (value: unknown) =>
         v-if="chip"
         size="xs"
         variant="default-soft"
-        class="shrink-0"
+        class="min-w-0 shrink"
         data-test="k8s2-list-chip"
-        >{{ chip }}</OTag
-      >
+        ><span class="truncate">{{ chip }}</span
+        ><OTooltip :content="chip"
+      /></OTag>
     </div>
     <OToggleGroup
       v-if="statusChips.length"
@@ -156,7 +153,7 @@ const onNamespaces = (value: unknown) =>
     <div class="ms-auto flex min-w-0 items-center gap-2">
       <OSelect
         v-if="namespaced"
-        class="w-56 max-md:hidden"
+        class="w-56 min-w-32 shrink max-md:hidden"
         size="sm"
         multiple
         searchable
@@ -182,7 +179,7 @@ const onNamespaces = (value: unknown) =>
       </OButton>
       <OSearchInput
         v-if="searchable"
-        class="min-w-0 flex-1 max-md:min-w-40 md:w-56 md:flex-none"
+        class="min-w-0 flex-1 max-md:min-w-40 md:w-56 md:min-w-32 md:flex-initial"
         size="sm"
         :model-value="search"
         :debounce="300"

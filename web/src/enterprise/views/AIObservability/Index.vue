@@ -31,14 +31,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex gap-2" :class="collapsed ? 'flex-col items-center' : 'items-center'">
             <OButton
               v-if="footerItem"
-              variant="outline-primary"
-              :size="collapsed ? 'icon-md' : 'md'"
+              variant="ghost"
+              :size="collapsed ? 'icon-toolbar' : 'sm'"
               :active="activeSection === footerItem.key"
               :icon-left="collapsed ? undefined : 'play-arrow'"
               :icon-right="footerItem.locked && !collapsed ? 'lock' : undefined"
               :aria-label="collapsed ? footerItem.label : undefined"
               :aria-current="activeSection === footerItem.key ? 'page' : undefined"
-              :class="collapsed ? undefined : 'flex-1'"
+              :class="['toolbar-btn-rest', collapsed ? undefined : 'flex-1']"
               :data-test="footerItem.locked ? `${footerItem.dataTest}-locked` : footerItem.dataTest"
               @click="openEntry(footerItem)"
             >
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #trigger>
                 <OButton
                   variant="outline"
-                  size="icon-md"
+                  size="icon-toolbar"
                   :active="configureActive"
                   :aria-label="t('aiObservability.nav.tools')"
                   data-test="ai-rail-tools"

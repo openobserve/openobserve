@@ -497,7 +497,7 @@ const onChannelSearch = (q: string) => {
       <template #actions>
         <OButton
           variant="primary"
-          size="sm-action"
+          size="sm"
           :loading="connecting"
           data-test="slack-app-dest-connect"
           @click="connectSlack"
@@ -718,7 +718,7 @@ const onChannelSearch = (q: string) => {
       <div class="flex flex-wrap items-center justify-between gap-2">
         <OButton
           variant="outline"
-          size="sm-action"
+          size="sm"
           icon-left="send"
           :loading="testing"
           :disabled="!canTest"

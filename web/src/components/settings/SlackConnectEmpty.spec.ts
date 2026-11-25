@@ -93,14 +93,14 @@ describe("SlackConnectEmpty on Cloud (A1)", () => {
   it("AC-12.1 names only what Phase 1 ships, with the consent line and the permission hint", () => {
     const w = mountEmpty();
     const text = w.text();
-    expect(text).toContain("Connect a Slack workspace");
+    expect(text).toContain("Connect a Slack Workspace");
     expect(text).not.toContain("Your team asks OpenObserve questions from Slack");
     expect(text).not.toContain("What happens next");
     const steps = w.findAll('[data-test="slack-connect-step"]').map((s) => s.text());
     expect(steps).toHaveLength(2);
     expect(steps[0]).toContain("Add to Slack");
     expect(steps[0]).not.toContain("Opens Slack in a popup");
-    expect(steps[1]).toContain("Link people");
+    expect(steps[1]).toContain("Link People");
     expect(text).not.toMatch(/Acknowledge|unfurl|Phase/);
     // A privacy fact rides behind one info icon, not a banner under the steps.
     expect(w.find('[data-test="slack-connect-consent"]').exists()).toBe(true);
@@ -294,9 +294,9 @@ describe("SlackConnectEmpty self-hosted (A1)", () => {
     expect(text).not.toContain("What happens next");
     const steps = w.findAll('[data-test="slack-connect-step"]').map((s) => s.text());
     expect(steps).toHaveLength(3);
-    expect(steps[0]).toContain("Check this server");
-    expect(steps[1]).toContain("Create the app");
-    expect(steps[2]).toContain("Install and link people");
+    expect(steps[0]).toContain("Check This Server");
+    expect(steps[1]).toContain("Create the App");
+    expect(steps[2]).toContain("Install and Link People");
     expect(text).not.toContain("Ask questions; answers use your own permissions");
     expect(text).toContain("Needs the Manage Slack permission");
     // A screen reader gets both tooltip lines, not just the first.
@@ -311,7 +311,7 @@ describe("SlackConnectEmpty self-hosted (A1)", () => {
     const steps = mountEmpty({ isCloud: false })
       .findAll('[data-test="slack-connect-step"]')
       .map((s) => s.text());
-    expect(steps).toEqual(["1Check this server", "2Create the app", "3Install and link people"]);
+    expect(steps).toEqual(["1Check This Server", "2Create the App", "3Install and Link People"]);
   });
 
   it("offers Connect this org to an existing workspace before the setup wizard", () => {

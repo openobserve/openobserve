@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import opentofuLogo from "@/assets/images/common/opentofu.svg";
@@ -77,7 +78,8 @@ const REGISTRIES = computed(() => [
 </script>
 
 <template>
-  <div class="flex items-center gap-2" :data-test="dataTest">
+  <!-- One joined group, so the pair reads as a single secondary control beside the header's other actions. -->
+  <OButtonGroup :divided="false" align="center" :data-test="dataTest">
     <OButton
       v-for="registry in REGISTRIES"
       :key="registry.key"
@@ -101,5 +103,5 @@ const REGISTRIES = computed(() => [
         align="end"
       />
     </OButton>
-  </div>
+  </OButtonGroup>
 </template>

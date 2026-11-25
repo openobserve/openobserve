@@ -747,7 +747,7 @@ describe("OnCallScheduleEditor", () => {
 
     const fresh = render({ schedule: schedule([rota("Primary")]), intent: { mode: "new" } });
     await flushPromises();
-    expect(fresh.findComponent({ name: "ODrawer" }).props("title")).toBe("New rotation");
+    expect(fresh.findComponent({ name: "ODrawer" }).props("title")).toBe("New Rotation");
   });
 
   /// The drawer used to survive its own save; the parent then rebuilt `draft`,

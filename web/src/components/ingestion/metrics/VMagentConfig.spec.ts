@@ -48,8 +48,8 @@ describe("VMagentConfig.vue", () => {
 
   it("renders vmagent snippets", () => {
     expect(wrapper.exists()).toBe(true);
-    expect(wrapper.text()).toContain("Single remote write target");
-    expect(wrapper.text()).toContain("Fan-out to multiple backends");
+    expect(wrapper.text()).toContain("Single Remote Write Target");
+    expect(wrapper.text()).toContain("Fan-out to Multiple Backends");
   });
 
   it("generates OpenObserve remote write endpoint", () => {

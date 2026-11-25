@@ -527,7 +527,7 @@ describe("AutoObserveUnfoldGraph on a live AutoObserve issue", () => {
     const w = draw();
     expect(w.get(sel("back:a")).text()).toContain("a");
     expect(w.get(sel("back:a")).text()).toContain("logs stream");
-    const legend = w.get('[aria-label="Card types"]').text();
+    const legend = w.get('[aria-label="Card Types"]').text();
     expect(legend).toContain("Log");
     expect(legend).toContain("Paged");
     expect(legend).toContain("Back or resolved");

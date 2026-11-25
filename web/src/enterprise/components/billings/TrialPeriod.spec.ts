@@ -79,7 +79,7 @@ describe("TrialPeriod.vue", () => {
       await mountStrip({ currentPage: "usage" });
 
       expect(strip().attributes("data-tone")).toBe("info");
-      expect(strip().text()).toContain("Trial period");
+      expect(strip().text()).toContain("Trial Period");
       expect(strip().text()).toContain("9 days left");
       expect(strip().text()).toContain(`ends ${shortDate(NOW + 9.5 * DAY_MS)}`);
     });

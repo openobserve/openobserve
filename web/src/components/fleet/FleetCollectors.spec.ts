@@ -253,8 +253,8 @@ describe("FleetCollectors", () => {
     wrapper = await mountList("/", {}, { allFleets: false });
     const input = () => wrapper.find('[data-test="fleet-collectors-search"] input');
     expect(input().attributes("placeholder")).toBe("Search collectors in this fleet");
-    expect(wrapper.find('[data-test="fleet-collectors-scope-this"]').text()).toBe("This fleet");
-    expect(wrapper.find('[data-test="fleet-collectors-scope-all"]').text()).toBe("All fleets");
+    expect(wrapper.find('[data-test="fleet-collectors-scope-this"]').text()).toBe("This Fleet");
+    expect(wrapper.find('[data-test="fleet-collectors-scope-all"]').text()).toBe("All Fleets");
     await wrapper.find('[data-test="fleet-collectors-scope-all"]').trigger("click");
     expect(wrapper.emitted("update:allFleets")?.at(-1)).toEqual([true]);
     await wrapper.setProps({ allFleets: true });

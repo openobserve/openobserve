@@ -138,6 +138,6 @@ describe("RankedKeysTable navigation actions name where they go", () => {
 
   it("names the phone row menu button (W20)", async () => {
     const w = await mountTable();
-    expect(w.find(`[data-test="${DT}-row-0-menu"]`).attributes("aria-label")).toBe("More actions");
+    expect(w.find(`[data-test="${DT}-row-0-menu"]`).attributes("aria-label")).toBe("More Actions");
   });
 });

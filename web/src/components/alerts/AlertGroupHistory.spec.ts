@@ -153,7 +153,7 @@ describe("AlertGroupHistory", () => {
           store.commit("setConfig", { ...original, alert_transitions_retention_days: days });
           wrapper = mountComp({ transitions: [], showGroupColumn: false });
           const empty = wrapper.find('[data-test="alerts-alertgrouphistory-empty"]');
-          expect(empty.text()).toContain("No transitions recorded");
+          expect(empty.text()).toContain("No Transitions Recorded");
           expect(empty.text()).toContain(
             "Level changes appear here as groups start firing, escalate or recover." + tail,
           );

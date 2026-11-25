@@ -30,12 +30,7 @@
       <!-- Disabled, not hidden, while the editor is open: hiding reflows the
            header, and an enabled click could only discard or duplicate work.
            Cancel is the one way out of the form. -->
-      <OButton
-        size="sm-action"
-        :disabled="editorOpen"
-        @click="startCreate"
-        data-test="slo-alerts-add"
-      >
+      <OButton size="sm" :disabled="editorOpen" @click="startCreate" data-test="slo-alerts-add">
         {{ t("slos.alerts.add") }}
       </OButton>
     </div>
@@ -95,7 +90,7 @@
           </OTag>
           <OButton
             variant="outline"
-            size="sm-action"
+            size="sm"
             @click="startEdit(a.alert_id)"
             :data-test="`slo-alerts-edit-${a.alert_id}`"
           >

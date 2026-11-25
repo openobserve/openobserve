@@ -106,7 +106,6 @@
             :model-value="message.toolName ?? ''"
             :options="toolOptions"
             :placeholder="t('aiObservability.playground.messageToolPlaceholder')"
-            size="md"
             width="full"
             searchable
             :data-test="`ai-playground-message-tool-${message.id}`"

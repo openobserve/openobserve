@@ -243,7 +243,7 @@ describe("on-call room confirm (MK-20, option b)", () => {
   it("warns that the team's pages post to the same channel and asks for the tick", async () => {
     await mountForm();
     await pick("slack-app-dest-channel", "C7");
-    expect(byTest("slack-app-dest-channel-tag")?.textContent).toContain("On-call room");
+    expect(byTest("slack-app-dest-channel-tag")?.textContent).toContain("On-Call Room");
     expect(byTest("slack-app-dest-oncall-room")?.textContent).toContain(
       "On-call pages for team payments-oncall also post to #payments-oncall through payments-oncall-slack. Alerts here post separately.",
     );

@@ -374,7 +374,7 @@ describe("FleetTokens", () => {
   it("creates the token for this fleet, with no fleet or labels field", async () => {
     wrapper = await mountTokens();
     await openCreate(wrapper);
-    expect(wrapper.find("h2").text()).toBe("New token");
+    expect(wrapper.find("h2").text()).toBe("New Token");
     expect(wrapper.find('[data-test="fleet-token-form-fleet"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="fleet-token-form-labels"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="o2-table-body"]').exists()).toBe(false);
@@ -586,7 +586,7 @@ describe("FleetTokens", () => {
     await fillAndSubmit(wrapper, { name: "edge" });
     const block = wrapper.findComponent({ name: "OCodeBlock" });
     expect(block.props("chrome")).toBe("editor");
-    expect(block.props("filename")).toBe("Enrollment token");
+    expect(block.props("filename")).toBe("Enrollment Token");
     expect(block.text()).not.toMatch(/plaintext/i);
   });
 

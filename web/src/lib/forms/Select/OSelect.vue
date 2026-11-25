@@ -1347,7 +1347,7 @@ const inlineTriggerClasses = computed(() => [
 const insideLabelClasses = computed(() =>
   isInlineAppearance.value
     ? "text-text-secondary pointer-events-none me-1.5 font-normal whitespace-nowrap select-none"
-    : "text-3xs text-text-secondary pointer-events-none ps-3 pe-7 text-start leading-none whitespace-nowrap select-none",
+    : "text-text-secondary pointer-events-none max-w-1/2 truncate ps-3 font-normal select-none",
 );
 
 const triggerEndPadding = computed(() =>
@@ -1453,9 +1453,9 @@ const fieldWidthClass = computed(() => {
                     /* Keep the red error border on focus; focus border color applies only when there's no error. */
                     'focus:outline-none',
                     'transition-[color,background-color,border-color,box-shadow] duration-150',
-                    'disabled:opacity-50 disabled:cursor-not-allowed',
+                    'disabled:cursor-not-allowed disabled:opacity-50',
                     labelPosition === 'inside' && label
-                      ? ['flex-col justify-between py-0.5', heightClasses[size ?? 'sm']]
+                      ? ['items-center', heightClasses[size ?? 'sm']]
                       : ['items-center', triggerEndPadding, heightClasses[size ?? 'sm']],
                   ]
             "
@@ -1469,11 +1469,7 @@ const fieldWidthClass = computed(() => {
             <div
               :class="
                 labelPosition === 'inside' && label && !isInlineAppearance
-                  ? [
-                      'flex w-full min-w-0 flex-1 items-center',
-                      triggerEndPadding,
-                      $slots['icon-left'] ? 'ps-2' : 'ps-3',
-                    ]
+                  ? ['flex w-full min-w-0 flex-1 items-center', triggerEndPadding, 'ps-1.5']
                   : 'contents'
               "
             >
@@ -1524,7 +1520,6 @@ const fieldWidthClass = computed(() => {
                       // its value. `truncate` would also zero its min-content
                       // width, letting any ancestor squeeze it to a lone ellipsis.
                       isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate',
-                      labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
                       isDisabled
                         ? 'text-select-disabled-text'
                         : hasSelection
@@ -2123,9 +2118,9 @@ const fieldWidthClass = computed(() => {
                   /* Keep the red error border on focus; focus border color applies only when there's no error. */
                   'focus:outline-none',
                   'transition-[color,background-color,border-color,box-shadow] duration-150',
-                  'data-disabled:opacity-50 data-disabled:cursor-not-allowed',
+                  'data-disabled:cursor-not-allowed data-disabled:opacity-50',
                   labelPosition === 'inside' && label
-                    ? ['flex-col justify-between py-0.5', heightClasses[size ?? 'sm']]
+                    ? ['items-center', heightClasses[size ?? 'sm']]
                     : ['items-center', triggerEndPadding, heightClasses[size ?? 'sm']],
                 ]
           "
@@ -2139,7 +2134,7 @@ const fieldWidthClass = computed(() => {
           <div
             :class="
               labelPosition === 'inside' && label && !isInlineAppearance
-                ? ['flex w-full min-w-0 flex-1 items-center', triggerEndPadding, 'ps-3']
+                ? ['flex w-full min-w-0 flex-1 items-center', triggerEndPadding, 'ps-1.5']
                 : 'contents'
             "
           >
@@ -2153,11 +2148,7 @@ const fieldWidthClass = computed(() => {
             <!-- reka's SelectValue is pointer-events:none, so the wrapper is what cuts and takes the hover. -->
             <OTruncatedText
               v-else
-              :class="[
-                'flex-1 text-start text-sm',
-                labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
-                triggerTextTone,
-              ]"
+              :class="['flex-1 text-start', triggerTextTone]"
               :tooltip="hasSelection && !$slots.trigger ? undefined : false"
             >
               <SelectValue :placeholder="placeholder">

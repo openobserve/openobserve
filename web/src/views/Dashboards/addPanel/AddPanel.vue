@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #actions>
             <template v-if="!isMobile">
               <OButton
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 @click="showTutorial"
                 data-test="dashboard-panel-tutorial-btn"
@@ -93,17 +93,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OButton
               v-if="!isMobile"
-              variant="outline-destructive"
-              size="sm-action"
+              variant="ghost"
+              size="sm"
+              class="toolbar-btn-rest"
               @click="goBackToDashboardList"
               data-test="dashboard-panel-discard"
               >{{ t("panel.discard") }}</OButton
             >
             <OButtonGroup radius="lg">
               <OButton
-                variant="outline"
-                size="sm-action"
-                :class="{ 'border-e-button-group-divider': !isMobile }"
+                variant="ghost"
+                size="sm"
+                :class="['toolbar-btn-rest', { 'border-e-button-group-divider': !isMobile }]"
                 data-test="dashboard-panel-save"
                 type="submit"
                 form="add-panel-form"
@@ -115,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     variant="outline"
                     size="icon-sm"
-                    class="h-8.5!"
+                    class="h-7!"
                     :disabled="isSavingPanel"
                     data-test="dashboard-panel-save-options-btn"
                     :aria-label="t('dashboard.moreActions')"
@@ -134,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="config.isEnterprise === 'false'"
                 :variant="applyVariant"
-                size="sm-action"
+                size="sm"
                 :class="{
                   'border-e-button-group-divider': showApplyMenu && applyVariant !== 'pending',
                 }"
@@ -152,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchRequestTraceIds.length > 0 ? 'dashboard-cancel' : 'dashboard-apply'
                 "
                 :variant="applyVariant"
-                size="sm-action"
+                size="sm"
                 :class="{ 'border-e-button-group-divider': applyVariant !== 'pending' }"
                 :aria-description="applyVariant === 'pending' ? applyTooltip : undefined"
                 @click="onApplyBtnClick"
@@ -170,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     :variant="applyVariant"
                     size="icon-sm"
-                    class="h-8.5!"
+                    class="h-7!"
                     :disabled="searchRequestTraceIds.length > 0"
                     data-test="dashboard-apply-options-btn"
                     :aria-label="t('dashboard.moreActions')"

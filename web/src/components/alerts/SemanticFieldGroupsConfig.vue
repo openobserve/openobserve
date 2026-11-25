@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="correlation-semanticfieldgroup-export-json-btn"
           variant="outline"
-          size="sm-action"
+          size="sm"
           :disabled="localGroups.length === 0"
           @click="exportGroups"
           >{{ t("correlation.exportToJson") }}</OButton
@@ -34,14 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="correlation-semanticfieldgroup-import-json-btn"
           variant="outline"
-          size="sm-action"
+          size="sm"
           @click="navigateToImport"
           >{{ t("correlation.importFromJson") }}</OButton
         >
         <OButton
           data-test="correlation-semanticfieldgroup-add-custom-group-btn"
           variant="outline"
-          size="sm-action"
+          size="sm"
           @click="addGroup"
           >{{ t("correlation.addCustomGroup") }}</OButton
         >

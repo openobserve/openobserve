@@ -158,13 +158,14 @@ const rootClass = computed(() => {
   // In a toolbar the chips share the search row only while all of them fit; otherwise they take a full line below.
   if (!isRow.value) {
     if (!chipStrip.value) return "max-md:flex-wrap max-md:gap-y-1";
+    // Inline, the fit check already found room, so the strip must not shrink: a shrink pushes the last chip under the edge fade.
     const place = fit.ownLine.value
-      ? "order-last basis-full"
-      : "basis-auto max-md:order-last max-md:basis-full";
-    return `shrink grow-0 gap-y-1.5 max-md:flex-wrap ${place}`;
+      ? "shrink order-last basis-full"
+      : "shrink-0 max-md:shrink basis-auto max-md:order-last max-md:basis-full";
+    return `grow-0 gap-y-1.5 max-md:flex-wrap ${place}`;
   }
   // Filter rows keep the chip height whether or not chips show, so one appearing never shifts the table.
-  const height = chipStrip.value ? "min-h-12 py-2" : "py-1.5";
+  const height = chipStrip.value ? "min-h-10 py-1.5" : "py-1.5";
   return `px-page-edge border-border-default gap-y-1.5 border-b max-md:flex-wrap ${height}`;
 });
 
@@ -371,6 +372,7 @@ const clear = () => {
           :data-test="item.dataTest"
           @click="onChipClick(item)"
         />
+        <slot name="chips-end" />
       </div>
       <!-- Overlays, so no chip moves; they reach past the row as far as the scroll box's
            focus-ring padding does, or a chip sliver shows beyond them. -->

@@ -94,14 +94,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <span class="border-border-default mt-auto flex items-center justify-end gap-1.5 border-t pt-2">
       <OButton
         variant="ghost"
-        size="sm"
+        size="sm-action"
         data-test="rum-analytics-app-filter-page-picker-cancel"
         @click="emit('cancel')"
         >{{ t("common.cancel") }}</OButton
       >
       <OButton
         variant="primary"
-        size="sm"
+        size="sm-action"
         :disabled="!ready"
         data-test="rum-analytics-app-filter-page-picker-apply"
         @click="apply"

@@ -265,7 +265,7 @@ describe("FolderList.vue", () => {
           "default",
         ]);
         const row = w.find(`[data-test="dashboard-folder-tab-${PUBLIC_ID}"]`);
-        expect(row.text()).toContain("Public dashboards");
+        expect(row.text()).toContain("Public Dashboards");
         expect(row.find('[data-test="beta-badge"]').exists()).toBe(true);
         expect(row.findComponent({ name: "FolderIcon" }).props("icon")).toBe("language");
         expect(row.find('[data-test="dashboard-more-icon"]').exists()).toBe(false);
@@ -614,7 +614,7 @@ describe("FolderList.vue", () => {
       );
     });
 
-    it("reads Fleets and New fleet for the fleets type", () => {
+    it("reads Fleets and New Fleet for the fleets type", () => {
       const fleets = mount(FolderList, {
         global: {
           plugins: [i18n],
@@ -627,7 +627,7 @@ describe("FolderList.vue", () => {
       expect(fleets.text()).toContain("Fleets");
       expect(fleets.text()).not.toContain("Folders");
       expect(fleets.find('[data-test="dashboard-new-folder-btn"]').attributes("title")).toBe(
-        "New fleet",
+        "New Fleet",
       );
       fleets.unmount();
     });

@@ -210,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ORefreshButton
                   layout="inline"
                   variant="ghost"
+                  class="toolbar-btn-rest"
                   :last-run-at="lastUpdatedAt"
                   :loading="refreshing"
                   shortcut-id="dashboardsListRefresh"

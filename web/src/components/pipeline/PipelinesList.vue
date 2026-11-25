@@ -1014,7 +1014,7 @@ const getColumnsForActiveTab = (tab: any) => {
     sortable: true,
     resizable: true,
     hideable: true,
-    size: COL.frequency,
+    size: 110,
     meta: { align: "left" },
   };
   const periodColumn = {
@@ -1024,7 +1024,7 @@ const getColumnsForActiveTab = (tab: any) => {
     sortable: true,
     resizable: true,
     hideable: true,
-    size: COL.frequency,
+    size: 110,
     meta: { align: "left" },
   };
   const cronColumn = {
@@ -1034,7 +1034,9 @@ const getColumnsForActiveTab = (tab: any) => {
     sortable: false,
     resizable: true,
     hideable: true,
-    size: COL.cron,
+    // Holds True/False; the All tab must fit beside the pinned Actions column or this one hides under it.
+    size: 80,
+    minSize: 72,
     meta: { align: "left" },
   };
   const typeColumn = {
@@ -1044,7 +1046,7 @@ const getColumnsForActiveTab = (tab: any) => {
     sortable: true,
     resizable: true,
     hideable: true,
-    size: COL.type,
+    size: 120,
     meta: { align: "left" },
   };
   const scheduledStreamTypeColumn = {

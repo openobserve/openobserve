@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ item.label }}
       </div>
       <div
-        class="text-text-heading font-mono text-lg leading-tight font-semibold tabular-nums"
+        class="text-text-heading font-mono text-base leading-tight font-semibold tabular-nums"
         :class="item.tone"
       >
         {{ item.value }}

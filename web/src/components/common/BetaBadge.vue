@@ -23,12 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   a menu row); the variant and casing stay fixed so the tag reads the same.
 -->
 <template>
-  <OBadge
-    variant="primary-outline"
-    :size="size"
-    class="font-semibold tracking-wide uppercase"
-    :data-test="`${stage}-badge`"
-  >
+  <OBadge variant="primary-outline" :size="size" class="font-medium" :data-test="`${stage}-badge`">
     {{ stage === "alpha" ? t("common.alpha") : t("common.beta") }}
   </OBadge>
 </template>
@@ -39,7 +34,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeProps } from "@/lib/core/Badge/OBadge.types";
 
 withDefaults(defineProps<{ size?: BadgeProps["size"]; stage?: "alpha" | "beta" }>(), {
-  size: "sm",
+  size: "xs",
   stage: "beta",
 });
 

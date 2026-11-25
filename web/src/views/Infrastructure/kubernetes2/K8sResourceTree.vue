@@ -157,7 +157,7 @@ const setOpen = (id: string, open: boolean) => {
                 v-for="item in group.items"
                 :key="item.view"
                 :name="item.view"
-                class="w-full border-transparent!"
+                class="text-compact h-7 w-full border-transparent! py-0!"
                 :data-test="`k8s2-rail-${item.view}`"
               >
                 <span class="flex min-w-0 flex-1 items-center gap-2">

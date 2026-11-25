@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="isSchemaUDSEnabled"
           data-test="log-stream-add-stream-btn"
           variant="primary"
-          size="sm-action"
+          size="sm"
           @click="addStream"
         >
           {{ t(`logStream.add`) }}
@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="bg-card-glass-bg h-full">
         <OTable
           data-test="log-stream-table"
+          :row-height="28"
           :data="logStream"
           :columns="columns"
           show-index
@@ -613,7 +614,7 @@ export default defineComponent({
         // Right-aligned so it joins the numeric block instead of floating in the
         // middle of the row: all the data columns then share one edge, and the
         // table's spare width collects in a single gap after the name.
-        meta: { align: "right" },
+        meta: { align: "left" },
       },
       {
         id: "doc_num",
@@ -623,7 +624,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 150,
-        meta: { align: "right" },
+        meta: { align: "left" },
       },
       {
         id: "storage_size",
@@ -633,7 +634,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: COL.sizeBytes,
-        meta: { align: "right" },
+        meta: { align: "left" },
       },
       {
         id: "compressed_size",
@@ -647,7 +648,7 @@ export default defineComponent({
         // "Compressed Si…". minSize keeps the header readable when resized.
         size: 160,
         minSize: 150,
-        meta: { align: "right" },
+        meta: { align: "left" },
       },
       {
         id: "compression",
@@ -661,7 +662,7 @@ export default defineComponent({
         hideable: true,
         size: 130,
         minSize: 120,
-        meta: { align: "right" },
+        meta: { align: "left" },
       },
       {
         id: "index_size",
@@ -671,7 +672,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: COL.sizeBytes,
-        meta: { align: "right" },
+        meta: { align: "left" },
       },
       {
         id: "actions",

@@ -117,7 +117,7 @@ const downloadEnv = () =>
 <template>
   <div
     ref="root"
-    class="text-text-heading max-w-[61.25rem] px-1 py-4 text-sm"
+    class="text-text-heading text-compact max-w-[61.25rem] px-1 py-4"
     data-test="ai-coding-agent-setup"
   >
     <div class="mb-7 [&_.text-input-hint]:whitespace-nowrap [&_label]:mb-0.5">

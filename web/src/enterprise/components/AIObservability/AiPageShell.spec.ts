@@ -94,16 +94,16 @@ describe("AiPageShell", () => {
     expect(btn.attributes("aria-busy")).toBe("true");
   });
 
-  it("renders the refresh button as a primary-variant labeled button", () => {
+  it("renders the refresh button as an outline-variant labeled button", () => {
     const w = mountShell();
     const btn = w.find('[data-test="ai-agent-behavior-refresh-btn"]');
-    expect(btn.attributes("data-o2-variant")).toBe("primary");
+    expect(btn.attributes("data-o2-variant")).toBe("ghost");
     expect(btn.text()).toContain("Refresh");
   });
 
   it("forwards the date-time on:date-change as a date-change event", async () => {
     const w = mountShell();
-    expect(w.find(".date-time").classes()).toContain("h-8");
+    expect(w.find(".date-time").classes()).toContain("h-7");
     await w.find(".date-time").trigger("click");
     expect(w.emitted("date-change")).toBeTruthy();
     expect(w.emitted("date-change")![0][0]).toEqual({ valueType: "relative" });

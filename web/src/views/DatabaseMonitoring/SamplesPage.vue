@@ -118,6 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="tableRef"
         :enable-column-resize="true"
         :data="rows"
+        :pagination="loading || rows.length ? 'client' : 'none'"
         :columns="columns"
         row-key="rowKey"
         :loading="loading"

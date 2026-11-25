@@ -111,7 +111,7 @@ describe("RcaAnalysisBar (contract E5)", () => {
       });
 
       const preview = byTest(wrapper, "rca-copy-preview");
-      expect(preview.text()).toContain("Copied to clipboard");
+      expect(preview.text()).toContain("Copied to Clipboard");
       expect(preview.text()).toContain(
         "Preview of the copied Markdown · Download as Markdown saves the same text",
       );
@@ -210,7 +210,7 @@ describe("RcaAnalysisBar (contract E5)", () => {
       const wrapper = mountBar({ live: false, canAsk: true });
       const ask = byTest(wrapper, "rca-ask-btn");
 
-      expect(ask.text()).toBe("Ask about this analysis");
+      expect(ask.text()).toBe("Ask About This Analysis");
       const html = wrapper.html();
       expect(html.indexOf('data-test="rca-ask-btn"')).toBeLessThan(
         html.indexOf('data-test="rca-reanalyze-btn"'),

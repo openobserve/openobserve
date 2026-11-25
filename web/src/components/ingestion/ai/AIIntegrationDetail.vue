@@ -163,7 +163,7 @@ const agentGuideName = computed(
       :logo-url-dark="integration.logoDark"
     />
     <AIIntegrationCard v-else-if="cardContent" :content="raw(cardContent)" :doc-url="docURL" />
-    <div v-else class="text-base">
+    <div v-else class="text-compact">
       <CredentialCodeBlock slug="ai-integration" :content="aiContent" />
       <div class="pt-6 pb-2 font-bold">
         {{ t("ingestion.ai.viewDocsPrefix") }}

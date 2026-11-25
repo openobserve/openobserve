@@ -1801,7 +1801,7 @@ describe("Stream picker — internal streams", () => {
       "_anomalies",
     ]);
     expect(quickPickLabels()).toEqual([
-      "Recently active streams",
+      "Recently Active Streams",
       "default",
       "Internal streams · 2 Hide",
       "_rumdata",
@@ -1852,7 +1852,7 @@ describe("Stream picker — internal streams", () => {
   describe("quick pick", () => {
     it("lists internal streams last under a header row with a Hide action", () => {
       expect(quickPickLabels()).toEqual([
-        "Recently active streams",
+        "Recently Active Streams",
         "default",
         "k8s_events",
         "Internal streams · 2 Hide",
@@ -1866,7 +1866,7 @@ describe("Stream picker — internal streams", () => {
       await flushPromises();
       expect(setting.hideInternalStreams.value).toBe(true);
       expect(quickPickLabels()).toEqual([
-        "Recently active streams",
+        "Recently Active Streams",
         "default",
         "k8s_events",
         "Internal streams · 2 hidden Show",

@@ -180,7 +180,7 @@ export interface SelectProps {
    * Controls where the label is rendered.
    * - `"outside"` (default): label sits above the trigger as a separate element.
    * - `"inside"`: label is rendered as a compact inline prefix inside the trigger,
-   *   saving vertical space when the label is short (e.g. in config panels).
+   *   on the same row as the value, so the trigger keeps its size height.
    *   With `appearance="inline"` it leads the value on the same line, so the whole "Label value ▾" is the trigger.
    */
   labelPosition?: "inside" | "outside";

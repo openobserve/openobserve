@@ -249,7 +249,7 @@ describe("MapView fill buckets (AC 43)", () => {
     expect(wrapper.find('[data-test="k8s2-map-legend-noReq"]').text()).toContain("No request set");
     const range = (cls: string) =>
       wrapper.find(`[data-test="k8s2-map-legend-${cls}"] [data-test="k8s2-map-range"]`).text();
-    expect(range("noData")).toBe("No data");
+    expect(range("noData")).toBe("No Data");
     expect(range("b5")).toBe("≥ 100%");
   });
 });
@@ -380,7 +380,7 @@ describe("MapView status fill (AC 46)", () => {
   it("draws the status legend as ok, warning, error and No data", async () => {
     await mountView(mapState({ fill: "status" }));
     const tags = legendItems().map((w) => w.find('[data-test="k8s2-map-range"]').text());
-    expect(tags).toEqual(["OK", "Warning", "Error", "No data"]);
+    expect(tags).toEqual(["OK", "Warning", "Error", "No Data"]);
   });
 });
 

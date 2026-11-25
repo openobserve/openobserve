@@ -78,7 +78,8 @@ const baseClasses = computed<string>(() =>
     // can fade in on tab hover without colliding with consumer `group` usage.
     "group/otab",
     "relative items-center",
-    isVertical.value ? "flex justify-start gap-2" : "inline-flex justify-center gap-1.5",
+    // Horizontal tabs keep their full label; the strip scrolls with arrows instead of truncating them.
+    isVertical.value ? "flex justify-start gap-2" : "inline-flex shrink-0 justify-center gap-1.5",
     // The rail's px-1 plus this px-2 puts a vertical tab's icon on the 12px page-edge grid line.
     // Reorderable tabs keep a fixed 0.75rem gutter for the grip, so hovering or editing never shifts the label.
     isReorderable.value
@@ -88,7 +89,11 @@ const baseClasses = computed<string>(() =>
         : slots.trailing
           ? "ps-2 pe-1"
           : "px-2",
-    emboldens.value || (isFilled.value && isActive.value) ? "font-semibold" : "font-medium",
+    isVertical.value
+      ? "font-normal"
+      : emboldens.value || (isFilled.value && isActive.value)
+        ? "font-semibold"
+        : "font-medium",
     "text-compact whitespace-nowrap",
     isFilled.value ? "rounded-default" : "rounded-t-default",
     "outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke] duration-(--duration-control) ease-(--ease-control)",
@@ -104,9 +109,11 @@ const stateClasses = computed<string>(() => {
   if (isDisabled.value && isActive.value) {
     return [
       "text-tabs-active-text cursor-not-allowed opacity-60",
-      isFilled.value
-        ? "bg-tabs-active-bg ring-tabs-indicator ring-1 ring-inset"
-        : "border-b-2 border-transparent",
+      isVertical.value
+        ? "bg-[var(--selected-tint)]"
+        : isFilled.value
+          ? "bg-tabs-active-bg ring-tabs-indicator ring-1 ring-inset"
+          : "border-b-2 border-transparent",
     ].join(" ");
   }
   if (isDisabled.value) {
@@ -114,6 +121,8 @@ const stateClasses = computed<string>(() => {
   }
   if (isActive.value) {
     // OTabs draws the one sliding underline, so a horizontal tab keeps a transparent border the size of its inactive one.
+    // A vertical rail row reads like the app sidebar: soft tint only, no ring, ink stays body text.
+    if (isVertical.value) return "text-text-body cursor-pointer bg-[var(--selected-tint)]";
     return [
       isFilled.value ? "text-selected-fg cursor-pointer" : "text-tabs-active-text cursor-pointer",
       isFilled.value
@@ -139,7 +148,8 @@ const heightClasses = computed<string>(() => {
     return "py-1.5";
   }
   if (isFilled.value) return isDense.value ? "h-7" : "h-8";
-  return isDense.value ? "h-8" : "h-10";
+  // Unfilled tabs always sit on the 32px dense height so every tab bar matches Logs.
+  return "h-8";
 });
 </script>
 

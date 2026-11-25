@@ -137,7 +137,7 @@ describe("K8sClusterPicker", () => {
       global: { plugins: [i18n] },
       attachTo: document.body,
     });
-    expect(wrapper.text()).toContain("Loading clusters");
+    expect(wrapper.text()).toContain("Loading Clusters");
     expect(wrapper.find(TRIGGER).attributes("disabled")).toBeDefined();
   });
 
@@ -148,6 +148,6 @@ describe("K8sClusterPicker", () => {
       attachTo: document.body,
     });
     expect(wrapper.text()).toContain("prod-east");
-    expect(wrapper.text()).not.toContain("Loading clusters");
+    expect(wrapper.text()).not.toContain("Loading Clusters");
   });
 });

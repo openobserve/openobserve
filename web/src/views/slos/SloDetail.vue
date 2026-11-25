@@ -66,7 +66,7 @@
       <OButton
         v-if="sourceAlertId"
         variant="outline"
-        size="sm-action"
+        size="sm"
         icon-left="shield"
         data-test="slos-slodetail-source-alert"
         @click="goToSourceAlert"
@@ -75,7 +75,7 @@
       </OButton>
       <OButton
         variant="outline"
-        size="sm-action"
+        size="sm"
         icon-left="notifications"
         data-test="slos-slodetail-new-alert"
         @click="goToNewAlert"
@@ -84,7 +84,7 @@
       </OButton>
       <OButton
         variant="primary"
-        size="sm-action"
+        size="sm"
         icon-left="edit"
         data-test="slos-slodetail-edit"
         @click="goToEdit"

@@ -118,7 +118,6 @@
           multiple
           searchable
           required
-          size="md"
           data-test="span-selector-fields"
         />
 

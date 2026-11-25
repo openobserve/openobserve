@@ -35,7 +35,6 @@ const THEMES = resolveTokens(
 /** Pinned (light, dark) with the stock theme so a token refactor cannot change what a vertical tab renders. */
 const MAIN: Record<string, [string, string]> = {
   "--color-focus-ring-accent": ["#3f7994", "#79a1b4"],
-  "--color-tabs-active-bg": ["#e2ebef", "#19303b"],
   "--color-tabs-active-text": ["#326176", "#ffffff"],
   "--color-tabs-disabled-text": ["#a3a3a3", "#525252"],
   "--color-tabs-hover-text": ["#262626", "#e5e5e5"],
@@ -91,17 +90,12 @@ function colourTokens(classes: string[]): string[] {
 }
 
 describe("vertical tabs render as on main", () => {
-  it("colours the active tab in brand ink at the medium weight with a full accent ring", () => {
+  it("paints the active tab as a soft tint with body ink, no ring", () => {
     const { active } = tabs(mountRail("a"));
     expect(active.classes()).toEqual(
-      expect.arrayContaining([
-        "text-tabs-active-text",
-        "font-medium",
-        "bg-tabs-active-bg",
-        "ring-tabs-indicator",
-        "ring-inset",
-      ]),
+      expect.arrayContaining(["text-text-body", "font-normal", "bg-[var(--selected-tint)]"]),
     );
+    expect(active.classes()).not.toContain("ring-1");
     expect(active.classes()).not.toContain("font-semibold");
     expect(active.classes()).not.toContain("text-text-heading");
   });
@@ -127,7 +121,7 @@ describe("vertical tabs render as on main", () => {
   it("colours slot-content rows like the alerts folder list as on main", () => {
     const [active, inactive] = mountFolderRail().findAll('[role="tab"]');
     expect(active.classes()).toEqual(
-      expect.arrayContaining(["text-tabs-active-text", "bg-tabs-active-bg", "font-medium"]),
+      expect.arrayContaining(["text-text-body", "bg-[var(--selected-tint)]", "font-normal"]),
     );
     expect(inactive.classes()).toEqual(
       expect.arrayContaining(["text-text-body", "enabled:hover:text-tabs-hover-text"]),

@@ -229,7 +229,11 @@ function ageCol(
     id,
     header ?? ctx.t("infra.k8s2.columnAge"),
     { render: "age", at: pick },
-    { accessorFn: (r: any) => (byTime ? sortable(pick(r)) : ageOf(ctx, pick(r))), size: 80 },
+    {
+      accessorFn: (r: any) => (byTime ? sortable(pick(r)) : ageOf(ctx, pick(r))),
+      // A time header ("Last Seen") plus its sort arrow needs more room than "Age".
+      ...(byTime ? { size: 120, minSize: 112 } : { size: 80 }),
+    },
   );
 }
 

@@ -210,7 +210,7 @@ describe("PlaylistDialog", () => {
 
   it("offers short slides and labels the cross-folder add", async () => {
     await mountDialog();
-    expect(body().textContent).toContain("Add dashboards");
+    expect(body().textContent).toContain("Add Dashboards");
     expect(q("dashboard-playlist-add-info")).not.toBeNull();
     const values = (wrapper!.findComponent({ name: "OSelect" }).props("options") as any[]).map(
       (option) => option.value,

@@ -386,7 +386,7 @@ describe("DependencyMap", () => {
     const names = ["zoom-in", "zoom-out", "fit"].map((id) =>
       wrapper.find(`[data-test="dependency-map-${id}"]`).attributes("aria-label"),
     );
-    expect(names).toEqual(["Zoom in", "Zoom out", "Fit to view"]);
+    expect(names).toEqual(["Zoom In", "Zoom Out", "Fit to View"]);
   });
 
   it("opens a clickable card from Enter or Space, and not one that is not", async () => {

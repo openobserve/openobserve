@@ -339,7 +339,7 @@ describe("SourceMaps.vue", () => {
 
       expect(wrapper.findComponent({ name: "OTable" }).props("loading")).toBe(false);
       expect(wrapper.find('[data-test-stub="o-table"]').text()).toContain(
-        "No source maps uploaded",
+        "No Source Maps Uploaded",
       );
     });
 
@@ -351,7 +351,7 @@ describe("SourceMaps.vue", () => {
       // OTable is always rendered; when data is empty it renders #empty slot with OEmptyState.
       expect(wrapper.find('[data-test-stub="o-table"]').exists()).toBe(true);
       expect(wrapper.find('[data-test-stub="o-table"]').text()).toContain(
-        "No source maps uploaded",
+        "No Source Maps Uploaded",
       );
     });
 

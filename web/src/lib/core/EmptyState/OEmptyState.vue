@@ -257,7 +257,11 @@ const FILTERED_ACTION: EmptyStateAction = {
 // --- copy resolution: filtered > explicit prop > preset i18n key ------------
 const resolvedTitle = computed(() => {
   if (props.title) return props.title;
-  if (isFiltered.value) return t("emptyState.filtered.title", { noun: noun.value });
+  // The title is a label (Title Case); the description reuses the same noun in prose.
+  if (isFiltered.value)
+    return t("emptyState.filtered.title", {
+      noun: noun.value.replace(/\b\p{Ll}/gu, (c) => c.toUpperCase()),
+    });
   return preset.value ? t(preset.value.titleKey) : "";
 });
 const resolvedDescription = computed(() => {
@@ -424,7 +428,8 @@ const SIZE_MAP: Record<
     copy: "gap-1",
     actions: "gap-2 pt-1",
     extra: "w-full flex flex-col items-center gap-1.5 pt-1",
-    title: raw("text-sm!"),
+    // No `!`: panel placeholders shrink the title with `[&_p]:` classes.
+    title: raw("text-sm"),
     description: raw("text-xs"),
     illustrationWidth: 0,
     illustration: "",

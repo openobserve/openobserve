@@ -85,7 +85,7 @@ describe("OnboardingStepChoose", () => {
     const w = mountChoose();
     expect(panelTitle(w)).toBe("Infrastructure");
     await choiceButtons(w)[2].trigger("focus");
-    expect(panelTitle(w)).toBe("Frontend and mobile apps");
+    expect(panelTitle(w)).toBe("Frontend and Mobile Apps");
   });
 
   it("fills the row the panel describes, and the panel shows that choice's example screen", async () => {
@@ -107,7 +107,7 @@ describe("OnboardingStepChoose", () => {
     expect(panelChips(w)).toEqual(["Metrics", "Logs", "Traces"]);
     await choiceButtons(w)[2].trigger("mouseenter");
     expect(panelText(w)).toBe("See what real users experience in your web and mobile apps.");
-    expect(panelChips(w)).toEqual(["Sessions", "Errors", "Web vitals (web)", "Session replays"]);
+    expect(panelChips(w)).toEqual(["Sessions", "Errors", "Web Vitals (Web)", "Session Replays"]);
     await w.find('[data-test="onboarding-step-choose-other-synthetics"]').trigger("mouseenter");
     expect(panelText(w)).toBe("Run checks on a schedule from outside your network.");
     expect(panelChips(w)).toEqual(["Uptime", "Latency", "Certificates"]);
@@ -126,7 +126,7 @@ describe("OnboardingStepChoose", () => {
         global: { plugins: [store] },
       });
       await choiceButtons(w)[1].trigger("mouseenter");
-      expect(panelTitle(w)).toBe("Backend applications");
+      expect(panelTitle(w)).toBe("Backend Applications");
       return panelChips(w);
     };
     expect(await backendChips(true)).toEqual(["Traces", "Logs", "Profiles"]);
@@ -146,17 +146,17 @@ describe("OnboardingStepChoose", () => {
     (items[0].element as HTMLElement).focus();
     await items[0].trigger("keydown", { key: "ArrowDown" });
     expect(document.activeElement).toBe(items[1].element);
-    expect(panelTitle(w)).toBe("Backend applications");
+    expect(panelTitle(w)).toBe("Backend Applications");
     await items[1].trigger("keydown", { key: "ArrowUp" });
     await items[0].trigger("keydown", { key: "ArrowUp" });
     expect(document.activeElement).toBe(items[4].element);
-    expect(panelTitle(w)).toBe("LLM and AI apps");
+    expect(panelTitle(w)).toBe("LLM and AI Apps");
     w.unmount();
   });
 
   it("opens the side panel on the prefilled choice", () => {
     sessionStorage.setItem(FIRST_SOURCE_PREFILL_KEY, JSON.stringify({ utm_content: "rum" }));
-    expect(panelTitle(mountChoose())).toBe("Frontend and mobile apps");
+    expect(panelTitle(mountChoose())).toBe("Frontend and Mobile Apps");
   });
 
   it("hides synthetic checks when synthetics is off", () => {

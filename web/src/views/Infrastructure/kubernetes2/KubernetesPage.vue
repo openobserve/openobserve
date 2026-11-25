@@ -115,7 +115,7 @@ const push = (next: K8sUrlState) => router.push({ query: toQuery(next, route.que
 
 const ready = computed(() => detection.value === "detected" && !pageError.value);
 
-const clustersLoading = computed(() => !k8s.loaded.value && !pageError.value);
+const clustersLoading = computed(() => !k8s.clustersLoaded.value && !pageError.value);
 const clusterOptions = computed(() => k8s.clusters.value.map((c) => ({ label: raw(c), value: c })));
 
 const stats = computed(() => clusterStatsOf(k8s.clusterResults.value, k8s.effectiveCluster.value));
@@ -478,8 +478,8 @@ k8s.loadStreams();
 
 <template>
   <OPageLayout :title="t('menu.kubernetes')" icon="hub" bleed>
-    <template v-if="ready && crumbs" #subtitle>
-      <OText class="flex min-w-0 items-center gap-1.5 text-sm" data-test="k8s2-breadcrumb">
+    <template v-if="ready && crumbs" #title-trail>
+      <OText class="text-compact flex min-w-0 items-center gap-1.5" data-test="k8s2-breadcrumb">
         <span class="max-md:hidden">{{ raw(k8s.effectiveCluster.value ?? "") }}</span>
         <span class="max-md:hidden">/</span>
         <span>{{ crumbs.group }}</span>
@@ -544,6 +544,16 @@ k8s.loadStreams();
           data-test-name="k8s2-date-time"
           @on:date-change="onDateChange"
         />
+        <OButton
+          v-if="pageError"
+          variant="outline"
+          size="sm"
+          icon-left="refresh"
+          data-test="k8s2-refresh"
+          @click="retryPage"
+        >
+          {{ t("common.refresh") }}
+        </OButton>
       </div>
     </template>
 
@@ -718,7 +728,7 @@ k8s.loadStreams();
         class="max-lg:px-page-edge mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
         data-test="k8s2-empty-state"
       >
-        <OText tag="h2" class="text-xl font-semibold">{{ t("infra.k8s2.emptyHeadline") }}</OText>
+        <OText tag="h2" class="text-sm font-semibold">{{ t("infra.k8s2.emptyHeadline") }}</OText>
         <DataSourceSetupCard slug="kubernetes" @detected="retryStreams" />
       </div>
     </div>
@@ -727,10 +737,27 @@ k8s.loadStreams();
       v-else-if="pageError"
       preset="load-error"
       :title="t('infra.k8s2.pageError')"
-      :description="raw(pageError)"
       data-test="k8s2-page-error"
       @action="retryPage"
-    />
+    >
+      <template #extra>
+        <details class="group w-full max-w-xl text-start" data-test="k8s2-page-error-details">
+          <summary
+            class="text-compact text-text-link mx-auto flex w-fit cursor-pointer list-none items-center gap-1 font-medium hover:underline [&::-webkit-details-marker]:hidden"
+          >
+            {{ t("infra.k8s2.showDetails") }}
+            <OIcon
+              name="expand-more"
+              size="sm"
+              class="transition-transform group-open:rotate-180"
+            />
+          </summary>
+          <pre
+            class="text-text-secondary bg-surface-subtle rounded-default mt-2 max-h-40 overflow-auto p-2 font-mono text-xs break-words whitespace-pre-wrap"
+            >{{ raw(pageError) }}</pre>
+        </details>
+      </template>
+    </OEmptyState>
 
     <K8sCommandPalette
       v-if="ready"

@@ -82,7 +82,7 @@ function onAdd(name: unknown) {
         v-for="name in names"
         :key="name"
         class="group px-page-edge hover:bg-surface-subtle flex cursor-pointer items-center gap-2 py-1"
-        :class="{ 'bg-surface-subtle': selected === name }"
+        :class="{ 'bg-[var(--selected-tint)]': selected === name }"
         role="button"
         tabindex="0"
         :data-test="`security-events-source-${name}`"
@@ -93,9 +93,7 @@ function onAdd(name: unknown) {
         <span class="size-2 shrink-0 rounded-full" :class="HEALTH_DOT[healthOf(name)]">
           <OTooltip :content="t(`siem.health.${healthOf(name)}`)" />
         </span>
-        <span
-          class="min-w-0 flex-1 truncate font-mono text-xs"
-          :class="selected === name ? 'text-text-heading font-semibold' : 'text-text-heading'"
+        <span class="text-text-heading min-w-0 flex-1 truncate font-mono text-xs"
           >{{ name }}<OTooltip v-if="sourceHint(name)" :content="sourceHint(name)"
         /></span>
         <OTag

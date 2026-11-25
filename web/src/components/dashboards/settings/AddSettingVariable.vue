@@ -412,7 +412,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="multiSelect"
               :label="t('dashboard.multiSelect')"
               data-test="dashboard-query_values-show_multiple_values"
-              size="lg"
             />
           </div>
           <!-- default value for multi select variables -->
@@ -496,7 +495,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="hideOnDashboard"
               :label="t('dashboard.hideOnDashboard')"
               data-test="dashboard-variable-hide_on_dashboard"
-              size="lg"
             />
           </div>
 
@@ -506,7 +504,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="escapeSingleQuotes"
               :label="t('dashboard.escapeSingleQuotes')"
               data-test="dashboard-variable-escape-single-quotes"
-              size="lg"
               disabled
             >
               <template #tooltip>

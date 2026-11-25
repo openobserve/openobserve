@@ -63,7 +63,7 @@ describe("SearchBar — Run button ignores natural-language detection (#15049)",
     store.state.zoConfig.auto_query_enabled = originalAutoQuery;
   });
 
-  it("keeps Run query and its dropdown items after the editor reports natural language", async () => {
+  it("keeps Run Query and its dropdown items after the editor reports natural language", async () => {
     store.state.zoConfig.auto_query_enabled = true;
     await router.replace({ name: "logs" });
     wrapper = mount(SearchBar, {
@@ -78,8 +78,8 @@ describe("SearchBar — Run button ignores natural-language detection (#15049)",
 
     const runButton = wrapper.find('button[data-test="logs-search-bar-refresh-btn"]');
     expect(runButton.exists()).toBe(true);
-    expect(runButton.text()).toBe("Run query");
-    expect(runButton.attributes("title")).toBe("Run query");
+    expect(runButton.text()).toBe("Run Query");
+    expect(runButton.attributes("title")).toBe("Run Query");
     expect(dropdownItem("logs-search-bar-refresh-btn")).toBeTruthy();
     expect(dropdownItem("logs-search-bar-live-mode-toggle-btn")).toBeTruthy();
   });

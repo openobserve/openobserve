@@ -86,7 +86,7 @@ const renderedSections = computed(() =>
       <!-- Header chrome -->
       <header class="mb-5">
         <div class="flex flex-wrap items-center gap-2">
-          <h2 class="m-0 text-xl leading-tight font-semibold">
+          <h2 class="m-0 text-sm leading-tight font-semibold">
             {{ metadata.displayName }}
           </h2>
           <OTag v-if="metadata.category" type="integrationMeta" value="category">
@@ -96,7 +96,7 @@ const renderedSections = computed(() =>
             {{ metadata.runtime }}
           </OTag>
         </div>
-        <p v-if="metadata.tagline" class="mt-1.5 mb-0 text-sm opacity-60">
+        <p v-if="metadata.tagline" class="text-compact mt-1.5 mb-0 opacity-60">
           {{ metadata.tagline }}
         </p>
       </header>
@@ -167,7 +167,7 @@ const renderedSections = computed(() =>
 }
 
 .o2-section-title {
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: 600;
   margin: 0 0 0.5rem;
   letter-spacing: 0.01em;

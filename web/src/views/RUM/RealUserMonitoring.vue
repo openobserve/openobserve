@@ -69,7 +69,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </router-view>
     </template>
-    <RumNoDataState v-else />
+    <template v-else>
+      <OPageHeader :title="t('rum.title')" icon="devices" class="shrink-0" />
+      <RumNoDataState class="min-h-0 flex-1" />
+    </template>
   </div>
 </template>
 

@@ -35,7 +35,7 @@ describe("RcaProposedActions", () => {
       global: { plugins: [i18n] },
     });
 
-    expect(wrapper.find("h3").text()).toBe("Proposed actions");
+    expect(wrapper.find("h3").text()).toBe("Proposed Actions");
     const rows = wrapper.findAll('[data-test="rca-proposed-action"]');
     expect(rows).toHaveLength(2);
     expect(rows[0].text()).toContain("Roll back 4f2c1e");

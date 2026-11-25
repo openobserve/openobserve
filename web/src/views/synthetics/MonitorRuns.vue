@@ -640,7 +640,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="browserFilter"
                   :options="browserOptions"
                   icon-key="icon"
-                  size="md"
                   class="w-35!"
                   data-test="monitor-runs-filter-browser"
                 />
@@ -649,7 +648,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="deviceFilter"
                   :options="deviceOptions"
                   icon-key="icon"
-                  size="md"
                   class="w-35!"
                   data-test="monitor-runs-filter-device"
                 />
@@ -657,7 +655,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="locationFilter"
                   :options="locationOptions"
                   icon-key="icon"
-                  size="md"
                   class="w-35!"
                   data-test="monitor-runs-filter-location"
                 />

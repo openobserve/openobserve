@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OButton
       variant="dashed"
-      size="sm-action"
+      size="sm"
       icon-left="add"
       class="self-start"
       :data-test="`${dataTestPrefix}-add-btn`"

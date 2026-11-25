@@ -38,12 +38,12 @@
       <div class="o2-input flex h-full items-center gap-4 max-md:h-auto max-md:basis-full">
         <!-- Divider between the function name (header #title) and the language
              toggle — they are separate controls sharing one header row. h-full +
-             the separator's own self-stretch span the full h-15 header row; my-2
-             insets it to ~2.75rem, so it runs past the subtitle line ("Add
+             the separator's own self-stretch span the full h-12 header row; my-2
+             insets it to ~2rem, so it runs past the subtitle line ("Add
              Function") rather than stopping at the name. -->
         <OSeparator vertical class="my-2 max-md:hidden" />
         <!-- Transform-type (language) selector -->
-        <div class="flex h-9 items-center gap-4">
+        <div class="flex h-7 items-center gap-4">
           <!-- A segmented toggle rather than a radio group: the two languages are
                mutually exclusive VIEWS of the same editor, so they read as a
                switch. Each option carries its OWN info tip, so both languages can
@@ -201,7 +201,7 @@
         data-test="add-function-fullscreen-btn"
         v-close-popup="true"
         variant="outline"
-        size="sm-action"
+        size="sm"
         :disabled="isSubmitting"
         @click="handleFullScreen"
         icon-left="fullscreen"
@@ -212,7 +212,7 @@
         v-if="!hideTest"
         data-test="add-function-test-btn"
         variant="outline"
-        size="sm-action"
+        size="sm"
         :disabled="isSubmitting"
         @click="emit('test')"
         icon-left="play-arrow"
@@ -223,7 +223,7 @@
         v-if="!embedded"
         data-test="add-function-cancel-btn"
         variant="outline"
-        size="sm-action"
+        size="sm"
         :disabled="isSubmitting"
         @click="emit('cancel')"
       >
@@ -232,7 +232,7 @@
       <OButton
         data-test="add-function-save-btn"
         variant="primary"
-        size="sm-action"
+        size="sm"
         type="submit"
         :loading="isSubmitting"
       >

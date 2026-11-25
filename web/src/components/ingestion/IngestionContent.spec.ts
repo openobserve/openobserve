@@ -104,7 +104,7 @@ describe("IngestionContent.vue", () => {
     expect(root.classes()).toContain("flex");
     expect(root.classes()).toContain("flex-col");
     expect(root.classes()).toContain("gap-4");
-    expect(root.classes()).toContain("text-sm");
+    expect(root.classes()).toContain("text-compact");
   });
 
   it("renders default slot content", () => {

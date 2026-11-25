@@ -269,7 +269,7 @@
                 </div>
                 <OButton
                   variant="outline"
-                  size="sm-action"
+                  size="sm"
                   @click="loadServiceGraph"
                   class="mt-4"
                   icon-left="refresh"

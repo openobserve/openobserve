@@ -80,7 +80,6 @@
                   :label="t('onlineEvals.job.targetScopeLabel')"
                   :options="targetScopeOptions"
                   :help-text="t(`onlineEvals.job.targetScopeHelp.${formValues.targetScope}`)"
-                  size="md"
                   required
                   data-test="job-form-target-scope-select"
                 />
@@ -92,7 +91,6 @@
                   :label="t('onlineEvals.job.streamLabel')"
                   :options="streamOptions"
                   :placeholder="t('onlineEvals.job.streamPlaceholder')"
-                  size="md"
                   required
                   :disabled="mode === 'edit'"
                   data-test="job-form-stream-select"
@@ -144,7 +142,6 @@
                     :label="t('onlineEvals.job.samplingModeLabel')"
                     :options="samplingModeOptions"
                     :help-text="t('onlineEvals.job.samplingHelp')"
-                    size="md"
                     data-test="job-form-sampling-mode-select"
                   />
                 </div>

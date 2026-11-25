@@ -524,12 +524,7 @@ describe("AppAnalytics shell", () => {
     expect(tips.some((c) => /^Refresh · data through 2026/.test(c))).toBe(true);
     const sampling = wrapper!.find('[data-test="rum-analytics-sdk-sampling"]');
     expect(sampling.attributes("aria-label")).toBe("Counts reflect sampled SDK sessions");
-    expect(
-      wrapper!
-        .find('[data-test="rum-analytics-title"]')
-        .find('[data-test="rum-analytics-sdk-sampling"]')
-        .exists(),
-    ).toBe(false);
+    expect(sampling.exists()).toBe(true);
   });
 
   it("names the excluded identity share, never the value, and Include it sets idall (AC-50)", async () => {

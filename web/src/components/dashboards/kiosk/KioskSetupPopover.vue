@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('dashboard.kiosk.refresh')"
         :model-value="refreshSeconds"
         :options="refreshOptions"
-        size="md"
         :searchable="false"
         data-test="dashboard-kiosk-refresh"
         @update:model-value="(value) => (refreshSeconds = Number(value) || 0)"

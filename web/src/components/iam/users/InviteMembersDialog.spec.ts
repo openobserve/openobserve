@@ -147,7 +147,7 @@ describe("InviteMembersDialog", () => {
       expect(
         document.querySelector('[data-test="invite-members-dialog-role-select"]'),
       ).not.toBeNull();
-      expect(document.body.textContent).toContain("Email addresses");
+      expect(document.body.textContent).toContain("Email Addresses");
       expect(document.body.textContent).toContain("Separate addresses with commas or semicolons.");
       expect(document.body.textContent).toContain("Send invites");
     });

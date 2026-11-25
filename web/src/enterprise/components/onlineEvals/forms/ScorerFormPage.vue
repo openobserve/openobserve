@@ -72,7 +72,6 @@
                   :label="t('onlineEvals.scorer.producesScoreConfigLabel')"
                   :options="scoreConfigOptions"
                   :placeholder="t('onlineEvals.scorer.producesScoreConfigNone')"
-                  size="md"
                   :disabled="mode === 'edit'"
                   data-test="scorer-form-score-config-select"
                   @update:modelValue="handleScoreConfigSelection"
@@ -129,7 +128,6 @@
                     :label="t('onlineEvals.scorer.providerLabel')"
                     :options="providerOptions"
                     :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
-                    size="md"
                     required
                     class="min-w-0 flex-1"
                     data-test="scorer-form-provider-select"
@@ -279,7 +277,6 @@
                     />
                     <OFormSelect
                       :name="`extraMetadataFields[${idx}].type`"
-                      size="md"
                       :options="extraFieldTypeOptions"
                       :data-test="`scorer-form-extra-field-type-${idx}`"
                     />
@@ -347,7 +344,6 @@
                   :label="t('codeScorer.startFromLabel')"
                   :options="starterOptions"
                   :placeholder="t('codeScorer.startFromPlaceholder')"
-                  size="md"
                   data-test="scorer-form-code-starter"
                   @update:model-value="applyStarter"
                 />
@@ -432,7 +428,6 @@
                 <div class="scorer-url-bar grid grid-cols-[6.5rem_minmax(0,1fr)] gap-0">
                   <OFormSelect
                     name="httpMethod"
-                    size="md"
                     :options="httpMethodOptions"
                     :searchable="false"
                     data-test="scorer-form-remote-method-select"
@@ -471,7 +466,6 @@
                   <OFormSelect
                     name="backoffStrategy"
                     :label="t('onlineEvals.scorer.remoteBackoffLabel')"
-                    size="md"
                     :options="backoffOptions"
                     :searchable="false"
                     data-test="scorer-form-remote-backoff"
@@ -504,7 +498,6 @@
                 <OFormSelect
                   name="authType"
                   :label="t('onlineEvals.scorer.remoteAuthLabel')"
-                  size="md"
                   :options="authTypeOptions"
                   :searchable="false"
                   :clearable="true"

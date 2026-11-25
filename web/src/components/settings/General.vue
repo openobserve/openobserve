@@ -312,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="general-settings-delete-org-btn"
               variant="outline-destructive"
-              size="sm-action"
+              size="sm"
               icon-left="delete"
               type="button"
               :loading="deleting"

@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OEmptyState illustration="radar" size="hero" :hide-action="true">
-    <template #title>{{ t("rum.emptyState.title") }}</template>
-    <template #description>{{ t("rum.emptyState.description") }}</template>
+    <template #title>{{ title ?? t("rum.emptyState.title") }}</template>
+    <template #description>{{ description ?? t("rum.emptyState.description") }}</template>
 
     <template #actions>
       <EmptyStateIngestionCard
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #extra>
       <div class="flex flex-wrap items-center justify-center gap-2">
-        <span class="text-text-secondary me-1 text-sm font-semibold">
+        <span class="text-text-secondary text-compact me-1 font-semibold">
           {{ t("rum.emptyState.learnMore") }}
         </span>
         <EmptyStateIngestionChip
@@ -67,6 +67,8 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
+
+defineProps<{ title?: string; description?: string }>();
 
 const { t } = useI18nTyped();
 const router = useRouter();

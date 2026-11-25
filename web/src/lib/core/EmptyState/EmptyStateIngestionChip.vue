@@ -47,7 +47,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 // Shape, spacing and focus ring — identical in both variants.
 const CHIP_BASE =
-  "es-ing-chip text-compact border-border-default inline-flex items-center gap-1.25 rounded-full border px-3 py-1 font-medium no-underline! outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
+  "es-ing-chip text-compact border-border-default inline-flex items-center gap-1.25 rounded-full border h-7 px-3 font-medium no-underline! outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
 // The two colour sets are mutually exclusive so no two `!` utilities ever
 // compete for the same property — which class wins would otherwise depend on

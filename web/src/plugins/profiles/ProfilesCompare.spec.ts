@@ -140,7 +140,7 @@ describe("ProfilesCompare", () => {
       return { label: select.props("label"), position: select.props("labelPosition") };
     };
     expect(labelOf("profiles-compare-label")).toEqual({
-      label: "Compare by label",
+      label: "Compare by Label",
       position: "inside",
     });
     expect(labelOf("profiles-compare-baseline")).toEqual({

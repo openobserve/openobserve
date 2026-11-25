@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="traces-latency-heatmap-body"
     >
       <div
+        v-if="status !== 'empty'"
         class="text-text-secondary text-2xs absolute top-0 right-2 z-1 flex h-4 items-center gap-1"
         data-test="traces-latency-heatmap-legend"
         :aria-label="
@@ -114,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('traces.latencyHeatmap.noData')"
         :backdrop="false"
         data-test="traces-latency-heatmap-no-data"
-        class="h-full"
+        class="[&_p]:text-text-secondary [&_p]:text-compact [container-type:size] absolute! inset-0 h-full !min-h-0 w-full !p-2 [&_p]:font-medium"
       />
       <!-- ChartRenderer preserves empty duration rows and maps category brushes back to histogram buckets. -->
       <ChartRenderer

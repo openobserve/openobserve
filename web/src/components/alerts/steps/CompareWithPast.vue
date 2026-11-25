@@ -23,11 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="step-content rounded-default bg-surface-overlay border-border-default min-h-0 flex-1 overflow-auto border"
     >
       <div
-        class="section-header border-border-default flex items-center gap-0 border-b px-3 py-2.5"
+        class="section-header border-border-default flex items-center gap-0 border-b px-3 py-1.5"
       >
-        <div
-          class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
-        />
         <span class="section-header-title text-compact text-text-heading font-semibold">{{
           t("alerts.steps.compareWithPast")
         }}</span>
@@ -35,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="px-3 pb-2">
         <!-- Alert set for header -->
         <div
-          class="multi-window-text text-text-body mt-3 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
+          class="multi-window-text text-text-body text-compact mt-3 flex items-center gap-2 py-2 align-middle leading-6 font-semibold"
         >
           <span>{{ t("alerts.compareWithPast.alertSetFor") }}</span>
           <div class="border-line h-px flex-1"></div>
@@ -46,14 +43,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="bg-card-glass-bg border-border-default flex min-h-27.5 flex-row items-start justify-between border px-3 py-2"
         >
           <div
-            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+            class="multi-window-text text-text-body text-compact w-auto text-left align-middle leading-6 font-semibold"
           >
             {{ t("alerts.compareWithPast.currentWindow") }}
           </div>
 
           <div class="flex flex-col items-start gap-2">
             <div
-              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+              class="multi-window-text text-text-body text-compact w-auto text-left align-middle leading-6 font-semibold"
             >
               {{ t("alerts.compareWithPast.cycle") }}
               <span class="cursor-pointer">
@@ -107,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Comparing with header -->
         <div
           v-if="localMultiTimeRange.length > 0"
-          class="multi-window-text text-text-body mt-2 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
+          class="multi-window-text text-text-body text-compact mt-2 flex items-center gap-2 py-2 align-middle leading-6 font-semibold"
         >
           <span>{{ t("alerts.compareWithPast.comparingWith") }}</span>
           <div class="border-line h-px flex-1"></div>
@@ -125,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="reference-window-container bg-card-glass-bg border-border-default mt-2 flex min-h-27.5 flex-row items-start justify-between border px-3 py-2"
         >
           <div
-            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+            class="multi-window-text text-text-body text-compact w-auto text-left align-middle leading-6 font-semibold"
           >
             {{ t("alerts.compareWithPast.referenceWindow") }} {{ index + 1 }}
           </div>
@@ -164,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Cycle Info -->
           <div class="flex flex-col items-start gap-2">
             <div
-              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+              class="multi-window-text text-text-body text-compact w-auto text-left align-middle leading-6 font-semibold"
             >
               {{ t("alerts.compareWithPast.cycle") }}
               <span class="cursor-pointer">

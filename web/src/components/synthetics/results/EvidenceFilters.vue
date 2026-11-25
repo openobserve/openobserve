@@ -100,7 +100,6 @@ const stepFilter = computed({
       v-if="stepOptions?.length"
       v-model="stepFilter"
       :options="stepOptions"
-      size="md"
       class="w-56! shrink-0"
       :searchable="false"
       data-test="synthetics-evidence-step-filter"

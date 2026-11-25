@@ -199,7 +199,7 @@ describe("OEmptyState", () => {
       // resolved from emptyState.noDashboards.title
       const title = wrapper.find("h2");
       expect(title.exists()).toBe(true);
-      expect(title.text()).toContain("Create your first dashboard");
+      expect(title.text()).toContain("Create Your First Dashboard");
     });
 
     it("renders the description from the preset i18n key", () => {
@@ -214,9 +214,9 @@ describe("OEmptyState", () => {
 
     // On-call's empty tabs state a title and one action, with no sub-sentence, in one wording.
     it.each([
-      ["no-oncall-members", "No members yet", "Add members"],
-      ["no-oncall-rules", "No routing rules yet", "New rule"],
-      ["no-oncall-schedule", "Create your first rotation", "From scratch"],
+      ["no-oncall-members", "No Members Yet", "Add members"],
+      ["no-oncall-rules", "No Routing Rules Yet", "New rule"],
+      ["no-oncall-schedule", "Create Your First Rotation", "From scratch"],
     ])("renders %s as a title and its action only", (preset, title, action) => {
       wrapper = buildWrapper({ preset });
       expect(wrapper.find("h2").text()).toBe(title);
@@ -313,7 +313,7 @@ describe("OEmptyState", () => {
       // Assert — exactly one action card with the Clear filters label
       const cards = wrapper.findAll(CARD);
       expect(cards).toHaveLength(1);
-      expect(cards[0].attributes("data-label")).toBe("Clear filters");
+      expect(cards[0].attributes("data-label")).toBe("Clear Filters");
     });
 
     it("shows filtered title with noun substitution", () => {
@@ -322,7 +322,7 @@ describe("OEmptyState", () => {
 
       // Assert — title contains the noun injected into the filtered template
       const title = wrapper.find("h2");
-      expect(title.text()).toBe("No dashboards found");
+      expect(title.text()).toBe("No Dashboards Found");
     });
 
     it("shows filtered description with noun substitution", () => {
@@ -342,7 +342,7 @@ describe("OEmptyState", () => {
       // Assert
       const cards = wrapper.findAll(CARD);
       expect(cards).toHaveLength(1);
-      expect(cards[0].attributes("data-label")).toBe("Clear filters");
+      expect(cards[0].attributes("data-label")).toBe("Clear Filters");
     });
 
     it("renders the no-results illustration when filtered is true", () => {
@@ -372,7 +372,7 @@ describe("OEmptyState", () => {
 
       // Assert
       const title = wrapper.find("h2");
-      expect(title.text()).toBe("No results found");
+      expect(title.text()).toBe("No Results Found");
     });
   });
 
@@ -395,7 +395,7 @@ describe("OEmptyState", () => {
       // Assert — the three "no-dashboards" actions with their English labels
       const cards = wrapper.findAll(CARD);
       const labels = cards.map((c) => c.attributes("data-label"));
-      expect(labels).toEqual(["New dashboard", "Import dashboard", "Browse templates"]);
+      expect(labels).toEqual(["New Dashboard", "Import dashboard", "Browse templates"]);
     });
 
     it("does not render action cards when hideAction is true", () => {

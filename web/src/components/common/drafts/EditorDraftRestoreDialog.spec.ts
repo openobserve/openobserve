@@ -44,7 +44,7 @@ describe("EditorDraftRestoreDialog", () => {
 
   it("names the entity and the draft time to the minute", async () => {
     await mountDialog();
-    expect(byTest("editor-draft-restore-dialog")?.textContent).toContain("Unsaved draft");
+    expect(byTest("editor-draft-restore-dialog")?.textContent).toContain("Unsaved Draft");
     const message = byTest("editor-draft-restore-message")?.textContent ?? "";
     expect(message).toContain("unsaved changes to this alert template from");
     expect(message).toContain("2026");

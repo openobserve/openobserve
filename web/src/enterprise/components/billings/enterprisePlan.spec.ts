@@ -309,11 +309,11 @@ describe("enterprisePlan.vue price line", () => {
     expect(line).toContain("volume discounts, BYOB");
   });
 
-  it("keeps the seven subgrid rows as the card's direct children, priced or not", () => {
+  it("keeps the seven subgrid rows as the card's direct children, the price row only when priced", () => {
     expect(mountPlan().classes()).toContain("grid-rows-subgrid");
     const priced = mountPlan({ price: { price: "Custom", note: "volume discounts, BYOB" } });
     expect(priced.element.children).toHaveLength(7);
-    expect(mountPlan().element.children).toHaveLength(7);
+    expect(mountPlan().element.children).toHaveLength(6);
   });
 
   it("renders no price line without a price", () => {
@@ -322,11 +322,11 @@ describe("enterprisePlan.vue price line", () => {
 
   it("shows the discount tag once: in the price block when priced, in the header otherwise", () => {
     const priced = mountPlan({ price: { price: "Custom", note: "volume discounts, BYOB" } });
-    expect(priced.text().match(/On discount/g)).toHaveLength(1);
+    expect(priced.text().match(/On Discount/g)).toHaveLength(1);
     expect(priced.get('[data-test="billing-plans-enterprise-price"]').text()).toContain(
-      "On discount",
+      "On Discount",
     );
     const unpriced = mountPlan();
-    expect(unpriced.text().match(/On discount/g)).toHaveLength(1);
+    expect(unpriced.text().match(/On Discount/g)).toHaveLength(1);
   });
 });

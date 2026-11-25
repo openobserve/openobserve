@@ -543,8 +543,8 @@ describe("GroupUsers Component", () => {
 
       const noneSelected = realEmpty.find('[data-test="iam-users-selection-none-selected"]');
       expect(noneSelected.exists()).toBe(true);
-      expect(noneSelected.text()).toContain("No users selected");
-      expect(realEmpty.text()).not.toContain("No users yet");
+      expect(noneSelected.text()).toContain("No Users Selected");
+      expect(realEmpty.text()).not.toContain("No Users Yet");
 
       realEmpty.unmount();
     });
@@ -572,7 +572,7 @@ describe("GroupUsers Component", () => {
       expect(realEmpty.find('[data-test="iam-users-selection-none-selected"]').exists()).toBe(
         false,
       );
-      expect(realEmpty.text()).toContain("No users yet");
+      expect(realEmpty.text()).toContain("No Users Yet");
 
       realEmpty.unmount();
     });
@@ -585,7 +585,7 @@ describe("GroupUsers Component", () => {
       expect(realEmpty.find('[data-test="iam-users-selection-none-selected"]').exists()).toBe(
         false,
       );
-      expect(realEmpty.text()).toContain("No users yet");
+      expect(realEmpty.text()).toContain("No Users Yet");
 
       realEmpty.unmount();
     });
@@ -603,13 +603,13 @@ describe("GroupUsers Component", () => {
 
       (realEmpty.vm as any).userSearchKey = "nobody";
       await flushPromises();
-      expect(realEmpty.text()).toContain("No users found");
+      expect(realEmpty.text()).toContain("No Users Found");
       expectUnclippable(realEmpty);
 
       realEmpty.unmount();
       mockUsersState.getOrgUsers.mockResolvedValue([]);
       const orgEmpty = await mountReal([]);
-      expect(orgEmpty.text()).toContain("No users yet");
+      expect(orgEmpty.text()).toContain("No Users Yet");
       expectUnclippable(orgEmpty);
 
       orgEmpty.unmount();
@@ -621,7 +621,7 @@ describe("GroupUsers Component", () => {
 
       expect(pending.findComponent(o2Stubs.OTable).props("loading")).toBe(true);
       expect(pending.find('[data-test="iam-users-selection-none-selected"]').exists()).toBe(false);
-      expect(pending.text()).not.toContain("No users yet");
+      expect(pending.text()).not.toContain("No Users Yet");
 
       pending.unmount();
     });
@@ -633,7 +633,7 @@ describe("GroupUsers Component", () => {
 
       expect(failed.find('[data-test="iam-users-selection-load-error"]').exists()).toBe(true);
       expect(failed.find('[data-test="iam-users-selection-none-selected"]').exists()).toBe(false);
-      expect(failed.text()).not.toContain("No users yet");
+      expect(failed.text()).not.toContain("No Users Yet");
 
       await failed.find('[data-test="iam-users-selection-load-error"] button').trigger("click");
       await flushPromises();
@@ -652,7 +652,7 @@ describe("GroupUsers Component", () => {
       expect(realEmpty.find('[data-test="iam-users-selection-none-selected"]').exists()).toBe(
         false,
       );
-      expect(realEmpty.text()).toContain("No users found");
+      expect(realEmpty.text()).toContain("No Users Found");
 
       realEmpty.unmount();
     });

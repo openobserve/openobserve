@@ -76,7 +76,7 @@ const run = async () => {
     <template #actions>
       <OButton
         variant="primary"
-        size="sm-action"
+        size="sm"
         :loading="pending.has(destination.name)"
         data-test="slack-app-switch-this"
         @click="run"

@@ -221,7 +221,7 @@ describe("FleetCollectorDrawer", () => {
     expect(wrapper.find(sel("remote-hash")).text()).toContain("9f2c1a7e");
     expect(wrapper.find(sel("marker")).text()).toBe("edge v2");
     const labels = wrapper.findAll("dt").map((el) => el.text());
-    expect(labels.at(-1)).toBe("OpAMP capabilities");
+    expect(labels.at(-1)).toBe("OpAMP Capabilities");
     expect(labels).not.toContain("Assignment");
   });
 
@@ -295,7 +295,7 @@ describe("FleetCollectorDrawer", () => {
     } as any);
     wrapper = mountDrawer("history");
     await flushPromises();
-    expect(wrapper.find(sel("history")).text()).toContain("Last confirmed running");
+    expect(wrapper.find(sel("history")).text()).toContain("Last Confirmed Running");
   });
 
   it("restarts and redelivers the collector", async () => {

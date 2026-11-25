@@ -295,7 +295,7 @@ describe("SavedFunnelsPage (AC-67, AC-68, AC-69)", () => {
     await wrapper!.find('[data-test="rum-analytics-saved-funnels-search"] input').setValue("zzz");
     await settle();
     expect(names()).toEqual([]);
-    expect(wrapper!.text()).toContain("No saved funnels found");
+    expect(wrapper!.text()).toContain("No Saved Funnels Found");
     expect(q("rum-analytics-funnel-quick-starts").exists()).toBe(false);
   });
 
@@ -364,7 +364,7 @@ describe("SavedFunnelsPage (AC-67, AC-68, AC-69)", () => {
       await action(1, "rename").trigger("click");
       await settle();
       expect(q("rum-analytics-save-funnel-dialog").attributes("data-title")).toBe(
-        "Rename saved funnel",
+        "Rename Saved Funnel",
       );
       await fillAndSubmit("Beta 2");
       expect(api.funnels.get(b.id)?.name).toBe("Beta 2");
@@ -440,7 +440,7 @@ describe("SavedFunnelsPage (AC-67, AC-68, AC-69)", () => {
       await action(1, "duplicate").trigger("click");
       await settle();
       expect(q("rum-analytics-save-funnel-dialog").attributes("data-title")).toBe(
-        "Duplicate funnel",
+        "Duplicate Funnel",
       );
       expect(nameInput().element.value).toBe("Copy of Beta");
       await fillAndSubmit();
@@ -510,7 +510,7 @@ describe("SavedFunnelsPage (AC-67, AC-68, AC-69)", () => {
       await q("rum-analytics-saved-funnel-row-0-rename-menu").trigger("click");
       await settle();
       expect(q("rum-analytics-save-funnel-dialog").attributes("data-title")).toBe(
-        "Rename saved funnel",
+        "Rename Saved Funnel",
       );
       expect(router.currentRoute.value.name).toBe(PA_ROUTES.funnels);
     });
@@ -536,7 +536,7 @@ describe("SavedFunnelsPage (AC-67, AC-68, AC-69)", () => {
 
   it("an app with none shows the empty state with Build a funnel and the quick starts (AC-58)", async () => {
     await mountPage();
-    expect(wrapper!.text()).toContain("No saved funnels yet");
+    expect(wrapper!.text()).toContain("No Saved Funnels Yet");
     expect(q("rum-analytics-funnel-entry-start-0").text()).toContain("/web/login");
     await q("rum-analytics-funnel-entry-start-0").trigger("click");
     await settle();

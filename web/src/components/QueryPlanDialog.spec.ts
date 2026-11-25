@@ -261,7 +261,7 @@ describe("QueryPlanDialog", () => {
 
     it("shows the title and the SQL on one line that expands on click", async () => {
       wrapper = await openDialog();
-      expect(find(wrapper, "o-dialog-title").text()).toBe("Query plan");
+      expect(find(wrapper, "o-dialog-title").text()).toBe("Query Plan");
       const toggle = find(wrapper, "query-plan-sql-toggle");
       expect(toggle.text()).toBe("SELECT k8s_namespace_name, count(*) AS cnt FROM app_logs");
       expect(find(wrapper, "query-plan-sql-full").exists()).toBe(false);

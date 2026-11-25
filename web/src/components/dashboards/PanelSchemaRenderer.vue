@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="noDataTitle"
         :backdrop="false"
         data-test="no-data"
-        class="noData [container-type:size] absolute! inset-0 h-full !min-h-0 w-full !p-2"
+        class="noData [&_p]:text-text-secondary [&_p]:text-compact [container-type:size] absolute! inset-0 h-full !min-h-0 w-full !p-2 [&_p]:font-medium"
       />
       <div
         v-if="errorDetail?.message && !panelSchema?.error_config?.custom_error_handeling"

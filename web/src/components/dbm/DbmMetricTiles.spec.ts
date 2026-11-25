@@ -69,7 +69,7 @@ describe("DbmMetricTiles", () => {
     expect(tile.text()).toContain("1.2 s");
     expect(tile.text()).toContain("2× more");
     expect(tile.get(".font-mono").classes()).toEqual(
-      expect.arrayContaining(["text-text-heading", "text-lg", "font-semibold", "tabular-nums"]),
+      expect.arrayContaining(["text-text-heading", "text-base", "font-semibold", "tabular-nums"]),
     );
   });
 

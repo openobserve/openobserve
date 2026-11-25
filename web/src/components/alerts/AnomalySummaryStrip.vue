@@ -38,7 +38,7 @@
       </span>
       <OButton
         variant="outline"
-        size="sm-action"
+        size="sm"
         icon-left="refresh"
         data-test="alerts-anomalysummarystrip-retry"
         @click="emit('retry')"
@@ -137,7 +137,7 @@
         <OButton
           v-if="response?.url"
           variant="primary"
-          size="sm-action"
+          size="sm"
           data-test="alerts-anomalysummarystrip-open"
           @click="emit('open', response.url)"
         >

@@ -89,7 +89,7 @@ describe("FunnelFilterBar", () => {
 
   it("draws Filter all steps in the shared builder with the funnel's rules", () => {
     const w = mountBar();
-    expect(w.text()).toContain("Filter all steps");
+    expect(w.text()).toContain("Filter All Steps");
     expect(builder(w).props("profile")).toBe("rum-funnel");
     expect(builder(w).props("layout")).toBeUndefined();
   });

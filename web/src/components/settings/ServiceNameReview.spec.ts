@@ -328,7 +328,7 @@ describe("Name review list", () => {
     await act("edit", rename).trigger("click");
     await flushPromises();
     const editor = byTest("svcver-name-review-inline-edit");
-    expect(editor.text()).toContain("Display as");
+    expect(editor.text()).toContain("Display As");
     expect(editor.text()).toContain("Changes the display only");
     expect(editor.find("input").element.value).toBe("InventoryService");
     await editor.find("input").setValue("Inventory");
@@ -467,7 +467,7 @@ describe("Name review states", () => {
     lists.proposed = { aliases: [], total: 0 };
     wrapper = mountReview();
     await flushPromises();
-    expect(byTest("svcver-name-review-empty").text()).toContain("No names to review");
+    expect(byTest("svcver-name-review-empty").text()).toContain("No Names to Review");
   });
 
   it("is read-only without edit rights: rows stay visible, actions go", async () => {
@@ -526,7 +526,7 @@ describe("Unresolved group", () => {
     expect(table?.props("wrap")).toBe(true);
   });
 
-  it("explains ambiguity without an action and offers Display as… elsewhere", async () => {
+  it("explains ambiguity without an action and offers Display As… elsewhere", async () => {
     placeholders = stage8.unresolved.placeholder_names;
     wrapper = mountReview({ services: rowsGolden });
     await flushPromises();
@@ -590,7 +590,7 @@ describe("Unresolved group", () => {
     expect(byTest("svcver-unresolved-sub").exists()).toBe(true);
   });
 
-  it("offers no Display as… for an internal stream name or an empty name", async () => {
+  it("offers no Display As… for an internal stream name or an empty name", async () => {
     placeholders = [{ service: "", last_seen: 1 }];
     wrapper = mountReview({ services: [detected("_rumdata"), detected("mailer")] });
     await flushPromises();
@@ -636,7 +636,7 @@ describe("Unresolved group", () => {
     expect(editors[0].find("input").element.value).toBe("InventoryService");
   });
 
-  it("retries a colliding Display as… qualified with allow_collisions", async () => {
+  it("retries a colliding Display As… qualified with allow_collisions", async () => {
     transport.post.mockRejectedValueOnce(conflict());
     wrapper = mountReview({ services: rowsGolden });
     await flushPromises();
@@ -754,11 +754,11 @@ describe("Discovered Services", () => {
     catalog = [...scopes, { ...scopes[0], scope_key: "other", newest_version: "v-other" }];
     await mountDiscovered();
     expect(tile("discovered")).toBe(
-      `Discovered (all signals)${keys.size}${traced.size} of these send traces`,
+      `Discovered (All Signals)${keys.size}${traced.size} of these send traces`,
     );
-    expect(tile("envs")).toBe(`Envs detected${stage7.envs.envs.length}prod`);
+    expect(tile("envs")).toBe(`Envs Detected${stage7.envs.envs.length}prod`);
     expect(tile("overrides")).toContain(String(stage7.overrides.total));
-    expect(tile("names")).toBe("Names to review3Review →");
+    expect(tile("names")).toBe("Names to Review3Review →");
     expect(tile("versions")).toBe(versionTile(catalog));
     expect(tile("versions")).not.toContain("raw");
     await byTest("svcver-tile-overrides-view").trigger("click");

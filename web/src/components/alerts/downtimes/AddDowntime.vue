@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex gap-2">
               <OButton
                 variant="outline"
-                size="sm-action"
+                size="sm"
                 :disabled="isSubmitting"
                 data-test="add-downtime-cancel"
                 @click="goBack"
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 variant="primary"
-                size="sm-action"
+                size="sm"
                 type="submit"
                 :loading="isSubmitting"
                 :disabled="noFolder"
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #actions>
             <OButton
               variant="outline"
-              size="sm-action"
+              size="sm"
               :loading="detailQuery.isFetching.value"
               data-test="add-downtime-reload"
               @click="reloadRow"
@@ -152,7 +152,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 py-2 max-lg:flex-none">
           <div class="bg-card-glass-bg border-border-default shrink-0 border-b px-3 py-2.5">
             <div class="flex items-center gap-3 max-md:flex-col max-md:items-start">
-              <div class="rounded-default bg-theme-accent h-4 w-0.75 shrink-0 max-md:hidden" />
               <span class="text-compact font-semibold">
                 {{ t("alerts.downtimes.form.appliesTo") }}
               </span>

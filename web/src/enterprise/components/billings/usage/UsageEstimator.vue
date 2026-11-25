@@ -100,7 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OInput
                     :model-value="inputs.avgStreamMb"
                     type="number"
-                    size="md"
                     :label="t('billing.usageV2.avgStreamSize')"
                     :suffix="rawMb"
                     data-test="billings-usageestimator-avg-stream"
@@ -125,7 +124,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OInput
                 :model-value="inputs[field.key]"
                 type="number"
-                size="md"
                 :label="t(field.labelKey)"
                 :suffix="field.suffix"
                 :help-text="field.key === 'scanPerSearchMb' ? scanNote : field.rate"
@@ -200,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="border-border-default bg-surface-subtle mt-auto border-t px-4 py-3">
             <div class="flex items-baseline gap-2">
               <span class="text-sm font-semibold">{{ t("billing.usageV2.estimatedTotal") }}</span>
-              <span class="ms-auto text-2xl leading-none font-semibold">
+              <span class="ms-auto text-lg leading-none font-semibold">
                 {{ formatCost(estimate.total) }}
               </span>
               <span class="text-text-secondary text-xs">{{ t("billing.usageV2.perMonth") }}</span>

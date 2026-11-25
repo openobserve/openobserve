@@ -82,8 +82,8 @@ describe("GroupServiceAccounts empty states", () => {
     w = await mountAccounts([]);
 
     expect(noneSelected(w).exists()).toBe(true);
-    expect(noneSelected(w).text()).toContain("No service accounts selected");
-    expect(w.text()).not.toContain("No service accounts yet");
+    expect(noneSelected(w).text()).toContain("No Service Accounts Selected");
+    expect(w.text()).not.toContain("No Service Accounts Yet");
   });
 
   it("switches to All from the none-selected action and lists the org's service accounts", async () => {
@@ -103,7 +103,7 @@ describe("GroupServiceAccounts empty states", () => {
 
     expect(w.vm.usersDisplay).toBe("selected");
     expect(noneSelected(w).exists()).toBe(false);
-    expect(w.text()).toContain("No service accounts yet");
+    expect(w.text()).toContain("No Service Accounts Yet");
   });
 
   it("shows the search-filtered state when a search empties the Selected view", async () => {
@@ -112,7 +112,7 @@ describe("GroupServiceAccounts empty states", () => {
     await flushPromises();
 
     expect(noneSelected(w).exists()).toBe(false);
-    expect(w.text()).toContain("No service accounts found");
+    expect(w.text()).toContain("No Service Accounts Found");
   });
 
   it("makes no claim about the org while its service-account list is still loading", async () => {
@@ -121,7 +121,7 @@ describe("GroupServiceAccounts empty states", () => {
 
     expect(w.findComponent(OTable).props("loading")).toBe(true);
     expect(noneSelected(w).exists()).toBe(false);
-    expect(w.text()).not.toContain("No service accounts yet");
+    expect(w.text()).not.toContain("No Service Accounts Yet");
   });
 
   it("shows a load error, not the org-empty copy, when the list fails, and recovers on retry", async () => {
@@ -131,7 +131,7 @@ describe("GroupServiceAccounts empty states", () => {
 
     expect(loadError(w).exists()).toBe(true);
     expect(noneSelected(w).exists()).toBe(false);
-    expect(w.text()).not.toContain("No service accounts yet");
+    expect(w.text()).not.toContain("No Service Accounts Yet");
 
     await loadError(w).find("button").trigger("click");
     await flushPromises();

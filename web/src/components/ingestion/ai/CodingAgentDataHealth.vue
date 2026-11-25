@@ -89,7 +89,7 @@ const viewTrace = (traceId: string) => {
 
 <template>
   <div
-    class="flex flex-col gap-2 text-sm"
+    class="text-compact flex flex-col gap-2"
     data-test="ai-coding-agent-health"
     :data-state="
       unsupported

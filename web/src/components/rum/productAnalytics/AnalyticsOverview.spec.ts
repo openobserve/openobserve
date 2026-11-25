@@ -1166,13 +1166,13 @@ describe("pa gap fixes (Overview exclusions)", () => {
   it("P7-R9: shows the Unnamed clicks by page card from the unnamed clicks query", async () => {
     withRoutes([[/AS unnamed/, [{ pg: "/web/unnamed-host", clicks: 41, unnamed: 37 }]]]);
     await mountOverview();
-    expect(text()).toContain("Unnamed clicks by page");
+    expect(text()).toContain("Unnamed Clicks by Page");
     expect(sqls().some((s) => /AS unnamed/.test(s))).toBe(true);
     const card = wrapper!
       .findAll("*")
       .filter(
         (e) =>
-          e.text().includes("Unnamed clicks by page") && e.text().includes("/web/unnamed-host"),
+          e.text().includes("Unnamed Clicks by Page") && e.text().includes("/web/unnamed-host"),
       )
       .at(-1);
     expect(card).toBeDefined();

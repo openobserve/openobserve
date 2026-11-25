@@ -28,11 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="inline-flex items-center gap-2">
         {{ t("rum.analytics.title") }}
         <BetaBadge />
-      </span>
-    </template>
-    <template #subtitle>
-      <span class="flex min-w-0 items-center gap-1">
-        <OTruncatedText class="leading-normal">{{ t("rum.analytics.subtitle") }}</OTruncatedText>
         <span
           tabindex="0"
           role="img"
@@ -41,9 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="rum-analytics-sdk-sampling"
         >
           <OIcon name="info-outline" size="xs" />
-          <OTooltip
-            :content="t('rum.analytics.sdkSampledTip', { field: raw('sessionSampleRate') })"
-          />
+          <OTooltip>
+            <template #content>
+              <div>{{ t("rum.analytics.subtitle") }}</div>
+              <div>{{ t("rum.analytics.sdkSampledTip", { field: raw("sessionSampleRate") }) }}</div>
+            </template>
+          </OTooltip>
         </span>
       </span>
     </template>
@@ -191,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="rum-analytics-identity-note"
               />
             </template>
-            <div class="flex flex-col gap-2 text-sm">
+            <div class="text-compact flex flex-col gap-2">
               <p class="text-text-body" data-test="rum-analytics-identity-help">
                 {{ identityHelp }}
               </p>
@@ -239,7 +237,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </Teleport>
       <div v-if="noRumData" class="flex min-h-0 flex-1 flex-col" data-test="rum-analytics-no-data">
-        <RumNoDataState />
+        <RumNoDataState
+          :title="t('rum.analytics.emptyState.title')"
+          :description="t('rum.analytics.emptyState.description')"
+        />
       </div>
       <div v-else class="flex min-h-0 flex-1 flex-col">
         <OBanner
@@ -369,7 +370,6 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";

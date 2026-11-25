@@ -77,8 +77,8 @@ describe("FleetManager", () => {
   });
 
   it.each([
-    ["fleets", "New fleet", "FleetFleets"],
-    ["configurations", "New configuration", "FleetConfigurations"],
+    ["fleets", "New Fleet", "FleetFleets"],
+    ["configurations", "New Configuration", "FleetConfigurations"],
   ])(
     "offers %s's create action to everyone and opens that tab's dialog",
     async (tab, label, target) => {
@@ -92,7 +92,7 @@ describe("FleetManager", () => {
     },
   );
 
-  it("marks New configuration, and only it, when a new-config draft exists", async () => {
+  it("marks New Configuration, and only it, when a new-config draft exists", async () => {
     localStorage.clear();
     writeEditorDraft(
       { kind: "fleet_config", org: "default", entityId: null, userEmail: "example@gmail.com" },
@@ -103,7 +103,7 @@ describe("FleetManager", () => {
     expect(btn.find('[data-test="fleet-manager-create-configurations-draft-dot"]').exists()).toBe(
       true,
     );
-    expect(btn.attributes("aria-label")).toBe("New configuration · unsaved draft");
+    expect(btn.attributes("aria-label")).toBe("New Configuration · unsaved draft");
     wrapper.unmount();
 
     wrapper = await mountAt("fleets");
@@ -137,9 +137,9 @@ describe("FleetManager", () => {
     expect(wrapper.find('[data-test="fleet-manager-subnav"]').exists()).toBe(false);
   });
 
-  it("titles the page Fleet management", async () => {
+  it("titles the page Fleet Management", async () => {
     wrapper = await mountAt("fleets");
-    expect(wrapper.text()).toContain("Fleet management");
+    expect(wrapper.text()).toContain("Fleet Management");
   });
 
   it("shows the pipelines map on the Overview tab", async () => {

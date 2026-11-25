@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   and mounts the page's FirstEventStatus bar under its snippets.
 -->
 <template>
-  <div ref="root" class="flex flex-col gap-4 p-3 text-sm">
+  <div ref="root" class="text-compact flex flex-col gap-4 p-3">
     <SlotWithBar />
   </div>
 </template>

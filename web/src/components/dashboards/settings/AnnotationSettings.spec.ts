@@ -971,7 +971,7 @@ describe("AnnotationSettings", () => {
     // Select All off: OSelect's own "deselect all" branch emits [].
     panelsField.vm.$emit("update:modelValue", []);
     await flushPromises();
-    expect(wrapper!.text()).toContain("Select panels");
+    expect(wrapper!.text()).toContain("Select Panels");
     expect(wrapper!.text()).not.toContain("All time-series panels");
 
     await submit();

@@ -550,7 +550,7 @@ describe("AllSuggestionsDrawer: Slack deep links (C4)", () => {
     expect(api).toHaveBeenCalledWith("org-a", expect.objectContaining({ kind: "coverage_gap" }));
     const chip = wrapper.findComponent('[data-test="autoobserve2-suggestions-drawer-kind"]');
     expect(chip.exists()).toBe(true);
-    expect(chip.text()).toContain("Coverage gap");
+    expect(chip.text()).toContain("Coverage Gap");
     chip.vm.$emit("remove");
     expect(wrapper.emitted("update:kind")).toEqual([[null]]);
   });
@@ -570,7 +570,7 @@ describe("AllSuggestionsDrawer: Slack deep links (C4)", () => {
     const wrapper = mountWith({ kind: "coverage_lost" });
     await flushPromises();
     const empty = wrapper.get('[data-test="autoobserve2-suggestions-drawer-empty"]');
-    expect(empty.text()).toContain("No open suggestions of the kind Coverage lost");
+    expect(empty.text()).toContain("No open suggestions of the kind Coverage Lost");
     expect(empty.text()).toContain("26 other suggestions are open.");
     expect(empty.text()).not.toContain("No suggestions right now");
     await empty.get("button").trigger("click");

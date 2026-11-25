@@ -747,7 +747,7 @@ describe("FilterBuilder", () => {
       await mountExpanded();
       const actions = find(`add-condition-${deepestPath}`).element.closest("div")!;
       expect(actions.classList).not.toContain("flex-wrap");
-      expect(actions.textContent).toContain("Add group");
+      expect(actions.textContent).toContain("Add Group");
       expect(actions.textContent).toContain("Ungroup");
     });
 

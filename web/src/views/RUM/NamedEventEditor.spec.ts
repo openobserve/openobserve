@@ -175,7 +175,7 @@ describe("NamedEventEditor (AC-44)", () => {
   it("edits load the event, send the opened version, and a conflict reloads, toasts and keeps the editor; saving again conflicts again", async () => {
     const [ev] = seed(1);
     await mountAt(PA_ROUTES.eventEdit, { id: ev.id });
-    expect(q("rum-analytics-event-editor")?.textContent).toContain("Edit named event");
+    expect(q("rum-analytics-event-editor")?.textContent).toContain("Edit Named Event");
     expect(input("rum-analytics-named-events-name")?.value).toBe("Event 0");
     api.touch("events", ev.id, { name: "Event 0 (theirs)" });
     await setValue("rum-analytics-named-events-name", "Event 0 (mine)");

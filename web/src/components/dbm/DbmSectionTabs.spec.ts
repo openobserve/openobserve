@@ -218,7 +218,7 @@ describe("DbmSectionTabs", () => {
     it("renders Deadlocks and Blocked queries as live tabs", () => {
       const wrapper = mountAt("dbmQueries");
       expect(wrapper.text()).toContain("Deadlocks");
-      expect(wrapper.text()).toContain("Blocked queries");
+      expect(wrapper.text()).toContain("Blocked Queries");
       // Both navigate; neither is a placeholder.
       expect(wrapper.text()).not.toContain("soon");
     });
@@ -335,7 +335,7 @@ describe("DbmSectionTabs", () => {
       const wrapper = mountWith({ count: 100, complete: false, vantage: "server" });
       // The cap survives the qualifier: still a floor, now an attributed one.
       expect(wrapper.text()).toContain("100+");
-      expect(vantageOf(wrapper).text()).toBe("server count");
+      expect(vantageOf(wrapper).text()).toBe("Server Count");
     });
 
     /**
@@ -374,7 +374,7 @@ describe("DbmSectionTabs", () => {
         global: { plugins: [i18n] },
       });
       expect(wrapper.find("[data-test='dbm-section-tab-vantage-queries']").text()).toBe(
-        "server count",
+        "Server Count",
       );
     });
 

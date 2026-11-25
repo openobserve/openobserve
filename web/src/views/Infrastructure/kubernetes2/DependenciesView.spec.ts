@@ -269,7 +269,7 @@ describe("DependenciesView", () => {
     const empty = testId("k8s2-deps-empty");
     expect(empty.text()).toContain("which the switches above hide");
     const [show, clear] = empty.findAll("button");
-    expect(clear.text()).toBe("Clear filters");
+    expect(clear.text()).toBe("Clear Filters");
     await show.trigger("click");
     await clear.trigger("click");
     expect(wrapper.emitted("update")).toEqual([

@@ -835,7 +835,7 @@ describe("TracesLatencyHeatmap", () => {
         copy.querySelector("kbd")!.remove();
         return copy.textContent!.trim();
       };
-      expect(items.map(label)).toEqual(["Filter to selection", "Drill down", "Clear selection"]);
+      expect(items.map(label)).toEqual(["Filter to selection", "Drill Down", "Clear selection"]);
       expect(items.map(hint)).toEqual(["F", "D", "Esc"]);
       for (const item of items) expect(item.querySelector("svg")).not.toBeNull();
     });

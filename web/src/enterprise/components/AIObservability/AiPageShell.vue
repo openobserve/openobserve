@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :default-relative-time="dateState.relativeTimePeriod ?? ''"
           :disable="dateDisabled"
           :data-test="`${dataTest}-date-time`"
-          class="h-8"
+          class="h-7"
           @on:date-change="$emit('date-change', $event)"
         />
       </OTooltip>
@@ -81,8 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            Disabled + spinning while a query is in flight (cancel isn't
            supported). -->
       <OButton
-        variant="primary"
+        variant="ghost"
         size="sm-toolbar"
+        class="toolbar-btn-rest"
         icon-left="refresh"
         :disabled="isLoading"
         :loading="isLoading"

@@ -167,7 +167,7 @@ describe("AnomalySummaryStrip", () => {
     it("shows No new data, not Ongoing, for a value run whose query went quiet", () => {
       const w = mountStrip({ response: ongoing({ no_new_data_since_us: at("18:05") }) });
       expect(text(w, "state-no_new_data").exists()).toBe(true);
-      expect(text(w, "chip").text()).toBe("No new data");
+      expect(text(w, "chip").text()).toBe("No New Data");
       expect(text(w, "fact").text()).toBe("since 18:05");
       expect(text(w, "message").text()).toBe(
         "The detector runs, but its query has returned no new data.",
@@ -361,7 +361,7 @@ describe("AnomalySummaryStrip", () => {
       {},
       { no_new_data_since_us: at("18:05") },
       "no_new_data",
-      "No new data",
+      "No New Data",
       "The detector runs, but its query has returned no new data.",
       "since 18:05",
     ],

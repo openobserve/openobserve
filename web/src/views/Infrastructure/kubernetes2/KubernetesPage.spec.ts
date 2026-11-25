@@ -642,7 +642,7 @@ describe("KubernetesPage", () => {
       const select = wrapper.findComponent('[data-test="k8s2-cluster-select"]');
       expect(select.exists()).toBe(true);
       expect(select.props("disabled")).toBe(true);
-      expect(select.props("placeholder")).toBe("Loading clusters…");
+      expect(select.props("placeholder")).toBe("Loading Clusters…");
     });
 
     it("passes apply-presets, not auto-apply, to the date picker", async () => {

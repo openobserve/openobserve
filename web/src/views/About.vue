@@ -15,12 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-default px-page-edge h-full w-full pt-2.5 pb-2.5">
-    <div class="h-full overflow-auto">
-      <div class="flex flex-col gap-4">
-        <h1 class="sr-only">{{ t("menu.about") }}</h1>
+  <OPageLayout bleed>
+    <template #header>
+      <OPageHeader :title="t('menu.about')" icon="info" class="border-border-default border-b" />
+    </template>
+    <div class="px-page-edge h-full w-full overflow-auto py-3">
+      <div
+        class="bg-card-glass-bg border-border-default rounded-default divide-border-default flex flex-col divide-y border"
+      >
         <!-- ── Hero Banner ─────────────────────────────────────────── -->
-        <div class="bg-card-glass-bg rounded-default relative overflow-hidden p-4">
+        <div class="relative overflow-hidden p-3">
           <div class="relative z-1">
             <img
               :alt="t('login.openObserveLogoAlt')"
@@ -29,36 +33,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? getImageURL('images/common/openobserve_latest_dark_2.svg')
                   : getImageURL('images/common/openobserve_latest_light_2.svg')
               "
-              class="block max-w-55"
-              width="220"
+              class="block h-8 w-auto"
             />
-            <OText variant="body" class="mt-1 mb-0">
+            <OText variant="body" class="text-compact mt-1 mb-0">
               {{ t("about.logoMsg") }}
             </OText>
 
             <!-- One-line meta bar -->
             <div
-              class="mt-5 inline-flex flex-wrap items-center gap-2 max-md:max-w-full max-md:[&>span]:max-w-full max-md:[&>span]:overflow-hidden"
+              class="mt-3 inline-flex flex-wrap items-center gap-2 max-md:max-w-full max-md:[&>span]:max-w-full max-md:[&>span]:overflow-hidden"
             >
               <!-- version -->
               <span
-                class="rounded-default text-status-positive border-status-positive/28 bg-card-glass-tint-positive inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm font-semibold whitespace-nowrap"
+                class="rounded-default border-border-default bg-surface-base text-text-body text-compact inline-flex items-center gap-1.5 border px-2 py-0.5 font-semibold whitespace-nowrap"
               >
-                <OIcon name="check-circle" size="sm" class="text-status-positive shrink-0" />
+                <OIcon name="check-circle" size="sm" class="text-text-muted shrink-0" />
                 {{ store.state.zoConfig.version }}
               </span>
               <!-- build type -->
               <span
-                class="rounded-default text-accent border-accent/28 bg-card-glass-tint-soft inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm font-semibold whitespace-nowrap capitalize"
+                class="rounded-default border-border-default bg-surface-base text-text-body text-compact inline-flex items-center gap-1.5 border px-2 py-0.5 font-semibold whitespace-nowrap capitalize"
               >
-                <OIcon name="workspaces" size="sm" class="text-accent shrink-0" />
+                <OIcon name="workspaces" size="sm" class="text-text-muted shrink-0" />
                 {{ store.state.zoConfig.build_type }}
               </span>
               <!-- commit -->
               <span
-                class="text-text-body rounded-default border-info/28 bg-card-glass-tint-info-soft inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm whitespace-nowrap max-md:min-w-0"
+                class="border-border-default bg-surface-base text-text-body rounded-default text-compact inline-flex items-center gap-1.5 border px-2 py-0.5 whitespace-nowrap max-md:min-w-0"
               >
-                <OIcon name="code" size="sm" class="text-info shrink-0" />
+                <OIcon name="code" size="sm" class="text-text-muted shrink-0" />
                 <span class="text-text-body text-xs font-semibold">{{
                   t("about.commit_lbl")
                 }}</span>
@@ -67,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}</OText>
                 <button
                   @click="copyToClipboard(store.state.zoConfig.commit_hash)"
-                  class="rounded-default text-text-muted hover:text-info inline-flex cursor-pointer items-center justify-center border-none bg-transparent p-0.5 transition-colors duration-150"
+                  class="rounded-default text-text-muted hover:text-text-heading inline-flex cursor-pointer items-center justify-center border-none bg-transparent p-0.5 transition-colors duration-150"
                   :title="t('about.copyCommitHash')"
                 >
                   <OIcon name="content-copy" size="sm" />
@@ -75,9 +78,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <!-- built date -->
               <span
-                class="text-text-body rounded-default border-warning/28 bg-card-glass-tint-warning inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm whitespace-nowrap"
+                class="border-border-default bg-surface-base text-text-body rounded-default text-compact inline-flex items-center gap-1.5 border px-2 py-0.5 whitespace-nowrap"
               >
-                <OIcon name="event" size="sm" class="text-warning shrink-0" />
+                <OIcon name="event" size="sm" class="text-text-muted shrink-0" />
                 <span class="text-text-body text-xs font-semibold">{{ t("about.build_lbl") }}</span>
                 {{
                   store.state.zoConfig.build_date ? formatDate(store.state.zoConfig.build_date) : ""
@@ -88,29 +91,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- ── Info Cards Grid ─────────────────────────────────────── -->
-        <div class="grid grid-cols-1 gap-4">
+        <div class="divide-border-default grid grid-cols-1 divide-y">
           <!-- Open Source Libraries -->
-          <div class="bg-card-glass-bg rounded-default flex flex-col gap-y-2 p-4">
-            <div class="flex items-center gap-3">
+          <div class="flex flex-col gap-y-2 p-3">
+            <div class="flex items-center gap-2">
               <div
-                class="rounded-default text-accent bg-card-glass-tint-medium flex h-12 w-12 shrink-0 items-center justify-center"
+                class="rounded-default text-text-muted bg-surface-base border-border-default flex h-6 w-6 shrink-0 items-center justify-center border"
               >
-                <OIcon name="code" size="md" />
+                <OIcon name="code" size="sm" />
               </div>
-              <OText variant="page-title" as="h2" class="text-xl font-medium">{{
+              <OText variant="page-title" as="h2" class="text-sm! font-semibold!">{{
                 t("about.os_libraries")
               }}</OText>
             </div>
-            <div class="text-text-secondary text-sm">{{ t("about.os_libraries_msg") }}</div>
-            <div class="grid grid-cols-4 gap-2.5 max-md:grid-cols-1">
+            <div class="text-text-secondary text-compact">{{ t("about.os_libraries_msg") }}</div>
+            <div class="grid grid-cols-4 gap-2 max-md:grid-cols-1">
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/Cargo.toml"
                 target="_blank"
-                class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200"
+                class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3 py-2 no-underline transition-all duration-200"
               >
-                <OIcon name="settings" size="md" class="text-accent shrink-0" />
+                <OIcon name="settings" size="md" class="text-text-muted shrink-0" />
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <OTruncatedText class="text-text-heading font-mono text-sm font-semibold">{{
+                  <OTruncatedText class="text-text-heading text-compact font-mono font-semibold">{{
                     t("about.cargoToml")
                   }}</OTruncatedText>
                   <span class="text-text-secondary text-xs">{{ t("about.rustCrates") }}</span>
@@ -120,11 +123,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/web/package.json"
                 target="_blank"
-                class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200"
+                class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3 py-2 no-underline transition-all duration-200"
               >
-                <OIcon name="backpack" size="md" class="text-accent shrink-0" />
+                <OIcon name="backpack" size="md" class="text-text-muted shrink-0" />
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <OTruncatedText class="text-text-heading font-mono text-sm font-semibold">{{
+                  <OTruncatedText class="text-text-heading text-compact font-mono font-semibold">{{
                     t("about.packageJson")
                   }}</OTruncatedText>
                   <span class="text-text-secondary text-xs">{{ t("about.nodePackages") }}</span>
@@ -134,11 +137,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://npmjs.com"
                 target="_blank"
-                class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200"
+                class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3 py-2 no-underline transition-all duration-200"
               >
-                <OIcon name="data-object" size="md" class="text-accent shrink-0" />
+                <OIcon name="data-object" size="md" class="text-text-muted shrink-0" />
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <OTruncatedText class="text-text-heading font-mono text-sm font-semibold">{{
+                  <OTruncatedText class="text-text-heading text-compact font-mono font-semibold">{{
                     t("about.npmjsCom")
                   }}</OTruncatedText>
                   <span class="text-text-secondary text-xs">{{ t("about.jsRegistry") }}</span>
@@ -148,11 +151,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://crates.io"
                 target="_blank"
-                class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200"
+                class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3 py-2 no-underline transition-all duration-200"
               >
-                <OIcon name="inventory-2" size="md" class="text-accent shrink-0" />
+                <OIcon name="inventory-2" size="md" class="text-text-muted shrink-0" />
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <OTruncatedText class="text-text-heading font-mono text-sm font-semibold">{{
+                  <OTruncatedText class="text-text-heading text-compact font-mono font-semibold">{{
                     t("about.cratesIo")
                   }}</OTruncatedText>
                   <span class="text-text-secondary text-xs">{{ t("about.rustRegistry") }}</span>
@@ -168,15 +171,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.build_type == 'opensource' ||
               (store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false')
             "
-            class="bg-card-glass-bg rounded-default p-4"
+            class="p-3"
           >
-            <div class="mb-3 flex items-center gap-3">
+            <div class="mb-2 flex items-center gap-2">
               <div
-                class="rounded-default text-info bg-card-glass-tint-info flex h-12 w-12 shrink-0 items-center justify-center"
+                class="rounded-default text-text-muted bg-surface-base border-border-default flex h-6 w-6 shrink-0 items-center justify-center border"
               >
-                <OIcon name="shield" size="md" />
+                <OIcon name="shield" size="sm" />
               </div>
-              <OText variant="page-title" as="h2" class="m-0 text-xl font-medium">{{
+              <OText variant="page-title" as="h2" class="m-0 text-sm! font-semibold!">{{
                 t("about.license_info")
               }}</OText>
             </div>
@@ -184,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="store.state.zoConfig.build_type == 'opensource'"
               variant="body"
               as="div"
-              class="m-0 mb-4 leading-relaxed"
+              class="text-compact m-0 mb-2"
             >
               {{ t("about.license_info_os_msg") }}
               <a
@@ -198,35 +201,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false'"
               variant="body"
               as="div"
-              class="leading-relaxed"
+              class="text-compact"
             >
               {{ t("about.license_info_msg") }}
             </OText>
-            <OBanner variant="info" icon="info" class="mt-2">
+            <p class="text-text-muted text-compact m-0 mt-2 flex items-start gap-1.5">
+              <OIcon name="info" size="sm" class="mt-0.5 shrink-0" />
               {{ t("about.license_info_note") }}
-            </OBanner>
+            </p>
           </div>
 
           <!-- Community Card (fallback for cloud) -->
-          <div v-else class="bg-card-glass-bg rounded-default p-4">
-            <div class="mb-3 flex items-center gap-3">
+          <div v-else class="p-3">
+            <div class="mb-2 flex items-center gap-2">
               <div
-                class="rounded-default text-accent bg-card-glass-tint-medium flex h-12 w-12 shrink-0 items-center justify-center"
+                class="rounded-default text-text-muted bg-surface-base border-border-default flex h-6 w-6 shrink-0 items-center justify-center border"
               >
-                <OIcon name="groups" size="md" />
+                <OIcon name="groups" size="sm" />
               </div>
-              <OText variant="page-title" as="h3" class="m-0 text-lg leading-6 font-medium">{{
+              <OText variant="page-title" as="h3" class="m-0 text-sm! font-semibold!">{{
                 t("about.community_lbl")
               }}</OText>
             </div>
-            <OText variant="body" class="m-0 mb-4 leading-relaxed">{{
+            <OText variant="body" class="text-compact m-0 mb-2">{{
               t("about.community_msg")
             }}</OText>
             <div class="flex flex-wrap gap-2">
               <a
                 href="https://github.com/openobserve/openobserve"
                 target="_blank"
-                class="rounded-default text-accent border-accent/18 bg-card-glass-tint-soft inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm font-medium no-underline transition-all duration-200"
+                class="border-border-default bg-surface-base text-text-body rounded-default text-compact inline-flex items-center gap-1.5 border px-2 py-0.5 font-medium no-underline transition-all duration-200"
               >
                 <OIcon name="code" size="sm" />
                 {{ t("about.github") }}
@@ -234,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://openobserve.ai"
                 target="_blank"
-                class="rounded-default text-accent border-accent/18 bg-card-glass-tint-soft inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm font-medium no-underline transition-all duration-200"
+                class="border-border-default bg-surface-base text-text-body rounded-default text-compact inline-flex items-center gap-1.5 border px-2 py-0.5 font-medium no-underline transition-all duration-200"
               >
                 <OIcon name="language" size="sm" />
                 {{ t("about.website") }}
@@ -244,40 +248,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- ── Enterprise License Details ──────────────────────────── -->
-        <div
-          v-if="config.isEnterprise == 'true' && config.isCloud === 'false'"
-          class="bg-card-glass-bg rounded-default p-4"
-        >
+        <div v-if="config.isEnterprise == 'true' && config.isCloud === 'false'" class="p-3">
           <!-- Header: eyebrow + title + manage button -->
           <div class="mb-2 flex items-start justify-between">
-            <div class="flex items-start gap-3">
+            <div class="flex items-start gap-2">
               <div
-                class="rounded-default text-info bg-card-glass-tint-info flex h-12 w-12 shrink-0 items-center justify-center"
+                class="rounded-default text-text-muted bg-surface-base border-border-default flex h-6 w-6 shrink-0 items-center justify-center border"
               >
-                <OIcon name="workspace-premium" size="md" />
+                <OIcon name="workspace-premium" size="sm" />
               </div>
               <div>
                 <OText variant="label" class="text-accent m-0 mb-1">{{
                   t("about.licenseAndUsage")
                 }}</OText>
-                <h2 class="text-text-heading m-0 text-xl font-semibold">
+                <h2 class="text-text-heading m-0 text-sm font-semibold">
                   {{ t("about.ent_lincese_detail_lbl") }}
                 </h2>
               </div>
             </div>
-            <OButton variant="primary" size="sm" @click="navigateToLicense">
+            <OButton variant="outline" size="sm" @click="navigateToLicense">
               {{ t("about.manage_license") }}
             </OButton>
           </div>
-          <div v-if="loadingLicense" class="py-8 text-center">
+          <div v-if="loadingLicense" class="py-3 text-center">
             <OSpinner size="md" />
-            <div class="text-text-muted mt-3 text-sm">{{ t("about.loading_license_info") }}</div>
+            <div class="text-text-muted text-compact mt-3">
+              {{ t("about.loading_license_info") }}
+            </div>
           </div>
 
           <div v-else-if="!licenseData || !licenseData.license" class="py-2">
-            <OBanner variant="warning" icon="warning">
-              <div class="mb-1 font-semibold">{{ t("about.no_license_installed_lbl") }}</div>
-              <p class="mb-2 text-sm">{{ t("about.no_license_installed_msg") }}</p>
+            <div class="text-text-body border-border-default rounded-default border px-3 py-2">
+              <div class="text-compact mb-1 font-semibold">
+                {{ t("about.no_license_installed_lbl") }}
+              </div>
+              <p class="text-compact mb-2">{{ t("about.no_license_installed_msg") }}</p>
               <div
                 v-if="licenseData && licenseData.installation_id"
                 class="flex flex-wrap items-center gap-1 text-xs"
@@ -289,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ licenseData.installation_id }}
                 </code>
               </div>
-            </OBanner>
+            </div>
           </div>
 
           <template v-else>
@@ -300,11 +305,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <tbody>
                     <tr class="border-table-row-divider border-b last:border-b-0">
                       <td
-                        class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                        class="text-table-header-text border-table-row-divider bg-table-header-bg text-compact w-2/5 border-e px-3 py-1 font-semibold whitespace-nowrap"
                       >
                         {{ t("about.lincese_id_lbl") }}
                       </td>
-                      <td class="text-text-body px-3.5 py-2.5 font-mono text-sm">
+                      <td class="text-text-body text-compact px-3 py-1 font-mono">
                         <div class="flex items-center gap-1.5">
                           <span>{{ licenseData.license.license_id }}</span>
                           <button
@@ -319,11 +324,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </tr>
                     <tr class="border-table-row-divider border-b last:border-b-0">
                       <td
-                        class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                        class="text-table-header-text border-table-row-divider bg-table-header-bg text-compact w-2/5 border-e px-3 py-1 font-semibold whitespace-nowrap"
                       >
                         {{ t("about.status_lbl") }}
                       </td>
-                      <td class="text-text-body px-3.5 py-2.5 text-sm">
+                      <td class="text-text-body text-compact px-3 py-1">
                         <span
                           class="me-1.5 inline-block h-2 w-2 rounded-full align-middle"
                           :class="
@@ -343,31 +348,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </tr>
                     <tr class="border-table-row-divider border-b last:border-b-0">
                       <td
-                        class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                        class="text-table-header-text border-table-row-divider bg-table-header-bg text-compact w-2/5 border-e px-3 py-1 font-semibold whitespace-nowrap"
                       >
                         {{ t("about.editionLbl") }}
                       </td>
-                      <td class="text-text-body px-3.5 py-2.5 text-sm">
+                      <td class="text-text-body text-compact px-3 py-1">
                         {{ t("about.value_license_enterprise") }}
                       </td>
                     </tr>
                     <tr class="border-table-row-divider border-b last:border-b-0">
                       <td
-                        class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                        class="text-table-header-text border-table-row-divider bg-table-header-bg text-compact w-2/5 border-e px-3 py-1 font-semibold whitespace-nowrap"
                       >
                         {{ t("about.create_at_lbl") }}
                       </td>
-                      <td class="text-text-body px-3.5 py-2.5 text-sm">
+                      <td class="text-text-body text-compact px-3 py-1">
                         {{ formatLicenseDate(licenseData.license.created_at) }}
                       </td>
                     </tr>
                     <tr class="border-table-row-divider border-b last:border-b-0">
                       <td
-                        class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                        class="text-table-header-text border-table-row-divider bg-table-header-bg text-compact w-2/5 border-e px-3 py-1 font-semibold whitespace-nowrap"
                       >
                         {{ t("about.expires_at_lbl") }}
                       </td>
-                      <td class="text-text-body px-3.5 py-2.5 text-sm">
+                      <td class="text-text-body text-compact px-3 py-1">
                         {{ formatLicenseDate(licenseData.license.expires_at) }}
                       </td>
                     </tr>
@@ -377,12 +382,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Ingestion usage panel -->
               <div
-                class="border-card-glass-border rounded-default bg-card-glass-tint-faint border p-5"
+                class="border-card-glass-border rounded-default bg-card-glass-tint-faint border p-3"
               >
-                <p class="text-text-heading m-0 mb-1 text-sm font-semibold">
+                <p class="text-text-heading text-compact m-0 mb-1 font-semibold">
                   {{ t("about.usage_limits") }}
                 </p>
-                <p class="text-text-muted m-0 mb-4 text-xs" data-test="about-license-limit">
+                <p class="text-text-muted m-0 mb-2 text-xs" data-test="about-license-limit">
                   {{
                     limitGb === null
                       ? t("about.license_status_unlimited")
@@ -392,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div v-if="usedPercent !== null">
                   <div class="mb-3 flex items-baseline gap-2">
                     <span
-                      class="text-text-body text-4xl leading-none font-bold"
+                      class="text-text-body text-lg leading-none font-semibold"
                       :class="
                         usedPercent > 90
                           ? 'text-status-error-text'
@@ -422,7 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="usedGb !== null"
-                  class="text-text-muted mb-3.5 flex justify-between text-xs"
+                  class="text-text-muted mb-2 flex justify-between text-xs"
                   data-test="about-license-used"
                 >
                   <span>{{ usedGb.toFixed(0) }} {{ t("about.gbToday") }}</span>
@@ -438,8 +443,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div class="mt-4" data-test="about-license-features">
-              <p class="text-text-heading m-0 mb-2 text-sm font-semibold">
+            <div class="mt-3" data-test="about-license-features">
+              <p class="text-text-heading text-compact m-0 mb-2 font-semibold">
                 {{ t("about.features") }}
               </p>
               <LicenseFeatures
@@ -453,12 +458,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- ── Feature Comparison ──────────────────────────────────── -->
-        <div v-if="config.isCloud === 'false'" class="bg-card-glass-bg rounded-default mb-5 p-4">
+        <div v-if="config.isCloud === 'false'" class="p-3">
           <FeatureComparisonTable />
         </div>
       </div>
     </div>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -477,7 +482,8 @@ import { quotaPercent } from "@/utils/licenseWaivers";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -490,7 +496,8 @@ export default defineComponent({
     OButton,
     OIcon,
     OSpinner,
-    OBanner,
+    OPageHeader,
+    OPageLayout,
     OText,
     OTruncatedText,
   },

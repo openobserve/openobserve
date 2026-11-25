@@ -156,7 +156,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OFormSwitch
             name="change_password"
             :label="t('user.changePassword')"
-            size="lg"
             data-test="user-change-password-field"
           />
 

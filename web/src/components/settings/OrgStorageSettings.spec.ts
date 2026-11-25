@@ -108,7 +108,7 @@ describe("OrgStorageSettings", () => {
     await nextTick();
     await nextTick();
 
-    expect(wrapper.text()).toContain("No bucket configured");
+    expect(wrapper.text()).toContain("No Bucket Configured");
     expect(wrapper.find('[data-test="org-storage-settings-empty-state"]').exists()).toBe(true);
   });
 

@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div class="mb-2.5 p-2.5" v-if="regexPatternCreators.length > 0">
               <div
-                class="text-primary mb-2.5 text-base uppercase"
+                class="text-primary text-compact mb-2.5 uppercase"
                 data-test="regex-pattern-import-creation-title"
               >
                 {{ t("settings.importRegexPattern.regexPatternCreation") }}

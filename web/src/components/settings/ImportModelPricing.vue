@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="mb-2.5 p-2.5" v-if="modelPricingCreators.length > 0">
             <div
-              class="text-primary mb-2.5 text-base uppercase"
+              class="text-primary text-compact mb-2.5 uppercase"
               data-test="model-pricing-import-creation-title"
             >
               {{ t("modelPricing.modelPricingCreation") }}

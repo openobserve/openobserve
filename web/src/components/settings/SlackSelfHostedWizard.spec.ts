@@ -343,7 +343,7 @@ describe("SlackSelfHostedWizard Step 2", () => {
     const footer = w.find('[data-test="slack-wizard-create"]').element.parentElement!;
     const labels = () =>
       Array.from(footer.querySelectorAll("button")).map((b) => b.textContent?.trim());
-    expect(labels()).toEqual(["Back", "Create the app"]);
+    expect(labels()).toEqual(["Back", "Create the App"]);
     const link = w.find('[data-test="slack-wizard-manual"]');
     expect(link.text()).toBe("No configuration token? Set up manually");
     expect(
@@ -356,7 +356,7 @@ describe("SlackSelfHostedWizard Step 2", () => {
     expect(w.find('[data-test="slack-wizard-manual"]').text()).toBe(
       "Use a configuration token instead",
     );
-    expect(labels()).toEqual(["Back", "Save credentials"]);
+    expect(labels()).toEqual(["Back", "Save Credentials"]);
   });
 
   it("AC-7.3 creates the app from the configuration token and moves to Install", async () => {
@@ -641,7 +641,7 @@ describe("SlackSelfHostedWizard Step 3", () => {
     expect(w.text()).toContain("Installed in Acme Corp");
   });
 
-  it("AC-7.8 Start over removes the pending app and returns to Create the app", async () => {
+  it("AC-7.8 Start over removes the pending app and returns to Create the App", async () => {
     const w = await mountWizard(pending);
     await w.find('[data-test="slack-wizard-start-over"]').trigger("click");
     expect(w.find('[data-test-stub="confirm-name"]').text()).toBe("A0SAMPLE01");
@@ -1095,7 +1095,7 @@ describe("SlackSelfHostedWizard on an instance workspace's team (M3, R-81, R-82)
     );
     const banner = w.find('[data-test="slack-wizard-unreachable"]').text();
     expect(banner).toContain("http vs https");
-    expect(banner).not.toMatch(/token|Create the app/i);
+    expect(banner).not.toMatch(/token|Create the App/i);
   });
 
   it("a refused config token shows the server message verbatim", async () => {

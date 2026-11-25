@@ -313,7 +313,7 @@ describe("License.vue", () => {
     });
 
     it("should display license information when license exists", () => {
-      expect(wrapper.text()).toContain("License information");
+      expect(wrapper.text()).toContain("License Information");
       expect(wrapper.text()).toContain("license-123");
       expect(wrapper.text()).toContain("Test Company");
     });
@@ -1240,7 +1240,7 @@ describe("License.vue", () => {
     });
 
     it("should display formatted created date", () => {
-      expect(wrapper.text()).toContain("Created at");
+      expect(wrapper.text()).toContain("Created At");
     });
 
     it("should display formatted expiry date", () => {

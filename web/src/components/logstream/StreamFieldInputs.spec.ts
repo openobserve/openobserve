@@ -296,7 +296,7 @@ describe("StreamFieldInputs (form-mode)", () => {
       const streamIndexType = childVm(wrapper).streamIndexType;
       expect(streamIndexType).toHaveLength(10);
       expect(streamIndexType[0]).toEqual({
-        label: "Full text search",
+        label: "Full Text Search",
         value: "fullTextSearchKey",
       });
       expect(streamIndexType[1]).toEqual({

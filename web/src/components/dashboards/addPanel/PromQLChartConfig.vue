@@ -275,7 +275,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="stickyFirstColumn"
           :label="t('dashboard.promQLChartConfig.stickyFirstColumnLabel')"
           data-test="dashboard-config-sticky-first-column"
-          size="lg"
         >
           <template #tooltip>
             <OTooltip max-width="18.75rem">

@@ -2413,7 +2413,7 @@ function onClearResults() {
 
             <OButton
               variant="ghost"
-              size="sm"
+              size="sm-action"
               data-test="synthetics-create-cancel-btn"
               @click="router.push(backTo)"
             >
@@ -2423,7 +2423,7 @@ function onClearResults() {
             <OButton
               v-if="!props.editId"
               variant="outline"
-              size="sm"
+              size="sm-action"
               data-test="synthetics-create-continue-btn"
               @click="onContinueToConfigure"
             >
@@ -2432,7 +2432,7 @@ function onClearResults() {
             <template v-else>
               <OButton
                 variant="outline"
-                size="sm"
+                size="sm-action"
                 :loading="isSaving"
                 data-test="synthetics-create-save-continue-btn"
                 @click="onSaveAndContinue"
@@ -2441,7 +2441,7 @@ function onClearResults() {
               </OButton>
               <OButton
                 variant="primary"
-                size="sm"
+                size="sm-action"
                 :loading="isSaving"
                 data-test="synthetics-create-save-exit-btn"
                 @click="onSaveAndExit"
@@ -2464,7 +2464,7 @@ function onClearResults() {
             <span class="flex-1" aria-hidden="true" />
             <OButton
               variant="ghost"
-              size="sm"
+              size="sm-action"
               data-test="synthetics-create-cancel-btn"
               @click="router.push(backTo)"
             >
@@ -2472,7 +2472,7 @@ function onClearResults() {
             </OButton>
             <OButton
               variant="outline"
-              size="sm"
+              size="sm-action"
               data-test="synthetics-create-back-to-journey-btn"
               @click="currentStep = 1"
             >
@@ -2480,7 +2480,7 @@ function onClearResults() {
             </OButton>
             <OButton
               variant="primary"
-              size="sm"
+              size="sm-action"
               :loading="isSaving"
               data-test="synthetics-create-save-btn"
               @click="onSaveAndExit"

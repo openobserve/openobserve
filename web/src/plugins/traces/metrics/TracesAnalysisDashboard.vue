@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="text-text-secondary text-sm">{{ error }}</div>
                   <OButton
                     variant="outline"
-                    size="sm-action"
+                    size="sm"
                     class="mt-4"
                     data-test="traces-analysis-dashboard-retry-btn"
                     @click="loadAnalysis"

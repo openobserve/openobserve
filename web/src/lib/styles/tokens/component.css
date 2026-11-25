@@ -308,7 +308,7 @@
      (e.g. a full-bleed OTable, whose first column self-insets to page-edge)
      aligns with the surface's own header instead of sitting 8px off it. */
   --spacing-dialog-header-px: var(--spacing-page-edge);
-  --spacing-dialog-header-py: var(--spacing-3);
+  --spacing-dialog-header-py: 0.625rem; /* 10px, one step under spacing-3 */
   --spacing-dialog-content-px: var(--spacing-page-edge);
   --spacing-dialog-content-py: var(--spacing-3);
   --spacing-dialog-footer-px: var(--spacing-page-edge);
@@ -821,7 +821,7 @@
   /* Subtle amber wash for warning/flagged rows (theme-aware). */
   --color-warning-surface: color-mix(in srgb, var(--color-warning-400) 10%, transparent);
   /* Row height tokens: change these to resize all OTable rows globally. */
-  --table-row-height-dense: 2.375rem; /* 38px */
+  --table-row-height-dense: 1.75rem; /* 28px */
   --table-row-height-normal: 2.75rem; /* 44px */
   --table-row-height-compact: 1.5625rem; /* 25px */
 

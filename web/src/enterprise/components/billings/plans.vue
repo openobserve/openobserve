@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="mb-2.5 text-xl font-bold tracking-[-0.0125rem]">
+      <div class="mb-2.5 text-base font-semibold tracking-[-0.0125rem]">
         {{ t("billing.billingGroup.plansManagedTitle") }}
       </div>
       <div class="mb-6 max-w-110 text-sm leading-[1.65] opacity-65">
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OButton
         variant="primary"
-        class="h-10 px-6 py-0 font-semibold"
+        size="sm"
         data-test="plans-view-org-group-btn"
         @click="goToOrgGroup"
       >
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.selectedOrganization.hasOwnProperty('note') &&
           store.state.selectedOrganization.note
         "
-        class="text-status-error-text flex items-center justify-start gap-2 pb-3 text-sm font-semibold"
+        class="text-status-error-text text-compact flex items-center justify-start gap-2 pb-3 font-semibold"
       >
         <OIcon name="warning" size="sm" />
         >{{ store.state.selectedOrganization.note }}
@@ -154,27 +154,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="loading" class="text-center text-xl font-medium font-semibold">
         <OSpinner size="md" class="mx-auto mt-3 block text-center" />
       </div>
-      <div v-else class="grid grid-cols-2 gap-x-3 max-lg:grid-cols-1 max-lg:gap-y-3">
-        <ProPlan
-          :planType="planType"
-          :billingProvider="billingProvider"
-          :subscriptionType="subscriptionType"
-          :features="proPlanFeatures"
-          :pricingOptions="proPlanPricingOptions"
-          :additionalInfo="proPlanAdditionalInfo"
-          :pricingError="pricingError"
-          @retry-pricing="fetchPricingData"
-          @contact-sales="contactSalesForAnnual"
-          @update:proSubscription="onLoadSubscription(config.paidPlan)"
-          @update:cancelSubscription="onUnsubscribe"
-        ></ProPlan>
-        <EnterprisePlan
-          :features="enterprisePlanFeatures"
-          :price="enterprisePlanPrice"
-          :pricingError="pricingError"
-          @retry-pricing="fetchPricingData"
-        ></EnterprisePlan>
-      </div>
+      <template v-else>
+        <div
+          v-if="pricingError"
+          class="border-border-default text-status-error-text rounded-default mb-2 flex items-center gap-2 border px-3 py-1"
+          data-test="billing-pricing-unavailable"
+        >
+          <OIcon name="warning" size="sm" />
+          <span class="text-text-body text-compact">{{ t("billing.pricingErrorMessage") }}</span>
+          <OButton
+            variant="outline"
+            size="sm"
+            class="ms-auto"
+            data-test="billing-pricing-retry"
+            @click="fetchPricingData"
+          >
+            {{ t("common.retry") }}
+          </OButton>
+        </div>
+        <div class="grid grid-cols-2 gap-x-3 max-lg:grid-cols-1 max-lg:gap-y-3">
+          <ProPlan
+            :planType="planType"
+            :billingProvider="billingProvider"
+            :subscriptionType="subscriptionType"
+            :features="proPlanFeatures"
+            :pricingOptions="proPlanPricingOptions"
+            :additionalInfo="proPlanAdditionalInfo"
+            :pricingError="pricingError"
+            @retry-pricing="fetchPricingData"
+            @contact-sales="contactSalesForAnnual"
+            @update:proSubscription="onLoadSubscription(config.paidPlan)"
+            @update:cancelSubscription="onUnsubscribe"
+          ></ProPlan>
+          <EnterprisePlan
+            :features="enterprisePlanFeatures"
+            :price="enterprisePlanPrice"
+            :pricingError="pricingError"
+            @retry-pricing="fetchPricingData"
+          ></EnterprisePlan>
+        </div>
+      </template>
     </template>
   </div>
 </template>
@@ -403,6 +422,8 @@ export default defineComponent({
       } catch (e: any) {
         this.loading = false;
         this.proLoading = false;
+        // A 404 means billing is unavailable; the inline message covers it.
+        if (e.response?.status === 404) return;
 
         toast({
           variant: "error",

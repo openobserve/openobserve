@@ -75,9 +75,9 @@ describe("LinkedAccountsDialog (L3)", () => {
     const first = body().find(testId("linked-accounts-item-link-1"));
     expect(first.text()).toContain("Slack · Acme Corp");
     expect(first.text()).toContain("@alice · org prod · Sign in with Slack");
-    expect(first.text()).toContain("Last used");
+    expect(first.text()).toContain("Last Used");
     expect(body().find(testId("linked-accounts-item-link-2")).text()).toContain(
-      "@al · org prod · Email match",
+      "@al · org prod · Email Match",
     );
     expect(body().text()).toContain("To link another workspace, mention @OpenObserve there");
   });
@@ -103,7 +103,7 @@ describe("LinkedAccountsDialog (L3)", () => {
     mountDialog();
     await flushPromises();
     const empty = body().find(testId("linked-accounts-empty"));
-    expect(empty.text()).toContain("No linked accounts");
+    expect(empty.text()).toContain("No Linked Accounts");
     expect(empty.text()).toContain("Mention @OpenObserve in Slack");
     expect(body().find(testId("linked-accounts-note")).exists()).toBe(false);
   });

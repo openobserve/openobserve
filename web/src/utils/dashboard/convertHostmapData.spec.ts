@@ -465,7 +465,7 @@ describe("convertHostmapData", () => {
     expect(noData.style.lineDash).toEqual([2, 2]);
     const filled = render({ dataIndex: 0 }, api());
     expect(filled.style.fill).not.toBe("--color-surface-subtle");
-    expect(result.options.legend.data).toContain("No data");
+    expect(result.options.legend.data).toContain("No Data");
   });
 
   it("draws hexagons, and hides cell labels when cells are too small", () => {

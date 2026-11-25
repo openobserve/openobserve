@@ -623,7 +623,7 @@ describe("TraceDetailsSidebar", async () => {
         );
         expect(failed.text()).not.toContain("No log stream has logs");
         expect(failed.find('[data-test="traces-span-drawer-open-logs-tab"]').text()).toBe(
-          "Open Logs tab",
+          "Open Logs Tab",
         );
         expect(mockToast).not.toHaveBeenCalled();
         expect(pushSpy).not.toHaveBeenCalled();
@@ -667,7 +667,7 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
 
         const open = viewLogsWrapper.find('[data-test="traces-span-drawer-open-logs-tab"]');
-        expect(open.text()).toBe("Open Logs tab");
+        expect(open.text()).toBe("Open Logs Tab");
         await open.trigger("click");
 
         expect(viewLogsWrapper.emitted("update:activeTab")?.at(-1)).toEqual(["correlated-logs"]);

@@ -297,13 +297,13 @@ describe("OStatStrip filter chips (selectable)", () => {
   it("renders each filter as a pressable chip inside a labelled group, no tray", () => {
     const w = mountChips();
     const strip = w.get('[data-test="o-stat-strip"]');
-    expect(strip.classes()).toEqual(expect.arrayContaining(["px-page-edge", "py-2"]));
+    expect(strip.classes()).toEqual(expect.arrayContaining(["px-page-edge", "py-1.5"]));
     const group = w.get('[role="group"]');
     expect(group.attributes("aria-label")).toBe("Filters");
     const chips = group.findAll("[aria-pressed]");
     expect(chips).toHaveLength(5);
     expect(chips[1].classes()).toEqual(
-      expect.arrayContaining(["h-8", "rounded-default", "border", "bg-surface-base"]),
+      expect.arrayContaining(["h-7", "rounded-default", "border", "bg-surface-base"]),
     );
     expect(w.find(".h-1").exists()).toBe(false);
   });
@@ -566,7 +566,7 @@ describe("OStatStrip inline KPI line", () => {
     expect(glyphs[2]).toContain("text-text-muted");
     const values = w.findAll('[data-test="o-stat-card-value"]').map((v) => v.classes());
     expect(values[0]).toEqual(
-      expect.arrayContaining(["text-base", "font-semibold", "text-text-heading", "tabular-nums"]),
+      expect.arrayContaining(["text-sm", "font-semibold", "text-text-heading", "tabular-nums"]),
     );
     expect(values[2]).toContain("text-text-muted");
   });
@@ -606,7 +606,7 @@ describe("OStatStrip row above a table", () => {
 
   it("draws a filter strip as its own padded row with the hairline on top of the table header", () => {
     expect(rootOf({ items: chips, selectable: true, defaultKey: "all" })).toEqual(
-      expect.arrayContaining([...ROW, "min-h-12", "py-2"]),
+      expect.arrayContaining([...ROW, "min-h-10", "py-1.5"]),
     );
   });
 
@@ -626,7 +626,7 @@ describe("OStatStrip row above a table", () => {
   it("sits inline at its natural width, so a wrapping toolbar moves it to its own line rather than squeezing it", () => {
     const inline = rootOf({ items: chips, selectable: true, defaultKey: "all", row: false });
     expect(inline).toEqual(
-      expect.arrayContaining(["basis-auto", "grow-0", "shrink", "min-w-0", "max-md:basis-full"]),
+      expect.arrayContaining(["basis-auto", "grow-0", "shrink-0", "min-w-0", "max-md:basis-full"]),
     );
     const kpisOnly = rootOf({ items: [chips[0]], selectable: true, defaultKey: "all", row: false });
     expect(kpisOnly).toContain("basis-auto");
@@ -659,7 +659,7 @@ describe("OStatStrip with nothing but the reset chip", () => {
   });
 
   it("keeps the row's chip height so the chips appearing later never shift the table", () => {
-    expect(mountDb(0).get('[data-test="o-stat-strip"]').classes()).toContain("min-h-12");
+    expect(mountDb(0).get('[data-test="o-stat-strip"]').classes()).toContain("min-h-10");
   });
 
   it("brings the reset chip back with the first real filter", () => {

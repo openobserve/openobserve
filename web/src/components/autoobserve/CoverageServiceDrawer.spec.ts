@@ -146,7 +146,7 @@ describe("CoverageServiceDrawer: a check just added here (COVERAGE-AFTER-ADD)", 
       const found = chips(mountDrawer(row, "gap"));
       expect(found[0].text()).toBe("Errors: Added");
       expect(found[0].find("span").classes().join(" ")).toContain(LIVE_DOT.added);
-      expect(found[1].text()).toBe("Latency: Coverage gap");
+      expect(found[1].text()).toBe("Latency: Coverage Gap");
       const wrapper = mountDrawer(row, "gap");
       const lines = wrapper
         .findAll('[data-test="autoobserve-coverage-drawer-gap-line"]')
@@ -317,8 +317,8 @@ describe("CoverageServiceDrawer in live mode", () => {
       "autoobserve-coverage-drawer-chip-absence",
     ]);
     expect(found.map((c) => c.text())).toEqual([
-      "Errors: Coverage gap",
-      "Latency: Coverage gap",
+      "Errors: Coverage Gap",
+      "Latency: Coverage Gap",
       "Stops sending: Watched",
     ]);
     const dot = (i: number) => found[i].find("span").classes().join(" ");
@@ -330,7 +330,7 @@ describe("CoverageServiceDrawer in live mode", () => {
     const other = wrapper.find('[data-test="autoobserve-coverage-drawer-extra"]').text();
     expect(other).toContain("Saturation");
     expect(other).not.toContain("Stops sending");
-    expect(other).toContain("Coverage gap");
+    expect(other).toContain("Coverage Gap");
     expect(other).not.toMatch(/\bNone\b/);
     expect(wrapper.find('[data-test="autoobserve-coverage-drawer-logs"]').exists()).toBe(false);
   });
@@ -357,7 +357,7 @@ describe("CoverageServiceDrawer in live mode", () => {
     });
     const wrapper = mountDrawer(row, "gap");
     expect(wrapper.find('[data-test="autoobserve-coverage-drawer-state"]').text()).toBe(
-      "Coverage gap",
+      "Coverage Gap",
     );
     const lines = wrapper
       .findAll('[data-test="autoobserve-coverage-drawer-gap-line"]')
@@ -401,12 +401,12 @@ describe("CoverageServiceDrawer in live mode", () => {
       expect.stringMatching(/^kept.*less than 14/),
     ]);
     expect(wrapper.find('[data-test="autoobserve-coverage-drawer-state"]').text()).toBe(
-      "Coverage gap",
+      "Coverage Gap",
     );
     expect(chips(wrapper).map((c) => c.text())).toEqual([
-      "Errors: Coverage gap",
-      "Latency: Coverage gap",
-      "Stops sending: Coverage gap",
+      "Errors: Coverage Gap",
+      "Latency: Coverage Gap",
+      "Stops sending: Coverage Gap",
     ]);
   });
 

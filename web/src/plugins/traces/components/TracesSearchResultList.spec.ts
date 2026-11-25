@@ -310,7 +310,7 @@ describe("TracesSearchResultList", () => {
 
     it("hides the empty state while loading", () => {
       wrapper = mount_({ hits: [], loading: true });
-      expect(wrapper.text()).not.toContain("No traces found");
+      expect(wrapper.text()).not.toContain("No Traces Found");
     });
   });
 
@@ -318,7 +318,7 @@ describe("TracesSearchResultList", () => {
   describe("empty state", () => {
     it("shows no-results message when search performed and hits are empty", () => {
       wrapper = mount_({ hits: [], loading: false, searchPerformed: true });
-      expect(wrapper.text()).toContain("No traces found");
+      expect(wrapper.text()).toContain("No Traces Found");
     });
 
     it("does not show spinner in empty state", () => {
@@ -335,7 +335,7 @@ describe("TracesSearchResultList", () => {
 
     it("does not show no-results message when searchPerformed is false", () => {
       wrapper = mount_({ hits: [], loading: false, searchPerformed: false });
-      expect(wrapper.text()).not.toContain("No traces found");
+      expect(wrapper.text()).not.toContain("No Traces Found");
     });
   });
 
@@ -357,7 +357,7 @@ describe("TracesSearchResultList", () => {
 
     it("does not show the no-results message when hits exist", () => {
       wrapper = mount_({ hits, loading: false, searchPerformed: true });
-      expect(wrapper.text()).not.toContain("No traces found");
+      expect(wrapper.text()).not.toContain("No Traces Found");
     });
   });
 

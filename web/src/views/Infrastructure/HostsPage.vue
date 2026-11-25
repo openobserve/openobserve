@@ -29,8 +29,11 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef, OTableSortParams } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -516,7 +519,7 @@ const osToggleLabel = (slug: string) =>
         <!-- Icon-only on phones so the actions share the title row; sr-only keeps the button named. -->
         <OButton
           variant="outline"
-          size="sm-action"
+          size="sm"
           icon-left="refresh"
           class="max-md:min-w-0 max-md:ps-2 max-md:pe-2"
           data-test="hosts-refresh"
@@ -534,27 +537,49 @@ const osToggleLabel = (slug: string) =>
     </div>
 
     <!-- Undetected: onboarding, not a dead end — the embedded card carries the auto-import wiring. -->
-    <div v-else-if="hostsState !== 'detected'" class="min-h-0 flex-1 overflow-y-auto">
+    <div v-else-if="hostsState !== 'detected'" class="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div
-        class="max-lg:px-page-edge mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
+        class="px-page-edge my-auto flex w-full min-w-0 flex-col gap-2 py-4"
         data-test="hosts-empty-state"
       >
-        <OText tag="h2" class="text-xl font-semibold">{{ t("infra.hosts.emptyHeadline") }}</OText>
-        <OText variant="meta">{{ t("infra.hosts.emptyRbacHint") }}</OText>
-        <div class="flex items-center gap-2 pt-2">
-          <OButton
-            v-for="slug in OS_SLUGS"
-            :key="slug"
-            :variant="osSlug === slug ? 'primary' : 'outline'"
-            size="sm-action"
-            :data-test="`hosts-os-toggle-${slug}`"
-            @click="osSlug = slug"
+        <OEmptyState
+          size="compact"
+          icon="lan"
+          :title="t('infra.hosts.emptyHeadline')"
+          :description="t('infra.hosts.emptyRbacHint')"
+        />
+        <!-- Native details keeps the card mounted while closed, so its detection polling still runs. -->
+        <details class="group w-full min-w-0" data-test="hosts-setup-disclosure">
+          <summary
+            class="border-border-default text-compact text-text-heading hover:bg-surface-subtle rounded-default mx-auto flex h-7 w-fit cursor-pointer list-none items-center gap-1 border px-3 font-medium [&::-webkit-details-marker]:hidden"
+            data-test="hosts-setup-toggle"
           >
-            {{ osToggleLabel(slug) }}
-          </OButton>
-        </div>
-        <!-- Detection connecting inside the embedded card must flip this page live (design 4.8). -->
-        <DataSourceSetupCard :slug="osSlug" @detected="detection.refresh({ force: true })" />
+            {{ t("ingestion.setupCard.installAgentTitle") }}
+            <OIcon
+              name="expand-more"
+              size="sm"
+              class="transition-transform group-open:rotate-180"
+            />
+          </summary>
+          <div class="mt-3 flex min-w-0 flex-col gap-2">
+            <OButtonGroup class="self-start">
+              <OButton
+                v-for="slug in OS_SLUGS"
+                :key="slug"
+                variant="outline"
+                size="sm"
+                :active="osSlug === slug"
+                :aria-pressed="String(osSlug === slug)"
+                :data-test="`hosts-os-toggle-${slug}`"
+                @click="osSlug = slug"
+              >
+                {{ osToggleLabel(slug) }}
+              </OButton>
+            </OButtonGroup>
+            <!-- Detection connecting inside the embedded card must flip this page live (design 4.8). -->
+            <DataSourceSetupCard :slug="osSlug" @detected="detection.refresh({ force: true })" />
+          </div>
+        </details>
       </div>
     </div>
 
@@ -583,9 +608,9 @@ const osToggleLabel = (slug: string) =>
       class="flex min-h-60 flex-col items-center justify-center gap-2"
       data-test="hosts-page-error"
     >
-      <OText class="text-lg font-semibold">{{ t("infra.hosts.pageError") }}</OText>
+      <OText class="text-sm font-semibold">{{ t("infra.hosts.pageError") }}</OText>
       <OText variant="meta">{{ raw(pageError) }}</OText>
-      <OButton variant="outline" size="sm-action" data-test="hosts-retry" @click="refreshList">
+      <OButton variant="outline" size="sm" data-test="hosts-retry" @click="refreshList">
         {{ t("infra.hosts.retry") }}
       </OButton>
     </div>
@@ -602,7 +627,7 @@ const osToggleLabel = (slug: string) =>
         data-test="hosts-liveness-banner"
       >
         <OText variant="meta">{{ t("infra.hosts.livenessBanner") }}</OText>
-        <OButton variant="outline" size="sm-action" data-test="hosts-retry" @click="refreshList">
+        <OButton variant="outline" size="sm" data-test="hosts-retry" @click="refreshList">
           {{ t("infra.hosts.retry") }}
         </OButton>
       </div>

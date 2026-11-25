@@ -6,7 +6,7 @@
     :class="frameless ? '' : 'border-border-default border-e'"
   >
     <div v-if="!frameless" class="px-page-edge my-3 flex shrink-0 items-center justify-between">
-      <span class="text-base font-bold">{{ t("panel.fields") }}</span>
+      <span class="text-sm font-semibold">{{ t("panel.fields") }}</span>
       <OButton
         variant="outline"
         size="icon-xs-sq"
@@ -48,6 +48,7 @@
             :options="streamTypeOptions"
             data-test="index-dropdown-stream_type"
             class="mb-1"
+            size="sm"
             label-position="inside"
             :disabled="dashboardPanelDataPageKey === 'logs'"
             @update:model-value="onStreamTypeChange"
@@ -63,6 +64,7 @@
             label-key="name"
             value-key="name"
             searchable
+            size="sm"
             label-position="inside"
             :disabled="dashboardPanelDataPageKey === 'logs'"
             option-tooltip

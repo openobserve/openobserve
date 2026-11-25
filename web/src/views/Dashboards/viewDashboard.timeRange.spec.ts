@@ -332,7 +332,7 @@ describe("ViewDashboard time range gate", () => {
     await flushPromises();
 
     expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
-    expect(refreshButton().props("variant")).toBe("outline");
+    expect(refreshButton().props("variant")).toBe("ghost");
     expect(wrapper.vm.isEditingLayout).toBe(true);
   });
 

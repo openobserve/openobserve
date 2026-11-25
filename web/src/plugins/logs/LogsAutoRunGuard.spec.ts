@@ -116,7 +116,7 @@ describe("LogsAutoRunGuard (J5, F5–F9)", () => {
     );
   });
 
-  it("is calm on a super cluster: Run query, no Narrow to (F9)", () => {
+  it("is calm on a super cluster: Run Query, no Narrow to (F9)", () => {
     const wrapper = mountGuard({
       blocked: blocked({
         decision: { allowed: false, reason: "unknown-unvalidated", estimateMb: 0 },
@@ -125,7 +125,7 @@ describe("LogsAutoRunGuard (J5, F5–F9)", () => {
       }),
     });
     expect(wrapper.text()).toContain("Ready to run across regions");
-    expect(wrapper.find('[data-test="logs-auto-run-guard-run-btn"]').text()).toBe("Run query");
+    expect(wrapper.find('[data-test="logs-auto-run-guard-run-btn"]').text()).toBe("Run Query");
     expect(wrapper.find('[data-test="logs-auto-run-guard-narrow-btn"]').exists()).toBe(false);
   });
 

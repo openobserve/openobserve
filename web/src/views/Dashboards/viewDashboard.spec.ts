@@ -2010,7 +2010,7 @@ describe("ViewDashboard", () => {
       await mountDashboard(withSlots);
 
       expect(buttonProps("dashboard-panel-add")).toMatchObject({
-        variant: "outline",
+        variant: "ghost",
         size: "sm-toolbar",
         iconLeft: "add",
       });
@@ -2019,8 +2019,8 @@ describe("ViewDashboard", () => {
 
       wrapper.vm.enterLayoutEdit();
       await flushPromises();
-      expect(buttonProps("dashboard-refresh-btn").variant).toBe("outline");
-      expect(buttonProps("dashboard-refresh-options-btn").variant).toBe("outline");
+      expect(buttonProps("dashboard-refresh-btn").variant).toBe("ghost");
+      expect(buttonProps("dashboard-refresh-options-btn").variant).toBe("ghost");
     });
 
     it("keeps Refresh pending while changes wait to be applied", async () => {
@@ -2031,7 +2031,7 @@ describe("ViewDashboard", () => {
       expect(wrapper.vm.isRefreshPending).toBe(true);
       expect(buttonProps("dashboard-refresh-btn").variant).toBe("pending");
       expect(buttonProps("dashboard-refresh-options-btn").variant).toBe("pending");
-      expect(buttonProps("dashboard-panel-add").variant).toBe("outline");
+      expect(buttonProps("dashboard-panel-add").variant).toBe("ghost");
     });
 
     it("renders the Add panel label and draft dot inside the real button", async () => {
@@ -2753,7 +2753,9 @@ describe("ViewDashboard", () => {
       expect(charts.props("viewOnly")).toBe(false);
       expect(charts.props("kiosk")).toBe(false);
       expect(charts.props("readOnlySelectors")).toBe(false);
-      expect(wrapper.findComponent({ name: "OPageLayout" }).props("headerClass")).toBe("shrink-0");
+      expect(wrapper.findComponent({ name: "OPageLayout" }).props("headerClass")).toBe(
+        "shrink-0 [&_[data-test=dashboard-back-btn]]:size-7",
+      );
     });
 
     it("opens TV mode with a link that keeps the relative range and adds the chosen options", async () => {

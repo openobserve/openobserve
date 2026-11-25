@@ -277,7 +277,7 @@ describe("RcaVerdictCard", () => {
         const wrapper = mountCard({ ...props, canResume: true });
 
         const button = byTest(wrapper, bannerId).find('[data-test="rca-resume-btn"]');
-        expect(button.text()).toBe("Resume run");
+        expect(button.text()).toBe("Resume Run");
         await button.trigger("click");
         expect(wrapper.emitted("resume")).toHaveLength(1);
       });
@@ -295,7 +295,7 @@ describe("RcaVerdictCard", () => {
       it("L: Retry stays next to Resume run", () => {
         const wrapper = mountCard({ ...FAILED, canResume: true });
 
-        expect(buttonTexts(wrapper, "rca-error-banner")).toEqual(["Resume run", "Retry analysis"]);
+        expect(buttonTexts(wrapper, "rca-error-banner")).toEqual(["Resume Run", "Retry analysis"]);
       });
 
       it.each([

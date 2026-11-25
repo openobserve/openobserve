@@ -96,7 +96,7 @@ describe("SlackPrerequisites", () => {
 
   it("falls back to the check's name when it has no variable", () => {
     const rows = mountChecks().findAll('[data-test-stub="otable-row"]');
-    expect(rows[1].text()).toContain("Delegation key");
+    expect(rows[1].text()).toContain("Delegation Key");
   });
 
   it("AC-7.1 counts a warning as passing, so only failures block", () => {
@@ -155,7 +155,7 @@ describe("SlackPrerequisites", () => {
         "ZO_WEB_URL=https://o2.example.com",
       );
       expect(w.find('[data-test="slack-prereq-row-delegation_key"]').text()).toContain(
-        "Delegation key",
+        "Delegation Key",
       );
       expect(w.find(SUMMARY).text()).toContain("1 of 4 failed");
     } finally {

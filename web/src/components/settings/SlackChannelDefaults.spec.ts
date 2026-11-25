@@ -172,12 +172,12 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     expect(slack.listChannelDefaults).toHaveBeenCalledWith("acme", "inst-1");
     const [mine, theirs] = w.findAll('[data-test-stub="otable-row"]');
     expect(mine.text()).toContain("#sre-prod");
-    expect(mine.text()).toContain("In thread");
-    expect(mine.find('[data-col="default_org"]').text()).toBe("This org");
+    expect(mine.text()).toContain("In Thread");
+    expect(mine.find('[data-col="default_org"]').text()).toBe("This Org");
     expect(mine.find('[data-col="set_by"]').text()).toBe("From an alert destination");
     expect(mine.find('[data-col="alert_routes"]').text()).toBe("—");
-    expect(theirs.text()).toContain("Private only");
-    expect(theirs.text()).toContain("Another org");
+    expect(theirs.text()).toContain("Private Only");
+    expect(theirs.text()).toContain("Another Org");
   });
 
   it("fills Alert routes with this workspace's Slack app destinations per channel (MK-6b)", async () => {
@@ -233,7 +233,7 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     const confirmDialog = w.find('[data-test-stub="confirm-dialog"]');
     expect(confirmDialog.attributes("message-keypath")).toBe("slackApp.channels.removeMessage");
     expect(confirmDialog.attributes("message-name")).toBe("#sre-prod");
-    expect(w.findComponent({ name: "ConfirmDialog" }).props("okLabel")).toBe("Remove default");
+    expect(w.findComponent({ name: "ConfirmDialog" }).props("okLabel")).toBe("Remove Default");
     expect(w.find('[data-test="slack-channel-remove-C1"]').attributes("aria-label")).toBe("Remove");
     expect(w.find('[data-test="slack-channel-C1-menu"]').exists()).toBe(true);
     expect(w.findComponent({ name: "ConfirmDialog" }).props("messageValues")).toEqual({
@@ -375,7 +375,7 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
 
   it("explains an empty list", async () => {
     const w = await mountDefaults([]);
-    expect(w.text()).toContain("No channel has a default org yet");
+    expect(w.text()).toContain("No Channel Has a Default Org Yet");
     expect(w.text()).toContain("go to each person's default org");
   });
 
@@ -383,7 +383,7 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     vi.mocked(slack.listChannelDefaults).mockReturnValue(new Promise(() => undefined) as any);
     const w = await mountWith();
     expect(w.find('[data-test-stub="otable-loading"]').exists()).toBe(true);
-    expect(w.text()).not.toContain("No channel has a default org yet");
+    expect(w.text()).not.toContain("No Channel Has a Default Org Yet");
   });
 
   it("W-S6 a failed load shows a retryable error instead of the empty state (real OTable)", async () => {
@@ -394,7 +394,7 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
       expect(w.find('[data-test="slack-channel-defaults-error"]').exists()).toBe(true),
     );
     const error = w.find('[data-test="slack-channel-defaults-error"]');
-    expect(w.text()).not.toContain("No channel has a default org yet");
+    expect(w.text()).not.toContain("No Channel Has a Default Org Yet");
 
     vi.mocked(slack.listChannelDefaults).mockReturnValue(ok({ defaults: rows }) as any);
     await error.find("button").trigger("click");
@@ -409,13 +409,13 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     vi.mocked(slack.listChannelDefaults).mockReturnValue(Promise.reject(axiosError(403)) as any);
     const w = await mountWith(true);
     await vi.waitFor(() => expect(w.find('[data-test="o2-table-forbidden"]').exists()).toBe(true));
-    expect(w.text()).not.toContain("No channel has a default org yet");
+    expect(w.text()).not.toContain("No Channel Has a Default Org Yet");
   });
 
   it("another org's channel reads Instance admin only with no Edit for an org admin", async () => {
     const w = await mountOn(managedView());
     const [mine, theirs] = w.findAll('[data-test-stub="otable-row"]');
-    expect(theirs.find('[data-col="default_org"]').text()).toBe("Another org");
+    expect(theirs.find('[data-col="default_org"]').text()).toBe("Another Org");
     expect(theirs.find('[data-test="slack-channel-instance-only"]').text()).toBe(
       "Instance admin only",
     );
@@ -505,7 +505,7 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     expect(everyOrg!.props("modelValue")).toBe("_meta");
   });
 
-  it("other viewers keep This org", async () => {
+  it("other viewers keep This Org", async () => {
     const w = await mountOn(managedView());
     await w.find('[data-test="slack-channel-set-default"]').trigger("click");
     await flushPromises();
@@ -527,6 +527,6 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     w.unmount();
     const managed = await mountOn(managedView());
     const cells = managed.findAll('[data-col="default_org"]').map((c) => c.text());
-    expect(cells).toEqual(["This org", "Another org"]);
+    expect(cells).toEqual(["This Org", "Another Org"]);
   });
 });

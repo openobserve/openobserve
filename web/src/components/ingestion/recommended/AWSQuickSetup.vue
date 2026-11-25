@@ -22,10 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-start gap-3">
           <OIcon name="rocket-launch" size="xl" class="text-text-link" />
           <div>
-            <h6 class="m-0 mb-2! text-xl! font-bold">
+            <h6 class="m-0 mb-2! text-sm! font-bold">
               {{ t("ingestion.completeAwsIntegration") }}
             </h6>
-            <p class="mt-0 mb-0 text-sm" :class="descriptionClass">
+            <p class="text-compact mt-0 mb-0" :class="descriptionClass">
               {{ t("ingestion.deployAwsServicesOneClick") }}
             </p>
           </div>
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Deployment Mode Toggle -->
       <div class="mb-6">
-        <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">
+        <div class="text-compact mb-3 font-semibold" :class="stepLabelClass">
           {{ t("ingestion.deploymentMode") }}
         </div>
         <OToggleGroup v-model="deploymentMode" data-test="aws-deployment-mode-toggle">
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex items-center gap-2 max-md:min-w-0">
             <OIcon :name="showServices ? 'expand-less' : 'expand-more'" size="sm" color="primary" />
-            <div class="text-sm font-semibold" :class="stepLabelClass">
+            <div class="text-compact font-semibold" :class="stepLabelClass">
               {{ t("ingestion.selectServicesToMonitor") }}
             </div>
             <OTag type="countChip" value="accent">
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Single Region: region picker -->
       <div v-if="deploymentMode === 'single'" class="mb-6">
-        <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">
+        <div class="text-compact mb-3 font-semibold" :class="stepLabelClass">
           {{ t("ingestion.deploymentRegion") }}
         </div>
         <OSelect
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- StackSets: admin + target regions -->
       <template v-else>
         <div class="mb-6">
-          <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">
+          <div class="text-compact mb-3 font-semibold" :class="stepLabelClass">
             {{ t("ingestion.adminRegion") }}
             <span class="text-text-muted text-xs font-normal">{{
               t("ingestion.whereStackSetIsManaged")
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 color="primary"
               />
-              <div class="text-sm font-semibold" :class="stepLabelClass">
+              <div class="text-compact font-semibold" :class="stepLabelClass">
                 {{ t("ingestion.targetRegions") }}
                 <span class="text-text-muted text-xs font-normal">{{
                   t("ingestion.whereStacksWillBeDeployed")
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="mb-6">
-          <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">
+          <div class="text-compact mb-3 font-semibold" :class="stepLabelClass">
             {{ t("ingestion.deploymentModel") }}
           </div>
           <OToggleGroup v-model="stackSetModel" data-test="aws-stackset-model-toggle">
@@ -232,16 +232,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : t("ingestion.openStackSetsConsole")
           }}
         </OButton>
-        <span v-if="enabledServices.length === 0" class="text-status-error-text text-sm">
+        <span v-if="enabledServices.length === 0" class="text-status-error-text text-compact">
           {{ t("ingestion.selectAtLeastOneService") }}
         </span>
         <span
           v-else-if="deploymentMode === 'stackset' && targetRegions.length === 0"
-          class="text-status-error-text text-sm"
+          class="text-status-error-text text-compact"
         >
           {{ t("ingestion.selectAtLeastOneTargetRegion") }}
         </span>
-        <span v-else class="text-sm" :class="hintTextClass">
+        <span v-else class="text-compact" :class="hintTextClass">
           {{ t("ingestion.service", { count: enabledServices.length }, enabledServices.length) }}
           {{ t("ingestion.selected") }}
           <template v-if="deploymentMode === 'stackset'">
@@ -265,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSeparator class="mb-4" />
             <div class="rounded-default p-4" :class="paramHelperClass">
               <div class="mb-3 flex items-center justify-between">
-                <div class="text-sm font-semibold" :class="stepLabelClass">
+                <div class="text-compact font-semibold" :class="stepLabelClass">
                   {{ t("ingestion.parametersToEnterInAwsWizard") }}
                 </div>
                 <OButton

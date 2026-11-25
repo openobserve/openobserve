@@ -128,7 +128,7 @@ describe("TelephonySettings", () => {
   describe("page states", () => {
     it("5a: no org and no deployment account shows the hero", async () => {
       await render(view());
-      expect(text("hero")).toContain("No phone provider connected");
+      expect(text("hero")).toContain("No Phone Provider Connected");
       expect(text("hero")).toContain("Connect Twilio");
       expect(q("connected")).toBeNull();
       expect(q("deployment")).toBeNull();

@@ -21,11 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Section header -->
       <div
-        class="section-header border-border-default flex items-center gap-0 border-b px-3 py-2.5"
+        class="section-header border-border-default flex items-center gap-0 border-b px-3 py-1.5"
       >
-        <div
-          class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
-        />
         <span
           class="section-header-title text-compact text-text-heading font-semibold tracking-[0.01em]"
           >{{ t("alerts.queryConfig.sectionTitle") }}</span
@@ -86,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="alert-if-row-logs"
                 >
                   <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                     >{{ t("alerts.threshold") }}*</span
                   >
                   <div class="flex flex-col gap-1.5">
@@ -141,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="selectedFunction === 'total_events'">
                       <div class="flex items-start gap-2">
                         <span
-                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
+                          class="text-foreground text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.criticalIf") }}</span
                         >
                         <OFormSelect
@@ -236,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-else>
                       <div class="flex items-start gap-2">
                         <span
-                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
+                          class="text-foreground text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.criticalIf") }}</span
                         >
                         <OFormSelect
@@ -334,7 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="alert-group-by-row"
                 >
                   <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 font-bold whitespace-nowrap"
+                    class="text-text-heading text-compact min-w-22.5 shrink-0 font-semibold whitespace-nowrap"
                   >
                     {{ t("alerts.groupBy") }}
                     <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" side="top" />
@@ -391,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="alert-having-groups-row"
                 >
                   <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                   >
                     {{ t("alerts.queryConfig.havingGroups") }}
                     <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" side="top" />
@@ -438,7 +435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                 >
                   <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                     >{{ t("alerts.threshold") }}*</span
                   >
                   <div class="flex flex-col gap-1.5">
@@ -514,7 +511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="selectedFunction === 'total_events'">
                       <div class="flex items-start gap-2">
                         <span
-                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
+                          class="text-foreground text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.criticalIf") }}</span
                         >
                         <OFormSelect
@@ -605,7 +602,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-else>
                       <div class="flex items-start gap-2">
                         <span
-                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
+                          class="text-foreground text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                           >{{ t("alerts.criticalIf") }}</span
                         >
                         <OFormSelect
@@ -701,7 +698,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="rounded-default text-compact flex items-center gap-3 px-3 py-2"
                 >
                   <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 font-bold whitespace-nowrap"
+                    class="text-text-heading text-compact min-w-22.5 shrink-0 font-semibold whitespace-nowrap"
                   >
                     {{ t("alerts.groupBy") }}
                     <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" side="top" />
@@ -756,7 +753,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                 >
                   <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                   >
                     {{ t("alerts.queryConfig.havingGroups") }}
                     <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" side="top" />
@@ -801,7 +798,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
               >
                 <span
-                  class="text-text-heading text-compact min-w-22.5 shrink-0 leading-7 font-bold whitespace-nowrap"
+                  class="text-text-heading text-compact min-w-22.5 shrink-0 leading-7 font-semibold whitespace-nowrap"
                 >
                   {{ t("alerts.queryConfig.checkEvery") }} *
                   <OTooltip :content="t('alerts.howOftenCheckTooltip')" side="top" />
@@ -1043,7 +1040,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="showVrl && localTab === 'sql' ? 'w-1/2' : 'w-full'"
                 >
                   <div
-                    class="flex h-9 shrink-0 items-center justify-between px-2.5"
+                    class="flex h-8 shrink-0 items-center justify-between px-2.5"
                     :class="'bg-surface-subtle border-border-default border-b'"
                   >
                     <div class="flex items-center gap-2">
@@ -1156,7 +1153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="showVrl && localTab === 'sql'"
                 >
                   <div
-                    class="flex h-9 shrink-0 items-center justify-between px-2.5"
+                    class="flex h-8 shrink-0 items-center justify-between px-2.5"
                     :class="'bg-surface-subtle border-border-default border-b'"
                   >
                     <div class="flex items-center gap-2">
@@ -1267,7 +1264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
               >
                 <span
-                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-7 font-bold whitespace-nowrap"
+                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-7 font-semibold whitespace-nowrap"
                 >
                   {{ t("alerts.queryConfig.checkEvery") }} *
                   <OTooltip :content="t('alerts.howOftenCheckTooltip')" side="top" />
@@ -1364,13 +1361,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
               >
                 <span
-                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                   >{{ t("alerts.alertIfNoOfEvents") }} *</span
                 >
                 <div class="flex flex-col gap-1.5">
                   <div class="flex items-start gap-2">
                     <span
-                      class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
+                      class="text-foreground text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                       >{{ t("alerts.criticalIf") }}</span
                     >
                     <OFormSelect
@@ -1479,7 +1476,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
               >
                 <span
-                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                   >{{ t("alerts.alertIfColumn") }} *</span
                 >
                 <div class="flex flex-col gap-1.5">
@@ -1504,7 +1501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="flex items-start gap-2">
                     <span
-                      class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
+                      class="text-foreground text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                       >{{ t("alerts.criticalIf") }}</span
                     >
                     <OFormSelect
@@ -1617,14 +1614,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                 >
                   <span
-                    class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                    class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                     >{{ t("alerts.alertIfValueIs") }} *
                     <OTooltip :content="t('alerts.queryConfig.alertIfValueIsTooltip')" side="top" />
                   </span>
                   <div class="flex flex-col gap-1.5">
                     <div class="flex items-start gap-2">
                       <span
-                        class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
+                        class="text-foreground text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap max-md:w-18"
                         >{{ t("alerts.criticalIf") }}</span
                       >
                       <OFormSelect
@@ -1735,7 +1732,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                 >
                   <span
-                    class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                    class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                     >{{ t("alerts.havingSeries") }} *
                     <OTooltip :content="t('alerts.queryConfig.havingSeriesTooltip')" side="top" />
                   </span>

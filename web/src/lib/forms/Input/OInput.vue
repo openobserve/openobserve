@@ -282,12 +282,8 @@ const wrapperClasses = computed(() => [
     ? "border-input-border-error focus-within:ring-2 focus-within:ring-input-border-error/20"
     : "border-input-border hover:border-input-border-hover focus-within:ring-2 focus-within:ring-focus-ring-accent",
   // Whole-control dim: a dashed edge read as a drop zone.
-  isDisabled.value
-    ? "opacity-50 cursor-not-allowed"
-    : "",
+  isDisabled.value ? "opacity-50 cursor-not-allowed" : "",
   props.readonly ? "border-input-border bg-input-bg" : "",
-  // Inside-label mode: wrapper is relative so the floating label can be absolutely placed
-  props.labelPosition === "inside" && props.label && !isTextarea.value ? "relative" : "",
 ]);
 </script>
 
@@ -317,11 +313,14 @@ const wrapperClasses = computed(() => [
 
     <!-- Input row -->
     <div :class="wrapperClasses">
-      <!-- Inside label: floating mini-label at the top of the input border -->
+      <!-- Inside label: inline prefix, so the control stays one row tall -->
       <label
         v-if="label && labelPosition === 'inside' && !isTextarea"
         :for="inputId"
-        class="text-2xs text-text-secondary pointer-events-none absolute start-3 end-7 top-1 overflow-hidden leading-none font-medium text-ellipsis whitespace-nowrap select-none"
+        :class="[
+          'text-text-secondary max-w-1/2 shrink-0 self-center truncate ps-3 select-none',
+          textSizeClasses[size ?? 'sm'],
+        ]"
         >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></label
       >
 
@@ -336,7 +335,7 @@ const wrapperClasses = computed(() => [
       <!-- Prefix slot (inside border) -->
       <span
         v-if="$slots.prefix || prefix"
-        class="text-input-addon-text flex shrink-0 items-center ps-3 text-sm select-none"
+        class="text-input-addon-text text-compact flex shrink-0 items-center ps-3 select-none"
       >
         <slot name="prefix">{{ prefix }}</slot>
       </span>
@@ -372,7 +371,7 @@ const wrapperClasses = computed(() => [
           $slots['icon-right'] || $slots.suffix || suffix || clearable || canReveal
             ? 'pe-2'
             : 'pe-3',
-          'text-sm',
+          textSizeClasses[size ?? 'sm'],
           autogrow ? 'resize-none' : 'resize-y',
         ]"
         @input="handleInput"
@@ -413,11 +412,10 @@ const wrapperClasses = computed(() => [
           'text-input-text placeholder:text-input-placeholder',
           'disabled:text-input-disabled-text disabled:cursor-not-allowed',
           'h-full',
-          // Inside-label: push text down to leave room for the floating mini-label
-          labelPosition === 'inside' && label
-            ? 'pt-3 pb-0.5 text-xs font-semibold'
-            : textSizeClasses[size ?? 'sm'],
-          $slots['icon-left'] || $slots.prefix || prefix ? 'ps-2' : 'ps-3',
+          textSizeClasses[size ?? 'sm'],
+          $slots['icon-left'] || $slots.prefix || prefix || (labelPosition === 'inside' && label)
+            ? 'ps-2'
+            : 'ps-3',
           $slots['icon-right'] || $slots.suffix || suffix || clearable || canReveal
             ? 'pe-2'
             : 'pe-3',
@@ -472,7 +470,7 @@ const wrapperClasses = computed(() => [
       <!-- Suffix slot (inside border — text) -->
       <span
         v-if="$slots.suffix || suffix"
-        class="text-input-addon-text flex shrink-0 items-center pe-3 text-sm select-none"
+        class="text-input-addon-text text-compact flex shrink-0 items-center pe-3 select-none"
       >
         <slot name="suffix">{{ suffix }}</slot>
       </span>

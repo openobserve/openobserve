@@ -130,7 +130,7 @@ describe("TrendsPanel (AC-48)", () => {
     const w = mountPanel({});
     expect(
       w.find('[data-test="rum-analytics-trends-add-dashboard-btn"]').attributes("aria-label"),
-    ).toBe("Add to dashboard");
+    ).toBe("Add to Dashboard");
   });
 
   it("locks Add to dashboard when dashboards are license-locked", async () => {

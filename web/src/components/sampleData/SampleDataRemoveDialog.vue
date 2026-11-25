@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-else>
           <OButton
             variant="outline"
-            size="sm"
+            size="sm-action"
             data-test="sample-remove-close"
             @click="session.closeRemoveDialog()"
           >
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             variant="primary"
-            size="sm"
+            size="sm-action"
             data-test="sample-remove-retry"
             @click="session.removeInDialog(session.removeOrg.value)"
           >

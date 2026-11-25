@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OButton
           variant="outline"
-          size="sm-action"
+          size="sm"
           block
           :disabled="!addCount || applying"
           data-test="edit-role-preset-apply"

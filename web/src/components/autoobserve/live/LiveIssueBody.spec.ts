@@ -255,7 +255,7 @@ describe("LiveIssueBody", () => {
         },
       } as never);
       const w = await mountBody(item({ members: [member("pay_api"), member("b", 2, 30)] }));
-      expect(w.get(sel("autoobserve-issue-rca")).text()).toContain("What happened");
+      expect(w.get(sel("autoobserve-issue-rca")).text()).toContain("What Happened");
       expect(w.get(sel("autoobserve-live-issue-no-cause")).text()).toContain("isn't turned on");
       expect(w.get(sel("autoobserve-live-issue-likely")).text()).toContain("shared collector");
       const chart = w.findComponent({ name: "IssueSignal" });

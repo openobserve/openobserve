@@ -213,7 +213,7 @@ const trendClass = computed(() =>
     :class="[
       variant === 'chip'
         ? [
-            'rounded-default text-compact focus-visible:outline-accent h-8 shrink-0 items-center gap-1.5 border px-2.5 font-medium focus-visible:outline-2 focus-visible:outline-offset-1',
+            'rounded-default text-compact focus-visible:outline-accent h-7 shrink-0 items-center gap-1.5 border px-2.5 font-medium focus-visible:outline-2 focus-visible:outline-offset-1',
             selected && !quiet
               ? 'border-accent bg-surface-accent-hover'
               : [
@@ -297,7 +297,7 @@ const trendClass = computed(() =>
         </slot>
       </span>
       <span
-        class="inline-flex h-5 items-center text-base leading-5 tabular-nums"
+        class="inline-flex h-5 items-center text-sm leading-5 tabular-nums"
         :class="isMuted ? 'text-text-muted font-medium' : 'text-text-heading font-semibold'"
         data-test="o-stat-card-value"
       >

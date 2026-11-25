@@ -187,7 +187,7 @@ describe("PatternList", () => {
 
     it("should display empty state message when no patterns", () => {
       const emptyText = wrapper.text();
-      expect(emptyText).toContain("No patterns found");
+      expect(emptyText).toContain("No Patterns Found");
     });
 
     it("should display total logs analyzed in empty state", () => {

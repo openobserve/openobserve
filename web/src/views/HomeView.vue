@@ -720,6 +720,12 @@ export default defineComponent({
   min-height: 0;
 }
 
+/* Greeting stays inside the Logs type scale. */
+.home-ai-panel :deep(.welcome-hero__title) {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
 /* Hide the entire chat header + its separator — sidebar owns this UI */
 .home-ai-panel :deep(.chat-header),
 .home-ai-panel :deep(.chat-content-wrapper > [role="separator"]) {

@@ -366,7 +366,7 @@ describe("OrganizationManagement.vue", () => {
         id: 1,
         name: "Test Org 1",
         identifier: "test-org-1",
-        plan: "Pay as you go",
+        plan: "Pay As You Go",
         billing_provider: "-",
         credits_used: 125,
         credits_limit: 5000,
@@ -725,7 +725,7 @@ describe("OrganizationManagement.vue", () => {
     const mockRows = [
       { name: "Test Organization", identifier: "test-org", plan: "Free" },
       { name: "Demo Company", identifier: "demo-co", plan: "Enterprise" },
-      { name: "Sample Corp", identifier: "sample", plan: "Pay as you go" },
+      { name: "Sample Corp", identifier: "sample", plan: "Pay As You Go" },
     ];
 
     it("should filter by organization name (case insensitive)", () => {

@@ -524,8 +524,8 @@ const chipIcon = (kind: StepChipKind) =>
 // A code block with a filename is a file, not a shell command — render it with
 // editor chrome even under a terminal-chip step. Needed when one step mixes
 // command and file variants (e.g. RUM's npm install vs CDN HTML snippet).
-const codeChrome = (step: RichCardStep): "terminal" | "editor" =>
-  !displayCode(step)?.filename && step.chip?.kind === "terminal" ? "terminal" : "editor";
+const codeChrome = (step: RichCardStep): "editor" | undefined =>
+  !displayCode(step)?.filename && step.chip?.kind === "terminal" ? undefined : "editor";
 
 const extras = computed(() => props.content.extras ?? {});
 const uninstallSection = computed(() => {
@@ -1047,7 +1047,7 @@ function fireConfetti() {
             <OCodeBlock
               v-else-if="!tokenWithheld(extras.advanced.code)"
               :lang="extras.advanced.code.lang"
-              :chrome="extras.advanced.code.filename ? 'editor' : 'terminal'"
+              :chrome="extras.advanced.code.filename ? 'editor' : undefined"
               :filename="extras.advanced.code.filename"
               :code="subStream(extras.advanced.code.raw) || ''"
               :code-masked="subStream(extras.advanced.code.masked)"
@@ -1189,7 +1189,7 @@ function fireConfetti() {
   --primary-ink: var(--color-text-link);
   --track: var(--color-surface-subtle);
   color: var(--text-1);
-  font-size: var(--text-sm);
+  font-size: var(--text-compact);
 }
 
 /* ---- layout ---- */
@@ -1216,17 +1216,17 @@ function fireConfetti() {
 }
 
 .ds-mono.xl {
-  width: 2.875rem;
-  height: 2.875rem;
+  width: 2rem;
+  height: 2rem;
   border-radius: var(--radius-surface);
-  font-size: var(--text-xl);
+  font-size: var(--text-compact);
 }
 
 .ds-mono.logo {
   background: var(--panel);
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--border);
-  padding: 0.5rem;
+  padding: 0.3125rem;
 }
 
 .ds-mono.logo img {
@@ -1238,21 +1238,21 @@ function fireConfetti() {
 
 /* ---- hero — its own header band: [logo + name] row, then tagline + chips ---- */
 .c-hero {
-  padding: 0.375rem 0 1.125rem;
+  padding: 0.25rem 0 0.75rem;
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid var(--border);
-  margin-bottom: 1.375rem;
+  margin-bottom: 1rem;
 }
 
 .c-hero-head {
   display: flex;
   align-items: center;
-  gap: 0.875rem;
+  gap: 0.625rem;
 }
 
 .c-h1 {
-  font-weight: 800;
-  font-size: var(--text-2xl);
+  font-weight: 600;
+  font-size: var(--text-compact);
   letter-spacing: -0.02em;
   margin: 0;
   line-height: 1.1;
@@ -1260,8 +1260,8 @@ function fireConfetti() {
 
 .c-sub {
   color: var(--text-2);
-  font-size: var(--text-sm);
-  margin: 0.625rem 0 0;
+  font-size: var(--text-compact);
+  margin: 0.5rem 0 0;
 }
 
 /* Hero meta chips are now <OTag> (lib) — just lay them out. */
@@ -1270,7 +1270,7 @@ function fireConfetti() {
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-  margin-top: 0.6875rem;
+  margin-top: 0.5rem;
 }
 
 /* ---- stream-name config input ----
@@ -1316,6 +1316,18 @@ function fireConfetti() {
    is styled here; the rail (indicator/connector/title) comes from OStepper. ---- */
 .steps {
   margin-top: 0;
+}
+
+/* OStepper's 2rem indicator outweighs the 13px step body; 1.25rem matches the dense Logs scale. */
+.steps :deep(.o-step > div:first-child > button) {
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: var(--text-2xs);
+}
+
+.steps :deep(.o-step > div:first-child > button svg) {
+  width: 0.75rem;
+  height: 0.75rem;
 }
 
 /* Step context chip is now <OTag> (lib). Only the terminal "$_" glyph (used
@@ -1436,8 +1448,8 @@ function fireConfetti() {
   display: flex;
   align-items: center;
   gap: 0.5625rem;
-  font-weight: 800;
-  font-size: var(--text-sm);
+  font-weight: 600;
+  font-size: var(--text-compact);
   color: var(--warn-ink);
 }
 
@@ -1524,7 +1536,7 @@ function fireConfetti() {
   display: flex;
   align-items: flex-start;
   gap: 0.5625rem;
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--text-compact);
   color: var(--text-1);
 }

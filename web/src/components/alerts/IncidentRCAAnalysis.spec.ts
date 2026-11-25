@@ -826,7 +826,7 @@ describe("IncidentRCAAnalysis", () => {
       await flushPromises();
 
       expect(writeText).toHaveBeenCalledWith(
-        rcaThreadPlainText(rcaThread(), "Investigation thread"),
+        rcaThreadPlainText(rcaThread(), "Investigation Thread"),
       );
       expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({ variant: "success", message: "Thread copied to clipboard" }),

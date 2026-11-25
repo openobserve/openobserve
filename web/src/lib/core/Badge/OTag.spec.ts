@@ -104,8 +104,8 @@ describe("OTag size", () => {
       props: { value: "custom" },
       slots: { default: "Custom" },
     }).html();
-    expect(typed.includes("py-1.5")).toBe(true);
-    expect(untyped.includes("py-1.5")).toBe(true);
+    expect(typed.includes("h-5")).toBe(true);
+    expect(untyped.includes("h-5")).toBe(true);
     expect(typed.includes("py-2")).toBe(false);
     expect(untyped.includes("py-2")).toBe(false);
   });

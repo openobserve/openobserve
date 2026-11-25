@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             class="flex min-w-0 items-center justify-between gap-2 max-xl:flex-col max-xl:items-start max-xl:gap-0.5"
           >
-            <span class="text-text-heading text-xl font-semibold tabular-nums">{{
+            <span class="text-text-heading text-lg font-semibold tabular-nums">{{
               tile.value
             }}</span>
             <OButton

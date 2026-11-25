@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="settings-data-retention-add"
             variant="outline"
-            size="sm-action"
+            size="sm"
             icon-left="add"
             icon-right="keyboard-arrow-down"
             type="button"
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="settings-data-retention-add"
           variant="outline"
-          size="sm-action"
+          size="sm"
           icon-left="add"
           type="button"
           disabled

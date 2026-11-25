@@ -243,7 +243,7 @@ describe("OnCallCoverForm — which clock the times are on", () => {
   it("is titled Cover a shift, with the window labelled When", () => {
     const wrapper = renderCover();
 
-    expect(wrapper.findComponent({ name: "ODialog" }).props("title")).toBe("Cover a shift");
+    expect(wrapper.findComponent({ name: "ODialog" }).props("title")).toBe("Cover a Shift");
     expect(wrapper.findComponent({ name: "OFormDateTimeRange" }).attributes("label")).toBe("When");
   });
 

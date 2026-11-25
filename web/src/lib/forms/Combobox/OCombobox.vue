@@ -171,12 +171,7 @@ const heightClasses: Record<NonNullable<ComboboxProps["size"]>, string> = {
   md: "h-8 text-compact",
   lg: "h-9 text-sm",
 };
-const heightClass = computed(() => {
-  if (props.labelPosition === "inside" && (props.label || slots.label)) {
-    return "h-10 text-sm pt-4";
-  }
-  return heightClasses[props.size ?? "sm"];
-});
+const heightClass = computed(() => heightClasses[props.size ?? "sm"]);
 
 // ── Error ────────────────────────────────────────────────────────────────────
 const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
@@ -192,9 +187,6 @@ onMounted(() =>
     inputId.value,
   ),
 );
-const hasInsideLabel = computed(
-  () => props.labelPosition === "inside" && (Boolean(slots.label) || Boolean(props.label)),
-);
 </script>
 
 <template>
@@ -206,7 +198,7 @@ const hasInsideLabel = computed(
   >
     <!-- Label (outside) -->
     <label
-      v-if="(hasLabel || $slots.tooltip) && labelPosition !== 'inside'"
+      v-if="hasLabel || $slots.tooltip"
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
@@ -236,14 +228,6 @@ const hasInsideLabel = computed(
       @update:model-value="onSelect"
     >
       <ComboboxAnchor class="relative flex w-full items-center">
-        <!-- Inside label -->
-        <span
-          v-if="hasInsideLabel"
-          class="text-3xs text-input-placeholder pointer-events-none absolute start-3 top-1 z-10 leading-none select-none"
-        >
-          <slot name="label">{{ label }}</slot
-          ><span v-if="required" aria-hidden="true">&nbsp;*</span>
-        </span>
         <ComboboxInput
           v-bind="controlAttrs"
           :id="inputId"

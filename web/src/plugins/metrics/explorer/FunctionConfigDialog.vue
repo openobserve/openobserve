@@ -190,12 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #footer>
       <div class="flex items-center justify-between gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          data-test="metrics-fn-restore"
-          @click="onRestore"
-        >
+        <OButton variant="outline" size="sm" data-test="metrics-fn-restore" @click="onRestore">
           {{ t("metrics.explorer.fn.resetToDefault") }}
         </OButton>
 

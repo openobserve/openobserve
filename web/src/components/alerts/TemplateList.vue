@@ -47,13 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         /></OButton>
       </template>
       <template #actions-overflow>
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="importTemplate"
-          data-test="template-import"
-          >{{ t(`dashboard.import`) }}</OButton
-        >
+        <OButton variant="outline" size="sm" @click="importTemplate" data-test="template-import">{{
+          t(`dashboard.import`)
+        }}</OButton>
       </template>
 
       <OBanner

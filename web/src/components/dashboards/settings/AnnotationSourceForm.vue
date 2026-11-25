@@ -519,14 +519,14 @@ const title = computed(() =>
               <template #actions>
                 <OButton
                   variant="outline"
-                  size="sm"
+                  size="sm-action"
                   data-test="dashboard-annotation-source-discard-sql-cancel"
                   @click="confirmDiscardSql = false"
                   >{{ t("dashboard.cancel") }}</OButton
                 >
                 <OButton
                   variant="destructive"
-                  size="sm"
+                  size="sm-action"
                   data-test="dashboard-annotation-source-discard-sql-confirm"
                   @click="discardSql"
                   >{{ t("dashboard.annotationSources.discard") }}</OButton

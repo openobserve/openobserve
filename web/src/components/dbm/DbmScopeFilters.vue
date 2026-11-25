@@ -57,7 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="filter.dimension"
             :model-value="filter.value"
             :options="filter.options"
-            size="md"
             :searchable="false"
             clearable
             :placeholder="filter.placeholder"

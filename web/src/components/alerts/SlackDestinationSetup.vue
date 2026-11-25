@@ -391,7 +391,7 @@ onMounted(() => {
         <template #actions>
           <OButton
             variant="primary"
-            size="sm-action"
+            size="sm"
             :loading="connecting"
             data-test="slack-form-upgrade-button"
             @click="connectSlack"
@@ -451,7 +451,7 @@ onMounted(() => {
       <OButton
         v-if="connected"
         variant="outline"
-        size="sm-action"
+        size="sm"
         class="w-fit"
         icon-left="refresh"
         :loading="connecting"
@@ -463,7 +463,7 @@ onMounted(() => {
       <OButton
         v-else
         variant="primary"
-        size="sm-action"
+        size="sm"
         class="w-fit"
         icon-left="link"
         :loading="connecting"
@@ -498,7 +498,7 @@ onMounted(() => {
           <OButton
             class="w-fit"
             variant="primary"
-            size="sm-action"
+            size="sm"
             icon-right="arrow-forward"
             :disabled="!canContinueManifest"
             data-test="slack-manifest-continue-button"
@@ -532,7 +532,7 @@ onMounted(() => {
           <div class="flex flex-wrap items-center gap-2">
             <OButton
               variant="outline"
-              size="sm-action"
+              size="sm"
               data-test="slack-manifest-back-button"
               @click="goBackManifest"
             >
@@ -544,7 +544,7 @@ onMounted(() => {
               target="_blank"
               rel="noopener noreferrer"
               variant="primary"
-              size="sm-action"
+              size="sm"
               icon-right="open-in-new"
               data-test="slack-manifest-open-slack"
               @click="advanceToWebhook"
@@ -564,7 +564,7 @@ onMounted(() => {
           <OButton
             class="w-fit"
             variant="outline"
-            size="sm-action"
+            size="sm"
             data-test="slack-manifest-back-button"
             @click="goBackManifest"
           >

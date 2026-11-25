@@ -474,7 +474,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             emit('empty-action', id);
           }
         "
-      />
+      >
+        <template v-if="!props.hasFilters" #actions>
+          <EmptyStateActionCard
+            v-for="a in emptyCreateActions"
+            :key="a.id"
+            size="compact"
+            :icon="a.icon"
+            :label="t(a.titleKey)"
+            :sublabel="a.descriptionKey ? t(a.descriptionKey) : undefined"
+            :data-test="`o2-empty-state-action-${a.id}`"
+            :data-empty-state-action="a.id"
+            @click="emit('empty-action', a.id)"
+          />
+        </template>
+      </OEmptyState>
     </template>
 
     <!-- Footer with count + bulk action buttons -->
@@ -614,6 +628,8 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import { emptyStatePresets } from "@/lib/core/EmptyState/presets";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
@@ -769,6 +785,9 @@ defineExpose({ restorePage: (page: number) => oTableRef.value?.restorePage?.(pag
 
 const { t } = useI18nTyped();
 
+// Compact cards sit in one row instead of the preset's wrapping full-size cards.
+const emptyCreateActions = emptyStatePresets["no-synthetic-monitors"].actions ?? [];
+
 // Not a `withDefaults` default: that is evaluated once at module scope and would freeze the copy in the first-loaded locale.
 const resolvedEmptyMessage = computed(() => props.emptyMessage ?? t("search.noResult"));
 
@@ -796,7 +815,7 @@ const STATUS_COL: OTableColumnDef = {
   id: "status",
   header: t("synthetics.table.status"),
   accessorKey: "status",
-  size: COL.status,
+  size: 92,
   minSize: 72,
   sortable: true,
   meta: { align: "left" },
@@ -805,7 +824,7 @@ const NAME_COL: OTableColumnDef = {
   id: "name",
   header: t("synthetics.table.check"),
   accessorKey: "name",
-  size: COL.name,
+  size: 120,
   minSize: 120,
   sortable: true,
   hideable: true,
@@ -825,8 +844,8 @@ const URL_COL: OTableColumnDef = {
   id: "url",
   header: t("synthetics.table.url"),
   accessorKey: "url",
-  size: COL.url,
-  minSize: 140,
+  size: 120,
+  minSize: 100,
   sortable: false,
   hideable: true,
 };
@@ -834,7 +853,7 @@ const TYPE_COL: OTableColumnDef = {
   id: "type",
   header: t("synthetics.table.type"),
   accessorKey: "type",
-  size: COL.type,
+  size: 88,
   minSize: 72,
   sortable: true,
   hideable: true,
@@ -853,8 +872,8 @@ const RESPONSE_TIME_COL: OTableColumnDef = {
   header: t("synthetics.table.response"),
   accessorFn: responseTimeSortValue,
   sortUndefined: "last",
-  size: COL.responseTime,
-  minSize: 72,
+  size: 100,
+  minSize: 96,
   sortable: true,
   meta: { align: "right" },
   hideable: true,
@@ -884,8 +903,8 @@ const LOCATIONS_COL: OTableColumnDef = {
   id: "locations",
   header: t("synthetics.table.locations"),
   accessorKey: "locations",
-  size: COL.locations,
-  minSize: 90,
+  size: 88,
+  minSize: 80,
   sortable: false,
   hideable: true,
 };
@@ -902,7 +921,7 @@ const LAST_CHECK_COL: OTableColumnDef = {
   id: "lastCheck",
   header: t("synthetics.table.lastCheck"),
   accessorKey: "lastCheck",
-  size: COL.lastCheck,
+  size: 84,
   minSize: 72,
   sortable: false,
   hideable: true,
@@ -939,8 +958,8 @@ const ACTIONS_COL: OTableColumnDef = {
   id: "actions",
   header: raw(""),
   accessorKey: "id",
-  size: 190,
-  minSize: 190,
+  size: 168,
+  minSize: 168,
   sortable: false,
   isAction: true,
 };

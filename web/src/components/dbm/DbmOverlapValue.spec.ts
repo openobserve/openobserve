@@ -86,7 +86,7 @@ describe("DbmOverlapValue", () => {
       qualifierKey: "serverCounted",
       engine: "mysql",
     });
-    expect(wrapper.get('[data-test="dbm-overlap-qualifier"]').text()).toBe("server count");
+    expect(wrapper.get('[data-test="dbm-overlap-qualifier"]').text()).toBe("Server Count");
   });
 
   /**

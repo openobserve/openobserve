@@ -145,11 +145,11 @@ const countChip = (wrapper: ReturnType<typeof mountRail>) => {
 const SUBTITLE = '[data-test="autoobserve2-suggestions-subtitle"]';
 
 describe("LiveSuggestions rail (OSS-11, OSS-9)", () => {
-  it("shows the top five, the server total, 'and N more' and 'See all N'", () => {
+  it("shows the top five, the server total, 'and N more' and 'See All N'", () => {
     const wrapper = mountRail(rail(8, 12));
     expect(cards(wrapper)).toHaveLength(5);
     expect(wrapper.find('[data-test="autoobserve2-suggestions-more"]').text()).toBe("and 7 more");
-    expect(wrapper.find('[data-test="autoobserve2-suggestions-see-all"]').text()).toBe("See all");
+    expect(wrapper.find('[data-test="autoobserve2-suggestions-see-all"]').text()).toBe("See All");
     expect(countChip(wrapper)).toBe("12");
   });
 
@@ -251,12 +251,12 @@ describe("LiveSuggestions rail (OSS-11, OSS-9)", () => {
 });
 
 describe("LiveSuggestions rail when decisions empty the first page", () => {
-  it("keeps See all from the server total, and never says there are no suggestions", () => {
+  it("keeps See All from the server total, and never says there are no suggestions", () => {
     const wrapper = mountRail(rail(0, 12));
     expect(cards(wrapper)).toHaveLength(0);
     const seeAll = wrapper.find('[data-test="autoobserve2-suggestions-see-all"]');
     expect(seeAll.exists()).toBe(true);
-    expect(seeAll.text()).toBe("See all");
+    expect(seeAll.text()).toBe("See All");
     expect(wrapper.find('[data-test="autoobserve2-suggestions-more"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="autoobserve2-suggestions-empty"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="autoobserve2-suggestions-page-empty"]').text()).toContain(
@@ -265,7 +265,7 @@ describe("LiveSuggestions rail when decisions empty the first page", () => {
     expect(countChip(wrapper)).toBe("12");
   });
 
-  it("keeps See all when the page holds fewer cards than the total", () => {
+  it("keeps See All when the page holds fewer cards than the total", () => {
     const wrapper = mountRail(rail(2, 12));
     expect(cards(wrapper)).toHaveLength(2);
     expect(wrapper.find('[data-test="autoobserve2-suggestions-more"]').text()).toBe("and 10 more");
@@ -306,14 +306,14 @@ describe("LiveSuggestions rail: a monitor that notifies no one (demo bug 4)", ()
 });
 
 describe("LiveSuggestions rail: one card shape for 0, 1, a few and many (test 16)", () => {
-  it("shows three cards with no footer, and seven as five plus 'and 2 more · See all 7'", () => {
+  it("shows three cards with no footer, and seven as five plus 'and 2 more · See All 7'", () => {
     const three = mountRail(rail(3, 3));
     expect(cards(three)).toHaveLength(3);
     expect(three.find('[data-test="autoobserve2-suggestions-see-all"]').exists()).toBe(false);
     const seven = mountRail(rail(7, 7));
     expect(cards(seven)).toHaveLength(5);
     expect(seven.find('[data-test="autoobserve2-suggestions-more"]').text()).toBe("and 2 more");
-    expect(seven.find('[data-test="autoobserve2-suggestions-see-all"]').text()).toBe("See all");
+    expect(seven.find('[data-test="autoobserve2-suggestions-see-all"]').text()).toBe("See All");
   });
 
   it("folds seven coverage gaps into one card that counts them all, with no 'and N more'", () => {

@@ -32,7 +32,7 @@
       <IacRegistryLinks data-test="slos-slolist-iac-registries" :compact="isMobile" />
       <OButton
         variant="outline"
-        size="sm-action"
+        size="sm"
         icon-left="upload-file"
         data-test="slos-slolist-import"
         @click="goToImport"
@@ -41,7 +41,7 @@
       </OButton>
       <OButton
         variant="primary"
-        size="sm-action"
+        size="sm"
         data-test="slos-slolist-new"
         :aria-label="
           sloDrafts.hasNew ? t('common.editorDraft.newDot', { label: t('slos.new') }) : undefined
@@ -394,7 +394,7 @@
           :title="t('slos.empty.title')"
           :description="t('slos.empty.description')"
         >
-          <OButton variant="primary" size="sm-action" icon-left="add" @click="goToNew">
+          <OButton variant="primary" size="sm" icon-left="add" @click="goToNew">
             {{ t("slos.new") }}
           </OButton>
         </OEmptyState>

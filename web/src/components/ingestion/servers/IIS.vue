@@ -53,7 +53,6 @@ const org = store.state.selectedOrganization.identifier;
             v-if="guide.installCommand"
             :slug="`${server}-install`"
             :content="guide.installCommand"
-            chrome="terminal"
             lang="bash"
           />
           <p v-else class="text-text-secondary m-0">

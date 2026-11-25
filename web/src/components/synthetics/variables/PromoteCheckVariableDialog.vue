@@ -37,12 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <template #footer>
-      <OButton variant="outline" size="sm" @click="$emit('update:open', false)">
+      <OButton variant="outline" size="sm-action" @click="$emit('update:open', false)">
         {{ t("common.cancel") }}
       </OButton>
       <OButton
         variant="primary"
-        size="sm"
+        size="sm-action"
         :disabled="!options.length || saving"
         data-test="synthetics-promote-check-variable-confirm"
         @click="submit"

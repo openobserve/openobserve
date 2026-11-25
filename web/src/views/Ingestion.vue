@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="ingestion-token-select"
         :aria-label="t('ingestion.mcp.auth.token')"
         :options="tokenOptions"
+        size="sm"
         label-key="label"
         value-key="value"
         class="max-w-xs min-w-55 max-md:order-last max-md:max-w-full max-md:min-w-0! max-md:basis-full"
@@ -50,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <FeatureLockExempt v-if="!isRUMPage" class="contents">
         <OButton
-          variant="primary"
-          size="sm-action"
+          variant="outline"
+          size="sm"
           class="shrink-0"
           icon-left="key"
           :title="isMobile ? t('ingestion.manageTokensBtnLabel') : undefined"
@@ -68,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.organizationData.rumToken.rum_token != ''
         "
         variant="primary"
-        size="sm-action"
+        size="sm"
         data-test="ingestion-reset-token-btn"
         @click="showRUMUpdateDialogFn"
       >
@@ -81,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.organizationData.rumToken.rum_token == ''
         "
         variant="primary"
-        size="sm-action"
+        size="sm"
         data-test="ingestion-reset-token-btn"
         @click="generateRUMToken"
       >
@@ -91,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-tabs>
       <!-- Pull the strip left (cancel the header's px-4) so the first tab lines
              up with the vertical sub-nav (Kubernetes/…) in the section below. -->
-      <div class="-ms-3 w-full">
+      <div class="-ms-3 w-full min-w-0">
         <!-- Below lg the token picker sits above the tabs so the title, search and token button share one row. -->
         <div v-if="!lgUp && !isRUMPage && tokenOptions.length > 0" class="ms-3 pb-2">
           <OSelect
@@ -100,13 +101,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="ingestion-token-select"
             :aria-label="t('ingestion.mcp.auth.token')"
             :options="tokenOptions"
+            size="sm"
             label-key="label"
             value-key="value"
             @update:model-value="onTokenSelected"
           />
         </div>
         <FeatureLockExempt>
-          <OTabs v-model="ingestTabType" align="left">
+          <OTabs v-model="ingestTabType" align="left" dense>
             <ORouteTab
               name="recommended"
               :to="{

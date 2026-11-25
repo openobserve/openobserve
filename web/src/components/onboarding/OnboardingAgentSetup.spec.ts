@@ -286,16 +286,16 @@ describe("OnboardingAgentSetup", () => {
   it("names each step once, as a heading, with no disabled button", async () => {
     const w = await mountPage();
     expect(w.findAll("ol > li h2").map((h) => h.text())).toEqual([
-      "Save your token",
-      "Copy the prompt",
+      "Save Your Token",
+      "Copy the Prompt",
       "Paste it into your coding agent",
     ]);
     expect(w.findAll("button[disabled]")).toHaveLength(0);
-    expect(w.find('[aria-current="step"] h2').text()).toBe("Save your token");
+    expect(w.find('[aria-current="step"] h2').text()).toBe("Save Your Token");
     await byTest(w, "ingestion-onboarding-agent-token-code-block-copy-btn").trigger("click");
     await flushPromises();
-    expect(w.find('[aria-current="step"] h2').text()).toBe("Copy the prompt");
-    expect(w.findAll("ol > li h2")[0].text()).toBe("Save your token (done)");
+    expect(w.find('[aria-current="step"] h2').text()).toBe("Copy the Prompt");
+    expect(w.findAll("ol > li h2")[0].text()).toBe("Save Your Token (done)");
   });
 
   it("re-copies the export line when the status asks to copy the command", async () => {
@@ -318,7 +318,7 @@ describe("OnboardingAgentSetup", () => {
       w.findComponent(StatusStub).vm.$emit("copy-command");
       await flushPromises();
       expect(copiedTexts()).toEqual([]);
-      expect(w.find('[aria-current="step"] h2').text()).toBe("Save your token");
+      expect(w.find('[aria-current="step"] h2').text()).toBe("Save Your Token");
     } finally {
       vi.mocked(useOrgCredential).mockImplementation(() => ({ ready: { value: true } }) as never);
     }
@@ -334,7 +334,7 @@ describe("OnboardingAgentSetup", () => {
     await flushPromises();
     expect(copiedTexts()).toEqual([]);
     expect(start).not.toHaveBeenCalled();
-    expect(w.find('[aria-current="step"] h2').text()).toBe("Save your token");
+    expect(w.find('[aria-current="step"] h2').text()).toBe("Save Your Token");
   });
 
   it("does not tick a new setup's prompt when the old prompt's copy finishes late", async () => {

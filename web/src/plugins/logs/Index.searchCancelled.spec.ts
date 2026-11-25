@@ -126,7 +126,7 @@ describe(
       vi.restoreAllMocks();
     });
 
-    it("Cancel on the Run button before any result shows Search cancelled, never No events found", async () => {
+    it("Cancel on the Run button before any result shows Search Cancelled, never No events found", async () => {
       await runButton().trigger("click");
       await vi.waitFor(() => expect(searchHits()).toHaveLength(1));
       await vi.waitFor(() => expect(runButton().text()).toBe("Cancel query"));
@@ -137,7 +137,7 @@ describe(
       expect(aborted).toContain(searchHits()[0].payload.traceId);
       const cancelled = wrapper.find('[data-test="logs-search-cancelled-state"]');
       expect(cancelled.exists()).toBe(true);
-      expect(cancelled.text()).toContain("Search cancelled");
+      expect(cancelled.text()).toMatch(/search cancelled/i);
       expect(cancelled.text()).toContain("No results were loaded");
       expect(wrapper.find('[data-test="logs-search-no-events-found-text"]').exists()).toBe(false);
       expect(wrapper.text()).not.toContain("No events found");
@@ -215,7 +215,7 @@ describe(
         expect(wrapper.find('[data-test="logs-search-cancelled-notice"]').exists()).toBe(
           retainedRows,
         );
-        expect(wrapper.text()).toContain("Search cancelled");
+        expect(wrapper.text()).toMatch(/search cancelled/i);
         expect(wrapper.text()).not.toContain("No events found");
 
         await runButton().trigger("click");

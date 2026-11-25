@@ -866,11 +866,11 @@ describe("Profiles page", () => {
     await settle();
 
     const filters = wrapper.get('[data-test="profiles-label-filters"]');
-    expect(filters.text()).toContain("Label filters");
+    expect(filters.text()).toContain("Label Filters");
     expect(filters.find(".bg-badge-orange-ol-text").exists()).toBe(false);
     const t = i18n.global.t;
-    expect(t("emptyState.noProfiles.title")).toBe("No profiles found");
-    expect(t("profiles.noSeries")).toBe("No data");
+    expect(t("emptyState.noProfiles.title")).toBe("No Profiles Found");
+    expect(t("profiles.noSeries")).toBe("No Data");
     expect(t("profiles.rootAtBottom")).toBe("Root at bottom");
     expect(t("profiles.runOptions")).toBe("Run options");
   });

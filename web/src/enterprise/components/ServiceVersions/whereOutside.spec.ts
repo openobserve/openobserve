@@ -89,7 +89,7 @@ describe("the shared where label", () => {
       in: "serviceVersions.compare.pods.title",
       outside: "serviceVersions.compare.pods.titleOutside",
     } as const;
-    expect(whereSentence(keys, "default", null, {}, gt)).toBe("Pods outside Kubernetes");
+    expect(whereSentence(keys, "default", null, {}, gt)).toBe("Pods Outside Kubernetes");
     expect(whereSentence(keys, "k8s:c1/web", null, {}, gt)).toBe("Pods in c1 · web");
   });
 });

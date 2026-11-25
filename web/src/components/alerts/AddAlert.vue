@@ -71,69 +71,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- EDIT MODE (anomaly): status + last-run + retry trail the name -->
           <template #title-trail>
-            <div
-              v-if="(beingUpdated || anomalyEditMode) && isAnomalyMode"
-              class="flex items-center gap-1.5"
-            >
-              <OTooltip
-                :content="raw(anomalyConfig.last_error)"
-                :disabled="
-                  (anomalyConfig.status !== 'failed' &&
-                    !isAnomalyDataReadinessStatus(anomalyConfig.status)) ||
-                  !anomalyConfig.last_error
-                "
+            <div class="flex min-w-0 items-center gap-3">
+              <div
+                v-if="(beingUpdated || anomalyEditMode) && isAnomalyMode"
+                class="flex items-center gap-1.5"
               >
-                <OTag
-                  v-if="anomalyConfig.status"
-                  type="anomalyStatus"
-                  :value="anomalyConfig.status"
-                />
-              </OTooltip>
-              <!-- §4.8 health badge: its own element keyed off notice_class, never folded into the status tag. -->
-              <OTooltip v-if="anomalyNoticeBadge" :content="anomalyNoticeTooltip">
-                <OTag
-                  variant="warning-quiet"
-                  :label="anomalyNoticeBadge.label"
-                  data-test="anomaly-notice-badge"
-                />
-              </OTooltip>
+                <OTooltip
+                  :content="raw(anomalyConfig.last_error)"
+                  :disabled="
+                    (anomalyConfig.status !== 'failed' &&
+                      !isAnomalyDataReadinessStatus(anomalyConfig.status)) ||
+                    !anomalyConfig.last_error
+                  "
+                >
+                  <OTag
+                    v-if="anomalyConfig.status"
+                    type="anomalyStatus"
+                    :value="anomalyConfig.status"
+                  />
+                </OTooltip>
+                <!-- §4.8 health badge: its own element keyed off notice_class, never folded into the status tag. -->
+                <OTooltip v-if="anomalyNoticeBadge" :content="anomalyNoticeTooltip">
+                  <OTag
+                    variant="warning-quiet"
+                    :label="anomalyNoticeBadge.label"
+                    data-test="anomaly-notice-badge"
+                  />
+                </OTooltip>
+                <span
+                  v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
+                  class="text-2xs text-text-secondary whitespace-nowrap"
+                >
+                  {{
+                    t("alerts.lastRun", { time: anomalyFormatTs(anomalyConfig.last_detection_run) })
+                  }}
+                </span>
+                <OTooltip
+                  v-if="anomalyConfig.status === 'failed'"
+                  :content="t('alerts.retryTraining')"
+                >
+                  <OButton
+                    variant="ghost-destructive"
+                    size="xs"
+                    :loading="anomalyRetraining"
+                    @click="anomalyTriggerRetrain"
+                    icon-left="replay"
+                  >
+                    {{ t("alerts.retry") }}
+                  </OButton>
+                </OTooltip>
+                <OTooltip
+                  v-else-if="anomalyCanCheckDataNow(anomalyConfig)"
+                  :content="t('alerts.anomaly.checkDataNowTooltip')"
+                >
+                  <OButton
+                    variant="ghost"
+                    size="xs"
+                    :loading="anomalyRetraining"
+                    data-test="anomaly-check-data-now"
+                    @click="anomalyTriggerRetrain"
+                    icon-left="replay"
+                  >
+                    {{ t("alerts.anomaly.checkDataNow") }}
+                  </OButton>
+                </OTooltip>
+              </div>
               <span
-                v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
-                class="text-2xs text-text-secondary whitespace-nowrap"
+                class="text-text-secondary text-compact flex min-w-0 items-center gap-1 leading-normal"
               >
-                {{
-                  t("alerts.lastRun", { time: anomalyFormatTs(anomalyConfig.last_detection_run) })
-                }}
+                <span class="whitespace-nowrap">
+                  {{ t("alerts.modeInFolder", { mode: headerModeLabel }) }}
+                </span>
+                <InlineSelectFolderDropdown
+                  v-if="!(beingUpdated || anomalyEditMode)"
+                  variant="inline"
+                  :model-value="activeFolderId as string"
+                  type="alerts"
+                  @update:model-value="updateActiveFolderId({ value: $event })"
+                />
+                <OTruncatedText v-else class="text-text-body font-medium">
+                  {{ activeFolderName }}
+                </OTruncatedText>
               </span>
-              <OTooltip
-                v-if="anomalyConfig.status === 'failed'"
-                :content="t('alerts.retryTraining')"
-              >
-                <OButton
-                  variant="ghost-destructive"
-                  size="xs"
-                  :loading="anomalyRetraining"
-                  @click="anomalyTriggerRetrain"
-                  icon-left="replay"
-                >
-                  {{ t("alerts.retry") }}
-                </OButton>
-              </OTooltip>
-              <OTooltip
-                v-else-if="anomalyCanCheckDataNow(anomalyConfig)"
-                :content="t('alerts.anomaly.checkDataNowTooltip')"
-              >
-                <OButton
-                  variant="ghost"
-                  size="xs"
-                  :loading="anomalyRetraining"
-                  data-test="anomaly-check-data-now"
-                  @click="anomalyTriggerRetrain"
-                  icon-left="replay"
-                >
-                  {{ t("alerts.anomaly.checkDataNow") }}
-                </OButton>
-              </OTooltip>
             </div>
           </template>
 
@@ -150,23 +169,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              formData.name → anomalyConfig.name watcher in useAlertForm still
              feeds the value saveAnomalyDetection reads, and anomaly edit-load
              seeds it via setF("name", data.name).) -->
-          <template #subtitle>
-            <span class="flex min-w-0 items-center gap-1 leading-normal">
-              <span class="whitespace-nowrap">
-                {{ t("alerts.modeInFolder", { mode: headerModeLabel }) }}
-              </span>
-              <InlineSelectFolderDropdown
-                v-if="!(beingUpdated || anomalyEditMode)"
-                variant="inline"
-                :model-value="activeFolderId as string"
-                type="alerts"
-                @update:model-value="updateActiveFolderId({ value: $event })"
-              />
-              <OTruncatedText v-else class="text-text-body font-medium">
-                {{ activeFolderName }}
-              </OTruncatedText>
-            </span>
-          </template>
         </OPageHeader>
       </template>
 
@@ -232,8 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="bg-card-glass-bg stream-config-card [container-type:inline-size] shrink-0 [container-name:stream-config]"
           >
-            <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
+            <div class="border-border-default flex items-center gap-0 border-b px-3 py-1.5">
               <span class="text-compact me-3 font-semibold tracking-[0.01em]">{{
                 t("alerts.alertType")
               }}</span>
@@ -570,9 +571,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Preview Card -->
           <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
             <div
-              class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2.5 select-none"
+              class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-1.5 select-none"
             >
-              <span class="text-sm font-medium">{{ t("alerts.preview") }}</span>
+              <span class="text-compact font-medium">{{ t("alerts.preview") }}</span>
               <template v-if="!isAnomalyMode && activeEvaluationStatus">
                 <div class="bg-border-default h-4 w-px" />
                 <OIcon
@@ -631,9 +632,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Summary Card -->
           <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
             <div
-              class="border-border-default flex shrink-0 items-center border-b px-3 py-2.5 select-none"
+              class="border-border-default flex shrink-0 items-center border-b px-3 py-1.5 select-none"
             >
-              <span class="text-sm font-medium">{{ t("alerts.summary.title") }}</span>
+              <span class="text-compact font-medium">{{ t("alerts.summary.title") }}</span>
             </div>
             <div class="min-h-0 flex-1 overflow-auto">
               <AnomalySummary

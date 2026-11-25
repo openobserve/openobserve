@@ -598,8 +598,8 @@ describe("GroupRoles Component", () => {
 
       const noneSelected = emptyGroup.find('[data-test="iam-roles-selection-none-selected"]');
       expect(noneSelected.exists()).toBe(true);
-      expect(noneSelected.text()).toContain("No roles selected");
-      expect(emptyGroup.text()).not.toContain("No roles yet");
+      expect(noneSelected.text()).toContain("No Roles Selected");
+      expect(emptyGroup.text()).not.toContain("No Roles Yet");
 
       emptyGroup.unmount();
     });
@@ -634,7 +634,7 @@ describe("GroupRoles Component", () => {
       expect(emptyGroup.find('[data-test="iam-roles-selection-none-selected"]').exists()).toBe(
         false,
       );
-      expect(emptyGroup.text()).toContain("No roles yet");
+      expect(emptyGroup.text()).toContain("No Roles Yet");
 
       emptyGroup.unmount();
     });
@@ -644,7 +644,7 @@ describe("GroupRoles Component", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="iam-roles-selection-none-selected"]').exists()).toBe(false);
-      expect(wrapper.text()).toContain("No roles found");
+      expect(wrapper.text()).toContain("No Roles Found");
     });
 
     it("keeps the org-empty copy under the default Selected filter when the org has no roles", async () => {
@@ -657,7 +657,7 @@ describe("GroupRoles Component", () => {
       expect(emptyGroup.find('[data-test="iam-roles-selection-none-selected"]').exists()).toBe(
         false,
       );
-      expect(emptyGroup.text()).toContain("No roles yet");
+      expect(emptyGroup.text()).toContain("No Roles Yet");
 
       emptyGroup.unmount();
     });
@@ -685,7 +685,7 @@ describe("GroupRoles Component", () => {
       queryClient.clear();
       const emptyGroup = await mountWithGroupRoles([]);
 
-      expect(emptyGroup.text()).toContain("No roles yet");
+      expect(emptyGroup.text()).toContain("No Roles Yet");
       expectUnclippable(emptyGroup);
 
       emptyGroup.unmount();
@@ -695,7 +695,7 @@ describe("GroupRoles Component", () => {
       await wrapper.find('input[type="text"]').setValue("nonexistent");
       await flushPromises();
 
-      expect(wrapper.text()).toContain("No roles found");
+      expect(wrapper.text()).toContain("No Roles Found");
       expectUnclippable(wrapper);
     });
 
@@ -707,7 +707,7 @@ describe("GroupRoles Component", () => {
 
       expect(pending.findComponent(OTable).props("loading")).toBe(true);
       expect(pending.find('[data-test="iam-roles-selection-none-selected"]').exists()).toBe(false);
-      expect(pending.text()).not.toContain("No roles yet");
+      expect(pending.text()).not.toContain("No Roles Yet");
 
       pending.unmount();
       queryClient.clear();
@@ -721,7 +721,7 @@ describe("GroupRoles Component", () => {
 
       expect(failed.find('[data-test="iam-roles-selection-load-error"]').exists()).toBe(true);
       expect(failed.find('[data-test="iam-roles-selection-none-selected"]').exists()).toBe(false);
-      expect(failed.text()).not.toContain("No roles yet");
+      expect(failed.text()).not.toContain("No Roles Yet");
 
       await (failed.vm as any).updateUserTable("all");
       await flushPromises();

@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <div
                   :data-test="`domain-management-domain-name-${domain.name}`"
-                  class="text-text-heading min-w-40 flex-1 text-sm font-medium break-all"
+                  class="text-text-heading text-compact min-w-40 flex-1 font-medium break-all"
                 >
                   {{ domain.name }}
                 </div>
@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         side="right"
         :width="40"
       >
-        <div class="text-sm">
+        <div class="text-compact">
           <div class="rounded-default bg-surface-subtle mb-4 p-4">
             <div class="mb-2 font-medium">{{ t("settings.claimParserFunctionInputTitle") }}</div>
             <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>

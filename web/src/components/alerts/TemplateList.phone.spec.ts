@@ -65,8 +65,8 @@ describe("TemplateList at phone width (B37)", { timeout: 15000 }, () => {
     expect(table.props("columnVisibility")).toEqual({ applies_to: false, used_by: false });
     const shown = headers(wrapper!);
     expect(shown).toContain("Name");
-    expect(shown).not.toContain("Applies to");
-    expect(shown).not.toContain("Used by");
+    expect(shown).not.toContain("Applies To");
+    expect(shown).not.toContain("Used By");
   });
 
   const toggle = () => wrapper!.findComponent({ name: "OTableColumnToggle" });
@@ -93,8 +93,8 @@ describe("TemplateList at phone width (B37)", { timeout: 15000 }, () => {
     await choose({ applies_to: true, used_by: false });
 
     const shown = headers(wrapper!);
-    expect(shown).toContain("Applies to");
-    expect(shown).not.toContain("Used by");
+    expect(shown).toContain("Applies To");
+    expect(shown).not.toContain("Used By");
   });
 
   it("keeps a phone choice from hiding the untouched column on desktop", async () => {
@@ -103,18 +103,18 @@ describe("TemplateList at phone width (B37)", { timeout: 15000 }, () => {
     await choose({ applies_to: true, used_by: false });
 
     await resize(true);
-    expect(headers(wrapper!)).toEqual(expect.arrayContaining(["Applies to", "Used by"]));
+    expect(headers(wrapper!)).toEqual(expect.arrayContaining(["Applies To", "Used By"]));
   });
 
   it("keeps a desktop hide from showing the untouched column on a phone", async () => {
     await mountList();
     await choose({ applies_to: false, used_by: true });
-    expect(headers(wrapper!)).not.toContain("Applies to");
+    expect(headers(wrapper!)).not.toContain("Applies To");
 
     await resize(false);
     const shown = headers(wrapper!);
-    expect(shown).not.toContain("Applies to");
-    expect(shown).not.toContain("Used by");
+    expect(shown).not.toContain("Applies To");
+    expect(shown).not.toContain("Used By");
   });
 
   it("returns to the viewport defaults on Reset", async () => {
@@ -127,9 +127,9 @@ describe("TemplateList at phone width (B37)", { timeout: 15000 }, () => {
     });
 
     await choose({ applies_to: false, used_by: false });
-    expect(headers(wrapper!)).not.toContain("Applies to");
+    expect(headers(wrapper!)).not.toContain("Applies To");
     await resize(true);
-    expect(headers(wrapper!)).toEqual(expect.arrayContaining(["Applies to", "Used by"]));
+    expect(headers(wrapper!)).toEqual(expect.arrayContaining(["Applies To", "Used By"]));
   });
 
   it("clears a choice made on the other viewport on Reset", async () => {
@@ -138,13 +138,13 @@ describe("TemplateList at phone width (B37)", { timeout: 15000 }, () => {
     await choose({ applies_to: true, used_by: false });
     await resize(true);
     await choose({ applies_to: true, used_by: false });
-    expect(headers(wrapper!)).not.toContain("Used by");
+    expect(headers(wrapper!)).not.toContain("Used By");
 
     await choose({ applies_to: true, used_by: true });
     await resize(false);
     const shown = headers(wrapper!);
-    expect(shown).not.toContain("Applies to");
-    expect(shown).not.toContain("Used by");
+    expect(shown).not.toContain("Applies To");
+    expect(shown).not.toContain("Used By");
   });
 
   it("shows both columns again when the viewport grows to md", async () => {
@@ -156,16 +156,16 @@ describe("TemplateList at phone width (B37)", { timeout: 15000 }, () => {
     await flushPromises();
 
     const shown = headers(wrapper!);
-    expect(shown).toContain("Applies to");
-    expect(shown).toContain("Used by");
+    expect(shown).toContain("Applies To");
+    expect(shown).toContain("Used By");
   });
 
   it("keeps both columns at desktop width and leaves them hideable", async () => {
     await mountList();
 
     const shown = headers(wrapper!);
-    expect(shown).toContain("Applies to");
-    expect(shown).toContain("Used by");
+    expect(shown).toContain("Applies To");
+    expect(shown).toContain("Used By");
     const columns = wrapper!.findComponent({ name: "OTable" }).props("columns") as {
       id: string;
       hideable?: boolean;

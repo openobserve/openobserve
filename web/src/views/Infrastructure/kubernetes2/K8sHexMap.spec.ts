@@ -318,7 +318,7 @@ describe("K8sHexMap (AC 52)", () => {
     expect(tip).toContain("b");
     expect(tip).toContain("Memory % of limit: 95%");
     expect(options().tooltip.formatter({ seriesIndex: 0, dataIndex: 2 })).toContain(
-      "Memory % of limit: No data",
+      "Memory % of limit: No Data",
     );
     expect(options().tooltip.formatter({ seriesIndex: 1, dataIndex: 1 })).toBe("<b>n2</b>");
   });

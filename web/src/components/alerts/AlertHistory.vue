@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else
               :name="value ? 'volume-off' : 'volume-up'"
               :class="value ? 'text-text-body' : 'text-status-positive'"
-              size="md"
+              size="xs"
             >
               <OTooltip
                 :content="value ? t('alerts.insights.filters.silenced') : t('common.notSilenced')"
@@ -266,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.suppressedAsRepeat") }}
             </OTruncatedText>
             <div v-else-if="row.grouped" class="text-primary flex items-center justify-center">
-              <OIcon name="group-work" size="md">
+              <OIcon name="group-work" size="xs">
                 <OTooltip>
                   <template #content>
                     {{ t("alerts.groupedNotification") }}
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-actions="{ row }">
             <OButton
               variant="ghost"
-              size="icon-sm"
+              size="icon-xs-sq"
               icon-left="visibility"
               class="max-md:hidden"
               @click="showDetailsDialog(row)"
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.error"
               :data-test="`pipeline-list-${row.name}-error-indicator`"
               variant="ghost-destructive"
-              size="icon-sm"
+              size="icon-xs-sq"
               icon-left="error"
               class="max-md:hidden"
               @click.stop="showErrorDialog(row)"
@@ -691,9 +691,9 @@ const columns = ref<OTableColumnDef[]>([
     header: t("alerts.type"),
     accessorKey: "is_realtime",
     sortable: true,
-    size: 37,
-    minSize: 37,
-    maxSize: 37,
+    size: 80,
+    minSize: 80,
+    maxSize: 80,
     cell: " ",
     meta: { align: "left" },
   },
@@ -702,9 +702,9 @@ const columns = ref<OTableColumnDef[]>([
     header: t("alerts.isSilenced"),
     accessorKey: "is_silenced",
     sortable: true,
-    size: 37,
-    minSize: 37,
-    maxSize: 37,
+    size: 120,
+    minSize: 120,
+    maxSize: 120,
     cell: " ",
     meta: { align: "left" },
   },
@@ -746,7 +746,7 @@ const columns = ref<OTableColumnDef[]>([
     size: COL.duration,
     maxSize: COL.duration,
     cell: " ",
-    meta: { align: "right" },
+    meta: { align: "left" },
   },
   {
     id: "status",

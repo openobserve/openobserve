@@ -163,7 +163,7 @@ describe("OverrideConfigPopup in chart mode", () => {
       "Add the series you want to format, then style each one with a live preview.",
     );
     expect(document.body.textContent).toContain("No series added");
-    expect(document.body.textContent).toContain("Format a series");
+    expect(document.body.textContent).toContain("Format a Series");
     expect(document.body.textContent).toContain("No series formatted yet");
     expect(document.body.textContent).not.toContain("Column Formatting");
   });
@@ -486,7 +486,7 @@ describe("OverrideConfigPopup in chart mode", () => {
     await mountChart({ entries: [series("cart")] });
     $('[data-test="series-override-remove-0"]')!.click();
     await flushPromises();
-    expect(document.body.textContent).toContain("Format a series");
+    expect(document.body.textContent).toContain("Format a Series");
     await save();
     expect(wrapper.emitted("save")[0][0]).toEqual([]);
   });

@@ -23,7 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("ingestion.awsSetup.title") }}
       </div>
-      <div data-test="aws-config-page-description" class="text-text-secondary m-0 mb-4 text-sm">
+      <div
+        data-test="aws-config-page-description"
+        class="text-text-secondary text-compact m-0 mb-4"
+      >
         {{ t("ingestion.awsSetup.description") }}
       </div>
 
@@ -55,10 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="mt-8">
       <div class="mb-3">
-        <div class="text-text-heading m-0 text-base font-semibold">
+        <div class="text-text-heading text-compact m-0 font-semibold">
           {{ t("ingestion.awsSetup.manualTitle") }}
         </div>
-        <div class="text-text-secondary m-0 text-sm">
+        <div class="text-text-secondary text-compact m-0">
           {{ t("ingestion.awsSetup.manualDescription") }}
         </div>
       </div>

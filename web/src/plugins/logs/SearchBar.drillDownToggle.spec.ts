@@ -90,11 +90,11 @@ describe("SearchBar — Drill down mode toggle", () => {
     expect(ids.indexOf("logs-patterns-toggle")).toBe(ids.indexOf("logs-drilldown-toggle") + 1);
   });
 
-  it("labels the toggle 'Drill down'", async () => {
+  it("labels the toggle 'Drill Down'", async () => {
     wrapper = mountSearchBar(1600);
     await flushPromises();
 
-    expect(wrapper.find('[data-test="logs-drilldown-toggle"]').text()).toContain("Drill down");
+    expect(wrapper.find('[data-test="logs-drilldown-toggle"]').text()).toContain("Drill Down");
   });
 
   it("lists Drill down in the narrow-width view-mode dropdown, disabled in SQL mode", async () => {
@@ -104,7 +104,7 @@ describe("SearchBar — Drill down mode toggle", () => {
 
     const option = () =>
       wrapper!.vm.toggleViewOptions.find((o: { value: string }) => o.value === "drilldown");
-    expect(option()).toMatchObject({ label: "Drill down", disabled: false });
+    expect(option()).toMatchObject({ label: "Drill Down", disabled: false });
 
     wrapper.vm.searchObj.meta.sqlMode = true;
     await flushPromises();

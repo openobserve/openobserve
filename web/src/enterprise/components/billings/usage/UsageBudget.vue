@@ -154,7 +154,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             :model-value="draftTotal || undefined"
             type="number"
-            size="md"
             prefix="$"
             :label="t('billing.usageV2.budgetAmount')"
             :placeholder="raw(suggestedBudget)"

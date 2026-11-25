@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OButton
                 variant="outline"
-                size="sm-action"
+                size="sm"
                 :disabled="!pendingChanges.length && !companionGaps.length"
                 data-test="edit-role-review-changes-btn"
                 @click="unsavedDrawerOpen = true"
@@ -253,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="edit-role-cancel-btn"
               variant="outline"
-              size="sm-action"
+              size="sm"
               @click="cancelPermissionsUpdate"
             >
               {{ t("alerts.cancel") }}
@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="edit-role-save-btn"
               variant="primary"
-              size="sm-action"
+              size="sm"
               :loading="isSaving"
               @click="saveRoleAndMark"
             >

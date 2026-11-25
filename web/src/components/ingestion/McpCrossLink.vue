@@ -52,11 +52,11 @@ const goToMcp = () => {
     >
       <div class="flex items-center gap-2">
         <OIcon name="mcp" size="md" />
-        <h2 class="text-lg font-semibold">
+        <h2 class="text-sm font-semibold">
           {{ t("ingestion.mcp.crossLinkTitle") }}
         </h2>
       </div>
-      <p class="text-text-secondary text-sm">
+      <p class="text-text-secondary text-compact">
         {{
           t("ingestion.mcp.crossLinkBody", {
             brand: raw("OpenObserve"),

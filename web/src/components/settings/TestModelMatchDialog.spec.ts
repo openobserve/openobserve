@@ -223,7 +223,7 @@ describe("TestModelMatchDialog", () => {
     it("forwards the title and subTitle to ODialog", () => {
       wrapper = mountDialog({ modelValue: true });
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe("Test model match");
+      expect(dialog.props("title")).toBe("Test Model Match");
       expect(dialog.props("subTitle")).toBe(
         "Simulate how a model name from your spans would match against pricing rules.",
       );

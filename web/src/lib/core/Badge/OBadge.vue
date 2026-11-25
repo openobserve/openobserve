@@ -112,8 +112,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
     "bg-badge-warning-quiet-bg text-badge-warning-quiet-text ring-1 ring-inset ring-badge-warning-quiet-border/30",
   "error-soft":
     "bg-badge-error-soft-bg text-badge-error-soft-text ring-1 ring-inset ring-badge-error-ol-border/30",
-  "error-quiet":
-    "bg-transparent text-badge-error-soft-text ring-1 ring-inset ring-border-control",
+  "error-quiet": "bg-transparent text-badge-error-soft-text ring-1 ring-inset ring-border-control",
 
   // NEW: Extended color families for correlation dimensions
   // Teal
@@ -199,8 +198,8 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
 // ── Size class map ────────────────────────────────────────────────────────
 const sizeClasses: Record<NonNullable<BadgeProps["size"]>, string> = {
   xs: "px-1.5 py-0.5 text-3xs gap-0.5",
-  sm: "px-2.5 py-1.5 text-2xs gap-1",
-  md: "px-2.5 py-1.5 text-xs gap-1.5",
+  sm: "h-5 px-2 text-2xs gap-1",
+  md: "h-5.5 px-2.5 text-xs gap-1.5",
   lg: "px-3 py-1.5 text-sm gap-2",
 };
 

@@ -36,7 +36,7 @@ describe("OverviewSectionEmpty", () => {
   it("explains a forbidden section in the same words as a forbidden card", () => {
     const w = mountEmpty({ kind: "forbidden" });
     const message = w.get('[data-test="overview-incidents-forbidden-message"]');
-    expect(message.text()).toContain("You don't have access");
+    expect(message.text()).toContain("You Don't Have Access");
     expect(message.text()).toContain(
       "Your role cannot see this data. Ask an org admin for access.",
     );

@@ -247,7 +247,7 @@ describe("Changes page empty and loading", () => {
     vi.useRealTimers();
     await flushPromises();
     const empty = sel(wrapper, "autoobserve2-activity-empty");
-    expect(empty.text()).toContain("No changes yet");
+    expect(empty.text()).toContain("No Changes Yet");
     wrapper.findComponent(LiveSurfaceEmpty).vm.$emit("action");
     expect(wrapper.emitted("see-suggestions")).toHaveLength(1);
   });

@@ -107,7 +107,7 @@ describe("SloBurndownChart", () => {
       expect(wrapper.find('[data-test="slos-sloburndownchart-budget"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="slos-sloburndownchart-burn"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("Error budget burndown");
-      expect(wrapper.text()).toContain("Burn rate");
+      expect(wrapper.text()).toContain("Burn Rate");
     });
 
     it("titles them with the shared PanelBar, so they carry the header tint", async () => {

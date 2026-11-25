@@ -130,7 +130,7 @@ function onFocusOut(e: FocusEvent) {
 
 const heightClasses: Record<NonNullable<DateProps["size"]>, string> = {
   sm: "h-6 text-sm",
-  md: "h-8.5 text-sm",
+  md: "h-7 text-compact",
 };
 
 const wrapperClasses = computed(() => [
@@ -143,7 +143,6 @@ const wrapperClasses = computed(() => [
   "focus-within:ring-2 focus-within:ring-focus-ring-accent",
   isDisabled.value ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60" : "",
   heightClasses[props.size ?? "md"],
-  isInsideLabel.value ? "relative" : "",
 ]);
 </script>
 
@@ -189,17 +188,20 @@ const wrapperClasses = computed(() => [
         @focusin="onFocusIn"
         @focusout="onFocusOut"
       >
-        <!-- Inside label: floating mini-label at the top of the border, above the date text -->
+        <!-- Inside label: inline prefix, so the control stays one row tall -->
         <label
           v-if="isInsideLabel"
           :for="inputId"
-          class="text-2xs text-text-secondary pointer-events-none absolute start-9 end-3 top-1 overflow-hidden leading-none font-medium text-ellipsis whitespace-nowrap select-none"
+          class="text-text-secondary max-w-1/2 shrink-0 truncate ps-3 select-none"
           >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></label
         >
 
         <!-- Calendar trigger (calendar icon) -->
         <DatePickerTrigger
-          class="text-datepicker-icon flex shrink-0 cursor-pointer items-center ps-3 outline-none disabled:cursor-not-allowed"
+          :class="[
+            'text-datepicker-icon flex shrink-0 cursor-pointer items-center outline-none disabled:cursor-not-allowed',
+            isInsideLabel ? 'ps-2' : 'ps-3',
+          ]"
           :aria-label="t('components.date.openCalendar')"
         >
           <OIcon name="calendar-month" size="sm" aria-hidden="true" />
@@ -212,8 +214,7 @@ const wrapperClasses = computed(() => [
           :class="[
             'flex min-w-0 flex-1 items-center gap-px ps-2 outline-none',
             clearable ? 'pe-2' : 'pe-3',
-            // Inside-label: push the date down to leave room for the floating mini-label
-            isInsideLabel ? 'h-8.5 pt-3 pb-0.5 text-xs font-semibold' : heightClasses[size ?? 'md'],
+            heightClasses[size ?? 'md'],
           ]"
         >
           <template #default="{ segments }">
@@ -343,7 +344,7 @@ const wrapperClasses = computed(() => [
           <button
             type="button"
             :disabled="isDisabled"
-            class="rounded-default bg-datepicker-day-selected-bg text-datepicker-day-selected-text ring-offset-surface-base focus-visible:ring-datepicker-focus-ring px-4 py-1.5 text-xs font-medium ring-offset-1 transition-[box-shadow] duration-150 outline-none enabled:hover:bg-button-primary-hover focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+            class="rounded-default bg-datepicker-day-selected-bg text-datepicker-day-selected-text ring-offset-surface-base focus-visible:ring-datepicker-focus-ring enabled:hover:bg-button-primary-hover px-4 py-1.5 text-xs font-medium ring-offset-1 transition-[box-shadow] duration-150 outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
             @click="handleApply"
           >
             {{ t("common.apply") }}

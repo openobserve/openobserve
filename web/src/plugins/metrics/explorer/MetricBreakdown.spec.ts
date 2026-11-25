@@ -380,7 +380,7 @@ describe("MetricBreakdown", () => {
       wrapper = mountBreakdown();
       await flushPromises();
       const drill = wrapper.find('[data-test="metrics-breakdown-select-route"]');
-      expect(drill.text()).toBe("Drill down");
+      expect(drill.text()).toBe("Drill Down");
       expect(drill.find("svg").exists()).toBe(true);
       expect(drill.attributes("aria-label")).toBe("Drill down into route to see its values");
       expect(wrapper.text()).toContain(

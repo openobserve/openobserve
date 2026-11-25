@@ -73,7 +73,7 @@ describe("OnboardingStepRows", () => {
     expect(kind()).toBe("infrastructure");
   });
 
-  it("shows no example screen for Continuous profiling, rather than a trace waterfall", async () => {
+  it("shows no example screen for Continuous Profiling, rather than a trace waterfall", async () => {
     const profiling = buildChoices(i18n.global.t as unknown as TranslateFn, {
       profiling: true,
     }).find((c) => c.id === "backend")!;
@@ -81,7 +81,7 @@ describe("OnboardingStepRows", () => {
     const at = profiling.rows.findIndex((r) => r.id === "continuous-profiling");
     expect(w.find('[data-test="onboarding-example"]').exists()).toBe(true);
     await rows(w)[at].trigger("mouseenter");
-    expect(panelTitle(w)).toBe("Continuous profiling");
+    expect(panelTitle(w)).toBe("Continuous Profiling");
     expect(w.find('[data-test="onboarding-example"]').exists()).toBe(false);
   });
 

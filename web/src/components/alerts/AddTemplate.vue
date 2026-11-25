@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-sm">{{ t("alert_templates.legacyBanner") }}</span>
               <OButton
                 variant="outline"
-                size="sm-action"
+                size="sm"
                 data-test="add-template-start-content-version-btn"
                 @click="startContentVersion"
                 >{{ t("alert_templates.startContentVersion") }}</OButton

@@ -380,7 +380,7 @@ describe("traces alert source and text", () => {
     const source = getAlertSource("traces");
     expect(source.id).toBe("traces");
     expect(source.defaultThreshold).toBe("count");
-    expect(t(source.labelKey)).toBe("Add alert");
+    expect(t(source.labelKey)).toBe("Add Alert");
     expect(t(source.toastKey)).toBe("Query imported from your traces search");
   });
 

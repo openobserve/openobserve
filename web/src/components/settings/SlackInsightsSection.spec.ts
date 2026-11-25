@@ -157,9 +157,9 @@ describe("SlackInsightsSection: load (S7a)", () => {
     const w = await mountSection(settings("adminOneChannel"));
     const text = w.text();
     expect(text).toContain("Channel");
-    expect(text).toContain("Daily digest time");
+    expect(text).toContain("Daily Digest Time");
     expect(text).toContain("Post trial findings as they happen");
-    expect(text).toContain("Allow changes from Slack");
+    expect(text).toContain("Allow Changes from Slack");
     expect(find(w, "slack-insights-channel-select").text()).toContain("#ops-insights");
     expect(find(w, "slack-insights-channel-line").text()).toContain(
       "Last digest today 09:00: 2 need attention, 30 suggestions, 1 calibration run.",
@@ -189,7 +189,7 @@ describe("SlackInsightsSection: load (S7a)", () => {
   it("names the digest time field for screen readers on the field itself", async () => {
     const w = await mountSection(settings("adminOneChannel"));
     const input = find(w, "slack-insights-time").find("input");
-    expect(input.attributes("aria-label")).toBe("Digest time");
+    expect(input.attributes("aria-label")).toBe("Digest Time");
   });
 
   it("keeps Save off until a value differs from the saved one", async () => {
@@ -309,7 +309,7 @@ describe("SlackInsightsSection: destination edits while a save is in flight (F1)
 });
 
 describe("SlackInsightsSection: channel picker", () => {
-  it("shows Load more channels in the menu and appends the next page (F2)", async () => {
+  it("shows Load More Channels in the menu and appends the next page (F2)", async () => {
     vi.mocked(slack.listChannels).mockImplementation(((
       _org: string,
       _id: string,
@@ -323,7 +323,7 @@ describe("SlackInsightsSection: channel picker", () => {
     const w = await mountSection(settings("adminOneChannel"));
     await openPicker(w);
     const more = inMenu("slack-insights-channel-more");
-    expect(more?.textContent).toContain("Load more channels");
+    expect(more?.textContent).toContain("Load More Channels");
     more!.click();
     await flushPromises();
     expect(slack.listChannels).toHaveBeenLastCalledWith(
@@ -367,7 +367,7 @@ describe("SlackInsightsSection: save failed (S7f)", () => {
     expect(error.attributes("role")).toBe("alert");
     expect(error.text()).toContain("AutoObserve settings weren't saved:");
     expect(error.text()).toContain("someone else changed these settings. Refresh and try again.");
-    expect(error.text()).toContain("Your edit: Post trial findings → On.");
+    expect(error.text()).toContain("Your edit: Post Trial Findings → On.");
     expect(find(w, "slack-insights-status").text()).not.toContain("Nothing is saved");
     await find(w, "slack-insights-refresh").trigger("click");
     await flushPromises();
@@ -441,7 +441,7 @@ describe("SlackInsightsSection: save failed (S7f)", () => {
     expect(error.exists()).toBe(true);
     expect(error.text()).toContain("someone else changed these settings.");
     expect(error.text()).toContain(
-      "Post trial findings → On. Refresh didn't work either. Try again.",
+      "Post Trial Findings → On. Refresh didn't work either. Try again.",
     );
     expect(find(w, "slack-insights-refresh").exists()).toBe(true);
   });

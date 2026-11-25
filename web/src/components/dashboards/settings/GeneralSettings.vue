@@ -93,7 +93,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="showDynamicFilters"
             :label="t('dashboard.showDynamicFilters')"
             data-test="dashboard-general-setting-dynamic-filter"
-            size="lg"
           />
           <p class="text-text-secondary text-xs">
             {{ t("dashboard.generalSettingsPage.dynamicFiltersHelp") }}

@@ -214,7 +214,7 @@ describe("LiveHistory", () => {
       "ops-lead@example.com applied my change to Nothing watches undone-apply.",
     );
     expect(rows[0]).toContain("Undone by sre@example.com");
-    expect(rows[0]).toContain("See the change");
+    expect(rows[0]).toContain("See the Change");
     expect(rows[1]).toContain(
       "ops-lead@example.com marked my report on Nothing watches marked as intended.",
     );

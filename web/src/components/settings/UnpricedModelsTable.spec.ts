@@ -147,7 +147,7 @@ describe("UnpricedModelsTable", () => {
     const approximate = await waitForRow(wrapper, "gpt-5.4-mini");
     const keep = approximate.find('[data-test="model-pricing-unpriced-keep-btn"]');
 
-    expect(keep.text()).toBe("Keep prices");
+    expect(keep.text()).toBe("Keep Prices");
     expect(keep.findComponent({ name: "OTooltip" }).props("content")).toBe("Keep GPT-5.4 prices");
   });
 

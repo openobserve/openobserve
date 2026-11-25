@@ -214,7 +214,7 @@ describe("ReplayEnvironmentMenu", () => {
 
   it("says the choice is for this session only", () => {
     wrapper = mountMenu();
-    expect(wrapper.text()).toContain("Replay and record in");
+    expect(wrapper.text()).toContain("Replay and Record in");
     expect(wrapper.text()).toContain("This session only — not saved with the test.");
   });
 

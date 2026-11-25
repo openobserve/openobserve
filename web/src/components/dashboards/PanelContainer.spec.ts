@@ -3060,7 +3060,7 @@ describe("PanelContainer", () => {
 
       expect(triggerDot().exists()).toBe(false);
       expect(itemDot().exists()).toBe(false);
-      expect(trigger().attributes("aria-label")).toBe("More actions");
+      expect(trigger().attributes("aria-label")).toBe("More Actions");
     });
 
     it("marks Edit Panel with a labelled dot after its label", async () => {
@@ -3143,7 +3143,7 @@ describe("PanelContainer", () => {
       await flushPromises();
 
       expect(triggerDot().exists()).toBe(false);
-      expect(trigger().attributes("aria-label")).toBe("More actions");
+      expect(trigger().attributes("aria-label")).toBe("More Actions");
     });
 
     it("hides the trigger badge in full screen", async () => {

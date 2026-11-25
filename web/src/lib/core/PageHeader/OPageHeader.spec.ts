@@ -186,10 +186,10 @@ describe("OPageHeader with the access chip", () => {
   it("sizes the chip by the row's wrap, not the viewport", async () => {
     await mountHeader(true, true, 700, OAccessHeaderChip);
     expect(chip().className).toContain("h-6");
-    expect(chip().textContent).not.toContain("Access denied");
+    expect(chip().textContent).not.toContain("Access Denied");
     await resizePage(1200);
     expect(chip().className).not.toContain("h-6");
-    expect(chip().textContent).toContain("Access denied");
+    expect(chip().textContent).toContain("Access Denied");
   });
 
   it("moves one chip when the row's wrap flips, keeping its card open and its announcement", async () => {

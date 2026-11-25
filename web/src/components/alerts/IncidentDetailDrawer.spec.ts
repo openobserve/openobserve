@@ -2074,7 +2074,7 @@ describe("IncidentDetailDrawer.vue", () => {
         alerts: [],
         triggers: [findingTrigger(at + 600_000_000), findingTrigger(at)],
       });
-      expect(byTest("incident-trigger-details-header").text()).toBe("Finding details");
+      expect(byTest("incident-trigger-details-header").text()).toBe("Finding Details");
       const panel = byTest("incident-finding-details");
       expect(panel.find('[data-test="incident-finding-what"]').text()).toBe("Stopped sending data");
       const streamType = panel.findComponent(OTag);

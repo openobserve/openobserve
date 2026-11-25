@@ -2075,9 +2075,9 @@ describe("OTable", () => {
           dense: true,
         },
       });
-      // dense mode sets row height to 2.25rem via CSS variable on the table
+      // dense mode sets row height to 1.75rem via CSS variable on the table
       const tableEl = wrapper.find('[data-test="o2-table"]');
-      expect(tableEl.attributes("style")).toContain("2.25rem");
+      expect(tableEl.attributes("style")).toContain("1.75rem");
     });
 
     it("uses the compact row token and unpadded cells when compact is true", () => {

@@ -428,13 +428,13 @@ limitations under the License.
         <OButton
           data-test="preview-copy-button"
           variant="outline"
-          size="sm-action"
+          size="sm"
           @click="copyTemplate"
           icon-left="content-copy"
         >
           {{ t("alerts.previewCopyTemplateBtn") }}
         </OButton>
-        <OButton variant="outline" size="sm-action" @click="isOpen = false">
+        <OButton variant="outline" size="sm" @click="isOpen = false">
           {{ t("common.close") }}
         </OButton>
       </div>

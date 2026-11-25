@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTable
           :key="tableKey"
           :frame="false"
+          :row-height="28"
           :data="displayedRows"
           :columns="columns"
           row-key="email"
@@ -133,6 +134,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <!-- Auth type badge (Native / SSO / LDAP) — enterprise/cloud only -->
+          <template #cell-last_name="{ row }">
+            <span v-if="row.last_name">{{ row.last_name }}</span>
+            <span v-else class="text-text-body">—</span>
+          </template>
+
           <template #cell-auth="{ row }">
             <OTag v-if="row.auth_type" type="authType" :value="row.auth_type" />
             <span v-else class="text-text-body">—</span>

@@ -466,7 +466,7 @@ const StatusLine = defineComponent({
             <OIcon v-else-if="pick?.icon" :name="pick.icon" size="md" class="mt-0.5 shrink-0" />
             <div class="flex min-w-0 flex-1 flex-col gap-0.5">
               <strong class="text-text-heading">{{ titleText }}</strong>
-              <i18n-t :keypath="bodyKey" tag="span" class="text-text-secondary text-sm">
+              <i18n-t :keypath="bodyKey" tag="span" class="text-text-secondary text-compact">
                 <template #org
                   ><strong class="text-text-body">{{ raw(orgName) }}</strong></template
                 >
@@ -489,7 +489,6 @@ const StatusLine = defineComponent({
             :code-masked="command.masked"
             :token-name="command.masked ? snippet.tokenName.value : undefined"
             :lang="command.lang"
-            chrome="terminal"
             wrap
             inset
             data-test="first-data-panel-code-block"
@@ -540,7 +539,10 @@ const StatusLine = defineComponent({
             <strong class="text-text-heading">{{
               t("ingestion.firstDataPanel.compactTitle", { org: raw(orgName) })
             }}</strong>
-            <span class="text-text-secondary text-sm" data-test="first-data-panel-compact-text">
+            <span
+              class="text-text-secondary text-compact"
+              data-test="first-data-panel-compact-text"
+            >
               <span :class="{ 'me-1': command }">{{ compactText }}</span>
               <span v-if="command">{{ t("ingestion.firstDataPanel.compactCommand") }}</span>
             </span>

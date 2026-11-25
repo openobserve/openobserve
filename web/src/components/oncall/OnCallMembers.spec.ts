@@ -328,7 +328,7 @@ describe("OnCallMembers", () => {
     await flushPromises();
     await openAdd(wrapper);
     expect(wrapper.find('[data-test="oncall-members-user-select"]').attributes("label")).toBe(
-      "People to add",
+      "People to Add",
     );
   });
 
@@ -342,7 +342,7 @@ describe("OnCallMembers", () => {
     expect(wrapper.find('[data-test="oncall-members-user-select"]').exists()).toBe(false);
     const input = wrapper.find('[data-test="oncall-members-email-input"]');
     expect(input.exists()).toBe(true);
-    expect(input.attributes("label")).toBe("People to add");
+    expect(input.attributes("label")).toBe("People to Add");
   });
 
   // Listed so the picker explains why they are missing, but they cannot be added twice.

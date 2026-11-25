@@ -283,7 +283,7 @@ describe("AddRegexPattern", () => {
       const wrapper = createWrapper();
       const drawer = wrapper.find('[data-test="o-drawer-stub"]');
       expect(drawer.exists()).toBe(true);
-      expect(drawer.attributes("data-title")).toBe("New pattern");
+      expect(drawer.attributes("data-title")).toBe("New Pattern");
     });
 
     it("should render the component title for editing regex pattern", () => {

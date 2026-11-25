@@ -43,7 +43,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Section navigation stays live on a license-locked page; edition-gated tabs keep their own `disable`. -->
   <FeatureLockExempt class="contents">
-    <OTabs :model-value="activeTab" align="left" data-test="dbm-section-tabs" @change="navigate">
+    <OTabs
+      :model-value="activeTab"
+      align="left"
+      dense
+      data-test="dbm-section-tabs"
+      @change="navigate"
+    >
       <OTab
         v-for="section in sections"
         :key="section.key"
@@ -75,8 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            deadlock count would imply a choice between feeds that was never
            available. -->
         <span
-          v-if="section.count != null"
-          class="text-2xs inline-flex items-baseline gap-1 rounded-full px-1.5 py-1 leading-none font-bold"
+          v-if="section.count != null && section.count !== '0'"
+          class="text-2xs inline-flex items-baseline gap-1 rounded-full px-1.5 py-0.5 leading-none font-bold"
           :class="
             section.key === activeTab
               ? 'bg-badge-primary-soft-bg text-badge-primary-soft-text'

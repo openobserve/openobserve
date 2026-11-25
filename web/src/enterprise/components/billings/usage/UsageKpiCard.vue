@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div
       v-else
-      class="truncate text-2xl leading-none font-semibold max-lg:text-lg"
+      class="truncate text-lg leading-none font-semibold"
       :class="
         tone === 'danger'
           ? 'text-status-error-text'

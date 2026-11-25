@@ -72,7 +72,7 @@ describe("PrefixFilterPanel", () => {
 
     // Clear lives in the aside's title row (MetricsExplorer), not in the panel:
     // the panel renders only its search and list.
-    it("always shows the 'Clear filters' control — disabled when nothing is selected", () => {
+    it("always shows the 'Clear Filters' control — disabled when nothing is selected", () => {
       // No disappearing controls: the button is always present and discoverable;
       // with no selection it is disabled and the count reads "0 selected", so the
       // row never changes size.
@@ -83,15 +83,15 @@ describe("PrefixFilterPanel", () => {
       expect(wrapper.text()).toContain("0 selected");
     });
 
-    it("enables 'Clear filters' and shows the count when there is a selection", () => {
-      // Labelled "Clear filters", NOT bare "Clear", so it is never confused with
+    it("enables 'Clear Filters' and shows the count when there is a selection", () => {
+      // Labelled "Clear Filters", NOT bare "Clear", so it is never confused with
       // the search box's own inline ✕ (which clears the search text, not filters).
       wrapper = createWrapper({
         selected: new Set(["node_cpu", "node_memory"]),
         hasSelection: true,
       });
       const clear = wrapper.find('[data-test="metrics-explorer-prefix-clear"]');
-      expect(clear.text()).toContain("Clear filters");
+      expect(clear.text()).toContain("Clear Filters");
       expect(clear.attributes("disabled")).toBeUndefined();
       expect(wrapper.text()).toContain("2 selected");
     });

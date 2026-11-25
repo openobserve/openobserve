@@ -169,7 +169,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelDataModel.data.config.show_exemplars"
           :label="t('dashboard.showExemplarsLabel')"
           data-test="dashboard-config-show-exemplars"
-          size="lg"
         >
           <template #tooltip>
             <OTooltip :content="t('dashboard.showExemplarsHelp')" max-width="15.625rem" />
@@ -183,7 +182,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="useDefaultTime"
               :label="t('dashboard.panelTimeEnabled')"
               data-test="dashboard-config-allow-panel-time"
-              size="lg"
               @change="onToggleDefaultTime"
             />
             <OButton variant="ghost" size="icon" class="mt-1" @click.stop icon-left="info-outline">
@@ -314,7 +312,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelDataModel.data.config.show_legends"
           :label="t('dashboard.showLegendsLabel')"
           data-test="dashboard-config-show-legend"
-          size="lg"
         />
 
         <OToggleGroup
@@ -725,7 +722,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelDataModel.data.config.heatmap_palette_reverse"
           :label="t('dashboard.heatmapPaletteReverse')"
           data-test="dashboard-config-heatmap_palette_reverse"
-          size="lg"
         />
 
         <OToggleGroup
@@ -847,7 +843,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="dashboardPanelData.data.config.treemap_show_breadcrumb !== false"
           :label="t('dashboard.treemapShowBreadcrumb')"
           data-test="dashboard-config-treemap_show_breadcrumb"
-          size="lg"
           @update:model-value="(value: any) => setDefaultOnFlag('treemap_show_breadcrumb', value)"
         />
         <OSwitch
@@ -856,7 +851,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="dashboardPanelData.data.config.sunburst_show_labels !== false"
           :label="t('dashboard.sunburstShowLabels')"
           data-test="dashboard-config-sunburst_show_labels"
-          size="lg"
           @update:model-value="(value: any) => setDefaultOnFlag('sunburst_show_labels', value)"
         />
         <template v-if="dashboardPanelData.data.type === 'funnel'">
@@ -891,7 +885,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :model-value="dashboardPanelData.data.config.funnel_show_percent === true"
             :label="t('dashboard.funnelShowPercent')"
             data-test="dashboard-config-funnel_show_percent"
-            size="lg"
             @update:model-value="(value: any) => setFlagConfig('funnel_show_percent', value)"
           >
             <template #tooltip>
@@ -925,7 +918,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :model-value="dashboardPanelData.data.config.node_graph_show_edge_labels === true"
             :label="t('dashboard.nodeGraphShowEdgeLabels')"
             data-test="dashboard-config-node_graph_show_edge_labels"
-            size="lg"
             @update:model-value="
               (value: any) => setFlagConfig('node_graph_show_edge_labels', value)
             "
@@ -948,7 +940,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="heatmapHistogramModeModel"
           :label="t('dashboard.heatmapHistogramMode')"
           data-test="dashboard-config-heatmap_mode"
-          size="lg"
         >
           <template #tooltip>
             <OTooltip :content="t('dashboard.heatmapHistogramModeTooltip')" max-width="15.625rem" />
@@ -1149,7 +1140,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.breakdown?.length == 0
           "
-          size="lg"
         >
           <template #tooltip>
             <OTooltip :content="t('dashboard.addOthersSeriesTooltip')" max-width="15.625rem" />
@@ -1162,7 +1152,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelDataModel.data.config.connect_nulls"
           :label="t('dashboard.connectNullValues')"
           data-test="dashboard-config-connect-null-values"
-          size="lg"
         >
           <template #tooltip>
             <OTooltip :content="t('dashboard.connectNullValuesTooltip')" max-width="15.625rem" />
@@ -1346,7 +1335,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="showStateTextModel"
           :label="t('dashboard.stateTimelineShowStateText')"
           data-test="dashboard-config-state-timeline-show-state-text"
-          size="lg"
         />
 
         <OSelect
@@ -1584,7 +1572,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelDataModel.data.config.axis_border_show"
           :label="t('dashboard.showBorder')"
           data-test="dashboard-config-axis-border"
-          size="lg"
         />
 
         <OToggleGroup
@@ -1945,7 +1932,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelDataModel.data.config.show_gridlines"
           :label="t('dashboard.showGridlines')"
           data-test="dashboard-config-show-gridlines"
-          size="lg"
         />
 
         <OInput
@@ -1977,7 +1963,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelDataModel.data.config.show_bar_track"
           :label="t('dashboard.showBarTrack')"
           data-test="dashboard-config-show-bar-track"
-          size="lg"
         >
           <template #tooltip>
             <OTooltip :content="t('dashboard.showBarTrackTooltip')" max-width="15.625rem" />
@@ -2291,7 +2276,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelDataModel.data.config.wrap_table_cells"
           :label="t('dashboard.wraptext')"
           data-test="dashboard-config-wrap-table-cells"
-          size="lg"
         />
 
         <OSwitch
@@ -2301,7 +2285,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.tableTranspose')"
           data-test="dashboard-config-table_transpose"
           :disabled="isPivotMode"
-          size="lg"
         />
 
         <OSwitch
@@ -2311,7 +2294,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.tableDynamicColumns')"
           data-test="dashboard-config-table_dynamic_columns"
           :disabled="isPivotMode"
-          size="lg"
         />
 
         <OSwitch
@@ -2319,7 +2301,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelDataModel.data.config.table_filtering"
           :label="t('dashboard.tableFiltering')"
           data-test="dashboard-config-table-filtering"
-          size="lg"
         />
 
         <OSwitch
@@ -2327,7 +2308,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelDataModel.data.config.table_expandable_rows"
           :label="t('dashboard.tableExpandableRows')"
           data-test="dashboard-config-table-expandable-rows"
-          size="lg"
         >
           <template #tooltip>
             <OTooltip :content="t('dashboard.tableExpandableRowsTooltip')" max-width="15.625rem" />
@@ -2339,7 +2319,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelDataModel.data.config.table_pagination"
           :label="t('dashboard.pagination')"
           data-test="dashboard-config-show-pagination"
-          size="lg"
         />
 
         <OInput
@@ -2399,7 +2378,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="isConfigOptionVisible('pivotTable', 'pivot-show-row-totals')"
           v-model="dashboardPanelDataModel.data.config.table_pivot_show_row_totals"
           data-test="dashboard-config-pivot-row-totals"
-          size="lg"
         >
           <template #label>
             {{ t("dashboard.pivotShowRowTotals") }}
@@ -2416,7 +2394,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="isConfigOptionVisible('pivotTable', 'pivot-sticky-col-totals')"
           v-model="dashboardPanelDataModel.data.config.table_pivot_sticky_col_totals"
           data-test="dashboard-config-pivot-sticky-col-totals"
-          size="lg"
         >
           <template #label>
             {{ t("dashboard.pivotStickyColTotals") }}
@@ -2434,7 +2411,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="isConfigOptionVisible('pivotTable', 'pivot-show-col-totals')"
           v-model="dashboardPanelDataModel.data.config.table_pivot_show_col_totals"
           data-test="dashboard-config-pivot-col-totals"
-          size="lg"
         >
           <template #label>
             {{ t("dashboard.pivotShowColTotals") }}
@@ -2451,7 +2427,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="isConfigOptionVisible('pivotTable', 'pivot-sticky-row-totals')"
           v-model="dashboardPanelDataModel.data.config.table_pivot_sticky_row_totals"
           data-test="dashboard-config-pivot-sticky-row-totals"
-          size="lg"
         >
           <template #label>
             {{ t("dashboard.pivotStickyRowTotals") }}
@@ -2630,7 +2605,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="mapsEnableRoam"
           :label="t('dashboard.mapsEnableRoam')"
           data-test="dashboard-config-map-roam"
-          size="lg"
         >
           <template #tooltip>
             <OTooltip :content="t('dashboard.mapsEnableRoamTooltip')" max-width="15.625rem" />
@@ -2771,7 +2745,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :model-value="dashboardPanelData.data.config.map_cluster === true"
             :label="t('dashboard.mapCluster')"
             data-test="dashboard-config-map_cluster"
-            size="lg"
             @update:model-value="(value: any) => setFlagConfig('map_cluster', value)"
           />
           <OInput
@@ -2905,7 +2878,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelDataModel.data.config.show_gauge_end_labels"
           :label="t('dashboard.showGaugeEndLabels')"
           data-test="dashboard-config-gauge-end-labels"
-          size="lg"
         />
         <OToggleGroup
           v-show="isConfigOptionVisible('gauge', 'gauge-style')"
@@ -2955,7 +2927,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="dashboardPanelData.data.config.gauge_round_cap === true"
           :label="t('dashboard.gaugeRoundCap')"
           data-test="dashboard-config-gauge_round_cap"
-          size="lg"
           @update:model-value="(value: any) => setFlagConfig('gauge_round_cap', value)"
         />
         <OSelect
@@ -2977,7 +2948,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="dashboardPanelData.data.config.bar_gauge_show_unfilled !== false"
           :label="t('dashboard.barGaugeShowUnfilled')"
           data-test="dashboard-config-bar_gauge_show_unfilled"
-          size="lg"
           @update:model-value="(value: any) => setDefaultOnFlag('bar_gauge_show_unfilled', value)"
         />
       </div>
@@ -3137,7 +3107,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="dashboardPanelDataModel.data.config.trellis.group_by_y_axis"
             :label="t('dashboard.groupMultiYAxisTrellis')"
             data-test="dashboard-config-trellis-group-by-y-axis"
-            size="lg"
           >
             <template #tooltip>
               <OTooltip>

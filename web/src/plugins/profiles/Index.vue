@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :auto-apply-dashboard="true"
         @update:model-value="pickInput('date', $event)"
         :hide-range-shift="isMobile"
-        class="h-8"
+        class="h-7"
         data-test="profiles-date-picker"
       />
       <ShareButton
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="icon-toolbar"
         :disabled="!hasProfileData"
-        class="h-8"
+        class="h-7"
         data-test="profiles-share-btn"
       />
       <!-- Run, Cancel and the Auto Run switch, as on RUM Performance and Dashboards (shared useAutoRunToggle). -->
@@ -128,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="pickSelect('stream', $event)"
             :label="t('profiles.stream')"
             label-position="inside"
+            size="sm"
             :options="streamOptions"
             :disabled="!streamOptions.length"
             class="w-full"
@@ -142,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="pickSelect('service', $event)"
             :label="t('profiles.service')"
             label-position="inside"
+            size="sm"
             :options="serviceOptions"
             class="w-full"
             data-test="profiles-service-select"
@@ -155,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="pickSelect('profileType', $event)"
             :label="t('profiles.profileType')"
             label-position="inside"
+            size="sm"
             :options="profileTypeSelectOptions"
             class="w-full"
             data-test="profiles-type-select"
@@ -505,6 +508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :model-value="sandwichName"
                       :label="t('profiles.function')"
                       label-position="inside"
+                      size="sm"
                       :options="functionOptions"
                       searchable
                       class="w-full"

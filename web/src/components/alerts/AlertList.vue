@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OInput>
                   </div>
                   <OStatStrip
-                    :items="summaryStats"
+                    :items="summaryChips"
                     :loading="loading"
                     compact
                     selectable
@@ -268,7 +268,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="max-md:order-last"
                     data-test="alert-list-summary"
                     @update:selected-keys="onStateFiltersUpdate"
-                  />
+                  >
+                    <template #chips-end>
+                      <ODropdown align="end">
+                        <template #trigger>
+                          <OButton
+                            variant="outline"
+                            size="sm"
+                            icon-right="expand-more"
+                            class="shrink-0"
+                            data-test="alert-list-summary-more"
+                          >
+                            {{ t("common.more") }}
+                            <span
+                              v-if="moreStatesSelected"
+                              class="bg-surface-accent-hover text-text-heading rounded-default px-1.5 tabular-nums"
+                              data-test="alert-list-summary-more-count"
+                              >{{ moreStatesSelected }}</span
+                            >
+                          </OButton>
+                        </template>
+                        <ODropdownItem
+                          v-for="item in moreStates"
+                          :key="item.key"
+                          :icon-left="isStateSelected(item.key) ? 'check' : item.icon"
+                          :data-test="item.dataTest"
+                          @select="onMoreStateSelect($event, item.key)"
+                        >
+                          <span class="flex-1">{{ item.label }}</span>
+                          <span class="text-text-muted ms-3 tabular-nums">{{ item.value }}</span>
+                        </ODropdownItem>
+                      </ODropdown>
+                    </template>
+                  </OStatStrip>
                 </div>
               </template>
               <template #toolbar-trailing>
@@ -2323,6 +2355,23 @@ export default defineComponent({
     const onStatSelect = (key: string) => {
       levelFilter.value = null;
       stateFilters.value = toggleFilterKey(stateFilters.value, key, "total");
+    };
+    // Rarer states sit in a "More" menu so the chip row stays one line.
+    const MORE_STATE_KEYS: string[] = ["error", "notify_failed", "recent"];
+    const summaryChips = computed(() =>
+      summaryStats.value.filter((item) => !MORE_STATE_KEYS.includes(item.key)),
+    );
+    const moreStates = computed(() =>
+      summaryStats.value.filter((item) => MORE_STATE_KEYS.includes(item.key)),
+    );
+    const isStateSelected = (key: string) => (stateFilters.value as string[]).includes(key);
+    const moreStatesSelected = computed(
+      () => stateFilters.value.filter((key) => MORE_STATE_KEYS.includes(key)).length,
+    );
+    const onMoreStateSelect = (event: Event, key: string) => {
+      // Keeps the menu open so several states can be toggled in one go.
+      event.preventDefault();
+      onStatSelect(key);
     };
     // Any chip change drops the linked level, as the level has no chip of its own.
     const onStateFiltersUpdate = (keys: string[]) => {
@@ -5031,6 +5080,11 @@ export default defineComponent({
       goToSlo,
       stateCounts,
       summaryStats,
+      summaryChips,
+      moreStates,
+      isStateSelected,
+      moreStatesSelected,
+      onMoreStateSelect,
       stateFilters,
       stateFilterEmptied,
       listFiltered,

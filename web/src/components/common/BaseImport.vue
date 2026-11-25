@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OButton
           variant="outline"
-          size="sm"
+          size="sm-action"
           :class="cancelButtonClass"
           @click="handleCancel"
           :data-test="`${testPrefix}-import-cancel-btn`"
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <OButton
           variant="primary"
-          size="sm"
+          size="sm-action"
           type="submit"
           :class="importButtonClass"
           @click="handleImport"
@@ -97,7 +97,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OInput
                         :data-test="`${testPrefix}-import-url-input`"
                         v-model="url"
-                        size="md"
                         :placeholder="t('dashboard.addURL')"
                       />
                     </div>

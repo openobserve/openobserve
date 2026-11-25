@@ -612,7 +612,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        meta: { align: "right" },
+        meta: { align: "left" },
         size: COL.count,
       },
       {
@@ -622,7 +622,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        meta: { align: "right", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) },
+        meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) },
         size: COL.sizeBytes,
       },
       {
@@ -633,7 +633,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         meta: {
-          align: "right",
+          align: "left",
           format: (_v: any, row: any) => formatSizeFromMB(row.compressed_size),
         },
         size: COL.sizeBytes,

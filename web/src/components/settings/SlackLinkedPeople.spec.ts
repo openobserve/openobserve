@@ -89,7 +89,7 @@ describe("SlackLinkedPeople", () => {
     expect(rows[0].text()).toContain("dana@acme.example");
     expect(rows[0].find('[data-col="slack_user_id"]').text()).toBe("U0SAMPLE01");
     expect(rows[0].text()).toContain("Sign in with Slack");
-    expect(rows[1].text()).toContain("Link all");
+    expect(rows[1].text()).toContain("Link All");
     expect(w.find('[data-test="slack-people-more"]').exists()).toBe(false);
   });
 
@@ -103,7 +103,7 @@ describe("SlackLinkedPeople", () => {
     const w = mountPeople();
     await flushPromises();
     const cells = w.findAll('[data-col="default_org"]').map((c) => c.text());
-    expect(cells).toEqual(["This org", "Another org"]);
+    expect(cells).toEqual(["This Org", "Another Org"]);
   });
 
   it("turns Unlink off for a reader who may not change Slack, with the same hint as the other write buttons (T4-10)", async () => {
@@ -151,7 +151,7 @@ describe("SlackLinkedPeople", () => {
     const confirmDialog = w.find('[data-test-stub="confirm-dialog"]');
     expect(confirmDialog.attributes("message-keypath")).toBe("slackApp.people.unlinkMessage");
     expect(confirmDialog.attributes("message-name")).toBe("dana@acme.example");
-    expect(w.findComponent({ name: "ConfirmDialog" }).props("okLabel")).toBe("Unlink account");
+    expect(w.findComponent({ name: "ConfirmDialog" }).props("okLabel")).toBe("Unlink Account");
     await w.find('[data-test-stub="confirm-ok"]').trigger("click");
     await flushPromises();
     expect(slack.deleteLink).toHaveBeenCalledWith("acme", "link-1");
@@ -161,7 +161,7 @@ describe("SlackLinkedPeople", () => {
     vi.mocked(slack.listLinks).mockReturnValue(ok({ links: [], next_cursor: null }) as any);
     const w = mountPeople();
     await flushPromises();
-    expect(w.text()).toContain("Nobody in this org has linked Slack yet");
+    expect(w.text()).toContain("Nobody in This Org Has Linked Slack Yet");
   });
 
   it("W-S7 shows no empty state while the links load", async () => {
@@ -169,7 +169,7 @@ describe("SlackLinkedPeople", () => {
     const w = mountPeople();
     await flushPromises();
     expect(w.find('[data-test-stub="otable-loading"]').exists()).toBe(true);
-    expect(w.text()).not.toContain("Nobody in this org has linked Slack yet");
+    expect(w.text()).not.toContain("Nobody in This Org Has Linked Slack Yet");
   });
 
   it("W-S6 a failed load shows a retryable error instead of the empty state (real OTable)", async () => {
@@ -179,7 +179,7 @@ describe("SlackLinkedPeople", () => {
     // OTable holds its skeleton for 50 ms before any end state.
     await vi.waitFor(() => expect(w.find('[data-test="slack-people-error"]').exists()).toBe(true));
     const error = w.find('[data-test="slack-people-error"]');
-    expect(w.text()).not.toContain("Nobody in this org has linked Slack yet");
+    expect(w.text()).not.toContain("Nobody in This Org Has Linked Slack Yet");
 
     vi.mocked(slack.listLinks).mockReturnValue(ok({ links: [link()], next_cursor: null }) as any);
     await error.find("button").trigger("click");
@@ -193,6 +193,6 @@ describe("SlackLinkedPeople", () => {
     const w = mountPeople(true);
     await flushPromises();
     await vi.waitFor(() => expect(w.find('[data-test="o2-table-forbidden"]').exists()).toBe(true));
-    expect(w.text()).not.toContain("Nobody in this org has linked Slack yet");
+    expect(w.text()).not.toContain("Nobody in This Org Has Linked Slack Yet");
   });
 });

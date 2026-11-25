@@ -185,7 +185,7 @@ describe("AddServiceAccount", () => {
     it("renders the dialog with the add title in create mode", () => {
       const dialog = wrapper.find('[data-test-stub="o-dialog"]');
       expect(dialog.exists()).toBe(true);
-      expect(dialog.attributes("data-title")).toBe("New service account");
+      expect(dialog.attributes("data-title")).toBe("New Service Account");
       expect(dialog.attributes("data-form-id")).toBe("add-service-account-form");
     });
 

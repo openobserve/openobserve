@@ -247,7 +247,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             :model-value="totalDraft.budget || undefined"
             type="number"
-            size="md"
             prefix="$"
             :label="t('billing.usageV2.overallBudgetLabel')"
             :help-text="allocationNote"

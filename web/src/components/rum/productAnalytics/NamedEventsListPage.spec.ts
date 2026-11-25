@@ -175,7 +175,7 @@ describe("NamedEventsListPage (AC-44)", () => {
     await settle();
     expect(rowText()).toEqual([]);
     const empty = q("rum-analytics-named-events-empty")!;
-    expect(empty.textContent).toContain("No named events found");
+    expect(empty.textContent).toContain("No Named Events Found");
     empty.querySelector<HTMLElement>("button")!.click();
     await settle();
     expect(rowText()).toEqual(["Event 0", "Event 1", "Event 2"]);
@@ -230,10 +230,10 @@ describe("NamedEventsListPage (AC-44)", () => {
     expect(
       more?.querySelector('[data-test="rum-analytics-named-events-row-1-more-draft-dot"]'),
     ).not.toBeNull();
-    expect(more?.getAttribute("aria-label")).toMatch(/^More actions · unsaved draft · .*\d/);
+    expect(more?.getAttribute("aria-label")).toMatch(/^More Actions · unsaved draft · .*\d/);
     expect(q("rum-analytics-named-events-row-0-more-draft-dot")).toBeNull();
     expect(q("rum-analytics-named-events-row-0-more-btn")?.getAttribute("aria-label")).toBe(
-      "More actions",
+      "More Actions",
     );
     // What the user sees on hover: the button's own tooltip names the kept copy and its date.
     vi.useFakeTimers();
@@ -480,7 +480,7 @@ describe("NamedEventsListPage (AC-44)", () => {
   it("with no events the empty state offers to create one", async () => {
     await mountList();
     const empty = q("rum-analytics-named-events-empty")!;
-    expect(empty.textContent).toContain("No named events yet");
+    expect(empty.textContent).toContain("No Named Events Yet");
     empty.querySelector<HTMLElement>("button")!.click();
     await settle();
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.eventNew);

@@ -72,21 +72,21 @@ const badge = (wrapper: ReturnType<typeof mountChart>) =>
 describe("CoverageMetricChart gap wording", () => {
   it("names a live gap by its glossary word once, on the badge only", () => {
     const missing = mountChart(gapCell("none"), true);
-    expect(badge(missing)).toBe("Coverage gap");
+    expect(badge(missing)).toBe("Coverage Gap");
     expect(
       missing.find('[data-test="autoobserve-coverage-chart-badge-latency"]').classes(),
     ).toContain("text-badge-amber-soft-text");
-    expect(missing.text().split("Coverage gap")).toHaveLength(2);
+    expect(missing.text().split("Coverage Gap")).toHaveLength(2);
     expect(missing.find('[data-test="autoobserve-coverage-chart-gap-latency"]').exists()).toBe(
       false,
     );
     expect(missing.find('[data-test="autoobserve-coverage-chart-nodata-latency"]').exists()).toBe(
       true,
     );
-    expect(badge(mountChart(gapCell("silent"), true))).toBe("Coverage gap");
+    expect(badge(mountChart(gapCell("silent"), true))).toBe("Coverage Gap");
   });
 
-  it("reads Added, not Coverage gap, on a check whose alert was just added (T2-N1)", () => {
+  it("reads Added, not Coverage Gap, on a check whose alert was just added (T2-N1)", () => {
     const wrapper = mount(CoverageMetricChart, {
       props: {
         def: DEF,
@@ -108,11 +108,11 @@ describe("CoverageMetricChart gap wording", () => {
     ).toContain("text-text-secondary");
   });
 
-  it("keeps 'Coverage gap' outside live mode", () => {
+  it("keeps 'Coverage Gap' outside live mode", () => {
     const wrapper = mountChart({ state: "gap" }, false);
-    expect(badge(wrapper)).toBe("Coverage gap");
+    expect(badge(wrapper)).toBe("Coverage Gap");
     expect(wrapper.find('[data-test="autoobserve-coverage-chart-gap-latency"]').text()).toBe(
-      "Coverage gap",
+      "Coverage Gap",
     );
   });
 });
@@ -236,12 +236,12 @@ describe("CoverageMetricChart live states", () => {
     const wrapper = mountLive({ cell: gapCell("none") });
     expect(find(wrapper, "gap").exists()).toBe(false);
     expect(find(wrapper, "value").text()).toBe("120 ms");
-    expect(badge(wrapper)).toBe("Coverage gap");
+    expect(badge(wrapper)).toBe("Coverage Gap");
   });
 
   it("captions partial data and a stream shared with other services", () => {
     const wrapper = mountLive({ partial: true, wide: true });
-    expect(find(wrapper, "partial").text()).toBe("Partial data");
+    expect(find(wrapper, "partial").text()).toBe("Partial Data");
     expect(find(wrapper, "wide").attributes("aria-label")).toBe(
       "Includes other services that share this stream",
     );
@@ -255,7 +255,7 @@ describe("CoverageMetricChart live states", () => {
       partial: true,
       reason: raw("No data from svc-b in the searched part of the last 24 h"),
     });
-    expect(find(wrapper, "partial").text()).toBe("Partial data");
+    expect(find(wrapper, "partial").text()).toBe("Partial Data");
     expect(find(wrapper, "nodata").text()).toBe(
       "No data from svc-b in the searched part of the last 24 h",
     );

@@ -142,7 +142,7 @@ const metadataRows = computed(() =>
         <span class="inline-flex">
           <OButton
             variant="outline"
-            size="sm-action"
+            size="sm"
             disabled
             data-test="traces-db-span-details-view-trend"
           >
@@ -157,7 +157,7 @@ const metadataRows = computed(() =>
     <div v-else-if="canViewTrend" class="flex justify-end">
       <OButton
         variant="outline"
-        size="sm-action"
+        size="sm"
         icon-left="trending-up"
         data-test="traces-db-span-details-view-trend"
         @click="openQueryTrend"

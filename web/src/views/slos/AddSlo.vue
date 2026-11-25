@@ -34,12 +34,12 @@
     title-data-test="slos-addslo-title"
   >
     <template #actions>
-      <OButton variant="outline" size="sm-action" data-test="slos-addslo-cancel" @click="cancel">
+      <OButton variant="outline" size="sm" data-test="slos-addslo-cancel" @click="cancel">
         {{ t("common.cancel") }}
       </OButton>
       <OButton
         variant="primary"
-        size="sm-action"
+        size="sm"
         :loading="saving"
         data-test="slos-addslo-save"
         @click="save()"

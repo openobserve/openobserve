@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex items-start justify-between gap-3 px-4 py-3">
       <div>
-        <h3 class="text-text-heading m-0 text-base leading-6 font-semibold">
+        <h3 class="text-text-heading m-0 text-sm leading-6 font-semibold">
           {{ t("billing.proPlanLabel") }}
         </h3>
         <p class="text-text-secondary m-0 text-xs leading-4 font-normal">
@@ -30,8 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag v-if="planType == planName" type="billingTag" value="subscribed" class="shrink-0" />
     </div>
 
-    <!-- Always rendered: the card is a subgrid row, so the price slot must exist even when empty. -->
-    <div :class="{ 'px-4 pb-3': pricingOptions?.length }">
+    <!-- Hidden when pricing is unavailable, in both cards at once, so no empty band shows. -->
+    <div v-if="pricingOptions?.length" class="px-4 pb-3">
       <div
         v-if="pricingOptions?.length"
         class="grid h-full grid-cols-1 gap-1.5 md:grid-cols-2"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div class="flex items-baseline gap-1">
-            <span class="text-text-heading text-2xl leading-7 font-semibold">
+            <span class="text-text-heading text-lg leading-7 font-semibold">
               {{ raw(option.price) }}
             </span>
             <span class="text-text-secondary text-xs">{{ raw(option.period) }}</span>
@@ -80,23 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OSeparator />
 
-    <div class="flex-1 px-4 py-3">
-      <div
-        v-if="pricingError && !features?.length"
-        class="text-status-error-text mb-2 flex items-center"
-      >
-        <OIcon name="warning" size="sm" class="me-2" />
-        <span class="text-text-body text-sm leading-5">{{ t("billing.pricingErrorMessage") }}</span>
-        <OButton
-          variant="ghost"
-          size="sm"
-          class="ms-2"
-          data-test="billing-pricing-retry"
-          @click="$emit('retry-pricing')"
-        >
-          {{ t("common.retry") }}
-        </OButton>
-      </div>
+    <div v-if="features?.length" class="flex-1 px-4 py-3">
       <div
         v-for="(feature, index) in features"
         :key="index"
@@ -126,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <OSeparator />
+    <OSeparator v-if="features?.length" />
 
     <p class="text-text-secondary m-0 px-4 pt-3 text-xs leading-4 font-normal">
       {{ t("billing.unlimitedNote") }}<br />
@@ -174,8 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else-if="planType == planName"
         variant="outline"
-        size="sm-action"
-        block
+        size="sm"
         data-test="billing-plans-pro-cancel-btn"
         @click="cancelSubscription"
       >
@@ -184,8 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else
         variant="primary"
-        size="sm-action"
-        block
+        size="sm"
         data-test="billing-plans-pro-subscribe-btn"
         @click="onSubscribe"
       >

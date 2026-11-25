@@ -40,7 +40,7 @@ const sentence = (result: CompareResponse) => line(result, "svcver-verdict-sente
 describe("RUM verdict banner headline", () => {
   it("reads as the RUM mockup: tile metric, change, pair, then the improved vitals", () => {
     expect(sentence(e2())).toBe(
-      "Possible regression: INP p75 +19.4% (179 → 213 ms); LCP and CLS improved.",
+      "Possible Regression: INP p75 +19.4% (179 → 213 ms); LCP and CLS improved.",
     );
   });
   it("keeps the shared sentence on a traces verdict", () => {
@@ -52,7 +52,7 @@ describe("RUM verdict banner headline", () => {
 describe("RUM verdict banner Why and window lines", () => {
   it("explains a real INP change held under the regression threshold", () => {
     expect(line(e2(), "svcver-verdict-reason")).toBe(
-      "Why Possible regression: the INP change is real, but below the regression threshold.",
+      "Why Possible Regression: the INP change is real, but below the regression threshold.",
     );
   });
   it("names the Good band limit when the vital stayed Good", () => {
@@ -60,7 +60,7 @@ describe("RUM verdict banner Why and window lines", () => {
     for (const verdict of [result.live_verdict!, result.stored_verdict!])
       verdict.reason_code = "within_good_band";
     expect(line(result, "svcver-verdict-reason")).toBe(
-      "Why Possible regression: the INP change is real, but INP is still Good (≤200 ms) and below the regression threshold.",
+      "Why Possible Regression: the INP change is real, but INP is still Good (≤200 ms) and below the regression threshold.",
     );
   });
   it("counts the windows in sessions without the equal-windows note", () => {
@@ -131,7 +131,7 @@ describe("headline direction", () => {
   });
   it("keeps the rise line when the metric rose", () => {
     expect(line(traced(p95(12000, 23000), p95(12000, 23000)), "svcver-verdict-reason")).toBe(
-      "Why Possible regression: p95 rose by a real 11 ms.",
+      "Why Possible Regression: p95 rose by a real 11 ms.",
     );
   });
 });
@@ -286,7 +286,7 @@ describe("a stated change agrees with the numbers on screen", () => {
     const result = e2();
     for (const verdict of [result.live_verdict!, result.stored_verdict!]) verdict.signal = "traces";
     expect(line(result, "svcver-verdict-reason")).toBe(
-      "Why Possible regression: INP rose by a real 34 ms.",
+      "Why Possible Regression: INP rose by a real 34 ms.",
     );
   });
 });

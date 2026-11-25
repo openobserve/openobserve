@@ -18,7 +18,6 @@ the Free Software Foundation, either version 3 of the License, or
             v-model="selectedProviderId"
             :options="providerOptions"
             :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
-            size="md"
             class="w-full"
             data-test="scorer-library-provider-select"
           />

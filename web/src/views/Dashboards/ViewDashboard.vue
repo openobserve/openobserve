@@ -71,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!isFullscreen && !isEditingLayout"
             v-show="store.state.printMode !== true"
             variant="ghost"
+            class="toolbar-btn-rest"
             :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
             @click="addPanelData"
             data-test="dashboard-panel-add"
@@ -230,6 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!isFullscreen && !isEditingLayout"
             v-show="store.state.printMode !== true"
             variant="ghost"
+            class="toolbar-btn-rest"
             :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
             icon-left="edit"
             :aria-label="t('dashboard.layoutEdit.enter')"
@@ -331,6 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :url="dashboardShareURL"
                 @copy:success="onDashboardShared"
                 variant="ghost"
+                class="toolbar-btn-rest"
                 :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
                 :show-label="!isMobile"
                 data-test="dashboard-share-btn"
@@ -344,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     variant="ghost"
                     size="icon-toolbar"
-                    class="w-5"
+                    class="toolbar-btn-rest -ms-px w-6"
                     :aria-label="t('dashboard.viewDashboard.moreShareOptions')"
                     data-test="dashboard-share-options-btn"
                     icon-left="arrow-drop-down"
@@ -378,6 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="store.state.printMode === true || isFullscreen"
               variant="ghost"
               size="icon-toolbar"
+              class="toolbar-btn-rest"
               @click="printDashboard"
               data-test="dashboard-print-btn"
             >
@@ -392,6 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-show="store.state.printMode !== true"
               variant="ghost"
               size="icon-toolbar"
+              class="toolbar-btn-rest"
               @click="toggleFullscreen"
               data-test="dashboard-fullscreen-btn"
             >
@@ -412,6 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #trigger>
                   <OButton
                     variant="ghost"
+                    class="toolbar-btn-rest"
                     :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
                     icon-left="more-horiz"
                     :aria-label="

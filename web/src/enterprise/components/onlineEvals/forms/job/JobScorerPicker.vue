@@ -9,7 +9,6 @@
       :placeholder="t('onlineEvals.job.scorerPicker.placeholder')"
       :search-placeholder="t('onlineEvals.job.scorerPicker.searchPlaceholder')"
       :help-text="t(`onlineEvals.job.scorerPicker.hint.${targetScope}`)"
-      size="md"
       :disabled="!scorers.length"
       data-test="job-form-scorer-select"
       @update:model-value="onChange"

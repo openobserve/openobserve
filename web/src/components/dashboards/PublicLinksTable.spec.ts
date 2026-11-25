@@ -754,7 +754,7 @@ describe("PublicLinksTable", () => {
     vi.mocked(admin.listOrg).mockResolvedValue({ data: { list: [] } } as never);
     const w = build();
     await flushPromises();
-    expect(find(w, "dashboards-public-links-empty").text()).toContain("No public links yet");
+    expect(find(w, "dashboards-public-links-empty").text()).toContain("No Public Links Yet");
   });
 
   it("shows a filtered empty state that clears back to every link", async () => {
@@ -765,7 +765,7 @@ describe("PublicLinksTable", () => {
     await flushPromises();
     await selectTile(w, "live");
     const empty = find(w, "dashboards-public-links-empty");
-    expect(empty.text()).toContain("No public links found");
+    expect(empty.text()).toContain("No Public Links Found");
 
     await w.findAllComponents({ name: "OEmptyState" })[0].vm.$emit("action", "clear-filters");
     await flushPromises();

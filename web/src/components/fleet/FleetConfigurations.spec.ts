@@ -117,7 +117,7 @@ describe("FleetConfigurations", () => {
     expect(
       wrapper.find('[data-test="fleet-configurations-fleets-hidden-edge-minimal"]').text(),
     ).toBe("+2 you cannot view");
-    expect(wrapper.text()).toContain("Used by fleets");
+    expect(wrapper.text()).toContain("Used by Fleets");
   });
 
   it("marks a row with an unsaved draft and drops the mark once the draft is gone", async () => {

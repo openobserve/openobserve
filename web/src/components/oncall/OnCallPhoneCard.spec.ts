@@ -510,10 +510,10 @@ describe("OnCallPhoneCard", () => {
     const remove = w.findComponent('[data-test="oncall-phone-remove"]');
     expect(change.props("iconLeft")).toBe("edit");
     expect(change.props("variant")).toBe("ghost");
-    expect(change.text()).toBe("Change phone");
+    expect(change.text()).toBe("Change Phone");
     expect(remove.props("iconLeft")).toBe("delete");
     expect(remove.props("variant")).toBe("ghost-destructive");
-    expect(remove.text()).toBe("Remove phone");
+    expect(remove.text()).toBe("Remove Phone");
   });
 
   it("verified: Change reopens the number box", async () => {
@@ -604,8 +604,8 @@ describe("OnCallPhoneCard", () => {
     await flushPromises();
 
     const remove = find(w, "remove");
-    expect(remove.attributes("aria-label")).toBe("Remove phone");
-    expect(find(w, "change").attributes("aria-label")).toBe("Change phone");
+    expect(remove.attributes("aria-label")).toBe("Remove Phone");
+    expect(find(w, "change").attributes("aria-label")).toBe("Change Phone");
     await remove.trigger("click");
     expect(w.find('[data-test="confirm"]').exists()).toBe(true);
   });

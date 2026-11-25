@@ -48,7 +48,6 @@
           :loading="loadingJobs"
           :disabled="loadingJobs || jobOptions.length === 0"
           required
-          size="md"
           data-test="manual-evaluation-job-select"
         />
       </OForm>

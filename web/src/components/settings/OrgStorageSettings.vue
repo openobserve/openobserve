@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="h-11 w-11 shrink-0 object-contain"
                 />
                 <div>
-                  <div class="text-base leading-tight font-bold">
+                  <div class="text-sm leading-tight font-semibold">
                     {{ configuredProviderLabel }}
                   </div>
                   <OTag type="activeFlag" class="mt-1" />

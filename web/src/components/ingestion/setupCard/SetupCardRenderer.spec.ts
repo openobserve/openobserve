@@ -1307,7 +1307,7 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
   it("keeps the verify step, with its data check, as Check Your Data", () => {
     mountOnboarding({ traces: "off", languages: [] });
     expect(titles()).toContain("Check Your Data");
-    expect(wrapper.text()).not.toContain("Verify data in OpenObserve");
+    expect(wrapper.text()).not.toContain("Verify Data in OpenObserve");
     expect(find("ai-step-verify").text()).toContain("Give the collector a few seconds to start");
     expect(find("ai-step-verify").findComponent(FirstEventStatusStub).exists()).toBe(true);
   });
@@ -1315,7 +1315,7 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
   it("has no tracing step when traces were skipped", () => {
     mountOnboarding({ traces: "off", languages: [] });
     expect(titles()).toEqual([
-      "Quick install (recommended)",
+      "Quick Install (Recommended)",
       "See which workloads talk to each other: eBPF network flows",
       "Check Your Data",
     ]);
@@ -1325,7 +1325,7 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
   it("shows a numbered eBPF step, open and with no toggle", async () => {
     mountOnboarding({ traces: "ebpf", languages: [] });
     expect(titles()).toEqual([
-      "Quick install (recommended)",
+      "Quick Install (Recommended)",
       "Trace your apps",
       "See which workloads talk to each other: eBPF network flows",
       "Check Your Data",
@@ -1344,7 +1344,7 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
   it("gives each language its own namespace placeholder and restart, with no input", () => {
     mountOnboarding({ traces: "library", languages: ["java", "nodejs"] });
     expect(titles()).toEqual([
-      "Quick install (recommended)",
+      "Quick Install (Recommended)",
       "Trace your apps",
       "See which workloads talk to each other: eBPF network flows",
       "Check Your Data",
@@ -1372,7 +1372,7 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
   ] as [string, SetupCardPresets][])("folds the optional steps for %s", (_, presets) => {
     mountOnboarding(presets);
     expect(titles()).toEqual([
-      "Quick install (recommended)",
+      "Quick Install (Recommended)",
       "Trace your applications: language libraries or eBPF",
       "See which workloads talk to each other: eBPF network flows",
       "Check Your Data",
@@ -1388,10 +1388,10 @@ describe("SetupCardRenderer — Kubernetes card in onboarding", () => {
       attachTo: document.body,
     });
     expect(titles()).toEqual([
-      "Quick install (recommended)",
+      "Quick Install (Recommended)",
       "Trace your applications: language libraries or eBPF",
       "See which workloads talk to each other: eBPF network flows",
-      "Verify data in OpenObserve",
+      "Verify Data in OpenObserve",
     ]);
     expect(wrapper.find('[data-test^="ai-step-fold-"]').exists()).toBe(false);
     expect(find("ai-step-verify").findComponent(FirstEventStatusStub).exists()).toBe(true);
@@ -1484,7 +1484,7 @@ describe("SetupCardRenderer — steps host", () => {
       languages: [],
     });
     expect(setSteps.mock.lastCall![0].map((s: { title: string }) => s.title)).toEqual([
-      "Quick install (recommended)",
+      "Quick Install (Recommended)",
       "Trace your applications: language libraries or eBPF",
       "See which workloads talk to each other: eBPF network flows",
       "Check Your Data",

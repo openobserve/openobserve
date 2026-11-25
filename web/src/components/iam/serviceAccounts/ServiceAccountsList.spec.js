@@ -756,7 +756,7 @@ describe("ServiceAccountsList Component", () => {
       const refreshDialog = confirmDialogs.find((d) => d.props("modelValue") === true);
       expect(refreshDialog).toBeDefined();
       // Verb-labeled, destructive — no hardcoded English / generic OK.
-      expect(refreshDialog.props("okLabel")).toBe("Rotate token");
+      expect(refreshDialog.props("okLabel")).toBe("Rotate Token");
       expect(refreshDialog.props("okColor")).toBe("destructive");
     });
   });
@@ -1233,7 +1233,7 @@ describe("ServiceAccountsList Component", () => {
       const summary = wrapper.find('[data-test="service-accounts-token-access-summary"]');
       expect(summary.exists()).toBe(true);
       // Label shown once, followed by a badge per role — not one sentence.
-      expect(summary.text()).toContain("Roles assigned");
+      expect(summary.text()).toContain("Roles Assigned");
       expect(summary.text()).toContain("editor");
     });
 
@@ -1246,7 +1246,7 @@ describe("ServiceAccountsList Component", () => {
 
       const summary = wrapper.find('[data-test="service-accounts-token-access-summary"]');
       expect(summary.exists()).toBe(true);
-      expect(summary.text()).toContain("Roles assigned");
+      expect(summary.text()).toContain("Roles Assigned");
       expect(summary.text()).toContain("editor");
       expect(summary.text()).toContain("Added to user groups");
       expect(summary.text()).toContain("pipelines");
@@ -1258,7 +1258,7 @@ describe("ServiceAccountsList Component", () => {
       );
     });
 
-    it("shows the 'Roles assigned' label once even when multiple roles were granted", async () => {
+    it("shows the 'Roles Assigned' label once even when multiple roles were granted", async () => {
       wrapper.vm.revealToken("tok", "svc@example.com", {
         assigned: { roles: ["editor", "viewer", "admin"], groups: [] },
         failed: { roles: [], groups: [] },
@@ -1266,7 +1266,7 @@ describe("ServiceAccountsList Component", () => {
       await nextTick();
 
       const summary = wrapper.find('[data-test="service-accounts-token-access-summary"]');
-      const labelOccurrences = summary.text().split("Roles assigned").length - 1;
+      const labelOccurrences = summary.text().split("Roles Assigned").length - 1;
       expect(labelOccurrences).toBe(1);
       ["editor", "viewer", "admin"].forEach((role) => {
         expect(summary.text()).toContain(role);

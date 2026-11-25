@@ -634,7 +634,7 @@ describe("Approved Slack choices", () => {
     const wrapper = mountComponent({ slackApp: true });
     const expected: Record<string, string> = {
       slack_app: "Act on alerts",
-      slack: "Post only",
+      slack: "Post Only",
       discord: "Chat posts",
       msteams: "Chat posts",
       email: "HTML email",

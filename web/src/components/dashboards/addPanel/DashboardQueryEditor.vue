@@ -193,7 +193,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('dashboard.toggleFunctionEditor')"
           @update:model-value="onFunctionToggle"
           :disabled="promqlMode"
-          size="lg"
         >
           <template #label>
             <img

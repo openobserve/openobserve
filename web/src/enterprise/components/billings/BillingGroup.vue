@@ -33,13 +33,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-sm leading-5 font-semibold whitespace-nowrap opacity-85">
               {{ t("billing.billingGroup.statTotal") }}
             </div>
-            <div class="mt-1.5 text-2xl leading-[1.2] font-semibold">{{ totalCount }}</div>
+            <div class="mt-1.5 text-lg leading-[1.2] font-semibold">{{ totalCount }}</div>
           </div>
           <div class="feature-card flex-1">
             <div class="text-sm leading-5 font-semibold whitespace-nowrap opacity-85">
               {{ t("billing.billingGroup.statActive") }}
             </div>
-            <div class="text-status-positive mt-1.5 text-2xl leading-[1.2] font-semibold">
+            <div class="text-status-positive mt-1.5 text-lg leading-[1.2] font-semibold">
               {{ activeCount }}
             </div>
           </div>
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-sm leading-5 font-semibold whitespace-nowrap opacity-85">
               {{ t("billing.billingGroup.statPending") }}
             </div>
-            <div class="text-status-warning-text mt-1.5 text-2xl leading-[1.2] font-semibold">
+            <div class="text-status-warning-text mt-1.5 text-lg leading-[1.2] font-semibold">
               {{ pendingCount }}
             </div>
           </div>
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="verified" size="xs" />
               {{ t("billing.billingGroup.statusActive") }}
             </div>
-            <div class="mb-4 text-4xl leading-[1.2] font-bold tracking-[-0.0375rem]">
+            <div class="mb-4 text-xl leading-[1.2] font-semibold tracking-[-0.0375rem]">
               {{ t("billing.billingGroup.childHeadline") }}
               <span
                 class="text-tabs-active-text inline-block max-w-full cursor-pointer overflow-hidden align-bottom text-ellipsis whitespace-nowrap"
@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="mb-2.5 text-xl font-bold tracking-[-0.0125rem]">
+          <div class="mb-2.5 text-base font-semibold tracking-[-0.0125rem]">
             {{
               allowedForBillingGroup
                 ? t("billing.billingGroup.emptyTitle")
