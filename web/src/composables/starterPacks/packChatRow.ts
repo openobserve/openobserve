@@ -29,7 +29,6 @@ export interface PackRowInput {
   forbidden: boolean;
   installFailed: boolean;
   failedCount: number;
-  canUndo: boolean;
   /** Every matched pack was refused, so no row offers a button. */
   askAdmin: boolean;
 }
@@ -38,7 +37,6 @@ export interface PackRowState {
   kind: PackRowKind;
   /** Items to retry; zero on a stopped run, which finishes instead. */
   retryCount: number;
-  canUndo: boolean;
   installFailed: boolean;
 }
 
@@ -53,7 +51,6 @@ export function packRowState(input: PackRowInput): PackRowState {
   const state = (kind: PackRowKind): PackRowState => ({
     kind,
     retryCount: kind === "failed" ? input.failedCount : 0,
-    canUndo: kind === "ready" && input.canUndo,
     installFailed: kind === "idle" && input.installFailed,
   });
   if (input.running) return state("settingUp");
@@ -68,14 +65,13 @@ export const packRowInput = (item: HomePackRowItem, askAdmin: boolean): PackRowI
   const { flow } = item;
   return {
     view: item.view.value,
-    running: flow.running.value,
+    running: flow.running.value && flow.claimed.value,
     installed: flow.installed.value,
     interrupted: flow.interrupted.value,
     runningElsewhere: flow.runningBy.value !== null,
     forbidden: flow.forbidden.value,
     installFailed: flow.installFailed.value,
     failedCount: flow.failed.value.length,
-    canUndo: flow.canUndo.value,
     askAdmin,
   };
 };

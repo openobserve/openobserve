@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { reactive } from "vue";
+
 import { queryClient } from "@/composables/query/queryClient";
 import { organizationKeys } from "./organizations.querykeys";
 
@@ -21,8 +23,12 @@ const QUIET_MS = 1_000;
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
+/** Orgs this page made a dashboard or alert in, so a held answer about their counts is out of date. */
+export const createdOrgs = reactive(new Set<string>());
+
 const fire = (org: string) => {
   timers.delete(org);
+  createdOrgs.add(org);
   void queryClient.invalidateQueries({ queryKey: organizationKeys.summary(org), exact: true });
 };
 

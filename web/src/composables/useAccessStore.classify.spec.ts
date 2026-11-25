@@ -116,6 +116,7 @@ describe("access store classification", () => {
   it("names the collection, not the item, for a named item in the path", () => {
     expect(extractResourceInfo("/api/acme/functions/my_fn")?.key).toBe("functions");
     expect(extractResourceInfo("/api/acme/roles/developer")?.key).toBe("roles");
+    expect(extractResourceInfo("/api/acme/kv/a.b", "POST")?.key).toBe("kv");
     expect(extractResourceInfo("/api/acme/alerts/templates/oncall")?.key).toBe("templates");
     expect(extractResourceInfo("/api/acme/alerts/destinations/pager")?.key).toBe("destinations");
     expect(accessPermission("GET", "/api/acme/functions/my_fn")).toBe("get");

@@ -42,9 +42,10 @@ export const kvValueQuery = (org: string, key: string) =>
 
 // ── Writes ──────────────────────────────────────────────────────────────────
 
-export const setKvMutation = (org: string) =>
+export const setKvMutation = (org: string, options?: { silentForbidden?: boolean }) =>
   mutationOptions({
-    mutationFn: (vars: { key: string; value: string }) => kv.set(org, vars.key, vars.value),
+    mutationFn: (vars: { key: string; value: string }) =>
+      kv.set(org, vars.key, vars.value, options),
     meta: { invalidates: [kvKeys.all(org)], silentError: true },
   });
 

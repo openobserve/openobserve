@@ -23,40 +23,20 @@ import type { PackInstallRecord } from "./types";
 /** A run rewrites its record after every item, so one quiet this long has lost its tab. */
 export const RUN_STALE_US = 5 * 60 * 1_000_000;
 
+// A live run on a fast clock must not be taken over; a stamp further ahead would lock the pack.
+const MAX_CLOCK_SKEW_US = 5 * 60 * 1_000_000;
+
 const keyPrefix = (packId: string) => `starter_pack.${packId}.`;
 
 const recordKey = (packId: string, installId: string) => `${keyPrefix(packId)}${installId}`;
 
-// FNV-1a: a change detector for item bodies, and `crypto.subtle` is absent on plain http.
-const fnv1a = (text: string): string => {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < text.length; index += 1) {
-    hash = Math.imul(hash ^ text.charCodeAt(index), 0x01000193);
-  }
-  return (hash >>> 0).toString(16);
-};
-
-const sortKeys = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(sortKeys);
-  if (typeof value !== "object" || value === null) return value;
-  return Object.fromEntries(
-    Object.entries(value)
-      // Code-unit order: the hash must match across browser locales.
-      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-      .map(([key, entry]) => [key, sortKeys(entry)]),
-  );
-};
-
-/** Independent of key order, since the server does not promise one. */
-export const contentHash = (value: unknown): string => {
-  const text = JSON.stringify(sortKeys(value));
-  return `${text.length.toString(16)}-${fnv1a(text)}`;
-};
-
 // Only a run writes `installing`; its last write says `complete` or `incomplete`.
-export const isRunning = (record: PackInstallRecord, nowUs: number): boolean =>
-  record.status === "installing" &&
-  nowUs - (record.updatedAt ?? record.installedAt ?? 0) < RUN_STALE_US;
+export const isRunning = (record: PackInstallRecord, nowUs: number): boolean => {
+  const quietUs = nowUs - (record.updatedAt ?? record.installedAt ?? 0);
+  return record.status === "installing" && quietUs < RUN_STALE_US && quietUs >= -MAX_CLOCK_SKEW_US;
+};
+
+const stamp = (value: unknown) => (Number.isFinite(value) ? (value as number) : undefined);
 
 // The KV store is shared and user-writable, so a stored value is not trusted to be a record.
 const parseRecord = (value: string): PackInstallRecord | null => {
@@ -65,8 +45,14 @@ const parseRecord = (value: string): PackInstallRecord | null => {
     const valid =
       typeof record?.packId === "string" &&
       typeof record?.installId === "string" &&
+      record.status !== "removed" &&
       Array.isArray(record?.items);
-    return valid ? record : null;
+    if (!valid) return null;
+    return {
+      ...record,
+      installedAt: stamp(record.installedAt),
+      updatedAt: stamp(record.updatedAt),
+    };
   } catch {
     return null;
   }

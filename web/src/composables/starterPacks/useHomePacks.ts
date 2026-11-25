@@ -157,7 +157,7 @@ export function useHomePacks(
   { save = true }: { save?: boolean } = {},
 ) {
   const items = packs.map((pack) => useHomePack(org, pack, active));
-  const { hasUserData } = useOrgHasUserData(org);
+  const { hasUserData, isFetching } = useOrgHasUserData(org);
   const { noResources } = useOrgHasNoResources(org, () => hasUserData.value === true);
   const browser = useBrowserMatches(org);
 
@@ -178,7 +178,15 @@ export function useHomePacks(
   // Waits for every pack, so no card moves once the strip shows.
   const answered = computed(() => offerable.value && !anyLoading.value && offered.value.length > 0);
   const showSection = computed(() => answered.value && canCreate.value);
-  const askAdmin = computed(() => answered.value && !canCreate.value);
+  // Only a data check that settled with no answer reads as refused; a known answer is not no access.
+  const noAccess = computed(
+    () =>
+      items.length > 0 &&
+      items.every((item) => item.view.value === "forbidden") &&
+      !isFetching.value &&
+      hasUserData.value === undefined,
+  );
+  const askAdmin = computed(() => noAccess.value || (answered.value && !canCreate.value));
   const offerShown = computed(() => loading.value || showSection.value);
   // An unfinished setup is said in any org; the rest only belongs next to an offer.
   const notices = computed(() =>
@@ -198,11 +206,10 @@ export function useHomePacks(
   // Serialized, so a re-render that changes nothing does not rewrite the browser copy.
   const builtIn = computed(() => {
     if (!settled.value) return null;
-    const interrupted = items.find((item) => item.flow.interrupted.value);
     return JSON.stringify({
       sources: offered.value.map(matchSource),
       installed: setUp.value.map((item) => item.pack.id),
-      interrupted: interrupted ? interruptedOf(interrupted) : null,
+      interrupted: items.filter((item) => item.view.value === "interrupted").map(interruptedOf),
     });
   });
   watch(
@@ -226,6 +233,7 @@ export function useHomePacks(
     notices,
     labelShown,
     loading,
+    noAccess,
   };
 }
 

@@ -435,10 +435,6 @@ const tiles = computed<Tile[]>(() => {
           <OIcon name="tune" size="sm" class="shrink-0" />
           {{ t("starterPacks.popup.chooseNext") }}
         </span>
-        <span class="flex items-center gap-2">
-          <OIcon name="undo" size="sm" class="shrink-0" />
-          {{ t("starterPacks.popup.undoWindow") }}
-        </span>
       </div>
     </div>
   </div>

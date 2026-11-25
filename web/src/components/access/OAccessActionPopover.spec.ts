@@ -85,6 +85,12 @@ describe("OAccessActionPopover", () => {
     expect(document.activeElement).toBe(anchor);
   });
 
+  it("shows over a dialog, one opened inside another included", async () => {
+    await openCard();
+    const layer = card()!.closest<HTMLElement>('[role="dialog"]')!;
+    expect(Number(layer.style.zIndex)).toBeGreaterThan(7000);
+  });
+
   it("names every refused write the one action sent", async () => {
     await openCard([
       viewDenial("roles", "update", ["PUT /api/default/roles/viewer"]),

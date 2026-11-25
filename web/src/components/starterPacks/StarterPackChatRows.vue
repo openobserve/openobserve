@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -39,7 +39,6 @@ import { usePackGate } from "@/composables/starterPacks/usePackGate";
 import type { StarterPack } from "@/composables/starterPacks/types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
-import StarterPackInlineConfirm from "./StarterPackInlineConfirm.vue";
 
 const props = defineProps<{ org: string; packIds: string[] }>();
 
@@ -51,7 +50,6 @@ const packs = props.packIds
   .slice(0, DIGEST_MAX_PACKS);
 // Only the digest's packs, so the org's saved match copy, which covers every pack, is left alone.
 const home = useHomePacks(props.org, packs, () => gate.visible.value, { save: false });
-const confirming = ref<string | null>(null);
 
 interface ChatRow {
   item: HomePack;
@@ -73,14 +71,6 @@ const bestId = computed(() =>
   rows.value.some(({ state }) => state.kind !== "idle" && state.kind !== "forbidden")
     ? null
     : rows.value.find(({ state }) => state.kind === "idle")?.item.pack.id,
-);
-
-// Undo can drop the row for a moment while the org summary refreshes, and the confirm's done is lost with it.
-watch(
-  () => rows.value.find(({ item }) => item.pack.id === confirming.value)?.state.kind,
-  (kind) => {
-    if (kind !== "ready") confirming.value = null;
-  },
 );
 
 const countsLine = ({ flow }: HomePack): I18nText => {
@@ -130,132 +120,114 @@ const setUpLabel = (count: number | null): I18nText =>
       class="border-border-default bg-surface-panel rounded-default flex min-h-14 items-center gap-3 border px-3 py-2"
       :data-test="`starter-pack-chat-row-${item.pack.id}`"
     >
-      <StarterPackInlineConfirm
-        v-if="confirming === item.pack.id"
-        :flow="item.flow"
-        mode="undo"
-        @cancel="confirming = null"
-        @done="confirming = null"
-      />
-      <template v-else>
-        <span
-          class="border-border-default bg-surface-base rounded-default flex size-9 shrink-0 items-center justify-center border"
-        >
-          <img
-            v-if="item.pack.logo"
-            :src="getImageURL(item.pack.logo)"
-            class="size-6 object-contain"
-            alt=""
-          />
-          <OIcon v-else name="package-2" size="sm" class="text-text-secondary" />
-        </span>
-        <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span class="text-text-heading flex min-w-0 items-center gap-2 text-sm font-semibold">
-            <OTruncatedText class="min-w-0">{{ item.title }}</OTruncatedText>
-            <OBadge
-              v-if="bestId === item.pack.id"
-              variant="primary"
-              size="sm"
-              :data-test="`starter-pack-chat-best-${item.pack.id}`"
-              >{{ t("starterPacks.home.bestStart") }}</OBadge
-            >
-          </span>
-          <span
-            class="text-text-secondary flex min-w-0 items-center gap-1.5 text-xs"
-            :data-test="`starter-pack-chat-note-${item.pack.id}`"
+      <span
+        class="border-border-default bg-surface-base rounded-default flex size-9 shrink-0 items-center justify-center border"
+      >
+        <img
+          v-if="item.pack.logo"
+          :src="getImageURL(item.pack.logo)"
+          class="size-6 object-contain"
+          alt=""
+        />
+        <OIcon v-else name="package-2" size="sm" class="text-text-secondary" />
+      </span>
+      <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span class="text-text-heading flex min-w-0 items-center gap-2 text-sm font-semibold">
+          <OTruncatedText class="min-w-0">{{ item.title }}</OTruncatedText>
+          <OBadge
+            v-if="bestId === item.pack.id"
+            variant="primary"
+            size="sm"
+            :data-test="`starter-pack-chat-best-${item.pack.id}`"
+            >{{ t("starterPacks.home.bestStart") }}</OBadge
           >
-            <template v-if="state.kind === 'settingUp'">
-              <OSpinner size="xs" class="shrink-0" />
-              <span class="truncate">{{ progressLine(item) }}</span>
-            </template>
-            <template v-else-if="state.kind === 'elsewhere'">
-              <OIcon name="schedule" size="sm" class="shrink-0" />
-              <span class="truncate">{{ runningLine(item) }}</span>
-            </template>
-            <span v-else-if="state.kind === 'ready'" class="truncate">{{
-              t("starterPacks.ready.title", { title: item.title })
-            }}</span>
-            <span
-              v-else-if="state.kind === 'failed' && item.flow.interruptedBy.value !== null"
-              class="truncate"
-              >{{ startedByLine(item.flow.interruptedBy.value) }}</span
-            >
-            <span v-else-if="state.kind === 'failed'" class="truncate">{{
-              t("starterPacks.progress.interrupted", {
-                made: item.flow.made.value.length,
-                total: item.flow.toCreate.value.length,
-              })
-            }}</span>
-            <template v-else-if="state.kind === 'forbidden'">
-              <OIcon name="lock" size="sm" class="shrink-0" />
-              <span class="truncate">{{ t("starterPacks.askAdmin") }}</span>
-            </template>
-            <template v-else-if="state.kind === 'idle' && item.flow.busyBy.value !== null">
-              <OIcon name="schedule" size="sm" class="shrink-0" />
-              <span class="truncate">{{ busyLine(item) }}</span>
-            </template>
-            <span v-else-if="state.installFailed" class="text-status-error-text truncate">{{
-              t("starterPacks.progress.installError")
-            }}</span>
-            <span v-else class="truncate">{{ countsLine(item) }}</span>
-          </span>
-        </div>
-        <div class="flex shrink-0 items-center gap-2">
-          <template v-if="state.kind === 'idle'">
-            <OButton
-              variant="link"
-              size="sm-action"
-              :aria-label="t('starterPacks.home.reviewSetUpLabel', { title: item.title })"
-              :data-test="`starter-pack-chat-review-${item.pack.id}`"
-              @click="item.openDetails()"
-            >
-              {{ t("starterPacks.home.reviewSetUp") }}
-            </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              :data-test="`starter-pack-chat-set-up-${item.pack.id}`"
-              @click="setUpWithDefaults(item.flow)"
-            >
-              {{ setUpLabel(count) }}
-            </OButton>
+        </span>
+        <span
+          class="text-text-secondary flex min-w-0 items-center gap-1.5 text-xs"
+          :data-test="`starter-pack-chat-note-${item.pack.id}`"
+        >
+          <template v-if="state.kind === 'settingUp'">
+            <OSpinner size="xs" class="shrink-0" />
+            <span class="truncate">{{ progressLine(item) }}</span>
           </template>
-          <template v-else-if="state.kind === 'ready'">
-            <OButton
-              v-if="state.canUndo"
-              variant="ghost"
-              size="sm-action"
-              :data-test="`starter-pack-chat-undo-${item.pack.id}`"
-              @click="confirming = item.pack.id"
-            >
-              {{ t("starterPacks.landing.undo") }}
-            </OButton>
-            <OButton
-              v-if="item.flow.dashboardItem.value?.id"
-              variant="outline"
-              size="sm-action"
-              :data-test="`starter-pack-chat-open-${item.pack.id}`"
-              @click="item.flow.land()"
-            >
-              {{ t("starterPacks.drawer.openDashboard") }}
-            </OButton>
+          <template v-else-if="state.kind === 'elsewhere'">
+            <OIcon name="schedule" size="sm" class="shrink-0" />
+            <span class="truncate">{{ runningLine(item) }}</span>
           </template>
+          <span v-else-if="state.kind === 'ready'" class="truncate">{{
+            t("starterPacks.ready.title", { title: item.title })
+          }}</span>
+          <span
+            v-else-if="state.kind === 'failed' && item.flow.interruptedBy.value !== null"
+            class="truncate"
+            >{{ startedByLine(item.flow.interruptedBy.value) }}</span
+          >
+          <span v-else-if="state.kind === 'failed'" class="truncate">{{
+            t("starterPacks.progress.interrupted", {
+              made: item.flow.made.value.length,
+              total: item.flow.toCreate.value.length,
+            })
+          }}</span>
+          <template v-else-if="state.kind === 'forbidden'">
+            <OIcon name="lock" size="sm" class="shrink-0" />
+            <span class="truncate">{{ t("starterPacks.askAdmin") }}</span>
+          </template>
+          <template v-else-if="state.kind === 'idle' && item.flow.busyBy.value !== null">
+            <OIcon name="schedule" size="sm" class="shrink-0" />
+            <span class="truncate">{{ busyLine(item) }}</span>
+          </template>
+          <span v-else-if="state.installFailed" class="text-status-error-text truncate">{{
+            t("starterPacks.progress.installError")
+          }}</span>
+          <span v-else class="truncate">{{ countsLine(item) }}</span>
+        </span>
+      </div>
+      <div class="flex shrink-0 items-center gap-2">
+        <template v-if="state.kind === 'idle'">
           <OButton
-            v-else-if="state.kind === 'failed'"
+            variant="link"
+            size="sm-action"
+            :aria-label="t('starterPacks.home.reviewSetUpLabel', { title: item.title })"
+            :data-test="`starter-pack-chat-review-${item.pack.id}`"
+            @click="item.openDetails()"
+          >
+            {{ t("starterPacks.home.reviewSetUp") }}
+          </OButton>
+          <OButton
             variant="primary"
             size="sm-action"
-            icon-left="refresh"
-            :data-test="`starter-pack-chat-retry-${item.pack.id}`"
-            @click="retrySetUp(item.flow)"
+            :loading="item.flow.running.value"
+            :data-test="`starter-pack-chat-set-up-${item.pack.id}`"
+            @click="setUpWithDefaults(item.flow)"
           >
-            {{
-              state.retryCount
-                ? t("starterPacks.progress.retry", { count: state.retryCount }, state.retryCount)
-                : t("starterPacks.progress.finish")
-            }}
+            {{ setUpLabel(count) }}
           </OButton>
-        </div>
-      </template>
+        </template>
+        <OButton
+          v-else-if="state.kind === 'ready' && item.flow.dashboardItem.value?.id"
+          variant="outline"
+          size="sm-action"
+          :data-test="`starter-pack-chat-open-${item.pack.id}`"
+          @click="item.flow.land()"
+        >
+          {{ t("starterPacks.drawer.openDashboard") }}
+        </OButton>
+        <OButton
+          v-else-if="state.kind === 'failed'"
+          variant="primary"
+          size="sm-action"
+          icon-left="refresh"
+          :loading="item.flow.running.value"
+          :data-test="`starter-pack-chat-retry-${item.pack.id}`"
+          @click="retrySetUp(item.flow)"
+        >
+          {{
+            state.retryCount
+              ? t("starterPacks.progress.retry", { count: state.retryCount }, state.retryCount)
+              : t("starterPacks.progress.finish")
+          }}
+        </OButton>
+      </div>
     </div>
   </div>
 </template>

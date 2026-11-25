@@ -21,14 +21,12 @@ export type PackFolderType = "dashboards" | "alerts";
 
 export type PackItemKind = "folder" | "dashboard" | "alert" | "savedView" | "function" | "pipeline";
 
-/** `existing` was there before this install, so undo never touches it. */
+/** `existing` was there before this install, so the pack only links it. */
 export type PackItemStatus = "pending" | "created" | "existing" | "failed" | "skipped";
 
-export type PackInstallStatus = "installing" | "complete" | "incomplete" | "removed";
+export type PackInstallStatus = "installing" | "complete" | "incomplete";
 
 export type PackEmailFailure = "email" | "forbidden";
-
-export type PackKeptReason = "changed" | "not_empty" | "delete_failed" | "unrecorded";
 
 export interface PackDashboard {
   id: string;
@@ -179,10 +177,8 @@ export interface PackRecordItem {
   itemId: string;
   status: PackItemStatus;
   id?: string;
-  /** Delete and read routes authorize against the folder. */
+  /** Read routes authorize against the folder. */
   folderId?: string;
-  /** Content hash read back right after create. */
-  sourceHash?: string;
   /** Library alert this Use all copy came from. */
   copyOf?: string;
   stream?: string;
@@ -195,7 +191,7 @@ export interface PackInstallRecord {
   installId: string;
   status: PackInstallStatus;
   items: PackRecordItem[];
-  /** Microseconds; starts the Undo window. */
+  /** Microseconds of the run that last started or resumed it. */
   installedAt?: number;
   /** Microseconds of the last write; a quiet `installing` record has stopped. */
   updatedAt?: number;
@@ -217,12 +213,6 @@ export interface PackInstallRecord {
   destination?: string;
   /** Why Email me could not be set up, so the note survives Retry and reopen. */
   emailFailure?: PackEmailFailure;
-}
-
-export interface PackKeptItem {
-  kind: PackItemKind;
-  itemId: string;
-  reason: PackKeptReason;
 }
 
 export type PackNotIncludedReason =
@@ -318,19 +308,6 @@ export interface PackInstallOptions {
   /** Admin's Set up in… choice; absent means the pack's own folder. */
   folderName?: string;
   onProgress?: (record: PackInstallRecord) => void;
-}
-
-export interface PackRemovalResult {
-  removed: PackRecordItem[];
-  kept: PackKeptItem[];
-}
-
-/** The KV write was refused, so nothing was created. */
-export class StarterPackPermissionError extends Error {
-  constructor() {
-    super("starter_pack_forbidden");
-    this.name = "StarterPackPermissionError";
-  }
 }
 
 /** Another install of the pack started first, so this one stopped before creating anything. */

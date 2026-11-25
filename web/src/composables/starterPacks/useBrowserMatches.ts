@@ -41,7 +41,8 @@ export interface BrowserMatchCopy {
   sources: FindMoreSource[];
   /** Built-in pack ids known to be installed at the last check. */
   installedPackIds: string[];
-  interrupted: BrowserInterrupted | null;
+  /** Every unfinished setup, so the header counts them before any record loads. */
+  interrupted: BrowserInterrupted[];
 }
 
 interface OrgState {
@@ -52,7 +53,7 @@ interface OrgState {
 export const matchesKey = (org: string, email: string) =>
   `o2.starterPacks.browserMatches.${org}.${email}`;
 
-const signedIn = (): string =>
+export const signedIn = (): string =>
   String((store.state.userInfo as { email?: string } | null)?.email ?? "");
 
 const isBuiltIn = (packId: string) => packs().some(({ id }) => id === packId);
@@ -83,6 +84,11 @@ const writeJson = (key: string, value: unknown) => {
 const strings = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
 
+const parseInterrupted = (value: unknown): BrowserInterrupted[] =>
+  Array.isArray(value)
+    ? value.filter((entry): entry is BrowserInterrupted => typeof entry?.packId === "string")
+    : [];
+
 const parseCopy = (value: unknown): BrowserMatchCopy | null => {
   const parsed = value as Partial<BrowserMatchCopy> | null;
   if (typeof parsed?.checkedAt !== "number" || !Array.isArray(parsed?.sources)) return null;
@@ -94,12 +100,11 @@ const parseCopy = (value: unknown): BrowserMatchCopy | null => {
         Array.isArray(source?.streams),
     ),
   );
-  const interrupted = typeof parsed.interrupted?.packId === "string" ? parsed.interrupted : null;
   return {
     checkedAt: parsed.checkedAt,
     sources,
     installedPackIds: strings(parsed.installedPackIds),
-    interrupted,
+    interrupted: parseInterrupted(parsed.interrupted),
   };
 };
 
@@ -112,27 +117,34 @@ const stateOf = (key: string, stored: boolean): OrgState => {
   return state;
 };
 
+/** Whether storage holds a copy, without reading it: one read with no catalog loaded loses every source. */
+export const hasSavedMatches = (org: string): boolean => {
+  const email = signedIn();
+  try {
+    return !!email && window.localStorage.getItem(matchesKey(org, email)) !== null;
+  } catch {
+    return false;
+  }
+};
+
 /** Forgets the in-memory copies, so the next read comes from storage. */
 export const resetBrowserMatches = () => copies.clear();
 
 /** This browser's last match result for an org; no network calls. */
 export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
   copy: Readonly<Ref<BrowserMatchCopy | null>>;
-  visible: ComputedRef<FindMoreSource[]>;
-  count: ComputedRef<number>;
   show: ComputedRef<boolean>;
   saveFull(
     result: FindMoreResult,
     installedPackIds: string[],
-    interrupted?: BrowserInterrupted | null,
+    interrupted?: BrowserInterrupted[],
   ): void;
   saveBuiltIn(
     sources: FindMoreSource[],
     installedPackIds: string[],
-    interrupted: BrowserInterrupted | null,
+    interrupted: BrowserInterrupted[],
   ): void;
   markInstalled(sourceId: string, packId?: string): void;
-  markRemoved(packId: string): void;
   clear(): void;
 } {
   // Without a known user any key could be read by the next one, so the copy stays in memory.
@@ -140,13 +152,6 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
   const key = computed(() => matchesKey(toValue(org), signedIn()));
   const state = computed(() => stateOf(key.value, stored.value));
   const copy = computed(() => state.value.copy);
-  const visible = computed(() => {
-    const installed = copy.value?.installedPackIds ?? [];
-    return (copy.value?.sources ?? []).filter(
-      ({ packId }) => !(packId && installed.includes(packId)),
-    );
-  });
-  const count = computed(() => visible.value.length);
   // Set-up packs stay listed and an empty check still has its screen, so any check shows the chip.
   const show = computed(() => copy.value !== null);
 
@@ -158,11 +163,11 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
   const saveBuiltIn = (
     sources: FindMoreSource[],
     installedPackIds: string[],
-    interrupted: BrowserInterrupted | null = null,
+    interrupted: BrowserInterrupted[] = [],
   ) => {
     const installed = [...new Set(installedPackIds)];
     const fresh = builtInOnly(sources);
-    // A check leaves out a set-up pack, so its last source is kept for an undo to list it again.
+    // A check leaves out a set-up pack, so its last source is kept for the popup to list its streams.
     const kept = (copy.value?.sources ?? []).filter(
       ({ packId }) =>
         !!packId && installed.includes(packId) && !fresh.some((row) => row.packId === packId),
@@ -178,31 +183,21 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
   const saveFull = (
     result: FindMoreResult,
     installedPackIds: string[],
-    interrupted: BrowserInterrupted | null = null,
+    interrupted: BrowserInterrupted[] = [],
   ) => saveBuiltIn(result.sources, installedPackIds, interrupted);
 
   const markInstalled = (sourceId: string, packId?: string) => {
     const current = copy.value;
     if (!current) return;
     const builtIn = !!packId && isBuiltIn(packId);
-    // A built-in source stays, hidden by its installed id, so an undo can list it again.
+    // A built-in source stays, hidden by its installed id, so the popup can list its streams.
     setCopy({
       ...current,
       sources: builtIn ? current.sources : current.sources.filter(({ id }) => id !== sourceId),
       installedPackIds: builtIn
         ? [...new Set([...current.installedPackIds, packId])]
         : current.installedPackIds,
-      interrupted: current.interrupted?.packId === packId ? null : current.interrupted,
-    });
-  };
-
-  const markRemoved = (packId: string) => {
-    const current = copy.value;
-    if (!current) return;
-    setCopy({
-      ...current,
-      installedPackIds: current.installedPackIds.filter((id) => id !== packId),
-      interrupted: current.interrupted?.packId === packId ? null : current.interrupted,
+      interrupted: current.interrupted.filter((entry) => entry.packId !== packId),
     });
   };
 
@@ -216,5 +211,5 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
     }
   };
 
-  return { copy, visible, count, show, saveFull, saveBuiltIn, markInstalled, markRemoved, clear };
+  return { copy, show, saveFull, saveBuiltIn, markInstalled, clear };
 }

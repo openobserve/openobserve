@@ -43,7 +43,7 @@ vi.mock("@/composables/starterPacks/useStarterPackMatcher", () => ({
     fake.matchers[pack.id],
 }));
 vi.mock("@/composables/useOrgHasUserData", () => ({
-  useOrgHasUserData: () => ({ hasUserData: fake.hasUserData }),
+  useOrgHasUserData: () => ({ hasUserData: fake.hasUserData, isFetching: ref(false) }),
 }));
 vi.mock("@/composables/useOrgResources", () => ({
   useOrgHasNoResources: () => ({ noResources: fake.noResources }),
@@ -127,6 +127,35 @@ describe("StarterPackChatRows", () => {
     expect(fake.matchers.kubernetes.checkShared).toHaveBeenCalled();
   });
 
+  it("keeps the pressed Set up button until the claim is held, and shows no error for a refusal", async () => {
+    const wrapper = await render(["kubernetes"]);
+    const flow = fake.flows.kubernetes;
+    flow.claimed.value = false;
+    let refuse!: () => void;
+    flow.install = vi.fn(async () => {
+      flow.running.value = true;
+      await new Promise<void>((done) => (refuse = done));
+      flow.running.value = false;
+      return false;
+    });
+    const button = () => wrapper.get('[data-test="starter-pack-chat-set-up-kubernetes"]');
+    const pressed = button().element;
+    await button().trigger("click");
+    await flushPromises();
+    expect(button().element).toBe(pressed);
+    expect(button().attributes("aria-busy")).toBe("true");
+    refuse();
+    await flushPromises();
+    expect(button().element).toBe(pressed);
+    expect(wrapper.get('[data-test="starter-pack-chat-note-kubernetes"]').text()).not.toContain(
+      "Setup didn't finish",
+    );
+    flow.running.value = true;
+    flow.claimed.value = true;
+    await nextTick();
+    expect(has(wrapper, "starter-pack-chat-set-up-kubernetes")).toBe(false);
+  });
+
   it("says who is setting the pack up when the chat Set up was stopped by another install", async () => {
     const wrapper = await render(["kubernetes"]);
     const flow = fake.flows.kubernetes;
@@ -159,37 +188,13 @@ describe("StarterPackChatRows", () => {
     expect(wrapper.get('[data-test="starter-pack-chat-note-kubernetes"]').text()).toBe(
       "Kubernetes monitoring is ready",
     );
-    expect(has(wrapper, "starter-pack-chat-undo-kubernetes")).toBe(true);
+    expect(wrapper.text()).not.toMatch(/undo|remove pack/i);
+    expect(wrapper.find('[data-test*="-undo-"], [data-test*="-remove-"]').exists()).toBe(false);
     expect(wrapper.get('[data-test="starter-pack-chat-open-kubernetes"]').text()).toBe(
       "Open dashboard",
     );
     expect(has(wrapper, "starter-pack-chat-row-hosts")).toBe(false);
     expect(has(wrapper, "starter-pack-chat-best-kubernetes")).toBe(false);
-  });
-
-  it("closes the Undo confirm and offers the pack again once undo finishes", async () => {
-    const flow = fake.flows.kubernetes;
-    flow.record.value = { status: "complete", items: [], installedAt: Date.now() * 1000 };
-    flow.installed.value = true;
-    fake.noResources.value = false;
-    // As the real flow does: the record goes, then the org summary refresh makes the org empty again.
-    flow.undo = vi.fn(async () => {
-      flow.record.value = null;
-      flow.installed.value = false;
-      await nextTick();
-      fake.noResources.value = true;
-      return true;
-    });
-    const wrapper = await render(["kubernetes"]);
-    await wrapper.get('[data-test="starter-pack-chat-undo-kubernetes"]').trigger("click");
-    await wrapper.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
-    await flushPromises();
-    expect(flow.undo).toHaveBeenCalled();
-    expect(has(wrapper, "starter-pack-undo-confirm-btn")).toBe(false);
-    expect(wrapper.get('[data-test="starter-pack-chat-set-up-kubernetes"]').text()).toBe(
-      "Set up 4 items",
-    );
-    expect(has(wrapper, "starter-pack-chat-review-kubernetes")).toBe(true);
   });
 
   it("drops the badge from the other offers while one pack is being set up", async () => {

@@ -39,7 +39,6 @@ const input = (over: Partial<PackRowInput> = {}): PackRowInput => ({
   forbidden: false,
   installFailed: false,
   failedCount: 0,
-  canUndo: false,
   askAdmin: false,
   ...over,
 });
@@ -49,7 +48,6 @@ describe("packRowState", () => {
     expect(packRowState(input())).toEqual({
       kind: "idle",
       retryCount: 0,
-      canUndo: false,
       installFailed: false,
     });
   });
@@ -70,14 +68,12 @@ describe("packRowState", () => {
     expect(packRowState(input({ runningElsewhere: true, forbidden: true })).kind).toBe("elsewhere");
   });
 
-  it("is ready once set up, with Undo only while the window lasts", () => {
-    expect(packRowState(input({ installed: true, view: "installed", canUndo: true }))).toEqual({
+  it("is ready once set up", () => {
+    expect(packRowState(input({ installed: true, view: "installed" }))).toEqual({
       kind: "ready",
       retryCount: 0,
-      canUndo: true,
       installFailed: false,
     });
-    expect(packRowState(input({ installed: true, canUndo: false })).canUndo).toBe(false);
   });
 
   it("offers a retry of the failed items on a partial set up", () => {

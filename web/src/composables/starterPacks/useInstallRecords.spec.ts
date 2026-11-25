@@ -13,24 +13,72 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { contentHash } from "./useInstallRecords";
+import type { PackInstallRecord } from "./types";
 
-describe("contentHash", () => {
-  it("ignores key order at every depth", () => {
-    expect(contentHash({ a: 1, b: { c: 2, d: [{ e: 3, f: 4 }] } })).toBe(
-      contentHash({ b: { d: [{ f: 4, e: 3 }], c: 2 }, a: 1 }),
-    );
+const kv = vi.hoisted(() => ({ value: "" }));
+vi.mock("@tanstack/vue-query", () => ({ useMutation: () => ({ mutateAsync: vi.fn() }) }));
+vi.mock("@/services/kv.queries", () => ({
+  kvValueQuery: () => ({}),
+  kvKeysQuery: () => ({}),
+  setKvMutation: vi.fn(),
+  deleteKvMutation: vi.fn(),
+}));
+vi.mock("@/composables/query/readQuery", () => ({ readQuery: async () => kv.value }));
+
+import { isRunning, useInstallRecords } from "./useInstallRecords";
+
+const MINUTE_US = 60 * 1_000_000;
+const NOW = 1_900_000_000_000_000;
+const installing = (stamps: Record<string, unknown>) =>
+  ({
+    packId: "kubernetes",
+    installId: "i1",
+    status: "installing",
+    items: [],
+    ...stamps,
+  }) as PackInstallRecord;
+
+const stored = async (stamps: Record<string, unknown>) => {
+  kv.value = JSON.stringify(installing(stamps));
+  return (await useInstallRecords("org").read("kubernetes", "i1"))!;
+};
+
+describe("isRunning", () => {
+  it.each(["updatedAt", "installedAt"])(
+    "allows %s a small clock skew ahead, and no more",
+    (key) => {
+      expect(isRunning(installing({ [key]: NOW + 4 * MINUTE_US }), NOW)).toBe(true);
+      expect(isRunning(installing({ [key]: NOW + 10 * MINUTE_US }), NOW)).toBe(false);
+    },
+  );
+
+  it("reads a quiet or unstamped run as stopped", () => {
+    expect(isRunning(installing({ updatedAt: NOW - MINUTE_US }), NOW)).toBe(true);
+    expect(isRunning(installing({ updatedAt: NOW - 10 * MINUTE_US }), NOW)).toBe(false);
+    expect(isRunning(installing({}), NOW)).toBe(false);
+  });
+});
+
+describe("a stored record's stamps", () => {
+  it.each([["soon"], [null], [{}], [[]], [true]])(
+    "drops %j, so it can neither lock nor sort a pack",
+    async (stamp) => {
+      const record = await stored({ updatedAt: stamp, installedAt: stamp });
+      expect(record.updatedAt).toBeUndefined();
+      expect(record.installedAt).toBeUndefined();
+      expect(isRunning(record, NOW)).toBe(false);
+    },
+  );
+
+  it("keeps numeric stamps", async () => {
+    const record = await stored({ updatedAt: NOW, installedAt: NOW - 1 });
+    expect(record).toMatchObject({ updatedAt: NOW, installedAt: NOW - 1 });
   });
 
-  it("orders keys by code unit whatever the locale would collate", () => {
-    const hash = contentHash({ height: 1, chartType: 2, Zeta: 3 });
-    expect(hash).toBe(contentHash({ Zeta: 3, chartType: 2, height: 1 }));
-    expect(hash).toBe("23-702abbf4");
-  });
-
-  it("changes with the content", () => {
-    expect(contentHash({ a: 1 })).not.toBe(contentHash({ a: 2 }));
+  it("falls back to the start time when only the last write is not a number", async () => {
+    const record = await stored({ updatedAt: "later", installedAt: NOW });
+    expect(isRunning(record, NOW)).toBe(true);
   });
 });

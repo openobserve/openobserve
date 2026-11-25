@@ -121,15 +121,6 @@ describe("groupFindMore", () => {
     expect(result.sources[0].items.map(({ id }) => id)).toEqual(["k8s/one", "events"]);
   });
 
-  it("offers items of a removed install again", () => {
-    const removed = record(
-      [{ kind: "dashboard", itemId: "overview", status: "created" }],
-      "removed",
-    );
-    const result = groupFindMore(inputs({ packs: [{ ...inputs().packs[0], records: [removed] }] }));
-    expect(result.sources[0].items.map(({ id }) => id)).toContain("overview");
-  });
-
   it("answers with no sources when nothing new fits", () => {
     const none = new Map<string, boolean>();
     const result = groupFindMore(

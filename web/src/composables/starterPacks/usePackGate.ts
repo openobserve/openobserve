@@ -18,7 +18,10 @@ import { useMutation, useQuery } from "@tanstack/vue-query";
 
 import { ruleCount } from "@/composables/useOrgResources";
 import { kvKeysQuery, setKvMutation } from "@/services/kv.queries";
+import { createdOrgs } from "@/services/orgSummaryRefresh";
 import { orgSummaryQuery } from "@/services/organizations.queries";
+
+import { signedIn } from "./useBrowserMatches";
 
 /** Org flag beside the other `starter_pack_*` keys; once set, packs never show again. */
 export const PACKS_RETIRED_KEY = "starter_pack_retired";
@@ -30,6 +33,34 @@ const written = new Set<string>();
 
 export const resetPackGate = () => written.clear();
 
+const sessionKey = (org: string) => `o2.starterPacks.gate.${org}.${signedIn()}`;
+
+// Storage can be missing or throw, and then every page load asks.
+const sessionSaysOpen = (org: string): boolean => {
+  try {
+    return !!signedIn() && window.sessionStorage.getItem(sessionKey(org)) !== null;
+  } catch {
+    return false;
+  }
+};
+
+const keepForSession = (org: string) => {
+  try {
+    if (signedIn()) window.sessionStorage.setItem(sessionKey(org), "open");
+  } catch {
+    // The next page load then asks again.
+  }
+};
+
+/** Drops the session's answer, so the next page load asks the server again. */
+export const forgetPackGate = (org: string) => {
+  try {
+    window.sessionStorage.removeItem(sessionKey(org));
+  } catch {
+    // Storage that cannot be reached holds no answer either.
+  }
+};
+
 /** Packs are for onboarding only: an org past both counts, or flagged once, is done with them. */
 export const packsRetired = (flag: string | null | undefined, summary: any): boolean => {
   if (flag === "1") return true;
@@ -38,17 +69,29 @@ export const packsRetired = (flag: string | null | undefined, summary: any): boo
   return Number(summary.total_dashboards) > LIMIT && ruleCount(summary.alerts) > LIMIT;
 };
 
-/** The one gate every pack surface reads: chip, Home section, banner and Data sources row. */
-export function usePackGate(org: string, enabled: () => boolean = () => true) {
-  const summary = useQuery(() => ({ ...orgSummaryQuery(org), enabled: enabled() }));
+/**
+ * The one gate every pack surface reads: chip, Home section, banner and Data sources row.
+ * Given `askAgain`, it trusts this session's "not retired" until the counts may have moved.
+ */
+export function usePackGate(
+  org: string,
+  enabled: () => boolean = () => true,
+  askAgain?: () => boolean,
+) {
+  const trusted = !!askAgain && sessionSaysOpen(org);
+  const cached = useQuery(() => ({ ...orgSummaryQuery(org), enabled: false }));
+  const moved = () => !trusted || cached.data.value !== undefined || createdOrgs.has(org);
+  const wanted = () => !!askAgain?.() || (enabled() && moved());
+  const summary = useQuery(() => ({ ...orgSummaryQuery(org), enabled: wanted() }));
   // The key list answers 200 for a missing flag where a single-key read logs a 404.
   const flag = useQuery(() => ({
     ...kvKeysQuery(org, PACKS_RETIRED_KEY),
-    enabled: enabled(),
+    enabled: wanted(),
     // The backend prefix match is a LIKE, so a longer key can come back too.
     select: (keys: string[]) => (keys.includes(PACKS_RETIRED_KEY) ? "1" : null),
   }));
-  const setKv = useMutation(() => setKvMutation(org));
+  // No one asked for this write, so a refusal is not the user's to hear about.
+  const setKv = useMutation(() => setKvMutation(org, { silentForbidden: true }));
 
   const retired = computed(() => packsRetired(flag.data.value, summary.data.value));
   // An unread flag may already be set, so the write waits for the read to answer.
@@ -70,7 +113,22 @@ export function usePackGate(org: string, enabled: () => boolean = () => true) {
     { immediate: true },
   );
 
+  // A failed read answers nothing, so it is never kept.
+  const answer = computed(() => {
+    if (retired.value) return "retired";
+    return summary.data.value !== undefined && flag.data.value !== undefined ? "open" : null;
+  });
+  watch(
+    answer,
+    (now) => {
+      if (now === "open") keepForSession(org);
+      else if (now === "retired") forgetPackGate(org);
+    },
+    { immediate: true },
+  );
+
   // A failed read leaves status "error", not "pending", so packs still show when a count cannot load.
   const loading = computed(() => summary.isPending.value || flag.isPending.value);
-  return { visible: computed(() => !loading.value && !retired.value), retired };
+  const visible = computed(() => !retired.value && (trusted || !loading.value));
+  return { visible, retired };
 }

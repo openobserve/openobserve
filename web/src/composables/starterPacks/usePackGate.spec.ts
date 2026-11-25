@@ -16,7 +16,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { VueQueryPlugin } from "@tanstack/vue-query";
-import { defineComponent, h, ref } from "vue";
+import { defineComponent, h, nextTick, ref } from "vue";
 
 import { queryClient } from "@/composables/query/queryClient";
 import alerts from "@/services/alerts";
@@ -24,10 +24,20 @@ import dashboards from "@/services/dashboards";
 import http from "@/services/http";
 import kv from "@/services/kv";
 import organizations from "@/services/organizations";
+import { createdOrgs, refreshOrgSummarySoon } from "@/services/orgSummaryRefresh";
+import { orgSummaryQuery } from "@/services/organizations.queries";
+import store from "@/stores";
+import { refreshOrgResources } from "@/composables/useOrgResources";
 
 vi.mock("@/services/http", () => ({ default: vi.fn() }));
 
-import { PACKS_RETIRED_KEY, packsRetired, resetPackGate, usePackGate } from "./usePackGate";
+import {
+  PACKS_RETIRED_KEY,
+  forgetPackGate,
+  packsRetired,
+  resetPackGate,
+  usePackGate,
+} from "./usePackGate";
 
 const summary = (alerts: number, dashboards: number) => ({
   alerts: { num_realtime: 0, num_scheduled: alerts },
@@ -37,12 +47,12 @@ const summary = (alerts: number, dashboards: number) => ({
 const noFlag = () => ({ data: [] });
 const flagSet = () => ({ data: [PACKS_RETIRED_KEY] });
 
-function setup(enabled?: () => boolean) {
+function setup(enabled?: () => boolean, askAgain?: () => boolean) {
   let gate!: ReturnType<typeof usePackGate>;
   const wrapper = mount(
     defineComponent({
       setup() {
-        gate = usePackGate("org1", enabled);
+        gate = usePackGate("org1", enabled, askAgain);
         return () => h("div");
       },
     }),
@@ -153,7 +163,7 @@ describe("usePackGate", () => {
     await flushPromises();
     expect(gate.visible.value).toBe(false);
     expect(set).toHaveBeenCalledTimes(1);
-    expect(set).toHaveBeenCalledWith("org1", PACKS_RETIRED_KEY, "1");
+    expect(set).toHaveBeenCalledWith("org1", PACKS_RETIRED_KEY, "1", { silentForbidden: true });
     wrapper.unmount();
   });
 
@@ -260,6 +270,175 @@ describe("usePackGate", () => {
     expect(list).toHaveBeenCalledTimes(1);
     expect(gate.visible.value).toBe(true);
     wrapper.unmount();
+  });
+
+  describe("a surface that trusts the session's answer", () => {
+    const ME = "me@x.io";
+    const KEY = `o2.starterPacks.gate.org1.${ME}`;
+    const quiet = (askAgain = () => false) => setup(() => true, askAgain);
+    const answers = (counts: unknown, flag = noFlag()) => {
+      vi.spyOn(kv, "set").mockResolvedValue({ data: "" } as never);
+      vi.spyOn(kv, "list").mockResolvedValue(flag as never);
+      return vi
+        .spyOn(organizations, "get_organization_summary")
+        .mockResolvedValue({ data: counts } as never);
+    };
+    const reload = () => {
+      queryClient.clear();
+      resetPackGate();
+    };
+    // A first load that got the answer "not retired", then a reload of the page.
+    const openSession = async () => {
+      const counts = answers(summary(1, 1));
+      const first = quiet();
+      await flushPromises();
+      first.wrapper.unmount();
+      reload();
+      counts.mockClear();
+      vi.mocked(kv.list).mockClear();
+      return counts;
+    };
+
+    beforeEach(() => {
+      window.sessionStorage.clear();
+      createdOrgs.clear();
+      store.commit("setUserInfo", { email: ME });
+    });
+    afterEach(() => store.commit("setUserInfo", {}));
+
+    it("asks on the first load of the session, then stays visible and quiet", async () => {
+      const counts = answers(summary(1, 1));
+      const first = quiet();
+      expect(first.gate.visible.value).toBe(false);
+      await flushPromises();
+      expect(counts).toHaveBeenCalledTimes(1);
+      expect(first.gate.visible.value).toBe(true);
+      expect(window.sessionStorage.getItem(KEY)).not.toBeNull();
+      first.wrapper.unmount();
+      reload();
+      const second = quiet();
+      expect(second.gate.visible.value).toBe(true);
+      await flushPromises();
+      expect(counts).toHaveBeenCalledTimes(1);
+      expect(kv.list).toHaveBeenCalledTimes(1);
+      second.wrapper.unmount();
+    });
+
+    it("asks again without hiding first once it is told to", async () => {
+      const counts = await openSession();
+      const ask = ref(false);
+      const { gate, wrapper } = quiet(() => ask.value);
+      ask.value = true;
+      await nextTick();
+      expect(gate.visible.value).toBe(true);
+      await flushPromises();
+      expect(counts).toHaveBeenCalledTimes(1);
+      expect(gate.visible.value).toBe(true);
+      wrapper.unmount();
+    });
+
+    it("asks nothing for a surface that would not show", async () => {
+      const counts = answers(summary(1, 1));
+      const { wrapper } = setup(
+        () => false,
+        () => false,
+      );
+      await flushPromises();
+      expect(counts).not.toHaveBeenCalled();
+      wrapper.unmount();
+    });
+
+    it("follows the counts another surface read, and again when they cross later", async () => {
+      const counts = await openSession();
+      const { gate, wrapper } = quiet();
+      await queryClient.fetchQuery(orgSummaryQuery("org1"));
+      await flushPromises();
+      expect(gate.retired.value).toBe(false);
+      counts.mockResolvedValue({ data: summary(11, 11) } as never);
+      await refreshOrgResources("org1");
+      await flushPromises();
+      expect(counts).toHaveBeenCalledTimes(2);
+      expect(gate.visible.value).toBe(false);
+      expect(window.sessionStorage.getItem(KEY)).toBeNull();
+      wrapper.unmount();
+    });
+
+    it("asks again once this page created something counted in its org only", async () => {
+      const counts = await openSession();
+      counts.mockResolvedValue({ data: summary(11, 11) } as never);
+      const { gate, wrapper } = quiet();
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      refreshOrgSummarySoon("other");
+      vi.advanceTimersByTime(1_000);
+      await nextTick();
+      expect(counts).not.toHaveBeenCalled();
+      refreshOrgSummarySoon("org1");
+      vi.advanceTimersByTime(1_000);
+      vi.useRealTimers();
+      await flushPromises();
+      expect(counts).toHaveBeenCalledTimes(1);
+      expect(gate.visible.value).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("keeps no answer for a retired org, a failed read or another user", async () => {
+      answers(summary(1, 1), flagSet());
+      const retired = quiet();
+      await flushPromises();
+      expect(window.sessionStorage.length).toBe(0);
+      retired.wrapper.unmount();
+
+      reload();
+      queryClient.setDefaultOptions({ queries: { retry: false } });
+      vi.mocked(kv.list).mockRejectedValue(new Error("down"));
+      const failed = quiet();
+      await flushPromises();
+      expect(failed.gate.visible.value).toBe(true);
+      expect(window.sessionStorage.length).toBe(0);
+      failed.wrapper.unmount();
+
+      reload();
+      const counts = await openSession();
+      store.commit("setUserInfo", { email: "other@x.io" });
+      const other = quiet();
+      expect(other.gate.visible.value).toBe(false);
+      await flushPromises();
+      expect(counts).toHaveBeenCalledTimes(1);
+      other.wrapper.unmount();
+    });
+
+    it("asks again on the next load once the answer is forgotten", async () => {
+      const counts = await openSession();
+      forgetPackGate("org1");
+      const { gate, wrapper } = quiet();
+      expect(gate.visible.value).toBe(false);
+      await flushPromises();
+      expect(counts).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+    });
+
+    it("works with no session storage", async () => {
+      const counts = answers(summary(1, 1));
+      const blocked = vi.spyOn(window, "sessionStorage", "get").mockImplementation(() => {
+        throw new Error("blocked");
+      });
+      const { gate, wrapper } = quiet();
+      await flushPromises();
+      expect(() => forgetPackGate("org1")).not.toThrow();
+      blocked.mockRestore();
+      expect(counts).toHaveBeenCalledTimes(1);
+      expect(gate.visible.value).toBe(true);
+      wrapper.unmount();
+    });
+
+    it("is not trusted by a surface that always asks", async () => {
+      await openSession();
+      const { gate, wrapper } = setup();
+      expect(gate.visible.value).toBe(false);
+      await flushPromises();
+      expect(gate.visible.value).toBe(true);
+      wrapper.unmount();
+    });
   });
 
   it("answers retired from the flag or the counts, never from a failed read", async () => {

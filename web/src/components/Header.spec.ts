@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
-import { mount, shallowMount } from "@vue/test-utils";
+import { flushPromises, mount, shallowMount } from "@vue/test-utils";
 import { computed, nextTick } from "vue";
 import i18n from "@/locales";
 import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
@@ -22,9 +22,12 @@ import Header from "@/components/Header.vue";
 import StarterPackHeaderChip from "@/components/starterPacks/StarterPackHeaderChip.vue";
 import * as cookies from "@/utils/cookies";
 import { chartColor } from "@/utils/chartTheme";
-import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+import { loadPackCatalog } from "@/composables/starterPacks/usePackCatalog";
+import starterPacksService from "@/services/starter_packs";
+import appStore from "@/stores";
+import catalog from "@/test/unit/fixtures/starterPacksCatalog.json";
 
-loadCatalogFixture();
+const MATCHES = "o2.starterPacks.browserMatches.test-org.me@x.io";
 
 const breakpoint = vi.hoisted(() => ({ lgUp: true }));
 vi.mock("@/composables/useBreakpoint", () => ({
@@ -73,9 +76,44 @@ describe("Header Component", () => {
   describe("starter packs header chip", () => {
     afterEach(() => (starterPacks.enabled = true));
 
-    it("mounts the chip for the selected org when starter packs are on", () => {
-      const header = createWrapper({ stubsOverrides: { StarterPackCatalogGate: false } });
-      expect(header.findComponent(StarterPackHeaderChip).exists()).toBe(true);
+    const chipOf = (header: any) => header.findComponent(StarterPackHeaderChip).exists();
+    const render = () => createWrapper({ stubsOverrides: { StarterPackCatalogGate: false } });
+    let load: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      window.localStorage.removeItem(MATCHES);
+      window.sessionStorage.clear();
+      appStore.commit("setUserInfo", { email: "me@x.io" });
+      load = vi.spyOn(starterPacksService, "catalog").mockResolvedValue({ data: catalog } as never);
+    });
+    afterEach(() => {
+      window.localStorage.removeItem(MATCHES);
+      appStore.commit("setUserInfo", {});
+      load.mockRestore();
+    });
+
+    it("asks for no catalog without a saved match copy", async () => {
+      const header = render();
+      await flushPromises();
+      expect(load).not.toHaveBeenCalled();
+      expect(chipOf(header)).toBe(false);
+    });
+
+    it("mounts the chip once another surface has asked for the org's catalog", async () => {
+      const header = render();
+      await loadPackCatalog("test-org");
+      await flushPromises();
+      expect(chipOf(header)).toBe(true);
+    });
+
+    it("asks for the catalog of an org with a saved match copy", async () => {
+      window.localStorage.setItem(MATCHES, "{}");
+      await loadPackCatalog("elsewhere");
+      load.mockClear();
+      const header = render();
+      await flushPromises();
+      expect(load).toHaveBeenCalledWith("test-org");
+      expect(chipOf(header)).toBe(true);
     });
 
     it("does not mount the chip at all when starter packs are off", () => {

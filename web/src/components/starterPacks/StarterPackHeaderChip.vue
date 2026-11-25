@@ -54,13 +54,27 @@ const { open: popupOpen, screen, packId } = popup;
 // Created here, in setup, so Home, the banner and the popup share one state per pack.
 const entries = packs().map((pack) => popup.entryOf(pack));
 
-const running = computed(() => entries.find(({ flow }) => flow.running.value) ?? null);
+const current = computed(() => entries.find(({ pack }) => pack.id === packId.value) ?? null);
+// A run without its claim has started nothing, so only one that holds it shows progress.
+const running = computed(
+  () => entries.find(({ flow }) => flow.running.value && flow.claimed.value) ?? null,
+);
+const busy = computed(() => entries.some(({ flow }) => flow.running.value));
 // With nothing saved and nothing running the chip cannot show, so it asks the server nothing.
-const gate = usePackGate(org, () => matches.show.value || !!running.value);
+const gate = usePackGate(
+  org,
+  () => matches.show.value,
+  () => popupOpen.value || busy.value,
+);
 // A retired org stays retired, so dropping its copy keeps later page loads from asking again.
 watch(
-  () => gate.retired.value && !running.value,
-  (done) => done && matches.clear(),
+  () => gate.retired.value && !busy.value,
+  (done) => {
+    if (!done) return;
+    matches.clear();
+    // The session's answer can be out of date, and a retired org must not start a setup.
+    if (screen.value === "list" || !current.value?.flow.record.value) popup.close();
+  },
   { immediate: true },
 );
 const shown = computed(
@@ -70,14 +84,15 @@ const shown = computed(
 const rail = computed<RailPack[]>(() => {
   const copy = matches.copy.value;
   const installedIds = copy?.installedPackIds ?? [];
+  const stoppedIds = copy?.interrupted.map(({ packId: id }) => id) ?? [];
   return entries.flatMap((entry): RailPack[] => {
     const { pack, flow } = entry;
     const source = copy?.sources.find(({ packId: id }) => id === pack.id);
     const known = installedIds.includes(pack.id);
-    // A loaded record knows better than the last check, so a fresh setup or undo shows at once.
-    const setUp = flow.loaded.value ? flow.installed.value : known;
-    const stopped =
-      flow.interrupted.value || (!flow.loaded.value && copy?.interrupted?.packId === pack.id);
+    // A loaded record knows better than the last check, so a fresh setup shows at once.
+    const unread = !flow.loaded.value;
+    const stopped = flow.interrupted.value || (unread && stoppedIds.includes(pack.id));
+    const setUp = unread ? known && !stopped : flow.installed.value;
     const elsewhere = flow.runningBy.value !== null;
     if (!source && !setUp && !stopped && !elsewhere && !known) return [];
     return [{ entry, source, setUp, stopped }];
@@ -91,8 +106,6 @@ const notSetUp = computed(() => rail.value.filter(({ setUp }) => !setUp).length)
 const bestStartId = computed(() =>
   rail.value.some((row) => row.setUp) ? null : (rail.value[0]?.entry.pack.id ?? null),
 );
-const current = computed(() => entries.find(({ pack }) => pack.id === packId.value) ?? null);
-
 const listSubtitle = computed(() => {
   if (!rail.value.length) return t("starterPacks.popup.subtitleNone");
   const count = notSetUp.value;
@@ -174,11 +187,7 @@ const openSelected = () => {
             made: running.flow.made.value.length,
             total: running.flow.toCreate.value.length,
           })
-        : t(
-            'starterPacks.headerChip.ariaLabel',
-            { count: matches.count.value },
-            matches.count.value,
-          )
+        : t('starterPacks.headerChip.ariaLabel', { count: notSetUp }, notSetUp)
     "
     data-test="header-starter-packs-btn"
     @click="openFromChip"
@@ -201,9 +210,7 @@ const openSelected = () => {
         })
       }}
     </span>
-    <span v-else class="font-bold" data-test="header-starter-packs-count">{{
-      matches.count.value
-    }}</span>
+    <span v-else class="font-bold" data-test="header-starter-packs-count">{{ notSetUp }}</span>
   </OButton>
 
   <ODialog

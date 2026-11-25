@@ -333,7 +333,11 @@ const interruptedLine = ({ flow, title }: HomePack) => {
     </template>
 
     <OBanner v-if="home.askAdmin.value" variant="default" dense data-test="home-pack-ask-admin">
-      {{ t("starterPacks.home.askAdminLine") }}
+      {{
+        home.noAccess.value
+          ? t("starterPacks.home.noAccessLine")
+          : t("starterPacks.home.askAdminLine")
+      }}
     </OBanner>
 
     <section
