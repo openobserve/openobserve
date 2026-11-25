@@ -814,9 +814,6 @@ describe("TableRenderer", () => {
       };
       wrapper = createWrapper({ data });
 
-      // Override tableRef so getRows() returns controlled data
-      (wrapper.vm as any).tableRef = { getRows: () => data.rows };
-
       wrapper.vm.downloadTableAsCSV("test");
 
       // Headers should use label
@@ -834,7 +831,6 @@ describe("TableRenderer", () => {
         rows: [{ _timestamp: "2023-01-01T00:00:00Z" }],
       };
       wrapper = createWrapper({ data });
-      (wrapper.vm as any).tableRef = { getRows: () => data.rows };
 
       wrapper.vm.downloadTableAsCSV("test");
 
@@ -849,7 +845,6 @@ describe("TableRenderer", () => {
         rows: [{ count: 42 }],
       };
       wrapper = createWrapper({ data });
-      (wrapper.vm as any).tableRef = { getRows: () => data.rows };
 
       wrapper.vm.downloadTableAsCSV("test");
 
@@ -865,11 +860,50 @@ describe("TableRenderer", () => {
         rows: [{ status: "active" }],
       };
       wrapper = createWrapper({ data });
-      (wrapper.vm as any).tableRef = { getRows: () => data.rows };
 
       wrapper.vm.downloadTableAsCSV("test");
 
       expect(capturedCsv).toContain('"active"');
+    });
+
+    it("exports every row of a paginated table, not just the page on screen", async () => {
+      const data = {
+        columns: [{ name: "id", label: "Id", field: "id", align: "left" }],
+        rows: Array.from({ length: 25 }, (_, i) => ({ id: i })),
+      };
+      wrapper = createWrapper({ data, showPagination: true, rowsPerPage: 10 });
+      await flushPromises();
+      expect(
+        (wrapper.vm as unknown as { tableRef: { getRows: () => unknown[] } }).tableRef.getRows(),
+      ).toHaveLength(10);
+
+      const count = wrapper.vm.downloadTableAsCSV("test");
+
+      expect(count).toBe(25);
+      expect(capturedCsv.split("\n")).toHaveLength(26);
+    });
+
+    it("exports a re-fetched full table, filtered by the table's column filters", () => {
+      const data = {
+        columns: [{ name: "id", label: "Id", field: "id", align: "left" }],
+        rows: [{ id: 1 }],
+      };
+      wrapper = createWrapper({ data });
+      (wrapper.vm as unknown as { tableRef: unknown }).tableRef = {
+        filterRows: (rows: { id: number }[]) => rows.filter((r) => r.id !== 2),
+      };
+      const full = {
+        columns: data.columns,
+        rows: [{ id: 1 }, { id: 2 }, { id: 3 }],
+        capped: false,
+        partial: false,
+        rowLimit: 100000,
+      };
+
+      const count = wrapper.vm.downloadTableAsCSV("test", full);
+
+      expect(count).toBe(2);
+      expect(capturedCsv.split("\n")).toEqual(["Id", '"1"', '"3"']);
     });
 
     it("should properly escape double quotes in CSV values", () => {
@@ -878,7 +912,6 @@ describe("TableRenderer", () => {
         rows: [{ msg: 'He said "hello"' }],
       };
       wrapper = createWrapper({ data });
-      (wrapper.vm as any).tableRef = { getRows: () => data.rows };
 
       wrapper.vm.downloadTableAsCSV("test");
 
@@ -894,7 +927,6 @@ describe("TableRenderer", () => {
         rows: [{ a: null, b: undefined }],
       };
       wrapper = createWrapper({ data });
-      (wrapper.vm as any).tableRef = { getRows: () => data.rows };
 
       wrapper.vm.downloadTableAsCSV("test");
 
