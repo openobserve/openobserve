@@ -850,6 +850,7 @@ fn failed_deltas_stats(
         trace_id: Some(trace_id.to_string()),
         took_wait_in_queue: Some(parallel_took_detail(done).wait_in_queue),
         work_group: get_work_group(done.iter().map(|res| res.work_group.clone()).collect()),
+        peak_memory_usage: peak_memory_of(done),
         ..Default::default()
     }
 }
@@ -871,6 +872,7 @@ pub fn merge_response(
     // Deltas with no hits are dropped below, but their scan and queue wait still count.
     let delta_scan_size: usize = search_responses.iter().map(|res| res.scan_size).sum();
     let delta_scan_files: usize = search_responses.iter().map(|res| res.scan_files).sum();
+    let delta_peak = peak_memory_of(&search_responses);
     let delta_took = parallel_took_detail(&search_responses);
     cached_responses.retain(|res| !res.hits.is_empty());
     search_responses.retain(|res| !res.hits.is_empty());
@@ -879,6 +881,7 @@ pub fn merge_response(
         return config::meta::search::Response {
             scan_size: delta_scan_size,
             scan_files: delta_scan_files,
+            peak_memory_usage: delta_peak,
             took_detail: delta_took,
             ..Default::default()
         };
@@ -922,6 +925,7 @@ pub fn merge_response(
         }
         cache_response.function_error = fn_error;
         cache_response.scan_files = delta_scan_files;
+        cache_response.peak_memory_usage = delta_peak;
         cache_response.took_detail = delta_took;
         return cache_response;
     }
@@ -929,6 +933,7 @@ pub fn merge_response(
 
     cache_response.scan_size = delta_scan_size;
     cache_response.scan_files = delta_scan_files;
+    cache_response.peak_memory_usage = delta_peak;
 
     let mut files_cache_ratio = 0;
     let mut search_hits_len = 0;
@@ -956,14 +961,6 @@ pub fn merge_response(
             continue;
         }
         fn_error.extend(res.function_error);
-
-        cache_response.peak_memory_usage = Some(
-            cache_response
-                .peak_memory_usage
-                .unwrap_or(0.0)
-                .max(res.peak_memory_usage.unwrap_or(0.0)),
-        );
-
         cache_response.hits.extend(res.hits);
     }
     sort_response(is_descending, &mut cache_response, ts_column, &order_by);
@@ -1017,6 +1014,14 @@ pub fn merge_response(
     }
     cache_response.is_histogram_eligible = first_is_histogram_eligible;
     cache_response
+}
+
+/// The peak memory of parallel deltas is the max of their peaks.
+fn peak_memory_of(responses: &[config::meta::search::Response]) -> Option<f64> {
+    responses
+        .iter()
+        .filter_map(|res| res.peak_memory_usage)
+        .reduce(f64::max)
 }
 
 /// The deltas run in parallel, so each part of the merged took detail is the max.
@@ -2259,6 +2264,7 @@ mod tests {
         let mut empty_delta = response_with_ts(&[]);
         empty_delta.scan_size = 100;
         empty_delta.scan_files = 3;
+        empty_delta.peak_memory_usage = Some(9.0);
         empty_delta.took_detail.wait_in_queue = 2000;
         let mut delta = response_with_ts(&[30]);
         delta.scan_files = 2;
@@ -2275,6 +2281,11 @@ mod tests {
         );
         assert_eq!(merged.scan_size, 101);
         assert_eq!(merged.scan_files, 5);
+        assert_eq!(
+            merged.peak_memory_usage,
+            Some(9.0),
+            "an empty delta keeps its peak"
+        );
         assert_eq!(merged.took_detail.wait_in_queue, 2000);
 
         let only_empty = merge_response(
@@ -2289,6 +2300,7 @@ mod tests {
         );
         assert_eq!(only_empty.scan_size, 100);
         assert_eq!(only_empty.scan_files, 3);
+        assert_eq!(only_empty.peak_memory_usage, Some(9.0));
         assert_eq!(only_empty.took_detail.wait_in_queue, 2000);
     }
 
@@ -2301,6 +2313,7 @@ mod tests {
         let mut b = response_with_ts(&[20, 30]);
         b.scan_size = 60;
         b.took_detail.wait_in_queue = 3;
+        b.peak_memory_usage = Some(4.0);
         let req = search::Request::default();
         let stats = failed_deltas_stats(&[a, b], "t", None, &req, 1.5);
         assert_eq!(stats.size, 100.0);
@@ -2308,6 +2321,7 @@ mod tests {
         assert_eq!(stats.scan_files, Some(2));
         assert_eq!(stats.took_wait_in_queue, Some(7));
         assert_eq!(stats.response_time, 1.5);
+        assert_eq!(stats.peak_memory_usage, Some(4.0));
     }
 
     #[test]
