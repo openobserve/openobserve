@@ -21,13 +21,13 @@ use std::sync::{
 use bytes::Bytes;
 use common::infra::config::{ORG_INGESTION_TOKENS, SPLUNK_HEC_TOKENS};
 use infra::{
+    coordinator::events::ORG_INGESTION_TOKENS_KEY_PREFIX,
     db::{self, delete_from_db_coordinator, get_coordinator, put_into_db_coordinator},
     table::org_ingestion_tokens::{
         self, OrgIngestionTokenListRecord, OrgIngestionTokenRecord, SplunkHecTokenEntry,
     },
 };
 
-const ORG_INGESTION_TOKENS_KEY_PREFIX: &str = "/org_ingestion_tokens/";
 /// Matches `DEFAULT_TOKEN_CACHE_TTL` in the table layer.
 const SPLUNK_TOKEN_RELOAD_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
 
