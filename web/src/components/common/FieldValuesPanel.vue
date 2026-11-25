@@ -584,8 +584,7 @@ onMounted(() => {
     (entries) => {
       if (entries[entries.length - 1]?.isIntersecting && !autoLoadPaused) loadNextPage();
     },
-    // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only
-    { root: valuesListRef.value, rootMargin: "0px 0px 84px 0px" },
+    { root: valuesListRef.value },
   );
   observeSentinel();
 });

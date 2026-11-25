@@ -24,6 +24,7 @@ import {
   type ActiveFilterValues,
   type FieldOfOperand,
 } from "./activeFilterValues";
+import { emptyValueConditions } from "@/utils/logs/breakdownFilter";
 import { isNullValue, joinValueConditions } from "./valueFilterExpression";
 import type { FieldPanelSource, PanelField, StreamOption, ValuesRequest } from "./fieldPanel.types";
 
@@ -135,22 +136,27 @@ export const buildTracesValueFilter = (
   fieldName: string,
   include: string[],
   exclude: string[],
+  fieldType?: string,
 ): string => {
   const condition = (op: string) => (value: string) =>
     `${fieldName}${op}'${escapeSingleQuotes(value)}'`;
-  const nullCondition = `${fieldName} is null`;
-  // A null row never equals the text 'null', so an included null is matched with `is null`.
+  // The values stream keys "" and missing alike as the missing-value key, so that row matches both.
+  const missing = (mode: "include" | "exclude") => {
+    const conditions = emptyValueConditions(fieldName, mode, (f) => f, fieldType);
+    const joined = conditions.join(mode === "include" ? " or " : " and ");
+    return conditions.length > 1 ? `(${joined})` : joined;
+  };
   const included = include.map((value) =>
-    isNullValue(value) ? nullCondition : condition("=")(value),
+    isNullValue(value) ? missing("include") : condition("=")(value),
   );
   const excluded = exclude.map((value) =>
-    isNullValue(value) ? `${fieldName} is not null` : condition("!=")(value),
+    isNullValue(value) ? missing("exclude") : condition("!=")(value),
   );
   return joinValueConditions(
     included,
     excluded,
     "lower",
-    include.some(isNullValue) ? nullCondition : undefined,
+    include.some(isNullValue) ? `${fieldName} is null` : undefined,
   );
 };
 
@@ -587,7 +593,8 @@ export default function useTracesFieldSource(options: TracesFieldSourceOptions):
       };
       return;
     }
-    const filter = buildTracesValueFilter(name, include, exclude);
+    const fieldType = flatFields.value.find((field) => field.name === name)?.dataType;
+    const filter = buildTracesValueFilter(name, include, exclude, fieldType);
     if (filter) addFilter(filter);
   };
 

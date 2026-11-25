@@ -669,13 +669,13 @@ describe("FieldValuesPanel.vue", () => {
       );
     });
 
-    it("watches a sentinel after the last value inside the values scroller, a few rows ahead", () => {
+    it("watches a sentinel after the last value inside the values scroller, with no prefetch margin", () => {
       wrapper = createWrapper({ fieldValues: page({}) });
       const scroller = wrapper.find('[data-test="field-values-panel-scroll"]').element;
       const sentinel = wrapper.find('[data-test="field-values-panel-load-more-sentinel"]').element;
       const list = wrapper.find('[data-test="field-values-panel-values-list"]').element;
       expect(observer().options.root).toBe(scroller);
-      expect(observer().options.rootMargin).toBe("0px 0px 84px 0px");
+      expect(observer().options.rootMargin).toBeUndefined();
       expect(observer().observed.has(sentinel)).toBe(true);
       expect(list.compareDocumentPosition(sentinel)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     });

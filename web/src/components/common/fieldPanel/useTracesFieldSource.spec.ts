@@ -1083,8 +1083,15 @@ describe("buildTracesValueFilter", () => {
     expect(buildTracesValueFilter("f", [], [])).toBe("");
   });
 
-  it("excludes the null row with is not null and keeps an empty value a literal", () => {
-    expect(buildTracesValueFilter("f", [], [MISSING_VALUE_KEY])).toBe("f is not null");
+  it("matches the missing-value row against null and, on a string field, the empty string too", () => {
+    expect(buildTracesValueFilter("f", [MISSING_VALUE_KEY], [], "Utf8")).toBe(
+      "(f is null or f = '')",
+    );
+    expect(buildTracesValueFilter("f", [], [MISSING_VALUE_KEY], "Utf8")).toBe(
+      "(f is not null and f != '')",
+    );
+    expect(buildTracesValueFilter("f", [MISSING_VALUE_KEY], [], "Int64")).toBe("f is null");
+    expect(buildTracesValueFilter("f", [], [MISSING_VALUE_KEY], "Int64")).toBe("f is not null");
     expect(buildTracesValueFilter("f", [], [""])).toBe("f!=''");
   });
 
@@ -1093,13 +1100,13 @@ describe("buildTracesValueFilter", () => {
   });
 
   it("lets null rows through each exclusion only when null is included (Additions 2)", () => {
-    expect(buildTracesValueFilter("f", ["a", MISSING_VALUE_KEY], ["c"])).toBe(
+    expect(buildTracesValueFilter("f", ["a", MISSING_VALUE_KEY], ["c"], "Int64")).toBe(
       "((f='a' or f is null) and (f!='c' or f is null))",
     );
-    expect(buildTracesValueFilter("f", [MISSING_VALUE_KEY], ["c"])).toBe(
+    expect(buildTracesValueFilter("f", [MISSING_VALUE_KEY], ["c"], "Int64")).toBe(
       "(f is null and (f!='c' or f is null))",
     );
-    expect(buildTracesValueFilter("f", [MISSING_VALUE_KEY], [])).toBe("f is null");
+    expect(buildTracesValueFilter("f", [MISSING_VALUE_KEY], [], "Int64")).toBe("f is null");
     expect(buildTracesValueFilter("f", [], ["c"])).toBe("f!='c'");
   });
   it("filters the text null as an ordinary value, not as a missing one", () => {
