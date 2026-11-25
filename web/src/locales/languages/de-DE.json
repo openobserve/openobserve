@@ -297,10 +297,10 @@
       "importDesc": "Laden Sie eine Pipeline-Definition hoch"
     },
     "noQueues": {
-      "title": "Erstellen Sie Ihre erste Warteschlange",
-      "description": "Warteschlangen sind zustandsbehaftete Review-Aufgabenlisten — binde Score-Konfigurationen, einen Zieldatensatz und einen Filter, der Elemente zur menschlichen Überprüfung einspeist.",
-      "action": "Neue Warteschlange",
-      "actionDesc": "Leere Warteschlange starten"
+      "title": "Erste Annotations-Warteschlange erstellen",
+      "description": "Annotations-Warteschlangen sind To-do-Listen für die Überprüfung – binden Sie Score-Konfigurationen, ein Ziel-Dataset und einen Filter ein, der Elemente zur menschlichen Überprüfung einspeist.",
+      "action": "Neue Annotations-Warteschlange",
+      "actionDesc": "Eine leere Annotations-Warteschlange starten"
     },
     "noPrompts": {
       "title": "Erstellen Sie Ihren ersten Prompt",
@@ -405,7 +405,7 @@
     },
     "noDiscoveryItems": {
       "title": "Nichts Ungesundes hier",
-      "description": "Keine ungesunden Elemente in diesem Zeitfenster. Erweitern Sie den Zeitbereich oder ändern Sie den Warteschlangenfilter, um Elemente zu sehen, die Sie bereits bewertet haben."
+      "description": "Keine fehlerhaften Elemente in diesem Zeitfenster. Erweitern Sie den Zeitbereich oder wechseln Sie den Filter der Annotations-Warteschlange, um bereits triagierte Elemente zu sehen."
     },
     "noTraces": {
       "title": "Keine Traces gefunden",
@@ -16092,8 +16092,10 @@
         "searchSuffixesAria": "Suffix-Filter suchen",
         "searchTypesAria": "Typfilter durchsuchen",
         "facetAria": "{label}, {count} Metriken",
+        "facetAriaUnchecked": "{label}, {count} mit Daten, {unchecked} noch nicht angehakt",
         "noPrefixMatch": "Keine Präfixe gefunden.",
         "noSuffixMatch": "Keine Suffixe gefunden.",
+        "uncheckedTooltip": "{count} mit Daten · {unchecked} noch nicht angehakt",
         "noTypeMatch": "Keine passenden Typen."
       },
       "views": {
@@ -17763,13 +17765,9 @@
       "noAgentsDescription": "Es wurden keine GenAI-Agenten für das ausgewählte Zeitfenster erkannt. Versuchen Sie einen größeren Bereich oder wechseln Sie zurück zur Stream-Ansicht.",
       "viewByStream": "Nach Stream anzeigen",
       "search": {
-        "placeholder": "Nach Benutzer oder Nachricht suchen",
-        "title": "Sitzungen finden, deren Benutzer-ID oder Konversationstext den Text enthält",
         "noResultsTitle": "Keine Sitzungen entsprechen Ihrer Suche",
-        "noResultsDescription": "Versuchen Sie einen anderen Begriff, ein anderes Feld oder einen größeren Zeitraum.",
-        "clear": "Suche löschen",
-        "user": "Benutzer: {user}",
-        "clearUser": "Alle Benutzer anzeigen"
+        "noResultsDescription": "Versuchen Sie einen anderen Filter oder einen größeren Zeitbereich.",
+        "clear": "Filter zurücksetzen"
       }
     },
     "sessionDetail": {
@@ -19080,7 +19078,7 @@
       "users": "Benutzer",
       "budgets": "Budgets",
       "discovery": "Entdeckung",
-      "queues": "Warteschlangen",
+      "queues": "Annotations-Warteschlangen",
       "datasets": "Datensätze",
       "experiments": "Experimente",
       "quality": "Qualität",
@@ -19365,15 +19363,15 @@
     },
     "traceActions": {
       "annotate": {
-        "button": "Zur Review-Warteschlange hinzufügen",
-        "title": "Zur Review-Warteschlange hinzufügen",
-        "hint": "Stellt {ref} zur manuellen Überprüfung in die Warteschlange. Es bleibt an seinem Platz — der Überprüfungsstatus befindet sich in der Warteschlange.",
-        "queueLabel": "Warteschlange",
-        "queuePlaceholder": "Warteschlange auswählen...",
-        "noQueues": "Keine Warteschlange akzeptiert einen {scope} — erstellen Sie zuerst eine auf der Seite „Warteschlangen“.",
-        "confirm": "Zur Warteschlange hinzufügen",
+        "button": "Zur Annotations-Warteschlange hinzufügen",
+        "title": "Zur Annotations-Warteschlange hinzufügen",
+        "hint": "Fügen Sie {ref} zur menschlichen Überprüfung hinzu. Der Eintrag bleibt, wo er ist – die Annotations-Warteschlange verfolgt seinen Überprüfungsstatus.",
+        "queueLabel": "Annotations-Warteschlange",
+        "queuePlaceholder": "Annotations-Warteschlange auswählen...",
+        "noQueues": "Keine Annotations-Warteschlange akzeptiert {scope} – erstellen Sie zuerst eine auf der Seite „Annotations-Warteschlangen“.",
+        "confirm": "Zur Annotations-Warteschlange hinzufügen",
         "success": "Zu {queue} hinzugefügt",
-        "error": "Fehler beim Hinzufügen dieses Elements zur Warteschlange"
+        "error": "Das Element konnte nicht zur Annotations-Warteschlange hinzugefügt werden"
       },
       "dataset": {
         "button": "Zum Dataset hinzufügen",
@@ -19410,12 +19408,12 @@
         "session": "Sessions"
       },
       "inQueueFilter": {
-        "label": "In Warteschlange",
-        "notEnqueued": "In Warteschlange: Nicht eingereiht",
-        "enqueued": "In Warteschlange: Beliebige Warteschlange",
-        "pending": "In Warteschlange: Ausstehend",
-        "reviewed": "In Warteschlange: Geprüft",
-        "all": "In Warteschlange: Alle"
+        "label": "Status der Annotations-Warteschlange",
+        "notEnqueued": "Nicht eingereiht",
+        "enqueued": "In einer Annotations-Warteschlange",
+        "pending": "Überprüfung ausstehend",
+        "reviewed": "Überprüft",
+        "all": "Alle Elemente"
       },
       "columns": {
         "timestamp": "Zeitstempel",
@@ -19431,7 +19429,7 @@
         "service": "Service",
         "input": "Eingabe",
         "quality": "Qualität",
-        "inQueue": "In Warteschlange?",
+        "inQueue": "In einer Annotations-Warteschlange?",
         "actions": "Aktionen"
       },
       "spanParent": "In {trace}",
@@ -19443,26 +19441,26 @@
       "inQueue": {
         "none": "Nicht eingereiht",
         "reviewed": "Bereits geprüft",
-        "multiple": "In {count} Warteschlangen"
+        "multiple": "In {count} Annotations-Warteschlangen"
       },
-      "addToQueue": "Zur Warteschlange hinzufügen",
+      "addToQueue": "Zur Annotations-Warteschlange hinzufügen",
       "addToQueueMenu": {
-        "loading": "Warteschlangen werden geladen...",
-        "noQueues": "Noch keine Warteschlangen — erstellen Sie zuerst eine auf der Seite 'Warteschlangen'.",
+        "loading": "Annotations-Warteschlangen werden geladen...",
+        "noQueues": "Noch keine Annotations-Warteschlangen – erstellen Sie zuerst eine auf der Seite „Annotations-Warteschlangen“.",
         "dimensions": "{count} Dimension | {count} Dimensionen",
         "accepts": "Akzeptiert nur {types}",
-        "sectionTitle": "Zur Warteschlange hinzufügen",
-        "manageQueues": "Warteschlangen verwalten"
+        "sectionTitle": "Zur Annotations-Warteschlange hinzufügen",
+        "manageQueues": "Annotations-Warteschlangen verwalten"
       },
-      "addSuccess": "Zu {queue} hinzugefügt — die Zeile bleibt in Discovery, ihr Zustand befindet sich in der Warteschlange.",
-      "addError": "Fehler beim Hinzufügen der Elemente zur Warteschlange",
-      "openQueue": "Warteschlange öffnen",
-      "queuesError": "Fehler beim Laden der Warteschlangen"
+      "addSuccess": "Zu {queue} hinzugefügt – die Zeile bleibt in Discovery, und die Annotations-Warteschlange verfolgt ihren Überprüfungsstatus.",
+      "addError": "Elemente konnten nicht zur Annotations-Warteschlange hinzugefügt werden",
+      "openQueue": "Annotations-Warteschlange öffnen",
+      "queuesError": "Annotations-Warteschlangen konnten nicht geladen werden"
     },
     "queues": {
-      "searchPlaceholder": "Warteschlangen suchen...",
-      "newButton": "Neue Warteschlange",
-      "loadError": "Fehler beim Laden der Warteschlangen",
+      "searchPlaceholder": "Annotations-Warteschlangen durchsuchen...",
+      "newButton": "Neue Annotations-Warteschlange",
+      "loadError": "Annotations-Warteschlangen konnten nicht geladen werden",
       "optionsLoadError": "Fehler beim Laden der Score-Konfigurationen",
       "review": "Prüfen",
       "cleared": "Bereinigt",
@@ -19477,7 +19475,7 @@
         "actions": "Aktionen"
       },
       "create": {
-        "title": "Neue Warteschlange",
+        "title": "Neue Annotations-Warteschlange",
         "errors": {
           "name": "Name ist erforderlich",
           "scoreConfigs": "Binden Sie mindestens eine Score-Konfiguration"
@@ -19485,9 +19483,9 @@
         "nameLabel": "Name",
         "namePlaceholder": "z. B. hallucination_review",
         "descriptionLabel": "Beschreibung",
-        "descriptionPlaceholder": "Wofür diese Warteschlange gedacht ist und wer sie überprüft...",
+        "descriptionPlaceholder": "Wofür diese Annotations-Warteschlange gedacht ist und wer sie überprüft...",
         "scoreConfigsLabel": "Score-Konfigurationen",
-        "scoreConfigsHint": "Eine Warteschlange bewertet Elemente in einer oder mehreren Dimensionen. Jede Score-Konfiguration ist eine einzelne Dimension — wählen Sie die zu bindenden Konfigurationen aus und heften Sie jede an eine Version.",
+        "scoreConfigsHint": "Eine Annotations-Warteschlange bewertet Elemente anhand einer oder mehrerer Dimensionen. Jede Score-Konfiguration ist eine einzelne Dimension – wählen Sie die zu bindenden Konfigurationen aus und legen Sie jeweils eine Version fest.",
         "scoreConfigsEmpty": "Wählen Sie die zu bindenden Score-Konfigurationen aus.",
         "addScoreConfig": "Score-Konfiguration hinzufügen",
         "allScoreConfigsAdded": "Alle Score-Konfigurationen sind hinzugefügt.",
@@ -19495,10 +19493,10 @@
         "noScoreConfigs": "Noch keine Score-Konfigurationen — erstellen Sie zuerst eine in Score-Konfigurationen.",
         "targetDatasetLabel": "Zieldatensatz",
         "targetDatasetNone": "Keine (nur Überprüfung)",
-        "targetDatasetHint": "Nur-Überprüfungs-Warteschlange — überprüfte Elemente werden nicht in einen Datensatz destilliert.",
+        "targetDatasetHint": "Ohne Ziel-Dataset werden Elemente in dieser Annotations-Warteschlange nur überprüft.",
         "autoRoutingLabel": "Automatische Weiterleitung",
-        "autoRoutingHint": "Objekte, deren Bewertungen einer Bedingung entsprechen, automatisch in die Warteschlange aufnehmen. Leer lassen, um diese Warteschlange manuell aus Discovery zu speisen.",
-        "autoRoutingEmpty": "Keine automatische Weiterleitung — diese Warteschlange wird manuell gespeist.",
+        "autoRoutingHint": "Objekte automatisch einreihen, deren Scores eine Bedingung erfüllen. Leer lassen, um Elemente aus Discovery zu dieser Annotations-Warteschlange hinzuzufügen.",
+        "autoRoutingEmpty": "Elemente werden manuell zu dieser Annotations-Warteschlange hinzugefügt.",
         "addCondition": "Bedingung hinzufügen",
         "conditionAnd": "UND",
         "operatorIs": "ist",
@@ -19507,12 +19505,12 @@
         "conditionValuePlaceholder": "Wert",
         "pin": "Version anheften",
         "versionLatest": "v{version} (neueste)",
-        "success": "Warteschlange erstellt",
-        "error": "Fehler beim Erstellen der Warteschlange"
+        "success": "Annotations-Warteschlange erstellt",
+        "error": "Annotations-Warteschlange konnte nicht erstellt werden"
       },
       "detail": {
-        "fallbackTitle": "Warteschlange",
-        "loadError": "Fehler beim Laden der Warteschlangenelemente",
+        "fallbackTitle": "Annotations-Warteschlange",
+        "loadError": "Elemente der Annotations-Warteschlange konnten nicht geladen werden",
         "startReviewing": "Überprüfung starten",
         "scoreConfigs": "Score-Konfigurationen ({count})",
         "targetDataset": "Zieldatensatz",
@@ -19522,7 +19520,7 @@
         "inTrace": "In Trace {traceId}",
         "reviewAgain": "Erneut überprüfen",
         "emptyTitle": "Nichts zu überprüfen",
-        "emptyBody": "Fügen Sie Traces, Spans oder Sitzungen aus der Discovery oder einer Trace-Ansicht zu dieser Warteschlange hinzu.",
+        "emptyBody": "Fügen Sie dieser Annotations-Warteschlange Traces, Spans oder Sitzungen aus Discovery oder einer Trace-Ansicht hinzu.",
         "columns": {
           "refType": "Ref",
           "refId": "Referenz",
@@ -19593,7 +19591,7 @@
         "true": "Wahr",
         "false": "Falsch",
         "allReviewedTitle": "Alle Elemente überprüft",
-        "allReviewedBody": "Jedes Element in dieser Warteschlange hat eine abgeschlossene Überprüfung."
+        "allReviewedBody": "Jedes Element in dieser Annotations-Warteschlange wurde vollständig überprüft."
       }
     },
     "experiments": {
@@ -25749,8 +25747,8 @@
     "sloDetail": "SLO-Detail",
     "alertDetail": "Alarmdetail",
     "editAlert": "Alarm bearbeiten",
-    "aiQueueDetail": "Warteschlange",
-    "aiQueueReview": "Warteschlangen-Überprüfung",
+    "aiQueueDetail": "Annotationswarteschlange",
+    "aiQueueReview": "Überprüfung der Annotationswarteschlange",
     "aiDatasetDetail": "Datensatz",
     "aiPromptCreate": "Neuer Prompt",
     "aiPromptVersionCreate": "Neue Prompt-Version",
@@ -34703,6 +34701,25 @@
       },
       "noHighConfidence": "Keine Namen mit hoher Konfidenz"
     }
+  },
+  "commandPalette": {
+    "title": "Seiten, Ressourcen und Aktionen suchen",
+    "placeholder": "Namen und IDs suchen",
+    "moreTypes": "Weitere Typen",
+    "pages": "Seiten",
+    "actions": "Erstellen",
+    "recent": "Letzte Besuche",
+    "localHistory": "Lokaler Verlauf",
+    "clearRecent": "Letzte Besuche löschen",
+    "historyStorageUnavailable": "Besuche können nicht gespeichert werden",
+    "recentUnavailable": "Dieser Eintrag ist derzeit nicht verfügbar",
+    "loading": "Suche…",
+    "partial": "Einige Ergebnisse sind nicht verfügbar",
+    "failed": "Suche konnte nicht abgeschlossen werden",
+    "offline": "Offline. Letzte Besuche bleiben verfügbar.",
+    "sourceUnavailable": "Dieser Ressourcentyp ist nicht verfügbar",
+    "emptyHelp": "Name oder ID zum Suchen eingeben",
+    "globalShortcut": "Globale Suche öffnen"
   },
   "timeRangeInput": {
     "label": "Zeitbereich eingeben",
