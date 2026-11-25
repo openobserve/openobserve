@@ -380,7 +380,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_replicated_oauth_edit_keeps_the_local_secret_only_for_the_same_hosts() {
+    async fn a_replicated_oauth_edit_keeps_the_local_secret_only_for_the_same_urls() {
         if !meta_store().await {
             return;
         }
@@ -397,8 +397,8 @@ mod tests {
             .unwrap();
         edit_here(&org, 11, |r| r.data = Some(auth(home, "mine").to_string())).await;
         for (at, token_url, want) in [
-            (20, "https://sso.example.com/v2/token", "mine"),
-            (30, "https://evil.example/token", ""),
+            (20, "https://SSO.example.com:443/token", "mine"),
+            (30, "https://sso.example.com/v2/token", ""),
         ] {
             apply_replicated(put(&org, at, auth(token_url, "")))
                 .await
@@ -591,7 +591,7 @@ mod tests {
         })
         .await;
 
-        for (at, url, kept) in [(20, "https://a/v2", "mine"), (22, "https://b", "")] {
+        for (at, url, kept) in [(20, "https://A:443/", "mine"), (22, "https://a/v2", "")] {
             let newer = json!({"url": url, "headers": {"K": "", "N": ""}});
             let replaced = apply_replicated(put(&org, at, newer)).await.unwrap();
             assert!(matches!(replaced, Applied::Replaced { .. }), "{replaced:?}");
@@ -600,7 +600,7 @@ mod tests {
             assert_eq!(
                 data,
                 json!({"url": url, "headers": {"K": kept, "N": ""}}),
-                "a value is kept only for the host it was entered for"
+                "a value is kept only for the URL it was entered for"
             );
         }
         let stale = put(&org, 5, json!({"url": "https://old"}));

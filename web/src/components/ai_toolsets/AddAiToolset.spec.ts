@@ -982,17 +982,56 @@ describe("AddAiToolset", () => {
       await editRow({ auth: { ...AUTH, client_secret: "" } });
       expect(await discover()).toBeUndefined();
       getForm().setFieldValue("description", "edited");
-      getForm().setFieldValue("mcp.url", `${URL}?v=2`);
       getForm().setFieldValue("mcp.allowed_tools", ["search"]);
       await submit();
       expect(updated().auth).toEqual({ ...AUTH, client_secret: "" });
     });
 
     it.each([
+      ["the host", "https://other.example.com/mcp"],
+      ["the path", `${URL}/v2`],
+      ["the query", `${URL}?v=2`],
+    ])("asks for every stored secret again when %s of the URL changes", async (_label, url) => {
+      await editRow({ auth: AUTH, headers: { "X-Key": "***" } });
+      getForm().setFieldValue("mcp.url", url);
+      await submit();
+      expect(aiToolsetsService.update).not.toHaveBeenCalled();
+      expect(wrapper.text().split("Enter this again")).toHaveLength(3);
+
+      getForm().setFieldValue("mcp.auth.client_secret", "new-secret");
+      getForm().setFieldValue("mcp.headers[0].value", "new-key");
+      await submit();
+      expect(updated()).toMatchObject({
+        url,
+        headers: { "X-Key": "new-key" },
+        auth: { client_secret: "new-secret" },
+      });
+    });
+
+    it("asks only for the client secret when the token URL changes", async () => {
+      await editRow({ auth: AUTH, headers: { "X-Key": "***" } });
+      getForm().setFieldValue("mcp.auth.token_url", "https://sso.example.com/v2/token");
+      await submit();
+      expect(aiToolsetsService.update).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="ai-toolset-client-secret-error"]').text()).toContain(
+        "Enter this again",
+      );
+      expect(wrapper.text().split("Enter this again")).toHaveLength(2);
+    });
+
+    it("keeps stored secrets when the URL is only spelled differently", async () => {
+      await editRow({ auth: AUTH, headers: { "X-Key": "***" } });
+      const spelled = URL.replace("https://", "HTTPS://").replace(".com/", ".com:443/");
+      getForm().setFieldValue("mcp.url", spelled);
+      await submit();
+      expect(updated()).toMatchObject({ headers: { "X-Key": "***" }, auth: AUTH });
+    });
+
+    it.each([
       ["the token URL", { "mcp.auth.token_url": "https://sso.example.com/v2/token" }],
       ["the client ID", { "mcp.auth.client_id": "other" }],
       ["the scope", { "mcp.auth.scope": "read write" }],
-      ["the URL's origin", { "mcp.url": "https://other.example.com/mcp" }],
+      ["the URL", { "mcp.url": `${URL}?v=2` }],
     ])("asks for a replicated toolset's secret once %s is edited", async (_label, values) => {
       await editRow({ auth: { ...AUTH, client_secret: "" } });
       Object.entries(values).forEach(([field, value]) => getForm().setFieldValue(field, value));
