@@ -598,7 +598,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
-import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
+import { useDbmColumnToggle } from "@/composables/dbm/useDbmColumnToggle";
 import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -939,17 +939,6 @@ const completionBias = ref<{ dropPercent: number } | null>(null);
 // Every badge comes from the shell's shared snapshot; this page publishes only its own queryCount into it.
 const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
 
-/**
- * Only the two things this page asks of the table. `InstanceType<typeof OTable>`
- * does not type-check — OTable is a generic component, so its instance type has
- * no construct signature to instantiate.
- */
-const tableRef = ref<{
-  scrollToTop?: () => void;
-  $el?: HTMLElement;
-  hasResizedColumns?: boolean;
-  resetColumnSizes?: () => void;
-} | null>(null);
 const stmtClass = ref<string>("query");
 const sortBy = ref<QuerySortKey>("total_time_ns");
 
@@ -2147,7 +2136,10 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
 /** The extra percentiles are available but off: the mockup's column set is
  *  what fits without horizontal scrolling at 1440. */
 const defaultColumnVisibility = { p99_ns: false, max_ns: false, services: false };
-const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("dbm-queries");
+const { tableRef, columnVisibility, setColumnVisibility } = useDbmColumnToggle(
+  "dbm-queries",
+  defaultColumnVisibility,
+);
 
 /** Traced figures show one source marker per row, beside the query. */
 const dataRows = computed(() => tableRows.value.filter((r) => !r.isOther && !r.isFold));
@@ -2176,7 +2168,6 @@ const emptyColumns = computed(() =>
 const visibleTableColumns = computed(() =>
   columns.value.filter((c) => !emptyColumns.value.includes(c.id)),
 );
-if (!Object.keys(columnVisibility.value).length) columnVisibility.value = defaultColumnVisibility;
 
 /**
  * The table emits the column id; the ids of sortable columns are deliberately
@@ -2276,7 +2267,7 @@ const onStmtClassChange = (value: unknown) => {
  * above): assign, publish to the URL, refetch — so a shared link carries the
  * term and the rows below match it.
  *
- * Refetches once typing stops, because `OSearchInput` debounces by 400ms.
+ * Refetches once typing stops, because `DbmFilterBar` debounces the search box by 400ms.
  */
 const onSearchInput = (value: unknown) => {
   search.value = typeof value === "string" ? value : "";
@@ -2284,7 +2275,7 @@ const onSearchInput = (value: unknown) => {
   load();
 };
 
-/** Clear all means all: a leftover search or insight leaves the table looking filtered with no explanation. */
+/** Reset every filter, search and insight together so the table never looks filtered without a visible cause. */
 const clearScope = () => {
   systemFilter.value = null;
   instanceFilter.value = null;

@@ -122,3 +122,21 @@ describe("the suggested threshold is derived from what is on screen", () => {
     expect(handler).toMatch(/observedEvents:/);
   });
 });
+
+describe("the deadlock storm banner keeps its Copy for Slack button", () => {
+  const source = read("DeadlocksPage.vue");
+
+  it("renders the button only while a storm shows, as a secondary action", () => {
+    expect(source).toMatch(
+      /<OButton\s+v-if="storm"\s+variant="outline"[^>]*data-test="dbm-deadlocks-storm-copy"[^>]*@click="copyStormSummary\(\)"/s,
+    );
+  });
+
+  it("copies a summary that names every pair, not just the first", () => {
+    const fn = source.slice(source.indexOf("const copyStormSummary"));
+    const body = fn.slice(0, fn.indexOf("};"));
+    expect(body).toContain("const rows = pairRows.value");
+    expect(body).toContain("rows.flatMap((r) => [...summaryLines(r)");
+    expect(body).toContain('scope: "storm"');
+  });
+});

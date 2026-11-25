@@ -15,6 +15,8 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import i18n from "@/locales";
+
 import {
   badgeCount,
   computeQps,
@@ -454,6 +456,14 @@ describe("formatAge", () => {
     vi.setSystemTime(NOW);
     expect(formatAge(agoMicros(3 * 60 * 60))).toBe("3h ago");
     expect(formatAge(agoMicros(3 * 24 * 60 * 60))).toBe("3d ago");
+  });
+
+  it("reads the unit text from the locale keys, not hard-coded English", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const t = i18n.global.t as unknown as (k: string, n: object) => string;
+    expect(formatAge(agoMicros(20))).toBe(t("dbm.age.seconds", { n: 20 }));
+    expect(formatAge(agoMicros(2 * 24 * 60 * 60))).toBe(t("dbm.age.days", { n: 2 }));
   });
 
   it("clamps a slightly-future timestamp to now rather than negative time", () => {

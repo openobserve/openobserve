@@ -26839,9 +26839,6 @@
         "failed": "失敗"
       },
       "databaseCount": "1 データベース | {count} データベース",
-      "openQueries": "クエリを表示",
-      "viewMetrics": "メトリクスを表示",
-      "alertMe": "アラートを受け取る",
       "columnHints": {
         "qps": "1秒あたりの呼び出し — このウィンドウの呼び出し数をその長さで割ったもので、15分ビューと4時間ビューを比較しやすくします。",
         "p50": "すべての呼び出しの半数はこれより速く完了しています。アプリケーションのトレース内の完了した呼び出しから測定しています。",
@@ -26852,14 +26849,7 @@
       },
       "failedChip": "{count} 失敗",
       "columnSubLabels": {
-        "attention": "データベースから",
-        "load": "アプリから",
         "calls": "アプリから"
-      },
-      "attention": {
-        "connections": "接続",
-        "noLimit": "制限が公開されていません",
-        "unknown": "未測定"
       }
     },
     "queries": {
@@ -26927,19 +26917,13 @@
       "errorsNone": "なし",
       "errorsAll": "すべて",
       "actions": {
-        "open": "詳細を開く",
         "traces": "トレースの例を見る",
         "copy": "クエリをコピー",
         "copied": "クエリをコピーしました",
-        "copyFailed": "クエリをコピーできませんでした。",
-        "alert": "これが遅くなったらアラート"
+        "copyFailed": "クエリをコピーできませんでした。"
       },
       "otherRowTextFor": "{database} の他のすべてのクエリ",
-      "otherRowDetailShort": "— {calls} コール。",
-      "columnSubLabels": {
-        "calls": "報告元サーバー",
-        "load": "報告元サーバー"
-      }
+      "otherRowDetailShort": "— {calls} コール。"
     },
     "insights": {
       "showRows": "このクエリを表示 | {count}件のクエリを表示",
@@ -27513,11 +27497,9 @@
       },
       "rowActions": {
         "topQueries": "Top queries で見つけられます",
-        "copy": "両方のクエリをコピー",
-        "alert": "デッドロックについてアラート"
+        "copy": "両方のクエリをコピー"
       },
       "detail": {
-        "mostRecent": "最新 · {time}",
         "nthOf": "{index} / {total}",
         "earlier": "前へ",
         "later": "次へ",
@@ -27538,11 +27520,7 @@
         "fixBody": "これらの2つのステートメントは {object} の行に逆順でアクセスします。両側を同じ順序（IDの小さい順）で更新するようにすれば、このペアはデッドロックしなくなります。",
         "fixGeneric": "両側が相手の求めるものを保持しています。すべてのトランザクションがこれらのロックを同じ順序で取得するようにすれば、このペアはデッドロックしなくなります。",
         "copyForSlack": "コピー",
-        "occurrencesTitle": "このペアがデッドロックした全{count}回",
-        "occurrencesHint": "ポイントを選択すると、その1件が上に読み込まれます。",
-        "lostLabel": "{pid} がキャンセル",
         "oneSideLoses": "{app} は毎回キャンセルされます。",
-        "showAbove": "上に表示",
         "copy": "SQL をコピー",
         "seeInTopQueries": "上位クエリで表示",
         "whichService": "どのサービス？",
@@ -27553,8 +27531,6 @@
         "copyForSlackHint": "両方のステートメント、このペアのデッドロック発生回数、最後に発生した時刻を、チャネルやチケットに貼り付けられるメッセージとして記載します。"
       },
       "storm": {
-        "title": "デッドロックストーム。",
-        "body": "このウィンドウ内の {count} 件 — 通常はありません。",
         "copyForSlack": "コピー",
         "biasWarning": "上位クエリタブは今は実際よりも穏やかに見えるでしょう。キャンセルされたクエリも完了しますが、これらのロックの背後で待機しているクエリは完了していません。そのため、そこでの呼び出し回数はユーザーが経験しているよりも少なくなっています。"
       },
@@ -27658,8 +27634,7 @@
       },
       "rowActions": {
         "showChain": "チェーンを表示",
-        "copy": "クエリをコピー",
-        "alertMe": "ロック待機についてアラートする"
+        "copy": "クエリをコピー"
       },
       "waitEvent": {
         "transaction": "別のトランザクションの終了",
@@ -27780,8 +27755,6 @@
         "application": "アプリケーション",
         "state": "状態",
         "waitEvent": "待機中",
-        "running": "実行時間",
-        "lastQuery": "最後のクエリ",
         "query": "クエリ",
         "blockedBy": "ブロック元"
       },
@@ -27798,7 +27771,6 @@
         "capped": "一度に読み取れるよりも多くのセッションがサンプリングされました。これらは取得できた {count} 件です。",
         "filtered": "{count} 件のセッションを表示中（全 {total} 件中）"
       },
-      "transactionOpen": "トランザクション開始から {age}",
       "healthy": {
         "title": "現在実行中のものはありません",
         "description": "データベースのセッションテーブルをサンプリングしましたが、アクティブなセッションは見つかりませんでした。これはアイドル状態のデータベースでは正常なことであり、収集の欠落ではありません。",
@@ -27848,15 +27820,11 @@
       }
     },
     "instanceMetrics": {
-      "columnHeader": "インスタンスの健全性",
-      "columnHint": "コレクターがすでに送信しているメトリクスに基づく、制限に対する接続数。レシーバーがこのインスタンスを報告するまで空白です。",
       "connectionsOf": "{used} / {limit} 接続",
       "connectionsNoLimit": "{used} 接続",
       "noLimitHint": "このエンジンのレシーバーは接続制限を独自に公開しないため、数のみが表示されます。セットアップカードの接続制限レシピ (sqlquery/mysql_limits) が max_connections を収集し、これをパーセンテージに変換します。",
       "trendLabel": "選択した期間内の接続数",
       "cacheHit": "キャッシュヒット {percent}",
-      "lagBytes": "レプリカ {value} 遅延",
-      "lagSeconds": "レプリカ {value} 遅延",
       "deadlocks": "{count} デッドロック | {count} デッドロック",
       "noTraffic": "この期間にアプリケーショントラフィックがありません",
       "noTrafficHint": "コレクターはこのインスタンスを報告していますが、この期間にアプリケーションからのクエリはありませんでした。クエリ列が空なのは、何も測定されなかったためであり、高速だったからではありません。",
@@ -27895,7 +27863,6 @@
       "checkRange": "時間範囲を広げてください。レシピは60秒に1回報告します。",
       "columns": {
         "relation": "テーブル",
-        "instance": "インスタンス",
         "totalBytes": "合計サイズ",
         "heapBytes": "ヒープサイズ",
         "overheadBytes": "インデックス + TOAST",
@@ -27914,10 +27881,7 @@
       }
     },
     "recommendations": {
-      "title": "推奨事項",
-      "subtitle": "コレクターが既に報告している内容に対する決定的なチェック。各チェックは、測定値と超えた閾値を示します。",
       "countersCumulative": "インデックススキャン回数は、前回の統計リセット以降の累計であり、選択した期間の回数ではありません。",
-      "andMore": "および、他に {count} 件の同様なもの",
       "unused-index": {
         "title": "スキャンされていないインデックス",
         "body": "{relation} 上の {index} には記録されたスキャンがなく、{size} を占有しています。",

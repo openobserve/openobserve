@@ -142,10 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-for="id in VACUUM_COLUMNS" :key="id" #[`cell-${id}`]="{ row }">
           <span class="text-text-body text-xs" :data-test="`dbm-table-health-${id}-${row.rowKey}`">
             {{ vacuumLabel(row[id], row, t) }}
-            <OTooltip
-              v-if="vacuumTimeMicros(row[id])"
-              :content="raw(formatDateTime(vacuumTimeMicros(row[id])!))"
-            />
+            <OTooltip v-for="tip in vacuumTipOf(row[id])" :key="tip" :content="raw(tip)" />
           </span>
         </template>
 
@@ -234,7 +231,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
-import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
+import { useDbmColumnToggle } from "@/composables/dbm/useDbmColumnToggle";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import DbmRecommendationMenu, {
   type DbmRecommendationMenuItem,
@@ -393,11 +390,16 @@ const defaultColumnVisibility = {
   mod_since_analyze: false,
 };
 
-const tableRef = ref<{ hasResizedColumns?: boolean; resetColumnSizes?: () => void } | null>(null);
-const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("dbm-table-health");
-// Nothing persisted yet: start from the page defaults.
-if (!Object.keys(columnVisibility.value).length)
-  columnVisibility.value = { ...defaultColumnVisibility };
+const { tableRef, columnVisibility, setColumnVisibility } = useDbmColumnToggle(
+  "dbm-table-health",
+  defaultColumnVisibility,
+);
+
+// Zero or one tooltip text, so the cell parses the timestamp once and needs no non-null assertion.
+const vacuumTipOf = (value: string | null | undefined): string[] => {
+  const micros = vacuumTimeMicros(value);
+  return micros ? [formatDateTime(micros)] : [];
+};
 
 const uniformInstance = computed(() => uniformValue(rows.value, (r) => r.instance));
 
@@ -417,10 +419,7 @@ const VACUUM_COLUMNS = ["last_autovacuum", "last_vacuum", "last_analyze"] as con
 /** Index health, the one input beyond the table feed that the page-level rules read. */
 const indexHits = shallowRef<IndexHealthRow[]>([]);
 const indexCountersAreCumulative = ref(false);
-/**
- * The rules, run over what this page loaded. Session and blocking rules are not
- * table findings, so they get no input and only the unused-index rule can fire.
- */
+// Only the unused-index rule can fire here: session and blocking rules get no input.
 const recommendations = computed<DbmRecommendation[]>(() =>
   buildRecommendations({
     indexes: indexHits.value,

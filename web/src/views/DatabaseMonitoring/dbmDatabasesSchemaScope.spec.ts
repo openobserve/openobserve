@@ -19,6 +19,7 @@ import { createMemoryHistory, createRouter, RouterView, type Router } from "vue-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DatabasesResponse, QueryStatsRow } from "@/services/db_monitoring";
+import type { OTableRowAction } from "@/lib/core/Table/OTable.types";
 import type { DbmScopeFilter } from "@/utils/dbm/scopeFilter";
 
 vi.mock("vuex", () => ({
@@ -170,7 +171,7 @@ const OTableStub = defineComponent({
     data: { type: Array as PropType<TreeRow[]>, default: () => [] },
     getRowWarning: { type: Function as PropType<(row: TreeRow) => boolean>, default: null },
     expandedIds: { type: Array as PropType<string[]>, default: () => [] },
-    rowActions: { type: Array as PropType<any[]>, default: () => [] },
+    rowActions: { type: Array as PropType<OTableRowAction<TreeRow>[]>, default: () => [] },
   },
   emits: ["row-click", "update:expandedIds", "sort-change"],
   setup(props, { slots }) {
@@ -208,14 +209,6 @@ const DbmPageChromeStub = defineComponent({
       h("div", slots.default?.()),
 });
 
-const DbmTableToolbarStub = defineComponent({
-  name: "DbmTableToolbar",
-  setup:
-    (_, { slots }) =>
-    () =>
-      h("div", slots.filters?.()),
-});
-
 const DbmFilterBarStub = defineComponent({
   name: "DbmFilterBar",
   props: { filters: { type: Array as PropType<DbmScopeFilter[]>, default: () => [] } },
@@ -225,7 +218,6 @@ const DbmFilterBarStub = defineComponent({
 const stubs = {
   OTable: OTableStub,
   DbmPageChrome: DbmPageChromeStub,
-  DbmTableToolbar: DbmTableToolbarStub,
   DbmFilterBar: DbmFilterBarStub,
   DbmCoverageLine: true,
   DbmEmptyState: true,

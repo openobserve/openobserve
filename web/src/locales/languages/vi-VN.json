@@ -26839,9 +26839,6 @@
         "failed": "Thất bại"
       },
       "databaseCount": "1 cơ sở dữ liệu | {count} cơ sở dữ liệu",
-      "openQueries": "Xem truy vấn của nó",
-      "viewMetrics": "Xem chỉ số",
-      "alertMe": "Cảnh báo tôi",
       "columnHints": {
         "qps": "Lời gọi mỗi giây — số lời gọi trong cửa sổ này chia cho độ dài của nó, để chế độ xem 15 phút và chế độ xem 4 giờ vẫn so sánh được.",
         "p50": "Một nửa số lệnh gọi hoàn tất nhanh hơn mức này. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
@@ -26852,14 +26849,7 @@
       },
       "failedChip": "{count} thất bại",
       "columnSubLabels": {
-        "attention": "từ cơ sở dữ liệu",
-        "load": "từ ứng dụng của bạn",
         "calls": "từ ứng dụng của bạn"
-      },
-      "attention": {
-        "connections": "kết nối",
-        "noLimit": "không có giới hạn được công bố",
-        "unknown": "không được đo"
       }
     },
     "queries": {
@@ -26927,19 +26917,13 @@
       "errorsNone": "không có",
       "errorsAll": "tất cả",
       "actions": {
-        "open": "Mở chi tiết",
         "traces": "Xem các trace mẫu",
         "copy": "Sao chép truy vấn",
         "copied": "Đã sao chép truy vấn",
-        "copyFailed": "Không thể sao chép truy vấn.",
-        "alert": "Cảnh báo tôi nếu điều này chậm lại"
+        "copyFailed": "Không thể sao chép truy vấn."
       },
       "otherRowTextFor": "Tất cả các truy vấn khác trên {database}",
-      "otherRowDetailShort": "— {calls} cuộc gọi.",
-      "columnSubLabels": {
-        "calls": "máy chủ nơi được báo cáo",
-        "load": "máy chủ nơi được báo cáo"
-      }
+      "otherRowDetailShort": "— {calls} cuộc gọi."
     },
     "insights": {
       "showRows": "Hiển thị truy vấn này | Hiển thị {count} truy vấn này",
@@ -27513,11 +27497,9 @@
       },
       "rowActions": {
         "topQueries": "Tìm các truy vấn này trong Top queries",
-        "copy": "Sao chép cả hai truy vấn",
-        "alert": "Cảnh báo tôi về deadlock"
+        "copy": "Sao chép cả hai truy vấn"
       },
       "detail": {
-        "mostRecent": "Gần nhất · {time}",
         "nthOf": "{index} trên {total}",
         "earlier": "Trước đó",
         "later": "Sau đó",
@@ -27538,11 +27520,7 @@
         "fixBody": "Hai câu lệnh này chạm vào các hàng {object} theo thứ tự ngược nhau. Hãy để cả hai phía cập nhật theo cùng một thứ tự — id thấp nhất trước — và cặp này sẽ không thể deadlock nữa.",
         "fixGeneric": "Cả hai bên đều giữ thứ mà bên kia muốn. Hãy để mọi giao dịch lấy các khóa này theo cùng một thứ tự và cặp này sẽ không thể deadlock nữa.",
         "copyForSlack": "Sao chép",
-        "occurrencesTitle": "Tất cả {count} lần cặp này deadlock",
-        "occurrencesHint": "Chọn một điểm để tải cái ở trên",
-        "lostLabel": "{pid} đã thua",
         "oneSideLoses": "{app} bị hủy mỗi lần.",
-        "showAbove": "Hiển thị ở trên",
         "copy": "Sao chép SQL",
         "seeInTopQueries": "Xem trong Top queries",
         "whichService": "Dịch vụ nào?",
@@ -27553,8 +27531,6 @@
         "copyForSlackHint": "Cả hai câu lệnh, tần suất cặp này deadlock và lần cuối xảy ra — được viết thành tin nhắn bạn có thể dán vào kênh hoặc ticket."
       },
       "storm": {
-        "title": "Bão deadlock.",
-        "body": "{count} trong cửa sổ này — bình thường không có.",
         "copyForSlack": "Sao chép",
         "biasWarning": "Hãy mong đợi tab Top queries trông yên bình hơn thực tế ngay bây giờ. Một truy vấn bị hủy vẫn hoàn thành, nhưng những truy vấn xếp hàng sau các khóa này thì chưa — vì vậy số lần gọi ở đó thấp hơn những gì người dùng của bạn đang trải qua."
       },
@@ -27658,8 +27634,7 @@
       },
       "rowActions": {
         "showChain": "Hiển thị chuỗi",
-        "copy": "Sao chép truy vấn",
-        "alertMe": "Cảnh báo tôi về tình trạng chờ khóa"
+        "copy": "Sao chép truy vấn"
       },
       "waitEvent": {
         "transaction": "một giao dịch khác hoàn thành",
@@ -27780,8 +27755,6 @@
         "application": "Ứng dụng",
         "state": "Trạng thái",
         "waitEvent": "Đang chờ",
-        "running": "Thời gian chạy",
-        "lastQuery": "Truy vấn gần nhất",
         "query": "Truy vấn",
         "blockedBy": "Bị chặn bởi"
       },
@@ -27798,7 +27771,6 @@
         "capped": "Có nhiều phiên được lấy mẫu hơn mức chúng tôi có thể đọc cùng lúc. Đây là {count} phiên chúng tôi có.",
         "filtered": "Hiển thị {count} trong tổng số {total} phiên."
       },
-      "transactionOpen": "giao dịch mở {age}",
       "healthy": {
         "title": "Không có gì đang chạy ngay bây giờ",
         "description": "Chúng tôi đã lấy mẫu các bảng phiên của cơ sở dữ liệu của bạn và không tìm thấy phiên hoạt động nào. Đó là trạng thái bình thường lành mạnh của một cơ sở dữ liệu nhàn rỗi, không phải là khoảng trống trong dữ liệu chúng tôi thu thập.",
@@ -27848,15 +27820,11 @@
       }
     },
     "instanceMetrics": {
-      "columnHeader": "Tình trạng instance",
-      "columnHint": "Số kết nối so với giới hạn, từ các chỉ số mà bộ thu thập của bạn đã gửi. Trống cho đến khi một bộ thu nhận báo cáo instance này.",
       "connectionsOf": "{used} trên {limit} kết nối",
       "connectionsNoLimit": "{used} kết nối",
       "noLimitHint": "Bộ thu nhận cho công cụ này không tự công bố giới hạn kết nối, vì vậy chỉ hiển thị số lượng. Công thức giới hạn kết nối của thẻ thiết lập (sqlquery/mysql_limits) thu thập max_connections và chuyển thành phần trăm.",
       "trendLabel": "Các kết nối trong khoảng thời gian đã chọn",
       "cacheHit": "Cache hit {percent}",
-      "lagBytes": "Bản sao tụt lại {value}",
-      "lagSeconds": "Bản sao tụt lại {value}",
       "deadlocks": "{count} deadlock | {count} deadlock",
       "noTraffic": "Không có lưu lượng ứng dụng trong khoảng thời gian này",
       "noTrafficHint": "Bộ thu thập của bạn báo cáo instance này, nhưng không có ứng dụng nào truy vấn nó trong khoảng thời gian này. Các cột truy vấn của nó trống vì không có gì đo chúng, không phải vì nó nhanh.",
@@ -27895,7 +27863,6 @@
       "checkRange": "Mở rộng khoảng thời gian — công thức báo cáo 60 giây một lần.",
       "columns": {
         "relation": "Bảng",
-        "instance": "Instance",
         "totalBytes": "Tổng kích thước",
         "heapBytes": "Kích thước heap",
         "overheadBytes": "Chỉ mục + TOAST",
@@ -27914,10 +27881,7 @@
       }
     },
     "recommendations": {
-      "title": "Khuyến nghị",
-      "subtitle": "Các kiểm tra xác định dựa trên những gì bộ thu thập đã báo cáo. Mỗi kiểm tra nêu rõ phép đo và ngưỡng mà nó vượt qua.",
       "countersCumulative": "Số lần quét chỉ mục là tổng tích lũy kể từ lần đặt lại thống kê gần nhất, không phải số lần trong khoảng thời gian đã chọn.",
-      "andMore": "và {count} mục khác tương tự",
       "unused-index": {
         "title": "Chỉ mục không được quét",
         "body": "{index} trên {relation} không có bản ghi quét nào và chiếm {size}.",

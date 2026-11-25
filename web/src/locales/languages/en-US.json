@@ -26838,10 +26838,7 @@
         "failed": "Failed"
       },
       "databaseCount": "1 database | {count} databases",
-      "openQueries": "See its queries",
       "openTopQueries": "Open Top Queries",
-      "viewMetrics": "View metrics",
-      "alertMe": "Alert me",
       "columnHints": {
         "instance": "Expand a database to see its schemas, then the apps that query each schema.",
         "qps": "Calls per second — this window's calls divided by its length, so a 15-minute view and a 4-hour view stay comparable.",
@@ -26853,14 +26850,7 @@
       },
       "failedChip": "{count} failed",
       "columnSubLabels": {
-        "attention": "from the database",
-        "load": "from your apps",
         "calls": "from your apps"
-      },
-      "attention": {
-        "connections": "connections",
-        "noLimit": "no limit published",
-        "unknown": "not measured"
       }
     },
     "queries": {
@@ -26930,19 +26920,13 @@
       "errorsNone": "none",
       "errorsAll": "all",
       "actions": {
-        "open": "Open details",
         "traces": "See example traces",
         "copy": "Copy query",
         "copied": "Query copied",
-        "copyFailed": "Could not copy the query.",
-        "alert": "Alert me if this slows"
+        "copyFailed": "Could not copy the query."
       },
       "otherRowTextFor": "All other queries on {database}",
-      "otherRowDetailShort": "— {calls} calls.",
-      "columnSubLabels": {
-        "calls": "server where reported",
-        "load": "server where reported"
-      }
+      "otherRowDetailShort": "— {calls} calls."
     },
     "insights": {
       "title": "Insights",
@@ -27554,15 +27538,14 @@
       },
       "rowActions": {
         "topQueries": "Find these in Top queries",
-        "copy": "Copy both queries",
-        "alert": "Alert me about deadlocks"
+        "copy": "Copy both queries"
       },
       "detail": {
         "eventAt": "Deadlock at {time}",
         "nthOf": "{index} of {total}",
         "spanLabel": "{count} deadlocks over {span}",
-        "earlier": "Earlier deadlock",
-        "later": "Later deadlock",
+        "earlier": "Earlier Deadlock",
+        "later": "Later Deadlock",
         "victim": "Cancelled by the database",
         "survivor": "Allowed to finish",
         "pid": "pid {pid}",
@@ -27595,7 +27578,8 @@
       "storm": {
         "short": "{count} deadlocks in this window, usually none.",
         "truncated": "Only the first {count} could be read, so the real number is higher.",
-        "biasWarning": "Expect the Top queries tab to look calmer than reality right now. A cancelled query still finishes, but the ones queued behind these locks haven't — so call counts there are lower than what your users are experiencing."
+        "biasWarning": "Expect the Top queries tab to look calmer than reality right now. A cancelled query still finishes, but the ones queued behind these locks haven't — so call counts there are lower than what your users are experiencing.",
+        "copyForSlack": "Copy"
       },
       "summary": {
         "deadlocks": "Deadlocks",
@@ -27701,8 +27685,7 @@
       },
       "rowActions": {
         "showChain": "Show the chain",
-        "copy": "Copy query",
-        "alertMe": "Alert me about lock waits"
+        "copy": "Copy query"
       },
       "waitEvent": {
         "transaction": "another transaction to finish",
@@ -27902,15 +27885,13 @@
       "snapshotAge": " ({age})"
     },
     "instanceMetrics": {
-      "columnHeader": "Instance health",
-      "columnHint": "Connections against the limit, from the metrics your collector already sends. Blank until a receiver reports this instance.",
       "connectionsOf": "{used} of {limit} connections",
       "connectionsNoLimit": "{used} connections",
       "connectionsIssue": "{percent} connections",
       "connectionsInUse": "{percent} of connections in use",
       "connectionsOfPercent": "{used} of {limit} ({percent})",
       "rowConnections": "Connections",
-      "rowCacheHit": "Cache hit",
+      "rowCacheHit": "Cache Hit",
       "rowDeadlocks": "Deadlocks",
       "status": {
         "healthy": "Healthy",
@@ -27922,8 +27903,6 @@
       "noLimitHint": "The receiver for this engine does not publish a connection limit on its own, so only the count is shown. The setup card's connection-limit recipe (sqlquery/mysql_limits) collects max_connections and turns this into a percentage.",
       "trendLabel": "Connections across the selected window",
       "cacheHit": "Cache hit {percent}",
-      "lagBytes": "Replica {value} behind",
-      "lagSeconds": "Replica {value} behind",
       "deadlocks": "{count} deadlock | {count} deadlocks",
       "noTraffic": "No application traffic in this window",
       "noTrafficHint": "Your collector reports this instance, but no application queried it during this window. Its query columns are empty because nothing measured them, not because it was fast.",
@@ -28012,6 +27991,12 @@
       "menuEmpty": "No recommendations right now.",
       "menuEmptyTables": "No recommendations for these tables.",
       "menuEmptyBlocked": "No blocking sessions need attention."
+    },
+    "age": {
+      "seconds": "{n}s ago",
+      "minutes": "{n}m ago",
+      "hours": "{n}h ago",
+      "days": "{n}d ago"
     }
   },
   "oncall": {

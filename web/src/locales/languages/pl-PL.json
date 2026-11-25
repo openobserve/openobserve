@@ -26839,9 +26839,6 @@
         "failed": "Nieudane"
       },
       "databaseCount": "1 baza danych | Bazy danych: {count}",
-      "openQueries": "Zobacz jej zapytania",
-      "viewMetrics": "Wyświetl metryki",
-      "alertMe": "Powiadom mnie",
       "columnHints": {
         "qps": "Wywołania na sekundę — wywołania w tym oknie podzielone przez jego długość, dzięki czemu widok 15-minutowy i 4-godzinny pozostają porównywalne.",
         "p50": "Połowa wszystkich wywołań zakończyła się szybciej niż ten czas. Mierzone na podstawie zakończonych wywołań w trace'ach Twojej aplikacji.",
@@ -26852,14 +26849,7 @@
       },
       "failedChip": "Nieudane: {count}",
       "columnSubLabels": {
-        "attention": "z bazy danych",
-        "load": "z Twoich aplikacji",
         "calls": "z Twoich aplikacji"
-      },
-      "attention": {
-        "connections": "połączenia",
-        "noLimit": "brak opublikowanego limitu",
-        "unknown": "nie mierzone"
       }
     },
     "queries": {
@@ -26927,19 +26917,13 @@
       "errorsNone": "brak",
       "errorsAll": "wszystkie",
       "actions": {
-        "open": "Otwórz szczegóły",
         "traces": "Zobacz przykładowe trace",
         "copy": "Kopiuj zapytanie",
         "copied": "Skopiowano zapytanie",
-        "copyFailed": "Nie udało się skopiować zapytania.",
-        "alert": "Powiadom mnie, jeśli to spowolni"
+        "copyFailed": "Nie udało się skopiować zapytania."
       },
       "otherRowTextFor": "Wszystkie inne zapytania w {database}",
-      "otherRowDetailShort": "— wywołania: {calls}.",
-      "columnSubLabels": {
-        "calls": "serwer, który to zgłosił",
-        "load": "serwer, który to zgłosił"
-      }
+      "otherRowDetailShort": "— wywołania: {calls}."
     },
     "insights": {
       "showRows": "Pokaż to zapytanie | Pokaż te zapytania ({count})",
@@ -27513,11 +27497,9 @@
       },
       "rowActions": {
         "topQueries": "Znajdź je w Top queries",
-        "copy": "Skopiuj oba zapytania",
-        "alert": "Powiadamiaj mnie o zakleszczeniach"
+        "copy": "Skopiuj oba zapytania"
       },
       "detail": {
-        "mostRecent": "Najnowsze · {time}",
         "nthOf": "{index} z {total}",
         "earlier": "Wcześniej",
         "later": "Później",
@@ -27538,11 +27520,7 @@
         "fixBody": "Te dwa zapytania dotykają wierszy {object} w przeciwnej kolejności. Spraw, aby obie strony aktualizowały w tej samej kolejności — najpierw najniższe id — a ta para nie będzie już mogła powodować zakleszczenia.",
         "fixGeneric": "Obie strony trzymają to, czego chce druga. Spraw, aby każda transakcja pobierała te blokady w tej samej kolejności, a ta para nie będzie już mogła powodować zakleszczenia.",
         "copyForSlack": "Kopiuj",
-        "occurrencesTitle": "Wszystkie przypadki zakleszczenia tej pary ({count})",
-        "occurrencesHint": "Wybierz punkt, aby załadować go powyżej",
-        "lostLabel": "{pid} przegrało",
         "oneSideLoses": "{app} jest anulowane za każdym razem.",
-        "showAbove": "Pokaż powyżej",
         "copy": "Kopiuj SQL",
         "seeInTopQueries": "Zobacz w Top queries",
         "whichService": "Która usługa?",
@@ -27553,8 +27531,6 @@
         "copyForSlackHint": "Oba polecenia, jak często ta para ulegała zakleszczeniu i kiedy to miało miejsce ostatnio — zapisane jako wiadomość, którą można wkleić na kanał lub do zgłoszenia."
       },
       "storm": {
-        "title": "Burza zakleszczeń.",
-        "body": "{count} w tym oknie — normalnie zero.",
         "copyForSlack": "Kopiuj",
         "biasWarning": "Spodziewaj się, że karta Top queries będzie teraz wyglądać na spokojniejszą, niż jest w rzeczywistości. Anulowane zapytanie nadal się kończy, ale te czekające w kolejce za tymi blokadami już nie — więc liczba wywołań jest tam niższa, niż doświadczają Twoi użytkownicy."
       },
@@ -27658,8 +27634,7 @@
       },
       "rowActions": {
         "showChain": "Pokaż łańcuch",
-        "copy": "Kopiuj zapytanie",
-        "alertMe": "Powiadom mnie o oczekiwaniach na blokady"
+        "copy": "Kopiuj zapytanie"
       },
       "waitEvent": {
         "transaction": "zakończenie innej transakcji",
@@ -27780,8 +27755,6 @@
         "application": "Aplikacja",
         "state": "Stan",
         "waitEvent": "Oczekuje na",
-        "running": "Działa od",
-        "lastQuery": "Ostatnie zapytanie",
         "query": "Zapytanie",
         "blockedBy": "Blokowane przez"
       },
@@ -27798,7 +27771,6 @@
         "capped": "Próbkowano więcej sesji, niż mogliśmy odczytać naraz. To {count}, które mamy.",
         "filtered": "Wyświetlanie {count} z {total} sesji."
       },
-      "transactionOpen": "transakcja otwarta {age}",
       "healthy": {
         "title": "Nic teraz nie działa",
         "description": "Próbkowaliśmy tabele sesji Twoich baz danych i nie znaleźliśmy żadnych aktywnych sesji. To zdrowa norma dla bezczynnej bazy danych, a nie luka w tym, co zbieramy.",
@@ -27848,15 +27820,11 @@
       }
     },
     "instanceMetrics": {
-      "columnHeader": "Kondycja instancji",
-      "columnHint": "Połączenia względem limitu, z metryk, które Twój kolektor już wysyła. Puste, dopóki odbiorca nie zgłosi tej instancji.",
       "connectionsOf": "{used} z {limit} połączeń",
       "connectionsNoLimit": "Połączenia: {used}",
       "noLimitHint": "Odbiorca tego silnika nie publikuje limitu połączeń samodzielnie, więc pokazywana jest tylko liczba. Przepis na limit połączeń z karty konfiguracji (sqlquery/mysql_limits) zbiera max_connections i przekształca to w procent.",
       "trendLabel": "Połączenia w wybranym oknie",
       "cacheHit": "Trafienie w cache {percent}",
-      "lagBytes": "Replika opóźniona o {value}",
-      "lagSeconds": "Replika opóźniona o {value}",
       "deadlocks": "{count} zakleszczenie | zakleszczenia: {count}",
       "noTraffic": "Brak ruchu aplikacji w tym oknie",
       "noTrafficHint": "Twój kolektor zgłasza tę instancję, ale żadna aplikacja nie zapytała o nią w tym oknie. Kolumny zapytań są puste, ponieważ nic ich nie zmierzyło, a nie dlatego, że działało szybko.",
@@ -27895,7 +27863,6 @@
       "checkRange": "Poszerz zakres czasu — przepis raportuje raz na 60 sekund.",
       "columns": {
         "relation": "Tabela",
-        "instance": "Instancja",
         "totalBytes": "Całkowity rozmiar",
         "heapBytes": "Rozmiar sterty",
         "overheadBytes": "Indeks + TOAST",
@@ -27914,10 +27881,7 @@
       }
     },
     "recommendations": {
-      "title": "Zalecenia",
-      "subtitle": "Deterministyczne kontrole tego, co raportuje kolektor. Każda podaje pomiar i próg, który został przekroczony.",
       "countersCumulative": "Liczby skanów indeksów to sumy od ostatniego resetu statystyk, a nie liczby dla wybranego zakresu czasu.",
-      "andMore": "i {count} więcej podobnych",
       "unused-index": {
         "title": "Indeks nie był skanowany",
         "body": "Indeks {index} na relacji {relation} nie ma zarejestrowanych skanów i zajmuje {size}.",

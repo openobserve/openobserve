@@ -26839,9 +26839,6 @@
         "failed": "Fallidas"
       },
       "databaseCount": "1 base de datos | {count} bases de datos",
-      "openQueries": "Ver sus consultas",
-      "viewMetrics": "Ver métricas",
-      "alertMe": "Alertarme",
       "columnHints": {
         "qps": "Llamadas por segundo — las llamadas de esta ventana divididas por su duración, de modo que una vista de 15 minutos y una de 4 horas sigan siendo comparables.",
         "p50": "La mitad de todas las llamadas terminó antes que esto. Medido a partir de las llamadas completadas en las trazas de tu aplicación.",
@@ -26852,14 +26849,7 @@
       },
       "failedChip": "{count} fallidas",
       "columnSubLabels": {
-        "attention": "desde la base de datos",
-        "load": "desde tus aplicaciones",
         "calls": "desde tus aplicaciones"
-      },
-      "attention": {
-        "connections": "conexiones",
-        "noLimit": "sin límite publicado",
-        "unknown": "no medido"
       }
     },
     "queries": {
@@ -26927,19 +26917,13 @@
       "errorsNone": "ninguna",
       "errorsAll": "todas",
       "actions": {
-        "open": "Abrir detalles",
         "traces": "Ver trazas de ejemplo",
         "copy": "Copiar consulta",
         "copied": "Consulta copiada",
-        "copyFailed": "No se pudo copiar la consulta.",
-        "alert": "Avísame si esto se ralentiza"
+        "copyFailed": "No se pudo copiar la consulta."
       },
       "otherRowTextFor": "Todas las demás consultas en {database}",
-      "otherRowDetailShort": "— {calls} llamadas.",
-      "columnSubLabels": {
-        "calls": "servidor donde se informó",
-        "load": "servidor donde se informó"
-      }
+      "otherRowDetailShort": "— {calls} llamadas."
     },
     "insights": {
       "showRows": "Mostrar esta consulta | Mostrar estas {count} consultas",
@@ -27513,11 +27497,9 @@
       },
       "rowActions": {
         "topQueries": "Encuentra estos en Consultas principales.",
-        "copy": "Copiar ambas consultas",
-        "alert": "Alertarme sobre interbloqueos"
+        "copy": "Copiar ambas consultas"
       },
       "detail": {
-        "mostRecent": "Más reciente · {time}",
         "nthOf": "{index} de {total}",
         "earlier": "Anterior",
         "later": "Posterior",
@@ -27538,11 +27520,7 @@
         "fixBody": "Estas dos sentencias tocan filas de {object} en orden opuesto. Haz que ambos lados actualicen en el mismo orden — el id más bajo primero — y este par ya no podrá interbloquearse.",
         "fixGeneric": "Ambos lados tienen lo que el otro quiere. Haz que cada transacción tome estos bloqueos en el mismo orden y este par ya no podrá interbloquearse.",
         "copyForSlack": "Copiar",
-        "occurrencesTitle": "Las {count} veces que este par tuvo un interbloqueo",
-        "occurrencesHint": "Selecciona un punto para cargar ese de arriba",
-        "lostLabel": "{pid} perdió",
         "oneSideLoses": "{app} se cancela cada vez.",
-        "showAbove": "Mostrar arriba",
         "copy": "Copiar SQL",
         "seeInTopQueries": "Ver en Consultas principales",
         "whichService": "¿Qué servicio?",
@@ -27553,8 +27531,6 @@
         "copyForSlackHint": "Ambas sentencias, con qué frecuencia este par ha entrado en interbloqueo y cuándo fue la última vez — escrito como un mensaje que puedes pegar en un canal o en un ticket."
       },
       "storm": {
-        "title": "Tormenta de interbloqueos.",
-        "body": "{count} en esta ventana — normalmente ninguno.",
         "copyForSlack": "Copiar",
         "biasWarning": "Espera que la pestaña de Consultas principales parezca más tranquila de lo que realmente está ahora. Una consulta cancelada aún termina, pero las que están en cola detrás de estos bloqueos no lo han hecho, por lo que los contadores de llamadas allí son más bajos de lo que tus usuarios están experimentando."
       },
@@ -27658,8 +27634,7 @@
       },
       "rowActions": {
         "showChain": "Mostrar la cadena",
-        "copy": "Copiar consulta",
-        "alertMe": "Alertarme sobre esperas de bloqueo"
+        "copy": "Copiar consulta"
       },
       "waitEvent": {
         "transaction": "a que otra transacción finalice",
@@ -27780,8 +27755,6 @@
         "application": "Aplicación",
         "state": "Estado",
         "waitEvent": "Esperando en",
-        "running": "Tiempo de ejecución",
-        "lastQuery": "Última consulta",
         "query": "Consulta",
         "blockedBy": "Bloqueado por"
       },
@@ -27798,7 +27771,6 @@
         "capped": "Se muestrearon más sesiones de las que pudimos leer a la vez. Estas son las {count} que tenemos.",
         "filtered": "Mostrando {count} de {total} sesiones."
       },
-      "transactionOpen": "transacción abierta durante {age}",
       "healthy": {
         "title": "Nada se está ejecutando en este momento",
         "description": "Muestreamos las tablas de sesiones de tus bases de datos y no encontramos sesiones activas. Eso es lo normal y saludable para una base de datos inactiva, no una brecha en lo que recopilamos.",
@@ -27848,15 +27820,11 @@
       }
     },
     "instanceMetrics": {
-      "columnHeader": "Salud de la instancia",
-      "columnHint": "Conexiones respecto al límite, a partir de las métricas que tu colector ya envía. En blanco hasta que un receptor informe de esta instancia.",
       "connectionsOf": "{used} de {limit} conexiones",
       "connectionsNoLimit": "{used} conexiones",
       "noLimitHint": "El receptor de este motor no publica un límite de conexiones por sí mismo, por lo que solo se muestra el recuento. La receta de límite de conexiones de la tarjeta de configuración (sqlquery/mysql_limits) recopila max_connections y lo convierte en un porcentaje.",
       "trendLabel": "Conexiones en la ventana seleccionada",
       "cacheHit": "Acierto de caché {percent}",
-      "lagBytes": "Réplica {value} por detrás",
-      "lagSeconds": "Réplica {value} por detrás",
       "deadlocks": "{count} interbloqueo | {count} interbloqueos",
       "noTraffic": "Sin tráfico de aplicaciones en esta ventana",
       "noTrafficHint": "Tu colector informa de esta instancia, pero ninguna aplicación la consultó durante esta ventana. Sus columnas de consulta están vacías porque nada las midió, no porque fuera rápida.",
@@ -27895,7 +27863,6 @@
       "checkRange": "Amplía el rango de tiempo — la receta informa una vez cada 60 segundos.",
       "columns": {
         "relation": "Tabla",
-        "instance": "Instancia",
         "totalBytes": "Tamaño total",
         "heapBytes": "Tamaño del heap",
         "overheadBytes": "Índice + TOAST",
@@ -27914,10 +27881,7 @@
       }
     },
     "recommendations": {
-      "title": "Recomendaciones",
-      "subtitle": "Comprobaciones deterministas sobre lo que ya informa el colector. Cada una indica la medición y el umbral que superó.",
       "countersCumulative": "Los recuentos de escaneos de índice son totales acumulados desde el último reinicio de estadísticas, no recuentos para el intervalo de tiempo seleccionado.",
-      "andMore": "y {count} más como este",
       "unused-index": {
         "title": "Índice no escaneado",
         "body": "{index} en {relation} no tiene escaneos registrados y ocupa {size}.",

@@ -165,7 +165,7 @@ describe("DbmInstanceHealthCell", () => {
       mountWith(metrics({ cacheHitRatio: 0.9 }))
         .find("[data-test='tip']")
         .text(),
-    ).toMatch(/Cache hit\s*90%/);
+    ).toMatch(/Cache Hit\s*90%/);
   });
 
   it("shows replication lag in BYTES for Postgres", () => {

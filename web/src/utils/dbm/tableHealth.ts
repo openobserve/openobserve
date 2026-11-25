@@ -200,14 +200,7 @@ export const vacuumTimeMicros = (value: string | null | undefined): number | nul
 export const hasVacuumStats = (row: Pick<TableHealthRow, "engine">): boolean =>
   !row.engine || row.engine === "postgresql";
 
-/**
- * Render a vacuum/analyze timestamp as a relative age.
- *
- * `null` on a Postgres row is NEVER, and says so: the recipe COALESCEs a null
- * vacuum time to the empty string and canonicalization drops it, so absence is
- * a measured fact. On an engine without vacuum it is "—", since "Never" would
- * claim a vacuum that cannot happen.
- */
+// Null on a Postgres row is "Never" (absence is measured); on engines without vacuum it is "—".
 export const vacuumLabel = (
   value: string | null | undefined,
   row: Pick<TableHealthRow, "engine">,

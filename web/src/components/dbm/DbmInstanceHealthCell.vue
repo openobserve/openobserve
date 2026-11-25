@@ -343,11 +343,7 @@ const deadlocksLabel = computed<I18nText>(() =>
   ),
 );
 
-/**
- * What is wrong, from the same colour rules this cell always used: connections
- * at the danger line and deadlocks are errors, a poor cache hit is a warning.
- * Replication lag has no threshold, so it is never an issue.
- */
+/** Replication lag has no threshold, so it is never an issue. */
 const issues = computed(() => {
   const { saturation } = props.metrics;
   return healthIssues(props.metrics).map((item) => ({

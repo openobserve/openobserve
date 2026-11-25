@@ -26839,9 +26839,6 @@
         "failed": "Fehlgeschlagen"
       },
       "databaseCount": "1 Datenbank | {count} Datenbanken",
-      "openQueries": "Abfragen ansehen",
-      "viewMetrics": "Metriken anzeigen",
-      "alertMe": "Mich benachrichtigen",
       "columnHints": {
         "qps": "Aufrufe pro Sekunde — die Aufrufe dieses Zeitfensters geteilt durch dessen Länge, damit eine 15-Minuten-Ansicht und eine 4-Stunden-Ansicht vergleichbar bleiben.",
         "p50": "Die Hälfte aller Aufrufe war schneller als dies. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
@@ -26852,14 +26849,7 @@
       },
       "failedChip": "{count} fehlgeschlagen",
       "columnSubLabels": {
-        "attention": "aus der Datenbank",
-        "load": "aus Ihren Apps",
         "calls": "aus Ihren Apps"
-      },
-      "attention": {
-        "connections": "Verbindungen",
-        "noLimit": "kein Limit veröffentlicht",
-        "unknown": "nicht gemessen"
       }
     },
     "queries": {
@@ -26927,19 +26917,13 @@
       "errorsNone": "keine",
       "errorsAll": "alle",
       "actions": {
-        "open": "Details öffnen",
         "traces": "Beispiel-Traces ansehen",
         "copy": "Abfrage kopieren",
         "copied": "Abfrage kopiert",
-        "copyFailed": "Die Abfrage konnte nicht kopiert werden.",
-        "alert": "Benachrichtigen Sie mich, wenn dies langsamer wird"
+        "copyFailed": "Die Abfrage konnte nicht kopiert werden."
       },
       "otherRowTextFor": "Alle anderen Abfragen auf {database}",
-      "otherRowDetailShort": "— {calls} Aufrufe.",
-      "columnSubLabels": {
-        "calls": "Server, von dem gemeldet",
-        "load": "Server, von dem gemeldet"
-      }
+      "otherRowDetailShort": "— {calls} Aufrufe."
     },
     "insights": {
       "showRows": "Diese Abfrage anzeigen | Diese {count} Abfragen anzeigen",
@@ -27513,11 +27497,9 @@
       },
       "rowActions": {
         "topQueries": "Finden Sie diese in den Top-Abfragen",
-        "copy": "Beide Abfragen kopieren",
-        "alert": "Benachrichtigen Sie mich über Deadlocks"
+        "copy": "Beide Abfragen kopieren"
       },
       "detail": {
-        "mostRecent": "Neueste · {time}",
         "nthOf": "{index} von {total}",
         "earlier": "Früher",
         "later": "Später",
@@ -27538,11 +27520,7 @@
         "fixBody": "Diese beiden Anweisungen greifen auf {object} Zeilen in umgekehrter Reihenfolge zu. Lassen Sie beide Seiten in derselben Reihenfolge aktualisieren — zuerst die niedrigste ID — und dieses Paar kann nicht mehr in einen Deadlock geraten.",
         "fixGeneric": "Beide Seiten halten, was die andere will. Lassen Sie jede Transaktion diese Sperren in derselben Reihenfolge anfordern, und dieses Paar kann nicht mehr in einen Deadlock geraten.",
         "copyForSlack": "Kopieren",
-        "occurrencesTitle": "Alle {count} Male, in denen dieses Paar in einen Deadlock geriet.",
-        "occurrencesHint": "Wählen Sie einen Punkt aus, um diesen oben zu laden.",
-        "lostLabel": "{pid} verloren",
         "oneSideLoses": "{app} wird jedes Mal abgebrochen.",
-        "showAbove": "Oben anzeigen",
         "copy": "SQL kopieren",
         "seeInTopQueries": "In Top-Abfragen ansehen",
         "whichService": "Welcher Dienst?",
@@ -27553,8 +27531,6 @@
         "copyForSlackHint": "Beide Anweisungen, wie oft dieses Paar in einen Deadlock verwickelt war und wann es zuletzt passiert ist — als Nachricht geschrieben, die Sie in einen Kanal oder ein Ticket einfügen können."
       },
       "storm": {
-        "title": "Deadlock-Sturm.",
-        "body": "{count} in diesem Fenster — normalerweise keiner.",
         "copyForSlack": "Kopieren",
         "biasWarning": "Erwarten Sie, dass der Tab „Top queries“ gerade ruhiger aussieht als die Realität. Eine abgebrochene Abfrage wird trotzdem abgeschlossen, aber diejenigen, die hinter diesen Sperren in der Warteschlange stehen, noch nicht — daher sind die Aufrufzahlen dort niedriger, als Ihre Benutzer es erleben."
       },
@@ -27658,8 +27634,7 @@
       },
       "rowActions": {
         "showChain": "Kette anzeigen",
-        "copy": "Abfrage kopieren",
-        "alertMe": "Benachrichtigen Sie mich über Sperrwartezeiten"
+        "copy": "Abfrage kopieren"
       },
       "waitEvent": {
         "transaction": "das Ende einer anderen Transaktion",
@@ -27780,8 +27755,6 @@
         "application": "Anwendung",
         "state": "Status",
         "waitEvent": "Wartet auf",
-        "running": "Läuft seit",
-        "lastQuery": "Letzte Abfrage",
         "query": "Abfrage",
         "blockedBy": "Blockiert von"
       },
@@ -27798,7 +27771,6 @@
         "capped": "Es wurden mehr Sitzungen erfasst, als wir auf einmal lesen konnten. Dies sind die {count}, die wir haben.",
         "filtered": "{count} von {total} Sitzungen werden angezeigt."
       },
-      "transactionOpen": "Transaktion geöffnet seit {age}",
       "healthy": {
         "title": "Aktuell läuft nichts",
         "description": "Wir haben die Sitzungstabellen Ihrer Datenbanken abgetastet und keine aktiven Sitzungen gefunden. Das ist der gesunde Normalzustand einer im Leerlauf befindlichen Datenbank, keine Lücke in unserer Erfassung.",
@@ -27848,15 +27820,11 @@
       }
     },
     "instanceMetrics": {
-      "columnHeader": "Instanzzustand",
-      "columnHint": "Verbindungen im Verhältnis zum Limit, basierend auf den Metriken, die Ihr Collector bereits sendet. Leer, bis ein Receiver diese Instanz meldet.",
       "connectionsOf": "{used} von {limit} Verbindungen",
       "connectionsNoLimit": "{used} Verbindungen",
       "noLimitHint": "Der Receiver für diese Engine veröffentlicht selbst keine Verbindungsgrenze, daher wird nur die Anzahl angezeigt. Das Connection-Limit-Rezept der Einrichtungskarte (sqlquery/mysql_limits) erfasst max_connections und wandelt dies in einen Prozentsatz um.",
       "trendLabel": "Verbindungen im ausgewählten Zeitraum",
       "cacheHit": "Cache-Treffer {percent}",
-      "lagBytes": "Replik {value} im Rückstand",
-      "lagSeconds": "Replik {value} im Rückstand",
       "deadlocks": "{count} Deadlock | {count} Deadlocks",
       "noTraffic": "Kein Anwendungsverkehr in diesem Zeitraum",
       "noTrafficHint": "Ihr Collector meldet diese Instanz, aber in diesem Zeitraum hat keine Anwendung sie abgefragt. Ihre Abfragespalten sind leer, weil nichts sie gemessen hat, nicht weil sie schnell war.",
@@ -27895,7 +27863,6 @@
       "checkRange": "Erweitern Sie den Zeitraum – das Rezept meldet einmal alle 60 Sekunden.",
       "columns": {
         "relation": "Tabelle",
-        "instance": "Instanz",
         "totalBytes": "Gesamtgröße",
         "heapBytes": "Heap-Größe",
         "overheadBytes": "Index + TOAST",
@@ -27914,10 +27881,7 @@
       }
     },
     "recommendations": {
-      "title": "Empfehlungen",
-      "subtitle": "Deterministische Prüfungen über das, was der Collector bereits meldet. Jede gibt die Messung und den überschrittenen Schwellenwert an.",
       "countersCumulative": "Index-Scan-Zähler sind Gesamtsummen seit dem letzten Zurücksetzen der Statistiken, nicht Zähler für den ausgewählten Zeitraum.",
-      "andMore": "und {count} weitere ähnliche",
       "unused-index": {
         "title": "Index nicht gescannt",
         "body": "{index} auf {relation} hat keine aufgezeichneten Scans und belegt {size}.",

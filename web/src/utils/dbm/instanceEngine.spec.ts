@@ -30,14 +30,20 @@ const f = (key: string, value: string | null): DbmScopeFilter => ({
 });
 const hits = [{ db_system: "postgresql", db_instance: "pg-1" }];
 
+const pick = <T extends { key: string }>(list: T[], key: string): T => {
+  const found = list.find((x) => x.key === key);
+  expect(found).toBeDefined();
+  return found as T;
+};
+
 describe("applyInstanceEngine", () => {
   it("shows the instance's engine and disables Engine", () => {
     const out = applyInstanceEngine([f("instance", "pg-1"), f("system", null)], hits, raw("why"));
-    const system = out.find((x) => x.key === "system")!;
+    const system = pick(out, "system");
     expect(system.value).toBe("postgresql");
     expect(system.disabled).toBe(true);
     expect(system.disabledReason).toEqual(raw("why"));
-    expect(out.find((x) => x.key === "instance")!.disabled).toBeUndefined();
+    expect(pick(out, "instance").disabled).toBeUndefined();
   });
 
   it("leaves Engine enabled with no instance or an unknown one", () => {
@@ -47,7 +53,7 @@ describe("applyInstanceEngine", () => {
         hits,
         raw("why"),
       );
-      const system = out.find((x) => x.key === "system")!;
+      const system = pick(out, "system");
       expect(system.value).toBe("mysql");
       expect(system.disabled).toBeUndefined();
     }
@@ -56,6 +62,6 @@ describe("applyInstanceEngine", () => {
   it("leaves Engine enabled when the instance name exists on two engines", () => {
     const both = [...hits, { db_system: "mysql", db_instance: "pg-1" }];
     const out = applyInstanceEngine([f("instance", "pg-1"), f("system", null)], both, raw("why"));
-    expect(out.find((x) => x.key === "system")!.disabled).toBeUndefined();
+    expect(pick(out, "system").disabled).toBeUndefined();
   });
 });

@@ -126,6 +126,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span data-test="dbm-deadlocks-banner-text">{{ bannerSummary }}</span>
             <template #actions>
+              <OButton
+                v-if="storm"
+                variant="outline"
+                size="xs"
+                icon-left="content-copy"
+                data-test="dbm-deadlocks-storm-copy"
+                @click="copyStormSummary()"
+              >
+                {{ t("dbm.deadlocks.storm.copyForSlack") }}
+                <OTooltip side="bottom" :content="t('dbm.deadlocks.detail.copyForSlackHint')" />
+              </OButton>
               <OPopover side="bottom" align="end">
                 <template #trigger>
                   <OButton variant="ghost" size="xs" data-test="dbm-deadlocks-banner-details">
@@ -1205,6 +1216,15 @@ const summaryLines = (row: DeadlockRow): string[] => [
 const copySummary = (row: DeadlockRow) => {
   copyToClipboard(summaryLines(row).join("\n"), t);
   analytics.track("dbm_deadlock_summary_copied", { scope: "pair" });
+};
+
+/** Every pair, so the clipboard matches the storm headline above the button. */
+const copyStormSummary = () => {
+  const rows = pairRows.value;
+  if (!rows.length) return;
+  const header = `*${eventCount.value} deadlocks in this window, from ${rows.length} query pair(s)*`;
+  copyToClipboard([header, "", ...rows.flatMap((r) => [...summaryLines(r), ""])].join("\n"), t);
+  analytics.track("dbm_deadlock_summary_copied", { scope: "storm" });
 };
 
 const onEmptyAction = (id: string) => {

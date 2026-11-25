@@ -26834,9 +26834,6 @@
         "failed": "失敗"
       },
       "databaseCount": "1 個資料庫 | {count} 個資料庫",
-      "openQueries": "查看其查詢",
-      "viewMetrics": "檢視指標",
-      "alertMe": "提醒我",
       "columnHints": {
         "qps": "每秒呼叫數 — 此時間範圍的呼叫數除以時間長度，因此 15 分鐘檢視與 4 小時檢視仍然可比。",
         "p50": "半數呼叫的完成速度比這個值更快。依據應用程式追蹤中已完成的呼叫測量而得。",
@@ -26847,14 +26844,7 @@
       },
       "failedChip": "{count} 失敗",
       "columnSubLabels": {
-        "attention": "來自資料庫",
-        "load": "來自你的應用程式",
         "calls": "來自你的應用程式"
-      },
-      "attention": {
-        "connections": "連線",
-        "noLimit": "未發布限制",
-        "unknown": "未測量"
       }
     },
     "queries": {
@@ -26922,19 +26912,13 @@
       "errorsNone": "無",
       "errorsAll": "全部",
       "actions": {
-        "open": "開啟詳細資料",
         "traces": "查看範例追蹤",
         "copy": "複製查詢",
         "copied": "已複製查詢",
-        "copyFailed": "無法複製查詢。",
-        "alert": "變慢時警示我"
+        "copyFailed": "無法複製查詢。"
       },
       "otherRowTextFor": "{database} 上的所有其他查詢",
-      "otherRowDetailShort": "— {calls} 次呼叫。",
-      "columnSubLabels": {
-        "calls": "回報的伺服器",
-        "load": "回報的伺服器"
-      }
+      "otherRowDetailShort": "— {calls} 次呼叫。"
     },
     "insights": {
       "showRows": "顯示此查詢 | 顯示這 {count} 個查詢",
@@ -27508,11 +27492,9 @@
       },
       "rowActions": {
         "topQueries": "在 Top queries 中尋找這些",
-        "copy": "複製兩個查詢",
-        "alert": "關於死結提醒我"
+        "copy": "複製兩個查詢"
       },
       "detail": {
-        "mostRecent": "最近 · {time}",
         "nthOf": "{index} / {total}",
         "earlier": "較早",
         "later": "較晚",
@@ -27533,11 +27515,7 @@
         "fixBody": "這兩個陳述式以相反順序存取 {object} 資料列。讓雙方以相同順序更新 — 最低 id 優先 — 這對查詢就不再發生死結。",
         "fixGeneric": "雙方都持有對方想要的鎖。讓每個交易都以相同順序取得這些鎖，這對查詢就不再發生死結。",
         "copyForSlack": "複製",
-        "occurrencesTitle": "此配對死結的所有 {count} 次",
-        "occurrencesHint": "選取一個點以載入上方該項目",
-        "lostLabel": "{pid} 失敗",
         "oneSideLoses": "{app} 每次都被取消。",
-        "showAbove": "在上方顯示",
         "copy": "複製 SQL",
         "seeInTopQueries": "在熱門查詢中查看",
         "whichService": "哪個服務？",
@@ -27548,8 +27526,6 @@
         "copyForSlackHint": "兩條語句、此配對發生死鎖的頻率以及最後一次發生的時間——以訊息形式寫出，你可以貼到頻道或工單中。"
       },
       "storm": {
-        "title": "死鎖風暴。",
-        "body": "{count} 在此時間窗口內——通常為零。",
         "copyForSlack": "複製",
         "biasWarning": "預期熱門查詢標籤頁現在看起來會比實際情況平靜。被取消的查詢仍會完成，但在這些鎖之後排隊的查詢尚未完成——因此那裡的呼叫計數低於使用者實際體驗到的數量。"
       },
@@ -27653,8 +27629,7 @@
       },
       "rowActions": {
         "showChain": "顯示鏈",
-        "copy": "複製查詢",
-        "alertMe": "鎖定等待時提醒我"
+        "copy": "複製查詢"
       },
       "waitEvent": {
         "transaction": "另一個交易完成",
@@ -27775,8 +27750,6 @@
         "application": "應用程式",
         "state": "狀態",
         "waitEvent": "等待對象",
-        "running": "執行時長",
-        "lastQuery": "上次查詢",
         "query": "查詢",
         "blockedBy": "阻塞來源"
       },
@@ -27793,7 +27766,6 @@
         "capped": "取樣到的工作階段超過我們一次能讀取的數量。這是我們擁有的 {count} 個。",
         "filtered": "顯示 {count} / {total} 個工作階段。"
       },
-      "transactionOpen": "交易已開啟 {age}",
       "healthy": {
         "title": "目前沒有正在執行的項目",
         "description": "我們取樣了您的資料庫的工作階段資料表，沒有發現任何使用中的工作階段。對於閒置的資料庫來說，這是健康的正常現象，並非我們收集資料的缺口。",
@@ -27843,15 +27815,11 @@
       }
     },
     "instanceMetrics": {
-      "columnHeader": "執行個體健康狀態",
-      "columnHint": "連線數與限制的比較，來自您的收集器已傳送的指標。在接收器回報此執行個體之前保持空白。",
       "connectionsOf": "{used} / {limit} 個連線",
       "connectionsNoLimit": "{used} 個連線",
       "noLimitHint": "此引擎的接收器不會自行發布連線限制，因此僅顯示計數。設定卡片的連線限制配方 (sqlquery/mysql_limits) 會收集 max_connections 並將其轉換為百分比。",
       "trendLabel": "所選時間範圍內的連線數",
       "cacheHit": "快取命中 {percent}",
-      "lagBytes": "複本落後 {value}",
-      "lagSeconds": "複本落後 {value}",
       "deadlocks": "{count} 個死結 | {count} 個死結",
       "noTraffic": "此時間範圍內沒有應用程式流量",
       "noTrafficHint": "您的收集器會回報此執行個體，但在此時間範圍內沒有應用程式查詢它。其查詢欄位會是空的，是因為沒有任何項目測量它們，而不是因為速度很快。",
@@ -27890,7 +27858,6 @@
       "checkRange": "擴大時間範圍 — 配方每 60 秒回報一次。",
       "columns": {
         "relation": "資料表",
-        "instance": "執行個體",
         "totalBytes": "總大小",
         "heapBytes": "堆積大小",
         "overheadBytes": "索引 + TOAST",
@@ -27909,10 +27876,7 @@
       }
     },
     "recommendations": {
-      "title": "建議",
-      "subtitle": "對於收集器已回報的內容進行確定性檢查。每一項都會說明測量值與其超過的臨界值。",
       "countersCumulative": "索引掃描計數是自上次統計重設以來的累計總數，而非所選時間範圍內的計數。",
-      "andMore": "以及另外 {count} 個類似項目",
       "unused-index": {
         "title": "索引未被掃描",
         "body": "{index} 位於 {relation} 上，沒有記錄到任何掃描，並佔用 {size}。",

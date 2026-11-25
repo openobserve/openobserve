@@ -26839,9 +26839,6 @@
         "failed": "Échoués"
       },
       "databaseCount": "1 base de données | {count} bases de données",
-      "openQueries": "Voir ses requêtes",
-      "viewMetrics": "Voir les métriques",
-      "alertMe": "M'alerter",
       "columnHints": {
         "qps": "Appels par seconde — les appels de cette fenêtre divisés par sa durée, de sorte qu'une vue de 15 minutes et une vue de 4 heures restent comparables.",
         "p50": "La moitié des appels se sont terminés plus rapidement que cette valeur. Mesuré à partir des appels terminés dans les traces de votre application.",
@@ -26852,14 +26849,7 @@
       },
       "failedChip": "{count} échoués",
       "columnSubLabels": {
-        "attention": "depuis la base de données",
-        "load": "depuis vos applications",
         "calls": "depuis vos applications"
-      },
-      "attention": {
-        "connections": "connexions",
-        "noLimit": "aucune limite publiée",
-        "unknown": "non mesuré"
       }
     },
     "queries": {
@@ -26927,19 +26917,13 @@
       "errorsNone": "Aucun",
       "errorsAll": "Tous",
       "actions": {
-        "open": "Ouvrir les détails",
         "traces": "Voir des exemples de traces",
         "copy": "Copier la requête",
         "copied": "Requête copiée",
-        "copyFailed": "Impossible de copier la requête.",
-        "alert": "M'alerter si cela ralentit"
+        "copyFailed": "Impossible de copier la requête."
       },
       "otherRowTextFor": "Toutes les autres requêtes sur {database}",
-      "otherRowDetailShort": "— {calls} appels.",
-      "columnSubLabels": {
-        "calls": "Serveur ayant rapporté",
-        "load": "Serveur ayant rapporté"
-      }
+      "otherRowDetailShort": "— {calls} appels."
     },
     "insights": {
       "showRows": "Afficher cette requête | Afficher ces {count} requêtes",
@@ -27513,11 +27497,9 @@
       },
       "rowActions": {
         "topQueries": "Trouvez-les dans les requêtes principales",
-        "copy": "Copier les deux requêtes",
-        "alert": "M'alerter en cas de blocages"
+        "copy": "Copier les deux requêtes"
       },
       "detail": {
-        "mostRecent": "Plus récent · {time}",
         "nthOf": "{index} sur {total}",
         "earlier": "Plus tôt",
         "later": "Plus tard",
@@ -27538,11 +27520,7 @@
         "fixBody": "Ces deux instructions touchent les lignes {object} dans un ordre opposé. Faites en sorte que les deux côtés mettent à jour dans le même ordre — identifiant le plus bas d'abord — et cette paire ne pourra plus se bloquer.",
         "fixGeneric": "Les deux côtés détiennent ce que l'autre veut. Faites en sorte que chaque transaction prenne ces verrous dans le même ordre et cette paire ne pourra plus se bloquer.",
         "copyForSlack": "Copier",
-        "occurrencesTitle": "Les {count} fois où cette paire a provoqué un blocage",
-        "occurrencesHint": "Sélectionnez un point pour charger l'entrée ci-dessus",
-        "lostLabel": "{pid} a perdu",
         "oneSideLoses": "{app} est annulé à chaque fois.",
-        "showAbove": "Afficher ci-dessus",
         "copy": "Copier SQL",
         "seeInTopQueries": "Voir dans Top queries",
         "whichService": "Quel service ?",
@@ -27553,8 +27531,6 @@
         "copyForSlackHint": "Les deux instructions, la fréquence à laquelle cette paire a provoqué un interblocage et la dernière occurrence — sous forme de message à coller dans un canal ou un ticket."
       },
       "storm": {
-        "title": "Tempête d'interblocages.",
-        "body": "{count} dans cette fenêtre — normalement aucun.",
         "copyForSlack": "Copier",
         "biasWarning": "Attendez-vous à ce que l'onglet Top queries semble plus calme que la réalité en ce moment. Une requête annulée se termine quand même, mais celles qui sont en file derrière ces verrous ne sont pas terminées — donc les compteurs d'appels y sont inférieurs à ce que vos utilisateurs vivent."
       },
@@ -27658,8 +27634,7 @@
       },
       "rowActions": {
         "showChain": "Afficher la chaîne",
-        "copy": "Copier la requête",
-        "alertMe": "M'avertir des attentes de verrou"
+        "copy": "Copier la requête"
       },
       "waitEvent": {
         "transaction": "la fin d'une autre transaction",
@@ -27780,8 +27755,6 @@
         "application": "Application",
         "state": "État",
         "waitEvent": "En attente de",
-        "running": "En cours depuis",
-        "lastQuery": "Dernière requête",
         "query": "Requête",
         "blockedBy": "Bloqué par"
       },
@@ -27798,7 +27771,6 @@
         "capped": "Plus de sessions ont été échantillonnées que nous ne pouvions en lire à la fois. Voici les {count} que nous avons.",
         "filtered": "Affichage de {count} sur {total} sessions."
       },
-      "transactionOpen": "transaction ouverte depuis {age}",
       "healthy": {
         "title": "Rien ne tourne actuellement",
         "description": "Nous avons échantillonné les tables de sessions de vos bases de données et n'avons trouvé aucune session active. C'est la norme saine pour une base de données inactive, pas une lacune dans ce que nous collectons.",
@@ -27848,15 +27820,11 @@
       }
     },
     "instanceMetrics": {
-      "columnHeader": "Santé de l'instance",
-      "columnHint": "Connexions par rapport à la limite, à partir des métriques que votre collecteur envoie déjà. Vide jusqu'à ce qu'un récepteur signale cette instance.",
       "connectionsOf": "{used} sur {limit} connexions",
       "connectionsNoLimit": "{used} connexions",
       "noLimitHint": "Le récepteur pour ce moteur ne publie pas de limite de connexion par lui-même, donc seul le nombre est affiché. La recette de limite de connexion de la carte de configuration (sqlquery/mysql_limits) collecte max_connections et la convertit en pourcentage.",
       "trendLabel": "Connexions sur la fenêtre sélectionnée",
       "cacheHit": "Succès du cache {percent}",
-      "lagBytes": "Réplique {value} en retard",
-      "lagSeconds": "Réplique {value} en retard",
       "deadlocks": "{count} interblocage | {count} interblocages",
       "noTraffic": "Aucun trafic d'application dans cette fenêtre",
       "noTrafficHint": "Votre collecteur signale cette instance, mais aucune application ne l'a interrogée pendant cette fenêtre. Ses colonnes de requêtes sont vides parce que rien ne les a mesurées, pas parce qu'il était rapide.",
@@ -27895,7 +27863,6 @@
       "checkRange": "Élargissez la plage de temps — la recette signale une fois toutes les 60 secondes.",
       "columns": {
         "relation": "Table",
-        "instance": "Instance",
         "totalBytes": "Taille totale",
         "heapBytes": "Taille du tas",
         "overheadBytes": "Index + TOAST",
@@ -27914,10 +27881,7 @@
       }
     },
     "recommendations": {
-      "title": "Recommandations",
-      "subtitle": "Vérifications déterministes sur ce que le collecteur rapporte déjà. Chacune indique la mesure et le seuil franchi.",
       "countersCumulative": "Les compteurs de scans d'index sont des totaux cumulés depuis la dernière réinitialisation des statistiques, et non des compteurs pour la plage temporelle sélectionnée.",
-      "andMore": "et {count} autres du même type",
       "unused-index": {
         "title": "Index non scanné",
         "body": "{index} sur {relation} n'a aucun scan enregistré et occupe {size}.",

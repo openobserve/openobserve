@@ -26833,9 +26833,6 @@
         "failed": "Failed"
       },
       "databaseCount": "1 database | {count} databases",
-      "openQueries": "See its queries",
-      "viewMetrics": "View metrics",
-      "alertMe": "Alert me",
       "columnHints": {
         "qps": "Calls per second — this window's calls divided by its length, so a 15-minute view and a 4-hour view stay comparable.",
         "p50": "Half of all calls finished faster than this. Measured from completed calls in your application's traces.",
@@ -26846,14 +26843,7 @@
       },
       "failedChip": "{count} failed",
       "columnSubLabels": {
-        "attention": "from the database",
-        "load": "from your apps",
         "calls": "from your apps"
-      },
-      "attention": {
-        "connections": "connections",
-        "noLimit": "no limit published",
-        "unknown": "not measured"
       }
     },
     "queries": {
@@ -26921,19 +26911,13 @@
       "errorsNone": "none",
       "errorsAll": "all",
       "actions": {
-        "open": "Open details",
         "traces": "See example traces",
         "copy": "Copy query",
         "copied": "Query copied",
-        "copyFailed": "Could not copy the query.",
-        "alert": "Alert me if this slows"
+        "copyFailed": "Could not copy the query."
       },
       "otherRowTextFor": "All other queries on {database}",
-      "otherRowDetailShort": "— {calls} calls.",
-      "columnSubLabels": {
-        "calls": "server where reported",
-        "load": "server where reported"
-      }
+      "otherRowDetailShort": "— {calls} calls."
     },
     "insights": {
       "showRows": "Show this query | Show these {count} queries",
@@ -27507,11 +27491,9 @@
       },
       "rowActions": {
         "topQueries": "Find these in Top queries",
-        "copy": "Copy both queries",
-        "alert": "Alert me about deadlocks"
+        "copy": "Copy both queries"
       },
       "detail": {
-        "mostRecent": "Most recent · {time}",
         "nthOf": "{index} of {total}",
         "earlier": "Earlier",
         "later": "Later",
@@ -27532,11 +27514,7 @@
         "fixBody": "These two statements touch {object} rows in opposite order. Make both sides update in the same order — lowest id first — and this pair can no longer deadlock.",
         "fixGeneric": "Both sides hold what the other wants. Make every transaction take these locks in the same order and this pair can no longer deadlock.",
         "copyForSlack": "คัดลอก",
-        "occurrencesTitle": "All {count} times this pair deadlocked",
-        "occurrencesHint": "Select a point to load that one above",
-        "lostLabel": "{pid} lost",
         "oneSideLoses": "{app} is cancelled every time.",
-        "showAbove": "Show above",
         "copy": "Copy SQL",
         "seeInTopQueries": "See in Top queries",
         "whichService": "Which service?",
@@ -27547,8 +27525,6 @@
         "copyForSlackHint": "Both statements, how often this pair has deadlocked and when it last happened — written as a message you can paste into a channel or a ticket."
       },
       "storm": {
-        "title": "Deadlock storm.",
-        "body": "{count} in this window — normally none.",
         "copyForSlack": "คัดลอก",
         "biasWarning": "Expect the Top queries tab to look calmer than reality right now. A cancelled query still finishes, but the ones queued behind these locks haven't — so call counts there are lower than what your users are experiencing."
       },
@@ -27652,8 +27628,7 @@
       },
       "rowActions": {
         "showChain": "Show the chain",
-        "copy": "Copy query",
-        "alertMe": "Alert me about lock waits"
+        "copy": "Copy query"
       },
       "waitEvent": {
         "transaction": "another transaction to finish",
@@ -27774,8 +27749,6 @@
         "application": "Application",
         "state": "State",
         "waitEvent": "Waiting on",
-        "running": "Running for",
-        "lastQuery": "Last query",
         "query": "Query",
         "blockedBy": "Blocked by"
       },
@@ -27792,7 +27765,6 @@
         "capped": "More sessions were sampled than we could read at once. These are the {count} we have.",
         "filtered": "Showing {count} of {total} sessions."
       },
-      "transactionOpen": "transaction open {age}",
       "healthy": {
         "title": "Nothing is running right now",
         "description": "We sampled your databases' session tables and found no active sessions. That is the healthy normal for an idle database, not a gap in what we collect.",
@@ -27842,15 +27814,11 @@
       }
     },
     "instanceMetrics": {
-      "columnHeader": "Instance health",
-      "columnHint": "Connections against the limit, from the metrics your collector already sends. Blank until a receiver reports this instance.",
       "connectionsOf": "{used} of {limit} connections",
       "connectionsNoLimit": "{used} connections",
       "noLimitHint": "The receiver for this engine does not publish a connection limit on its own, so only the count is shown. The setup card's connection-limit recipe (sqlquery/mysql_limits) collects max_connections and turns this into a percentage.",
       "trendLabel": "Connections across the selected window",
       "cacheHit": "Cache hit {percent}",
-      "lagBytes": "Replica {value} behind",
-      "lagSeconds": "Replica {value} behind",
       "deadlocks": "{count} deadlock | {count} deadlocks",
       "noTraffic": "No application traffic in this window",
       "noTrafficHint": "Your collector reports this instance, but no application queried it during this window. Its query columns are empty because nothing measured them, not because it was fast.",
@@ -27889,7 +27857,6 @@
       "checkRange": "Widen the time range — the recipe reports once every 60 seconds.",
       "columns": {
         "relation": "Table",
-        "instance": "Instance",
         "totalBytes": "Total size",
         "heapBytes": "Heap size",
         "overheadBytes": "Index + TOAST",
@@ -27908,10 +27875,7 @@
       }
     },
     "recommendations": {
-      "title": "Recommendations",
-      "subtitle": "Deterministic checks over what the collector already reports. Each states the measurement and the threshold it crossed.",
       "countersCumulative": "Index scan counts are lifetime totals since the last statistics reset, not counts for the selected time range.",
-      "andMore": "and {count} more like it",
       "unused-index": {
         "title": "Index not scanned",
         "body": "{index} on {relation} has no recorded scans and occupies {size}.",

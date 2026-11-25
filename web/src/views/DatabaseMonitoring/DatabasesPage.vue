@@ -469,7 +469,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
-import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
+import { useDbmColumnToggle } from "@/composables/dbm/useDbmColumnToggle";
 import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -1631,11 +1631,10 @@ const defaultColumnVisibility = {
   services: false,
 };
 
-const tableRef = ref<{ hasResizedColumns?: boolean; resetColumnSizes?: () => void } | null>(null);
-const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("dbm-databases");
-// Seed once so the five columns start hidden; a saved user choice still wins.
-if (!Object.keys(columnVisibility.value).length)
-  columnVisibility.value = { ...defaultColumnVisibility };
+const { tableRef, columnVisibility, setColumnVisibility } = useDbmColumnToggle(
+  "dbm-databases",
+  defaultColumnVisibility,
+);
 
 const clearScope = () => {
   systemFilter.value = null;

@@ -14,9 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  DbmFilterBar: [Instance / Engine / Schema selects] [More Filters] [search] [page toggles] [trailing].
--->
 <template>
   <div class="flex shrink-0 flex-col" data-test="dbm-filter-bar">
     <div class="px-page-edge flex flex-wrap items-center gap-2 py-2" data-test="dbm-filter-row">

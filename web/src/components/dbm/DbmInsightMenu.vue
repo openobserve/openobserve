@@ -14,10 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  DbmInsightMenu — the insights as one filter-row button + popover list.
-  Each row emits `filter`, and the active one clears itself.
--->
+<!-- Insights live in a popover so the filter row stays one line. -->
 <template>
   <!-- Always shown, so switching the comparison never makes the row jump; an empty list says so. -->
   <span class="flex shrink-0 items-center gap-1">
@@ -50,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="insight in ranked"
           :key="insight.id"
           type="button"
-          class="hover:bg-surface-subtle rounded-default flex cursor-pointer items-start gap-2 px-2 py-1.5 text-left"
+          class="hover:bg-surface-subtle rounded-default flex cursor-pointer items-start gap-2 px-2 py-1.5 text-start"
           :class="activeId === insight.id ? 'bg-surface-accent-active' : ''"
           :data-test="`dbm-insight-item-${insight.id}`"
           @click="emit('filter', insight)"
@@ -137,14 +134,15 @@ const contextOf = (insight: DbmInsight) => {
   return row.service_name ?? row.services?.[0] ?? row.db_instance ?? "";
 };
 
-/** The query (or, when the row has no text, the service) the insight is about. */
-const SUBJECT_LENGTH = 90;
+/** The query (or the service when the row has no text); OTruncatedText does the clipping. */
 const subjectOf = (insight: DbmInsight): I18nText => {
   const text = oneLine(insight.evidence.row.query_norm);
   const base = text || contextOf(insight);
-  const clipped = base.length > SUBJECT_LENGTH ? `${base.slice(0, SUBJECT_LENGTH)}…` : base;
-  return raw(text && contextOf(insight) ? `${contextOf(insight)} · ${clipped}` : clipped);
+  return raw(text && contextOf(insight) ? `${contextOf(insight)} · ${base}` : base);
 };
+
+/** The query is quoted inside a sentence, which has no ellipsis, so it is cut to a short preview. */
+const QUERY_PREVIEW_LENGTH = 30;
 
 const titleOf = (insight: DbmInsight): I18nText => {
   const e = insight.evidence;
@@ -189,7 +187,7 @@ const sentenceOf = (insight: DbmInsight): I18nText => {
       return t("dbm.insights.all-failing.body", {
         failed: formatCount(e.current),
         total: formatCount(e.baseline),
-        query: oneLine(insight.evidence.row.query_norm).slice(0, 30),
+        query: oneLine(insight.evidence.row.query_norm).slice(0, QUERY_PREVIEW_LENGTH),
       });
     default:
       return raw("");

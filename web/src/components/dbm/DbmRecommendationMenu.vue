@@ -14,10 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  DbmRecommendationMenu — the recommendations as one filter-row button + popover list.
-  Same shell as DbmInsightMenu, but its rows are read-only findings with no table filter to apply.
--->
+<!-- Rows are read-only findings, so unlike the insight menu there is no table filter to apply. -->
 <template>
   <!-- Always shown, so the filter row never jumps; an empty list says so. -->
   <OPopover align="end">

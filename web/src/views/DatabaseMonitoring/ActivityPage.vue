@@ -324,7 +324,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
-import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
+import { useDbmColumnToggle } from "@/composables/dbm/useDbmColumnToggle";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -672,11 +672,10 @@ const visibleTableColumns = computed(() =>
 /** The identity columns are secondary to what the session is DOING. */
 const defaultColumnVisibility = { user: false, application: false };
 
-const tableRef = ref<{ hasResizedColumns?: boolean; resetColumnSizes?: () => void } | null>(null);
-const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("dbm-activity");
-// Nothing persisted yet: start from the page defaults.
-if (!Object.keys(columnVisibility.value).length)
-  columnVisibility.value = { ...defaultColumnVisibility };
+const { tableRef, columnVisibility, setColumnVisibility } = useDbmColumnToggle(
+  "dbm-activity",
+  defaultColumnVisibility,
+);
 
 const stateTone = (state: string | null | undefined): string => {
   const s = (state ?? "").toLowerCase();

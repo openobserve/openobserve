@@ -26839,9 +26839,6 @@
         "failed": "失败"
       },
       "databaseCount": "1 个数据库 | {count} 个数据库",
-      "openQueries": "查看其查询",
-      "viewMetrics": "查看指标",
-      "alertMe": "提醒我",
       "columnHints": {
         "qps": "每秒调用次数——此窗口内的调用数除以其时长，因此 15 分钟视图和 4 小时视图具有可比性。",
         "p50": "一半的调用比此更快完成。根据应用程序追踪中已完成的调用测得。",
@@ -26852,14 +26849,7 @@
       },
       "failedChip": "{count} 次失败",
       "columnSubLabels": {
-        "attention": "来自数据库",
-        "load": "来自你的应用",
         "calls": "来自你的应用"
-      },
-      "attention": {
-        "connections": "连接数",
-        "noLimit": "未发布限制",
-        "unknown": "未测量"
       }
     },
     "queries": {
@@ -26927,19 +26917,13 @@
       "errorsNone": "无",
       "errorsAll": "全部",
       "actions": {
-        "open": "打开详情",
         "traces": "查看示例追踪",
         "copy": "复制查询",
         "copied": "查询已复制",
-        "copyFailed": "无法复制查询。",
-        "alert": "变慢时提醒我"
+        "copyFailed": "无法复制查询。"
       },
       "otherRowTextFor": "{database} 上的所有其他查询",
-      "otherRowDetailShort": "— {calls} 次调用。",
-      "columnSubLabels": {
-        "calls": "报告所在服务器",
-        "load": "报告所在服务器"
-      }
+      "otherRowDetailShort": "— {calls} 次调用。"
     },
     "insights": {
       "showRows": "显示此查询 | 显示这些 {count} 个查询",
@@ -27513,11 +27497,9 @@
       },
       "rowActions": {
         "topQueries": "在热门查询中查找这些",
-        "copy": "复制两个查询",
-        "alert": "死锁时提醒我"
+        "copy": "复制两个查询"
       },
       "detail": {
-        "mostRecent": "最近 · {time}",
         "nthOf": "{index} / {total}",
         "earlier": "更早",
         "later": "更晚",
@@ -27538,11 +27520,7 @@
         "fixBody": "这两个语句以相反的顺序访问 {object} 行。让双方按相同顺序更新 — id 最小者优先 — 这对操作就不会再死锁。",
         "fixGeneric": "双方都持有对方想要的东西。让每个事务按相同顺序获取这些锁，这对操作就不会再死锁。",
         "copyForSlack": "复制",
-        "occurrencesTitle": "这对操作死锁的所有 {count} 次",
-        "occurrencesHint": "选择一个点以加载上方相应的记录",
-        "lostLabel": "{pid} 落败",
         "oneSideLoses": "{app} 每次都被取消。",
-        "showAbove": "在上方显示",
         "copy": "复制 SQL",
         "seeInTopQueries": "在热门查询中查看",
         "whichService": "哪个服务？",
@@ -27553,8 +27531,6 @@
         "copyForSlackHint": "两条语句、这对死锁的频率以及上次发生时间——写成一条消息，你可以粘贴到频道或工单中。"
       },
       "storm": {
-        "title": "死锁风暴。",
-        "body": "{count} 在此时间窗口内——通常为零。",
         "copyForSlack": "复制",
         "biasWarning": "预计热门查询标签页现在看起来会比实际情况更平静。取消的查询仍然会完成，但排在这些锁后面的查询没有完成——因此那里的调用计数低于用户实际体验到的。"
       },
@@ -27658,8 +27634,7 @@
       },
       "rowActions": {
         "showChain": "显示链路",
-        "copy": "复制查询",
-        "alertMe": "在锁等待时提醒我"
+        "copy": "复制查询"
       },
       "waitEvent": {
         "transaction": "等待另一个事务完成",
@@ -27780,8 +27755,6 @@
         "application": "应用程序",
         "state": "状态",
         "waitEvent": "正在等待",
-        "running": "已运行",
-        "lastQuery": "最后查询",
         "query": "查询",
         "blockedBy": "阻塞者"
       },
@@ -27798,7 +27771,6 @@
         "capped": "我们无法一次读取所有采样到的会话。以下是我们拥有的 {count} 个。",
         "filtered": "显示共 {total} 个会话中的 {count} 个。"
       },
-      "transactionOpen": "事务开启 {age}",
       "healthy": {
         "title": "当前没有正在运行的内容",
         "description": "我们采样了你的数据库会话表，未发现任何活动会话。对于空闲数据库来说，这是健康的正常情况，而不是采集上的缺口。",
@@ -27848,15 +27820,11 @@
       }
     },
     "instanceMetrics": {
-      "columnHeader": "实例健康",
-      "columnHint": "连接数相对于限制，来自您的采集器已发送的指标。在接收器报告此实例之前为空。",
       "connectionsOf": "{used} / {limit} 个连接",
       "connectionsNoLimit": "{used} 个连接",
       "noLimitHint": "此引擎的接收器本身不发布连接限制，因此仅显示计数。设置卡片中的连接限制配方（sqlquery/mysql_limits）会收集 max_connections 并将其转换为百分比。",
       "trendLabel": "所选时间窗口内的连接数",
       "cacheHit": "缓存命中 {percent}",
-      "lagBytes": "副本落后 {value}",
-      "lagSeconds": "副本落后 {value}",
       "deadlocks": "{count} 次死锁 | {count} 次死锁",
       "noTraffic": "此时间窗口内无应用程序流量",
       "noTrafficHint": "您的采集器报告了此实例，但在此时间窗口内没有应用程序查询它。其查询列为空是因为没有测量它们，而不是因为它运行很快。",
@@ -27895,7 +27863,6 @@
       "checkRange": "扩大时间范围 — 该配方每 60 秒报告一次。",
       "columns": {
         "relation": "表",
-        "instance": "实例",
         "totalBytes": "总大小",
         "heapBytes": "堆大小",
         "overheadBytes": "索引 + TOAST",
@@ -27914,10 +27881,7 @@
       }
     },
     "recommendations": {
-      "title": "建议",
-      "subtitle": "对收集器已报告的内容进行确定性检查。每项都说明测量值及其超过的阈值。",
       "countersCumulative": "索引扫描计数是自上次统计重置以来的累计总数，而非所选时间范围内的计数。",
-      "andMore": "以及 {count} 个类似的项",
       "unused-index": {
         "title": "索引未被扫描",
         "body": "{relation} 上的索引 {index} 没有扫描记录，占用空间 {size}。",

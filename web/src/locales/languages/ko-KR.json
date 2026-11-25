@@ -26839,9 +26839,6 @@
         "failed": "실패"
       },
       "databaseCount": "데이터베이스 1개 | 데이터베이스 {count}개",
-      "openQueries": "쿼리 보기",
-      "viewMetrics": "메트릭 보기",
-      "alertMe": "알림 받기",
       "columnHints": {
         "qps": "초당 호출 — 이 창의 호출 수를 기간으로 나눈 값으로, 15분 보기와 4시간 보기가 비교 가능하게 유지됩니다.",
         "p50": "전체 호출의 절반이 이보다 빠르게 완료되었습니다. 애플리케이션 트레이스에서 완료된 호출을 기준으로 측정됩니다.",
@@ -26852,14 +26849,7 @@
       },
       "failedChip": "{count} 실패",
       "columnSubLabels": {
-        "attention": "데이터베이스 기준",
-        "load": "앱 기준",
         "calls": "앱 기준"
-      },
-      "attention": {
-        "connections": "연결",
-        "noLimit": "게시된 한도 없음",
-        "unknown": "측정되지 않음"
       }
     },
     "queries": {
@@ -26927,19 +26917,13 @@
       "errorsNone": "없음",
       "errorsAll": "모두",
       "actions": {
-        "open": "세부 정보 열기",
         "traces": "예제 트레이스 보기",
         "copy": "쿼리 복사",
         "copied": "쿼리 복사됨",
-        "copyFailed": "쿼리를 복사할 수 없습니다.",
-        "alert": "이 쿼리가 느려지면 알림"
+        "copyFailed": "쿼리를 복사할 수 없습니다."
       },
       "otherRowTextFor": "{database}의 다른 모든 쿼리",
-      "otherRowDetailShort": "— {calls}건의 호출.",
-      "columnSubLabels": {
-        "calls": "보고된 서버",
-        "load": "보고된 서버"
-      }
+      "otherRowDetailShort": "— {calls}건의 호출."
     },
     "insights": {
       "showRows": "이 쿼리 표시 | 이 {count}개 쿼리 표시",
@@ -27513,11 +27497,9 @@
       },
       "rowActions": {
         "topQueries": "Top 쿼리에서 찾기",
-        "copy": "두 쿼리 복사",
-        "alert": "교착 상태 알림 받기"
+        "copy": "두 쿼리 복사"
       },
       "detail": {
-        "mostRecent": "최근 · {time}",
         "nthOf": "{index} / {total}",
         "earlier": "이전",
         "later": "다음",
@@ -27538,11 +27520,7 @@
         "fixBody": "이 두 문장은 {object} 행을 반대 순서로 접근합니다. 양쪽이 같은 순서(가장 낮은 id 먼저)로 업데이트하도록 하면 이 쌍은 더 이상 교착 상태가 되지 않습니다.",
         "fixGeneric": "양쪽이 서로가 원하는 것을 보유하고 있습니다. 모든 트랜잭션이 같은 순서로 잠금을 획득하도록 하면 이 쌍은 더 이상 교착 상태가 되지 않습니다.",
         "copyForSlack": "복사",
-        "occurrencesTitle": "이 쌍이 교착 상태가 된 모든 {count}회",
-        "occurrencesHint": "위에서 해당 항목을 로드하려면 지점을 선택하세요.",
-        "lostLabel": "{pid} 취소됨",
         "oneSideLoses": "{app}는 매번 취소됩니다.",
-        "showAbove": "위에 표시",
         "copy": "SQL 복사",
         "seeInTopQueries": "Top queries에서 보기",
         "whichService": "어떤 서비스인가요?",
@@ -27553,8 +27531,6 @@
         "copyForSlackHint": "두 문장, 이 쌍의 교착 상태 발생 빈도와 마지막 발생 시각 — 채널이나 티켓에 붙여넣을 수 있는 메시지로 작성됩니다."
       },
       "storm": {
-        "title": "교착 상태 폭풍.",
-        "body": "이 창에서 {count}개 — 정상적으로는 없음.",
         "copyForSlack": "복사",
         "biasWarning": "지금 Top queries 탭이 실제보다 조용해 보일 수 있습니다. 취소된 쿼리도 결국 완료되지만, 이 잠금 뒤에 대기 중인 쿼리는 완료되지 않았습니다. 따라서 호출 수가 사용자가 겪고 있는 것보다 낮게 표시됩니다."
       },
@@ -27658,8 +27634,7 @@
       },
       "rowActions": {
         "showChain": "체인 표시",
-        "copy": "쿼리 복사",
-        "alertMe": "잠금 대기 알림 받기"
+        "copy": "쿼리 복사"
       },
       "waitEvent": {
         "transaction": "다른 트랜잭션 완료",
@@ -27780,8 +27755,6 @@
         "application": "애플리케이션",
         "state": "상태",
         "waitEvent": "대기 대상",
-        "running": "실행 시간",
-        "lastQuery": "마지막 쿼리",
         "query": "쿼리",
         "blockedBy": "차단자"
       },
@@ -27798,7 +27771,6 @@
         "capped": "한 번에 읽을 수 있는 것보다 더 많은 세션이 샘플링되었습니다. 이는 현재 보유한 {count}개입니다.",
         "filtered": "전체 {total}개 세션 중 {count}개 표시 중."
       },
-      "transactionOpen": "트랜잭션 열림 {age}",
       "healthy": {
         "title": "지금 실행 중인 것이 없습니다",
         "description": "데이터베이스의 세션 테이블을 샘플링했지만 활성 세션을 찾지 못했습니다. 이는 유휴 데이터베이스의 정상적인 상태이며, 수집에 공백이 있는 것이 아닙니다.",
@@ -27848,15 +27820,11 @@
       }
     },
     "instanceMetrics": {
-      "columnHeader": "인스턴스 상태",
-      "columnHint": "수집기가 이미 보내는 메트릭 기준으로 한도 대비 연결 수입니다. 수신기가 이 인스턴스를 보고하기 전까지는 비어 있습니다.",
       "connectionsOf": "{used} / {limit} 연결",
       "connectionsNoLimit": "{used} 연결",
       "noLimitHint": "이 엔진의 수신기는 자체적으로 연결 한도를 게시하지 않으므로 개수만 표시됩니다. 설정 카드의 연결 한도 레시피(sqlquery/mysql_limits)는 max_connections를 수집하여 백분율로 변환합니다.",
       "trendLabel": "선택한 기간 동안의 연결",
       "cacheHit": "캐시 적중 {percent}",
-      "lagBytes": "복제본 {value} 지연",
-      "lagSeconds": "복제본 {value} 지연",
       "deadlocks": "{count} 교착 상태 | {count} 교착 상태",
       "noTraffic": "이 기간 동안 애플리케이션 트래픽이 없습니다",
       "noTrafficHint": "수집기가 이 인스턴스를 보고하지만 이 기간 동안 애플리케이션에서 쿼리하지 않았습니다. 쿼리 열이 비어 있는 것은 측정된 것이 없기 때문이지 빠르기 때문이 아닙니다.",
@@ -27895,7 +27863,6 @@
       "checkRange": "시간 범위를 넓히세요 — 레시피는 60초마다 한 번씩 보고합니다.",
       "columns": {
         "relation": "테이블",
-        "instance": "인스턴스",
         "totalBytes": "총 크기",
         "heapBytes": "힙 크기",
         "overheadBytes": "인덱스 + TOAST",
@@ -27914,10 +27881,7 @@
       }
     },
     "recommendations": {
-      "title": "권장 사항",
-      "subtitle": "수집기가 이미 보고하는 내용에 대한 결정적 검사입니다. 각 항목은 측정값과 초과한 임계값을 나타냅니다.",
       "countersCumulative": "인덱스 스캔 수는 마지막 통계 초기화 이후의 전체 누적 수치이며, 선택한 시간 범위의 수치가 아닙니다.",
-      "andMore": "그 외 {count}개 더",
       "unused-index": {
         "title": "스캔되지 않은 인덱스",
         "body": "{relation}의 {index} 인덱스는 기록된 스캔이 없으며 {size}를 차지합니다.",
