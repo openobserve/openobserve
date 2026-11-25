@@ -787,6 +787,13 @@ export function useTextHighlighter() {
    * @param semanticType - The detected semantic type
    * @returns CSS class name for the semantic type
    */
+  // 4xx and 5xx get their own class so client and server errors can carry the warning and error colors.
+  function statusRangeClass(semanticType: string, text: string): string {
+    if (semanticType !== "status_code") return "";
+    const first = text.trim().charAt(0);
+    return first === "4" ? " log-status-4xx" : first === "5" ? " log-status-5xx" : "";
+  }
+
   function getSemanticCSSClass(semanticType: string): string {
     const classMap: { [key: string]: string } = {
       ip: "log-ip",
@@ -904,7 +911,8 @@ export function useTextHighlighter() {
             } else {
               // Apply semantic colorization based on content type
               const semanticType = detectSemanticType(part.text);
-              const semanticClass = getSemanticCSSClass(semanticType);
+              const semanticClass =
+                getSemanticCSSClass(semanticType) + statusRangeClass(semanticType, part.text);
               return `<span class="${semanticClass}">${renderLogTextWithKeys(part.text, keyRanges, contentOffset)}</span>`;
             }
           })

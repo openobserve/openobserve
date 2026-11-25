@@ -483,6 +483,13 @@ describe("useTextHighlighter", () => {
       expect(html).toContain('<span class="log-highlighted">failed</span>');
     });
 
+    it("tags 4xx and 5xx status codes with their range class", () => {
+      const html = textHighlighter.processTextWithHighlights("GET 200 404 503", "", {});
+      expect(html).toContain('<span class="log-status-code">200</span>');
+      expect(html).toContain('<span class="log-status-code log-status-4xx">404</span>');
+      expect(html).toContain('<span class="log-status-code log-status-5xx">503</span>');
+    });
+
     it("should apply str_match literals to values longer than the regex text limit", () => {
       const text = `${"x ".repeat(400)}needle`;
       expect(highlight(text, "str_match(f, 'needle')")).toEqual(["needle"]);

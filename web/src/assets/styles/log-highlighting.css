@@ -109,19 +109,25 @@
     .log-null,
     .log-separator,
     .log-object-brace,
-    .log-ip,
-    .log-url,
     .log-email,
-    .log-timestamp,
     .log-http-method,
-    .log-status-code,
     .log-path,
-    .log-uuid,
     .log-file-size,
     .log-object-value,
     .log-array-value
   ) {
   color: inherit;
+}
+
+/* Only the tokens people scan for get color: one calm accent, plus warning and error for 4xx and 5xx. */
+:root .log-cell-html :is(.log-ip, .log-url, .log-uuid, .log-timestamp, .log-status-code) {
+  color: var(--log-syntax-accent);
+}
+:root .log-cell-html .log-status-4xx {
+  color: var(--color-log-severity-warning-text);
+}
+:root .log-cell-html .log-status-5xx {
+  color: var(--color-log-severity-error-text);
 }
 
 :root .log-cell-html .log-key {
