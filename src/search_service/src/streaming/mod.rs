@@ -130,17 +130,11 @@ pub async fn process_search_stream_request(
         let o2_config = get_o2_config();
         let zo_config = config::get_config();
 
-        // Determine max_logs - same logic for both sampling and non-sampling modes
-        // Prioritize: 1) user's size, 2) O2 config, 3) OpenObserve default
-        let max_logs = if req.query.size > 0 && req.query.size < 10_000_000 {
-            req.query.size as usize
-        } else if o2_config.log_patterns.max_logs_for_extraction > 0 {
-            // Use O2 config value if set (default is 10K for consistent pattern quality)
-            o2_config.log_patterns.max_logs_for_extraction
-        } else {
-            // Fall back to OpenObserve's query_default_limit
-            zo_config.limit.query_default_limit as usize
-        };
+        let max_logs = extraction_size(
+            req.query.size,
+            o2_config.log_patterns.max_logs_for_extraction,
+            zo_config.limit.query_default_limit,
+        ) as usize;
 
         log::info!(
             "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction config: max_logs={}, sampling_ratio={:?}, min_cluster={}, threshold={}, min_field_len={}",
@@ -1187,6 +1181,21 @@ pub async fn process_search_stream_request_multi(
     }
 }
 
+/// Logs to mine: the caller's size capped at `max_logs` (0 = query default). [pure]
+#[cfg(feature = "enterprise")]
+pub fn extraction_size(requested: i64, max_logs: usize, query_default_limit: i64) -> i64 {
+    let max = if max_logs > 0 {
+        max_logs as i64
+    } else {
+        query_default_limit
+    };
+    if requested <= 0 {
+        max
+    } else {
+        requested.min(max)
+    }
+}
+
 /// Synchronous VRL compilation and execution for multi-stream results.
 ///
 /// This is extracted as a non-async function because `VRLRuntimeConfig` is `!Send` and
@@ -1757,5 +1766,26 @@ for_each(result) -> |_idx, query_hits| {
 
         assert!(futures::poll!(fut.as_mut()).is_pending());
         assert!(tracing::Span::current().is_none());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extraction_size_caps_caller_size() {
+        // (requested, max_logs, query_default_limit, expected)
+        let cases = [
+            (-1, 10_000, 1_000, 10_000),
+            (0, 10_000, 1_000, 10_000),
+            (500, 10_000, 1_000, 500),
+            (9_999_999, 10_000, 1_000, 10_000),
+            (-1, 0, 1_000, 1_000),
+            (9_999_999, 0, 1_000, 1_000),
+        ];
+        for (requested, max_logs, default_limit, expected) in cases {
+            assert_eq!(
+                super::extraction_size(requested, max_logs, default_limit),
+                expected,
+                "requested={requested} max_logs={max_logs}"
+            );
+        }
     }
 }
