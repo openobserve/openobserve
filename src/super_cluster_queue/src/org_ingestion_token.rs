@@ -14,15 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use bytes::Bytes;
-use config::utils::{json, str::mask_secret};
+use config::utils::json;
 use infra::{
     db::{delete_from_db_coordinator, put_into_db_coordinator},
     errors::{Error, Result},
     table::org_ingestion_tokens::{self, OrgIngestionTokenRecord},
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
-
-const ORG_INGESTION_TOKENS_KEY_PREFIX: &str = "/org_ingestion_tokens/";
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
@@ -70,19 +68,17 @@ async fn put(msg: Message) -> Result<()> {
 }
 
 async fn delete(msg: Message) -> Result<()> {
-    let item_key = msg
-        .key
-        .strip_prefix(ORG_INGESTION_TOKENS_KEY_PREFIX)
-        .ok_or_else(|| Error::Message("Invalid org ingestion token key".to_string()))?;
-    let (org_id, token) = item_key
-        .split_once('/')
+    let (org_id, token_id, fingerprint) = db::org_ingestion_tokens::parse_event_key(&msg.key)
         .ok_or_else(|| Error::Message("Invalid org ingestion token key".to_string()))?;
 
-    if let Err(e) = org_ingestion_tokens::remove_by_token(org_id, token).await {
-        // Never log the token itself: this line is the credential in plaintext.
+    // Remove only the value the sender retired: a put that overtook this delete
+    // already wrote the row's new value, which must survive.
+    if let Some(record) = org_ingestion_tokens::find_by_id(org_id, token_id).await?
+        && org_ingestion_tokens::token_fingerprint(&record.token) == fingerprint
+        && let Err(e) = org_ingestion_tokens::remove_by_token(org_id, &record.token).await
+    {
         log::error!(
-            "[SUPER_CLUSTER:sync] Failed to delete org ingestion token: org: {org_id}, token: {}, error: {e}",
-            mask_secret(token)
+            "[SUPER_CLUSTER:sync] Failed to delete org ingestion token: org: {org_id}, id: {token_id}, error: {e}"
         );
         return Err(e);
     }

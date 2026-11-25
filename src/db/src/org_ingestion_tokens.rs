@@ -24,6 +24,7 @@ use infra::{
     db::{self, delete_from_db_coordinator, get_coordinator, put_into_db_coordinator},
     table::org_ingestion_tokens::{
         self, OrgIngestionTokenListRecord, OrgIngestionTokenRecord, SplunkHecTokenEntry,
+        token_fingerprint,
     },
 };
 
@@ -40,8 +41,25 @@ pub fn cache_key(org_id: &str, token: &str) -> String {
     format!("{}/{}", org_id, token)
 }
 
-fn event_key(org_id: &str, token: &str) -> String {
-    format!("{ORG_INGESTION_TOKENS_KEY_PREFIX}{}/{}", org_id, token)
+/// Splits an event key into (org_id, token_id, token fingerprint).
+pub fn parse_event_key(key: &str) -> Option<(&str, &str, &str)> {
+    let mut parts = key
+        .strip_prefix(ORG_INGESTION_TOKENS_KEY_PREFIX)?
+        .splitn(3, '/');
+    match (parts.next(), parts.next(), parts.next()) {
+        (Some(org), Some(id), Some(fp)) if !org.is_empty() && !id.is_empty() && !fp.is_empty() => {
+            Some((org, id, fp))
+        }
+        _ => None,
+    }
+}
+
+/// Coordinator keys are logged, so the token value is named by its fingerprint only.
+fn event_key(org_id: &str, token_id: &str, token: &str) -> String {
+    format!(
+        "{ORG_INGESTION_TOKENS_KEY_PREFIX}{org_id}/{token_id}/{}",
+        token_fingerprint(token)
+    )
 }
 
 /// Mirror one row into the Splunk lookup map, dropping any stale GUID it had.
@@ -86,6 +104,15 @@ async fn evict_removed_splunk_tokens(org_id: &str) {
     }
 }
 
+/// Drop the org's cached token whose value has this fingerprint.
+fn evict_fingerprint(org_id: &str, fingerprint: &str) {
+    let prefix = format!("{org_id}/");
+    ORG_INGESTION_TOKENS.retain(|key, _| {
+        key.strip_prefix(&prefix)
+            .is_none_or(|token| token_fingerprint(token) != fingerprint)
+    });
+}
+
 /// Drop one org's tokens from both local lookup maps.
 ///
 /// Neither map has a TTL and the validator answers from a cache hit before any
@@ -117,7 +144,7 @@ async fn committed_row(org_id: &str, name: &str) -> Result<OrgIngestionTokenReco
 /// Insert a new org ingestion token and notify the cluster.
 pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), anyhow::Error> {
     org_ingestion_tokens::add(record).await?;
-    let key = event_key(&record.org_id, &record.token);
+    let key = event_key(&record.org_id, &record.id, &record.token);
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
     #[cfg(feature = "enterprise")]
     super_cluster::org_ingestion_token_put(&key, record).await?;
@@ -136,11 +163,11 @@ pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, anyhow::Er
     let new_token = org_ingestion_tokens::rotate_token(org_id, name).await?;
 
     // Notify about old token removal
-    let old_key = event_key(org_id, &existing.token);
+    let old_key = event_key(org_id, &existing.id, &existing.token);
     let _ = delete_from_db_coordinator(&old_key, false, true, None).await;
 
     // Notify about new token
-    let new_key = event_key(org_id, &new_token);
+    let new_key = event_key(org_id, &existing.id, &new_token);
     let _ = put_into_db_coordinator(&new_key, Bytes::new(), true, None).await;
 
     #[cfg(feature = "enterprise")]
@@ -165,11 +192,10 @@ pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), 
 
     org_ingestion_tokens::set_enabled(org_id, name, enabled).await?;
 
-    // The event key carries the token VALUE, so it has to come from the committed
-    // row: a replica-stale read concurrent with a rotation announces the change at
-    // a value no other node holds, and it never propagates until the 60s reload.
+    // The event key fingerprints the token VALUE, so it has to come from the committed
+    // row: a replica-stale read concurrent with a rotation names a value no node holds.
     let committed = committed_row(org_id, name).await?;
-    let key = event_key(org_id, &committed.token);
+    let key = event_key(org_id, &committed.id, &committed.token);
     if enabled {
         let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
     } else {
@@ -219,7 +245,7 @@ pub async fn set_splunk_token(
 
     // Keyed off the committed row too: a replica-stale `token` here would address
     // the event at a rotated-away value, so no other node would update its cache.
-    let key = event_key(org_id, &committed.token);
+    let key = event_key(org_id, &committed.id, &committed.token);
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
 
     #[cfg(feature = "enterprise")]
@@ -237,23 +263,25 @@ pub async fn set_splunk_token(
 pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
     let existing = org_ingestion_tokens::list_by_org(org_id).await?;
 
+    let mut keys = Vec::with_capacity(existing.len());
+    let mut tokens: Vec<(String, Option<String>)> = Vec::with_capacity(existing.len());
     // Evict cluster-wide while the rows still exist, so a failed event leaves them for the retry.
-    for record in &existing {
-        let key = event_key(org_id, &record.token);
+    for record in existing {
+        let key = event_key(org_id, &record.id, &record.token);
         delete_from_db_coordinator(&key, false, true, None).await?;
         #[cfg(feature = "enterprise")]
         super_cluster::org_ingestion_token_delete(&key).await?;
+        keys.push(key);
+        tokens.push((record.token, record.splunk_token));
     }
 
-    let mut tokens: Vec<(String, Option<String>)> = existing
-        .into_iter()
-        .map(|r| (r.token, r.splunk_token))
-        .collect();
     // The delete names each row the listing missed, which is evicted only after it.
-    for (token, splunk_token) in org_ingestion_tokens::delete_by_org(org_id).await? {
+    for (id, token, splunk_token) in org_ingestion_tokens::delete_by_org(org_id).await? {
         if tokens.iter().all(|(listed, _)| *listed != token) {
+            let key = event_key(org_id, &id, &token);
             #[cfg(feature = "enterprise")]
-            super_cluster::org_ingestion_token_delete(&event_key(org_id, &token)).await?;
+            super_cluster::org_ingestion_token_delete(&key).await?;
+            keys.push(key);
             tokens.push((token, splunk_token));
         }
     }
@@ -261,8 +289,8 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
     evict_token_caches(org_id, &tokens);
 
     // A delete event that still finds the row keeps its Splunk GUID, so announce again once gone.
-    for (token, _) in &tokens {
-        delete_from_db_coordinator(&event_key(org_id, token), false, true, None).await?;
+    for key in &keys {
+        delete_from_db_coordinator(key, false, true, None).await?;
     }
     Ok(())
 }
@@ -341,9 +369,10 @@ pub async fn run_splunk_token_reload() -> Result<(), anyhow::Error> {
 
 /// Watch for cluster-wide cache invalidation events.
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = ORG_INGESTION_TOKENS_KEY_PREFIX;
     let cluster_coordinator = get_coordinator().await;
-    let mut events = cluster_coordinator.watch(key).await?;
+    let mut events = cluster_coordinator
+        .watch(ORG_INGESTION_TOKENS_KEY_PREFIX)
+        .await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching org_ingestion_tokens");
     loop {
@@ -354,55 +383,61 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 break;
             }
         };
-        match ev {
-            db::Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                let parts: Vec<&str> = item_key.splitn(2, '/').collect();
-                if parts.len() == 2 {
-                    // Also drop the org -> default-token pick, which synthetics
-                    // reads once per job. Reusing this existing watch means a
-                    // rotate or disable on another node lands here without a
-                    // second event stream.
-                    org_ingestion_tokens::invalidate_default_cache(parts[0]);
-                    // find_enabled_token only returns enabled tokens.
-                    // If found → token is enabled → cache it.
-                    // If not found → token is disabled/missing → remove from cache.
-                    if let Ok(Some(record)) =
-                        org_ingestion_tokens::find_enabled_token(parts[0], parts[1]).await
-                    {
-                        sync_splunk_token(&record);
-                        ORG_INGESTION_TOKENS.insert(item_key.to_string(), record.name);
-                    } else {
-                        if let Ok(Some(record)) =
-                            org_ingestion_tokens::find_token_any_state(parts[0], parts[1]).await
-                        {
-                            sync_splunk_token(&record);
-                        }
-                        ORG_INGESTION_TOKENS.remove(item_key);
-                    }
-                }
-            }
-            db::Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                if let Some((org_id, token)) = item_key.split_once('/') {
-                    org_ingestion_tokens::invalidate_default_cache(org_id);
-                    match org_ingestion_tokens::find_token_any_state(org_id, token).await {
-                        // Still there: a disable, so keep the entry and mark it.
-                        Ok(Some(record)) => sync_splunk_token(&record),
-                        // Gone (a deletion, or an o2oi_ rotation's old key): the
-                        // GUID is no longer reachable by name, so drop it by value.
-                        Ok(None) => evict_removed_splunk_tokens(org_id).await,
-                        Err(e) => log::error!(
-                            "[SPLUNK_HEC] could not resolve {org_id} token on delete: {e}"
-                        ),
-                    }
-                }
-                ORG_INGESTION_TOKENS.remove(item_key);
-            }
-            db::Event::Empty => {}
+        let (key, is_put) = match &ev {
+            db::Event::Put(ev) => (&ev.key, true),
+            db::Event::Delete(ev) => (&ev.key, false),
+            db::Event::Empty => continue,
+        };
+        let Some((org_id, token_id, fingerprint)) = parse_event_key(key) else {
+            // Never log the key: an old-shape key ends in the plaintext token.
+            log::warn!("watch_org_ingestion_tokens: ignoring a malformed event key");
+            continue;
+        };
+        // Synthetics reads the org -> default-token pick once per job, so a rotate or
+        // disable on another node has to drop it here too.
+        org_ingestion_tokens::invalidate_default_cache(org_id);
+        if is_put {
+            apply_put_event(org_id, token_id, fingerprint).await;
+        } else {
+            apply_delete_event(org_id, token_id, fingerprint).await;
         }
     }
     Ok(())
+}
+
+/// Cache the named token only while its row is enabled and still holds that value.
+async fn apply_put_event(org_id: &str, token_id: &str, fingerprint: &str) {
+    let record = match org_ingestion_tokens::find_by_id(org_id, token_id).await {
+        Ok(record) => record,
+        Err(e) => {
+            log::error!("[ORG_INGESTION_TOKENS] could not resolve {org_id}/{token_id} on put: {e}");
+            None
+        }
+    };
+    let Some(record) = record else {
+        evict_fingerprint(org_id, fingerprint);
+        return;
+    };
+    sync_splunk_token(&record);
+    if record.enabled
+        && org_ingestion_tokens::may_authenticate(&record.name, &record.created_by)
+        && token_fingerprint(&record.token) == fingerprint
+    {
+        ORG_INGESTION_TOKENS.insert(cache_key(org_id, &record.token), record.name);
+    } else {
+        evict_fingerprint(org_id, fingerprint);
+    }
+}
+
+async fn apply_delete_event(org_id: &str, token_id: &str, fingerprint: &str) {
+    evict_fingerprint(org_id, fingerprint);
+    match org_ingestion_tokens::find_by_id(org_id, token_id).await {
+        // Still there: a disable or a rotation, so refresh the entry from the row.
+        Ok(Some(record)) => sync_splunk_token(&record),
+        // Gone: the GUID is no longer reachable by name, so drop it by value.
+        Ok(None) => evict_removed_splunk_tokens(org_id).await,
+        Err(e) => log::error!("[SPLUNK_HEC] could not resolve {org_id} token on delete: {e}"),
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -460,8 +495,40 @@ mod tests {
 
     #[test]
     fn test_event_key_format() {
-        let key = event_key("default", "o2oi_abc123");
-        assert_eq!(key, "/org_ingestion_tokens/default/o2oi_abc123");
+        let key = event_key("default", "id-1", "o2oi_abc123");
+        assert!(!key.contains("o2oi_abc123"));
+        let fingerprint = token_fingerprint("o2oi_abc123");
+        assert_eq!(fingerprint.len(), 16);
+        assert_eq!(
+            key,
+            format!("/org_ingestion_tokens/default/id-1/{fingerprint}")
+        );
+        assert_eq!(
+            parse_event_key(&key),
+            Some(("default", "id-1", fingerprint.as_str()))
+        );
+        assert_eq!(
+            parse_event_key("/org_ingestion_tokens/default/o2oi_abc123"),
+            None
+        );
+        assert_eq!(parse_event_key("/org_ingestion_tokens/default/id-1/"), None);
+    }
+
+    /// Rotation's delete event names only the fingerprint of the value it retires.
+    #[test]
+    fn evict_fingerprint_drops_only_the_named_value_in_the_org() {
+        ORG_INGESTION_TOKENS.insert(cache_key("fp-org", "o2oi_old"), "t".to_string());
+        ORG_INGESTION_TOKENS.insert(cache_key("fp-org", "o2oi_new"), "t".to_string());
+        ORG_INGESTION_TOKENS.insert(cache_key("fp-other", "o2oi_old"), "t".to_string());
+
+        evict_fingerprint("fp-org", &token_fingerprint("o2oi_old"));
+
+        assert!(!ORG_INGESTION_TOKENS.contains_key(&cache_key("fp-org", "o2oi_old")));
+        assert!(ORG_INGESTION_TOKENS.contains_key(&cache_key("fp-org", "o2oi_new")));
+        assert!(ORG_INGESTION_TOKENS.contains_key(&cache_key("fp-other", "o2oi_old")));
+
+        ORG_INGESTION_TOKENS.remove(&cache_key("fp-org", "o2oi_new"));
+        ORG_INGESTION_TOKENS.remove(&cache_key("fp-other", "o2oi_old"));
     }
 
     fn entry(org_id: &str, token_id: &str, enabled: bool) -> SplunkHecTokenEntry {
@@ -568,6 +635,57 @@ mod tests {
         assert!(SPLUNK_HEC_TOKENS.contains_key("other-guid"));
         SPLUNK_HEC_TOKENS.remove("other-guid");
         SPLUNK_HEC_TOKENS.remove("guid-4");
+    }
+
+    /// The global meta store CI configures through `ZO_META_STORE`, migrated once per binary.
+    async fn meta_store() -> bool {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return false;
+        }
+        ONCE.get_or_init(|| async {
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+        true
+    }
+
+    /// Another node sees a rotation only as two events naming the row id and value fingerprints.
+    #[tokio::test]
+    async fn rotate_events_move_a_remote_nodes_cache_to_the_new_value() {
+        if !meta_store().await {
+            return;
+        }
+        let org_id = format!("t_rotate_event_{}", config::utils::time::now_micros());
+        let mut row = record(&format!("{org_id}-id"), &org_id, None, true);
+        row.token = org_ingestion_tokens::generate_token();
+        org_ingestion_tokens::add(&row).await.unwrap();
+        let old = row.token.clone();
+        ORG_INGESTION_TOKENS.insert(cache_key(&org_id, &old), row.name.clone());
+
+        let new = org_ingestion_tokens::rotate_token(&org_id, &row.name)
+            .await
+            .unwrap();
+        apply_put_event(&org_id, &row.id, &token_fingerprint(&old)).await;
+        assert!(
+            !ORG_INGESTION_TOKENS.contains_key(&cache_key(&org_id, &old)),
+            "a put that overtook the rotation must not keep the retired value"
+        );
+        ORG_INGESTION_TOKENS.insert(cache_key(&org_id, &old), row.name.clone());
+        apply_delete_event(&org_id, &row.id, &token_fingerprint(&old)).await;
+        apply_put_event(&org_id, &row.id, &token_fingerprint(&new)).await;
+
+        assert!(!ORG_INGESTION_TOKENS.contains_key(&cache_key(&org_id, &old)));
+        assert!(ORG_INGESTION_TOKENS.contains_key(&cache_key(&org_id, &new)));
+
+        org_ingestion_tokens::set_enabled(&org_id, &row.name, false)
+            .await
+            .unwrap();
+        apply_put_event(&org_id, &row.id, &token_fingerprint(&new)).await;
+        assert!(!ORG_INGESTION_TOKENS.contains_key(&cache_key(&org_id, &new)));
+        org_ingestion_tokens::delete_by_org(&org_id).await.unwrap();
     }
 
     /// A token row with no GUID must not take an unrelated Splunk entry with it.
