@@ -470,28 +470,17 @@ async fn fetch_extraction_sample(
 
     // A slice that ran but carries `function_error` (e.g. a failed CAST) is a
     // failure, not an empty window.
-    let slice_errors = drop_failed_slices(&mut responses);
+    let slice_errors = drop_failed_slices(&mut responses, &mut failed_slices);
     if responses.is_empty() && last_error.is_none() && !slice_errors.is_empty() {
         last_error = Some(infra::errors::Error::Message(slice_errors.join("; ")));
     }
 
-    let had_task_error = last_error.is_some();
     // Every slice failed: surface the error instead of reporting an empty
     // sample, which the handler would render as "this window has no logs".
     if responses.is_empty()
         && let Some(e) = last_error
     {
         return Err(e);
-    }
-    if had_task_error || !slice_errors.is_empty() {
-        for res in responses.iter_mut() {
-            res.is_partial = true;
-            for e in &slice_errors {
-                if !res.function_error.contains(e) {
-                    res.function_error.push(e.clone());
-                }
-            }
-        }
     }
 
     // Trim to the caller's budget HERE, fairly across slices, rather than
@@ -504,6 +493,9 @@ async fn fetch_extraction_sample(
     // within the cap keeps every slice represented.
     trim_slices_to_budget(&mut responses, req_size as usize);
     mark_partial_slices(&mut responses, failed_slices, slices);
+    if let Some(first) = responses.first_mut() {
+        first.function_error.extend(slice_errors);
+    }
 
     let fetched: usize = responses.iter().map(|r| r.hits.len()).sum();
     for mut res in responses {
@@ -524,14 +516,15 @@ fn can_slice_extraction(sql: &str) -> bool {
         && !config::utils::sql::has_limit_clause(sql)
 }
 
-/// Removes slices whose response carries `function_error` and returns the
-/// distinct messages.
-fn drop_failed_slices(responses: &mut Vec<Response>) -> Vec<String> {
+/// Removes slices whose response carries `function_error`, counts them as failed and
+/// returns the distinct messages.
+fn drop_failed_slices(responses: &mut Vec<Response>, failed: &mut usize) -> Vec<String> {
     let mut errors: Vec<String> = Vec::new();
     responses.retain(|r| {
         if r.function_error.is_empty() {
             return true;
         }
+        *failed += 1;
         for e in &r.function_error {
             if !errors.contains(e) {
                 errors.push(e.clone());
@@ -1081,15 +1074,18 @@ mod tests {
         let mut bad2 = slice_with(0);
         bad2.function_error = vec!["cast error".into()];
         let mut slices = vec![slice_with(3), bad, bad2];
-        let errors = drop_failed_slices(&mut slices);
-        assert_eq!(slices.len(), 1);
+        let mut failed = 0;
+        let errors = drop_failed_slices(&mut slices, &mut failed);
+        assert_eq!((slices.len(), failed), (1, 2));
         assert_eq!(errors, vec!["cast error".to_string()]);
     }
 
     #[test]
     fn test_drop_failed_slices_keeps_clean_slices() {
         let mut slices = vec![slice_with(0), slice_with(2)];
-        assert!(drop_failed_slices(&mut slices).is_empty());
+        let mut failed = 0;
+        assert!(drop_failed_slices(&mut slices, &mut failed).is_empty());
+        assert_eq!(failed, 0);
         assert_eq!(slices.len(), 2);
     }
 
