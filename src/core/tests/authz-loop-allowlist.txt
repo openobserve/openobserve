@@ -1,0 +1,114 @@
+# Format: path | func | reason
+# A new entry states why the loop is bounded or kept; review it with the authz maintainers.
+# Prefer openobserve_core::authz::list (authorize_objects, readable_streams) over a new entry.
+
+# Request-bounded: one Check per id in the request body.
+src/api/management/src/request/alerts/destinations.rs | delete_destination_bulk | request-bounded: one Check per id in the body
+src/api/management/src/request/alerts/mod.rs | delete_alert_bulk | request-bounded: one Check per id in the body, plus its composite references
+src/api/management/src/request/alerts/mod.rs | enable_alert_bulk | request-bounded: one Check per id in the body, plus its composite references
+src/api/management/src/request/alerts/mod.rs | move_alerts | request-bounded: one anomaly move Check per id in the body
+src/api/management/src/request/alerts/templates.rs | delete_template_bulk | request-bounded: one Check per id in the body
+src/api/management/src/request/authz/fga.rs | delete_group_bulk | request-bounded: one Check per id in the body
+src/api/management/src/request/authz/fga.rs | delete_role_bulk | request-bounded: one Check per id in the body
+src/api/management/src/request/dashboards/mod.rs | delete_dashboard_bulk | request-bounded: one Check per id in the body
+src/api/management/src/request/dashboards/reports.rs | delete_report_bulk | request-bounded: one Check per id in the body
+src/api/management/src/request/dashboards/reports.rs | delete_report_bulk_v2 | request-bounded: one Check per id in the body
+src/api/management/src/request/dashboards/reports.rs | move_reports | request-bounded: one Check per id in the body
+src/api/management/src/request/keys/mod.rs | delete_bulk | request-bounded: one Check per id in the body
+src/api/management/src/request/service_accounts/mod.rs | delete_bulk | request-bounded: one Check per id in the body
+src/api/management/src/request/slos/mod.rs | move_slos | request-bounded: one Check per id in the body
+src/api/management/src/request/status_pages/admin.rs | set_components | request-bounded: one Check per distinct check id in the submitted components
+src/api/management/src/request/synthetics/mod.rs | delete_synthetics_bulk | request-bounded: one Check per id in the body
+src/api/management/src/request/synthetics/mod.rs | move_synthetics | request-bounded: one Check per id in the body
+src/api/management/src/request/synthetics/mod.rs | require_env_access | request-bounded: one Check per environment the submitted check names
+src/api/management/src/request/synthetics/mod.rs | require_update_env_access | request-bounded: one Check per removed environment that still exists (submitted ones go through require_env_access)
+src/api/management/src/request/synthetics/variables.rs | split_synthetics_variable | request-bounded: one Check per target in the body
+src/api/management/src/request/users/mod.rs | delete_bulk | request-bounded: one Check per id in the body
+src/api/management/src/request/workflows/mod.rs | move_workflows | request-bounded: one Check per id in the body
+src/api/pipelines/src/request/functions/mod.rs | delete_function_bulk | request-bounded: one Check per id in the body
+src/api/pipelines/src/request/pipeline.rs | delete_pipeline_bulk | request-bounded: one Check per id in the body
+src/api/pipelines/src/request/pipeline.rs | enable_pipeline_bulk | request-bounded: one Check per id in the body
+src/api/pipelines/src/request/re_pattern/mod.rs | delete_bulk | request-bounded: one Check per id in the body
+src/core/src/alerts/alert.rs | move_to_folder | request-bounded: one Check per alert id in the move request
+src/core/src/dashboards/mod.rs | move_dashboards | request-bounded: one move Check per dashboard id in the body
+
+# Object-bounded: the references of one object.
+src/api/management/src/request/alerts/mod.rs | composite_detail_response | object-bounded: children of one composite alert
+src/api/management/src/request/alerts/mod.rs | composite_unauthorized_children | object-bounded: children of one composite alert
+src/api/management/src/request/alerts/mod.rs | get_composite_references | object-bounded: parents and children of one alert
+src/api/management/src/request/alerts/mod.rs | get_composite_timeline | object-bounded: children of one composite alert
+src/api/management/src/request/alerts/mod.rs | readable_parent_snapshot | object-bounded: composite parents of one alert
+src/api/management/src/request/alerts/mod.rs | validate_composite_alert | object-bounded: children named by one composite alert
+src/api/management/src/request/synthetics/mod.rs | caller_can_read_children | object-bounded: children of one synthetic check
+src/api/management/src/request/synthetics/mod.rs | readable_parents | object-bounded: parents of one synthetic check
+src/core/src/alerts/ack.rs | may_edit_any_alert | object-bounded: the alerts of one incident
+src/core/src/alerts/incidents.rs | readable_definitions | object-bounded: the alert definitions of one incident
+src/core/src/alerts/incidents.rs | get_incident_with_alerts | object-bounded: the alerts of one incident, via incident_with_alerts
+src/core/src/auth.rs | first_unreadable | object-bounded: the objects one saved object references, deduplicated
+src/core/src/downtimes/access.rs | check_target_folders | object-bounded: target folders of one downtime
+src/core/src/downtimes/access.rs | check_target_ids | object-bounded: target ids of one downtime
+src/core/src/downtimes/access.rs | check_targets | object-bounded: target folders and ids of one downtime
+
+# Query-bounded: the streams, metrics or keys named in one query (D 7.2 S1a, S1b, S2).
+src/api/search/src/promql/mod.rs | check_metric_permissions | phase 1 keeps today's path; P2-5 (D 7.2 S2, query-bounded)
+src/api/search/src/search/mod.rs | can_clear_cache | query-bounded: streams named in the cache-clear request
+src/api/search/src/search/mod.rs | check_sql_stream_permissions | phase 1 keeps today's path; P2-5 (D 7.2 S1a, query-bounded)
+src/api/search/src/search/mod.rs | security_scope_admits | phase 1 keeps today's path; P2-5 (D 7.2 S1b, query-bounded)
+src/api/search/src/search/multi_streams.rs | around_multi | query-bounded: streams named in one multi-stream around query
+src/api/search/src/search/multi_streams.rs | search_multi | query-bounded: cipher keys of each query in one multi-search request
+src/api/search/src/search/search_inspector.rs | get_search_profile | query-bounded: cipher keys used by one inspected query
+src/api/search/src/search/search_job.rs | check_permissions | query-bounded: streams named in one search job query
+src/api/search/src/search/search_stream.rs | values_http2_stream | query-bounded: streams named in one values query
+src/api/search/src/traces/time_index/mod.rs | drop_unpermitted | query-bounded: trace streams named in one time-index query
+src/core/src/authz.rs | authorize_with | phase 1 keeps today's path; P2-5 (D 7.2 S1c, sources of one saved object)
+src/core/src/authz.rs | denied_named_cipher_keys | query-bounded: cipher keys named in one query, serial
+src/core/src/fleet.rs | instant | query-bounded: metric streams of one PromQL query
+src/core/src/public_dashboards/mod.rs | fill_defaults | query-bounded: variable queries of one public dashboard, through the panels' authorize
+src/core/src/public_dashboards/mod.rs | range_edit_sources | query-bounded: variable queries of one public dashboard
+src/core/src/public_dashboards/mod.rs | run_promql_panel | query-bounded: metrics of one public dashboard panel
+src/core/src/public_dashboards/mod.rs | run_sql_panel | query-bounded: streams of one public dashboard panel
+src/core/src/public_dashboards/mod.rs | streams_allowed | query-bounded: streams of one public dashboard panel
+src/core/src/security.rs | admit_security_sources | serial Security admission for the denied remainder of one request (D 15 item 1)
+
+# Kept on today's path in phase 1 (D 7.2).
+src/api/management/src/request/alerts/destinations.rs | redact_unwritable | phase 1 keeps today's path; P2-5 (D 7.2 row 18)
+src/api/management/src/request/autoobserve/mod.rs | LiveReader::all_monitors | phase 1 keeps today's path; P2-5 (D 7.2 row 4 extras, one Check per module type)
+src/api/management/src/request/autoobserve/mod.rs | LiveReader::all_streams | phase 1 keeps today's path; P2-5 (D 7.2 row 4 extras, one Check per stream type)
+src/api/management/src/request/autoobserve/mod.rs | folder_writes | phase 1 keeps today's path; P2-5 (D 7.2 row 15)
+src/api/management/src/request/autoobserve/mod.rs | readable_mask | phase 1 keeps today's path; P2-5 (D 7.2 row 4 extras: one memoized org_wide Check per distinct resource type; alert folders come from one folders_of call)
+src/api/management/src/request/autoobserve/viewer.rs | resolve_with | phase 1 keeps today's path; P2-5 (D 7.2 rows 15-19 family: pipelines and fleets of one AutoObserve page)
+src/api/management/src/request/fleet/mod.rs | withhold_token_values | phase 1 keeps today's path; P2-5 (D 7.2 row 19)
+src/api/management/src/request/scorers/mod.rs | redact_unwritable | phase 1 keeps today's path; P2-5 (D 7.2 row 17)
+src/api/management/src/request/synthetics/variables.rs | gettable | phase 1 keeps today's path; P2-5 (D 7.2 row 16)
+src/core/src/downtimes/access.rs | individually_readable | phase 1 keeps today's path; P2-5 (D 7.2 row 8)
+src/core/src/downtimes/access.rs | match_visibility | phase 1 keeps today's path; P2-5 (D 7.2 row 7, via readable_matches)
+src/core/src/downtimes/access.rs | retain_listable_folders | phase 1 keeps today's path; P2-5 (D 7.2 row 8)
+src/core/src/downtimes/access.rs | visibility | phase 1 keeps today's path; P2-5 (D 7.2 row 6, via readable_candidates)
+src/core/src/downtimes/values.rs | searchable_records | phase 1 keeps today's path; P2-5 (D 7.2 row 6 family: downtime value records, via readable_records)
+src/core/src/downtimes/values.rs | search_values | phase 1 keeps today's path; P2-5 (D 7.2 row 6 family: streams queried for one typeahead, via run_parallel)
+src/core/src/metrics/usage.rs | folder_access | phase 1 keeps today's path; P2-5 (D 7.2 row 9)
+src/core/src/public_dashboards/mod.rs | hide_unreadable_slugs | phase 1 keeps today's path; P2-5 (D 7.2 row 14)
+src/core/src/public_dashboards/status.rs | hide_unreadable_details | phase 1 keeps today's path; P2-5 (D 7.2 row 14)
+
+# The list primitive, its fallbacks and the legacy copies of converted sites (D 6.9, D 15 item 1).
+src/core/src/authz.rs | check_each | per-stream fallback used by legacy_readable_streams and the other legacy_* copies; 16 in flight
+src/core/src/authz/list.rs | TypeAnswers::decide | primitive fallback: one Check per id the type answers do not cover
+src/api/management/src/request/gen_ai.rs | load_agent_list | D 7.1 row 13: rows whose stream_type is not a listable StreamType keep today's per-row can_read_stream, deduplicated
+src/api/management/src/request/gen_ai.rs | legacy_agent_stream_permissions | legacy copy of D 7.1 row 13 for the off and shadow modes
+src/core/src/service_identity/access.rs | legacy_verdict | legacy copy of D 7.1 row 12 for the off and shadow modes
+src/core/src/authz.rs | FakeStreamChecker::org_wide_readable | test-utils fake checker; no OpenFGA call
+src/core/src/authz.rs | FakeStreamChecker::types_access | test-utils fake checker; no OpenFGA call
+
+# Bounded by something other than org size.
+src/api/management/src/request/db_monitoring/service/server_samples.rs | read_server_samples_body | bounded: at most the two fixed DBM server streams
+src/api/management/src/request/organization/org.rs | organizations | user-bounded: one users GET Check per org the caller belongs to
+src/api/management/src/request/resources/rbac.rs | resolve | bounded: one resolve_kind per requested ResourceKind of one Command K search
+src/api/management/src/request/resources/rbac.rs | signals | bounded: one LIST entry Check per fixed signal (logs, metrics, traces)
+src/api/management/src/request/security/sources.rs | attach | bounded: a fixed list of object types plus one pipeline
+src/api/management/src/request/stream/mod.rs | hide_unreadable_schemas | no Check: can_read is a lookup in ids listed once per stream type
+src/core/src/authz.rs | check_stream_permissions | bounded: the stream model plus at most one feature model for one stream
+src/core/src/overview.rs | module_access | bounded: one LIST Check per overview stream type plus alerts and pipelines
+
+# Not converted yet; scale with the org (follow-up, P2-5).
+src/api/management/src/request/fleet/mod.rs | list_fleets | not converted: one fleet_read Check per listed fleet folder; P2-5
+src/api/management/src/request/prompts.rs | match_prompts | not converted: one Check per prompt version when list filtering is off; P2-5
