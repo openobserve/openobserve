@@ -1445,6 +1445,7 @@
     "queryEditorLabel": "Abfrage-Editor:",
     "addFieldToTable": "Feld zur Tabelle hinzufügen",
     "removeFieldFromTable": "Feld aus Tabelle entfernen",
+    "groupByThisField": "Nach diesem Feld gruppieren",
     "rows": "Zeilen",
     "resetFields": "Ausgewählte Tabellenfelder zurücksetzen",
     "metrics": "Metriken",
@@ -17329,7 +17330,100 @@
     "searchTypeOthers": "Andere"
   },
   "traces": {
+    "groups": {
+      "label": "Gruppieren nach",
+      "grouped": "Gruppiert nach {field}",
+      "count": "{count} Gruppe | {count} Gruppen",
+      "clear": "Gruppierung aufheben",
+      "spans": "Spans",
+      "errors": "Fehler",
+      "errorPct": "Fehler %",
+      "p50": "p50",
+      "p95": "p95",
+      "p95Tooltip": "Ungefähr",
+      "p99": "p99",
+      "rate": "Rate",
+      "rateTooltip": "Spans im ausgewählten Zeitraum",
+      "noValue": "(kein Wert)",
+      "showingOf": "Zeigt {shown} von ~{total} Werten",
+      "openTraces": "Traces öffnen",
+      "empty": "Keine Spans entsprechen diesem Filter im ausgewählten Zeitraum",
+      "loadFailed": "Die Gruppen konnten nicht geladen werden"
+    },
     "nlNeedsSql": "Diese Frage benötigt SQL; öffnen Sie sie in Logs",
+    "scope": {
+      "label": "Bereich",
+      "all": "Alle Spans",
+      "allDesc": "Jeder Span, der dem Filter entspricht",
+      "root": "Root-Spans",
+      "rootDesc": "Spans ohne Parent, an denen jeder Trace beginnt",
+      "entrypoint": "Einstiegspunkt-Spans",
+      "entrypointDesc": "Server- oder Consumer-Spans sowie alle Root-Spans",
+      "rootUnavailable": "Diesem Stream fehlt das Feld reference_parent_span_id",
+      "allShort": "Alle",
+      "rootShort": "Root",
+      "entrypointShort": "Einstieg",
+      "allHint": "Jeder Span im Zeitraum",
+      "rootHint": "Nur der erste Span jedes Traces",
+      "entrypointHint": "Server- und Consumer-Spans sowie Roots",
+      "chip": "Bereich: {scope}"
+    },
+    "sqlMode": {
+      "actionUnavailable": "Im SQL-Modus noch nicht verfügbar",
+      "drillDownDisabled": "Drill-down ist im SQL-Modus nicht verfügbar",
+      "putConditionInWhere": "Im SQL-Modus die Bedingung in die WHERE-Klausel setzen",
+      "rowsCount": "{count} Zeile | {count} Zeilen",
+      "histogramLossWarning": "Diese Abfrageform kann Spans über Zeitpartitionen hinweg verlieren",
+      "openInSpans": "In der Spans-Ansicht öffnen",
+      "runsInSpans": "SQL läuft in der Spans-Ansicht",
+      "backToTraces": "Zurück zu Traces",
+      "sqlKept": "Ihr SQL bleibt erhalten. SQL aktivieren, um es zurückzubekommen.",
+      "statementInTraces": {
+        "title": "Die Traces-Ansicht erwartet einen Filter, kein SELECT",
+        "subqueryTitle": "Die Traces-Ansicht kann keine Unterabfrage ausführen",
+        "description": "SQL läuft in der Spans-Ansicht."
+      },
+      "noTraceIdHint": "Diese Zeilen haben keine trace_id und öffnen daher keinen Trace.",
+      "addTraceId": "trace_id hinzufügen",
+      "openTrace": "Trace öffnen",
+      "openingTrace": "Trace wird geöffnet",
+      "firstTraces": "Erste {count} Trace | Erste {count} Traces",
+      "firstRows": "Erste {count} Zeile | Erste {count} Zeilen",
+      "conditionAdded": "{condition} zur WHERE-Klausel hinzugefügt",
+      "conditionRemoved": "Bedingung {field} aus der WHERE-Klausel entfernt",
+      "editWhereToRemove": "Bearbeite die WHERE-Klausel, um die Bedingung {field} zu entfernen",
+      "undo": "Rückgängig",
+      "inAllColumn": "in {column}",
+      "awaitingRun": {
+        "spansTitle": "Führe die Abfrage aus, um Ergebnisse zu sehen",
+        "description": "Es wurde noch nichts ausgeführt. „Abfrage ausführen“ sendet das SQL aus dem Editor."
+      },
+      "errors": {
+        "fieldNotFoundTitle": "Feld nicht gefunden: {field}",
+        "fieldNotFoundDesc": "In diesem Stream existiert ein Feld mit ähnlichem Namen.",
+        "didYouMean": "Meinten Sie {field}?",
+        "didYouMeanDesc": "Ersetzt {field} in der Abfrage und führt sie dann aus",
+        "outOfMemoryTitle": "Der Arbeitsspeicher reichte für diese Abfrage nicht aus",
+        "outOfMemoryDesc": "Abfragen über lange Zeiträume können mehr Arbeitsspeicher benötigen, als der Server zulässt.",
+        "useLastHour": "Letzte 1 Stunde verwenden",
+        "useLastHourDesc": "Verkleinert den Zeitraum und führt dann die Abfrage aus",
+        "missingStreamTitle": "Stream-Name nach FROM fehlt",
+        "missingStreamDesc": "Schreibe den Stream-Namen nach FROM, zum Beispiel FROM \"{stream}\".",
+        "noFullTextTitle": "Dieser Stream hat keine Volltextfelder",
+        "noFullTextDesc": "match_all durchsucht nur Volltextfelder. Durchsuche stattdessen ein einzelnes Feld mit str_match."
+      },
+      "matchAllEmpty": {
+        "title": "Keine Spans gefunden",
+        "description": "Im ausgewählten Zeitfenster passte nichts zu dieser Abfrage. Möglicherweise hat der Stream keine befüllten Volltextfelder, sodass match_all nichts zu durchsuchen hat.",
+        "searchOneField": "Stattdessen ein einzelnes Feld durchsuchen",
+        "searchOneFieldDesc": "Führt {call} aus"
+      },
+      "strayKeyword": "Der Server ignoriert {word} zwischen dem Stream-Namen und WHERE. Entferne es oder verschiebe die Bedingung in die WHERE-Klausel.",
+      "joinLongRange": "Ein JOIN über mehr als 1 Stunde kann den Arbeitsspeicher erschöpfen. Verkleinere den Zeitraum, falls die Abfrage fehlschlägt.",
+      "partialResults": "Das Ergebnis wurde am Zeilenlimit abgeschnitten, daher fehlen einige Zeilen. Füge ein LIMIT hinzu oder schränke die Abfrage ein.",
+      "allFieldsNote": "Felder außerhalb des Stream-Schemas werden in {column} gespeichert. Verwende json_get_str({column}, 'field').",
+      "maybeInAll": "Dieses Feld ist möglicherweise in {column} gespeichert"
+    },
     "redActions": {
       "menuGroupDashboards": "Dashboards",
       "addRedToDashboard": "RED-Diagramme zum Dashboard hinzufügen",
@@ -17347,6 +17441,42 @@
         "days": "Dieses Diagramm behält die {count}-Tage-Balken, die Sie jetzt sehen."
       }
     },
+    "redCaption": {
+      "about": "Über dieses Diagramm",
+      "matched": "Diagramme: alle passenden Spans",
+      "matchedCount": "Diagramme: {count} passender Span | Diagramme: alle {count} passenden Spans",
+      "noneMatched": "Diagramme: 0 passende Spans",
+      "cte": "Diagramme: Spans aus CTE {name}",
+      "branches": "Diagramme: Spans, die zu einem von {count} Zweig passen | Diagramme: Spans, die zu einem von {count} Zweigen passen (Überschneidungen nur einmal gezählt)",
+      "joinMatched": "Diagramme: Spans der linken Seite in Traces, bei denen Ihr Join gepasst hat",
+      "joinLeft": "Diagramme: Spans der linken Seite, die zu Ihrer WHERE-Klausel passen",
+      "inner": "Diagramme: Spans aus der inneren Abfrage",
+      "stream": "Diagramme: alle Spans in {stream} · Filter Ihrer Abfrage nicht angewendet",
+      "count": "{count} Span | {count} Spans",
+      "notApplied": "{clauses} nicht angewendet",
+      "scope": "Umfang: alle Spans (Ihr SQL entscheidet)",
+      "clause": {
+        "groupBy": "GROUP BY",
+        "having": "HAVING",
+        "distinct": "DISTINCT",
+        "orderBy": "ORDER BY",
+        "limit": "LIMIT",
+        "offset": "OFFSET",
+        "window": "Fensterfunktion",
+        "qualify": "QUALIFY",
+        "outerWhere": "äußeres WHERE",
+        "bothSidesWhere": "WHERE auf beiden Seiten",
+        "join": "Join"
+      }
+    },
+    "redCharts": {
+      "loadFailed": "Dieses Diagramm konnte nicht geladen werden",
+      "notTraces": "Diagramme benötigen einen Traces-Stream. Ihre Abfrage liest {stream}.",
+      "unreadable": "Diagramme können nicht erkennen, welche Spans Ihre Abfrage auswählt.",
+      "shape": "Diagramme können nicht erkennen, welche Spans diese Abfrage auswählt.",
+      "noData": "Keine Daten",
+      "showAllSpans": "Alle Spans in {stream} anzeigen"
+    },
     "latencyHeatmap": {
       "title": "Dauer",
       "tooltipSpans": "{count} Span | {count} Spans",
@@ -17357,7 +17487,6 @@
         "errors": "Fehler"
       },
       "noData": "Keine Daten",
-      "unavailable": "Die Latenz-Heatmap ist für diese Suche nicht verfügbar",
       "loadFailed": "Latenz-Heatmap konnte nicht geladen werden",
       "selection": {
         "label": "Heatmap-Auswahl",

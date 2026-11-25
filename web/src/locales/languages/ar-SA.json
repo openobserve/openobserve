@@ -1445,6 +1445,7 @@
     "queryEditorLabel": "محرر الاستعلامات:",
     "addFieldToTable": "إضافة حقل إلى الجدول",
     "removeFieldFromTable": "إزالة الحقل من الجدول",
+    "groupByThisField": "جمّع حسب هذا الحقل",
     "rows": "الصفوف",
     "resetFields": "إعادة تعيين حقول الجداول المحددة",
     "metrics": "المقاييس",
@@ -17329,7 +17330,100 @@
     "searchTypeOthers": "آخرون"
   },
   "traces": {
+    "groups": {
+      "label": "التجميع حسب",
+      "grouped": "مجمّع حسب {field}",
+      "count": "{count} مجموعة | {count} مجموعات",
+      "clear": "مسح التجميع حسب",
+      "spans": "الامتدادات",
+      "errors": "الأخطاء",
+      "errorPct": "نسبة الأخطاء %",
+      "p50": "p50",
+      "p95": "p95",
+      "p95Tooltip": "تقريبي",
+      "p99": "p99",
+      "rate": "المعدل",
+      "rateTooltip": "الامتدادات خلال النطاق الزمني المحدد",
+      "noValue": "(لا توجد قيمة)",
+      "showingOf": "عرض {shown} من أصل ~{total} قيمة",
+      "openTraces": "فتح التتبعات",
+      "empty": "لا توجد امتدادات تطابق هذا الفلتر في النطاق الزمني المحدد",
+      "loadFailed": "تعذّر تحميل المجموعات"
+    },
     "nlNeedsSql": "يتطلب هذا السؤال SQL؛ افتحه في السجلات",
+    "scope": {
+      "label": "النطاق",
+      "all": "كل الامتدادات",
+      "allDesc": "كل امتداد يطابق الفلتر",
+      "root": "الامتدادات الجذرية",
+      "rootDesc": "الامتدادات التي ليس لها امتداد أعلى، حيث يبدأ كل تتبع",
+      "entrypoint": "امتدادات نقطة الدخول",
+      "entrypointDesc": "امتدادات الخادم أو المستهلك، بالإضافة إلى أي امتداد جذري",
+      "rootUnavailable": "لا يحتوي هذا التدفق على حقل reference_parent_span_id",
+      "allShort": "الكل",
+      "rootShort": "الجذر",
+      "entrypointShort": "الدخول",
+      "allHint": "كل امتداد في النطاق الزمني",
+      "rootHint": "أول امتداد فقط في كل تتبع",
+      "entrypointHint": "امتدادات الخادم والمستهلك، بالإضافة إلى الامتدادات الجذرية",
+      "chip": "النطاق: {scope}"
+    },
+    "sqlMode": {
+      "actionUnavailable": "غير متاح في وضع SQL بعد",
+      "drillDownDisabled": "التعمق غير متاح في وضع SQL",
+      "putConditionInWhere": "في وضع SQL، ضع الشرط في جملة WHERE الخاصة بك",
+      "rowsCount": "{count} صف | {count} صفوف",
+      "histogramLossWarning": "قد يتسبب شكل الاستعلام هذا في فقدان امتدادات عبر أقسام زمنية",
+      "openInSpans": "فتح في عرض الامتدادات",
+      "runsInSpans": "يتم تشغيل SQL في عرض الامتدادات",
+      "backToTraces": "العودة إلى التتبع",
+      "sqlKept": "تم الاحتفاظ بـ SQL الخاص بك. شغّل SQL لاستعادته.",
+      "statementInTraces": {
+        "title": "يقبل عرض التتبع فلترًا، لا SELECT",
+        "subqueryTitle": "لا يمكن لعرض التتبع تشغيل استعلام فرعي",
+        "description": "يتم تشغيل SQL في عرض الامتدادات."
+      },
+      "noTraceIdHint": "لا تحتوي هذه الصفوف على trace_id، لذا لا تفتح تتبعًا.",
+      "addTraceId": "إضافة trace_id",
+      "openTrace": "فتح التتبع",
+      "openingTrace": "جارٍ فتح التتبع",
+      "firstTraces": "أول {count} تتبع | أول {count} تتبع",
+      "firstRows": "أول {count} صف | أول {count} صف",
+      "conditionAdded": "أُضيف {condition} إلى WHERE",
+      "conditionRemoved": "أُزيل شرط {field} من WHERE",
+      "editWhereToRemove": "حرّر WHERE لإزالة شرط {field}",
+      "undo": "تراجع",
+      "inAllColumn": "في {column}",
+      "awaitingRun": {
+        "spansTitle": "شغّل الاستعلام لعرض النتائج",
+        "description": "لم يُنفَّذ شيء بعد. يرسل «Run query» تعليمة SQL الموجودة في المحرر."
+      },
+      "errors": {
+        "fieldNotFoundTitle": "الحقل غير موجود: {field}",
+        "fieldNotFoundDesc": "يوجد حقل باسم مشابه في هذا التدفق.",
+        "didYouMean": "هل تقصد {field}؟",
+        "didYouMeanDesc": "يستبدل {field} في الاستعلام ثم يشغّله",
+        "outOfMemoryTitle": "نفدت الذاكرة أثناء تنفيذ هذا الاستعلام",
+        "outOfMemoryDesc": "قد تستهلك الاستعلامات على نطاقات زمنية طويلة ذاكرةً أكثر مما يسمح به الخادم.",
+        "useLastHour": "استخدام آخر ساعة واحدة",
+        "useLastHourDesc": "يضيّق النطاق الزمني ثم يشغّل الاستعلام",
+        "missingStreamTitle": "اسم التدفق مفقود بعد FROM",
+        "missingStreamDesc": "اكتب اسم التدفق بعد FROM، مثل FROM \"{stream}\".",
+        "noFullTextTitle": "لا يحتوي هذا التدفق على حقول نص كامل",
+        "noFullTextDesc": "يبحث match_all في حقول النص الكامل فقط. استخدم str_match للبحث في حقل واحد بدلًا من ذلك."
+      },
+      "matchAllEmpty": {
+        "title": "لم يتم العثور على امتدادات",
+        "description": "لم يطابق هذا الاستعلام أي شيء في النافذة المحددة. قد لا يحتوي التدفق على حقول نص كامل مُعمّرة، لذا قد لا يجد match_all ما يبحث فيه.",
+        "searchOneField": "البحث في حقل واحد بدلًا من ذلك",
+        "searchOneFieldDesc": "يشغّل {call}"
+      },
+      "strayKeyword": "يتجاهل الخادم {word} بين اسم التدفق وWHERE. أزله أو انقل الشرط إلى WHERE.",
+      "joinLongRange": "قد ينفد JOIN على مدى يزيد عن ساعة من الذاكرة. ضيّق النطاق الزمني إذا فشل الاستعلام.",
+      "partialResults": "قُطع الناتج عند حد الصفوف، لذا بعض الصفوف مفقودة. أضف LIMIT أو ضيّق الاستعلام.",
+      "allFieldsNote": "تُخزَّن الحقول خارج مخطط التدفق في {column}. استخدم json_get_str({column}, 'field').",
+      "maybeInAll": "قد يُخزَّن هذا الحقل في {column}"
+    },
     "redActions": {
       "menuGroupDashboards": "لوحات المعلومات",
       "addRedToDashboard": "إضافة مخططات RED إلى لوحة المعلومات",
@@ -17347,6 +17441,42 @@
         "days": "يحتفظ هذا المخطط بأعمدة مدتها {count} يوم كما تراها الآن."
       }
     },
+    "redCaption": {
+      "about": "حول هذا المخطط",
+      "matched": "المخططات: جميع الامتدادات المطابقة",
+      "matchedCount": "المخططات: {count} امتداد مطابق | المخططات: جميع {count} من الامتدادات المطابقة",
+      "noneMatched": "المخططات: 0 امتداد مطابق",
+      "cte": "المخططات: امتدادات من CTE {name}",
+      "branches": "المخططات: امتدادات تطابق أيًا من {count} فرع | المخططات: امتدادات تطابق أيًا من {count} فرع (تُحتسب التداخلات مرة واحدة)",
+      "joinMatched": "المخططات: الامتدادات من الجانب الأيسر في التتبعات التي تطابق فيها الربط",
+      "joinLeft": "المخططات: الامتدادات اليسرى المطابقة لـ WHERE الخاص بك",
+      "inner": "المخططات: امتدادات من الاستعلام الداخلي",
+      "stream": "المخططات: جميع الامتدادات في {stream} · لم يُطبَّق فلتر استعلامك",
+      "count": "{count} امتداد | {count} امتداد",
+      "notApplied": "{clauses} غير مطبَّق",
+      "scope": "النطاق: جميع الامتدادات (يقررها SQL الخاص بك)",
+      "clause": {
+        "groupBy": "GROUP BY",
+        "having": "HAVING",
+        "distinct": "DISTINCT",
+        "orderBy": "ORDER BY",
+        "limit": "LIMIT",
+        "offset": "OFFSET",
+        "window": "دالة النافذة",
+        "qualify": "QUALIFY",
+        "outerWhere": "WHERE الخارجي",
+        "bothSidesWhere": "WHERE على كلا الجانبين",
+        "join": "ربط"
+      }
+    },
+    "redCharts": {
+      "loadFailed": "تعذّر تحميل هذا المخطط",
+      "notTraces": "تحتاج المخططات إلى تدفق تتبعات. استعلامك يقرأ {stream}.",
+      "unreadable": "لا تستطيع المخططات معرفة الامتدادات التي يختارها استعلامك.",
+      "shape": "لا تستطيع المخططات تحديد الامتدادات التي يختارها هذا الاستعلام.",
+      "noData": "لا توجد بيانات",
+      "showAllSpans": "عرض جميع الامتدادات في {stream}"
+    },
     "latencyHeatmap": {
       "title": "المدة",
       "tooltipSpans": "{count} Span | {count} Span",
@@ -17357,7 +17487,6 @@
         "errors": "الأخطاء"
       },
       "noData": "لا توجد بيانات",
-      "unavailable": "خريطة الحرارة للكمون غير متاحة لهذا البحث",
       "loadFailed": "فشل تحميل خريطة الحرارة للكمون",
       "selection": {
         "label": "تحديد الخريطة الحرارية",

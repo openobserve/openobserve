@@ -176,3 +176,59 @@ describe("useSqlEditorDiagnostics — markers from a run", () => {
     expect(markers.value).toEqual([SERVER_RANGE]);
   });
 });
+
+describe("useSqlEditorDiagnostics — page checks in SQL mode", () => {
+  const CHECK_RANGE: SqlErrorRange = {
+    startLine: 1,
+    endLine: 1,
+    column: 3,
+    endColumn: 6,
+    error: "x",
+  };
+
+  function setupChecks(sqlMode: boolean) {
+    const markers = ref<SqlErrorRange[]>([]);
+    const text = ref(`SELECT * FROM "a" AND WHERE b = 1`);
+    const sqlChecks = vi.fn().mockReturnValue([CHECK_RANGE]);
+    const diag = useSqlEditorDiagnostics({
+      queryEditorRef: ref({
+        addErrorDiagnostics: (ranges: SqlErrorRange[]) => {
+          markers.value = ranges;
+        },
+        getValue: () => text.value,
+      }),
+      sqlMode: ref(sqlMode),
+      query: text,
+      streamName: ref("a"),
+      sqlChecks,
+    });
+    return { diag, markers, sqlChecks, text };
+  }
+
+  beforeEach(() => {
+    validateSql.mockReset();
+    validateSql.mockResolvedValue(null);
+  });
+
+  it("shows the page's checks on blur when the SQL parses", async () => {
+    const { diag, markers, sqlChecks, text } = setupChecks(true);
+    await diag.onBlur();
+    expect(sqlChecks).toHaveBeenCalledWith(text.value);
+    expect(markers.value).toEqual([CHECK_RANGE]);
+  });
+
+  it("shows only the syntax error when the SQL does not parse", async () => {
+    const syntax: SqlErrorRange = { startLine: 1, endLine: 1, error: "syntax" };
+    validateSql.mockResolvedValue(syntax);
+    const { diag, markers } = setupChecks(true);
+    await diag.onBlur();
+    expect(markers.value).toEqual([syntax]);
+  });
+
+  it("skips the checks in filter mode", async () => {
+    const { diag, markers, sqlChecks } = setupChecks(false);
+    await diag.onBlur();
+    expect(sqlChecks).not.toHaveBeenCalled();
+    expect(markers.value).toEqual([]);
+  });
+});

@@ -1445,6 +1445,7 @@
     "queryEditorLabel": "Editor di query:",
     "addFieldToTable": "Aggiungi campo alla tabella",
     "removeFieldFromTable": "Rimuovi campo dalla tabella",
+    "groupByThisField": "Raggruppa per questo campo",
     "rows": "righe",
     "resetFields": "Reimposta i campi della tabella selezionati",
     "metrics": "Metriche",
@@ -17329,7 +17330,100 @@
     "searchTypeOthers": "Altri"
   },
   "traces": {
+    "groups": {
+      "label": "Raggruppa per",
+      "grouped": "Raggruppato per {field}",
+      "count": "{count} gruppo | {count} gruppi",
+      "clear": "Rimuovi raggruppamento",
+      "spans": "Span",
+      "errors": "Errori",
+      "errorPct": "% errori",
+      "p50": "p50",
+      "p95": "p95",
+      "p95Tooltip": "Approssimativo",
+      "p99": "p99",
+      "rate": "Frequenza",
+      "rateTooltip": "Span nell'intervallo di tempo selezionato",
+      "noValue": "(nessun valore)",
+      "showingOf": "Visualizzazione di {shown} su ~{total} valori",
+      "openTraces": "Apri tracce",
+      "empty": "Nessuno span corrisponde a questo filtro nell'intervallo di tempo selezionato",
+      "loadFailed": "Impossibile caricare i gruppi"
+    },
     "nlNeedsSql": "Questa domanda richiede SQL; aprila in Log",
+    "scope": {
+      "label": "Ambito",
+      "all": "Tutti gli span",
+      "allDesc": "Ogni span che corrisponde al filtro",
+      "root": "Span radice",
+      "rootDesc": "Span senza span padre, dove inizia ogni traccia",
+      "entrypoint": "Span di ingresso",
+      "entrypointDesc": "Span server o consumer, più qualsiasi span radice",
+      "rootUnavailable": "Questo stream non ha il campo reference_parent_span_id",
+      "allShort": "Tutti",
+      "rootShort": "Radice",
+      "entrypointShort": "Ingresso",
+      "allHint": "Ogni span nell'intervallo di tempo",
+      "rootHint": "Solo il primo span di ogni traccia",
+      "entrypointHint": "Span server e consumer, più le radici",
+      "chip": "Ambito: {scope}"
+    },
+    "sqlMode": {
+      "actionUnavailable": "Non ancora disponibile in modalità SQL",
+      "drillDownDisabled": "Il drill down non è disponibile in modalità SQL",
+      "putConditionInWhere": "In modalità SQL, inserisci la condizione nella clausola WHERE",
+      "rowsCount": "{count} riga | {count} righe",
+      "histogramLossWarning": "Questa forma di query può perdere span tra le partizioni temporali",
+      "openInSpans": "Apri nella vista Span",
+      "runsInSpans": "SQL viene eseguito nella vista Span",
+      "backToTraces": "Torna a Tracce",
+      "sqlKept": "Il tuo SQL è conservato. Attiva SQL per recuperarlo.",
+      "statementInTraces": {
+        "title": "La vista Tracce accetta un filtro, non una SELECT",
+        "subqueryTitle": "La vista Tracce non può eseguire una sottoquery",
+        "description": "SQL viene eseguito nella vista Span."
+      },
+      "noTraceIdHint": "Queste righe non hanno trace_id, quindi non aprono una traccia.",
+      "addTraceId": "Aggiungi trace_id",
+      "openTrace": "Apri traccia",
+      "openingTrace": "Apertura traccia",
+      "firstTraces": "Prima {count} traccia | Prime {count} tracce",
+      "firstRows": "Prima {count} riga | Prime {count} righe",
+      "conditionAdded": "Aggiunto {condition} alla WHERE",
+      "conditionRemoved": "Rimossa la condizione {field} dalla WHERE",
+      "editWhereToRemove": "Modifica la WHERE per rimuovere la condizione {field}",
+      "undo": "Annulla",
+      "inAllColumn": "in {column}",
+      "awaitingRun": {
+        "spansTitle": "Esegui la query per vedere i risultati",
+        "description": "Non è ancora stato eseguito nulla. Esegui query invia l'SQL nell'editor."
+      },
+      "errors": {
+        "fieldNotFoundTitle": "Campo non trovato: {field}",
+        "fieldNotFoundDesc": "In questo stream esiste un campo con un nome simile.",
+        "didYouMean": "Intendevi {field}?",
+        "didYouMeanDesc": "Sostituisce {field} nella query, poi la esegue",
+        "outOfMemoryTitle": "Questa query ha esaurito la memoria",
+        "outOfMemoryDesc": "Le query su intervalli lunghi possono usare più memoria di quella consentita dal server.",
+        "useLastHour": "Usa l'ultima ora",
+        "useLastHourDesc": "Restringe l'intervallo di tempo, poi esegue la query",
+        "missingStreamTitle": "Nome dello stream mancante dopo FROM",
+        "missingStreamDesc": "Scrivi il nome dello stream dopo FROM, ad esempio FROM \"{stream}\".",
+        "noFullTextTitle": "Questo stream non ha campi full-text",
+        "noFullTextDesc": "match_all cerca solo nei campi full-text. Per cercare in un singolo campo usa str_match."
+      },
+      "matchAllEmpty": {
+        "title": "Nessuno span trovato",
+        "description": "Nessun risultato per questa query nella finestra selezionata. Lo stream potrebbe non avere campi full-text popolati, quindi match_all potrebbe non avere nulla da cercare.",
+        "searchOneField": "Cerca invece in un singolo campo",
+        "searchOneFieldDesc": "Esegue {call}"
+      },
+      "strayKeyword": "Il server ignora {word} tra il nome dello stream e WHERE. Rimuovilo oppure sposta la condizione nella WHERE.",
+      "joinLongRange": "Un JOIN su più di 1 ora può esaurire la memoria. Restringi l'intervallo di tempo se la query fallisce.",
+      "partialResults": "Il risultato è stato troncato al limite di righe, quindi alcune righe mancano. Aggiungi un LIMIT o restringi la query.",
+      "allFieldsNote": "I campi al di fuori dello schema dello stream sono memorizzati in {column}. Usa json_get_str({column}, 'field').",
+      "maybeInAll": "Questo campo potrebbe essere memorizzato in {column}"
+    },
     "redActions": {
       "menuGroupDashboards": "Dashboard",
       "addRedToDashboard": "Aggiungi i grafici RED alla dashboard",
@@ -17347,6 +17441,42 @@
         "days": "Questo grafico mantiene le barre da {count} giorni che vedi ora."
       }
     },
+    "redCaption": {
+      "about": "Informazioni su questo grafico",
+      "matched": "Grafici: tutti gli span corrispondenti",
+      "matchedCount": "Grafici: {count} span corrispondente | Grafici: tutti i {count} span corrispondenti",
+      "noneMatched": "Grafici: 0 span corrispondenti",
+      "cte": "Grafici: span dalla CTE {name}",
+      "branches": "Grafici: span che corrispondono a uno qualsiasi di {count} ramo | Grafici: span che corrispondono a uno qualsiasi di {count} rami (sovrapposizioni contate una volta)",
+      "joinMatched": "Grafici: span lato sinistro nelle tracce in cui il join ha trovato corrispondenze",
+      "joinLeft": "Grafici: span lato sinistro corrispondenti alla tua WHERE",
+      "inner": "Grafici: span dalla query interna",
+      "stream": "Grafici: tutti gli span in {stream} · filtro della tua query non applicato",
+      "count": "{count} span | {count} span",
+      "notApplied": "{clauses} non applicate",
+      "scope": "Ambito: tutti gli span (decide il tuo SQL)",
+      "clause": {
+        "groupBy": "GROUP BY",
+        "having": "HAVING",
+        "distinct": "DISTINCT",
+        "orderBy": "ORDER BY",
+        "limit": "LIMIT",
+        "offset": "OFFSET",
+        "window": "funzione finestra",
+        "qualify": "QUALIFY",
+        "outerWhere": "WHERE esterno",
+        "bothSidesWhere": "WHERE su entrambi i lati",
+        "join": "join"
+      }
+    },
+    "redCharts": {
+      "loadFailed": "Impossibile caricare questo grafico",
+      "notTraces": "I grafici richiedono uno stream di tracce. La tua query legge {stream}.",
+      "unreadable": "I grafici non riescono a determinare quali span seleziona la tua query.",
+      "shape": "I grafici non riescono a determinare quali span seleziona questa query.",
+      "noData": "Nessun dato",
+      "showAllSpans": "Mostra tutti gli span in {stream}"
+    },
     "latencyHeatmap": {
       "title": "Durata",
       "tooltipSpans": "{count} span | {count} span",
@@ -17357,7 +17487,6 @@
         "errors": "Errori"
       },
       "noData": "Nessun dato",
-      "unavailable": "La heatmap della latenza non è disponibile per questa ricerca",
       "loadFailed": "Impossibile caricare la heatmap della latenza",
       "selection": {
         "label": "Selezione heatmap",
