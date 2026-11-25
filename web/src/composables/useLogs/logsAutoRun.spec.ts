@@ -1009,6 +1009,44 @@ describe("panel records for Visualize and Build (J7)", () => {
     expect(fakeSearchObj.value.meta.runOutcome?.visualize).toBe("running");
   });
 
+  it("a handed chart load that ends without querying closes the run: a shown result records, nothing cancels", () => {
+    let type = "bar";
+    run().setPanelConfigReader(() => ({ type }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    const empty = run().openToggleChartRun(false) as number;
+    run().markPanelDispatched(empty);
+    run().panelLoadEndedWithoutFetch(false);
+    expect(run().hasPanelRun(empty)).toBe(false);
+    expect(run().engine.currentGeneration("grid")?.settled).toBe(true);
+    expect(fakeSearchObj.value.meta.runOutcome?.visualize).toBe("cancelled");
+    expect(fakeSearchObj.value.meta.executedPanel).toBeNull();
+
+    const restored = run().openToggleChartRun(false) as number;
+    run().markPanelDispatched(restored);
+    const handed = run().panelSignature("visualize");
+    type = "line";
+    run().panelLoadEndedWithoutFetch(true);
+    expect(run().hasPanelRun(restored)).toBe(false);
+    expect(fakeSearchObj.value.meta.runOutcome?.visualize).toBe("complete");
+    expect(fakeSearchObj.value.meta.executedPanel).toMatchObject({
+      generation: restored,
+      configSignature: handed,
+    });
+  });
+
+  it("a no-fetch end leaves open a run not yet handed its config, or one whose load is in flight", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    const unhanded = run().openToggleChartRun(false) as number;
+    run().panelLoadEndedWithoutFetch(false);
+    expect(run().hasPanelRun(unhanded)).toBe(true);
+
+    run().panelLoadingChanged(true, false);
+    run().panelLoadEndedWithoutFetch(true);
+    expect(run().hasPanelRun(unhanded)).toBe(true);
+    expect(fakeSearchObj.value.meta.runOutcome?.visualize).toBe("running");
+  });
+
   it("a Visualize toggle that resolves after the user left Visualize opens no panel run", () => {
     fakeSearchObj.value.meta.logsVisualizeToggle = "logs";
     const before = run().engine.currentGeneration("grid")?.id;

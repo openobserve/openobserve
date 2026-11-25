@@ -479,6 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :is_ui_histogram="shouldUseHistogramQuery"
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
               :histogramQuery="storedHistogramQuery"
+              @loadEndedWithoutFetch="onVisualizeLoadEndedWithoutFetch"
             >
             </VisualizeLogsQuery>
           </div>
@@ -3032,8 +3033,7 @@ export default defineComponent({
             );
             autoRun.notePanelScopeApplied();
             // run query
-            await copyDashboardDataToVisualize();
-            if (togglePanelRun !== null) autoRun.markPanelDispatched(togglePanelRun);
+            await copyDashboardDataToVisualize(togglePanelRun);
 
             // Clear the restoration flag after all operations are complete
             await nextTick();
@@ -3426,9 +3426,7 @@ export default defineComponent({
           end_time: new Date(dateTime.endTime),
         };
 
-        await copyDashboardDataToVisualize();
-        if (generationId !== null && generationId !== undefined)
-          autoRun.markPanelDispatched(generationId);
+        await copyDashboardDataToVisualize(generationId ?? null);
 
         // Sync visualization config to URL parameters
         patchUrlViewState(dashboardPanelData);
@@ -3659,7 +3657,7 @@ export default defineComponent({
     };
 
     // Helper function to copy dashboardPanelData while preserving stream info
-    const copyDashboardDataToVisualize = async () => {
+    const copyDashboardDataToVisualize = async (panelRunId: number | null = null) => {
       // Extract and assign stream info BEFORE copying
       const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
       const currentQuery = dashboardPanelData.data.queries[currentQueryIndex];
@@ -3685,6 +3683,8 @@ export default defineComponent({
 
       // Now copy dashboardPanelData with updated stream info
       visualizeChartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      // The chart reacts on the next flush, before an awaiting caller resumes, so the run must hold this config now.
+      if (panelRunId !== null) autoRun.markPanelDispatched(panelRunId);
     };
 
     const extractVisualizationFields = async (autoSelectChartType: boolean = true) => {
@@ -3892,6 +3892,12 @@ export default defineComponent({
 
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState);
+
+    // The Visualize chart stays mounted while hidden, so its loads must not end another surface's run.
+    const onVisualizeLoadEndedWithoutFetch = (shown: boolean) => {
+      if (searchObj.meta.logsVisualizeToggle === "visualize")
+        autoRun.panelLoadEndedWithoutFetch(shown);
+    };
 
     const panelsLoading = computed(() =>
       Object.values(variablesAndPanelsDataLoadingState.panels ?? {}).some(Boolean),
@@ -4414,6 +4420,7 @@ export default defineComponent({
       handleRunQueryFn,
       visualizeChartData,
       handleChartApiError,
+      onVisualizeLoadEndedWithoutFetch,
       visualizeErrorData,
       resetHistogramWithError,
       fnParsedSQL,

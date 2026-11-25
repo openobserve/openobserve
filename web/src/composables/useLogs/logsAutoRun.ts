@@ -700,6 +700,14 @@ function createLogsAutoRun() {
     engine.settleGeneration(run.generationId);
   }
 
+  // A load that ends without querying never flips loading, so the run it was handed would stay open.
+  function panelLoadEndedWithoutFetch(shown: boolean): void {
+    const run = panelRun;
+    if (!run || run.started || run.dispatched === null) return;
+    if (shown) endPanelRun(!run.failed);
+    else cancelUnstartedPanelRun();
+  }
+
   function cancelPanelLoad(): void {
     outsideRunLoad = null;
     if (panelRun) panelRun.scope = null;
@@ -754,6 +762,7 @@ function createLogsAutoRun() {
     markPanelFailed,
     endPanelRun,
     cancelUnstartedPanelRun,
+    panelLoadEndedWithoutFetch,
     panelLoadingChanged,
     cancelPanelLoad,
     notePanelScopeApplied,
