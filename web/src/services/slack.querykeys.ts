@@ -29,6 +29,7 @@ export const slackKeys = {
       params.mode,
       params.name ?? "",
       params.channel_history ?? true,
+      params.command ?? "",
     ),
   installation: (org: string, id: string) => orgKey(org, "slack", "installation", id),
   linking: (org: string, id: string) => orgKey(org, "slack", "installation", id, "linking"),
