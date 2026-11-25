@@ -1120,6 +1120,20 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_cluster_window_on_computed_key_keeps_equivalences() {
+        // DataFusion drops the outer sort through `scan_type ≡ COALESCE(..)`, which only
+        // holds above RemoteScanExec if it keeps the input's equivalence classes.
+        assert_cluster_plan_is_sane(
+            "SELECT _timestamp, COALESCE(k8s_cluster, 'unknown') AS scan_type, value, \
+                ROW_NUMBER() OVER (PARTITION BY COALESCE(k8s_cluster, 'unknown') ORDER BY value) \
+                AS rn_by_scan, \
+                AVG(value) OVER (PARTITION BY COALESCE(k8s_cluster, 'unknown')) AS avg_by_scan \
+                FROM t WHERE value IS NOT NULL ORDER BY scan_type, rn_by_scan LIMIT 10",
+        )
+        .await;
+    }
+
+    #[tokio::test]
     async fn test_cluster_union_and_join_plans_sort_on_the_leader() {
         for sql in [
             "SELECT _timestamp, event_name FROM t WHERE value >= 30 \
