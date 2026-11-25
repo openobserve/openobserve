@@ -70,6 +70,18 @@ describe("AutoResolveStepCard", () => {
   );
 
   it.each([
+    ["the same text as its error", "relation exists", false],
+    ["its own text", "ran 2 of 3", true],
+  ])("a failed step whose result is %s: result line shown %s", (_, result, shown) => {
+    const w = mountCard(
+      autoresolveStep({ state: "failed", result_summary: result, error: "relation exists" }),
+    );
+
+    expect(w.find('[data-test="autoresolve-step-card-result"]').exists()).toBe(shown);
+    expect(w.find('[data-test="autoresolve-step-card-error"]').text()).toBe("relation exists");
+  });
+
+  it.each([
     ["running", "Running for 1 min 20 s"],
     ["done", "Done"],
   ] as const)("a %s step's state says how long it has run", (state, label) => {

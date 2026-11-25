@@ -34808,6 +34808,7 @@
         "failed": "The run failed and stopped.",
         "failedWith": "The run failed and stopped. {reason}",
         "stepFailedWith": "{reason} Ran: {ran}. Did not run: {notRun}.",
+        "stepFailedAlone": "Step {step} failed.",
         "outcomeUnknownWith": "A step was sent but no answer came back. It will not be retried. {reason}",
         "held": "The run paused: it tried a call that was not approved, so that call was held."
       },
@@ -34852,6 +34853,7 @@
         "noneChosen": "None chosen",
         "notAsked": "Not asked yet",
         "notAskedEnded": "Not asked",
+        "correctedNotApproved": "Corrected, never approved",
         "waitingForYou": "Waiting for you. Lapses at {time}",
         "waitingForYouOn": "Waiting for you. Lapses {time}",
         "waitingFor": "Waiting for {names}. Lapses at {time}",

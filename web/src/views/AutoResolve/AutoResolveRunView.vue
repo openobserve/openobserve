@@ -620,6 +620,13 @@ const stateNotice = computed<{ variant: InlineNoticeVariant; text: I18nText } | 
         ran: ran.length ? stepLabels(ran) : t("autoresolve.run.notice.noSteps"),
         notRun: notRun.length ? stepLabels(notRun) : t("autoresolve.run.notice.noSteps"),
       };
+      // With no other step either way, "Ran: none. Did not run: none." says nothing.
+      if (!ran.length && !notRun.length) {
+        return {
+          variant: "error",
+          text: reason ?? t("autoresolve.run.notice.stepFailedAlone", params),
+        };
+      }
       return {
         variant: "error",
         text: reason
@@ -733,6 +740,9 @@ const approvalFact = computed(() => {
   }
   if (current.state === "lapsed" && deadline) return deadlineText(deadline, LAPSED_KEYS, t);
   if (current.state === "declined") return t("autoresolve.state.declined");
+  if (isTerminalRunState(current.state) && !current.approved_by && current.corrections?.length) {
+    return t("autoresolve.run.facts.correctedNotApproved");
+  }
   return isTerminalRunState(current.state)
     ? t("autoresolve.run.facts.notAskedEnded")
     : t("autoresolve.run.facts.notAsked");
@@ -772,13 +782,28 @@ const sameDay = (a: number, b: number) =>
 
 // One entry per sent step: sent and finished times share it, so the record reads one line per call.
 const stepEvidence = (step: AutoResolveStep): EvidenceItem[] => {
-  if (!step.consumed_at_us) return [];
-  const sent = evidenceTime(step.consumed_at_us);
   const params = { seq: step.seq, tool: raw(step.tool) };
   const failed = step.state === "failed";
   const view = stepResultView(failed ? step.error : step.result_summary);
   // JSON on one line shows raw keys; the step card holds it in full.
   const detail = view?.kind === "text" ? view.line : undefined;
+  // A step refused before it was sent (its MCP unreachable or changed) still belongs in the record.
+  if (!step.consumed_at_us && failed && step.finished_at_us) {
+    return [
+      {
+        key: step.id,
+        kind: "step",
+        at: step.finished_at_us,
+        title: detail
+          ? t("autoresolve.run.evidence.stepFailedWith", { ...params, detail: raw(detail) })
+          : t("autoresolve.run.evidence.stepFailed", params),
+        time: raw(evidenceTime(step.finished_at_us)),
+        variant: "destructive",
+      },
+    ];
+  }
+  if (!step.consumed_at_us) return [];
+  const sent = evidenceTime(step.consumed_at_us);
   let title: I18nText = t("autoresolve.run.evidence.stepSent", params);
   if (step.finished_at_us && detail) {
     title = failed

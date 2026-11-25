@@ -123,8 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("autoresolve.step.dryRunAfter") }}
         </span>
       </ODescriptionItem>
-      <ODescriptionItem v-if="result?.kind === 'text'" :label="t('autoresolve.step.result')">
-        <AutoResolveStepResultText :text="result.text" />
+      <ODescriptionItem v-if="resultText" :label="t('autoresolve.step.result')">
+        <AutoResolveStepResultText :text="resultText" />
       </ODescriptionItem>
       <ODescriptionItem v-if="step.error" :label="t('autoresolve.step.error')">
         <span
@@ -215,6 +215,13 @@ const expanded = ref(false);
 const expandedResult = ref(false);
 
 const result = computed(() => stepResultView(props.step.result_summary));
+
+// A failed call's result is often its error text; the Error line already says it.
+const resultText = computed(() => {
+  if (result.value?.kind !== "text") return null;
+  const error = props.step.error?.trim();
+  return error && result.value.text.trim() === error ? null : result.value.text;
+});
 
 const held = computed(() => props.step.state === "held");
 
