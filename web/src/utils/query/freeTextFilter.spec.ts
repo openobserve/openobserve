@@ -876,13 +876,48 @@ describe("freeTextFilter", () => {
       }
     });
 
-    it("materialises free text and wraps the whole filter (AC6.9)", () => {
+    it("materialises free text and wraps it only when it holds a top-level OR (AC6.9)", () => {
       expect(appendConjunct("timeout", "level='error'", ["s"], ftsCtx)).toBe(
-        "(\nmatch_all('timeout')\n) AND level='error'",
+        "match_all('timeout') AND level='error'",
       );
       expect(appendConjunct("timeout OR refused", "level='error'", ["s", "t"], ftsCtx)).toBe(
         "(\nmatch_all('timeout') OR match_all('refused')\n) AND level='error'",
       );
+    });
+
+    it("appends flat when no top-level OR or comment could change the meaning", () => {
+      const cases: Array<[string, string]> = [
+        ["activity_name = 'Create'", "activity_name = 'Create' AND x=1"],
+        ["match_all('x')", "match_all('x') AND x=1"],
+        ["a = 1 AND b = 2", "a = 1 AND b = 2 AND x=1"],
+        ["msg = 'x OR y'", "msg = 'x OR y' AND x=1"],
+        ['"or" = 1', '"or" = 1 AND x=1'],
+        ["a = 1 AND (b = 2 OR c = 3)", "a = 1 AND (b = 2 OR c = 3) AND x=1"],
+        ["NOT a = 1", "NOT a = 1 AND x=1"],
+        ["a BETWEEN 1 AND 5", "a BETWEEN 1 AND 5 AND x=1"],
+        ["order_id = 1\n", "order_id = 1 AND x=1"],
+      ];
+      for (const [filter, expected] of cases) {
+        expect(appendConjunct(filter, "x=1", ["s"], ftsCtx)).toBe(expected);
+      }
+    });
+
+    it("keeps the wrapper for a top-level OR, a comment or a filter it cannot scan", () => {
+      const cases: Array<[string, string]> = [
+        ["a = 1 OR b = 2", "(\na = 1 OR b = 2\n) AND x=1"],
+        ["a = 1 or b = 2", "(\na = 1 or b = 2\n) AND x=1"],
+        ["a = f(1)OR b = 2", "(\na = f(1)OR b = 2\n) AND x=1"],
+        ["a = 'x'OR b = 2", "(\na = 'x'OR b = 2\n) AND x=1"],
+        ["a = 1 AND b = 2 -- note", "(\na = 1 AND b = 2 -- note\n) AND x=1"],
+        ["a = 1 /* note */", "(\na = 1 /* note */\n) AND x=1"],
+        ["a = (1", "(\na = (1\n) AND x=1"],
+        ["a = 1)", "(\na = 1)\n) AND x=1"],
+        ["a = 'x", "(\na = 'x\n) AND x=1"],
+        ["a = 1;", "(\na = 1;\n) AND x=1"],
+      ];
+      for (const [filter, expected] of cases) {
+        expect(appendConjunct(filter, "x=1", ["s"], ftsCtx)).toBe(expected);
+      }
     });
 
     it("wraps a plain SQL filter so an inline comment cannot swallow the predicate", () => {
@@ -903,13 +938,13 @@ describe("freeTextFilter", () => {
       expect(materializeFreeText("timeout", ["unknown"], ftsCtx)).toBeNull();
     });
 
-    it("does not nest another wrapper when a grouped AND chain gets a new predicate", () => {
+    it("keeps an AND chain flat as predicates are added one by one", () => {
       let query = "error_id = 'a'";
       for (const predicate of ["error_source = 'console'", "action_id is null", "x is null"]) {
         query = appendConjunct(query, predicate, ["s"], ftsCtx);
       }
       expect(query).toBe(
-        "(\nerror_id = 'a'\n) AND error_source = 'console' AND action_id is null AND x is null",
+        "error_id = 'a' AND error_source = 'console' AND action_id is null AND x is null",
       );
     });
 
@@ -964,7 +999,7 @@ describe("freeTextFilter", () => {
     it("honours the token gate from the context", () => {
       const ctx = { ...ftsCtx, tokenLimits: { min: 8, max: 64 } };
       expect(appendConjunct("timeout", "level='error'", ["s"], ctx)).toBe(
-        "(\ntimeout\n) AND level='error'",
+        "timeout AND level='error'",
       );
     });
   });
@@ -1082,7 +1117,7 @@ describe("freeTextFilter", () => {
       const parens = `${"(".repeat(5000)}timeout${")".repeat(5000)}`;
       expect(planFilter(parens, FIELDS).kind).toBe("unclassified");
       expect(appendConjunct(nots, "level='x'", ["s"], ctxFor({ s: FTS }))).toBe(
-        `(\n${nots}\n) AND level='x'`,
+        `${nots} AND level='x'`,
       );
     });
 
@@ -1459,10 +1494,10 @@ describe("freeTextFilter", () => {
     it("keeps a one-line --word filter when a value is appended", () => {
       const ctx = ctxFor({ s: FTS });
       expect(appendConjunct("--404", "level='error'", ["s"], ctx)).toBe(
-        "(\nNOT match_all('404')\n) AND level='error'",
+        "NOT match_all('404') AND level='error'",
       );
       expect(appendConjunct("--note", "level='error'", ["s"], ctx)).toBe(
-        "(\nNOT match_all('note')\n) AND level='error'",
+        "NOT match_all('note') AND level='error'",
       );
     });
 
