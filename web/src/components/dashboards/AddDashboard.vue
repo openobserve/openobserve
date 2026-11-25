@@ -92,12 +92,15 @@ export default defineComponent({
     const addDashboardSchema = makeAddDashboardSchema(t);
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
-    const activeFolder: any = store.state.organizationData.folders.find(
-      (item: any) => item.folderId === props.activeFolderId,
-    );
+    // A pseudo-folder such as Favorites holds no dashboards, so a dashboard created
+    // from one lands in default, as the folder picker shows.
+    const folders = store.state.organizationData.folders;
+    const activeFolder: any =
+      folders.find((item: any) => item.folderId === props.activeFolderId) ??
+      folders.find((item: any) => item.folderId === "default");
     const selectedFolder = ref({
       label: activeFolder?.name,
-      value: activeFolder?.folderId,
+      value: activeFolder?.folderId ?? "default",
     });
 
     //generate random integer number for dashboard Id
@@ -145,19 +148,20 @@ export default defineComponent({
         version: 3,
       };
 
+      const folderId = selectedFolder.value.value;
       try {
         const res = await dashboardService.create(
           store.state.selectedOrganization.identifier,
           baseObj,
-          selectedFolder.value.value ?? "default",
+          folderId,
         );
         analytics.track("dashboard_created");
 
         const data = convertDashboardSchemaVersion(res?.data["v" + res?.data?.version]);
 
         //update store
-        await getAllDashboards(store, selectedFolder.value.value, true);
-        emit("updated", data.dashboardId, selectedFolder.value.value);
+        await getAllDashboards(store, folderId, true);
+        emit("updated", data.dashboardId, folderId);
 
         showPositiveNotification(t("dashboard.addDashboardPage.addedSuccessfully"));
       } catch (err: any) {

@@ -49,6 +49,7 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((data) => data),
 }));
 
+import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
 import AddDashboard from "@/components/dashboards/AddDashboard.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -260,6 +261,20 @@ describe("AddDashboard", () => {
       expect(wrapper.emitted("updated")).toBeTruthy();
       const payload = wrapper.emitted("updated")![0];
       expect(payload).toEqual(["new-dashboard-1", "default"]);
+    });
+
+    it("creates and opens the dashboard in the default folder when created from Favorites", async () => {
+      wrapper = createWrapper({ activeFolderId: FAVORITES_FOLDER_ID });
+
+      await wrapper.vm.onSubmit({ name: "From favorites", description: "" });
+      await flushPromises();
+
+      expect(dashboardService.create).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({ title: "From favorites" }),
+        "default",
+      );
+      expect(wrapper.emitted("updated")![0]).toEqual(["new-dashboard-1", "default"]);
     });
 
     it("should show a positive notification on success", async () => {
