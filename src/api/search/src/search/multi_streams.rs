@@ -462,7 +462,7 @@ pub async fn search_multi(
                         start,
                         &org_id,
                         stream_type,
-                        "500",
+                        "429",
                         "_search_multi",
                         "",
                         "",
