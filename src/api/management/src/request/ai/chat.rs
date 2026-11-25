@@ -2196,9 +2196,22 @@ async fn cancel_turn(
         }
     } else {
         let turns = o2_enterprise::enterprise::ai::chat::registry::turns(&org_id, &session_id);
+        // An ephemeral turn is held by the member id the caps count, a direct one by the email.
+        let principal = turn_principal(
+            openobserve_core::ai_chat::admission::resolve_owner(&caller).await,
+            &caller,
+        )
+        .unwrap_or_else(|_| caller.clone());
         let running: Vec<(&str, &str)> = turns
             .iter()
-            .map(|t| (t.turn_id.as_str(), t.user_id.as_str()))
+            .map(|t| {
+                let user = if t.user_id == principal {
+                    caller.as_str()
+                } else {
+                    t.user_id.as_str()
+                };
+                (t.turn_id.as_str(), user)
+            })
             .collect();
         let target = match direct_stop_target(turn_id.as_deref(), &running, &caller) {
             Ok(target) => target,
@@ -4036,20 +4049,34 @@ async fn direct_turn(turn: StreamTurn) -> Response {
         let session_id = forward_headers
             .as_ref()
             .and_then(|h| h.get(X_O2_ASSISTANT_SESSION_ID.as_str()));
-        match register_ephemeral_turn(
+        let principal = match turn_principal(
+            openobserve_core::ai_chat::admission::resolve_owner(&user_id).await,
+            &user_id,
+        ) {
+            Ok(principal) => principal,
+            Err(refusal) => {
+                end_span(&span);
+                audit
+                    .report(refusal.status(), Some("Member id unavailable"))
+                    .await;
+                return refusal;
+            }
+        };
+        let registered = register_ephemeral_turn(
             &org_id,
             session_id.map(String::as_str),
             &charge_key,
             &user_id,
+            &principal,
             auth_session_id.as_deref(),
         )
-        .await
-        {
+        .await;
+        match registered.and_then(refuse_if_signed_out) {
             Ok(registration) => Some(registration),
             Err(refusal) => {
                 end_span(&span);
                 audit
-                    .report(refusal.status(), Some("Active-turn limit reached"))
+                    .report(refusal.status(), Some("Ephemeral turn refused"))
                     .await;
                 return refusal;
             }
@@ -4108,7 +4135,7 @@ async fn direct_turn(turn: StreamTurn) -> Response {
                     &sid.to_ascii_lowercase(),
                     &charge_key,
                     &user_id,
-                    None,
+                    auth_session_id.as_deref(),
                 )
             })
     });
@@ -4128,12 +4155,28 @@ async fn direct_turn(turn: StreamTurn) -> Response {
         ),
         None => (None, None),
     };
+    let mut sign_out = registration.as_ref().map(|r| r.signal());
     // Keep the OTel span alive for the full stream.
     let s = async_stream::stream! {
         let _registration = registration;
         let _turn_mark = turn_mark;
         let mut agent_stream = response.bytes_stream();
-        while let Some(chunk_result) = agent_stream.next().await {
+        loop {
+            let next = tokio::select! {
+                biased;
+                () = until_signed_out(sign_out.as_mut()) => None,
+                next = agent_stream.next() => Some(next),
+            };
+            let Some(next) = next else {
+                cancel_signed_out_upstream(&client, &org_id, session.as_deref(), &auth);
+                for chunk in meter.interrupt(signed_out_error().to_sse_frame()).await {
+                    yield Ok::<Bytes, std::io::Error>(chunk);
+                }
+                break;
+            };
+            let Some(chunk_result) = next else {
+                break;
+            };
             let out = match chunk_result {
                 Ok(bytes) => {
                     toolset_use.note(&bytes);
@@ -4180,7 +4223,8 @@ async fn register_ephemeral_turn(
     org_id: &str,
     session_id: Option<&str>,
     turn_key: &str,
-    user_id: &str,
+    user_email: &str,
+    principal: &str,
     auth_session_id: Option<&str>,
 ) -> Result<o2_enterprise::enterprise::ai::chat::registry::Registration, Response> {
     use o2_enterprise::enterprise::ai::chat::registry;
@@ -4199,9 +4243,95 @@ async fn register_ephemeral_turn(
         client_id: None,
     };
     let caps = registry::TurnCaps::from_config();
-    openobserve_core::ai_chat::admission::register_turn(turn, user_id, user_id, owner, caps)
+    openobserve_core::ai_chat::admission::register_turn(turn, user_email, principal, owner, caps)
         .await
         .map_err(super::chats::turn_limit_response)
+}
+
+/// The id the active-turn caps count a member by: a saved turn's owner id, so both paths share one
+/// budget. Without a users row there is no saved turn, so the email stands in.
+#[cfg(feature = "enterprise")]
+fn turn_principal(
+    owner: Result<String, openobserve_core::ai_chat::admission::AdmitError>,
+    user_email: &str,
+) -> Result<String, Response> {
+    use openobserve_core::ai_chat::admission::AdmitError;
+    match owner {
+        Ok(id) => Ok(id),
+        Err(AdmitError::NotRegistered) => Ok(user_email.to_string()),
+        Err(e) => Err(super::chats::admit_error_response(e)),
+    }
+}
+
+/// A turn of a login that already signed out never reaches o2-ai.
+#[cfg(feature = "enterprise")]
+fn refuse_if_signed_out(
+    registration: o2_enterprise::enterprise::ai::chat::registry::Registration,
+) -> Result<o2_enterprise::enterprise::ai::chat::registry::Registration, Response> {
+    use o2_enterprise::enterprise::ai::chat::CancelReason;
+    if registration.signal().reason() == Some(CancelReason::SignedOut) {
+        return Err(signed_out_error().into_response());
+    }
+    Ok(registration)
+}
+
+/// Resolves once the turn's sign-in ends; a Stop or a missing registration never resolves it.
+#[cfg(feature = "enterprise")]
+async fn until_signed_out(
+    signal: Option<&mut o2_enterprise::enterprise::ai::chat::registry::CancelSignal>,
+) {
+    use o2_enterprise::enterprise::ai::chat::CancelReason;
+    let Some(signal) = signal else {
+        return std::future::pending().await;
+    };
+    let mut seen = None;
+    loop {
+        let reason = signal.cancelled_beyond(seen).await;
+        if reason == CancelReason::SignedOut {
+            return;
+        }
+        seen = Some(reason);
+    }
+}
+
+/// Asks o2-ai to drop a signed-out direct turn; closing the stream alone may not stop its tools.
+#[cfg(feature = "enterprise")]
+fn cancel_signed_out_upstream(
+    client: &Arc<o2_enterprise::enterprise::ai::client::AiAgentClient>,
+    org_id: &str,
+    session_id: Option<&str>,
+    auth: &str,
+) {
+    use o2_enterprise::enterprise::ai::client::CancelBy;
+    let Some(session_id) = session_id else {
+        return;
+    };
+    let (client, org_id) = (client.clone(), org_id.to_string());
+    let (session_id, auth) = (session_id.to_string(), auth.to_string());
+    tokio::spawn(async move {
+        let asked = client.cancel_session(&session_id, &org_id, &auth, CancelBy::SignedOut);
+        match tokio::time::timeout(UPSTREAM_CANCEL_WAIT, asked).await {
+            Ok(Ok(resp)) if resp.status().is_success() => {}
+            Ok(Ok(resp)) => log::warn!(
+                "[AI-CHAT] o2-ai refused the signed_out cancel of {org_id}/{session_id}: {}",
+                resp.status()
+            ),
+            Ok(Err(e)) => log::warn!(
+                "[AI-CHAT] o2-ai did not take the signed_out cancel of {org_id}/{session_id}: {e}"
+            ),
+            Err(_) => log::warn!(
+                "[AI-CHAT] o2-ai did not answer the signed_out cancel of {org_id}/{session_id}"
+            ),
+        }
+    });
+}
+
+#[cfg(feature = "enterprise")]
+fn signed_out_error() -> AiErrorEnvelope {
+    AiErrorEnvelope::new(
+        AiErrorCode::SignedOut,
+        "You signed out, so this answer was stopped.",
+    )
 }
 
 /// Meters a persisted turn and reads on after the browser leaves, so a background turn still pays.
@@ -6593,17 +6723,124 @@ mod tests {
         let mut held = Vec::new();
         for n in 0..caps.per_user {
             let turn_key = format!("t{n}");
-            let turn = register_ephemeral_turn("eph-org", None, &turn_key, &user, None);
+            let turn = register_ephemeral_turn("eph-org", None, &turn_key, &user, &user, None);
             held.push(turn.await.unwrap());
         }
-        let over = register_ephemeral_turn("eph-org", None, "t-over", &user, None).await;
+        let over = register_ephemeral_turn("eph-org", None, "t-over", &user, &user, None).await;
         let Err(refusal) = over else {
             panic!("a turn over the per-user cap was admitted");
         };
         assert_eq!(refusal.status(), StatusCode::TOO_MANY_REQUESTS);
         drop(held);
-        let again = register_ephemeral_turn("eph-org", None, "t-again", &user, None).await;
+        let again = register_ephemeral_turn("eph-org", None, "t-again", &user, &user, None).await;
         assert!(again.is_ok());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn saved_and_ephemeral_turns_of_a_member_share_one_budget() {
+        use o2_enterprise::enterprise::ai::chat::registry::{TurnCaps, TurnOwner};
+        use openobserve_core::ai_chat::admission::{TurnKey, register_turn};
+        let caps = TurnCaps::from_config();
+        if caps.per_user == 0 {
+            return;
+        }
+        let (email, owner) = (
+            format!("mix-{}@x", config::ider::uuid()),
+            config::ider::uuid(),
+        );
+        let mut held = Vec::new();
+        for n in 0..caps.per_user {
+            let session = uuid::Uuid::now_v7().to_string();
+            let turn_id = format!("saved-{n}");
+            let turn = TurnKey {
+                org_id: "mix-org",
+                session_id: &session,
+                turn_id: &turn_id,
+            };
+            let no_login = TurnOwner {
+                auth_session_id: None,
+                client_id: None,
+            };
+            held.push(
+                register_turn(turn, &email, &owner, no_login, caps)
+                    .await
+                    .unwrap(),
+            );
+        }
+        let principal = turn_principal(Ok(owner.clone()), &email).unwrap();
+        let over = register_ephemeral_turn("mix-org", None, "eph", &email, &principal, None).await;
+        let Err(refusal) = over else {
+            panic!("an ephemeral turn past the member's saved turns was admitted");
+        };
+        assert_eq!(refusal.status(), StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_member_without_a_users_row_is_counted_by_email_and_an_outage_refuses() {
+        use openobserve_core::ai_chat::admission::AdmitError;
+        assert_eq!(turn_principal(Ok("id-1".into()), "a@x").unwrap(), "id-1");
+        assert_eq!(
+            turn_principal(Err(AdmitError::NotRegistered), "a@x").unwrap(),
+            "a@x"
+        );
+        let refusal = turn_principal(Err(AdmitError::Unavailable("down")), "a@x").unwrap_err();
+        assert_eq!(refusal.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_signed_out_login_starts_no_ephemeral_turn() {
+        use o2_enterprise::enterprise::ai::chat::registry;
+        let login = format!("login-{}", config::ider::uuid());
+        registry::cancel_for_auth_session(&login);
+        let session = uuid::Uuid::now_v7().to_string();
+        let turn =
+            register_ephemeral_turn("so-org", Some(&session), "t1", "a@x", "a@x", Some(&login))
+                .await
+                .unwrap();
+        let refusal = refuse_if_signed_out(turn)
+            .err()
+            .expect("a signed-out turn was dispatched");
+        assert_eq!(refusal.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_sign_out_ends_a_streaming_ephemeral_turn_and_a_stop_does_not() {
+        use std::time::Duration;
+
+        use o2_enterprise::enterprise::ai::chat::{CancelReason, registry};
+        let login = format!("login-{}", config::ider::uuid());
+        let session = uuid::Uuid::now_v7().to_string();
+        let turn =
+            register_ephemeral_turn("so-org", Some(&session), "t1", "a@x", "a@x", Some(&login))
+                .await
+                .and_then(refuse_if_signed_out)
+                .unwrap();
+        let mut signal = turn.signal();
+        let wait = Duration::from_millis(50);
+        assert!(
+            tokio::time::timeout(wait, until_signed_out(Some(&mut signal)))
+                .await
+                .is_err()
+        );
+        registry::cancel("so-org", &session, CancelReason::User);
+        assert!(
+            tokio::time::timeout(wait, until_signed_out(Some(&mut signal)))
+                .await
+                .is_err()
+        );
+        registry::cancel_for_auth_session(&login);
+        let ended =
+            tokio::time::timeout(Duration::from_secs(1), until_signed_out(Some(&mut signal)));
+        assert!(ended.await.is_ok());
+        assert!(
+            tokio::time::timeout(wait, until_signed_out(None))
+                .await
+                .is_err()
+        );
     }
 
     #[cfg(feature = "enterprise")]
@@ -6617,9 +6854,10 @@ mod tests {
             Ok(StopTarget::Elsewhere)
         ));
         let session = uuid::Uuid::now_v7().to_string();
-        let _turn = register_ephemeral_turn("eph-org", Some(&session), "t1", "alice", None)
-            .await
-            .unwrap();
+        let _turn =
+            register_ephemeral_turn("eph-org", Some(&session), "t1", "alice", "alice", None)
+                .await
+                .unwrap();
         let running = o2_enterprise::enterprise::ai::chat::registry::turns("eph-org", &session);
         let running: Vec<(&str, &str)> = running
             .iter()

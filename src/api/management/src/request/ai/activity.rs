@@ -526,15 +526,18 @@ async fn vouched_for(action: &Recorded) -> bool {
 
 /// Whether a turn of the member runs the session on any node, so the header is not forged.
 async fn bound_to_turn(org_id: &str, origin: &Origin) -> bool {
-    runs_here(org_id, origin)
+    let owner = openobserve_core::ai_chat::admission::resolve_owner(&origin.user_email)
+        .await
+        .ok();
+    runs_here(org_id, origin, owner.as_deref())
         || super::turn_marks::turn_runs(org_id, &origin.session_id, &origin.user_email).await
 }
 
-/// This node's registry, which holds the direct path's turns by the member's email.
-fn runs_here(org_id: &str, origin: &Origin) -> bool {
+/// This node's registry: a direct turn is held by the member's email, an ephemeral one by its id.
+fn runs_here(org_id: &str, origin: &Origin, owner: Option<&str>) -> bool {
     registry::turns(org_id, &origin.session_id)
         .iter()
-        .any(|turn| turn.user_id == origin.user_email)
+        .any(|turn| turn.user_id == origin.user_email || Some(turn.user_id.as_str()) == owner)
 }
 
 /// The scope of the standing grant that let `action` run, preferring the one its approval names.
@@ -1374,13 +1377,18 @@ mod tests {
             turn_id: None,
             approval: None,
         };
-        assert!(!runs_here("o-bound", &origin("a@x")));
+        assert!(!runs_here("o-bound", &origin("a@x"), None));
         let turn = registry::register("o-bound", SESSION, "t1", "a@x", None);
-        assert!(runs_here("o-bound", &origin("a@x")));
-        assert!(!runs_here("o-bound", &origin("m@x")));
-        assert!(!runs_here("o-other", &origin("a@x")));
+        assert!(runs_here("o-bound", &origin("a@x"), None));
+        assert!(!runs_here("o-bound", &origin("m@x"), None));
+        assert!(!runs_here("o-other", &origin("a@x"), None));
         drop(turn);
-        assert!(!runs_here("o-bound", &origin("a@x")));
+        assert!(!runs_here("o-bound", &origin("a@x"), None));
+        // An ephemeral turn is held by the member id, which binds the member and no one else.
+        let turn = registry::register("o-bound", SESSION, "t2", "id-a", None);
+        assert!(runs_here("o-bound", &origin("a@x"), Some("id-a")));
+        assert!(!runs_here("o-bound", &origin("m@x"), Some("id-m")));
+        drop(turn);
     }
 
     #[tokio::test]
@@ -1389,7 +1397,7 @@ mod tests {
         approved.org_id = "o-approved".into();
         approved.origin.session_id = "0199e7b2-6f0c-7a3e-a1b2-c3d4e5f6bbbb".into();
         approved.approval_id = Some("apr_0123456789abcdef0123".into());
-        assert!(!runs_here(&approved.org_id, &approved.origin));
+        assert!(!runs_here(&approved.org_id, &approved.origin, None));
         assert!(vouched_for(&approved).await);
     }
 
