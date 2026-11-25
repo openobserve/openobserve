@@ -134,7 +134,7 @@ test("a changed file outside web/ picks the spec that imports it", () => {
 
 test("a changed code file outside web/ runs everything, since it can re-export other files", () => {
   const r = run({ "src/config/shared.ts": "export const s = 2;", "web/.prettierignore": "x" });
-  assert.equal(r.reason, "web/ imports a changed file outside web/: src/config/shared.ts");
+  assert.equal(r.reason, "web/src/utils/shared.spec.ts imports a changed file outside web/: src/config/shared.ts");
 });
 
 test("a glob over files outside web/ runs everything when an outside file changes", () => {
@@ -143,7 +143,29 @@ test("a glob over files outside web/ runs everything when an outside file change
   const b2 = commit();
   write({ "src/config/parity.json": `{"b":1}`, "web/.prettierignore": "y" });
   const r = select({ repo, base: b2, head: commit() });
-  assert.equal(r.reason, `src/utils/cat.spec.ts globs files outside web/: ../../../src/config/*.json`);
+  assert.equal(r.reason, `web/src/utils/cat.spec.ts globs files outside web/: ../../../src/config/*.json`);
+});
+
+test("globs with ? or [...] over files outside web/ run everything", () => {
+  for (const pat of ["?.json", "[ab].json"]) {
+    git("checkout", "-q", base);
+    write({ "web/src/utils/cat.spec.ts": `const all = import.meta.glob("../../../src/config/${pat}");` });
+    const b2 = commit();
+    write({ "src/config/parity.json": `{"c":1}`, "web/.prettierignore": pat });
+    assert.equal(select({ repo, base: b2, head: commit() }).mode, "full", pat);
+  }
+});
+
+test("outside JSON re-exported by unchanged outside code runs everything", () => {
+  git("checkout", "-q", base);
+  write({
+    "src/config/bridge.ts": `export { default } from "./parity.json";`,
+    "web/src/utils/bridge.spec.ts": `import b from "../../../src/config/bridge";`,
+  });
+  const b2 = commit();
+  write({ "src/config/parity.json": `{"d":1}`, "web/.prettierignore": "z" });
+  const r = select({ repo, base: b2, head: commit() });
+  assert.equal(r.reason, "src/config/bridge.ts imports a changed file outside web/: src/config/parity.json");
 });
 
 test("a template-literal import of a changed file outside web/ picks its importer", () => {
