@@ -34,7 +34,7 @@ pub use timestamp_selected::is_timestamp_selected;
 pub use visitors::TimestampVisitor;
 pub use where_fragment::{validate_optional_where_fragment, validate_where_fragment};
 
-pub const AGGREGATE_UDF_LIST: [&str; 19] = [
+pub const AGGREGATE_UDF_LIST: [&str; 51] = [
     "min",
     "max",
     "avg",
@@ -54,6 +54,38 @@ pub const AGGREGATE_UDF_LIST: [&str; 19] = [
     "approx_topk_distinct",
     "sequence_depth",
     "sequence_step_times",
+    "any_value",
+    "covar_samp",
+    "covar",
+    "covar_pop",
+    "corr",
+    "regr_slope",
+    "regr_intercept",
+    "regr_count",
+    "regr_r2",
+    "regr_avgx",
+    "regr_avgy",
+    "regr_sxx",
+    "regr_syy",
+    "regr_sxy",
+    "var",
+    "var_sample",
+    "var_samp",
+    "var_pop",
+    "var_population",
+    "stddev",
+    "stddev_samp",
+    "stddev_pop",
+    "quantile_cont",
+    "string_agg",
+    "bit_and",
+    "bit_or",
+    "bit_xor",
+    "bool_and",
+    "bool_or",
+    "mean",
+    "grouping",
+    "nth_value",
 ];
 
 pub fn quote_identifier(value: &str) -> String {

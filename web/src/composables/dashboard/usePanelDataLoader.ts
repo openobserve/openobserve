@@ -83,6 +83,7 @@ export const usePanelDataLoader = (
   regionClusterParams?: any,
   allowAnnotationsAPI?: any,
   injectedPromqlData?: any,
+  onLoadEndedWithoutFetch?: (shown: boolean) => void,
 ) => {
   const PANEL_DATA_LOADER_DEBUG = false;
   const log = (...args: any[]) => {
@@ -421,6 +422,8 @@ export const usePanelDataLoader = (
 
   const loadData = async () => {
     const loadCall = ++latestLoadCall;
+    let fetched = false;
+    let shown = false;
     failedRefreshHold.loadScheduled();
     log("[usePanelDataLoader] " + panelSchema?.value?.title + ": loadData() PROCEEDING");
 
@@ -464,6 +467,7 @@ export const usePanelDataLoader = (
         state.annotations = [];
         state.errorDetail = injectedPromqlData.value.errorDetail ?? { message: "", code: "" };
         runCount++;
+        shown = true;
         return;
       }
 
@@ -512,6 +516,7 @@ export const usePanelDataLoader = (
           log("loadData: panelcache: restored from cache");
           failedRefreshHold.loadRestored();
           runCount++;
+          shown = true;
           if (!refreshAfterRestore.queueRefresh()) return;
         }
       }
@@ -559,6 +564,7 @@ export const usePanelDataLoader = (
 
       refreshAfterRestore.holdIfQueued();
       failedRefreshHold.loadStarted();
+      fetched = true;
       state.loading = true;
       state.isCachedDataDifferWithCurrentTimeRange = false;
 
@@ -586,6 +592,9 @@ export const usePanelDataLoader = (
     } finally {
       // Covers every early return: a call that was not superseded and left nothing running has its answer.
       if (loadCall === latestLoadCall && !state.loading) settleLoad();
+      // A superseded call hands its answer to the newer one, which reports for itself.
+      if (loadCall === latestLoadCall && !fetched)
+        onLoadEndedWithoutFetch?.(shown && !state.errorDetail?.message);
     }
   };
 

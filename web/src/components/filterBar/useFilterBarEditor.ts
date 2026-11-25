@@ -670,6 +670,14 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     if (multiValue.value && draft.value?.values.length) commitDraft();
   }
 
+  /** Applies what a half-built chip already holds, so leaving the bar never drops a filter unseen. */
+  function commitPending() {
+    if (editingId.value || !draft.value?.operator) return;
+    const typed = step.value === "value" ? text.value.trim() : "";
+    if (typed && (!multiValue.value || !draft.value.values.includes(typed))) addValue(typed);
+    if (draft.value) commitDraft();
+  }
+
   function onSeparator() {
     const typed = text.value.trim();
     if (step.value === "value" && multiValue.value && typed && acceptsTyped(typed)) addValue(typed);
@@ -1049,6 +1057,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     onEnter,
     onSeparator,
     applyValues,
+    commitPending,
     onTextChange,
     onBackspace,
     onDelete,

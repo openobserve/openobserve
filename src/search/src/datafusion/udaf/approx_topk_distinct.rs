@@ -114,7 +114,7 @@ impl AggregateUDFImpl for ApproxTopKDistinct {
         APPROX_TOPK_DISTINCT
     }
 
-    fn signature(&self) -> &datafusion::logical_expr::Signature {
+    fn signature(&self) -> &Signature {
         &self.0
     }
 
@@ -596,7 +596,10 @@ impl Accumulator for ApproxTopKDistinctAccumulator {
 #[cfg(test)]
 mod tests {
     use arrow::array::StringArray;
-    use datafusion::{datasource::MemTable, logical_expr::AggregateUDF, prelude::SessionContext};
+    use datafusion::{
+        datasource::MemTable, logical_expr::AggregateUDF, physical_expr::expressions::Literal,
+        prelude::SessionContext,
+    };
 
     use super::*;
 
@@ -686,19 +689,17 @@ mod tests {
 
     #[test]
     fn test_validate_k_parameter_rejects_huge_value() {
-        let expr: Arc<dyn PhysicalExpr> =
-            Arc::new(datafusion::physical_expr::expressions::Literal::new(
-                ScalarValue::Int64(Some(2_500_000_000_000_000)),
-            ));
+        let expr: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Int64(Some(
+            2_500_000_000_000_000,
+        ))));
         assert!(validate_k_parameter(&expr).is_err());
     }
 
     #[test]
     fn test_validate_cap_parameter_rejects_huge_value() {
-        let expr: Arc<dyn PhysicalExpr> =
-            Arc::new(datafusion::physical_expr::expressions::Literal::new(
-                ScalarValue::Int64(Some(2_500_000_000_000_000)),
-            ));
+        let expr: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Int64(Some(
+            2_500_000_000_000_000,
+        ))));
         assert!(validate_cap_parameter(&expr).is_err());
     }
 

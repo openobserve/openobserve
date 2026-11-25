@@ -715,6 +715,7 @@ export default defineComponent({
     "update:initialVariableValues",
     "updated:vrlFunctionFieldList",
     "loading-state-change",
+    "load-ended-without-fetch",
     "limit-number-of-series-warning-message-update",
     "series-limit-update",
     "region-join-update",
@@ -975,6 +976,7 @@ export default defineComponent({
       regionClusterParams,
       allowAnnotationsAPI,
       injectedPromqlData,
+      (shown: boolean) => emit("load-ended-without-fetch", shown),
     );
 
     // Html, markdown and the alert list render without a query, so they never wait on one.

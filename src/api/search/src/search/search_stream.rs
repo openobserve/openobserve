@@ -439,12 +439,7 @@ pub async fn search_http2_stream(
 
     #[cfg(feature = "enterprise")]
     // Check permissions for each stream
-    let permission_resource_type =
-        if req.search_type == Some(config::meta::search::SearchEventType::Insights) {
-            StreamPermissionResourceType::Insights
-        } else {
-            StreamPermissionResourceType::Search
-        };
+    let permission_resource_type = stream_resource_type(req.search_type, extract_patterns);
 
     #[cfg(not(feature = "enterprise"))]
     if let Some(res) = crate::search::digest_query_refusal(&req.query.sql, stream_type, &trace_id) {
@@ -498,6 +493,33 @@ pub async fn search_http2_stream(
             trace_id,
             res.status().into(),
             Some("Unauthorized Access to key".to_string()),
+            "POST".to_string(),
+            format!("/api/{}/_search_stream", org_id),
+            query
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&"),
+            body_bytes,
+        )
+        .await;
+        return res;
+    }
+
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = crate::search::check_query_fn_permissions(
+        &org_id,
+        &user_id,
+        req.query.query_fn.as_deref().as_slice(),
+    )
+    .await
+    {
+        report_to_audit(
+            user_id,
+            org_id.clone(),
+            trace_id,
+            res.status().into(),
+            Some("Unauthorized Access".to_string()),
             "POST".to_string(),
             format!("/api/{}/_search_stream", org_id),
             query
@@ -918,6 +940,32 @@ pub async fn values_http2_stream(
         .await;
         return res;
     }
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = crate::search::check_query_fn_permissions(
+        &org_id,
+        &user_id,
+        values_req.vrl_fn.as_deref().as_slice(),
+    )
+    .await
+    {
+        report_to_audit(
+            user_id,
+            org_id.clone(),
+            trace_id,
+            res.status().into(),
+            Some("Unauthorized Access".to_string()),
+            "POST".to_string(),
+            format!("/api/{}/_values_stream", org_id),
+            query
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&"),
+            body_bytes.clone(),
+        )
+        .await;
+        return res;
+    }
 
     // Create a channel for streaming results
     let (tx, rx) =
@@ -1049,6 +1097,21 @@ async fn with_suggestion_source(
     Err((err, suggest_from))
 }
 
+/// The permission a stream search needs; Patterns and Insights have their own grants. [pure]
+#[cfg(feature = "enterprise")]
+fn stream_resource_type(
+    search_type: Option<config::meta::search::SearchEventType>,
+    extract_patterns: bool,
+) -> StreamPermissionResourceType {
+    use config::meta::search::SearchEventType::Insights;
+
+    match (extract_patterns, search_type) {
+        (true, _) => StreamPermissionResourceType::PatternExtract,
+        (false, Some(Insights)) => StreamPermissionResourceType::Insights,
+        (false, _) => StreamPermissionResourceType::Search,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use axum::{
@@ -1135,5 +1198,30 @@ mod tests {
         )
         .await;
         assert_protected(resp).await;
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_stream_resource_type_follows_the_feature_run() {
+        use config::meta::search::SearchEventType::{Insights, UI};
+
+        use super::{StreamPermissionResourceType as R, stream_resource_type};
+
+        let cases = [
+            (None, false, "search"),
+            (Some(UI), false, "search"),
+            (Some(Insights), false, "insights"),
+            (None, true, "patterns"),
+            (Some(UI), true, "patterns"),
+            (Some(Insights), true, "patterns"),
+        ];
+        for (search_type, extract_patterns, expected) in cases {
+            let got = match stream_resource_type(search_type, extract_patterns) {
+                R::Search => "search",
+                R::Insights => "insights",
+                R::PatternExtract => "patterns",
+            };
+            assert_eq!(got, expected, "{search_type:?} patterns={extract_patterns}");
+        }
     }
 }

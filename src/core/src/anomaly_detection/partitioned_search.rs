@@ -32,8 +32,8 @@ use search::sql::visitor::histogram_interval::validate_and_adjust_histogram_inte
 use sqlparser::{
     ast::{
         BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, GroupByExpr, Ident,
-        ObjectNamePart, Query, Select, SelectFlavor, SelectItem, SetExpr, Statement, TableFactor,
-        Value, visit_expressions,
+        ObjectName, ObjectNamePart, Query, Select, SelectFlavor, SelectItem, SetExpr, Statement,
+        TableFactor, Value, visit_expressions,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
@@ -933,7 +933,7 @@ fn check_row_local(statement: &Statement) -> Result<(), String> {
 }
 
 /// The lowercased last part of a function name, so `pg_catalog.now` and `NOW` read the same.
-fn function_name(name: &sqlparser::ast::ObjectName) -> Option<String> {
+fn function_name(name: &ObjectName) -> Option<String> {
     match name.0.last()? {
         ObjectNamePart::Identifier(ident) => Some(ident.value.to_ascii_lowercase()),
         _ => None,

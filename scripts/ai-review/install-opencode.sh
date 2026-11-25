@@ -9,9 +9,16 @@ dest="${1:?usage: install-opencode.sh <install-dir>}"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-url="https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-linux-x64.tar.gz"
+# Linux aarch64 (the o2o container on Apple silicon) has its own asset and digest; everything else stays on x64.
+asset="opencode-linux-x64.tar.gz"
+sha256="$OPENCODE_SHA256"
+if [ "$(uname -s)" = "Linux" ] && { [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; }; then
+  asset="opencode-linux-arm64.tar.gz"
+  sha256="$OPENCODE_SHA256_ARM64"
+fi
+url="https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/${asset}"
 curl -fsSL --retry 3 --retry-all-errors -o "$tmp/opencode.tar.gz" "$url"
-echo "${OPENCODE_SHA256}  $tmp/opencode.tar.gz" | sha256sum --check --strict -
+echo "${sha256}  $tmp/opencode.tar.gz" | sha256sum --check --strict -
 
 mkdir -p "$dest"
 tar -xzf "$tmp/opencode.tar.gz" -C "$dest" opencode

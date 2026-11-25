@@ -761,6 +761,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                     </div>
                   </div>
+                  <div
+                    v-if="tab !== 'promql'"
+                    data-test="scheduled-pipeline-row-limit-note"
+                    class="text-accent px-2 py-0.5 text-xs leading-3"
+                  >
+                    {{ rowLimitNote }}
+                  </div>
 
                   <div>
                     <span @click.stop="expandState.output = !expandState.output">
@@ -1313,6 +1320,13 @@ const fieldValuesTimeRange: Ref<Record<string, { start_time: number; end_time: n
 const defaultValuesCount = computed(() => store.state.zoConfig?.query_values_default_num || 10);
 
 const showFtsFieldValues = computed(() => store.state.zoConfig?.showFtsFieldValues ?? false);
+
+const rowLimitNote = computed(() => {
+  const limit = store.state.zoConfig?.query_default_limit;
+  return limit
+    ? t("pipeline.queryRowLimitNote", { limit })
+    : t("pipeline.queryRowLimitNoteNoLimit");
+});
 
 const tabOptions = computed(() => [
   {

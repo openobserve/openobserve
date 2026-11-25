@@ -52,7 +52,7 @@ pub mod organization;
 pub mod password_policy;
 pub mod pipeline_errors;
 pub mod prompt_settings;
-#[cfg(feature = "vectorscan")]
+#[cfg(feature = "enterprise")]
 pub mod re_pattern;
 pub mod resources;
 pub mod saved_view;

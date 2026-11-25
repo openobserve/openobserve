@@ -223,7 +223,7 @@ pub fn validate_and_adjust_histogram_interval(
 #[cfg(test)]
 mod tests {
 
-    use sqlparser::{ast::VisitMut, dialect::GenericDialect};
+    use sqlparser::{ast::VisitMut, dialect::GenericDialect, parser::Parser};
 
     use super::*;
 
@@ -459,7 +459,7 @@ mod tests {
     fn test_histogram_interval_visitor() {
         // Test with time range and histogram function
         let sql = "SELECT histogram(_timestamp, '10 second') FROM logs";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -476,7 +476,7 @@ mod tests {
     fn test_histogram_interval_visitor_with_zero_time_range() {
         // Test with zero time range
         let sql = "SELECT histogram(_timestamp) FROM logs";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -493,7 +493,7 @@ mod tests {
     fn test_histogram_interval_visitor_numeric_interval_sets_error() {
         // Numeric interval (like 123) is invalid — visitor must set an error
         let sql = "SELECT histogram(_timestamp, 123) FROM logs";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -569,7 +569,7 @@ mod tests {
         let sql = "SELECT histogram(_timestamp) FROM logs";
 
         let parse = |sql: &str| {
-            sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            Parser::parse_sql(&GenericDialect {}, sql)
                 .unwrap()
                 .pop()
                 .unwrap()
@@ -632,7 +632,7 @@ mod tests {
         let sql = "SELECT histogram(_timestamp) FROM logs";
 
         let parse = |sql: &str| {
-            sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            Parser::parse_sql(&GenericDialect {}, sql)
                 .unwrap()
                 .pop()
                 .unwrap()

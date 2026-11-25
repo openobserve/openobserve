@@ -42,6 +42,7 @@ pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 pub const PIPELINE_EXEC_FAILED: &str = "pipeline_execution_failed";
 pub const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
+pub const STREAM_BEING_DELETED: &str = "stream_being_deleted";
 pub const ACTION_PARSE_FAILED: &str = "action_parse_failed";
 
 /// Request positions of one stream's `_bulk` actions, kept beside its records.
@@ -340,7 +341,7 @@ async fn ingest_with_blocked_streams(
     }
 
     // Checked up front, pipeline destinations included: a whole-request 503 is retried safely.
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     {
         let streams: Vec<(&str, u64)> = streams_data
             .iter()
@@ -358,7 +359,7 @@ async fn ingest_with_blocked_streams(
     }
 
     // process data by stream
-    #[cfg(feature = "vectorscan")]
+    #[cfg(feature = "enterprise")]
     let mut written_any = false;
     for (stream_name, records) in streams_data {
         // Every buffered row initialized its stream plan before parsing.
@@ -376,7 +377,7 @@ async fn ingest_with_blocked_streams(
         .await
         {
             Ok(v) => {
-                #[cfg(feature = "vectorscan")]
+                #[cfg(feature = "enterprise")]
                 {
                     written_any = true;
                 }
@@ -393,7 +394,7 @@ async fn ingest_with_blocked_streams(
             Err(e) => {
                 log::error!("[LOGS:BULK] stream {org_id}/logs/{stream_name}: Ingestion error: {e}");
                 // Once a group is written, a whole-request retry would duplicate it: 503 per item.
-                #[cfg(feature = "vectorscan")]
+                #[cfg(feature = "enterprise")]
                 if crate::ingestion::is_sdr_fail_closed_refusal(&e) {
                     if !written_any {
                         return Err(e);
@@ -799,7 +800,7 @@ mod tests {
             ingest(0, org, Bytes::from(warm), user.clone())
                 .await
                 .unwrap();
-            #[cfg(not(feature = "vectorscan"))]
+            #[cfg(not(feature = "enterprise"))]
             assert!(
                 super::super::ingest::plan_bulk_columnar(org, &allowed, (0, i64::MAX))
                     .await

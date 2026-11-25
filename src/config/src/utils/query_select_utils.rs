@@ -17,10 +17,12 @@ use std::ops::ControlFlow;
 
 use sqlparser::{
     ast::{
-        Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList, FunctionArguments,
-        Ident, ObjectName, ObjectNamePart, Query, Select, SetExpr, Statement, TableFactor, Value,
-        ValueWithSpan, VisitorMut,
+        BinaryOperator, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList,
+        FunctionArguments, Ident, ObjectName, ObjectNamePart, Query, Select, SetExpr, Statement,
+        TableFactor, Value, ValueWithSpan, VisitorMut,
     },
+    dialect::GenericDialect,
+    parser::Parser,
     tokenizer::Span,
 };
 
@@ -152,7 +154,7 @@ impl VisitorMut for StringMatchReplacer {
             }
             Expr::BinaryOp { left, right, op } => {
                 // Handle equality expressions
-                if matches!(op, sqlparser::ast::BinaryOperator::Eq)
+                if matches!(op, BinaryOperator::Eq)
                     && let Some(replacement) = self.process_equality_expression(left, right)
                 {
                     *expr = replacement;
@@ -298,8 +300,6 @@ pub fn replace_o2_custom_patterns(sql: &str) -> Result<String, String> {
     if !sql.contains(O2_CUSTOM_SUFFIX) {
         return Ok(sql.to_string());
     }
-    use sqlparser::{dialect::GenericDialect, parser::Parser};
-
     let dialect = GenericDialect {};
     let mut statements =
         Parser::parse_sql(&dialect, sql).map_err(|e| format!("Parse error: {e}"))?;
@@ -327,11 +327,7 @@ pub fn replace_o2_custom_patterns(sql: &str) -> Result<String, String> {
 
 /// Like `replace_o2_custom_patterns` but also returns the parsed AST so callers
 /// can run additional visitors without a second `Parser::parse_sql` call.
-pub fn parse_and_replace_o2_custom_patterns(
-    sql: &str,
-) -> Result<(String, Vec<sqlparser::ast::Statement>), String> {
-    use sqlparser::{dialect::GenericDialect, parser::Parser};
-
+pub fn parse_and_replace_o2_custom_patterns(sql: &str) -> Result<(String, Vec<Statement>), String> {
     let mut statements =
         Parser::parse_sql(&GenericDialect {}, sql).map_err(|e| format!("Parse error: {e}"))?;
 
